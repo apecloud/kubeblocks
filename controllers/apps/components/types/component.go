@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"context"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,11 +31,11 @@ import (
 type Component interface {
 	// IsRunning when relevant k8s workloads changes, it checks whether the component is running.
 	// you can also reconcile the pods of component till the component is Running here.
-	IsRunning(obj client.Object) (bool, error)
+	IsRunning(ctx context.Context, obj client.Object) (bool, error)
 
 	// PodsReady checks whether all pods of the component are ready.
 	// it means the pods are available in StatefulSet or Deployment.
-	PodsReady(obj client.Object) (bool, error)
+	PodsReady(ctx context.Context, obj client.Object) (bool, error)
 
 	// PodIsAvailable checks whether a pod of the component is available.
 	// if the component is Stateless/StatefulSet, the available conditions follows as:
@@ -47,14 +48,14 @@ type Component interface {
 	// we should handle the component phase when the role probe timeout and return a bool.
 	// if return true, means probe is not timing out and need to requeue after an interval time to handle probe timeout again.
 	// else return false, means probe has timed out and needs to update the component phase to Failed or Abnormal.
-	HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error)
+	HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error)
 
 	// GetPhaseWhenPodsNotReady when the pods of component are not ready, calculate the component phase is Failed or Abnormal.
 	// if return an empty phase, means the pods of component are ready and skips it.
-	GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error)
+	GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.Phase, error)
 
 	// HandleUpdate handles component updating when basic workloads of the components are updated
-	HandleUpdate(obj client.Object) error
+	HandleUpdate(ctx context.Context, obj client.Object) error
 }
 
 const (

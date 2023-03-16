@@ -1,6 +1,8 @@
-## kbcli addon list
+---
+title: kbcli addon list
+---
 
-List addons
+List addons.
 
 ```
 kbcli addon list  [flags]
@@ -42,5 +44,7 @@ kbcli addon list  [flags]
 
 ### SEE ALSO
 
-* [kbcli addon](kbcli_addon.md)	 - Addon command
+* [kbcli addon](kbcli_addon.md)	 - Addon command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -21,12 +21,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("helper", func() {
@@ -37,32 +36,6 @@ var _ = Describe("helper", func() {
 		Expect(len(infos) == 1).Should(BeTrue())
 	})
 
-	It("Get type from pod", func() {
-		mockPod := func(name string) *corev1.Pod {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "foo",
-					Namespace:       "test",
-					ResourceVersion: "10",
-					Labels: map[string]string{
-						intctrlutil.AppNameLabelKey: name,
-					},
-				},
-			}
-			return pod
-		}
-
-		pod := mockPod("mysql-apecloud-mysql")
-		compDefName, err := GetClusterTypeByPod(pod)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(compDefName).Should(Equal("mysql"))
-
-		pod = mockPod("")
-		compDefName, err = GetClusterTypeByPod(pod)
-		Expect(err).Should(HaveOccurred())
-		Expect(compDefName).Should(Equal(""))
-	})
-
 	It("find component in cluster by name", func() {
 		cluster := testing.FakeCluster("test", "test")
 		component := FindClusterComp(cluster, "test")
@@ -70,26 +43,6 @@ var _ = Describe("helper", func() {
 
 		component = FindClusterComp(cluster, testing.ComponentDefName)
 		Expect(component).ShouldNot(BeNil())
-	})
-
-	It("get all clusters", func() {
-		cluster := testing.FakeCluster("test", "test")
-		dynamic := testing.FakeDynamicClient(cluster)
-		clusters := &appsv1alpha1.ClusterList{}
-
-		By("get clusters from specified namespace")
-		Expect(GetAllCluster(dynamic, "test", clusters)).ShouldNot(HaveOccurred())
-		Expect(len(clusters.Items)).Should(Equal(1))
-
-		By("get clusters from nonexistent namespace")
-		Expect(GetAllCluster(dynamic, "nonexistent", clusters)).ShouldNot(HaveOccurred())
-		Expect(len(clusters.Items)).Should(Equal(0))
-
-		By("get clusters from all namespace")
-		anotherCluster := testing.FakeCluster("test", "test1")
-		dynamic = testing.FakeDynamicClient(cluster, anotherCluster)
-		Expect(GetAllCluster(dynamic, "", clusters)).ShouldNot(HaveOccurred())
-		Expect(len(clusters.Items)).Should(Equal(2))
 	})
 
 	It("get cluster endpoints", func() {
@@ -135,7 +88,7 @@ var _ = Describe("helper", func() {
 		genVersion := func(name string, t time.Time) appsv1alpha1.ClusterVersion {
 			v := appsv1alpha1.ClusterVersion{}
 			v.Name = name
-			v.SetLabels(map[string]string{intctrlutil.ClusterDefLabelKey: clusterDefName})
+			v.SetLabels(map[string]string{constant.ClusterDefLabelKey: clusterDefName})
 			v.SetCreationTimestamp(metav1.NewTime(t))
 			return v
 		}

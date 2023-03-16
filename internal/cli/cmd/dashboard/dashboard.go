@@ -57,21 +57,25 @@ type dashboard struct {
 }
 
 var (
+	// we do not use the default port to port-forward to avoid conflict with other services
 	dashboards = [...]*dashboard{
 		{
-			Name:      "kubeblocks-grafana",
-			AddonName: "kb-addon-grafana",
-			Label:     "app.kubernetes.io/instance=kb-addon-grafana,app.kubernetes.io/name=grafana",
+			Name:       "kubeblocks-grafana",
+			AddonName:  "kb-addon-grafana",
+			Label:      "app.kubernetes.io/instance=kb-addon-grafana,app.kubernetes.io/name=grafana",
+			TargetPort: "13000",
 		},
 		{
-			Name:      "kubeblocks-prometheus-alertmanager",
-			AddonName: "kb-addon-prometheus-alertmanager",
-			Label:     "app=prometheus,component=alertmanager,release=kb-addon-prometheus",
+			Name:       "kubeblocks-prometheus-alertmanager",
+			AddonName:  "kb-addon-prometheus-alertmanager",
+			Label:      "app=prometheus,component=alertmanager,release=kb-addon-prometheus",
+			TargetPort: "19093",
 		},
 		{
-			Name:      "kubeblocks-prometheus-server",
-			AddonName: "kb-addon-prometheus-server",
-			Label:     "app=prometheus,component=server,release=kb-addon-prometheus",
+			Name:       "kubeblocks-prometheus-server",
+			AddonName:  "kb-addon-prometheus-server",
+			Label:      "app=prometheus,component=server,release=kb-addon-prometheus",
+			TargetPort: "19090",
 		},
 	}
 )
@@ -93,7 +97,7 @@ func newListOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *lis
 func NewDashboardCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dashboard",
-		Short: "List and open the KubeBlocks dashboards",
+		Short: "List and open the KubeBlocks dashboards.",
 	}
 
 	// add subcommands
@@ -109,7 +113,7 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := newListOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all dashboards",
+		Short: "List all dashboards.",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete())
@@ -170,7 +174,7 @@ func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := newOpenOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:   "open",
-		Short: "Open one dashboard",
+		Short: "Open one dashboard.",
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			var names []string
 			for _, d := range dashboards {
@@ -277,7 +281,9 @@ func getDashboardInfo(client *kubernetes.Clientset) error {
 		d.CreationTime = util.TimeFormat(&svc.CreationTimestamp)
 		if len(svc.Spec.Ports) > 0 {
 			d.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)
-			d.TargetPort = svc.Spec.Ports[0].TargetPort.String()
+			if d.TargetPort == "" {
+				d.TargetPort = svc.Spec.Ports[0].TargetPort.String()
+			}
 		}
 	}
 	return nil

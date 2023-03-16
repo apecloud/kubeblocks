@@ -15,6 +15,7 @@
 options: {
 	name:           string
 	namespace:      string
+	mgrNamespace:   string
 	cluster:        string
 	schedule:       string
 	backupType:     string
@@ -27,7 +28,9 @@ cronjob: {
 	kind:       "CronJob"
 	metadata: {
 		name:      options.name
-		namespace: options.namespace
+		namespace: options.mgrNamespace
+		annotations:
+			"kubeblocks.io/backup-namespace": options.namespace
 		labels:
 			"app.kubernetes.io/managed-by": "kubeblocks"
 	}
@@ -58,7 +61,7 @@ metadata:
     dataprotection.kubeblocks.io/backup-type: \(options.backupType)
     dataprotection.kubeblocks.io/autobackup: "true"
   name: backup-\(options.namespace)-\(options.cluster)-$(date -u +'%Y%m%d%H%M%S')
-  namespace: default
+  namespace: \(options.namespace)
 spec:
   backupPolicyName: \(options.name)
   backupType: \(options.backupType)

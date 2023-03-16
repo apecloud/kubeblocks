@@ -101,6 +101,7 @@ spec:
                     - dotenv
                     - toml
                     - properties
+                    - redis
                     type: string
                   iniConfig:
                     description: iniConfig represents the ini options.

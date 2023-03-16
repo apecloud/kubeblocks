@@ -43,7 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type reconfigureOptions struct {
@@ -61,7 +61,7 @@ type reconfigureOptions struct {
 	keys       []string
 	showDetail bool
 	// for cache
-	tpls []appsv1alpha1.ConfigTemplate
+	tpls []appsv1alpha1.ComponentConfigSpec
 }
 
 type opsRequestDiffOptions struct {
@@ -147,7 +147,7 @@ func (r *reconfigureOptions) validate() error {
 	return nil
 }
 
-func (r *reconfigureOptions) findTemplateByName(tplName string) (*appsv1alpha1.ConfigTemplate, error) {
+func (r *reconfigureOptions) findTemplateByName(tplName string) (*appsv1alpha1.ComponentConfigSpec, error) {
 	if err := r.syncComponentCfgTpl(); err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (r *reconfigureOptions) complete2(args []string) error {
 
 	// for explain
 	for _, tpl := range r.tpls {
-		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
 			templateNames = append(templateNames, tpl.Name)
 		}
 	}
@@ -338,7 +338,7 @@ func (r *reconfigureOptions) printConfigureHistory() error {
 	// filter reconfigure
 	// kubernetes not support fieldSelector with CRD: https://github.com/kubernetes/kubernetes/issues/51046
 	listOptions := metav1.ListOptions{
-		LabelSelector: strings.Join([]string{intctrlutil.AppInstanceLabelKey, r.clusterName}, "="),
+		LabelSelector: strings.Join([]string{constant.AppInstanceLabelKey, r.clusterName}, "="),
 	}
 
 	opsList, err := r.dynamic.Resource(types.OpsGVR()).Namespace(r.namespace).List(context.TODO(), listOptions)
@@ -591,7 +591,7 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *appsv1alpha1.OpsRequest, d
 		if len(labels) == 0 {
 			return ""
 		}
-		return labels[intctrlutil.AppInstanceLabelKey]
+		return labels[constant.AppInstanceLabelKey]
 	}
 	getComponentName := func(ops appsv1alpha1.OpsRequestSpec) string {
 		return ops.Reconfigure.ComponentName
@@ -626,7 +626,7 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *appsv1alpha1.OpsRequest, d
 
 func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.VisualizedParam, error) {
 	var (
-		tpl              *appsv1alpha1.ConfigTemplate
+		tpl              *appsv1alpha1.ComponentConfigSpec
 		configConstraint = &appsv1alpha1.ConfigConstraint{}
 	)
 
@@ -770,7 +770,7 @@ func getValidUpdatedParams(status appsv1alpha1.OpsRequestStatus) string {
 	return string(b)
 }
 
-func findTplByName(tpls []appsv1alpha1.ConfigTemplate, tplName string) *appsv1alpha1.ConfigTemplate {
+func findTplByName(tpls []appsv1alpha1.ComponentConfigSpec, tplName string) *appsv1alpha1.ComponentConfigSpec {
 	for i := range tpls {
 		tpl := &tpls[i]
 		if tpl.Name == tplName {
@@ -804,7 +804,7 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 	}
 	cmd := &cobra.Command{
 		Use:               "describe-configure",
-		Short:             "Show details of a specific reconfiguring",
+		Short:             "Show details of a specific reconfiguring.",
 		Example:           describeReconfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -829,7 +829,7 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 	}
 	cmd := &cobra.Command{
 		Use:               "explain-configure",
-		Short:             "List the constraint for supported configuration params",
+		Short:             "List the constraint for supported configuration params.",
 		Example:           explainReconfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -850,7 +850,7 @@ func NewDiffConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	o := &opsRequestDiffOptions{baseOptions: newDescribeOpsOptions(f, streams)}
 	cmd := &cobra.Command{
 		Use:               "diff-configure",
-		Short:             "Show the difference in parameters between the two submitted OpsRequest",
+		Short:             "Show the difference in parameters between the two submitted OpsRequest.",
 		Example:           diffConfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {

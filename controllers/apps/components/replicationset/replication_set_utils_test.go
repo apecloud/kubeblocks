@@ -25,9 +25,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -59,8 +62,8 @@ var _ = Describe("ReplicationSet Util", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -123,7 +126,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		}
 
 		By("Test ReplicationSet pod number of sts equals 1")
-		_, err = GetAndCheckReplicationPodByStatefulSet(ctx, k8sClient, stsList[0])
+		_, err = getAndCheckReplicationPodByStatefulSet(ctx, k8sClient, stsList[0])
 		Expect(err).Should(Succeed())
 
 		By("Test handleReplicationSet success when stsList count equal cluster.replicas.")
@@ -133,13 +136,13 @@ var _ = Describe("ReplicationSet Util", func() {
 		By("Test handleReplicationSet scale-in return err when remove Finalizer after delete the sts")
 		clusterObj.Spec.ComponentSpecs[0].Replicas = testapps.DefaultReplicationReplicas - 1
 		Expect(HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)).Should(Succeed())
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.StatefulSetSignature,
+		Eventually(testapps.GetListLen(&testCtx, generics.StatefulSetSignature,
 			client.InNamespace(testCtx.DefaultNamespace))).Should(Equal(1))
 
 		By("Test handleReplicationSet scale replicas to 0")
 		clusterObj.Spec.ComponentSpecs[0].Replicas = 0
 		Expect(HandleReplicationSet(ctx, k8sClient, clusterObj, stsList[:1])).Should(Succeed())
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.StatefulSetSignature, client.InNamespace(testCtx.DefaultNamespace))).Should(Equal(0))
+		Eventually(testapps.GetListLen(&testCtx, generics.StatefulSetSignature, client.InNamespace(testCtx.DefaultNamespace))).Should(Equal(0))
 		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.StoppedPhase))
 	}
 
@@ -229,6 +232,78 @@ var _ = Describe("ReplicationSet Util", func() {
 		}
 	}
 
+	testHandleReplicationSetRoleChangeEvent := func() {
+		By("Creating a cluster with replication workloadType.")
+		clusterSwitchPolicy := &appsv1alpha1.ClusterSwitchPolicy{
+			Type: appsv1alpha1.Noop,
+		}
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
+			SetReplicas(testapps.DefaultReplicationReplicas).
+			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
+			SetSwitchPolicy(clusterSwitchPolicy).
+			Create(&testCtx).GetObject()
+
+		By("Creating a statefulSet of replication workloadType.")
+		container := corev1.Container{
+			Name:            "mock-redis-container",
+			Image:           testapps.DefaultRedisImageName,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+		}
+		stsList := make([]*appsv1.StatefulSet, 0)
+		secondaryName := clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-1"
+		for k, v := range map[string]string{
+			string(Primary):   clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-0",
+			string(Secondary): secondaryName,
+		} {
+			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
+				AddContainer(container).
+				AddAppInstanceLabel(clusterObj.Name).
+				AddAppComponentLabel(testapps.DefaultRedisCompName).
+				AddAppManangedByLabel().
+				AddRoleLabel(k).
+				SetReplicas(1).
+				Create(&testCtx).GetObject()
+			isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
+			if k == string(Primary) {
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).Should(BeTrue())
+			} else {
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).ShouldNot(BeTrue())
+			}
+			stsList = append(stsList, sts)
+		}
+
+		By("Creating Pods of replication workloadType.")
+		var (
+			primaryPod   *corev1.Pod
+			secondaryPod *corev1.Pod
+		)
+		for _, sts := range stsList {
+			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+				AddContainer(container).
+				AddLabelsInMap(sts.Labels).
+				Create(&testCtx).GetObject()
+			if sts.Labels[constant.RoleLabelKey] == string(Primary) {
+				primaryPod = pod
+			} else {
+				secondaryPod = pod
+			}
+		}
+		By("Test update replicationSet pod role label with event driver, secondary change to primary.")
+		reqCtx := intctrlutil.RequestCtx{
+			Ctx: testCtx.Ctx,
+			Log: log.FromContext(ctx).WithValues("event", testCtx.DefaultNamespace),
+		}
+		err := HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName, secondaryPod, string(Primary))
+		Expect(err).Should(Succeed())
+		By("Test when secondary change to primary, the old primary label has been updated at the same time, so return nil directly.")
+		err = HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName, primaryPod, string(Secondary))
+		Expect(err).Should(BeNil())
+	}
+
 	// Scenarios
 
 	Context("test replicationSet util", func() {
@@ -255,6 +330,10 @@ var _ = Describe("ReplicationSet Util", func() {
 
 		It("Test generatePVC from volume claim templates", func() {
 			testGeneratePVCFromVolumeClaimTemplates()
+		})
+
+		It("Test update pod role label by roleChangedEvent when ha switch", func() {
+			testHandleReplicationSetRoleChangeEvent()
 		})
 	})
 })

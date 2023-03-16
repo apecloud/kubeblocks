@@ -1,6 +1,8 @@
-## kbcli cluster configure
+---
+title: kbcli cluster configure
+---
 
-reconfigure parameters with the specified components in the cluster
+Reconfigure parameters with the specified components in the cluster.
 
 ```
 kbcli cluster configure [flags]
@@ -22,7 +24,7 @@ kbcli cluster configure [flags]
       --component-name strings       Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.
       --configure-file string        Specify the name of the configuration file to be updated (e.g. for mysql: --configure-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.
   -h, --help                         help for configure
-      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
+      --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --set strings                  Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-configure'.
       --template-name string         Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --template-name=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
@@ -54,5 +56,7 @@ kbcli cluster configure [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

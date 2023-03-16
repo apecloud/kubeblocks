@@ -18,11 +18,8 @@ package apps
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
-	"regexp"
-	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -40,8 +37,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensusset"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -108,83 +104,33 @@ type ClusterReconciler struct {
 	Recorder record.EventRecorder
 }
 
-type probeMessage struct {
-	Event        string `json:"event,omitempty"`
-	OriginalRole string `json:"originalRole,omitempty"`
-	Role         string `json:"role,omitempty"`
-}
+// ClusterStatusEventHandler is the event handler for the cluster status event
+type ClusterStatusEventHandler struct{}
+
+var _ k8score.EventHandler = &ClusterStatusEventHandler{}
 
 func init() {
-	k8score.EventHandlerMap["cluster-controller"] = &ClusterReconciler{}
+	k8score.EventHandlerMap["cluster-status-handler"] = &ClusterStatusEventHandler{}
 }
 
-func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+// Handle is the event handler for the cluster status event.
+func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	if event.InvolvedObject.FieldPath != component.ProbeRoleChangedCheckPath {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
-	var (
-		role        string
-		err         error
-		annotations = event.GetAnnotations()
-	)
-	// filter role changed event that has been handled
-	if annotations != nil && annotations[csRoleChangedAnnotKey] == trueStr {
+
+	// parse probe event message when field path is probe-role-changed-check
+	message := k8score.ParseProbeEventMessage(reqCtx, event)
+	if message == nil {
+		reqCtx.Log.Info("parse probe event message failed", "message", event.Message)
 		return nil
 	}
 
-	if role, err = handleRoleChangedEvent(cli, reqCtx, recorder, event); err != nil {
-		return err
+	// if probe message event is checkRoleFailed, it means the cluster is abnormal, need to handle the cluster status
+	if message.Event == k8score.ProbeEventCheckRoleFailed {
+		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
-
-	// event order is crucial in role probing, but it's not guaranteed when controller restarted, so we have to mark them to be filtered
-	patch := client.MergeFrom(event.DeepCopy())
-	if event.Annotations == nil {
-		event.Annotations = make(map[string]string, 0)
-	}
-	event.Annotations[csRoleChangedAnnotKey] = trueStr
-	if err = cli.Patch(reqCtx.Ctx, event, patch); err != nil {
-		return err
-	}
-	if role != "" {
-		return nil
-	}
-	// if role is empty, means the event is not role changed event, handle it.
-	return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
-}
-
-// handleRoleChangedEvent handles role changed event and return role.
-func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) (string, error) {
-	// get role
-	message := &probeMessage{}
-	re := regexp.MustCompile(`Readiness probe failed: ({.*})`)
-	matches := re.FindStringSubmatch(event.Message)
-	if len(matches) != 2 {
-		return "", nil
-	}
-	msg := matches[1]
-	err := json.Unmarshal([]byte(msg), message)
-	if err != nil {
-		// not role related message, ignore it
-		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
-		return "", nil
-	}
-	role := strings.ToLower(message.Role)
-
-	podName := types.NamespacedName{
-		Namespace: event.InvolvedObject.Namespace,
-		Name:      event.InvolvedObject.Name,
-	}
-	// get pod
-	pod := &corev1.Pod{}
-	if err = cli.Get(reqCtx.Ctx, podName, pod); err != nil {
-		return role, err
-	}
-	// event belongs to old pod with the same name, ignore it
-	if pod.UID != event.InvolvedObject.UID {
-		return role, nil
-	}
-
-	return role, consensusset.UpdateConsensusSetRoleLabel(cli, reqCtx, pod, role)
+	return nil
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -284,12 +230,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err = cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	}
-
-	// validate primaryIndex and send warning event log necessarily
-	if err = cluster.ValidatePrimaryIndex(clusterDefinition); err != nil {
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// preCheck succeed, starting the cluster provisioning
@@ -567,11 +507,11 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 		cluster.Status.Phase = appsv1alpha1.CreatingPhase
 		cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
 		for _, v := range cluster.Spec.ComponentSpecs {
-			cluster.Status.Components[v.Name] = appsv1alpha1.ClusterComponentStatus{
+			cluster.Status.SetComponentStatus(v.Name, appsv1alpha1.ClusterComponentStatus{
 				Phase: appsv1alpha1.CreatingPhase,
-			}
+			})
 		}
-	} else if util.IsCompleted(cluster.Status.Phase) && !existsOperations(cluster) {
+	} else if componentutil.IsCompleted(cluster.Status.Phase) && !existsOperations(cluster) {
 		needPatch = true
 		cluster.Status.Phase = appsv1alpha1.SpecUpdatingPhase
 	}
@@ -614,7 +554,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	if !r.needCheckClusterForReady(cluster) {
 		return nil
 	}
-	if cluster.Status.Components == nil {
+	if len(cluster.Status.Components) == 0 {
 		return nil
 	}
 
@@ -712,7 +652,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		// handle the cluster status when some components are not ready.
 		handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
 		currPhase := cluster.Status.Phase
-		if !util.IsFailedOrAbnormal(currPhase) {
+		if !componentutil.IsFailedOrAbnormal(currPhase) {
 			return false, nil
 		}
 		message := fmt.Sprintf("Cluster: %s is %s, check according to the components message", cluster.Name, currPhase)
@@ -806,7 +746,7 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 	backupName string) (bool, error) {
 	// get the sts list of component
 	stsList := &appsv1.StatefulSetList{}
-	if err := util.GetObjectListByComponentName(ctx, r.Client, cluster, stsList, componentName); err != nil {
+	if err := componentutil.GetObjectListByComponentName(ctx, r.Client, *cluster, stsList, componentName); err != nil {
 		return false, err
 	}
 	var doRemoveInitContainers bool
@@ -828,7 +768,7 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 		// if need to remove init container, reset component to Creating.
 		compStatus := cluster.Status.Components[componentName]
 		compStatus.Phase = appsv1alpha1.CreatingPhase
-		cluster.Status.Components[componentName] = compStatus
+		cluster.Status.SetComponentStatus(componentName, compStatus)
 	}
 	return doRemoveInitContainers, nil
 }

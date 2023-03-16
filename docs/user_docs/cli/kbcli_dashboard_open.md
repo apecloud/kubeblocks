@@ -1,6 +1,8 @@
-## kbcli dashboard open
+---
+title: kbcli dashboard open
+---
 
-Open one dashboard
+Open one dashboard.
 
 ```
 kbcli dashboard open [flags]
@@ -40,5 +42,7 @@ kbcli dashboard open [flags]
 
 ### SEE ALSO
 
-* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards
+* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

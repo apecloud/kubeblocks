@@ -35,21 +35,22 @@ spec:
         exporterConfig:
           scrapePath: /metrics
           scrapePort: 5556
-      configSpec:
-        configTemplateRefs:
-          - name: kafka-configuration-tpl
-            configConstraintRef: kafka-cc
-            configTplRef: kafka-configuration-tpl
-            volumeName: kafka-config
-            namespace: {{ .Release.Namespace }}
-          - name: kafka-jmx-configuration-tpl
-            configTplRef: kafka-jmx-configuration-tpl
-            volumeName: jmx-config
-          - name: kafka-scripts-tpl
-            configTplRef: kafka-scripts-tpl
-            volumeName: scripts
-            namespace: {{ .Release.Namespace }}
-            defaultMode: 0755
+      configSpecs:
+        - name: kafka-configuration-tpl
+          constraintRef: kafka-cc
+          templateRef: kafka-configuration-tpl
+          volumeName: kafka-config
+          namespace: {{ .Release.Namespace }}
+        - name: kafka-jmx-configuration-tpl
+          templateRef: kafka-jmx-configuration-tpl
+          volumeName: jmx-config
+          namespace: {{ .Release.Namespace }}
+      scriptSpecs:
+        - name: kafka-scripts-tpl
+          templateRef: kafka-scripts-tpl
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0755
       service:
         ports:
           - name: kafka-client
@@ -224,21 +225,21 @@ spec:
         exporterConfig:
           scrapePath: /metrics
           scrapePort: 5556
-      configSpec:
-        configTemplateRefs:
-          - name: kafka-configuration-tpl
-            configConstraintRef: kafka-cc
-            configTplRef: kafka-configuration-tpl
-            volumeName: kafka-config
-            namespace: {{ .Release.Namespace }}
-          - name: kafka-jmx-configuration-tpl
-            configTplRef: kafka-jmx-configuration-tpl
-            volumeName: jmx-config
-          - name: kafka-scripts-tpl
-            configTplRef: kafka-scripts-tpl
-            volumeName: scripts
-            namespace: {{ .Release.Namespace }}
-            defaultMode: 0755
+      configSpecs:
+        - name: kafka-configuration-tpl
+          constraintRef: kafka-cc
+          templateRef: kafka-configuration-tpl
+          volumeName: kafka-config
+          namespace: {{ .Release.Namespace }}
+        - name: kafka-jmx-configuration-tpl
+          templateRef: kafka-jmx-configuration-tpl
+          volumeName: jmx-config
+      scriptSpecs:
+        - name: kafka-scripts-tpl
+          templateRef: kafka-scripts-tpl
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0755
       service:
         ports:
           - name: kafka-ctrlr
@@ -392,21 +393,21 @@ spec:
         exporterConfig:
           scrapePath: /metrics
           scrapePort: 5556
-      configSpec:
-        configTemplateRefs:
-          - name: kafka-configuration-tpl
-            configConstraintRef: kafka-cc
-            configTplRef: kafka-configuration-tpl
-            volumeName: kafka-config
-            namespace: {{ .Release.Namespace }}
-          - name: kafka-jmx-configuration-tpl
-            configTplRef: kafka-jmx-configuration-tpl
-            volumeName: jmx-config
-          - name: kafka-scripts-tpl
-            configTplRef: kafka-scripts-tpl
-            volumeName: scripts
-            namespace: {{ .Release.Namespace }}
-            defaultMode: 0755
+      configSpecs:
+        - name: kafka-configuration-tpl
+          constraintRef: kafka-cc
+          templateRef: kafka-configuration-tpl
+          volumeName: kafka-config
+          namespace: {{ .Release.Namespace }}
+        - name: kafka-jmx-configuration-tpl
+          templateRef: kafka-jmx-configuration-tpl
+          volumeName: jmx-config
+      scriptSpecs:
+        - name: kafka-scripts-tpl
+          templateRef: kafka-scripts-tpl
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0755
       service:
         ports:
           - name: kafka-client
@@ -549,13 +550,12 @@ spec:
 
     - name: kafka-exporter
       workloadType: Stateless
-      configSpec:
-        configTemplateRefs:
-          - name: kafka-scripts-tpl
-            configTplRef: kafka-scripts-tpl
-            volumeName: scripts
-            namespace: {{ .Release.Namespace }}
-            defaultMode: 0755
+      scriptSpecs:
+        - name: kafka-scripts-tpl
+          templateRef: kafka-scripts-tpl
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0755
       probes:
       monitor:
         builtIn: false

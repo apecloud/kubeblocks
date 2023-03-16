@@ -151,8 +151,8 @@ func TestConfigMapConfig(t *testing.T) {
 	log.Log.Info("cfg option: %v", cfg.Option)
 
 	require.Equal(t, cfg.fileCount, 2)
-	require.NotNil(t, cfg.getCfgViper(NewCfgOptions("my.cnf")))
-	require.Nil(t, cfg.getCfgViper(NewCfgOptions("my2.cnf")))
+	require.NotNil(t, cfg.getConfigObject(NewCfgOptions("my.cnf")))
+	require.Nil(t, cfg.getConfigObject(NewCfgOptions("my2.cnf")))
 
 	res, err := cfg.Query("$..slow_query_log_file", NewCfgOptions(""))
 	require.Nil(t, err)

@@ -4,6 +4,7 @@ metadata:
   name: apecloud-mysql
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": apecloud
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

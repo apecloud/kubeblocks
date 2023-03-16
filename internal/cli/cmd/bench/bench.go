@@ -53,7 +53,7 @@ var (
 func NewBenchCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bench",
-		Short: "Run a benchmark",
+		Short: "Run a benchmark.",
 	}
 
 	cmd.PersistentFlags().IntVar(&maxProcs, "max-procs", 0, "runtime.GOMAXPROCS")

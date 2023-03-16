@@ -1,6 +1,8 @@
-## kbcli kubeblocks uninstall
+---
+title: kbcli kubeblocks uninstall
+---
 
-Uninstall KubeBlocks
+Uninstall KubeBlocks.
 
 ```
 kbcli kubeblocks uninstall [flags]
@@ -50,5 +52,7 @@ kbcli kubeblocks uninstall [flags]
 
 ### SEE ALSO
 
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -1,6 +1,8 @@
-## kbcli cluster list-backups
+---
+title: kbcli cluster list-backups
+---
 
-List backups
+List backups.
 
 ```
 kbcli cluster list-backups [flags]
@@ -49,5 +51,7 @@ kbcli cluster list-backups [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

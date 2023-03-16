@@ -21,7 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -44,7 +44,7 @@ func MockStatelessPod(testCtx testutil.TestContext, deploy *appsv1.Deployment, c
 		}
 	}
 	return NewPodFactory(testCtx.DefaultNamespace, podName).
-		SetOwnerReferences("apps/v1", intctrlutil.ReplicaSet, newRs).
+		SetOwnerReferences("apps/v1", constant.ReplicaSet, newRs).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(componentName).
 		AddAppManangedByLabel().

@@ -178,22 +178,26 @@ var _ = Describe("clusterDefinition webhook", func() {
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName + "-cfg-test")
 			tests := []struct {
 				name               string
-				tpls               []ConfigTemplate
+				tpls               []ComponentConfigSpec
 				wantErr            bool
 				expectedErrMessage string
 			}{{
 				name: "cm_duplicate_test",
-				tpls: []ConfigTemplate{
+				tpls: []ComponentConfigSpec{
 					{
-						Name:                "tpl1",
-						ConfigTplRef:        "cm1",
-						VolumeName:          "volume1",
+						ComponentTemplateSpec: ComponentTemplateSpec{
+							Name:        "tpl1",
+							TemplateRef: "cm1",
+							VolumeName:  "volume1",
+						},
 						ConfigConstraintRef: "constraint1",
 					},
 					{
-						Name:                "tpl2",
-						ConfigTplRef:        "cm1",
-						VolumeName:          "volume2",
+						ComponentTemplateSpec: ComponentTemplateSpec{
+							Name:        "tpl2",
+							TemplateRef: "cm1",
+							VolumeName:  "volume2",
+						},
 						ConfigConstraintRef: "constraint1",
 					},
 				},
@@ -201,17 +205,21 @@ var _ = Describe("clusterDefinition webhook", func() {
 				expectedErrMessage: "configmap[cm1] already existed.",
 			}, {
 				name: "name_duplicate_test",
-				tpls: []ConfigTemplate{
+				tpls: []ComponentConfigSpec{
 					{
-						Name:                "tpl1",
-						ConfigTplRef:        "cm1",
-						VolumeName:          "volume1",
+						ComponentTemplateSpec: ComponentTemplateSpec{
+							Name:        "tpl1",
+							TemplateRef: "cm1",
+							VolumeName:  "volume1",
+						},
 						ConfigConstraintRef: "constraint1",
 					},
 					{
-						Name:                "tpl1",
-						ConfigTplRef:        "cm2",
-						VolumeName:          "volume2",
+						ComponentTemplateSpec: ComponentTemplateSpec{
+							Name:        "tpl1",
+							TemplateRef: "cm2",
+							VolumeName:  "volume2",
+						},
 						ConfigConstraintRef: "constraint2",
 					},
 				},
@@ -219,17 +227,21 @@ var _ = Describe("clusterDefinition webhook", func() {
 				expectedErrMessage: "Duplicate value: map",
 			}, {
 				name: "volume_duplicate_test",
-				tpls: []ConfigTemplate{
+				tpls: []ComponentConfigSpec{
 					{
-						Name:                "tpl1",
-						ConfigTplRef:        "cm1",
-						VolumeName:          "volume1",
+						ComponentTemplateSpec: ComponentTemplateSpec{
+							Name:        "tpl1",
+							TemplateRef: "cm1",
+							VolumeName:  "volume1",
+						},
 						ConfigConstraintRef: "constraint1",
 					},
 					{
-						Name:                "tpl2",
-						ConfigTplRef:        "cm2",
-						VolumeName:          "volume1",
+						ComponentTemplateSpec: ComponentTemplateSpec{
+							Name:        "tpl2",
+							TemplateRef: "cm2",
+							VolumeName:  "volume1",
+						},
 						ConfigConstraintRef: "constraint2",
 					},
 				},
@@ -237,17 +249,21 @@ var _ = Describe("clusterDefinition webhook", func() {
 				expectedErrMessage: "volume[volume1] already existed.",
 			}, {
 				name: "normal_test",
-				tpls: []ConfigTemplate{
+				tpls: []ComponentConfigSpec{
 					{
-						Name:                "tpl1",
-						ConfigTplRef:        "cm1",
-						VolumeName:          "volume1",
+						ComponentTemplateSpec: ComponentTemplateSpec{
+							Name:        "tpl1",
+							TemplateRef: "cm1",
+							VolumeName:  "volume1",
+						},
 						ConfigConstraintRef: "constraint1",
 					},
 					{
-						Name:                "tpl2",
-						ConfigTplRef:        "cm2",
-						VolumeName:          "volume2",
+						ComponentTemplateSpec: ComponentTemplateSpec{
+							Name:        "tpl2",
+							TemplateRef: "cm2",
+							VolumeName:  "volume2",
+						},
 						ConfigConstraintRef: "constraint1",
 					},
 				},
@@ -255,9 +271,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			}}
 
 			for _, tt := range tests {
-				clusterDef.Spec.ComponentDefs[0].ConfigSpec = &ConfigurationSpec{
-					ConfigTemplateRefs: tt.tpls,
-				}
+				clusterDef.Spec.ComponentDefs[0].ConfigSpecs = tt.tpls
 				err := testCtx.CreateObj(ctx, clusterDef)
 				if tt.wantErr {
 					Expect(err).ShouldNot(Succeed())

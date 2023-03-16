@@ -441,28 +441,6 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	return nil
 }
 
-// ValidatePrimaryIndex validates primaryIndex in cluster API yaml. When workloadType is Replication,
-// checks that primaryIndex cannot be nil, and when the replicas of the component in the cluster API is empty,
-// checks that the value of primaryIndex cannot be greater than the defaultReplicas in the clusterDefinition API.
-func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
-	message := make([]string, 0)
-	for _, compSpec := range r.Spec.ComponentSpecs {
-		for _, compDef := range cd.Spec.ComponentDefs {
-			if !strings.EqualFold(compSpec.ComponentDefRef, compDef.Name) {
-				continue
-			}
-			if compDef.WorkloadType != Replication {
-				continue
-			}
-			if compSpec.PrimaryIndex == nil {
-				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be nil when workloadType is Replication.", compSpec.ComponentDefRef))
-				return errors.New(strings.Join(message, ";"))
-			}
-		}
-	}
-	return nil
-}
-
 // GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentSpec.
 func (r *Cluster) GetDefNameMappingComponents() map[string][]ClusterComponentSpec {
 	m := map[string][]ClusterComponentSpec{}
@@ -474,7 +452,7 @@ func (r *Cluster) GetDefNameMappingComponents() map[string][]ClusterComponentSpe
 	return m
 }
 
-// GetMessage get message map deep copy object
+// GetMessage gets message map deep copy object
 func (in *ClusterComponentStatus) GetMessage() ComponentMessageMap {
 	messageMap := map[string]string{}
 	for k, v := range in.Message {
@@ -485,17 +463,38 @@ func (in *ClusterComponentStatus) GetMessage() ComponentMessageMap {
 
 // SetMessage override message map object
 func (in *ClusterComponentStatus) SetMessage(messageMap ComponentMessageMap) {
+	if in == nil {
+		return
+	}
 	in.Message = messageMap
 }
 
-// GetObjectMessage get the k8s workload message in component status message map
-func (m ComponentMessageMap) GetObjectMessage(objectKind, objectName string) string {
+// SetObjectMessage sets k8s workload message to component status message map
+func (in *ClusterComponentStatus) SetObjectMessage(objectKind, objectName, message string) {
+	if in == nil {
+		return
+	}
+	if in.Message == nil {
+		in.Message = map[string]string{}
+	}
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
-	return m[messageKey]
+	in.Message[messageKey] = message
 }
 
-// SetObjectMessage set k8s workload message to component status message map
+// GetObjectMessage gets the k8s workload message in component status message map
+func (in *ClusterComponentStatus) GetObjectMessage(objectKind, objectName string) string {
+	if in == nil {
+		return ""
+	}
+	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
+	return in.Message[messageKey]
+}
+
+// SetObjectMessage sets k8s workload message to component status message map
 func (m ComponentMessageMap) SetObjectMessage(objectKind, objectName, message string) {
+	if m == nil {
+		return
+	}
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
 	m[messageKey] = message
 }
@@ -520,19 +519,47 @@ func (r *Cluster) GetComponentDefRefName(componentName string) string {
 	return ""
 }
 
-func ToVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
+// SetComponentStatus does safe operation on ClusterStatus.Components map object update.
+func (r *ClusterStatus) SetComponentStatus(name string, status ClusterComponentStatus) {
+	if r == nil {
+		return
+	}
+	r.checkedInitComponentsMap()
+	r.Components[name] = status
+}
+
+func (r *ClusterStatus) checkedInitComponentsMap() {
+	if r.Components == nil {
+		r.Components = map[string]ClusterComponentStatus{}
+	}
+}
+
+// ToVolumeClaimTemplates convert r.VolumeClaimTemplates to []corev1.PersistentVolumeClaimTemplate.
+func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolumeClaimTemplate {
+	if r == nil {
+		return nil
+	}
+	var ts []corev1.PersistentVolumeClaimTemplate
+	for _, template := range r.VolumeClaimTemplates {
+		ts = append(ts, toVolumeClaimTemplate(template))
+	}
+	return ts
+}
+
+// GetPrimaryIndex provide safe operation get ClusterComponentSpec.PrimaryIndex, if value is nil, it's treated as 0.
+func (r *ClusterComponentSpec) GetPrimaryIndex() int32 {
+	if r == nil || r.PrimaryIndex == nil {
+		return 0
+	}
+	return *r.PrimaryIndex
+}
+
+// following are helper functions
+func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
 	t := corev1.PersistentVolumeClaimTemplate{}
 	t.ObjectMeta.Name = template.Name
 	if template.Spec != nil {
 		t.Spec = *template.Spec
 	}
 	return t
-}
-
-func ToVolumeClaimTemplates(templates []ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
-	ts := []corev1.PersistentVolumeClaimTemplate{}
-	for _, template := range templates {
-		ts = append(ts, ToVolumeClaimTemplate(template))
-	}
-	return ts
 }

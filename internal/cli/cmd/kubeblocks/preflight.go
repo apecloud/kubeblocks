@@ -97,7 +97,7 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	}
 	cmd := &cobra.Command{
 		Use:     "preflight",
-		Short:   "Run and retrieve preflight checks for KubeBlocks",
+		Short:   "Run and retrieve preflight checks for KubeBlocks.",
 		Example: preflightExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(p.complete(f, args))

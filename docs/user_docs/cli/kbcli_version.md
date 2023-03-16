@@ -1,6 +1,8 @@
-## kbcli version
+---
+title: kbcli version
+---
 
-Print the version information
+Print the version information, include kubernetes, KubeBlocks and kbcli version.
 
 ```
 kbcli version [flags]
@@ -39,5 +41,7 @@ kbcli version [flags]
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
+
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 )
 
 var (
@@ -76,7 +77,7 @@ func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	o := newOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:               "describe NAME",
-		Short:             "Show details of a specific cluster",
+		Short:             "Show details of a specific cluster.",
 		Example:           describeExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -129,6 +130,7 @@ func (o *describeOptions) describeCluster(name string) error {
 			WithService:    true,
 			WithPod:        true,
 			WithEvent:      true,
+			WithPVC:        true,
 		},
 	}
 
@@ -203,6 +205,11 @@ func showEvents(events *corev1.EventList, name string, namespace string, out io.
 	cnt := 0
 	for _, o := range *objs {
 		e := o.(*corev1.Event)
+		// do not output KubeBlocks probe events
+		if e.InvolvedObject.FieldPath == component.ProbeRoleChangedCheckPath {
+			continue
+		}
+
 		tbl.AddRow(util.GetEventTimeStr(e), e.Type, e.Reason, util.GetEventObject(e), e.Message)
 		cnt++
 		if cnt == 5 {

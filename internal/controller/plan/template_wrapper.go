@@ -72,7 +72,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileT
 		if err != nil {
 			return err
 		}
-		updateCMConfigSelectorLabels(cm, tpl)
+		updateCMConfigSpecLabels(cm, tpl)
 
 		if err := wrapper.addRenderObject(tpl.ComponentTemplateSpec, cm, scheme); err != nil {
 			return err
@@ -108,20 +108,24 @@ func (wrapper *renderWrapper) addRenderObject(tpl appsv1alpha1.ComponentTemplate
 	cmName := cm.Name
 	wrapper.volumes[cmName] = tpl
 	wrapper.renderedObjs = append(wrapper.renderedObjs, cm)
-
-	// Configuration.kubeblocks.io/cfg-tpl-${ctpl-name}: ${cm-instance-name}
 	wrapper.templateLabels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
 	return nil
 }
 
-func updateCMConfigSelectorLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ComponentConfigSpec) {
-	if len(tpl.Keys) == 0 {
-		return
-	}
+func updateCMConfigSpecLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ComponentConfigSpec) {
 	if cm.Labels == nil {
 		cm.Labels = make(map[string]string)
 	}
-	cm.Labels[constant.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
+
+	cm.Labels[constant.CMConfigurationSpecProviderLabelKey] = tpl.Name
+	cm.Labels[constant.CMConfigurationTplNameLabelKey] = tpl.TemplateRef
+	if tpl.ConfigConstraintRef != "" {
+		cm.Labels[constant.CMConfigurationConstraintsNameLabelKey] = tpl.ConfigConstraintRef
+	}
+
+	if len(tpl.Keys) != 0 {
+		cm.Labels[constant.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
+	}
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.

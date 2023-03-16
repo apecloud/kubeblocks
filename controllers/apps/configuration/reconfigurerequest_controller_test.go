@@ -86,7 +86,7 @@ var _ = Describe("Reconfigure Controller", func() {
 					constant.KBAppComponentLabelKey, statefulCompName,
 					constant.CMConfigurationTplNameLabelKey, configTplName,
 					constant.CMConfigurationConstraintsNameLabelKey, cmName,
-					constant.CMConfigurationProviderTplLabelKey, configTplName,
+					constant.CMConfigurationSpecProviderLabelKey, configTplName,
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 				))
 

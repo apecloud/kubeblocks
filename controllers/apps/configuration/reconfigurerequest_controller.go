@@ -52,7 +52,7 @@ var ConfigurationRequiredLabels = []string{
 	constant.KBAppComponentLabelKey,
 	constant.CMConfigurationTplNameLabelKey,
 	constant.CMConfigurationTypeLabelKey,
-	constant.CMConfigurationProviderTplLabelKey,
+	constant.CMConfigurationSpecProviderLabelKey,
 }
 
 // +kubebuilder:rbac:groups=core,resources=configmap,verbs=get;list;watch;create;update;patch;delete
@@ -139,7 +139,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		configKey = client.ObjectKeyFromObject(config)
 
 		componentName     = config.Labels[constant.KBAppComponentLabelKey]
-		configTplName     = config.Labels[constant.CMConfigurationProviderTplLabelKey]
+		configTplName     = config.Labels[constant.CMConfigurationSpecProviderLabelKey]
 		configTplLabelKey = cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName)
 	)
 

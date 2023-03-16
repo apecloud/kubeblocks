@@ -99,7 +99,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					constant.KBAppComponentLabelKey, componentName,
 					constant.CMConfigurationTplNameLabelKey, tpl.TemplateRef,
 					constant.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
-					constant.CMConfigurationProviderTplLabelKey, tpl.Name,
+					constant.CMConfigurationSpecProviderLabelKey, tpl.Name,
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 				),
 			)

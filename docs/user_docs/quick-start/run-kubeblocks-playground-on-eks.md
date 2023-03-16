@@ -7,11 +7,12 @@ sidebar_label: Playground on AWS EKS
 
 # Run KubeBlocks Playground on AWS EKS
 
-KubeBlocks v0.4 supports using the `kbcli playground` command to deploy EKS cluster and deploy KubeBlocks on EKS. This tutorial introduces how to configure this command.
+KubeBlocks supports using the `kbcli playground` command to deploy EKS cluster and deploy KubeBlocks on EKS from v0.4. This tutorial introduces how to configure this command.
 
 ## How kbcli works on EKS
 
-`kbcli` currently supports deploy Playground on [the local host](./run-kubeblocks-playground-on-localhost.md) and the cloud. For the cloud environment, `kbcli` only supports deploying AWS EKS clusters. When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find the script at [Github repository](https://github.com/apecloud/cloud-provider).
+`kbcli` currently supports deploying Playground on [the local host](./run-kubeblocks-playground-on-localhost.md) and the cloud. For the cloud environment, `kbcli` only supports deploying AWS EKS clusters. When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find the script at [Github repository](https://github.com/apecloud/cloud-provider).
+
 When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repository to the local host, calls the terraform commands to initialize the cluster, then deploys KubeBlocks on this cluster.
 
 ## Before you start
@@ -25,7 +26,7 @@ For AWS, there are two options.
 
 **Option 1.** Use aws configure
 
-Fill in `AWS Access Key ID` and `AWS Secret Access Key` and run the command below to configure access permission.
+Fill in AWS Access Key ID and AWS Secret Access Key and run the command below to configure access permission.
 
 ```bash
 aws configure
@@ -54,6 +55,7 @@ kbbcli playground init --cloud-provider aws --region cn-northwest-1
 * `region` specifies the region to deploy a Kubernetes cluster.
    Frequently used regions are as follow. You can find the full region list on [the official website](https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/?nc1=h_ls).
   * Americas
+  
      | Region ID  | Region name         |
      | :--        | :--                 |
      | us-east-1  | Northern Virginia   |
@@ -62,6 +64,7 @@ kbbcli playground init --cloud-provider aws --region cn-northwest-1
      | us-west-2  | Oregon              |
 
   * Asia Pacific
+  
      | Region ID         | Region name |
      | :--               | :--         |
      | ap-east-1         | Hong Kong   |
@@ -92,7 +95,7 @@ The Playground guide includes three sections, namely [Basic functions](#basic-fu
 
 ### Basic functions
 
-KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](./docs/user_docs) for details.
+KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](./../introduction/introduction.md) for details.
 
 :::note
 
@@ -119,7 +122,7 @@ The local host does not support volume expansion, backup, and restore functions.
 
 #### Access an ApeCloud MySQL cluster
 
-**Option 1.** Use `kbcli`.
+**Option 1.** Use kbcli
 
 If a database cluster has been created and its status is `Running`, run `kbcli cluster connect` to access a specified database cluster. For example, 
 ```bash
@@ -145,10 +148,21 @@ mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
 ...
 Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-mysql>
+mysql>> show databases;
+>
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mydb               |
+| mysql              |
+| performance_schema |
+| sys                |
++--------------------+
+5 rows in set (0.02 sec)
 ```
 
-**Option 2.** Use an access address.
+**Option 2.** Use an access address
 
 If you want to access a cluster via MySQL client, get the access address from `Endpoints` in the cluster details.
 ```bash
@@ -236,7 +250,7 @@ In this example, we delete the leader pod to simulate a failure.
 2. Run the command below to delete the leader pod.
    ```bash
    kubectl delete pod maple05-mysql-1
-
+   >
    pod "maple05-mysql-1" deleted
    ```
 
@@ -288,7 +302,7 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
 
 ## Step 3. Destroy Playground
 
-Before destroying Playground, it is recommended to delete the clusters created by KubeBlocks
+Before destroying Playground, it is recommended to delete the clusters created by KubeBlocks.
 
 ```bash
 # View all clusters

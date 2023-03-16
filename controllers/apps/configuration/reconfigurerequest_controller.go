@@ -146,7 +146,6 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		constant.AppNameLabelKey:        config.Labels[constant.AppNameLabelKey],
 		constant.AppInstanceLabelKey:    config.Labels[constant.AppInstanceLabelKey],
 		constant.KBAppComponentLabelKey: config.Labels[constant.KBAppComponentLabelKey],
-		//configTplLabelKey:               config.GetName(),
 	}
 
 	var keySelector []string

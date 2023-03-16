@@ -37,9 +37,9 @@ type templateRenderValidator = func(map[string]string) error
 type renderWrapper struct {
 	templateBuilder *configTemplateBuilder
 
-	volumes        map[string]appsv1alpha1.ComponentTemplateSpec
-	templateLabels map[string]string
-	renderedObjs   []client.Object
+	volumes             map[string]appsv1alpha1.ComponentTemplateSpec
+	templateAnnotations map[string]string
+	renderedObjs        []client.Object
 
 	ctx     context.Context
 	cli     client.Client
@@ -54,9 +54,9 @@ func newTemplateRenderWrapper(cfgTplBuilder *configTemplateBuilder, cluster *app
 		cluster: cluster,
 		params:  params,
 
-		templateBuilder: cfgTplBuilder,
-		templateLabels:  make(map[string]string),
-		volumes:         make(map[string]appsv1alpha1.ComponentTemplateSpec),
+		templateBuilder:     cfgTplBuilder,
+		templateAnnotations: make(map[string]string),
+		volumes:             make(map[string]appsv1alpha1.ComponentTemplateSpec),
 	}
 }
 
@@ -108,7 +108,7 @@ func (wrapper *renderWrapper) addRenderObject(tpl appsv1alpha1.ComponentTemplate
 	cmName := cm.Name
 	wrapper.volumes[cmName] = tpl
 	wrapper.renderedObjs = append(wrapper.renderedObjs, cm)
-	wrapper.templateLabels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
+	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
 	return nil
 }
 

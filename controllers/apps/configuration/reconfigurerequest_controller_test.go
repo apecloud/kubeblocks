@@ -18,6 +18,7 @@ package configuration
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -47,6 +48,11 @@ var _ = Describe("Reconfigure Controller", func() {
 	const configVolumeName = "mysql-config"
 
 	const cmName = "mysql-tree-node-template-8.0"
+
+	var (
+		timeout  = time.Second * 60
+		interval = time.Second
+	)
 
 	var ctx = context.Background()
 
@@ -127,7 +133,7 @@ var _ = Describe("Reconfigure Controller", func() {
 				AddAppNameLabel(clusterName).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(statefulCompName).
-				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name).
+				AddAnnotations(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name).
 				Create(&testCtx).GetObject()
 
 			By("check config constraint")
@@ -161,7 +167,7 @@ var _ = Describe("Reconfigure Controller", func() {
 				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
 				g.Expect(newHash).NotTo(Equal(configHash))
 				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureAutoReloadType))
-			}).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
 
 			By("invalid Update")
 			invalidUpdatedCM := testapps.NewCustomizedObj("resources/mysql_ins_config_invalid_update.yaml", &corev1.ConfigMap{})

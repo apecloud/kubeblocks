@@ -376,7 +376,11 @@ func validateConfigConstraintStatus(configStatus appsv1alpha1.ConfigConstraintSt
 	return configStatus.Phase == appsv1alpha1.AvailablePhase
 }
 
-func getRelatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.ObjectKey) ([]appv1.StatefulSet, []string) {
+func usingComponentConfigSpec(annotations map[string]string, key, value string) bool {
+	return len(annotations) != 0 && annotations[key] == value
+}
+
+func getAssociatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.ObjectKey, configSpecName string) ([]appv1.StatefulSet, []string) {
 	managerContainerName := constant.ConfigSidecarName
 	stsLen := len(stsList.Items)
 	if stsLen == 0 {
@@ -385,7 +389,11 @@ func getRelatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.
 
 	sts := make([]appv1.StatefulSet, 0, stsLen)
 	containers := set.NewLinkedHashSetString()
+	configSpecKey := cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName)
 	for _, s := range stsList.Items {
+		if !usingComponentConfigSpec(s.GetAnnotations(), configSpecKey, cfg.Name) {
+			continue
+		}
 		volumeMounted := intctrlutil.GetVolumeMountName(s.Spec.Template.Spec.Volumes, cfg.Name)
 		if volumeMounted == nil {
 			continue

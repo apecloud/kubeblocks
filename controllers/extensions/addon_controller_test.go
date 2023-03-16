@@ -511,7 +511,7 @@ var _ = Describe("Addon controller", func() {
 				_, err := doReconcile()
 				g.Expect(err).To(Not(HaveOccurred()))
 				job := &batchv1.Job{}
-				g.Eventually(testCtx.Cli.Get(ctx, jobKey, job)).Should(Succeed())
+				g.Eventually(testCtx.Cli.Get(ctx, jobKey, job), time.Second).Should(Succeed())
 				g.Expect(job.Spec.Template.Spec.Tolerations).ShouldNot(BeEmpty())
 				g.Expect(job.Spec.Template.Spec.NodeSelector).ShouldNot(BeEmpty())
 				g.Expect(job.Spec.Template.Spec.Affinity).ShouldNot(BeNil())

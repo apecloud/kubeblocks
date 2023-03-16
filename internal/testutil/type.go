@@ -59,11 +59,11 @@ const (
 func init() {
 	viper.AutomaticEnv()
 	viper.SetDefault("EventuallyTimeout", time.Second*10)
-	viper.SetDefault("EventuallyPollingInterval", time.Second*1)
+	viper.SetDefault("EventuallyPollingInterval", time.Millisecond)
 	viper.SetDefault("ConsistentlyDuration", time.Second*3)
-	viper.SetDefault("ConsistentlyPollingInterval", time.Second*1)
-	viper.SetDefault("ClearResourceTimeout", time.Second*60)
-	viper.SetDefault("ClearResourcePollingInterval", time.Second*1)
+	viper.SetDefault("ConsistentlyPollingInterval", time.Millisecond)
+	viper.SetDefault("ClearResourceTimeout", time.Second*10)
+	viper.SetDefault("ClearResourcePollingInterval", time.Millisecond)
 }
 
 // NewDefaultTestContext create default test context, if provided namespace optional arg, a namespace

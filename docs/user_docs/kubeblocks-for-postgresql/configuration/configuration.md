@@ -8,17 +8,7 @@ sidebar_position: 1
 
 The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter change interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
 
-## Structure of KubeBlocks configuration function
 
-KubeBlocks configuration consists of five modules:
-
-1. Default configuration builder: Based on the Go template, the KubeBlocks configuration realizes a set of module rendering engines that can dynamically generate the parameters suitable for the current resources based on the instance specifications.
-2. Persistency and changes in the configuration: The KubeBlocks configuration abstracts the configurations and uses the ConfigObject interface to manage the configuration files of the database engines. It also provides the parameter effectiveness check, persistency, and version control.
-3. Operator: The operator is used to monitor your parameter reconfiguration. Different strategies are adopted based on how the parameters take effect. For example, some parameters can update online while other parameters require a pod restarting.
-4. ConfigManager sidecar: The ConfigManager sidecar is used to manage the local configuration files of database instances. Kubernetes provides a set of centralized configuration management mechanisms based on ConfigMap. On the foundation of ConifgMap, KubeBlocks manages the dynamic parameter reconfigurations of different engines by ConfigManager.
-5. CLI/OpsRequest: CLI/OpsRequest are two methods to realize the management of engine parameters.
-
-![Configuration](./../../../img/configuration.png)
 
 ## How KubeBlocks configuration works
 
@@ -33,8 +23,10 @@ KubeBlocks configuration consists of five modules:
 1. An OpsRequest is created by `kbcli` or a YAML file, whose type is `reconfiguring`. You need to modify the names and values of parameters in the OpsRequest. If you use `kbcli` to create an OpsRequest, `kbcli` verifies the parameter changes before the OpsRequest is submitted. If the verification fails, the system prompts that the parameter setting is abnormal.
 2. After the OpsRequest Operator detects the OpsRequest resources, it first verifies the effectiveness of the parameters. If the verification fails, the OpsRequest will be set to `Failed`. If the verification passes, the changes will be merged into the ConfigMap of the configuration object and a new version will be generated.
 3. When the Reconfigure Operator detects the ConfigMap changes, it first checks the effective parameter list and then adopts different execution strategies based on how the parameters take effect:
-   1. If the effectiveness type of changed parameters is **dynamic**, the Reconfigure Operator adopts the dynamic change strategy in which the ConfigManager is in charge to perform the parameter changes.
+   1. If the effectiveness type of changed parameters is **dynamic**, the Reconfigure Operator adopts the dynamic change strategy in which the ConfigManager performs OnlineUpdate to the parameters.
    2. If the effectiveness type of changed parameters is **static**, the Reconfigure Operator adopts the pod restarting strategy.
+
+![Configuration](./../../../img/configuration.png)
 
 ## Reconfigure the parameters
 
@@ -45,10 +37,10 @@ KubeBlocks configuration consists of five modules:
 
 ### View the parameter information
 
-1. Run the command below to search for parameter change information.
+1. Run the command below to search for parameter information.
    
    ```bash
-   kbcli cluster explain-configure mysql-cluster |head -n 20
+   kbcli cluster explain-config mysql-cluster |head -n 20
    >
    template meta:
    ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mysql-cluster
@@ -74,7 +66,7 @@ KubeBlocks configuration consists of five modules:
 
 2. View the user guide of a parameter.
    ```bash
-   kbcli cluster explain-configure mysql-cluster --param=innodb_buffer_pool_size
+   kbcli cluster explain-config mysql-cluster --param=innodb_buffer_pool_size
    template meta:
       ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mysql-cluster
 
@@ -88,12 +80,12 @@ KubeBlocks configuration consists of five modules:
     ```
     * Allowed Values: It defines the valid value of this parameter.
     * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. As mentioned in [How KubeBlocks configuration works](#how-kubeblocks-configuration-works), there are two different reconfiguration strategies based on the effectiveness type of changed parameters, i.e. **dynamic** and **static**. 
-      * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and you can follow the instructions in [Strategy 1](#strategy-1-configure-onlineupdate-parameters).
-      * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and you can follow the instructions in [Strategy 2](#strategy-2-reconfigure-mysql-static-parameters).
+      * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and you can follow the instructions in [Reconfigure dynamic parameters](#reconfigure-dynamic-parameters).
+      * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and you can follow the instructions in [Reconfigure static parameters](#reconfigure-static-parameters).
     * Description: It describes the parameter definition.
 
 
-### Strategy 1. Reconfigure OnlineUpdate parameters
+### Reconfigure dynamic parameters
 
 Here we take reconfiguring `max_connection` and `beb_buffer_pool_size` as an example.
 
@@ -201,13 +193,13 @@ Here we take reconfiguring `max_connection` and `beb_buffer_pool_size` as an exa
    1 row in set (0.00 sec)
    ```
 
-### Strategy 2. Reconfigure static parameters
+### Reconfigure static parameters
 
 Static parameter reconfiguring requires restarting the pod. Here we take reconfiguring `ngram_token_size` as an example.
 
 1. Search the current value of `ngram_token_size` and the default value is 2.
    ```bash
-   kbcli cluster explain-configure mysql-cluster --param=ngram_token_size
+   kbcli cluster explain-config mysql-cluster --param=ngram_token_size
    >
    template meta:
      ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mysql-cluster

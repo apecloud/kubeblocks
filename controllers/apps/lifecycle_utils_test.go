@@ -180,7 +180,7 @@ spec:
 		vs := snapshotv1.VolumeSnapshot{}
 		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
 		labels := map[string]string{
-			constant.AutoCreatedByKey:       "h-scale",
+			constant.KBManagedByKey:         "cluster",
 			constant.AppInstanceLabelKey:    clusterName,
 			constant.KBAppComponentLabelKey: componentName,
 		}

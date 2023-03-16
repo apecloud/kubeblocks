@@ -33,7 +33,7 @@ backup_policy: {
 		generateName: "\(backup_key.Name)-"
 		namespace:    backup_key.Namespace
 		labels: {
-			"apps.kubeblocks.io/auto-created-by":                     "h-scale"
+			"apps.kubeblocks.io/managed-by": "cluster"
 			for k, v in sts.metadata.labels {
 				"\(k)": "\(v)"
 			}

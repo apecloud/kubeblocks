@@ -31,7 +31,7 @@ snapshot: {
 		name:      snapshot_key.Name
 		namespace: snapshot_key.Namespace
 		labels: {
-			"apps.kubeblocks.io/auto-created-by": "h-scale"
+			"apps.kubeblocks.io/managed-by": "cluster"
 			for k, v in sts.metadata.labels {
 				"\(k)": "\(v)"
 			}

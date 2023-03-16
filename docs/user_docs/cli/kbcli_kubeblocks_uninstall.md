@@ -20,7 +20,7 @@ kbcli kubeblocks uninstall [flags]
 ```
       --auto-approve       Skip interactive approval before uninstalling KubeBlocks
   -h, --help               help for uninstall
-      --remove-namespace   Remove "kb-system" namespace or not
+      --remove-namespace   Remove default created "kb-system" namespace or not
       --remove-pvcs        Remove PersistentVolumeClaim or not
       --remove-pvs         Remove PersistentVolume or not
       --verbose            Show logs in detail.

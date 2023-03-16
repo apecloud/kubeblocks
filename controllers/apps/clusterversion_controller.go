@@ -31,9 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
@@ -53,40 +58,7 @@ type ClusterVersionReconciler struct {
 }
 
 func init() {
-	clusterDefUpdateHandlers["clusterVersion"] = clusterVersionUpdateHandler
 	viper.SetDefault(maxConcurReconClusterVersionKey, runtime.NumCPU()*2)
-}
-
-func clusterVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef *appsv1alpha1.ClusterDefinition) error {
-
-	labelSelector, err := labels.Parse(clusterDefLabelKey + "=" + clusterDef.GetName())
-	if err != nil {
-		return err
-	}
-	o := &client.ListOptions{LabelSelector: labelSelector}
-
-	list := &appsv1alpha1.ClusterVersionList{}
-	if err := cli.List(ctx, list, o); err != nil {
-		return err
-	}
-	for _, item := range list.Items {
-		if item.Status.ClusterDefGeneration != clusterDef.Generation {
-			patch := client.MergeFrom(item.DeepCopy())
-			if statusMsg := validateClusterVersion(&item, clusterDef); statusMsg != "" {
-				item.Status.Phase = appsv1alpha1.UnavailablePhase
-				item.Status.Message = statusMsg
-			} else {
-				item.Status.Phase = appsv1alpha1.AvailablePhase
-				item.Status.Message = ""
-				item.Status.ClusterDefGeneration = clusterDef.Generation
-			}
-			if err = cli.Status().Patch(ctx, &item, patch); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -98,7 +70,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("ClusterVersion", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
 
@@ -107,49 +79,33 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, clusterVersion, clusterVersionFinalizerName, func() (*ctrl.Result, error) {
-		recordEvent := func() {
-			r.Recorder.Event(clusterVersion, corev1.EventTypeWarning, constant.ReasonRefCRUnavailable,
-				"cannot be deleted because of existing referencing Cluster.")
-		}
-		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, clusterVersion,
-			clusterVersionLabelKey, recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
-			return res, err
-		}
-		return nil, r.deleteExternalResources(reqCtx, clusterVersion)
-	})
+	deletionHandler := func() (*ctrl.Result, error) {
+		return r.deleteExternalResources(reqCtx, clusterVersion)
+	}
+	if res, err := intctrlutil.HandleCRDeletion(reqCtx, r, clusterVersion, clusterVersionFinalizerName, deletionHandler); res != nil {
+		return *res, err
+	}
+
+	clusterDefinition, res, err := r.getReferencedClusterDefinition(reqCtx, clusterVersion)
 	if res != nil {
 		return *res, err
 	}
 
-	if clusterVersion.Status.ObservedGeneration == clusterVersion.Generation {
+	if clusterVersion.Status.ObservedGeneration == clusterVersion.Generation &&
+		clusterVersion.Status.ClusterDefGeneration == clusterDefinition.Generation {
 		return intctrlutil.Reconciled()
+	}
+
+	if res, err := r.patchLabelIfNotExist(reqCtx, clusterVersion, clusterDefinition); res != nil {
+		return *res, err
 	}
 
 	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 
-	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-		Name: clusterVersion.Spec.ClusterDefinitionRef,
-	}, clusterdefinition); err != nil {
-		if apierrors.IsNotFound(err) {
-			_ = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error())
-		}
-		return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
-	}
-
 	patch := client.MergeFrom(clusterVersion.DeepCopy())
-	if clusterVersion.ObjectMeta.Labels == nil {
-		clusterVersion.ObjectMeta.Labels = map[string]string{}
-	}
-	clusterVersion.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
-	if err = r.Client.Patch(reqCtx.Ctx, clusterVersion, patch); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	if statusMsg := validateClusterVersion(clusterVersion, clusterdefinition); statusMsg != "" {
+	if statusMsg := validateClusterVersion(clusterVersion, clusterDefinition); statusMsg != "" {
 		clusterVersion.Status.Phase = appsv1alpha1.UnavailablePhase
 		clusterVersion.Status.Message = statusMsg
 	} else {
@@ -157,24 +113,124 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		clusterVersion.Status.Message = ""
 	}
 	clusterVersion.Status.ObservedGeneration = clusterVersion.Generation
-	clusterVersion.Status.ClusterDefGeneration = clusterdefinition.Generation
+	clusterVersion.Status.ClusterDefGeneration = clusterDefinition.Generation
+
 	if err = r.Client.Status().Patch(ctx, clusterVersion, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
 	intctrlutil.RecordCreatedEvent(r.Recorder, clusterVersion)
+
 	return ctrl.Result{}, nil
 }
 
-// handleClusterDefNotFound handles clusterVersion status when clusterDefinition not found.
-func (r *ClusterVersionReconciler) handleClusterDefNotFound(reqCtx intctrlutil.RequestCtx,
+// SetupWithManager sets up the controller with the Manager.
+func (r *ClusterVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&appsv1alpha1.ClusterVersion{}).
+		Watches(
+			&source.Kind{Type: &appsv1alpha1.ClusterDefinition{}},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForClusterDefinition),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(maxConcurReconClusterVersionKey),
+		}).
+		Complete(r)
+}
+
+func (r *ClusterVersionReconciler) findObjectsForClusterDefinition(obj client.Object) []reconcile.Request {
+	labelSelector, err := labels.Parse(clusterDefLabelKey + "=" + obj.GetName())
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	clusterVersions := &appsv1alpha1.ClusterVersionList{}
+	opts := &client.ListOptions{
+		LabelSelector: labelSelector,
+		Namespace:     obj.GetNamespace(),
+	}
+	err = r.List(context.TODO(), clusterVersions, opts)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, len(clusterVersions.Items))
+	for i, item := range clusterVersions.Items {
+		requests[i] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.GetName(),
+				Namespace: item.GetNamespace(),
+			},
+		}
+	}
+	return requests
+}
+
+func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx,
+	clusterVersion *appsv1alpha1.ClusterVersion) (*ctrl.Result, error) {
+	//
+	// delete any external resources associated with the cronJob
+	//
+	// Ensure that delete implementation is idempotent and safe to invoke
+	// multiple times for same object.
+
+	recordEvent := func() {
+		r.Recorder.Event(clusterVersion, corev1.EventTypeWarning, constant.ReasonRefCRUnavailable,
+			"cannot be deleted because of existing referencing Cluster.")
+	}
+	if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, clusterVersion,
+		clusterVersionLabelKey, recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
+		return res, err
+	}
+
+	return nil, appsconfig.DeleteConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
+}
+
+func (r *ClusterVersionReconciler) getReferencedClusterDefinition(reqCtx intctrlutil.RequestCtx,
+	cv *appsv1alpha1.ClusterVersion) (*appsv1alpha1.ClusterDefinition, *ctrl.Result, error) {
+	cd := &appsv1alpha1.ClusterDefinition{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: cv.Spec.ClusterDefinitionRef}, cd); err != nil {
+		if apierrors.IsNotFound(err) {
+			_ = r.handleClusterDefinitionNotFound(reqCtx, cv, err.Error())
+		}
+		res, err := intctrlutil.RequeueWithErrorAndRecordEvent(cv, r.Recorder, err, reqCtx.Log)
+		return nil, &res, err
+	}
+	return cd, nil, nil
+}
+
+// handleClusterDefinitionNotFound handles clusterVersion status when clusterDefinition not found.
+func (r *ClusterVersionReconciler) handleClusterDefinitionNotFound(reqCtx intctrlutil.RequestCtx,
 	clusterVersion *appsv1alpha1.ClusterVersion, message string) error {
 	if clusterVersion.Status.Message == message {
 		return nil
 	}
+
 	patch := client.MergeFrom(clusterVersion.DeepCopy())
 	clusterVersion.Status.Phase = appsv1alpha1.UnavailablePhase
 	clusterVersion.Status.Message = message
 	return r.Client.Status().Patch(reqCtx.Ctx, clusterVersion, patch)
+}
+
+func (r *ClusterVersionReconciler) patchLabelIfNotExist(reqCtx intctrlutil.RequestCtx,
+	clusterVersion *appsv1alpha1.ClusterVersion, clusterDefinition *appsv1alpha1.ClusterDefinition) (*ctrl.Result, error) {
+	if clusterVersion.Labels != nil {
+		if label, ok := clusterVersion.Labels[clusterDefLabelKey]; ok && label == clusterDefinition.Name {
+			return nil, nil
+		}
+	}
+
+	patch := client.MergeFrom(clusterVersion.DeepCopy())
+	if clusterVersion.Labels == nil {
+		clusterVersion.Labels = map[string]string{}
+	}
+	clusterVersion.Labels[clusterDefLabelKey] = clusterDefinition.Name
+	if err := r.Client.Patch(reqCtx.Ctx, clusterVersion, patch); err != nil {
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
+	}
+	return nil, nil
 }
 
 func validateClusterVersion(clusterVersion *appsv1alpha1.ClusterVersion, clusterDef *appsv1alpha1.ClusterDefinition) string {
@@ -186,23 +242,4 @@ func validateClusterVersion(clusterVersion *appsv1alpha1.ClusterVersion, cluster
 		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.componentSpecs[*].componentDefRef %v missing spec.componentSpecs[*].containers in ClusterDefinition.spec.componentDefs[*] and ClusterVersion.spec.componentVersions[*]", noContainersComponents))
 	}
 	return strings.Join(statusMsgs, ";")
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *ClusterVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1alpha1.ClusterVersion{}).
-		WithOptions(controller.Options{
-			MaxConcurrentReconciles: viper.GetInt(maxConcurReconClusterVersionKey),
-		}).
-		Complete(r)
-}
-
-func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, clusterVersion *appsv1alpha1.ClusterVersion) error {
-	//
-	// delete any external resources associated with the cronJob
-	//
-	// Ensure that delete implementation is idempotent and safe to invoke
-	// multiple times for same object.
-	return appsconfig.DeleteConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
 }

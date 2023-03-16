@@ -46,8 +46,6 @@ type ClusterDefinitionReconciler struct {
 	Recorder record.EventRecorder
 }
 
-var clusterDefUpdateHandlers = map[string]func(client client.Client, ctx context.Context, clusterDef *appsv1alpha1.ClusterDefinition) error{}
-
 func init() {
 	viper.SetDefault(maxConcurReconClusterDefKey, runtime.NumCPU()*2)
 }
@@ -96,12 +94,6 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, dbClusterDef); err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
-	}
-
-	for _, handler := range clusterDefUpdateHandlers {
-		if err := handler(r.Client, reqCtx.Ctx, dbClusterDef); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
 	}
 
 	statusPatch := client.MergeFrom(dbClusterDef.DeepCopy())

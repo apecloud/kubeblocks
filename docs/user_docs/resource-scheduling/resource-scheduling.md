@@ -9,7 +9,7 @@ sidebar_position: 1
 Affinity controls the selection logic of pod allocation on nodes. By a reasonable allocation of Kubernetes pods on different nodes, the business availability, resource usage rate, and stability are improved. 
 Affinity and toleration can be set by `kbcli` or the CR YAML file of the cluster. `kbcli` only supports the cluster-level configuration and the CR YAML file supports both the cluster-level and component-level configurations.
 
-## Option 1. Use `kbcli`
+## Option 1. Use kbcli
 
 Run `kbcli cluster create -h` to view the examples and the parameter options of affinity and toleration configurations.
 
@@ -154,6 +154,8 @@ If you need one cluster only for the online core business and need to ensure eve
 kbcli cluster create --tenancy=DedicatedNode
 ```
 
-> ***Note:***
->
-> This command will be performed successfully based on the prerequisite that you have added taints for these nodes. Otherwise, the business that is not managed by KubeBlocks can still be deployed on these nodes.
+:::note
+
+This command will be performed successfully based on the prerequisite that you have added taints for these nodes. Otherwise, the business that is not managed by KubeBlocks can still be deployed on these nodes.
+
+:::

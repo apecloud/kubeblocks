@@ -28,7 +28,7 @@ data:
         sleep 1
     done
     echo "create extension pg_stat_statements."
-    psql -Upostgres -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;" >/dev/null 2>&1
+    psql -Upostgres -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;" 2>&1
     if [ $? -eq 0 ];then
         echo "create extension pg_stat_statements success."
     else

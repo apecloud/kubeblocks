@@ -151,9 +151,8 @@ type ProvisionStatements struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
-	// ClusterDefinition phase -
+	// ClusterDefinition phase, valid values are <empty>, Available.
 	// Available is ClusterDefinition become available, and can be referenced for co-related objects.
-	// +kubebuilder:validation:Enum={Available}
 	Phase Phase `json:"phase,omitempty"`
 
 	// Extra message in current phase
@@ -165,6 +164,10 @@ type ClusterDefinitionStatus struct {
 	// updated on mutation by the API Server.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+func (r ClusterDefinitionStatus) GetTerminalPhases() []Phase {
+	return []Phase{AvailablePhase}
 }
 
 type ComponentTemplateSpec struct {

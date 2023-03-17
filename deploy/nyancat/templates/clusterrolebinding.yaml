@@ -5,7 +5,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: {{ include "nyancat.serviceAccountName" . }}
-    namespace: {{ .Values.namespace }}
+    namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
   name: {{ include "nyancat.fullname" . }}

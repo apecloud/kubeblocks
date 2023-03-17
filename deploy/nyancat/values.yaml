@@ -7,7 +7,7 @@ replicaCount: 2
 image:
   registry: registry.cn-hangzhou.aliyuncs.com
   repository: apecloud/nyancat
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: "latest"
 
@@ -66,5 +66,3 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
-
-namespace: ""

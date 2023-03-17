@@ -19,9 +19,9 @@ This section shows how to use `kbcli` to back up and restore a MySQL Standalone 
 
 ***Steps:***
 
-1. Install KubeBlocks and check whether the snapshot-controller add-on is enabled.
+1. Install KubeBlocks and the snapshot-controller add-on.
      ```bash
-     kbcli kubeblocks install
+     kbcli kubeblocks install --set snapshot-controller.enabled=true
      ```
  
      Since your `kubectl` is already connected to the EKS cluster, this command installs the latest version of KubeBlocks in the default namespace `kb-system` in your EKS environment.

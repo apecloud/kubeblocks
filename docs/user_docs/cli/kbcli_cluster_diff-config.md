@@ -1,38 +1,24 @@
 ---
-title: kbcli cluster explain-configure
+title: kbcli cluster diff-config
 ---
 
-List the constraint for supported configuration params.
+Show the difference in parameters between the two submitted OpsRequest.
 
 ```
-kbcli cluster explain-configure [flags]
+kbcli cluster diff-config [flags]
 ```
 
 ### Examples
 
 ```
-  # describe a cluster, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster
-  
-  # describe a specified configure template, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl
-  
-  # describe a specified configure template, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --trunc-document=false --trunc-enum=false
-  
-  # describe a specified parameters, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --param=sql_mode
+  # compare config files
+  kbcli cluster diff-configure opsrequest1 opsrequest2
 ```
 
 ### Options
 
 ```
-      --component-name string    Specify the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter."
-  -h, --help                     help for explain-configure
-      --param string             Specify the name of parameter to be query. It clearly display the details of the parameter.
-      --template-names strings   Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --template-names=mysql-3node-tpl)
-      --trunc-document           If the document length of the parameter is greater than 100, it will be truncated.
-      --trunc-enum               If the value list length of the parameter is greater than 20, it will be truncated. (default true)
+  -h, --help   help for diff-config
 ```
 
 ### Options inherited from parent commands

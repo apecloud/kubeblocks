@@ -1,0 +1,55 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: aws-loadbalancer-controller
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: The AWS Load Balancer Controller manages AWS Elastic Load Balancers for a Kubernetes cluster.
+  type: Helm
+
+  helm:
+    # origin: https://aws.github.io/eks-charts/aws-load-balancer-controller-1.4.8.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/aws-load-balancer-controller-1.4.8.tgz
+
+    installValues:
+      configMapRefs:
+      - name: aws-loadbalancer-controller-chart-kubeblocks-values
+        key: values-kubeblocks-override.yaml
+
+      setValues:
+      - serviceAccount.create=true
+      - serviceAccount.name=kubeblocks-service-account-aws-load-balancer-controller
+      - clusterName={{ index .Values "aws-loadbalancer-controller" "cluterName " }}
+      - image.repository={{ index .Values "aws-loadbalancer-controller" "image" "registry"}}
+
+    valuesMapping:
+      valueMap:
+        replicaCount: replicaCount
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+  - replicas: 1
+
+  installable:
+    autoInstall: false
+    selectors:
+    - key: KubeGitVersion
+      operator: Contains
+      values:
+      - eks
+

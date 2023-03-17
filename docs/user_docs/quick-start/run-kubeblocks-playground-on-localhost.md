@@ -15,6 +15,8 @@ Meet the following requirements for smooth operation of Playground and other fun
 * Minimum system requirements:
   * CPU: 4 cores
   * RAM: 4 GB
+  To check CPU, use `sysctl hw.physicalcpu` command;
+  To check memory, use `top -d` command.
 
 * Make sure the following tools are installed on your local host.
   * Docker: v20.10.5 (runc ≥ v1.0.0-rc93) or above. For installation details, refer to [Get Docker](https://docs.docker.com/get-docker/).

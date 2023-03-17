@@ -50,8 +50,8 @@ var _ = Describe("Reconfigure Controller", func() {
 	const cmName = "mysql-tree-node-template-8.0"
 
 	var (
-		timeout  = time.Second * 60
-		interval = time.Second
+		timeout  = time.Second * 30
+		interval = time.Millisecond
 	)
 
 	var ctx = context.Background()

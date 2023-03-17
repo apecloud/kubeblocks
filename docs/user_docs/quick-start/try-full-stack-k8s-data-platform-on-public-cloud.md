@@ -1,11 +1,11 @@
 ---
-title: Run KubeBlocks Playground on AWS EKS
+title: Try full stack k8s data platform on public cloud
 description: How to run KubeBlocks on Playground
 sidebar_position: 2
-sidebar_label: Playground on AWS EKS
+sidebar_label: Try KubeBlocks on public cloud
 ---
 
-# Run KubeBlocks Playground on AWS EKS
+# Try full stack k8s data platform on public cloud
 
 You can deploy EKS cluster and deploy KubeBlocks on EKS from v0.4 with `kbcli playground` command. 
 
@@ -195,7 +195,7 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
 ### High availability of ApeCloud MySQL
 
 ApeCloud MySQL Paxos Group delivers high availability with RPO=0 and RTO in less than 30 seconds.
-Here we use a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
+This section use a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
 
 #### Create an ApeCloud MySQL Paxos Group
 

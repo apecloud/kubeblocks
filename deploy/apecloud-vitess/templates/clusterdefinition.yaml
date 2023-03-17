@@ -236,6 +236,7 @@ spec:
                 su vitess <<EOF
                 exec vttablet \
                 $topology_fags \
+                --alsologtostderr \
                 --log_dir $VTDATAROOT \
                 --log_queries_to_file $VTDATAROOT/$tablet_logfile \
                 --tablet-path $alias \
@@ -244,8 +245,8 @@ spec:
                 --init_shard $shard \
                 --init_tablet_type $tablet_type \
                 --health_check_interval 1s \
-                --shard_sync_retry_delay 2s \
-                --remote_operation_timeout 2s \
+                --shard_sync_retry_delay 1s \
+                --remote_operation_timeout 1s \
                 --db_connect_timeout_ms 500 \
                 --enable_replication_reporter \
                 --backup_storage_implementation file \
@@ -265,8 +266,7 @@ spec:
                 --service_map 'grpc-queryservice,grpc-tabletmanager,grpc-updatestream' \
                 --pid_file $VTDATAROOT/vttablet.pid \
                 --vtctld_addr http://$vtctld_host:$vtctld_web_port/ \
-                --disable_active_reparents \
-                > $VTDATAROOT/vttablet.out 2>&1
+                --disable_active_reparents 
                 EOF
       systemAccounts:
         cmdExecutorConfig:
@@ -370,7 +370,7 @@ spec:
 
                 etcd --enable-v2=true --data-dir "${VTDATAROOT}/etcd/"  \
                   --listen-client-urls "http://0.0.0.0:${etcd_port}" \
-                  --advertise-client-urls "http://0.0.0.0:${etcd_port}" > "${VTDATAROOT}"/etcd.out 2>&1
+                  --advertise-client-urls "http://0.0.0.0:${etcd_port}"
             lifecycle:
               postStart:
                 exec:
@@ -459,6 +459,7 @@ spec:
                 su vitess <<EOF
                 exec vtctld \
                 $topology_fags \
+                --alsologtostderr \
                 --cell $cell \
                 --service_map 'grpc-vtctl,grpc-vtctld' \
                 --backup_storage_implementation file \
@@ -466,8 +467,7 @@ spec:
                 --log_dir $VTDATAROOT \
                 --port $vtctld_web_port \
                 --grpc_port $grpc_port \
-                --pid_file $VTDATAROOT/vtctld.pid \
-                  > $VTDATAROOT/vtctld.out 2>&1
+                --pid_file $VTDATAROOT/vtctld.pid 
                 EOF
     - name: vtconsensus
       characterType: vtconsensus
@@ -529,13 +529,13 @@ spec:
                 su vitess <<EOF
                 exec vtconsensus \
                   $topology_fags \
+                  --alsologtostderr \
                   --clusters_to_watch "$keyspace/$shard" \
-                  --refresh_interval 2s \
-                  --scan_repair_timeout 2s \
+                  --refresh_interval 1s \
+                  --scan_repair_timeout 1s \
                   --log_dir ${VTDATAROOT} \
                   --db_username "$MYSQL_ROOT_USER" \
-                  --db_password "$MYSQL_ROOT_PASSWORD" \
-                  > $VTDATAROOT/vtconsensus.out 2>&1
+                  --db_password "$MYSQL_ROOT_PASSWORD"
                 EOF
     - name: vtgate
       characterType: vtgate
@@ -614,11 +614,12 @@ spec:
                 su vitess <<EOF
                 exec vtgate \
                   $TOPOLOGY_FLAGS \
+                  --alsologtostderr \
                   --gateway_initial_tablet_timeout 30s \
-                  --healthcheck_timeout 2s \
-                  --srv_topo_timeout 2s \
-                  --grpc_keepalive_time 3s \
-                  --grpc_keepalive_timeout 3s \
+                  --healthcheck_timeout 1s \
+                  --srv_topo_timeout 1s \
+                  --grpc_keepalive_time 1s \
+                  --grpc_keepalive_timeout 2s \
                   --log_dir $VTDATAROOT \
                   --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
                   --port $web_port \
@@ -630,6 +631,5 @@ spec:
                   --tablet_types_to_wait PRIMARY,REPLICA \
                   --service_map 'grpc-vtgateservice' \
                   --pid_file $VTDATAROOT/vtgate.pid \
-                  --mysql_auth_server_impl none \
-                  > $VTDATAROOT/vtgate.out 2>&1
+                  --mysql_auth_server_impl none 
                 EOF

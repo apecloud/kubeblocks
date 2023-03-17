@@ -25,7 +25,7 @@ spec:
       - serviceAccount.create=true
       - serviceAccount.name=kubeblocks-service-account-aws-load-balancer-controller
       - clusterName={{ index .Values "aws-loadbalancer-controller" "cluterName " }}
-      - image.repository={{ index .Values "aws-load-balancer-controller" "image" "registry"}}
+      - image.repository={{ index .Values "aws-loadbalancer-controller" "image" "registry"}}
 
     valuesMapping:
       valueMap:

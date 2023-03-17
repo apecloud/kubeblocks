@@ -1615,3 +1615,15 @@ alertmanager-webhook-adaptor:
   ## Webhook-Adaptor ConfigMap Entries
   configFiles:
     config.yaml: { }
+
+csi-hostpath-driver:
+  ## @param csi-hostpath-driver.enabled -- Enable csi-hostpath-driver chart.
+  ##
+  enabled: false
+  ## csi-hostpath-driver storageClass setting
+  ## @param csi-hostpath-driver.storageClass.create -- Specifies whether the storage class should be created.
+  ## @param csi-hostpath-driver.storageClass.default -- Specifies whether the storage class should be default after created.
+  ##
+  storageClass:
+    create: true
+    default: true

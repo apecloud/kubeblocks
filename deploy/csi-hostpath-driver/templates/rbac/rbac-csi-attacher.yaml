@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: csi-attacher
+  name: csi-attacher-{{ include "csi-hostpath-driver.fullname" . }}
   namespace: {{ .Release.Namespace }}
 
 ---
@@ -9,7 +9,7 @@ metadata:
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: external-attacher-runner
+  name: external-attacher-runner-{{ include "csi-hostpath-driver.fullname" . }}
 rules:
   - apiGroups: [""]
     resources: ["persistentvolumes"]
@@ -35,14 +35,14 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-attacher-role
+  name: csi-attacher-role-{{ include "csi-hostpath-driver.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: csi-attacher
+    name: csi-attacher-{{ include "csi-hostpath-driver.fullname" . }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
-  name: external-attacher-runner
+  name: external-attacher-runner-{{ include "csi-hostpath-driver.fullname" . }}
   apiGroup: rbac.authorization.k8s.io
 
 ---
@@ -52,7 +52,7 @@ kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: external-attacher-cfg
+  name: external-attacher-cfg-{{ include "csi-hostpath-driver.fullname" . }}
 rules:
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]
@@ -62,13 +62,13 @@ rules:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-attacher-role-cfg
+  name: csi-attacher-role-cfg-{{ include "csi-hostpath-driver.fullname" . }}
   namespace: {{ .Release.Namespace }}
 subjects:
   - kind: ServiceAccount
-    name: csi-attacher
+    name: csi-attacher-{{ include "csi-hostpath-driver.fullname" . }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
-  name: external-attacher-cfg
+  name: external-attacher-cfg-{{ include "csi-hostpath-driver.fullname" . }}
   apiGroup: rbac.authorization.k8s.io

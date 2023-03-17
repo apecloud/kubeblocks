@@ -44,6 +44,10 @@ func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
 		KBCLIApp: version.GetVersion(),
 	}
 
+	if client == nil {
+		return versionInfo, nil
+	}
+
 	if versionInfo[KubernetesApp], err = getK8sVersion(client.Discovery()); err != nil {
 		return versionInfo, err
 	}

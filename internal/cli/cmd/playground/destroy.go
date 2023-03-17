@@ -19,6 +19,7 @@ package playground
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -146,10 +147,12 @@ func (o *destroyOptions) destroyCloud() error {
 		return cmdutil.ErrExit
 	}
 
+	o.startTime = time.Now()
 	fmt.Fprintf(o.Out, "Destroy %s %s cluster %s...\n", o.cloudProvider, cp.K8sService(o.cloudProvider), name)
 	if err = provider.DeleteK8sCluster(name); err != nil {
 		return err
 	}
+	fmt.Fprintf(o.Out, "Playground destroy completed in %s.\n", time.Since(o.startTime))
 
 	return nil
 }

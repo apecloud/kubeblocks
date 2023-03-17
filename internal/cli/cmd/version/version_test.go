@@ -19,26 +19,10 @@ package version
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
+
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-
-	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
-
-const kbVersion = "0.3.0"
-
-var mockDeploy = func(version string) *appsv1.Deployment {
-	deploy := &appsv1.Deployment{}
-	deploy.SetLabels(map[string]string{
-		"app.kubernetes.io/name": types.KubeBlocksChartName,
-	})
-	if len(version) > 0 {
-		deploy.Labels["app.kubernetes.io/version"] = version
-	}
-	return deploy
-}
 
 var _ = Describe("version", func() {
 	It("version", func() {
@@ -48,15 +32,8 @@ var _ = Describe("version", func() {
 		cmd := NewVersionCmd(tf)
 		Expect(cmd).ShouldNot(BeNil())
 
-		By("complete")
-		o := &versionOptions{}
-		Expect(o.Complete(tf)).Should(Succeed())
-
 		By("testing run")
-		client := testing.FakeClientSet(mockDeploy(kbVersion))
-		o = &versionOptions{
-			client: client,
-		}
-		o.Run()
+		o := &versionOptions{}
+		o.Run(tf)
 	})
 })

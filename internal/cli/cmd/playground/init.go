@@ -54,6 +54,7 @@ var (
 type baseOptions struct {
 	cloudProvider string
 	region        string
+	startTime     time.Time
 }
 
 type initOptions struct {
@@ -63,7 +64,6 @@ type initOptions struct {
 	verbose        bool
 	kbVersion      string
 	clusterVersion string
-	startTime      time.Time
 
 	baseOptions
 }
@@ -209,7 +209,7 @@ if it takes a long time, please check the network environment and try again.
 	}
 
 	o.startTime = time.Now()
-	fmt.Fprintln(o.Out)
+	printer.PrintBlankLine(o.Out)
 	cpPath, err := cloudProviderRepoDir()
 	if err != nil {
 		return err
@@ -250,6 +250,7 @@ if it takes a long time, please check the network environment and try again.
 		return err
 	}
 
+	printer.PrintBlankLine(o.Out)
 	// CreateK8sCluster KubeBlocks and create cluster
 	return o.installKBAndCluster(clusterName)
 }

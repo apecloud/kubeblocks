@@ -14,20 +14,6 @@ Volume expansion triggers pod restart, all pods restart in the order of learner 
 
 :::
 
-## How KubeBlocks expands the volume
-
-![Expand volume](./../../../img/mysql_cluster_expand_volume.png)
-
-1. A user creates a volume expansion OpsRequest CR.
-2. This CR passes the webhook validation.
-3. The OpsRequest controller handles this OpsRequest and updates the storage size of the specified component and VolumeClaimTemplate to the configured amount.
-4. The OpsRequest controller updates the cluster phase to `VolumeExpanding`.
-5. The cluster controller watches the cluster CR.
-6. The cluster controller changes the capacity of the corresponding PVC.
-7. The PVC controller listens to the PVC changes and asks the OpsRequest controller to reconcile the phases of the cluster and OpsRequest.
-8. If the PVC of a component is expanded successfully, the OpsRequest controller updates this component phase to `Running`. When all components are expanded successfully, the OpsRequest controller updates this OpsRequest to `Succeed`.
-9. The cluster controller watches the component phase changes and when all components are Running, the cluster controller updates the cluster phase to `Running`.
-
 ## Before you start
 
 Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.

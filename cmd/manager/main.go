@@ -86,7 +86,7 @@ func init() {
 	viper.AutomaticEnv()
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
-	viper.SetDefault("VOLUMESNAPSHOT", true)
+	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
 	viper.SetDefault("PROBE_SERVICE_HTTP_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)

@@ -104,11 +104,10 @@ func (c *clusterPlanBuilder) Validate() error {
 		return newRequeueError(ControllerErrorRequeueTime, message)
 	}
 
-	// validate logs & replication set primary index availability
+	// validate logs
 	// and a sample validator chain
 	chain := &graph.ValidatorChain{
 		&enableLogsValidator{cluster: c.cluster, clusterDef: cd},
-		&rplSetPrimaryIndexValidator{cluster: c.cluster, clusterDef: cd},
 	}
 	if err := chain.WalkThrough(); err != nil {
 		_ = c.conMgr.setPreCheckErrorCondition(c.cluster, err)

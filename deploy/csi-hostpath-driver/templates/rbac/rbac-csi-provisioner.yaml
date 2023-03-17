@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: csi-provisioner
+  name: csi-provisioner-{{ include "csi-hostpath-driver.fullname" . }}
   namespace: {{ .Release.Namespace }}
 
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: external-provisioner-runner
+  name: external-provisioner-runner-{{ include "csi-hostpath-driver.fullname" . }}
 rules:
   # The following rule should be uncommented for plugins that require secrets
   # for provisioning.
@@ -58,14 +58,14 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-provisioner-role
+  name: csi-provisioner-role-{{ include "csi-hostpath-driver.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: csi-provisioner
+    name: csi-provisioner-{{ include "csi-hostpath-driver.fullname" . }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
-  name: external-provisioner-runner
+  name: external-provisioner-runner-{{ include "csi-hostpath-driver.fullname" . }}
   apiGroup: rbac.authorization.k8s.io
 
 ---
@@ -75,7 +75,7 @@ kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: external-provisioner-cfg
+  name: external-provisioner-cfg-{{ include "csi-hostpath-driver.fullname" . }}
 rules:
   # Only one of the following rules for endpoints or leases is required based on
   # what is set for `--leader-election-type`. Endpoints are deprecated in favor of Leases.
@@ -102,13 +102,13 @@ rules:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-provisioner-role-cfg
+  name: csi-provisioner-role-cfg-{{ include "csi-hostpath-driver.fullname" . }}
   namespace: {{ .Release.Namespace }}
 subjects:
   - kind: ServiceAccount
-    name: csi-provisioner
+    name: csi-provisioner-{{ include "csi-hostpath-driver.fullname" . }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
-  name: external-provisioner-cfg
+  name: external-provisioner-cfg-{{ include "csi-hostpath-driver.fullname" . }}
   apiGroup: rbac.authorization.k8s.io

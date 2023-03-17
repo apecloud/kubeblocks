@@ -218,17 +218,17 @@ func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.Invo
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
-		result["event"] = "ExecFailed"
+		result["event"] = OperationFailed
 		result["message"] = "no sql provided"
 		return result, nil
 	}
 	count, err := mysqlOps.exec(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("exec error: %v", err)
-		result["event"] = "ExecFailed"
+		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = "ExecSuccess"
+		result["event"] = OperationSuccess
 		result["count"] = count
 	}
 	return result, nil
@@ -240,10 +240,10 @@ func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *bindings.In
 	_, err := mysqlOps.query(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("GetLagOps error: %v", err)
-		result["event"] = "GetLagOpsFailed"
+		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = "GetLagOpsSuccess"
+		result["event"] = OperationSuccess
 		result["lag"] = 0
 	}
 	return result, nil
@@ -253,17 +253,17 @@ func (mysqlOps *MysqlOperations) QueryOps(ctx context.Context, req *bindings.Inv
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
-		result["event"] = "QueryFailed"
+		result["event"] = OperationFailed
 		result["message"] = "no sql provided"
 		return result, nil
 	}
 	data, err := mysqlOps.query(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("Query error: %v", err)
-		result["event"] = "QueryFailed"
+		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = "QuerySuccess"
+		result["event"] = OperationSuccess
 		result["message"] = string(data)
 	}
 	return result, nil
@@ -295,7 +295,7 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindin
 	result := OpsResult{}
 	if err != nil {
 		mysqlOps.Logger.Infof("CheckStatus error: %v", err)
-		result["event"] = "CheckStatusFailed"
+		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		if mysqlOps.CheckStatusFailedCount%mysqlOps.FailedEventReportFrequency == 0 {
 			mysqlOps.Logger.Infof("status checks failed %v times continuously", mysqlOps.CheckStatusFailedCount)
@@ -303,7 +303,7 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindin
 		}
 		mysqlOps.CheckStatusFailedCount++
 	} else {
-		result["event"] = "CheckStatusSuccess"
+		result["event"] = OperationSuccess
 		result["message"] = string(data)
 		mysqlOps.CheckStatusFailedCount = 0
 	}

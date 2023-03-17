@@ -117,7 +117,7 @@ func init() {
 
 // Handle is the event handler for the cluster status event.
 func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != component.ProbeRoleChangedCheckPath {
+	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 
@@ -227,9 +227,17 @@ func (r *ClusterReconciler) checkWithReferencedCD(reqCtx intctrlutil.RequestCtx,
 		res, err := intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 		return &res, err
 	}
+
 	if err := cluster.ValidatePrimaryIndex(cd); err != nil {
 		_ = condMgr.setPreCheckErrorCondition(err)
 		res, err := intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		return &res, err
+	}
+
+	// validate config and send warning event log necessarily
+	if err = cluster.ValidateEnabledLogs(cd); err != nil {
+		_ = condMgr.setPreCheckErrorCondition(err)
+		res, err := intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 		return &res, err
 	}
 	return nil, nil

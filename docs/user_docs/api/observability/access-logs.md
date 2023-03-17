@@ -208,7 +208,7 @@ data:
 ...
 ```
 
-### `Status`
+### Status
 
 The log-related function, similar to a warning, neither affects the main flow of control and management nor changes `Phase` or `Generation`. It adds a `conditions` field in `cluster API status` to store the warning of a cluster.
 

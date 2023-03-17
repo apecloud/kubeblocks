@@ -26,6 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -263,6 +264,8 @@ func (o *uninstallOptions) uninstallAddons() error {
 				allErrs = append(allErrs, err)
 				continue
 			}
+			klog.V(1).Infof("Addon: %s, enabled: %v, status: %s",
+				addon.Name, addon.Spec.InstallSpec.GetEnabled(), addon.Status.Phase)
 			addons = append(addons, &addon)
 			if addon.Status.Phase == extensionsv1alpha1.AddonDisabled {
 				continue
@@ -290,11 +293,13 @@ func (o *uninstallOptions) uninstallAddons() error {
 		return nil
 	}
 
-	// check if all addons are disabled, if so, then we will stop uninstalling addons
-	// otherwise, we will wait for a while and check again
-	for i := 0; i < 5; i++ {
-		klog.V(1).Infof("Wait for %d seconds and check addons disabled again", i+3)
-		time.Sleep(time.Duration(i+3) * time.Second)
+	// check if all addons are disabled, if so, then we will stop checking addons
+	// status otherwise, we will wait for a while and check again
+	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_TIMES"); i++ {
+		klog.V(1).Infof("Wait for %d seconds and check addons disabled again", 5)
+		time.Sleep(5 * time.Second)
+		// pass a nil processFn, we will only check addons status, do not try to
+		// uninstall addons again
 		if o.addons, err = processAddons(nil); err != nil {
 			return err
 		}

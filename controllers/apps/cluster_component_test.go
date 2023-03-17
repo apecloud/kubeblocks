@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -179,7 +180,7 @@ spec:
 		vs := snapshotv1.VolumeSnapshot{}
 		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
 		labels := map[string]string{
-			constant.AppManagedByLabelKey:   constant.AppName,
+			constant.KBManagedByKey:         "cluster",
 			constant.AppInstanceLabelKey:    clusterName,
 			constant.KBAppComponentLabelKey: componentName,
 		}
@@ -358,6 +359,41 @@ spec:
 			targetAnnotations := map[string]string{"k1": "v11"}
 			expectAnnotations := map[string]string{"k1": "v11"}
 			Expect(mergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
+		})
+	})
+
+	Context("backup test", func() {
+		It("should not delete backups not created by lifecycle", func() {
+			backupPolicyName := "test-backup-policy"
+			backupName := "test-backup-job"
+
+			By("creating a backup as user do")
+			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				SetTTL("168h0m0s").
+				SetBackupPolicyName(backupPolicyName).
+				SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(mysqlCompName).
+				AddAppManangedByLabel().
+				Create(&testCtx).GetObject()
+			backupKey := client.ObjectKeyFromObject(backup)
+
+			By("checking backup exists")
+			Eventually(func(g Gomega) {
+				tmpBackup := dataprotectionv1alpha1.Backup{}
+				g.Expect(k8sClient.Get(ctx, backupKey, &tmpBackup)).Should(Succeed())
+				g.Expect(tmpBackup.Labels[constant.AppInstanceLabelKey]).NotTo(Equal(""))
+				g.Expect(tmpBackup.Labels[constant.KBAppComponentLabelKey]).NotTo(Equal(""))
+			}).Should(Succeed())
+
+			By("call deleteBackup in lifecycle which should only delete backups created by itself")
+			Expect(deleteBackup(ctx, k8sClient, clusterName, mysqlCompName))
+
+			By("checking backup does not be deleted")
+			Consistently(func(g Gomega) {
+				tmpBackup := dataprotectionv1alpha1.Backup{}
+				Expect(k8sClient.Get(ctx, backupKey, &tmpBackup)).Should(Succeed())
+			}).Should(Succeed())
 		})
 	})
 })

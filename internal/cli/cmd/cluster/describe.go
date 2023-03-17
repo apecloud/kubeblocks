@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -204,6 +205,11 @@ func showEvents(events *corev1.EventList, name string, namespace string, out io.
 	cnt := 0
 	for _, o := range *objs {
 		e := o.(*corev1.Event)
+		// do not output KubeBlocks probe events
+		if e.InvolvedObject.FieldPath == constant.ProbeCheckRolePath {
+			continue
+		}
+
 		tbl.AddRow(util.GetEventTimeStr(e), e.Type, e.Reason, util.GetEventObject(e), e.Message)
 		cnt++
 		if cnt == 5 {

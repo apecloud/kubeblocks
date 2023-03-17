@@ -38,15 +38,26 @@ import (
 // GetSimpleInstanceInfos return simple instance info that only contains instance name and role, the default
 // instance should be the first element in the returned array.
 func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace string) []*InstanceInfo {
+	// if cluster status contains what we need, return directly
+	if infos := getInstanceInfoFromStatus(dynamic, name, namespace); len(infos) > 0 {
+		return infos
+	}
+
+	// if cluster status does not contain what we need, try to list all pods and build instance info
+	return getInstanceInfoByList(dynamic, name, namespace)
+}
+
+// getInstancesInfoFromCluster get instances info from cluster status
+func getInstanceInfoFromStatus(dynamic dynamic.Interface, name string, namespace string) []*InstanceInfo {
 	var infos []*InstanceInfo
 	cluster, err := GetClusterByName(dynamic, name, namespace)
 	if err != nil {
 		return nil
 	}
-
 	// travel all components, check type
 	for _, c := range cluster.Status.Components {
 		var info *InstanceInfo
+		// workload type is Consensus
 		if c.ConsensusSetStatus != nil {
 			buildInfoByStatus := func(status *appsv1alpha1.ConsensusMemberStatus) {
 				if status == nil {
@@ -67,6 +78,8 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 			// learner
 			buildInfoByStatus(c.ConsensusSetStatus.Learner)
 		}
+
+		// workload type is Replication
 		if c.ReplicationSetStatus != nil {
 			buildInfoByStatus := func(status *appsv1alpha1.ReplicationMemberStatus) {
 				if status == nil {
@@ -84,11 +97,15 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 			}
 		}
 	}
+	return infos
+}
 
-	// if cluster status does not contain what we need, try to get all instances
+// getInstanceInfoByList get instances info by list all pods
+func getInstanceInfoByList(dynamic dynamic.Interface, name string, namespace string) []*InstanceInfo {
+	var infos []*InstanceInfo
 	objs, err := dynamic.Resource(schema.GroupVersionResource{Group: corev1.GroupName, Version: types.K8sCoreAPIVersion, Resource: "pods"}).
 		Namespace(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: util.BuildLabelSelectorByNames("", []string{cluster.Name}),
+		LabelSelector: util.BuildLabelSelectorByNames("", []string{name}),
 	})
 	if err != nil {
 		return nil
@@ -96,33 +113,7 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 	for _, o := range objs.Items {
 		infos = append(infos, &InstanceInfo{Name: o.GetName()})
 	}
-
 	return infos
-}
-
-// GetClusterTypeByPod gets the cluster type from pod label
-func GetClusterTypeByPod(pod *corev1.Pod) (string, error) {
-	var clusterType string
-
-	if name, ok := pod.Labels[constant.AppNameLabelKey]; ok {
-		clusterType = strings.Split(name, "-")[0]
-	}
-
-	if clusterType == "" {
-		return "", fmt.Errorf("failed to get the cluster type")
-	}
-
-	return clusterType, nil
-}
-
-// GetAllCluster get all clusters in current namespace
-func GetAllCluster(client dynamic.Interface, namespace string, clusters *appsv1alpha1.ClusterList) error {
-	objs, err := client.Resource(types.ClusterGVR()).Namespace(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	return runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), clusters)
 }
 
 // FindClusterComp finds component in cluster object based on the component definition name

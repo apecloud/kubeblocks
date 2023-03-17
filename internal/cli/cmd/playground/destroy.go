@@ -19,6 +19,7 @@ package playground
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -69,7 +70,7 @@ func newGuideCmd() *cobra.Command {
 		Use:   "guide",
 		Short: "Display playground cluster user guide.",
 		Run: func(cmd *cobra.Command, args []string) {
-			printGuide(false, "")
+			printGuide()
 		},
 	}
 	return cmd
@@ -146,10 +147,12 @@ func (o *destroyOptions) destroyCloud() error {
 		return cmdutil.ErrExit
 	}
 
+	o.startTime = time.Now()
 	fmt.Fprintf(o.Out, "Destroy %s %s cluster %s...\n", o.cloudProvider, cp.K8sService(o.cloudProvider), name)
 	if err = provider.DeleteK8sCluster(name); err != nil {
 		return err
 	}
+	fmt.Fprintf(o.Out, "\nPlayground destroy completed in %s.\n", time.Since(o.startTime).Truncate(time.Second))
 
 	return nil
 }

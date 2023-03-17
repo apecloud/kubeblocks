@@ -289,7 +289,7 @@ clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 
 .PHONY: doc
-kbcli-doc: ## generate CLI command reference manual.
+kbcli-doc: generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 ##@ Load Balancer
@@ -528,7 +528,7 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	docker buildx create --platform linux/amd64,linux/arm64 --name x-builder --driver docker-container --use
 
 .PHONY: golangci
-golangci: GOLANGCILINT_VERSION = v1.49.0
+golangci: GOLANGCILINT_VERSION = v1.51.2
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
 	echo golangci-lint is already installed

@@ -2,6 +2,7 @@
 title: OpsRequest
 description: The API of KubeBlocks OpsRequest
 sidebar_position: 2
+sidebar_label: OpsRequest
 ---
 
 # OpsRequest
@@ -12,9 +13,9 @@ sidebar_position: 2
 
 ## OpsRequest CRD Specifications
 
-The following are sample `OpsRequest` CRs for different operations:
+The following are examples of `OpsRequest` CRs for different operations:
 
-### Sample `OpsRequest` for restarting a KubeBlocks cluster
+### Example for restarting a KubeBlocks cluster
 
 ```
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -61,7 +62,7 @@ status:
   phase: Succeed
 ```
 
-### Sample `OpsRequest` for vertical scaling
+### Example for vertical scaling
 
 ```
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -82,7 +83,7 @@ spec:
       cpu: "0.2"
 ```
 
-### Sample `OpsRequest` for horizontal scaling
+### Example for horizontal scaling
 
 ```
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -99,7 +100,7 @@ spec:
       replicas: 3
 ```
 
-### Sample `OpsRequest` for upgrading a KubeBlocks cluster
+### Example for upgrading a KubeBlocks cluster
 
 ```
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -115,7 +116,7 @@ spec:
     clusterVersionRef: 5.0.1
 ```
 
-### Sample `OpsRequest` for volume expansion
+### Example for volume expansion
 
 ```
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -133,7 +134,7 @@ spec:
       storage: "2Gi" 
 ```
 
-## OpsRequest `spec`
+## OpsRequest spec
 
 An `OpsRequest` object has the following fields in the `spec` section.
 
@@ -201,7 +202,7 @@ It indicates the component-level operation and is an array that supports operati
       replicas: 3
     ```
 
-## OpsRequest `status`
+## OpsRequest status
 
 `status` describes the current state and progress of the `OpsRequest` operation. It has the following fields:
 

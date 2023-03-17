@@ -96,7 +96,7 @@ func TestInvoke(t *testing.T) {
 			if err != nil {
 				t.Errorf("CheckRunning failed: %s", err)
 			}
-			if opsRes["event"] != "CheckRunningFailed" {
+			if opsRes["event"] != OperationFailed {
 				t.Errorf("unexpected response: %s", string(resp.Data))
 			}
 		})
@@ -109,7 +109,7 @@ func TestInvoke(t *testing.T) {
 			if err != nil {
 				t.Errorf("CheckRunning failed: %s", err)
 			}
-			if opsRes["event"] != "CheckRunningSuccess" {
+			if opsRes["event"] != OperationSuccess {
 				t.Errorf("unexpected response: %s", string(resp.Data))
 			}
 		})
@@ -152,7 +152,7 @@ func TestInvoke(t *testing.T) {
 			if err != nil {
 				t.Errorf("CheckRole failed: %s", err)
 			}
-			if opsRes["event"] != "roleInvalid" {
+			if opsRes["event"] != OperationInvalid {
 				t.Errorf("CheckRole response error: %s", resp.Data)
 			}
 		})
@@ -182,7 +182,7 @@ func TestInvoke(t *testing.T) {
 			if err != nil {
 				t.Errorf("GetRole failed: %s", err)
 			}
-			if opsRes["event"] != "checkRoleFailed" {
+			if opsRes["event"] != OperationFailed {
 				t.Errorf("GetRole response error: %s", resp.Data)
 			}
 		})
@@ -237,7 +237,7 @@ func TestInvoke(t *testing.T) {
 			if err != nil {
 				t.Errorf("GetRole failed: %s", err)
 			}
-			if opsRes["event"] != "getRoleFailed" {
+			if opsRes["event"] != OperationFailed {
 				t.Errorf("GetRole response error: %s", resp.Data)
 			}
 		})

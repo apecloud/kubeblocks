@@ -100,7 +100,7 @@ metrics:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/postgres-exporter
-    tag: 0.11.1-debian-11-r49
+    tag: 0.11.1-debian-11-r66
     digest: ""
     pullPolicy: IfNotPresent
     ## Optionally specify an array of imagePullSecrets.

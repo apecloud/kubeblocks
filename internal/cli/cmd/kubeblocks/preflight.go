@@ -151,7 +151,10 @@ func (p *PreflightOptions) complete(factory cmdutil.Factory, args []string) erro
 		if err != nil {
 			return errors.New("get k8s version of server failed, and please check your k8s accessibility")
 		}
-		vendorName := util.GetK8sProvider(versionInfo[util.KubernetesApp])
+		vendorName, err := util.GetK8sProvider(versionInfo[util.KubernetesApp], clientSet)
+		if err != nil {
+			return errors.New("get k8s cloud provider failed, and please check your k8s accessibility")
+		}
 		p.checkYamlData, err = LoadVendorCheckYaml(vendorName)
 		if err != nil {
 			return err

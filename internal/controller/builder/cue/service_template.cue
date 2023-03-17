@@ -64,5 +64,11 @@ svc: {
 		if service.spec.type != _|_ {
 			type: service.spec.type
 		}
+		if service.spec.type == "LoadBalancer" {
+			// Set externalTrafficPolicy to Local has two benefits:
+			// 1. preserve client IP
+			// 2. improve network performance by reducing one hop
+			externalTrafficPolicy: "Local"
+		}
 	}
 }

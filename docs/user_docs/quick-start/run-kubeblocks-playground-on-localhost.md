@@ -2,13 +2,14 @@
 title: Run KubeBlocks Playground on localhost
 description: How to run KubeBlocks on Playground
 sidebar_position: 1
+sidebar_label: Playground on localhost
 ---
 
 # Run KubeBlocks Playground on localhost
 This guide uses one `kbcli` command to create a KubeBlocks demo environment (Playground) quickly on your local host.
 With Playground, you can try KubeBlocks and some ApeCloud MySQL features. This guide introduces how to install Playground and how to try KubeBlocks on Playground.
 
-***Before you start***
+## Before you start
 
 Ensure the following requirements are met, so Playground and other functions can run fluently.
 
@@ -32,38 +33,42 @@ Ensure the following requirements are met, so Playground and other functions can
 
 ## Step 1. Install Playground
 
-Run the command below to install Playground.
+1. Run the command below to install Playground.
 
-```bash
-kbcli playground init
-```
+   ```bash
+   kbcli playground init
+   ```
 
-How this command works on your local host:
-1. Create a Kubernetes cluster in the container by using [K3d](https://k3d.io/v5.4.6/).
-2. Deploy KubeBlocks in this Kubernetes cluster.
-3. Create an ApeCloud MySQL Paxos group by KubeBlocks.
+   How this command works on your local host:
+   1. Create a Kubernetes cluster in the container by using [K3d](https://k3d.io/v5.4.6/).
+   2. Deploy KubeBlocks in this Kubernetes cluster.
+   3. Create an ApeCloud MySQL Paxos group by KubeBlocks.
 
-Run`kbcli cluster list` to view the created cluster and when the status is `Running`, this cluster is created successfully. 
+2. Run `kbcli cluster list` to view the created cluster and when the status is `Running`, this cluster is created successfully. 
 
-Following the instructions in "1. Basic commands for cluster", switch to the Kubernetes local cluster created by Playground by running `export KUBECONFIG=xxx` to start your trip on KubeBlocks and ApeCloud MySQL.
+3. Following the instructions in "1. Basic commands for cluster", switch to the Kubernetes local cluster created by Playground by running `export KUBECONFIG=xxx` to start your trip on KubeBlocks and ApeCloud MySQL.
 
-You can find the Playground user guide under the installation success tip. View this guide again by running `kbcli playground guide`.
+   You can find the Playground user guide under the installation success tip. View this guide again by running `kbcli playground guide`.
 
-> ***Caution:***  
-> 
-> Running `export KUBECONFIG` is a necessity for using KubeBlocks and ApeCloud MySQL.
+   :::caution
+
+   Running `export KUBECONFIG` is a necessity for using KubeBlocks and ApeCloud MySQL.
+
+   :::
 
 ## Step 2. Run Playground
 
-The Playground guide includes three sections, namely [Basic functions](#basic-functions), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Feature list](./../introduction/feature-list.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
+The Playground guide includes three sections, namely [Basic functions](#basic-functions), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Feature list](./../introduction/introduction.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
 
 ### Basic functions
 
-KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](./docs/user_docs) for details.
+KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](./../introduction/introduction.md) for details.
 
-> ***Note:***
->
-> The local host does not support volume expansion, backup, and restore functions.
+:::note
+
+The local host does not support volume expansion, backup, and restore functions.
+
+:::
 
 #### View an ApeCloud MySQL cluster
 
@@ -84,7 +89,7 @@ KubeBlocks supports the complete life cycle management of a database cluster and
 
 #### Access an ApeCloud MySQL cluster
 
-**Option 1.** Use `kbcli`.
+**Option 1.** Use kbcli
 
 If a database cluster has been created and its status is `Running`, run `kbcli cluster connect` to access a specified database cluster. For example, 
 ```bash
@@ -111,6 +116,7 @@ mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
 Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
 mysql> show databases;
+>
 +--------------------+
 | Database           |
 +--------------------+
@@ -167,7 +173,7 @@ Here we use a simple failure simulation to show you the failure recovery capabil
 
 #### Create an ApeCloud MySQL Paxos group
 
-Playground creates an ApeCloud-MySQL standalone by default. You can also use `kbcli` to create a new Paxos group. The following is an example of creating an ApeCloud-MySQL Paxos group with default configurations.
+Playground creates an ApeCloud MySQL standalone by default. You can also use `kbcli` to create a new Paxos group. The following is an example of creating an ApeCloud MySQL Paxos group with default configurations.
 
 ```bash
 kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
@@ -211,7 +217,7 @@ In this example, we delete the leader pod to simulate a failure.
 2. Run the command below to delete the leader pod.
    ```bash
    kubectl delete pod maple05-mysql-1
-
+   >
    pod "maple05-mysql-1" deleted
    ```
 
@@ -255,7 +261,7 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
 2. Use `port-forward` according to the hints above to expose an application port as available access for your local host, then visit this application via http://127.0.0.1:8087.
 3. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
    ![NYAN CAT](./../../img/quick_start_nyan_cat.png)
-4. Uninstall the NYAN CAT demo application.
+4. Uninstall the NYAN CAT demo application after your trial.
    ```bash
    kbcli app uninstall nyancat
    ```
@@ -264,8 +270,8 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
 
 Destroying Playground cleans up relevant component services and data:
 
-* Delete all KubeBlocks database clusters, such as ApeCloud MySQL Paxos group
-* Uninstall KubeBlocks
+* Delete all KubeBlocks database clusters, such as ApeCloud MySQL Paxos Group.
+* Uninstall KubeBlocks.
 * Delete the local Kubernetes clusters created by K3d.
   
 Run the command below to destroy Playground.

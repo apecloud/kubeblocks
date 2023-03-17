@@ -41,33 +41,29 @@ const (
 // randomize the port to avoid conflicting
 var testEndpoint = "http://localhost:" + strconv.Itoa(52600+rand.Intn(1000))
 
-func TestGetRole(t *testing.T) {
+func TestETCD(t *testing.T) {
 	etcdServer, err := startEtcdServer(testEndpoint)
 	defer stopEtcdServer(etcdServer)
 	if err != nil {
 		t.Errorf("start embedded etcd server error: %s", err)
 	}
-	e := mockEtcd(etcdServer)
-	role, err := e.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
-	if err != nil {
-		t.Errorf("get role error: %s", err)
-	}
-	if role != "leader" {
-		t.Errorf("unexpected role: %s", role)
-	}
-}
-
-func TestInitDelay(t *testing.T) {
-	etcdServer, err := startEtcdServer(testEndpoint)
-	defer stopEtcdServer(etcdServer)
-	if err != nil {
-		t.Errorf("start embedded etcd server error: %s", err)
-	}
-	e := &Etcd{endpoint: testEndpoint}
-	err = e.InitDelay()
-	if err != nil {
-		t.Errorf("etcd client init error: %s", err)
-	}
+	t.Run("Invoke GetRole", func(t *testing.T) {
+		e := mockEtcd(etcdServer)
+		role, err := e.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
+		if err != nil {
+			t.Errorf("get role error: %s", err)
+		}
+		if role != "leader" {
+			t.Errorf("unexpected role: %s", role)
+		}
+	})
+	t.Run("InitDelay", func(t *testing.T) {
+		e := &Etcd{endpoint: testEndpoint}
+		err = e.InitDelay()
+		if err != nil {
+			t.Errorf("etcd client init error: %s", err)
+		}
+	})
 }
 
 func mockEtcd(etcdServer *EmbeddedETCD) *Etcd {

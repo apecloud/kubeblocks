@@ -161,7 +161,7 @@ func TestGetLagOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, "GetLagOpsSuccess", event)
+		assert.Equal(t, OperationSuccess, event)
 	})
 }
 
@@ -183,7 +183,7 @@ func TestQueryOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, "QuerySuccess", event)
+		assert.Equal(t, OperationSuccess, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -199,7 +199,7 @@ func TestQueryOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, "QueryFailed", event)
+		assert.Equal(t, OperationFailed, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -221,7 +221,7 @@ func TestExecOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, "ExecSuccess", event)
+		assert.Equal(t, OperationSuccess, event)
 
 		count, ok := result["count"]
 		assert.True(t, ok)
@@ -237,7 +237,7 @@ func TestExecOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, "ExecFailed", event)
+		assert.Equal(t, OperationFailed, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -268,7 +268,7 @@ func TestCheckStatusOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, "CheckStatusSuccess", event)
+		assert.Equal(t, OperationSuccess, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -290,7 +290,7 @@ func TestCheckStatusOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, "CheckStatusSuccess", event)
+		assert.Equal(t, OperationSuccess, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -306,7 +306,7 @@ func TestCheckStatusOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, "CheckStatusSuccess", event)
+		assert.Equal(t, OperationSuccess, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -329,7 +329,7 @@ func TestCheckStatusOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, "CheckStatusFailed", event)
+		assert.Equal(t, OperationFailed, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)

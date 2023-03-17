@@ -1060,7 +1060,7 @@ var _ = Describe("Cluster Controller", func() {
 				BackupType:       "snapshot",
 			},
 		}
-		Expect(testCtx.Cli.Create(ctx, &backup)).Should(Succeed())
+		Expect(testCtx.Create(ctx, &backup)).Should(Succeed())
 
 		By("Checking backup status to failed, because VolumeSnapshot disabled")
 		Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {

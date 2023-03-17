@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -122,12 +123,9 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return *res, err
 	}
 
-	if clusterVersion.Status.ObservedGeneration == clusterVersion.Generation {
+	if clusterVersion.Status.ObservedGeneration == clusterVersion.Generation &&
+		slices.Contains(clusterVersion.Status.GetTerminalPhases(), clusterVersion.Status.Phase) {
 		return intctrlutil.Reconciled()
-	}
-
-	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 
 	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
@@ -135,34 +133,49 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Name: clusterVersion.Spec.ClusterDefinitionRef,
 	}, clusterdefinition); err != nil {
 		if apierrors.IsNotFound(err) {
-			_ = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error())
+
+			err = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error())
 		}
 		return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 	}
 
-	patch := client.MergeFrom(clusterVersion.DeepCopy())
-	if clusterVersion.ObjectMeta.Labels == nil {
-		clusterVersion.ObjectMeta.Labels = map[string]string{}
-	}
-	clusterVersion.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
-	if err = r.Client.Patch(reqCtx.Ctx, clusterVersion, patch); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	patchStatus := func(phase appsv1alpha1.Phase, message string) error {
+		patch := client.MergeFrom(clusterVersion.DeepCopy())
+		clusterVersion.Status.Phase = phase
+		clusterVersion.Status.Message = message
+		clusterVersion.Status.ObservedGeneration = clusterVersion.Generation
+		clusterVersion.Status.ClusterDefGeneration = clusterdefinition.Generation
+		return r.Client.Status().Patch(ctx, clusterVersion, patch)
 	}
 
 	if statusMsg := validateClusterVersion(clusterVersion, clusterdefinition); statusMsg != "" {
-		clusterVersion.Status.Phase = appsv1alpha1.UnavailablePhase
-		clusterVersion.Status.Message = statusMsg
-	} else {
-		clusterVersion.Status.Phase = appsv1alpha1.AvailablePhase
-		clusterVersion.Status.Message = ""
+		if err := patchStatus(appsv1alpha1.UnavailablePhase, statusMsg); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		return intctrlutil.Reconciled()
 	}
-	clusterVersion.Status.ObservedGeneration = clusterVersion.Generation
-	clusterVersion.Status.ClusterDefGeneration = clusterdefinition.Generation
-	if err = r.Client.Status().Patch(ctx, clusterVersion, patch); err != nil {
+
+	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
+	}
+
+	if v, ok := clusterVersion.ObjectMeta.Labels[clusterDefLabelKey]; !ok || v != clusterdefinition.Name {
+		patch := client.MergeFrom(clusterVersion.DeepCopy())
+		if clusterVersion.ObjectMeta.Labels == nil {
+			clusterVersion.ObjectMeta.Labels = map[string]string{}
+		}
+		clusterVersion.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
+		if err = r.Client.Patch(reqCtx.Ctx, clusterVersion, patch); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		return intctrlutil.Reconciled()
+	}
+
+	if err = patchStatus(appsv1alpha1.AvailablePhase, ""); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	intctrlutil.RecordCreatedEvent(r.Recorder, clusterVersion)
-	return ctrl.Result{}, nil
+	return intctrlutil.Reconciled()
 }
 
 // handleClusterDefNotFound handles clusterVersion status when clusterDefinition not found.

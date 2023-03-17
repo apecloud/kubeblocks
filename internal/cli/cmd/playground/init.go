@@ -282,6 +282,10 @@ func (o *initOptions) installKubeBlocks() error {
 		Quiet:   true,
 		Check:   true,
 	}
+	if o.cloudProvider == cp.Local {
+		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
+			"snapshot-controller.enabled=true", "csi-hostpath-driver.enabled=true")
+	}
 	return insOpts.Install()
 }
 

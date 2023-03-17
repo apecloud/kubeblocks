@@ -155,13 +155,13 @@
 	constraint_exclusion?: string & "partition" | "on" | "off"
 
 	// Sets the planners estimate of the cost of processing each index entry during an index scan.
-	cpu_index_tuple_cost?: float & >=0 & <=1.79769
+	cpu_index_tuple_cost?: float & >=0 & <=1.79769e+308
 
 	// Sets the planners estimate of the cost of processing each operator or function call.
-	cpu_operator_cost?: float & >=0 & <=1.79769
+	cpu_operator_cost?: float & >=0 & <=1.79769e+308
 
 	// Sets the planners estimate of the cost of processing each tuple (row).
-	cpu_tuple_cost?: float & >=0 & <=1.79769
+	cpu_tuple_cost?: float & >=0 & <=1.79769e+308
 
 	// Sets the database to store pg_cron metadata tables
 	"cron.database_name"?: string
@@ -371,13 +371,13 @@
 	jit: bool & false | true | *false
 
 	// Perform JIT compilation if query is more expensive.
-	jit_above_cost?: float & >=-1 & <=1.79769
+	jit_above_cost?: float & >=-1 & <=1.79769e+308
 
 	// Perform JIT inlining if query is more expensive.
-	jit_inline_above_cost?: float & >=-1 & <=1.79769
+	jit_inline_above_cost?: float & >=-1 & <=1.79769e+308
 
 	// Optimize JITed functions if query is more expensive.
-	jit_optimize_above_cost?: float & >=-1 & <=1.79769
+	jit_optimize_above_cost?: float & >=-1 & <=1.79769e+308
 
 	// Sets the FROM-list size beyond which JOIN constructs are not flattened.
 	join_collapse_limit?: int & >=1 & <=2147483647
@@ -596,10 +596,10 @@
 	parallel_leader_participation?: bool & false | true
 
 	// Sets the planner's estimate of the cost of starting up worker processes for parallel query.
-	parallel_setup_cost?: float & >=0 & <=1.79769
+	parallel_setup_cost?: float & >=0 & <=1.79769e+308
 
 	// Sets the planner's estimate of the cost of passing each tuple (row) from worker to master backend.
-	parallel_tuple_cost?: float & >=0 & <=1.79769
+	parallel_tuple_cost?: float & >=0 & <=1.79769e+308
 
 	// Encrypt passwords.
 	password_encryption?: string & "md5" | "scram-sha-256"
@@ -845,7 +845,7 @@
 	quote_all_identifiers?: bool & false | true
 
 	// Sets the planners estimate of the cost of a nonsequentially fetched disk page.
-	random_page_cost?: float & >=0 & <=1.79769
+	random_page_cost?: float & >=0 & <=1.79769e+308
 
 	// Lower threshold of Dice similarity. Molecules with similarity lower than threshold are not similar by # operation.
 	"rdkit.dice_threshold"?: float & >=0 & <=1
@@ -875,7 +875,7 @@
 	search_path?: string
 
 	// Sets the planners estimate of the cost of a sequentially fetched disk page.
-	seq_page_cost?: float & >=0 & <=1.79769
+	seq_page_cost?: float & >=0 & <=1.79769e+308
 
 	// Lists shared libraries to preload into each backend.
 	session_preload_libraries?: string & "auto_explain" | "orafce" | "pg_bigm" | "pg_hint_plan" | "pg_prewarm" | "pg_similarity" | "pg_stat_statements" | "pg_transport" | "plprofiler"

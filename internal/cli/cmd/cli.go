@@ -129,7 +129,7 @@ func initConfig() {
 	viper.SetDefault("CLUSTER_DEFAULT_CPU", "1000m")
 	viper.SetDefault("CLUSTER_DEFAULT_MEMORY", "1Gi")
 
-	viper.SetDefault("KB_WAIT_ADDON_READY_TIMES", 60)
+	viper.SetDefault("KB_WAIT_ADDON_TIMES", 60)
 	viper.SetDefault("PLAYGROUND_WAIT_TIMES", 20)
 
 	// If a config file is found, read it in.

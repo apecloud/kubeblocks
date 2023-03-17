@@ -69,7 +69,7 @@ func newGuideCmd() *cobra.Command {
 		Use:   "guide",
 		Short: "Display playground cluster user guide.",
 		Run: func(cmd *cobra.Command, args []string) {
-			printGuide(false, "")
+			printGuide()
 		},
 	}
 	return cmd

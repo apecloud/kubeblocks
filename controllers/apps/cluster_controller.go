@@ -113,26 +113,6 @@ func init() {
 	k8score.EventHandlerMap["cluster-status-handler"] = &ClusterStatusEventHandler{}
 }
 
-// Handle is the event handler for the cluster status event.
-func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
-		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
-	}
-
-	// parse probe event message when field path is probe-role-changed-check
-	message := k8score.ParseProbeEventMessage(reqCtx, event)
-	if message == nil {
-		reqCtx.Log.Info("parse probe event message failed", "message", event.Message)
-		return nil
-	}
-
-	// if probe message event is checkRoleFailed, it means the cluster is abnormal, need to handle the cluster status
-	if message.Event == k8score.ProbeEventCheckRoleFailed {
-		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
-	}
-	return nil
-}
-
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
@@ -257,6 +237,21 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return intctrlutil.Reconciled()
 }
 
+// SetupWithManager sets up the controller with the Manager.
+func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// TODO: add filter predicate for core API objects
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&appsv1alpha1.Cluster{}).
+		Owns(&appsv1.StatefulSet{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&policyv1.PodDisruptionBudget{}).
+		Complete(r)
+}
+
 // patchClusterStatus patches the cluster status.
 func (r *ClusterReconciler) patchClusterStatus(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
@@ -306,21 +301,6 @@ func (r *ClusterReconciler) patchClusterLabelsIfNotExist(
 	cluster.Labels[clusterDefLabelKey] = cdName
 	cluster.Labels[clusterVersionLabelKey] = cvName
 	return r.Client.Patch(ctx, cluster, patch)
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// TODO: add filter predicate for core API objects
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1alpha1.Cluster{}).
-		Owns(&appsv1.StatefulSet{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&corev1.Service{}).
-		Owns(&corev1.Secret{}).
-		Owns(&corev1.ConfigMap{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
-		Owns(&policyv1.PodDisruptionBudget{}).
-		Complete(r)
 }
 
 func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) (*ctrl.Result, error) {
@@ -518,6 +498,7 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 	if !needPatch {
 		return nil
 	}
+	cluster.Status.ObservedGeneration = cluster.GetGeneration()
 	if err := r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
 		return err
 	}
@@ -771,4 +752,24 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 		cluster.Status.SetComponentStatus(componentName, compStatus)
 	}
 	return doRemoveInitContainers, nil
+}
+
+// Handle is the event handler for the cluster status event.
+func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
+		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
+	}
+
+	// parse probe event message when field path is probe-role-changed-check
+	message := k8score.ParseProbeEventMessage(reqCtx, event)
+	if message == nil {
+		reqCtx.Log.Info("parse probe event message failed", "message", event.Message)
+		return nil
+	}
+
+	// if probe message event is checkRoleFailed, it means the cluster is abnormal, need to handle the cluster status
+	if message.Event == k8score.ProbeEventCheckRoleFailed {
+		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
+	}
+	return nil
 }

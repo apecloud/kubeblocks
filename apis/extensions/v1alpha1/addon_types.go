@@ -554,6 +554,9 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 // GetSortedDefaultInstallValues return DefaultInstallValues items with items that has
 // provided selector first.
 func (r *AddonSpec) GetSortedDefaultInstallValues() []AddonDefaultInstallSpecItem {
+	if r == nil {
+		return nil
+	}
 	values := make([]AddonDefaultInstallSpecItem, 0, len(r.DefaultInstallValues))
 	nvalues := make([]AddonDefaultInstallSpecItem, 0, len(r.DefaultInstallValues))
 	for _, i := range r.DefaultInstallValues {

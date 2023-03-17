@@ -51,6 +51,8 @@ type TestContext struct {
 	CheckedCreateObj                   func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
 }
 
+var ErrUninitError = fmt.Errorf("cli uninitialized error")
+
 const (
 	envExistingClusterType = "EXISTING_CLUSTER_TYPE"
 	envUseExistingCluster  = "USE_EXISTING_CLUSTER"
@@ -69,6 +71,9 @@ func init() {
 // NewDefaultTestContext create default test context, if provided namespace optional arg, a namespace
 // will be created if not exist
 func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envtest.Environment, namespace ...string) TestContext {
+	if cli == nil {
+		panic("missing required cli arg")
+	}
 	t := TestContext{
 		TestObjLabelKey:                    "kubeblocks.io/test",
 		DefaultNamespace:                   "default",
@@ -78,10 +83,10 @@ func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envt
 		DefaultConsistentlyPollingInterval: viper.GetDuration("ConsistentlyPollingInterval"),
 		ClearResourceTimeout:               viper.GetDuration("ClearResourceTimeout"),
 		ClearResourcePollingInterval:       viper.GetDuration("ClearResourcePollingInterval"),
+		Ctx:                                ctx,
+		Cli:                                cli,
+		TestEnv:                            testEnv,
 	}
-	t.Ctx = ctx
-	t.Cli = cli
-	t.TestEnv = testEnv
 	t.CreateObj = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 		l := obj.GetLabels()
 		if l == nil {
@@ -89,7 +94,7 @@ func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envt
 		}
 		l[t.TestObjLabelKey] = "true"
 		obj.SetLabels(l)
-		return cli.Create(ctx, obj, opts...)
+		return t.Cli.Create(ctx, obj, opts...)
 	}
 
 	t.CheckedCreateObj = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
@@ -112,6 +117,10 @@ func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envt
 	return t
 }
 
+func (testCtx TestContext) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	return testCtx.CreateObj(ctx, obj, opts...)
+}
+
 func (testCtx TestContext) GetNamespaceKey() client.ObjectKey {
 	return client.ObjectKey{
 		Name: testCtx.DefaultNamespace,
@@ -131,7 +140,7 @@ func (testCtx TestContext) CreateNamespace() error {
 		return nil
 	}
 	namespace := testCtx.GetNamespaceObj()
-	return testCtx.Cli.Create(testCtx.Ctx, &namespace)
+	return testCtx.Create(testCtx.Ctx, &namespace)
 }
 
 func (testCtx TestContext) GetRandomStr() string {

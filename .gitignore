@@ -27,6 +27,7 @@ __debug_bin
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+cover
 cover.html
 .coverage/
 

@@ -57,7 +57,7 @@ func init() {
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Operation Controller Suite")
+	RunSpecs(t, "Operation util Suite")
 }
 
 var _ = BeforeSuite(func() {

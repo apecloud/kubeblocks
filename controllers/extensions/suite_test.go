@@ -65,6 +65,7 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+
 	if viper.GetBool("ENABLE_DEBUG_LOG") {
 		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
 			o.TimeEncoder = zapcore.ISO8601TimeEncoder
@@ -124,9 +125,8 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
+	cancel()
 	By("tearing down the test environment")
-	Eventually(func(g Gomega) {
-		err := testEnv.Stop()
-		Expect(err).NotTo(HaveOccurred())
-	})
+	err := testEnv.Stop()
+	Expect(err).NotTo(HaveOccurred())
 })

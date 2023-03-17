@@ -102,6 +102,19 @@ ifeq ($(DOCKER_NO_BUILD_CACHE), true)
 	DOCKER_BUILD_ARGS = $(DOCKER_BUILD_ARGS) --no-cache
 endif
 
+ifeq ($(OS),Linux)
+	NUMPROC := $(shell grep -c ^processor /proc/cpuinfo)
+else ifeq ($(OS),Darwin)
+	NUMPROC := $(shell sysctl -n hw.ncpu)
+else
+	NUMPROC := 8
+endif
+
+# Only take half as many processors as available
+NUMPROC := $(shell expr $(NUMPROC) / 2 )
+ifeq ($(NUMPROC), 0)
+	NUMPROC ?= 1
+endif
 
 .DEFAULT_GOAL := help
 
@@ -206,8 +219,6 @@ module: ## Run go mod tidy->verify against go modules.
 	$(GO) mod tidy -compat=1.19
 	$(GO) mod verify
 
-TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
-
 CLUSTER_TYPES=minikube k3d
 .PHONY: add-k8s-host
 add-k8s-host:  ## add DNS to /etc/hosts when k8s cluster is minikube or k3d
@@ -217,13 +228,36 @@ ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).int
 endif
 endif
 
+# use ginkgo to run long-lived controller test cases, as it can parallel running specs in a package.
+GINKGO_TEST_PACKAGES ?= ./controllers/...
+# use go test to run short-lived test cases, as it can parallel testing between packages
+GO_TEST_PACKAGES ?= ./internal/... ./apis/... ./cmd/...
+TEST_PACKAGES ?= $(GO_TEST_PACKAGES) $(GINKGO_TEST_PACKAGES)
+COVER_OUTPUT_DIR ?= ${CURDIR}/cover
+
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
+prepare-cover:
+	@rm -rf ${COVER_OUTPUT_DIR}
+	@mkdir -p ${COVER_OUTPUT_DIR}
+
 .PHONY: test-fast
-test-fast: envtest
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
+test-fast: envtest ginkgo prepare-cover
+	make -j 4 ginkgo-test-controllers go-test
+	@# merge cover profiles from different test jobs, first line is the cover mode
+	@cat cover/*.cover | grep 'mode: ' | head -n 1 > cover.out
+	@cat cover/*.cover | grep -v 'mode: ' >> cover.out
+
+ginkgo-test-controllers: $(shell find controllers -type f -name "*_test.go" -exec dirname {} \; | sort -u | sed -e 's/\//./g' -e 's/^/ginkgo-test-controllers-/g')
+ginkgo-test-controllers-%: GINKGO_TEST_DIR=$(shell echo $* | sed -e 's/^ginkgo-test-controllers-//g' -e 's/\./\//g')
+ginkgo-test-controllers-%:
+	@echo '> ginkgo run in package $(GINKGO_TEST_DIR)'
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) run --procs $(NUMPROC) -output-dir $(COVER_OUTPUT_DIR) --succinct -coverprofile $*.cover $(GINKGO_TEST_DIR)
+
+go-test:
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -outputdir $(COVER_OUTPUT_DIR) -coverprofile test.cover $(GO_TEST_PACKAGES)
 
 .PHONY: test
 test: manifests generate test-go-generate fmt vet add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
@@ -618,7 +652,17 @@ ifeq (, $(shell which git-hook))
 	}
 endif
 
-
+.PHONY: ginkgo
+ginkgo: ## Download ginkgo locally if necessary.
+ifeq (, $(shell which ginkgo))
+	@{ \
+	set -e ;\
+	go install github.com/onsi/ginkgo/v2/ginkgo
+	}
+GINKGO=$(GOBIN)/ginkgo
+else
+GINKGO=$(shell which ginkgo)
+endif
 
 .PHONY: oras
 oras: ORAS_VERSION=0.14.1

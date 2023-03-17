@@ -152,7 +152,7 @@ func (o *destroyOptions) destroyCloud() error {
 	if err = provider.DeleteK8sCluster(name); err != nil {
 		return err
 	}
-	fmt.Fprintf(o.Out, "Playground destroy completed in %s.\n", time.Since(o.startTime))
+	fmt.Fprintf(o.Out, "\nPlayground destroy completed in %s.\n", time.Since(o.startTime).Truncate(time.Second))
 
 	return nil
 }

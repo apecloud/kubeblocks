@@ -133,8 +133,10 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Name: clusterVersion.Spec.ClusterDefinitionRef,
 	}, clusterdefinition); err != nil {
 		if apierrors.IsNotFound(err) {
-
-			err = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error())
+			if err = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error()); err != nil {
+				return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
+			}
+			return intctrlutil.Reconciled()
 		}
 		return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 	}

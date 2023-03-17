@@ -195,7 +195,7 @@ func (o *statusOptions) showAddons() {
 	tbl := printer.NewTablePrinter(o.Out)
 	tbl.SetHeader("NAME", "STATUS", "TYPE")
 	for _, addon := range o.addons {
-		tbl.AddRow(addon.Name, addon.Namespace, addon.Status.Phase, addon.Spec.Type)
+		tbl.AddRow(addon.Name, addon.Status.Phase, addon.Spec.Type)
 	}
 	tbl.Print()
 }

@@ -268,7 +268,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	}
 
 	// wait for all auto-install addons to be enabled
-	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_READY_TIMES"); i++ {
+	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_TIMES"); i++ {
 		allEnabled, err := checkAddons()
 		if err != nil {
 			return err

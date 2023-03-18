@@ -259,7 +259,7 @@ func isAnyContainerFailed(containersStatus []corev1.ContainerStatus) (bool, stri
 		}
 		terminatedState := v.State.Terminated
 		if terminatedState != nil && terminatedState.Message != "" {
-			return true, waitingState.Message
+			return true, terminatedState.Message
 		}
 	}
 	return false, ""

@@ -35,7 +35,7 @@ spec:
         echo "recovery_target_timeline = 'latest'" >> postgresql.auto.conf
         init_scripts_dir=${DATA_DIR}/../init-scripts
         mkdir -p ${init_scripts_dir}
-        echo "touch ${DATA_DIR}/recovery.signal" > ${init_scripts_dir}/restore.sh
+        echo "touch ${DATA_DIR}/recovery.signal" > ${init_scripts_dir}/kb_restore.sh
         echo "done!"
     incrementalRestoreCommands: []
   logical:

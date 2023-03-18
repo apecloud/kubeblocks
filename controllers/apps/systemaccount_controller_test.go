@@ -18,7 +18,6 @@ package apps
 
 import (
 	"context"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -243,9 +242,6 @@ var _ = Describe("SystemAccount Controller", func() {
 
 		clustersMap = make(map[string]types.NamespacedName)
 
-		timeout := time.Second * 10
-		interval := time.Second
-
 		// create cluster defined in each testcase
 		for testName, testCase := range testCases {
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -260,8 +256,10 @@ var _ = Describe("SystemAccount Controller", func() {
 			Eventually(func(g Gomega) {
 				rootSecretName := component.GenerateConnCredential(clusterKey.Name)
 				rootSecret := &corev1.Secret{}
-				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: clusterKey.Namespace, Name: rootSecretName}, rootSecret)).To(Succeed())
-			}, timeout, interval).Should(Succeed())
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+					Namespace: clusterKey.Namespace,
+					Name:      rootSecretName}, rootSecret)).To(Succeed())
+			}).Should(Succeed())
 		}
 		return
 	}

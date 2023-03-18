@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
@@ -36,8 +35,6 @@ import (
 )
 
 const (
-	timeout       = 10 * time.Second
-	interval      = time.Second
 	testFinalizer = "test.kubeblocks.io/finalizer"
 )
 
@@ -107,11 +104,11 @@ func DeletePodLabelKey(ctx context.Context, testCtx testutil.TestContext, podNam
 	patch := client.MergeFrom(pod.DeepCopy())
 	delete(pod.Labels, labelKey)
 	gomega.Expect(testCtx.Cli.Patch(ctx, pod, patch)).Should(gomega.Succeed())
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func(g gomega.Gomega) {
 		tmpPod := &corev1.Pod{}
 		_ = testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, tmpPod)
-		return tmpPod.Labels == nil || tmpPod.Labels[labelKey] == ""
-	}, timeout, interval).Should(gomega.BeTrue())
+		g.Expect(tmpPod.Labels == nil || tmpPod.Labels[labelKey] == "").Should(gomega.BeTrue())
+	}).Should(gomega.Succeed())
 }
 
 // UpdatePodStatusNotReady updates the pod status to make it not ready.
@@ -121,11 +118,12 @@ func UpdatePodStatusNotReady(ctx context.Context, testCtx testutil.TestContext, 
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = nil
 	gomega.Expect(testCtx.Cli.Status().Patch(ctx, pod, patch)).Should(gomega.Succeed())
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func(g gomega.Gomega) {
 		tmpPod := &corev1.Pod{}
-		_ = testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, tmpPod)
-		return tmpPod.Status.Conditions == nil
-	}, timeout, interval).Should(gomega.BeTrue())
+		_ = testCtx.Cli.Get(context.Background(),
+			client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, tmpPod)
+		g.Expect(tmpPod.Status.Conditions).Should(gomega.BeNil())
+	}).Should(gomega.Succeed())
 }
 
 // MockPodIsTerminating mocks pod is terminating.
@@ -134,11 +132,12 @@ func MockPodIsTerminating(ctx context.Context, testCtx testutil.TestContext, pod
 	pod.Finalizers = []string{testFinalizer}
 	gomega.Expect(testCtx.Cli.Patch(ctx, pod, patch)).Should(gomega.Succeed())
 	gomega.Expect(testCtx.Cli.Delete(ctx, pod)).Should(gomega.Succeed())
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func(g gomega.Gomega) {
 		tmpPod := &corev1.Pod{}
-		_ = testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: pod.Name, Namespace: testCtx.DefaultNamespace}, tmpPod)
-		return !tmpPod.DeletionTimestamp.IsZero()
-	}, timeout, interval).Should(gomega.BeTrue())
+		_ = testCtx.Cli.Get(context.Background(),
+			client.ObjectKey{Name: pod.Name, Namespace: testCtx.DefaultNamespace}, tmpPod)
+		g.Expect(!tmpPod.DeletionTimestamp.IsZero()).Should(gomega.BeTrue())
+	}).Should(gomega.Succeed())
 }
 
 // RemovePodFinalizer removes the pod finalizer to delete the pod finally.
@@ -147,8 +146,9 @@ func RemovePodFinalizer(ctx context.Context, testCtx testutil.TestContext, pod *
 	pod.Finalizers = []string{}
 	gomega.Expect(testCtx.Cli.Patch(ctx, pod, patch)).Should(gomega.Succeed())
 	gomega.Eventually(func() error {
-		return testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: pod.Name, Namespace: testCtx.DefaultNamespace}, &corev1.Pod{})
-	}, timeout, interval).Should(gomega.Satisfy(apierrors.IsNotFound))
+		return testCtx.Cli.Get(context.Background(),
+			client.ObjectKey{Name: pod.Name, Namespace: testCtx.DefaultNamespace}, &corev1.Pod{})
+	}).Should(gomega.Satisfy(apierrors.IsNotFound))
 }
 
 func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.NamespacedName) *apps.StatefulSetList {
@@ -157,7 +157,7 @@ func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.Namespaced
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
 			constant.AppInstanceLabelKey: key.Name,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
-		g.Expect(len(stsList.Items) > 0).To(gomega.BeTrue())
+		g.Expect(stsList.Items).ShouldNot(gomega.BeEmpty())
 	}).Should(gomega.Succeed())
 	return stsList
 }
@@ -169,7 +169,7 @@ func ListAndCheckStatefulSetWithComponent(testCtx *testutil.TestContext, key typ
 			constant.AppInstanceLabelKey:    key.Name,
 			constant.KBAppComponentLabelKey: componentName,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
-		g.Expect(len(stsList.Items) > 0).To(gomega.BeTrue())
+		g.Expect(stsList.Items).ShouldNot(gomega.BeEmpty())
 	}).Should(gomega.Succeed())
 	return stsList
 }

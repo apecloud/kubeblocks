@@ -114,7 +114,8 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 			It("should create/delete the tls cert Secret", func() {
 				By("create a cluster obj")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace,
+					clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompType).
 					SetReplicas(3).
@@ -122,11 +123,19 @@ var _ = Describe("TLS self-signed cert function", func() {
 					SetIssuer(tlsIssuer).
 					Create(&testCtx).
 					GetObject()
+
+				clusterKey := client.ObjectKeyFromObject(clusterObj)
+
+				By("Waiting for the cluster initialized")
+				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+				By("By inspect that TLS cert. secret")
 				ns := clusterObj.Namespace
 				name := plan.GenerateTLSSecretName(clusterObj.Name, statefulCompName)
 				nsName := types.NamespacedName{Namespace: ns, Name: name}
 				secret := &corev1.Secret{}
 				Eventually(k8sClient.Get(ctx, nsName, secret)).Should(Succeed())
+
 				By("Checking volume & volumeMount settings in podSpec")
 				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
 				sts := stsList.Items[0]

@@ -1311,6 +1311,12 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
 
+			// REVIEW: following expect always failed
+			//   [FAILED] Timed out after 10.000s.
+			//   Expected
+			//   <int>: 1
+			// to be equivalent to
+			//   <int>: 2
 			By("Checking statefulSet number")
 			var stsList *appsv1.StatefulSetList
 			Eventually(func(g Gomega) {

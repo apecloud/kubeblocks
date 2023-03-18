@@ -498,7 +498,8 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 	if !needPatch {
 		return nil
 	}
-	cluster.Status.ObservedGeneration = cluster.GetGeneration()
+	// TODO: should patch ObservedGeneration
+	// cluster.Status.ObservedGeneration = cluster.GetGeneration()
 	if err := r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
 		return err
 	}

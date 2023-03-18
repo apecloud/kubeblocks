@@ -19,7 +19,6 @@ package analyzer
 import (
 	"encoding/json"
 	"errors"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,7 +33,6 @@ var _ = Describe("host_utility_test", func() {
 	var (
 		hostUtilityAnalyzer AnalyzeHostUtility
 		resInfo             kbcollector.HostUtilityInfo
-		timeOut             = time.Second * 10
 	)
 
 	Context("AnalyzeHostUtility test", func() {
@@ -69,7 +67,7 @@ var _ = Describe("host_utility_test", func() {
 				res, err := hostUtilityAnalyzer.Analyze(getCollectedFileContents)
 				g.Expect(err).Should(HaveOccurred())
 				g.Expect(res).Should(BeNil())
-			}, timeOut).Should(Succeed())
+			}).Should(Succeed())
 		})
 
 		It("Analyze test, and analyzer result is expected that fail is true", func() {
@@ -87,7 +85,7 @@ var _ = Describe("host_utility_test", func() {
 				res, err := hostUtilityAnalyzer.Analyze(getCollectedFileContents)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(res[0].IsWarn).Should(BeTrue())
-			}, timeOut).Should(Succeed())
+			}).Should(Succeed())
 		})
 
 		It("Analyze test, and analyzer result is expected that pass is true", func() {
@@ -106,7 +104,7 @@ var _ = Describe("host_utility_test", func() {
 				res, err := hostUtilityAnalyzer.Analyze(getCollectedFileContents)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(res[0].IsPass).Should(BeTrue())
-			}, timeOut).Should(Succeed())
+			}).Should(Succeed())
 		})
 	})
 })

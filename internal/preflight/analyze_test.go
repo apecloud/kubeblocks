@@ -18,7 +18,6 @@ package preflight
 
 import (
 	"context"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,7 +35,6 @@ var _ = Describe("analyze_test", func() {
 		kbAnalyzers      []*preflightv1beta2.ExtendAnalyze
 		hostAnalyzers    []*troubleshoot.HostAnalyze
 		kbhHostAnalyzers []*preflightv1beta2.ExtendHostAnalyze
-		timeout          = time.Second * 10
 		clusterVersion   = `
 {
   "info": {
@@ -79,6 +77,6 @@ var _ = Describe("analyze_test", func() {
 			g.Expect(len(analyzeList)).Should(Equal(4))
 			g.Expect(analyzeList[0].IsPass).Should(Equal(true))
 			g.Expect(analyzeList[1].IsFail).Should(Equal(true))
-		}, timeout).Should(Succeed())
+		}).Should(Succeed())
 	})
 })

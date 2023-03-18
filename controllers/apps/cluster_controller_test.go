@@ -29,6 +29,14 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,15 +46,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -63,11 +62,7 @@ var _ = Describe("Cluster Controller", func() {
 	const leader = "leader"
 	const follower = "follower"
 
-	const timeout = time.Second * 10
-	const interval = time.Second
-
 	// Cleanups
-
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -188,7 +183,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster initialized")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
-		validateSvc := func(g Gomega, total int, svcName string) bool {
+		validateSvc := func(g Gomega, total int, svcName string, predicate func(Gomega, int) bool) bool {
 			svcList := &corev1.ServiceList{}
 			g.Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
@@ -198,16 +193,19 @@ var _ = Describe("Cluster Controller", func() {
 			idx := slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
 				return strings.HasSuffix(e.Name, svcName)
 			})
+			if predicate != nil {
+				return predicate(g, idx)
+			}
 			g.Expect(idx >= 0).Should(BeTrue())
 			svc := svcList.Items[idx]
 			return (svc.Spec.Type != corev1.ServiceTypeLoadBalancer ||
 				svc.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal)
 		}
 		Consistently(func(g Gomega) bool {
-			return validateSvc(g, 4, testapps.ServiceVPCName)
+			return validateSvc(g, 4, testapps.ServiceVPCName, nil)
 		}).Should(BeTrue())
 		Consistently(func(g Gomega) bool {
-			return validateSvc(g, 4, testapps.ServiceInternetName)
+			return validateSvc(g, 4, testapps.ServiceInternetName, nil)
 		}).Should(BeTrue())
 
 		By("Delete a LoadBalancer service")
@@ -228,8 +226,12 @@ var _ = Describe("Cluster Controller", func() {
 			}
 
 		})).Should(Succeed())
+		// REVIEW: not so BDD as need to implement condition logics.
 		Eventually(func(g Gomega) bool {
-			return validateSvc(g, 3, testapps.ServiceVPCName)
+			return validateSvc(g, 3, testapps.ServiceVPCName,
+				func(g Gomega, i int) bool {
+					return i >= 0
+				})
 		}).Should(BeFalse())
 
 		By("Add the deleted LoadBalancer service back")
@@ -247,7 +249,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}))
 		Eventually(func(g Gomega) {
-			validateSvc(g, 4, testapps.ServiceVPCName)
+			validateSvc(g, 4, testapps.ServiceVPCName, nil)
 		}).Should(BeTrue())
 	}
 
@@ -943,7 +945,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			g.Expect(leaderCount).Should(Equal(1))
 			g.Expect(followerCount).Should(Equal(2))
-		}, timeout, interval).Should(Succeed())
+		}).Should(Succeed())
 
 		By("Updating StatefulSet's status")
 		sts.Status.UpdateRevision = "mock-version"
@@ -969,7 +971,7 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(len(consensusStatus.Followers) == 2).To(BeTrue())
 			g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
 			g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
-		}, timeout, interval).Should(Succeed())
+		}).Should(Succeed())
 
 		By("Waiting the cluster be running")
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
@@ -1339,6 +1341,8 @@ var _ = Describe("Cluster Controller", func() {
 				Create(&testCtx).GetObject()
 		})
 
+		// REVIEW/TODO: following test always failed at cluster.phase.observerGeneration=1
+		//     with cluster.phase.phase=creating
 		It("Should success with primary sts and secondary sts", func() {
 			By("Mock a cluster obj with replication componentDefRef.")
 			pvcSpec := testapps.NewPVC("1Gi")
@@ -1351,9 +1355,17 @@ var _ = Describe("Cluster Controller", func() {
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-			By("Waiting for cluster creation")
+			By("Waiting for the cluster initialized")
+			// REVIEW: expect
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
 
+			// REVIEW: following expect always failed
+			//   [FAILED] Timed out after 10.000s.
+			//   Expected
+			//   <int>: 1
+			// to be equivalent to
+			//   <int>: 2
 			By("Checking statefulSet number")
 			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 			Eventually(len(stsList.Items)).Should(BeEquivalentTo(2))

@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -160,7 +161,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		// If using RequeueWithError and the user fixed this error,
 		// it may take up to 1000s to reconcile again, causing the user to think that the repair is not effective.
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(
+			time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)),
+			reqCtx.Log, "")
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.Generation {
@@ -193,7 +196,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// this is a block to handle error.
 			// so when update cluster conditions failed, we can ignore it.
 			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-			return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+			return intctrlutil.RequeueAfter(
+				time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)), reqCtx.Log, "")
 		}
 		if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
 			appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
@@ -209,7 +213,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// validate config and send warning event log necessarily
 	if err = cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(
+			time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)), reqCtx.Log, "")
 	}
 
 	// preCheck succeed, starting the cluster provisioning
@@ -222,13 +227,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(
+			time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)), reqCtx.Log, "")
 	}
 	if shouldRequeue {
 		if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(
+			time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)), reqCtx.Log, "")
 	}
 
 	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDeepCopy, clusterDefinition); err != nil {
@@ -469,7 +476,8 @@ func (r *ClusterReconciler) checkReferencedCRStatus(
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
-	res, err := intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+	res, err := intctrlutil.RequeueAfter(
+		time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)), reqCtx.Log, "")
 	return &res, err
 }
 

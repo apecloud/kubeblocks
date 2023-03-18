@@ -41,8 +41,6 @@ import (
 )
 
 const (
-	timeout       = 10 * time.Second
-	interval      = 1 * time.Second
 	svcPort       = 12345
 	svcTargetPort = 80
 	namespace     = "default"
@@ -243,7 +241,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 					return false
 				}
 				return svc.Annotations[AnnotationKeyFloatingIP] == floatingIP
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			By("By migrating service")
 			mockCloud.EXPECT().DeallocIPAddresses(oldENIId, gomock.Any()).Return(nil).AnyTimes()
@@ -263,7 +261,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 			Eventually(func() bool {
 				Expect(k8sClient.Get(context.Background(), key, svc)).Should(Succeed())
 				return svc.Annotations[AnnotationKeyENIId] == newENIId
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			By("By deleting service")
 			mockCloud.EXPECT().DeallocIPAddresses(newENIId, gomock.Any()).Return(nil).AnyTimes()
@@ -296,7 +294,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 					return false
 				}
 				return svc.Annotations[AnnotationKeyFloatingIP] == eniIP12
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			mockProvider.EXPECT().DeallocIPAddresses(eniID1, gomock.Any()).Return(nil).AnyTimes()
 			mockNode.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
@@ -345,7 +343,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 					return false
 				}
 				return pod.Status.HostIP != "" && svc.GetAnnotations()[AnnotationKeyENINodeIP] == pod.Status.HostIP
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			svc.GetAnnotations()[AnnotationKeySubnetID] = subnetID2
 			Expect(k8sClient.Update(context.Background(), svc)).Should(Succeed())
@@ -357,7 +355,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 					return false
 				}
 				return pod.Status.HostIP != "" && svc.GetAnnotations()[AnnotationKeyENINodeIP] == pod.Status.HostIP
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			By("release resources")
 		})

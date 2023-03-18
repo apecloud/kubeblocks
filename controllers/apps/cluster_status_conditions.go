@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
@@ -71,15 +72,15 @@ const (
 	// ReasonClusterReady the components of cluster are ready, the component phase are running
 	ReasonClusterReady = "ClusterReady"
 
-	// ClusterControllerErrorDuration if there is an error in the cluster controller,
-	// it will not be automatically repaired unless there is network jitter.
-	// so if the error lasts more than 5s, the cluster will enter the ConditionsError phase
-	// and prompt the user to repair manually according to the message.
-	ClusterControllerErrorDuration = 5 * time.Second
+	// // ClusterControllerErrorDuration if there is an error in the cluster controller,
+	// // it will not be automatically repaired unless there is network jitter.
+	// // so if the error lasts more than 5s, the cluster will enter the ConditionsError phase
+	// // and prompt the user to repair manually according to the message.
+	// ClusterControllerErrorDuration = 5 * time.Second
 
-	// ControllerErrorRequeueTime the requeue time to reconcile the error event of the cluster controller
-	// which need to respond to user repair events timely.
-	ControllerErrorRequeueTime = 5 * time.Second
+	// // ControllerErrorRequeueTime the requeue time to reconcile the error event of the cluster controller
+	// // which need to respond to user repair events timely.
+	// ControllerErrorRequeueTime = 5 * time.Second
 )
 
 // updateClusterConditions updates cluster.status condition and records event.
@@ -119,7 +120,8 @@ func (conMgr clusterConditionManager) handleConditionForClusterPhase(oldConditio
 		return false
 	}
 
-	if time.Now().Before(oldCondition.LastTransitionTime.Add(ClusterControllerErrorDuration)) {
+	if time.Now().Before(oldCondition.LastTransitionTime.Add(
+		time.Millisecond * time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)))) {
 		return false
 	}
 	if !util.IsFailedOrAbnormal(conMgr.cluster.Status.Phase) &&

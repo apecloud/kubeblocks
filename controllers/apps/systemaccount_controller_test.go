@@ -393,15 +393,34 @@ var _ = Describe("SystemAccount Controller", func() {
 				cluster := &appsv1alpha1.Cluster{}
 				Expect(k8sClient.Get(ctx, clusterKey, cluster)).Should(Succeed())
 
-				ml := getLabelsForSecretsAndJobs(componentUniqueKey{namespace: cluster.Namespace, clusterName: cluster.Name, componentName: testCase.componentName})
+				ml := getLabelsForSecretsAndJobs(componentUniqueKey{
+					namespace:     cluster.Namespace,
+					clusterName:   cluster.Name,
+					componentName: testCase.componentName})
+
 				By("Verify accounts to be created are correct")
 				Eventually(func(g Gomega) {
 					accounts := getAccounts(g, cluster, ml)
 					g.Expect(accounts).To(BeEquivalentTo(acctList))
 				}).Should(Succeed())
 
+				// REVIEW: need to revise this test case, caught intermittent error:
+				//  [FAILED] Expected
+				//   <int>: 3
+				//   to be equivalent to
+				// 	 <int>: 4
+				// [FAILED] Timed out after 10.000s.
+				//   Expected
+				// 	 <int>: 2
+				//   to be equivalent to
+				// 	 <int>: 3
+				// [FAILED] Timed out after 10.000s.
+				// Expected
+				// 	<int>: 3
+				// to be equivalent to
+				// 	<int>: 4
 				By("Verify secrets cached are correct")
-				Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(cachedSecretNum))
+				Eventually(len(systemAccountReconciler.SecretMapStore.ListKeys())).Should(BeEquivalentTo(cachedSecretNum))
 
 				// wait for a while till all jobs are created
 				By("Mock all jobs are completed and deleted")

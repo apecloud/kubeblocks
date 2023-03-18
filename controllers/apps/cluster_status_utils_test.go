@@ -177,7 +177,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace},
 				func(g Gomega, fetched *appsv1.StatefulSet) {
 					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
-				}), time.Second*20, time.Second*1).Should(Succeed())
+				})).Should(Succeed())
 			stsInvolvedObject := corev1.ObjectReference{
 				Name:      stsName,
 				Kind:      constant.StatefulSetKind,
@@ -251,9 +251,10 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			})()).Should(Succeed())
 
 			// expect cluster phase is Abnormal by cluster controller.
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Status.Phase == appsv1alpha1.AbnormalPhase).Should(BeTrue())
-			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
+				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+					g.Expect(tmpCluster.Status.Phase == appsv1alpha1.AbnormalPhase).Should(BeTrue())
+				})).Should(Succeed())
 
 			By("test the cluster phase when cluster only contains a component of Stateful workload, and the component is Failed or Abnormal")
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
@@ -281,7 +282,6 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				})).Should(Succeed())
 				// wait for cluster controller reconciles to complete.
 				Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(cluster))).Should(Equal(expectObservedGeneration))
-
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), checkFun)).Should(Succeed())
 			}
 

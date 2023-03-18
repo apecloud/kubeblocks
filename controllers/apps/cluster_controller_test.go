@@ -188,33 +188,27 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster initialized")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
-		validateSvc := func(total int, svcName string) bool {
+		validateSvc := func(g Gomega, total int, svcName string) {
 			svcList := &corev1.ServiceList{}
-			Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
+			g.Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: mysqlCompName,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-			if len(svcList.Items) != total {
-				return false
-			}
-
+			g.Expect(svcList.Items).Should(HaveLen(total))
 			idx := slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
 				return strings.HasSuffix(e.Name, svcName)
 			})
-			if idx < 0 {
-				return false
-			}
-
+			g.Expect(idx < 0).Should(BeTrue())
 			svc := svcList.Items[idx]
-			if svc.Spec.Type == corev1.ServiceTypeLoadBalancer &&
-				svc.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyTypeLocal {
-				return false
-			}
-			return true
+			g.Expect(svc.Spec.Type == corev1.ServiceTypeLoadBalancer &&
+				svc.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyTypeLocal).Should(BeTrue())
 		}
-
-		Expect(validateSvc(4, testapps.ServiceVPCName)).Should(BeTrue())
-		Expect(validateSvc(4, testapps.ServiceInternetName)).Should(BeTrue())
+		Consistently(func(g Gomega) {
+			validateSvc(g, 4, testapps.ServiceVPCName)
+		}).Should(Succeed())
+		Consistently(func(g Gomega) {
+			validateSvc(g, 4, testapps.ServiceInternetName)
+		}).Should(Succeed())
 
 		By("Delete a LoadBalancer service")
 		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
@@ -234,7 +228,9 @@ var _ = Describe("Cluster Controller", func() {
 			}
 
 		})).Should(Succeed())
-		Eventually(validateSvc(3, testapps.ServiceVPCName)).Should(BeFalse())
+		Consistently(func(g Gomega) {
+			validateSvc(g, 3, testapps.ServiceVPCName)
+		}).Should(Succeed())
 
 		By("Add the deleted LoadBalancer service back")
 		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
@@ -250,7 +246,9 @@ var _ = Describe("Cluster Controller", func() {
 				return
 			}
 		}))
-		Eventually(validateSvc(4, testapps.ServiceVPCName)).Should(BeTrue())
+		Eventually(func(g Gomega) {
+			validateSvc(g, 4, testapps.ServiceVPCName)
+		}).Should(BeTrue())
 	}
 
 	checkAllServicesCreate := func() {
@@ -288,10 +286,8 @@ var _ = Describe("Cluster Controller", func() {
 		getHeadlessSvcPorts := func(compDefName string) []corev1.ServicePort {
 			cluster := &appsv1alpha1.Cluster{}
 			Expect(k8sClient.Get(testCtx.Ctx, clusterKey, cluster)).To(Succeed())
-
 			comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *cluster, compDefName)
 			Expect(err).ShouldNot(HaveOccurred())
-
 			var headlessSvcPorts []corev1.ServicePort
 			for _, container := range comp.PodSpec.Containers {
 				for _, port := range container.Ports {

@@ -126,10 +126,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				name := plan.GenerateTLSSecretName(clusterObj.Name, statefulCompName)
 				nsName := types.NamespacedName{Namespace: ns, Name: name}
 				secret := &corev1.Secret{}
-				Eventually(func() error {
-					err := k8sClient.Get(ctx, nsName, secret)
-					return err
-				}).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(Succeed())
+				Eventually(k8sClient.Get(ctx, nsName, secret)).Should(Succeed())
 				By("Checking volume & volumeMount settings in podSpec")
 				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
 				sts := stsList.Items[0]

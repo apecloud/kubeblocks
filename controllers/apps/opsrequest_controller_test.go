@@ -170,7 +170,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("patch opsrequest controller to run")
 		Eventually(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
 			if verticalScalingOpsRequest.Annotations == nil {
-				verticalScalingOpsRequest.Annotations = make(map[string]string, 1)
+				verticalScalingOpsRequest.Annotations = map[string]string{}
 			}
 			verticalScalingOpsRequest.Annotations[constant.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
 		})).Should(Succeed())

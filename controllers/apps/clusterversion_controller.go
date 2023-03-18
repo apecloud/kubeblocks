@@ -136,7 +136,8 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error()); err != nil {
 				return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 			}
-			return intctrlutil.Reconciled()
+			return intctrlutil.RequeueAfter(time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)),
+				reqCtx.Log, "")
 		}
 		return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 	}

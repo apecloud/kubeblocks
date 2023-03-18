@@ -78,7 +78,7 @@ var _ = Describe("Event Controller", func() {
 					Namespace: pod.Namespace,
 					Name:      pod.Name,
 				}, p)
-			}, time.Second*10, time.Second).Should(Succeed())
+			}).Should(Succeed())
 
 			By("send role changed event")
 			sndEvent, err := createRoleChangedEvent(podName, "leader")
@@ -93,7 +93,7 @@ var _ = Describe("Event Controller", func() {
 					return err.Error()
 				}
 				return event.InvolvedObject.Name
-			}, time.Second*60, time.Second).Should(Equal(sndEvent.InvolvedObject.Name))
+			}).Should(Equal(sndEvent.InvolvedObject.Name))
 
 			By("Test parse event message")
 			reqCtx := intctrlutil.RequestCtx{

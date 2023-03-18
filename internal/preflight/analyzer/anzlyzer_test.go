@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,16 +33,12 @@ import (
 )
 
 var _ = Describe("analyzer_test", func() {
-	var (
-		timeOut = time.Second * 10
-	)
-
 	Context("KBAnalyze test", func() {
 		It("KBAnalyze test, and ExtendAnalyze is nil", func() {
 			Eventually(func(g Gomega) {
 				res := KBAnalyze(context.TODO(), &preflightv1beta2.ExtendAnalyze{}, nil, nil)
 				g.Expect(res[0].IsFail).Should(BeTrue())
-			}, timeOut).Should(Succeed())
+			}).Should(Succeed())
 		})
 
 		It("KBAnalyze test, and expect success", func() {
@@ -82,7 +77,7 @@ var _ = Describe("analyzer_test", func() {
 				res := KBAnalyze(context.TODO(), kbAnalyzer, getCollectedFileContents, nil)
 				Expect(len(res)).Should(Equal(1))
 				g.Expect(res[0].IsPass).Should(BeTrue())
-			}, timeOut).Should(Succeed())
+			}).Should(Succeed())
 		})
 	})
 
@@ -91,7 +86,7 @@ var _ = Describe("analyzer_test", func() {
 			Eventually(func(g Gomega) {
 				res := HostKBAnalyze(context.TODO(), &preflightv1beta2.ExtendHostAnalyze{}, nil, nil)
 				g.Expect(res[0].IsFail).Should(BeTrue())
-			}, timeOut).Should(Succeed())
+			}).Should(Succeed())
 		})
 
 		It("HostKBAnalyze test, and expect success", func() {
@@ -121,7 +116,7 @@ var _ = Describe("analyzer_test", func() {
 				res := HostKBAnalyze(context.TODO(), kbHostAnalyzer, getCollectedFileContents, nil)
 				Expect(len(res)).Should(Equal(1))
 				g.Expect(res[0].IsPass).Should(BeTrue())
-			}, timeOut).Should(Succeed())
+			}).Should(Succeed())
 		})
 	})
 
@@ -133,7 +128,7 @@ var _ = Describe("analyzer_test", func() {
 			collector, ok = GetAnalyzer(&preflightv1beta2.ExtendAnalyze{})
 			g.Expect(collector).Should(BeNil())
 			g.Expect(ok).Should(BeFalse())
-		}, timeOut).Should(Succeed())
+		}).Should(Succeed())
 	})
 
 	It("NewAnalyzeResultError test, argument isn't nil", func() {

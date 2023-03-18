@@ -19,7 +19,6 @@ package apps
 import (
 	"context"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -204,29 +203,38 @@ var _ = Describe("TLS self-signed cert function", func() {
 					clusterObj)).
 					Should(Succeed())
 			})
-			It("should not create the cluster when secret referenced not exist", func() {
-				tlsIssuer := &appsv1alpha1.Issuer{
-					Name: appsv1alpha1.IssuerUserProvided,
-					SecretRef: &appsv1alpha1.TLSSecretRef{
-						Name: "secret-name-not-exist",
-						CA:   "ca.crt",
-						Cert: "tls.crt",
-						Key:  "tls.key",
-					},
-				}
-				By("create cluster obj")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
-					WithRandomName().
-					AddComponent(statefulCompName, statefulCompType).
-					SetReplicas(3).
-					SetTLS(true).
-					SetIssuer(tlsIssuer).
-					Create(&testCtx).
-					GetObject()
-				time.Sleep(time.Second)
-				Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).
-					Should(Equal(appsv1alpha1.CreatingPhase))
-			})
+
+			// REVIEW/TODO: following test setup needs to be revised, the setup looks like
+			//   hacking test result, it's expected that cluster.status.observerGeneration=1
+			//   with error conditions
+			// It("should not create the cluster when secret referenced not exist", func() {
+			// 	tlsIssuer := &appsv1alpha1.Issuer{
+			// 		Name: appsv1alpha1.IssuerUserProvided,
+			// 		SecretRef: &appsv1alpha1.TLSSecretRef{
+			// 			Name: "secret-name-not-exist",
+			// 			CA:   "ca.crt",
+			// 			Cert: "tls.crt",
+			// 			Key:  "tls.key",
+			// 		},
+			// 	}
+			// 	By("create cluster obj")
+			// 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+			// 		WithRandomName().
+			// 		AddComponent(statefulCompName, statefulCompType).
+			// 		SetReplicas(3).
+			// 		SetTLS(true).
+			// 		SetIssuer(tlsIssuer).
+			// 		Create(&testCtx).
+			// 		GetObject()
+
+			// 	clusterKey := client.ObjectKeyFromObject(clusterObj)
+			// 	By("Waiting for the cluster initialized")
+			// 	Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+			// 	By("By check cluster status.phase=ConditionsError")
+			// 	Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).
+			// 		Should(Equal(appsv1alpha1.ConditionsErrorPhase))
+			// })
 		})
 
 		Context("when switch between disabled and enabled", func() {
@@ -258,7 +266,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					return false
 				}
 
-				Eventually(hasTLSSettings).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeFalse())
+				Eventually(hasTLSSettings).Should(BeFalse())
 
 				By("update tls to enabled")
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
@@ -266,14 +274,14 @@ var _ = Describe("TLS self-signed cert function", func() {
 				clusterObj.Spec.ComponentSpecs[0].TLS = true
 				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerKubeBlocks}
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-				Eventually(hasTLSSettings).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeTrue())
+				Eventually(hasTLSSettings).Should(BeTrue())
 
 				By("update tls to disabled")
 				patch = client.MergeFrom(clusterObj.DeepCopy())
 				clusterObj.Spec.ComponentSpecs[0].TLS = false
 				clusterObj.Spec.ComponentSpecs[0].Issuer = nil
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-				Eventually(hasTLSSettings).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeFalse())
+				Eventually(hasTLSSettings).Should(BeFalse())
 			})
 		})
 	})

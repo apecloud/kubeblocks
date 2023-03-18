@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
@@ -231,7 +232,9 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 			isReady, svcEP, headlessEP, err := r.isComponentReady(reqCtx, cluster.Name, compName)
 			if err != nil {
-				return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "failed to get service")
+				return intctrlutil.RequeueAfter(
+					time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)),
+					reqCtx.Log, "failed to get service")
 			}
 
 			// either service or endpoint is not ready, increase counter and continue to process next component

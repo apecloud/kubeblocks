@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,8 +33,6 @@ var _ = Describe("clusterDefinition webhook", func() {
 		clusterDefinitionName  = "webhook-cd-" + randomStr
 		clusterDefinitionName2 = "webhook-cd2" + randomStr
 		clusterDefinitionName3 = "webhook-cd3" + randomStr
-		timeout                = time.Second * 10
-		interval               = time.Second
 	)
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
@@ -62,7 +59,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
 				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			By("By creating a new clusterDefinition")
 			clusterDef, _ = createTestClusterDefinitionObj3(clusterDefinitionName3)
@@ -71,7 +68,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)
 				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			By("By creating a new clusterDefinition with workloadType==Consensus but consensusSpec not present")
 			clusterDef, _ = createTestClusterDefinitionObj2(clusterDefinitionName2)
@@ -170,7 +167,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)
 				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 		})
 
 		It("Should webhook validate configSpec", func() {
@@ -292,7 +289,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 		Eventually(func(g Gomega) int32 {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
 			return clusterDef.Spec.ComponentDefs[0].Probes.RoleProbeTimeoutAfterPodsReady
-		}, timeout, interval).Should(Equal(DefaultRoleProbeTimeoutAfterPodsReady))
+		}).Should(Equal(DefaultRoleProbeTimeoutAfterPodsReady))
 
 		By("test set zero to RoleProbeTimeoutAfterPodsReady when roleChangedProbe is nil")
 		clusterDef.Spec.ComponentDefs[0].Probes = &ClusterDefinitionProbes{
@@ -302,7 +299,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 		Eventually(func(g Gomega) int32 {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
 			return clusterDef.Spec.ComponentDefs[0].Probes.RoleProbeTimeoutAfterPodsReady
-		}, timeout, interval).Should(Equal(int32(0)))
+		}).Should(Equal(int32(0)))
 	})
 })
 

@@ -539,7 +539,7 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 	return client.MatchingLabels{
 		constant.AppInstanceLabelKey:    clusterName,
 		constant.KBAppComponentLabelKey: componentName,
-		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.KBManagedByKey:         "cluster", // the resources are managed by which controller
 	}
 }
 
@@ -553,7 +553,14 @@ func isVolumeSnapshotExists(cli types2.ReadonlyClient,
 	if err := cli.List(ctx, &vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	return len(vsList.Items) > 0, nil
+	for _, vs := range vsList.Items {
+		// when do h-scale very shortly after last h-scale,
+		// the last volume snapshot could not be deleted completely
+		if vs.DeletionTimestamp.IsZero() {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func doSnapshot(cli types2.ReadonlyClient,
@@ -588,13 +595,16 @@ func doSnapshot(cli types2.ReadonlyClient,
 		if err != nil {
 			return err
 		}
+		if err := controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
+			return err
+		}
 		vertex := &lifecycleVertex{obj: snapshot, action: actionPtr(CREATE)}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 
 		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 		// TODO: SetOwnership
-		if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
+		if err := controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
 			return err
 		}
 		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
@@ -648,7 +658,16 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 		if len(vsList.Items) == 0 {
 			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, componentName)
 		}
-		return createPVCFromSnapshot(vct, stsObj, pvcKey, vsList.Items[0].Name, dag, root)
+		// exclude volumes that are deleting
+		vsName := ""
+		for _, vs := range vsList.Items {
+			if vs.DeletionTimestamp != nil {
+				continue
+			}
+			vsName = vs.Name
+			break
+		}
+		return createPVCFromSnapshot(vct, stsObj, pvcKey, vsName, dag, root)
 	}
 	return nil
 }
@@ -706,8 +725,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return err
 		}
-		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-		if err := controllerutil.SetOwnerReference(cluster, backup, scheme); err != nil {
+		if err := controllerutil.SetControllerReference(cluster, backup, scheme); err != nil {
 			return err
 		}
 		vertex := &lifecycleVertex{obj: backup, action: actionPtr(CREATE)}
@@ -738,6 +756,9 @@ func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
 	if err != nil {
 		return err
 	}
+	rootVertex, _ := root.(*lifecycleVertex)
+	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+	intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName)
 	vertex := &lifecycleVertex{obj: pvc, action: actionPtr(CREATE)}
 	dag.AddVertex(vertex)
 	dag.Connect(root, vertex)

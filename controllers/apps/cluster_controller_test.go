@@ -188,7 +188,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster initialized")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
-		validateSvc := func(g Gomega, total int, svcName string) {
+		validateSvc := func(g Gomega, total int, svcName string) bool {
 			svcList := &corev1.ServiceList{}
 			g.Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
@@ -198,17 +198,17 @@ var _ = Describe("Cluster Controller", func() {
 			idx := slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
 				return strings.HasSuffix(e.Name, svcName)
 			})
-			g.Expect(idx < 0).Should(BeTrue())
+			g.Expect(idx >= 0).Should(BeTrue())
 			svc := svcList.Items[idx]
-			g.Expect(svc.Spec.Type == corev1.ServiceTypeLoadBalancer &&
-				svc.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyTypeLocal).Should(BeTrue())
+			return (svc.Spec.Type != corev1.ServiceTypeLoadBalancer ||
+				svc.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal)
 		}
-		Consistently(func(g Gomega) {
-			validateSvc(g, 4, testapps.ServiceVPCName)
-		}).Should(Succeed())
-		Consistently(func(g Gomega) {
-			validateSvc(g, 4, testapps.ServiceInternetName)
-		}).Should(Succeed())
+		Consistently(func(g Gomega) bool {
+			return validateSvc(g, 4, testapps.ServiceVPCName)
+		}).Should(BeTrue())
+		Consistently(func(g Gomega) bool {
+			return validateSvc(g, 4, testapps.ServiceInternetName)
+		}).Should(BeTrue())
 
 		By("Delete a LoadBalancer service")
 		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
@@ -228,9 +228,9 @@ var _ = Describe("Cluster Controller", func() {
 			}
 
 		})).Should(Succeed())
-		Consistently(func(g Gomega) {
-			validateSvc(g, 3, testapps.ServiceVPCName)
-		}).Should(Succeed())
+		Eventually(func(g Gomega) bool {
+			return validateSvc(g, 3, testapps.ServiceVPCName)
+		}).Should(BeFalse())
 
 		By("Add the deleted LoadBalancer service back")
 		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {

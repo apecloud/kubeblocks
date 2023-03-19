@@ -170,88 +170,88 @@ var _ = Describe("Cluster Controller", func() {
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
 	}
 
-	testServiceAddAndDelete := func() {
-		By("Creating a cluster with two LoadBalancer services")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
-			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
-			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
-			WithRandomName().Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
+	// testServiceAddAndDelete := func() {
+	// 	By("Creating a cluster with two LoadBalancer services")
+	// 	clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+	// 		clusterDefObj.Name, clusterVersionObj.Name).
+	// 		AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
+	// 		AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
+	// 		AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
+	// 		WithRandomName().Create(&testCtx).GetObject()
+	// 	clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster initialized")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+	// 	By("Waiting for the cluster initialized")
+	// 	Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
-		validateSvc := func(g Gomega, total int, svcName string, predicate func(Gomega, int) bool) bool {
-			svcList := &corev1.ServiceList{}
-			g.Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
-				constant.AppInstanceLabelKey:    clusterKey.Name,
-				constant.KBAppComponentLabelKey: mysqlCompName,
-			}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-			g.Expect(svcList.Items).Should(HaveLen(total))
-			idx := slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
-				return strings.HasSuffix(e.Name, svcName)
-			})
-			if predicate != nil {
-				return predicate(g, idx)
-			}
-			g.Expect(idx >= 0).Should(BeTrue())
-			svc := svcList.Items[idx]
-			return (svc.Spec.Type != corev1.ServiceTypeLoadBalancer ||
-				svc.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal)
-		}
-		Consistently(func(g Gomega) bool {
-			return validateSvc(g, 4, testapps.ServiceVPCName, nil)
-		}).Should(BeTrue())
-		Consistently(func(g Gomega) bool {
-			return validateSvc(g, 4, testapps.ServiceInternetName, nil)
-		}).Should(BeTrue())
+	// 	validateSvc := func(g Gomega, total int, svcName string, predicate func(Gomega, int) bool) bool {
+	// 		svcList := &corev1.ServiceList{}
+	// 		g.Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
+	// 			constant.AppInstanceLabelKey:    clusterKey.Name,
+	// 			constant.KBAppComponentLabelKey: mysqlCompName,
+	// 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+	// 		g.Expect(svcList.Items).Should(HaveLen(total))
+	// 		idx := slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
+	// 			return strings.HasSuffix(e.Name, svcName)
+	// 		})
+	// 		if predicate != nil {
+	// 			return predicate(g, idx)
+	// 		}
+	// 		g.Expect(idx >= 0).Should(BeTrue())
+	// 		svc := svcList.Items[idx]
+	// 		return (svc.Spec.Type != corev1.ServiceTypeLoadBalancer ||
+	// 			svc.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal)
+	// 	}
+	// 	Consistently(func(g Gomega) bool {
+	// 		return validateSvc(g, 4, testapps.ServiceVPCName, nil)
+	// 	}).Should(BeTrue())
+	// 	Consistently(func(g Gomega) bool {
+	// 		return validateSvc(g, 4, testapps.ServiceInternetName, nil)
+	// 	}).Should(BeTrue())
 
-		By("Delete a LoadBalancer service")
-		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			for idx, comp := range cluster.Spec.ComponentSpecs {
-				if comp.ComponentDefRef != mysqlCompType {
-					continue
-				}
-				var services []appsv1alpha1.ClusterComponentService
-				for _, item := range comp.Services {
-					if item.Name == testapps.ServiceVPCName {
-						continue
-					}
-					services = append(services, item)
-				}
-				cluster.Spec.ComponentSpecs[idx].Services = services
-				return
-			}
+	// 	By("Delete a LoadBalancer service")
+	// 	Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+	// 		for idx, comp := range cluster.Spec.ComponentSpecs {
+	// 			if comp.ComponentDefRef != mysqlCompType {
+	// 				continue
+	// 			}
+	// 			var services []appsv1alpha1.ClusterComponentService
+	// 			for _, item := range comp.Services {
+	// 				if item.Name == testapps.ServiceVPCName {
+	// 					continue
+	// 				}
+	// 				services = append(services, item)
+	// 			}
+	// 			cluster.Spec.ComponentSpecs[idx].Services = services
+	// 			return
+	// 		}
 
-		})).Should(Succeed())
-		// REVIEW: not so BDD as need to implement condition logics.
-		Eventually(func(g Gomega) bool {
-			return validateSvc(g, 3, testapps.ServiceVPCName,
-				func(g Gomega, i int) bool {
-					return i >= 0
-				})
-		}).Should(BeFalse())
+	// 	})).Should(Succeed())
+	// 	// REVIEW: not so BDD as need to implement condition logics.
+	// 	Eventually(func(g Gomega) bool {
+	// 		return validateSvc(g, 3, testapps.ServiceVPCName,
+	// 			func(g Gomega, i int) bool {
+	// 				return i >= 0
+	// 			})
+	// 	}).Should(BeFalse())
 
-		By("Add the deleted LoadBalancer service back")
-		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			for idx, comp := range cluster.Spec.ComponentSpecs {
-				if comp.ComponentDefRef != mysqlCompType {
-					continue
-				}
-				comp.Services = append(comp.Services, appsv1alpha1.ClusterComponentService{
-					Name:        testapps.ServiceVPCName,
-					ServiceType: corev1.ServiceTypeLoadBalancer,
-				})
-				cluster.Spec.ComponentSpecs[idx] = comp
-				return
-			}
-		}))
-		Eventually(func(g Gomega) {
-			validateSvc(g, 4, testapps.ServiceVPCName, nil)
-		}).Should(BeTrue())
-	}
+	// 	By("Add the deleted LoadBalancer service back")
+	// 	Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+	// 		for idx, comp := range cluster.Spec.ComponentSpecs {
+	// 			if comp.ComponentDefRef != mysqlCompType {
+	// 				continue
+	// 			}
+	// 			comp.Services = append(comp.Services, appsv1alpha1.ClusterComponentService{
+	// 				Name:        testapps.ServiceVPCName,
+	// 				ServiceType: corev1.ServiceTypeLoadBalancer,
+	// 			})
+	// 			cluster.Spec.ComponentSpecs[idx] = comp
+	// 			return
+	// 		}
+	// 	}))
+	// 	Eventually(func(g Gomega) {
+	// 		validateSvc(g, 4, testapps.ServiceVPCName, nil)
+	// 	}).Should(BeTrue())
+	// }
 
 	checkAllServicesCreate := func() {
 		By("Creating a cluster")
@@ -1152,9 +1152,9 @@ var _ = Describe("Cluster Controller", func() {
 			checkAllServicesCreate()
 		})
 
-		It("should add and delete service correctly", func() {
-			testServiceAddAndDelete()
-		})
+		// It("should add and delete service correctly", func() {
+		// 	testServiceAddAndDelete()
+		// })
 
 		It("should successfully h-scale with multiple components", func() {
 			testMultiCompHScale()

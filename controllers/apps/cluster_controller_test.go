@@ -29,14 +29,6 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -46,6 +38,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -198,8 +199,8 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			g.Expect(idx >= 0).Should(BeTrue())
 			svc := svcList.Items[idx]
-			return (svc.Spec.Type != corev1.ServiceTypeLoadBalancer ||
-				svc.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal)
+			return svc.Spec.Type != corev1.ServiceTypeLoadBalancer ||
+				svc.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal
 		}
 		Consistently(func(g Gomega) bool {
 			return validateSvc(g, 4, testapps.ServiceVPCName, nil)
@@ -211,7 +212,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Delete a LoadBalancer service")
 		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			for idx, comp := range cluster.Spec.ComponentSpecs {
-				if comp.ComponentDefRef != mysqlCompType {
+				if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
 					continue
 				}
 				var services []appsv1alpha1.ClusterComponentService
@@ -237,7 +238,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Add the deleted LoadBalancer service back")
 		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			for idx, comp := range cluster.Spec.ComponentSpecs {
-				if comp.ComponentDefRef != mysqlCompType {
+				if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
 					continue
 				}
 				comp.Services = append(comp.Services, appsv1alpha1.ClusterComponentService{
@@ -247,9 +248,9 @@ var _ = Describe("Cluster Controller", func() {
 				cluster.Spec.ComponentSpecs[idx] = comp
 				return
 			}
-		}))
-		Eventually(func(g Gomega) {
-			validateSvc(g, 4, testapps.ServiceVPCName, nil)
+		})).Should(Succeed())
+		Eventually(func(g Gomega) bool {
+			return validateSvc(g, 4, testapps.ServiceVPCName, nil)
 		}).Should(BeTrue())
 	}
 

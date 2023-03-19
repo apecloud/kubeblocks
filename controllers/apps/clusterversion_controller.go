@@ -58,38 +58,6 @@ func init() {
 	viper.SetDefault(maxConcurReconClusterVersionKey, runtime.NumCPU()*2)
 }
 
-func clusterVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef *appsv1alpha1.ClusterDefinition) error {
-
-	labelSelector, err := labels.Parse(clusterDefLabelKey + "=" + clusterDef.GetName())
-	if err != nil {
-		return err
-	}
-	o := &client.ListOptions{LabelSelector: labelSelector}
-
-	list := &appsv1alpha1.ClusterVersionList{}
-	if err := cli.List(ctx, list, o); err != nil {
-		return err
-	}
-	for _, item := range list.Items {
-		if item.Status.ClusterDefGeneration != clusterDef.Generation {
-			patch := client.MergeFrom(item.DeepCopy())
-			if statusMsg := validateClusterVersion(&item, clusterDef); statusMsg != "" {
-				item.Status.Phase = appsv1alpha1.UnavailablePhase
-				item.Status.Message = statusMsg
-			} else {
-				item.Status.Phase = appsv1alpha1.AvailablePhase
-				item.Status.Message = ""
-				item.Status.ClusterDefGeneration = clusterDef.Generation
-			}
-			if err = cli.Status().Patch(ctx, &item, patch); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
@@ -136,8 +104,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error()); err != nil {
 				return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 			}
-			return intctrlutil.RequeueAfter(time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)),
-				reqCtx.Log, "")
+			return intctrlutil.RequeueAfter(time.Millisecond*requeueDuration, reqCtx.Log, "")
 		}
 		return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 	}
@@ -181,6 +148,16 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return intctrlutil.Reconciled()
 }
 
+// SetupWithManager sets up the controller with the Manager.
+func (r *ClusterVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&appsv1alpha1.ClusterVersion{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(maxConcurReconClusterVersionKey),
+		}).
+		Complete(r)
+}
+
 // handleClusterDefNotFound handles clusterVersion status when clusterDefinition not found.
 func (r *ClusterVersionReconciler) handleClusterDefNotFound(reqCtx intctrlutil.RequestCtx,
 	clusterVersion *appsv1alpha1.ClusterVersion, message string) error {
@@ -204,16 +181,6 @@ func validateClusterVersion(clusterVersion *appsv1alpha1.ClusterVersion, cluster
 	return strings.Join(statusMsgs, ";")
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *ClusterVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1alpha1.ClusterVersion{}).
-		WithOptions(controller.Options{
-			MaxConcurrentReconciles: viper.GetInt(maxConcurReconClusterVersionKey),
-		}).
-		Complete(r)
-}
-
 func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, clusterVersion *appsv1alpha1.ClusterVersion) error {
 	//
 	// delete any external resources associated with the cronJob
@@ -221,4 +188,35 @@ func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.Re
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
 	return appsconfig.DeleteConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
+}
+
+func clusterVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef *appsv1alpha1.ClusterDefinition) error {
+	labelSelector, err := labels.Parse(clusterDefLabelKey + "=" + clusterDef.GetName())
+	if err != nil {
+		return err
+	}
+	o := &client.ListOptions{LabelSelector: labelSelector}
+
+	list := &appsv1alpha1.ClusterVersionList{}
+	if err := cli.List(ctx, list, o); err != nil {
+		return err
+	}
+	for _, item := range list.Items {
+		if item.Status.ClusterDefGeneration != clusterDef.Generation {
+			patch := client.MergeFrom(item.DeepCopy())
+			if statusMsg := validateClusterVersion(&item, clusterDef); statusMsg != "" {
+				item.Status.Phase = appsv1alpha1.UnavailablePhase
+				item.Status.Message = statusMsg
+			} else {
+				item.Status.Phase = appsv1alpha1.AvailablePhase
+				item.Status.Message = ""
+				item.Status.ClusterDefGeneration = clusterDef.Generation
+			}
+			if err = cli.Status().Patch(ctx, &item, patch); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

@@ -74,6 +74,10 @@ type ClusterStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// phase describes the phase of the Cluster. the detail information of phase is as follows:
+	// Running: cluster is running, all components are available. [terminal state]
+	// Stopped: all components are stopped, or some components are stopped and other components are running. [terminal state]
+	// Failed: cluster is unavailable. [terminal state]
+	// Abnormal: Cluster is still available, but part of its components are Abnormal. [terminal state]
 	// Creating: creating Cluster.
 	// Running: Cluster is running, all components are available.
 	// Updating: the Cluster phase will be 'Updating' when directly updating Cluster.spec.
@@ -83,12 +87,9 @@ type ClusterStatus struct {
 	// VersionUpgrading: upgrade operation is running.
 	// Rebooting: restart operation is running.
 	// Stopping: stop operation is running.
-	// Stopped: all components are stopped, or some components are stopped and other components are running.
 	// Starting: start operation is running.
 	// Reconfiguring: reconfiguration operation is running.
-	// Deleting/Deleted: deleting Cluster/Cluster is deleted.
-	// Failed: Cluster is unavailable.
-	// Abnormal: Cluster is still available, but part of its components are Abnormal.
+	// Deleting: deleting Cluster.
 	// if the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// ConditionsError: Cluster and all the components are still healthy, but some update/create API fails due to invalid parameters.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
@@ -422,6 +423,9 @@ func init() {
 }
 
 func (r *Cluster) SetStatusCondition(condition metav1.Condition) {
+	if r == nil {
+		return
+	}
 	meta.SetStatusCondition(&r.Status.Conditions, condition)
 }
 
@@ -562,4 +566,13 @@ func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.
 		t.Spec = *template.Spec
 	}
 	return t
+}
+
+func (r ClusterStatus) GetTerminalPhases() []Phase {
+	return []Phase{
+		RunningPhase,
+		StoppedPhase,
+		FailedPhase,
+		AbnormalPhase,
+	}
 }

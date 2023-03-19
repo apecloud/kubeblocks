@@ -32,6 +32,9 @@ import (
 
 const (
 	errorLogName = "error"
+	leader       = "leader"
+	follower     = "follower"
+	learner      = "learner"
 )
 
 // InitConsensusMysql initializes a cluster environment which only contains a component of ConsensusSet type for testing,

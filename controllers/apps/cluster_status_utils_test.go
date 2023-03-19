@@ -253,7 +253,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			// expect cluster phase is Abnormal by cluster controller.
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-					g.Expect(tmpCluster.Status.Phase == appsv1alpha1.AbnormalPhase).Should(BeTrue())
+					g.Expect(tmpCluster.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.AbnormalPhase))
 				})).Should(Succeed())
 
 			By("test the cluster phase when cluster only contains a component of Stateful workload, and the component is Failed or Abnormal")

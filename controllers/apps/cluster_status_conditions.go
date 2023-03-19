@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
@@ -121,7 +120,7 @@ func (conMgr clusterConditionManager) handleConditionForClusterPhase(oldConditio
 	}
 
 	if time.Now().Before(oldCondition.LastTransitionTime.Add(
-		time.Millisecond * time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)))) {
+		time.Millisecond * requeueDuration)) {
 		return false
 	}
 	if !util.IsFailedOrAbnormal(conMgr.cluster.Status.Phase) &&

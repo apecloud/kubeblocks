@@ -158,12 +158,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}, clusterDefinition); err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
+		if setErr := clusterConditionMgr.setPreCheckErrorCondition(err); setErr != nil {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		}
+
 		// If using RequeueWithError and the user fixed this error,
 		// it may take up to 1000s to reconcile again, causing the user to think that the repair is not effective.
-		return intctrlutil.RequeueAfter(
-			time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)),
-			reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.Generation {
@@ -197,7 +198,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// so when update cluster conditions failed, we can ignore it.
 			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 			return intctrlutil.RequeueAfter(
-				time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)), reqCtx.Log, "")
+				time.Millisecond*requeueDuration, reqCtx.Log, "")
 		}
 		if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
 			appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
@@ -214,7 +215,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err = cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		return intctrlutil.RequeueAfter(
-			time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)), reqCtx.Log, "")
+			time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
 
 	// preCheck succeed, starting the cluster provisioning
@@ -228,14 +229,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
 		return intctrlutil.RequeueAfter(
-			time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)), reqCtx.Log, "")
+			time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
 	if shouldRequeue {
 		if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.RequeueAfter(
-			time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)), reqCtx.Log, "")
+			time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
 
 	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDeepCopy, clusterDefinition); err != nil {
@@ -246,6 +247,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	requeueDuration = time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS))
 	// TODO: add filter predicate for core API objects
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Cluster{}).
@@ -476,8 +478,7 @@ func (r *ClusterReconciler) checkReferencedCRStatus(
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
-	res, err := intctrlutil.RequeueAfter(
-		time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)), reqCtx.Log, "")
+	res, err := intctrlutil.RequeueAfter(time.Millisecond*requeueDuration, reqCtx.Log, "")
 	return &res, err
 }
 

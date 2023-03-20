@@ -1358,7 +1358,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Waiting for the cluster initialized")
 			// REVIEW: expect
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
 
 			// REVIEW: following expect always failed

@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
@@ -177,14 +178,14 @@ func (o *OperationsOptions) validateReconfiguring() error {
 	if err := o.validateConfigMapKey(tpl, componentName); err != nil {
 		return err
 	}
-	if err := o.validateConfigParams(tpl, componentName); err != nil {
+	if err := o.validateConfigParams(tpl); err != nil {
 		return err
 	}
 	o.printConfigureTips()
 	return nil
 }
 
-func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConfigSpec, componentName string) error {
+func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConfigSpec) error {
 	transKeyPair := func(pts map[string]string) map[string]interface{} {
 		m := make(map[string]interface{}, len(pts))
 		for key, value := range pts {
@@ -193,18 +194,59 @@ func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConf
 		return m
 	}
 
-	configConstraint := appsv1alpha1.ConfigConstraint{}
-	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
+	configConstraintKey := client.ObjectKey{
 		Namespace: "",
 		Name:      tpl.ConfigConstraintRef,
-	}, o.Dynamic, &configConstraint); err != nil {
+	}
+	configConstraint := appsv1alpha1.ConfigConstraint{}
+	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), configConstraintKey, o.Dynamic, &configConstraint); err != nil {
 		return err
 	}
 
-	_, err := cfgcore.MergeAndValidateConfiguration(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
+	newConfigData, err := cfgcore.MergeAndValidateConfiguration(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
 		Key:           o.CfgFile,
 		UpdatedParams: transKeyPair(o.KeyValues),
 	}})
+	if err != nil {
+		return err
+	}
+	return o.checkChangedParamsAndDoubleConfirm(&configConstraint.Spec, newConfigData, tpl)
+}
+
+func (o *OperationsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.ConfigConstraintSpec, data map[string]string, tpl *appsv1alpha1.ComponentConfigSpec) error {
+	mockEmptyData := func(m map[string]string) map[string]string {
+		r := make(map[string]string, len(data))
+		for key := range m {
+			r[key] = ""
+		}
+		return r
+	}
+
+	configPatch, _, err := cfgcore.CreateConfigurePatch(mockEmptyData(data), data, cc.FormatterConfig.Format, tpl.Keys, false)
+	if err != nil {
+		return err
+	}
+
+	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(cc, configPatch)
+	if err != nil {
+		return nil
+	}
+	if dynamicUpdated {
+		return nil
+	}
+	return o.confirmReconfigureWithRestart()
+}
+
+func (o *OperationsOptions) confirmReconfigureWithRestart() error {
+	const confirmStr = "yes"
+	printer.Warning(o.Out, restartConfirmPrompt)
+	_, err := prompt.NewPrompt(fmt.Sprintf("Please type \"%s\" to confirm:", confirmStr),
+		func(input string) error {
+			if input != confirmStr {
+				return fmt.Errorf("typed \"%s\" does not match \"%s\"", input, confirmStr)
+			}
+			return nil
+		}, o.In).Run()
 	return err
 }
 

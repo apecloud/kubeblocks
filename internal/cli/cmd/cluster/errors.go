@@ -31,6 +31,7 @@ var (
 
 	notCueSchemaPrompt            = "The config template not define cue schema and parameter explain info cannot be generated."
 	cue2openAPISchemaFailedPrompt = "The cue schema may not satisfy the conversion constraints of openAPISchema and parameter explain info cannot be generated."
+	restartConfirmPrompt          = "This configure will restart the process, which may cause the cluster to be unavailable for a period of time."
 )
 
 func makeClusterNotExistErr(clusterName string) error {

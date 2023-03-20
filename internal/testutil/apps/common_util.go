@@ -299,7 +299,7 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 			if len(finalizers) > 0 {
 				// PVCs are protected by the "kubernetes.io/pvc-protection" finalizer
 				g.Expect(finalizers[0]).Should(gomega.BeElementOf([]string{"orphan", "kubernetes.io/pvc-protection",
-					"configuration.kubeblocks.io/finalizer"}))
+					"configuration.kubeblocks.io/finalizer", "cluster.kubeblocks.io/finalizer"}))
 				g.Expect(len(finalizers)).Should(gomega.Equal(1))
 				g.Expect(ChangeObj(testCtx, pobj, func() {
 					pobj.SetFinalizers([]string{})

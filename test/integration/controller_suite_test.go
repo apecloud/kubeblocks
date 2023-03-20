@@ -23,12 +23,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/go-logr/logr"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -42,10 +47,15 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	dpctrl "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	cliutil "github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -53,6 +63,7 @@ import (
 
 var cfg *rest.Config
 var k8sClient client.Client
+var dynamicClient dynamic.Interface
 var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
@@ -73,6 +84,149 @@ func TestIntegrationController(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Integration Test Suite")
+}
+
+// GetConsensusRoleCountMap gets a role:count map from a consensusSet cluster
+func GetConsensusRoleCountMap(testCtx testutil.TestContext, k8sClient client.Client, cluster *appsv1alpha1.Cluster) (roleCountMap map[string]int) {
+	clusterkey := client.ObjectKeyFromObject(cluster)
+	stsList := &appsv1.StatefulSetList{}
+	err := testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
+		constant.AppInstanceLabelKey: clusterkey.Name,
+	}, client.InNamespace(clusterkey.Namespace))
+
+	roleCountMap = make(map[string]int)
+	roleCountMap["leader"] = 0
+	roleCountMap["follower"] = 0
+	roleCountMap["learner"] = 0
+
+	if err != nil || len(stsList.Items) == 0 {
+		return roleCountMap
+	}
+
+	sts := stsList.Items[0]
+	pods, err := util.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
+
+	if err != nil {
+		return roleCountMap
+	}
+
+	for _, pod := range pods {
+		role := pod.Labels[constant.RoleLabelKey]
+		roleCountMap[role]++
+	}
+
+	return roleCountMap
+}
+
+func CreateSimpleConsensusMySQLClusterWithConfig(
+	testCtx testutil.TestContext,
+	clusterDefName,
+	clusterVersionName,
+	clusterName,
+	mysqlConfigTemplatePath,
+	mysqlConfigConstraintPath,
+	mysqlScriptsPath string) (
+	*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
+
+	const mysqlCompName = "mysql"
+	const mysqlCompType = "mysql"
+
+	const mysqlConfigName = "mysql-component-config"
+	const mysqlConfigConstraintName = "mysql8.0-config-constraints"
+	const mysqlScriptsConfigName = "apecloud-mysql-scripts"
+
+	const mysqlDataVolumeName = "data"
+	const mysqlConfigVolumeName = "mysql-config"
+	const mysqlScriptsVolumeName = "scripts"
+
+	const mysqlErrorFilePath = "/data/mysql/log/mysqld-error.log"
+	const mysqlGeneralFilePath = "/data/mysql/log/mysqld.log"
+	const mysqlSlowlogFilePath = "/data/mysql/log/mysqld-slowquery.log"
+
+	mysqlConsensusType := string(testapps.ConsensusMySQLComponent)
+
+	configmap := testapps.CreateCustomizedObj(&testCtx,
+		mysqlConfigTemplatePath, &corev1.ConfigMap{},
+		testCtx.UseDefaultNamespace(),
+		testapps.WithLabels(
+			constant.AppNameLabelKey, clusterName,
+			constant.AppInstanceLabelKey, clusterName,
+			constant.KBAppComponentLabelKey, mysqlConsensusType,
+			constant.CMConfigurationTemplateNameLabelKey, mysqlConfigName,
+			constant.CMConfigurationConstraintsNameLabelKey, mysqlConfigConstraintName,
+			constant.CMConfigurationSpecProviderLabelKey, mysqlConfigName,
+			constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
+		))
+
+	_ = testapps.CreateCustomizedObj(&testCtx, mysqlScriptsPath, &corev1.ConfigMap{},
+		testapps.WithName(mysqlScriptsConfigName), testCtx.UseDefaultNamespace())
+
+	By("Create a constraint obj")
+	constraint := testapps.CreateCustomizedObj(&testCtx,
+		mysqlConfigConstraintPath,
+		&appsv1alpha1.ConfigConstraint{})
+
+	mysqlVolumeMounts := []corev1.VolumeMount{
+		{
+			Name:      mysqlConfigVolumeName,
+			MountPath: "/opt/mysql",
+		},
+		{
+			Name:      mysqlScriptsVolumeName,
+			MountPath: "/scripts",
+		},
+		{
+			Name:      mysqlDataVolumeName,
+			MountPath: "/data/mysql",
+		},
+	}
+
+	By("Create a clusterDefinition obj")
+	mode := int32(0755)
+	clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+		SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
+		AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
+		AddConfigTemplate(mysqlConfigName, configmap.Name, constraint.Name,
+			testCtx.DefaultNamespace, mysqlConfigVolumeName).
+		AddScriptTemplate(mysqlScriptsConfigName, mysqlScriptsConfigName,
+			testCtx.DefaultNamespace, mysqlScriptsVolumeName, &mode).
+		AddContainerVolumeMounts(testapps.DefaultMySQLContainerName, mysqlVolumeMounts).
+		AddLogConfig("error", mysqlErrorFilePath).
+		AddLogConfig("general", mysqlGeneralFilePath).
+		AddLogConfig("slow", mysqlSlowlogFilePath).
+		AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(mysqlConfigName), configmap.Name,
+			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+		AddContainerEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
+		AddContainerEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "CLUSTER_START_INDEX", Value: "1"}).
+		AddContainerEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "CLUSTER_ID", Value: "1"}).
+		Create(&testCtx).GetObject()
+
+	By("Create a clusterVersion obj")
+	clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+		AddComponent(mysqlCompType).
+		AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+		AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(mysqlConfigName), configmap.Name,
+			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+		Create(&testCtx).GetObject()
+
+	By("Creating a cluster")
+	pvcSpec := &corev1.PersistentVolumeClaimSpec{
+		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+		clusterDefObj.Name, clusterVersionObj.Name).
+		AddComponent(mysqlCompName, mysqlCompType).
+		SetReplicas(3).
+		SetEnabledLogs("error", "general", "slow").
+		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+		Create(&testCtx).GetObject()
+
+	return clusterDefObj, clusterVersionObj, clusterObj
 }
 
 var _ = BeforeSuite(func() {
@@ -118,6 +272,10 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+
+	dynamicClient, err = cliutil.NewFactory().DynamicClient()
+	Expect(err).NotTo(HaveOccurred())
+	Expect(dynamicClient).NotTo(BeNil())
 
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{

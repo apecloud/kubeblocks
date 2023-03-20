@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,11 +31,6 @@ import (
 )
 
 var _ = Describe("cluster webhook", func() {
-	const (
-		timeout  = time.Second * 10
-		interval = time.Second
-	)
-
 	var (
 		randomStr               string
 		clusterName             string
@@ -93,7 +87,7 @@ var _ = Describe("cluster webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
 				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			By("By creating a new clusterVersion")
 			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
@@ -102,7 +96,7 @@ var _ = Describe("cluster webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterVersionName}, clusterVersion)
 				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			By("By creating a new Cluster")
 			cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
@@ -213,7 +207,7 @@ var _ = Describe("cluster webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
 				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			By("By creating a new clusterVersion")
 			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
@@ -222,7 +216,7 @@ var _ = Describe("cluster webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterVersionName}, clusterVersion)
 				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 		})
 		It("should assure tls fields setting properly", func() {
 			By("creating cluster with nil issuer")
@@ -243,7 +237,7 @@ var _ = Describe("cluster webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), &Cluster{})
 				return apierrors.IsNotFound(err)
-			}).WithTimeout(timeout).WithPolling(interval).Should(BeTrue())
+			}).Should(BeTrue())
 			cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
 			cluster.Spec.ComponentSpecs[0].TLS = true
 			cluster.Spec.ComponentSpecs[0].Issuer = &Issuer{
@@ -276,7 +270,7 @@ var _ = Describe("cluster webhook", func() {
 			Eventually(func(g Gomega) int32 {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
 				return *cluster.Spec.ComponentSpecs[0].PrimaryIndex
-			}, timeout, interval).Should(Equal(int32(0)))
+			}).Should(Equal(int32(0)))
 
 			By("By update Replication component replicas to 0, expect succeed")
 			cluster.Spec.ComponentSpecs[0].Replicas = int32(0)

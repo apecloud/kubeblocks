@@ -17,8 +17,6 @@ limitations under the License.
 package configuration
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -216,7 +214,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 				Expect(err).Should(Succeed())
 				Expect(status.Status).Should(BeElementOf(ESNone, ESRetry))
 				return status.Status == ESNone
-			}, time.Second*20, time.Second*1).Should(BeTrue())
+			}).Should(BeTrue())
 
 			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(status.Status).Should(BeEquivalentTo(ESNone))

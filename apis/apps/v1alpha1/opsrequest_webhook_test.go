@@ -19,19 +19,17 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"time"
-
-	storagev1 "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubectl/pkg/util/storage"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -44,8 +42,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		clusterVersionNameForUpgrade = "opswebhook-mysql-upgrade-" + randomStr
 		clusterName                  = "opswebhook-mysql-" + randomStr
 		opsRequestName               = "opswebhook-mysql-ops-" + randomStr
-		timeout                      = time.Second * 10
-		interval                     = time.Second
 		replicaSetComponentName      = "replicasets"
 		proxyComponentName           = "proxy"
 	)
@@ -134,7 +130,7 @@ var _ = Describe("OpsRequest webhook", func() {
 				return ""
 			}
 			return err.Error()
-		}, timeout, interval).Should(ContainSubstring("Existing OpsRequest: testOpsName"))
+		}).Should(ContainSubstring("Existing OpsRequest: testOpsName"))
 		// test opsRequest reentry
 		addClusterRequestAnnotation(cluster, opsRequest.Name, VersionUpgradingPhase)
 		By("By creating a upgrade opsRequest, it should be succeed")
@@ -142,14 +138,14 @@ var _ = Describe("OpsRequest webhook", func() {
 			opsRequest.Spec.Upgrade.ClusterVersionRef = newClusterVersion.Name
 			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 
 		// wait until OpsRequest created
 		Eventually(func() bool {
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: opsRequest.Name,
 				Namespace: opsRequest.Namespace}, opsRequest)
 			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 
 		newClusterName := clusterName + "1"
 		newCluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, newClusterName)
@@ -166,7 +162,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			patch = client.MergeFrom(opsRequest.DeepCopy())
 			opsRequest.Spec.ClusterRef = newClusterName
 			return Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring("update OpsRequest is forbidden when status.Phase is Succeed"))
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 	}
 
 	testVerticalScaling := func(cluster *Cluster) {
@@ -223,7 +219,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			opsRequest.Spec.VerticalScalingList[0].Requests[corev1.ResourceCPU] = resource.MustParse("100m")
 			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 	}
 
 	testVolumeExpansion := func(cluster *Cluster) {
@@ -305,13 +301,13 @@ var _ = Describe("OpsRequest webhook", func() {
 		Eventually(func() bool {
 			opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[2]}
 			return testCtx.CheckedCreateObj(ctx, opsRequest) == nil
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 
 		By("By testing volumeExpansion - (TODO)use specified storage class")
 		// Eventually(func() bool {
 		// 	 opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[3]}
 		// 	 Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(BeNil())
-		// }, timeout, interval).Should(BeTrue())
+		// }).Should(BeTrue())
 	}
 
 	testHorizontalScaling := func(clusterDef *ClusterDefinition, cluster *Cluster) {
@@ -343,7 +339,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			tmp := &ClusterDefinition{}
 			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name, Namespace: clusterDef.Namespace}, tmp)
 			return len(tmp.Spec.ComponentDefs) == 1
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 
 		By("By testing horizontalScaling - target component not exist")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
@@ -377,7 +373,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Eventually(func() bool {
 			opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[2]}
 			return testCtx.CheckedCreateObj(ctx, opsRequest) == nil
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 
 		By("test min, max is zero")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
@@ -385,7 +381,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[2]}
 			opsRequest.Spec.HorizontalScalingList[0].Replicas = 5
 			return testCtx.CheckedCreateObj(ctx, opsRequest) == nil
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 	}
 
 	testWhenClusterDeleted := func(cluster *Cluster, opsRequest *OpsRequest) {
@@ -398,7 +394,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Eventually(func() bool {
 			err := k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, &Cluster{})
 			return err != nil
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 
 		patch := client.MergeFrom(opsRequest.DeepCopy())
 		opsRequest.Labels["test"] = "test-ops"
@@ -418,7 +414,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			opsRequest.Spec.RestartList[0].ComponentName = replicaSetComponentName
 			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 		return opsRequest
 	}
 
@@ -435,7 +431,7 @@ var _ = Describe("OpsRequest webhook", func() {
 				clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
 				err := testCtx.CheckedCreateObj(ctx, clusterVersion)
 				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			opsRequest := createTestOpsRequest(clusterName, opsRequestName, UpgradeType)
 			cluster := &Cluster{}
@@ -447,7 +443,7 @@ var _ = Describe("OpsRequest webhook", func() {
 				cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
 				err := testCtx.CheckedCreateObj(ctx, cluster)
 				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			testUpgrade(cluster)
 

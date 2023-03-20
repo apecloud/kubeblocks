@@ -19,7 +19,6 @@ package collector
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -31,7 +30,6 @@ import (
 
 var _ = Describe("host_utility_test", func() {
 	var (
-		timeOut     = 10 * time.Second
 		hostUtility CollectHostUtility
 		testName    = "testName"
 	)
@@ -56,7 +54,7 @@ var _ = Describe("host_utility_test", func() {
 			err = json.Unmarshal(collectd, utilityInfo)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(utilityInfo.Error).ShouldNot(BeNil())
-		}, timeOut).Should(Succeed())
+		}).Should(Succeed())
 
 	})
 })

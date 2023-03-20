@@ -641,6 +641,11 @@ var ProviderExposeAnnotations = map[K8sProvider]map[ExposeType]map[string]string
 			"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "internet",
 		},
 	},
+	// TKE VPC LoadBalancer needs the subnet id, it's difficult for KB to get it, so we just support the internet on TKE now.
+	// reference: https://cloud.tencent.com/document/product/457/45487
+	TKEProvider: {
+		ExposeToInternet: map[string]string{},
+	},
 }
 
 func GetExposeAnnotations(provider K8sProvider, exposeType ExposeType) (map[string]string, error) {
@@ -666,7 +671,7 @@ func GetK8SProvider(client kubernetes.Interface) (K8sProvider, error) {
 	if !ok {
 		return "", versionErr
 	}
-	return GetK8sProvider(k8sVersionStr), nil
+	return GetK8sProvider(k8sVersionStr, client)
 }
 
 // BuildAddonReleaseName returns the release name of addon, its f

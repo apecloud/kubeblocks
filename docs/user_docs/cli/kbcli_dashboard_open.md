@@ -8,6 +8,16 @@ Open one dashboard.
 kbcli dashboard open [flags]
 ```
 
+### Examples
+
+```
+  # Open a dashboard, such as kube-grafana
+  kbcli dashboard open kubeblocks-grafana
+  
+  # Open a dashboard with a specific local port
+  kbcli dashboard open kubeblocks-grafana --port 8080
+```
+
 ### Options
 
 ```

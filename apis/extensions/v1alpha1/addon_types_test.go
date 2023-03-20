@@ -343,3 +343,40 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 	g.Expect(fmt.Sprintf("%s=null",
 		mappingName("primary", sc))).Should(BeElementOf(mergedValues.SetValues))
 }
+
+func TestAddonSpecMisc(t *testing.T) {
+	g := NewGomegaWithT(t)
+	var addonSpec *AddonSpec
+	g.Expect(addonSpec.GetSortedDefaultInstallValues()).Should(BeNil())
+	addonSpec = &AddonSpec{}
+	g.Expect(addonSpec.InstallSpec.GetEnabled()).Should(BeFalse())
+	g.Expect(addonSpec.Helm.BuildMergedValues(nil)).Should(BeEquivalentTo(HelmInstallValues{}))
+	addonSpec.InstallSpec = &AddonInstallSpec{
+		Enabled:              true,
+		AddonInstallSpecItem: NewAddonInstallSpecItem(),
+	}
+	g.Expect(addonSpec.InstallSpec.GetEnabled()).Should(BeTrue())
+
+	addonSpec.DefaultInstallValues = []AddonDefaultInstallSpecItem{
+		{
+			AddonInstallSpec: AddonInstallSpec{
+				Enabled: true,
+			},
+			Selectors: []SelectorRequirement{
+				{
+					Key:      KubeVersion,
+					Operator: Contains,
+					Values:   []string{"1.0.0"},
+				},
+			},
+		},
+		{
+			AddonInstallSpec: AddonInstallSpec{
+				Enabled: true,
+			},
+		},
+	}
+
+	di := addonSpec.GetSortedDefaultInstallValues()
+	g.Expect(di).Should(HaveLen(2))
+}

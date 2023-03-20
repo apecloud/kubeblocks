@@ -2,13 +2,19 @@
 title: Delete a PostgreSQL Cluster
 description: How to delete a PostgreSQL Cluster
 sidebar_position: 6
+sidebar_label: Delete protection
 ---
 
 # Delete a PostgreSQL Cluster
 
-> ***Note:*** 
->
-> The termination policy determines how you delete a cluster.
+
+:::note
+
+The termination policy determines how you delete a cluster.
+
+:::
+
+## Termination policy
 
 | **terminationPolicy**  | **Deleting Operation**                    |
 |:--                     | :--                                       |
@@ -28,13 +34,11 @@ kbcli cluster list <name>
 ```bash
 kbcli cluster list pg-cluster
 >
-NAME         NAMESPACE   CLUSTER-DEFINITION           VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:49 UTC+0800
+NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:49 UTC+0800
 ```
 
-***Steps:***
-
-**Option 1.** Use `kbcli`.
+## Option 1. Use kbcli
 
 Configure the cluster name and run the command below to delete the specified cluster.
 
@@ -48,7 +52,7 @@ kbcli cluster delete <name>
 kbcli cluster delete pg-cluster
 ```
 
-**Option 2.** Use `kubectl`.
+## Option 2. Use kubectl
 
 Configure the cluster name and run the command below to delete the specified cluster.
 

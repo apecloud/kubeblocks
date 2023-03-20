@@ -19,6 +19,7 @@ package printer
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 )
@@ -151,4 +152,12 @@ func PrintTitle(title string) {
 
 func PrintLine(line string) {
 	fmt.Println(line)
+}
+
+// PrintBlankLine print a blank line
+func PrintBlankLine(out io.Writer) {
+	if out == nil {
+		out = os.Stdout
+	}
+	fmt.Fprintln(out)
 }

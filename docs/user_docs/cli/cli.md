@@ -23,14 +23,6 @@ Manage alert receiver, include add, list and delete receiver.
 * [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
 
 
-## [app](kbcli_app.md)
-
-Manage external applications related to KubeBlocks.
-
-* [kbcli app install](kbcli_app_install.md)	 - Install the application with the specified name.
-* [kbcli app uninstall](kbcli_app_uninstall.md)	 - Uninstall the application with the specified name.
-
-
 ## [backup-config](kbcli_backup-config.md)
 
 KubeBlocks backup config.

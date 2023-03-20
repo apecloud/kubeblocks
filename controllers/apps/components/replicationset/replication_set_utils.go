@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -364,6 +365,10 @@ func GeneratePVCFromVolumeClaimTemplates(sts *appsv1.StatefulSet, vctList []core
 	claims := make(map[string]*corev1.PersistentVolumeClaim, len(vctList))
 	for index := range vctList {
 		claim := &corev1.PersistentVolumeClaim{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "PersistentVolumeClaim",
+				APIVersion: "v1",
+			},
 			Spec: vctList[index].Spec,
 		}
 		// The replica of replicationSet statefulSet defaults to 1, so the ordinal here is 0

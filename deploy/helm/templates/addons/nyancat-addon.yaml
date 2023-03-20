@@ -1,0 +1,41 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: nyancat
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": apecloud
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'Deploys a nyancat application in a cluster.
+  Nyancat is a demo application for showing database cluster availibility.'
+  type: Helm
+
+  helm:
+    # chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    valuesMapping:
+      valueMap:
+        replicaCount: replicaCount
+        namespace: namespace
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+    - replicas: 2
+
+  installable:
+    autoInstall: false
+

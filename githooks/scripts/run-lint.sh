@@ -1,2 +1,2 @@
 #!/bin/sh
-make vet lint
+make vet fast-lint

@@ -17,60 +17,119 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
 var _ = Describe("provider util", func() {
+
+	buildNodes := func(provider string) *corev1.NodeList {
+		return &corev1.NodeList{
+			Items: []corev1.Node{
+				{
+					Spec: corev1.NodeSpec{
+						ProviderID: fmt.Sprintf("%s://blabla", provider),
+					},
+				},
+			},
+		}
+	}
 	It("GetK8sProvider", func() {
 		cases := []struct {
-			version  string
-			expected string
-			provider K8sProvider
-			isCloud  bool
+			description    string
+			version        string
+			expectVersion  string
+			expectProvider K8sProvider
+			isCloud        bool
+			nodes          *corev1.NodeList
 		}{
 			{
+				"unknown provider without providerID and unique version identifier",
 				"v1.25.0",
 				"1.25.0",
 				UnknownProvider,
 				false,
+				buildNodes(""),
 			},
 			{
+				"EKS with unique version identifier",
 				"v1.25.0-eks-123456",
 				"1.25.0",
 				EKSProvider,
 				true,
+				buildNodes(""),
 			},
 			{
+				"EKS with providerID",
 				"1.25.0",
 				"1.25.0",
-				UnknownProvider,
-				false,
+				EKSProvider,
+				true,
+				buildNodes("aws"),
 			},
 			{
-				"",
-				"",
-				UnknownProvider,
-				false,
-			},
-			{
+				"GKE with unique version identifier",
 				"v1.24.9-gke.3200",
 				"1.24.9",
 				GKEProvider,
 				true,
+				buildNodes(""),
 			},
 			{
-				"v1.24.9-gke",
+				"GKE with providerID",
+				"v1.24.9",
 				"1.24.9",
 				GKEProvider,
 				true,
+				buildNodes("gce"),
+			},
+			{
+				"TKE with unique version identifier",
+				"v1.24.4-tke.5",
+				"1.24.4",
+				TKEProvider,
+				true,
+				buildNodes(""),
+			},
+			{
+				"TKE with providerID",
+				"v1.24.9",
+				"1.24.9",
+				TKEProvider,
+				true,
+				buildNodes("qcloud"),
+			},
+			{
+				"ACK with unique version identifier, as ACK don't have providerID",
+				"v1.24.6-aliyun.1",
+				"1.24.6",
+				ACKProvider,
+				true,
+				buildNodes(""),
+			},
+			{
+				"AKS with providerID, as AKS don't have unique version identifier",
+				"v1.24.9",
+				"1.24.9",
+				AKSProvider,
+				true,
+				buildNodes("azure"),
 			},
 		}
 
 		for _, c := range cases {
-			Expect(GetK8sVersion(c.version)).Should(Equal(c.expected))
-			p := GetK8sProvider(c.version)
-			Expect(p).Should(Equal(c.provider))
+			By(c.description)
+			Expect(GetK8sVersion(c.version)).Should(Equal(c.expectVersion))
+			client := testing.FakeClientSet(c.nodes)
+			p, err := GetK8sProvider(c.version, client)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(p).Should(Equal(c.expectProvider))
 			Expect(p.IsCloud()).Should(Equal(c.isCloud))
 		}
 	})

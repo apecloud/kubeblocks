@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/transport/spdy"
 	cmdpf "k8s.io/kubectl/pkg/cmd/portforward"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/pointer"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -57,6 +58,19 @@ type dashboard struct {
 }
 
 var (
+	listExample = templates.Examples(`
+		# List all dashboards
+		kbcli dashboard list
+	`)
+
+	openExample = templates.Examples(`
+		# Open a dashboard, such as kube-grafana
+		kbcli dashboard open kubeblocks-grafana
+
+		# Open a dashboard with a specific local port
+		kbcli dashboard open kubeblocks-grafana --port 8080
+	`)
+
 	// we do not use the default port to port-forward to avoid conflict with other services
 	dashboards = [...]*dashboard{
 		{
@@ -118,9 +132,10 @@ func NewDashboardCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newListOptions(f, streams)
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all dashboards.",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List all dashboards.",
+		Example: listExample,
+		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete())
 			util.CheckErr(o.run())
@@ -179,8 +194,9 @@ func newOpenOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *ope
 func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newOpenOptions(f, streams)
 	cmd := &cobra.Command{
-		Use:   "open",
-		Short: "Open one dashboard.",
+		Use:     "open",
+		Short:   "Open one dashboard.",
+		Example: openExample,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			var names []string
 			for _, d := range dashboards {

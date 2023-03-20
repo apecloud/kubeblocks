@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgresql-configuration
+  name: postgresql-ha-configuration
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 data:

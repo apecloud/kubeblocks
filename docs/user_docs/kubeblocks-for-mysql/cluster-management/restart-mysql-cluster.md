@@ -14,20 +14,6 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
 
 :::
 
-## How KubeBlocks restarts a cluster
-
-![Restart a cluster](./../../../img/mysql_cluster_restart.png)
-
-1. A user creates a restarting OpsRequest CR.
-2. This CR passes the webhook validation.
-3. The OpsRequest controller adds the restart annotation to the podTemplate of the StatefulSet/Deployment controller corresponding to the component.
-4. The OpsRequest controller updates the cluster phase to `Rebooting`.
-5. The component controller watches the StatefulSet/Deployment controller and pods.
-6. When the component type is Stateful/Stateless, the Kubernetes StatefulSet/Deployment controller applies a rolling update to pods. When the component type is Consensus/ReplicationSet, the component controller applies the restarting operation to pods. 
-7. When restarting is completed, the component controller updates the cluster CR component to `Running`.
-8. The cluster controller watches the component phase changes and when all components are `Running`, the cluster controller updates the cluster phase to `Running`.
-9. The OpsRequest controller reconciles the status when the cluster component status changes.
-
 ## Steps
 
 1. Restart a cluster.

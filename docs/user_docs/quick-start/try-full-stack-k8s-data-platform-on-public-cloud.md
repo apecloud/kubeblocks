@@ -1,74 +1,114 @@
 ---
-title: Run KubeBlocks Playground on localhost
+title: Try full stack k8s data platform on public cloud
 description: How to run KubeBlocks on Playground
-sidebar_position: 1
-sidebar_label: Playground on localhost
+sidebar_position: 2
+sidebar_label: Try KubeBlocks on public cloud
 ---
 
-# Run KubeBlocks Playground on localhost
-This guide uses one `kbcli` command to create a KubeBlocks demo environment (Playground) quickly on your local host.
-With Playground, you can try KubeBlocks and some ApeCloud MySQL features. This guide introduces how to install Playground and how to try KubeBlocks on Playground.
+# Try full stack k8s data platform on public cloud
+
+You can deploy EKS cluster and deploy KubeBlocks on EKS from v0.4 with `kbcli playground` command. 
+
+## How kbcli works on EKS
+
+When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find the script at [Github repository](https://github.com/apecloud/cloud-provider).
+
+When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repository to the local host, calls the terraform commands to initialize the cluster, then deploys KubeBlocks on this cluster.
 
 ## Before you start
 
-Ensure the following requirements are met, so Playground and other functions can run fluently.
-
-* Minimum system requirements:
-  * CPU: 4 cores
-  * RAM: 4 GB
-
-* The following tools are installed on your local host.
-  * Docker: It acts as a workload environment and the version should be v20.10.5 (runc ≥ v1.0.0-rc93) or above. For installation details, refer to [Get Docker](https://docs.docker.com/get-docker/).
+* Install AWS CLI. Refer to [Installing or updating the latest version of the AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) for details.
+* Make sure the following tools are installed on your local host.
+  * Docker: v20.10.5 (runc ≥ v1.0.0-rc93) or above. For installation details, refer to [Get Docker](https://docs.docker.com/get-docker/).
+  * `kubectl`: It is used to interact with Kubernetes clusters. For installation details, refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
   * `kbcli`: It is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. Follow the steps below to install `kbcli`.
-    1. Run the command below to install `kbcli`.
+    1. Install `kbcli`.
          ```bash
          curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
          ```
     2. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.
-    3. Run the command below to uninstall `kbcli` if you want to delete `kbcli` after your trial.
-         ```bash
-         sudo rm /usr/local/bin/kbcli
-         ```
-  * `kubectl`: It is used to interact with Kubernetes clusters. For installation details, refer to [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
 
-## Step 1. Install Playground
+## Configure access key
 
-1. Run the command below to install Playground.
+Configure the Access Key of cloud resources.
+For AWS, there are two options.
 
-   ```bash
-   kbcli playground init
-   ```
+**Option 1.** Use `aws configure`.
 
-   How this command works on your local host:
-   1. Create a Kubernetes cluster in the container by using [K3d](https://k3d.io/v5.4.6/).
-   2. Deploy KubeBlocks in this Kubernetes cluster.
-   3. Create an ApeCloud MySQL Paxos group by KubeBlocks.
+Fill in AWS Access Key ID and AWS Secret Access Key and run the command below to configure access permission.
 
-2. Run `kbcli cluster list` to view the created cluster and when the status is `Running`, this cluster is created successfully. 
+```bash
+aws configure
+AWS Access Key ID [None]: AKIAIOSFODNN7EXAMPLE
+AWS Secret Access Key [None]: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+```
 
-3. Following the instructions in "1. Basic commands for cluster", switch to the Kubernetes local cluster created by Playground by running `export KUBECONFIG=xxx` to start your trip on KubeBlocks and ApeCloud MySQL.
+You can refer to [Quick configuration with aws configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html#cli-configure-quickstart-config) for detailed information.
 
-   You can find the Playground user guide under the installation success tip. View this guide again by running `kbcli playground guide`.
+**Option 2.** Use environment variables.
 
-   :::caution
+```bash
+export AWS_ACCESS_KEY_ID="anaccesskey"
+export AWS_SECRET_ACCESS_KEY="asecretkey"
+```
 
-   Running `export KUBECONFIG` is a necessity for using KubeBlocks and ApeCloud MySQL.
+## Step 2. Initialize Playground
 
-   :::
+Initialize Playground.
 
-## Step 2. Run Playground
+```bash
+kbbcli playground init --cloud-provider aws --region cn-northwest-1
+```
 
-The Playground guide includes three sections, namely [Basic functions](#basic-functions), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Feature list](./../introduction/introduction.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
+* `cloud-provider` specifies the cloud provider. 
+* `region` specifies the region to deploy a Kubernetes cluster.
+   Frequently used regions are as follows. You can find the full region list on [the official website](https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/?nc1=h_ls).
+  * Americas
+  
+     | Region ID  | Region name         |
+     | :--        | :--                 |
+     | us-east-1  | Northern Virginia   |
+     | us-east-2  | Ohio                |
+     | us-west-1  | Northern California |
+     | us-west-2  | Oregon              |
 
-### Basic functions
+  * Asia Pacific
+  
+     | Region ID         | Region name |
+     | :--               | :--         |
+     | ap-east-1         | Hong Kong   |
+     | ap-southeast-1    | Singapore   |
+     | cn-north-1        | Beijing     |
+     | cn-northwest-1    | Ningxia     |
 
-KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](./../introduction/introduction.md) for details.
+During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the path `~/.kbcli/playground` and calls the terraform script to create cloud resources. And then `kbcli` deploys KubeBlocks automatically and installs a MySQL cluster.
+
+After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the deployed cluster.
+
+```bash
+# View kbcli version
+kbcli version
+
+# View the cluster list
+kbcli cluster list
+```
 
 :::note
 
-The local host does not support volume expansion, backup, and restore functions.
+The initialization lasts about 20 minutes. If the installation fails after a long time, please check your network environment.
 
 :::
+
+## Try KubeBlocks with Playground
+
+You can explore three parts of KubeBlocks, the [Basic functions](#basic-functions), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Feature list](./../introduction/introduction.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
+
+### Basic functions
+
+KubeBlocks supports the complete life cycle management of a database cluster. Go through the following instruction to try basic features of KubeBlocks. 
+ For the full feature set, refer to [KubeBlocks Documentation](./../introduction/introduction.md) for details.
+
+
 
 #### View an ApeCloud MySQL cluster
 
@@ -77,9 +117,7 @@ The local host does not support volume expansion, backup, and restore functions.
 1. Run the command below to view the database cluster list.
     ```bash
     kbcli cluster list
-    >
-    NAME     	NAMESPACE	CLUSTER-DEFINITION	VERSION        	TERMINATION-POLICY	STATUS 	CREATED-TIME
-    mycluster	default  	apecloud-mysql    	ac-mysql-8.0.30	WipeOut           	Running	Jan 31,2023 16:06 UTC+0800
+   
     ```
 
 2. Run `kbcli cluster describe` to view the details of a specified database cluster, such as `STATUS`, `Endpoints`, `Topology`, `Images`, and `Events`.
@@ -115,7 +153,7 @@ mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
 ...
 Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-mysql> show databases;
+mysql>> show databases;
 >
 +--------------------+
 | Database           |
@@ -129,16 +167,16 @@ mysql> show databases;
 5 rows in set (0.02 sec)
 ```
 
-**Option 2.** Use an access address.
+**Option 2.** Access with MySQL client 
 
 If you want to access a cluster via MySQL client, get the access address from `Endpoints` in the cluster details.
 ```bash
 kbcli cluster describe mycluster
 ```
 
-#### Delete an ApeCloud MySQL cluster
+#### (Optional)Delete an ApeCloud MySQL cluster
 
-Run the command below to delete a specified database cluster. For example, 
+Delete a specified database cluster with `kbcli cluster delete`. For example, 
 ```bash
 kbcli cluster delete mycluster
 ```
@@ -152,14 +190,11 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
 1. Run the command below to view the monitoring page to observe the service running status.
    ```bash
    kbcli dashboard open kubeblocks-grafana
-
-   Forwarding from 127.0.0.1:3000 -> 3000
-   Forward successfully! Opening browser ...
    ```
 
    ***Result***
 
-   A monitoring page is loaded automatically after the command is executed. 
+   A monitoring page on Grafana website is loaded automatically after the command is executed. 
 
 2. Click the Dashboard icon on the left bar and two monitoring panels show on the page.
    ![Dashboards](./../../img/quick_start_dashboards.png)
@@ -168,12 +203,12 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
 
 ### High availability of ApeCloud MySQL
 
-ApeCloud MySQL Paxos group delivers high availability with RPO=0 and RTO in less than 30 seconds.
-Here we use a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
+ApeCloud MySQL Paxos Group delivers high availability with RPO=0 and RTO in less than 30 seconds.
+This section use a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
 
-#### Create an ApeCloud MySQL Paxos group
+#### Create an ApeCloud MySQL Paxos Group
 
-Playground creates an ApeCloud MySQL standalone by default. You can also use `kbcli` to create a new Paxos group. The following is an example of creating an ApeCloud MySQL Paxos group with default configurations.
+Playground creates an ApeCloud MySQL Standalone by default. You can also use `kbcli` to create a new Paxos Group. The following is an example of creating an ApeCloud MySQL Paxos Group with default configurations.
 
 ```bash
 kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
@@ -185,7 +220,8 @@ In this example, we delete the leader pod to simulate a failure.
 
 ***Steps:***
 
-1. Run the command below to view the ApeCloud MySQL Paxos group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
+1. Run `kbcli cluster describe ` to view the ApeCloud MySQL Paxos group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
+
    ```bash
    kbcli cluster describe maple05
    >
@@ -214,14 +250,14 @@ In this example, we delete the leader pod to simulate a failure.
    Events(last 5 warnings, see more:kbcli cluster list-events -n default mycluster):
    TIME        TYPE        REASON        OBJECT        MESSAGE
    ```
-2. Run the command below to delete the leader pod.
+2. Delete the leader pod.
    ```bash
    kubectl delete pod maple05-mysql-1
    >
    pod "maple05-mysql-1" deleted
    ```
 
-3. Run `kbcli cluster connect maple05` to connect to the ApeCloud MySQL Paxos group to test its availability. You can find this group can be accessed within seconds.
+3. Run `kbcli cluster connect maple05` to connect to the ApeCloud MySQL Paxos Group to test its availability. You can find this group can still be accessed within seconds due to our HA strategy.
    ```bash
    kbcli cluster connect maple05
    >
@@ -241,7 +277,7 @@ In this example, we delete the leader pod to simulate a failure.
    mysql>
    ```
 
-#### Observe clusters by NON-STOP NYAN CAT
+#### Demonstrate availability failure by NON-STOP NYAN CAT (for fun)
 The above example uses `kbcli cluster connect` to test availability, in which the changes are not obvious to see.
 NON-STOP NYAN CAT is a demo application to observe how the database cluster exceptions affect actual businesses. Animations and real-time key information display provided by NON-STOP NYAN CAT can directly show the availability influences of database services.
 
@@ -250,14 +286,15 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
 1. Run the command below to install the NYAN CAT demo application.
    ```bash
    kbcli app install nyancat
-   >
+   ```
+***Result:***
+   ```
    Installing application nyancat OK
    Install nyancat SUCCESSFULLY!
    1. Get the application URL by running these commands:
    kubectl --namespace default port-forward service/nyancat 8087:8087
    echo "Visit http://127.0.0.1:8087 to use Nyan Cat demo application."
    ```
-
 2. Use `port-forward` according to the hints above to expose an application port as available access for your local host, then visit this application via http://127.0.0.1:8087.
 3. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
    ![NYAN CAT](./../../img/quick_start_nyan_cat.png)
@@ -266,15 +303,35 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
    kbcli app uninstall nyancat
    ```
 
-## Step 3. Destroy Playground
 
-Destroying Playground cleans up relevant component services and data:
 
-* Delete all KubeBlocks database clusters, such as ApeCloud MySQL Paxos Group.
-* Uninstall KubeBlocks.
-* Delete the local Kubernetes clusters created by K3d.
-  
-Run the command below to destroy Playground.
+## Destroy Playground
+
+Before destroying Playground, it is recommended to delete the clusters created by KubeBlocks.
+
 ```bash
-kbcli playground destroy
+# View all clusters
+kbcli cluster list -A
+
+# Delete a cluster
+# A double-check is required and you can add --auto-approve to check it automatically
+kbcli cluster delete <my-cluster>
+
+# Uninstall KubeBlocks
+# A double-check is required and you can add --auto-approve to check it automatically
+kbcli kubeblocks uninstall --remove-pvcs --remove-pvs
 ```
+
+Run the command below to destroy Playground.
+
+```bash
+kbbcli playground destroy --cloud-provider aws --region cn-northwest-1
+```
+
+Like the parameters in `kbcli playground init`, use `--cloud-provider` and `--region` to specify the cloud provider and the region.
+
+:::caution
+
+`kbcli playground destroy` directly deletes the Kubernetes cluster on the cloud but there might be residual resources in cloud, such as volumes. Please confirm whether there are residual resources after uninstalling and delete them in time to avoid unnecessary fees.
+
+:::

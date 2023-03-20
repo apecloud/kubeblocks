@@ -1364,7 +1364,7 @@ var _ = Describe("Cluster Controller", func() {
 			var stsList *appsv1.StatefulSetList
 			Eventually(func(g Gomega) {
 				stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-				g.Expect(len(stsList.Items)).Should(HaveLen(2))
+				g.Expect(stsList.Items).Should(HaveLen(2))
 			}).Should(Succeed())
 
 			By("Checking statefulSet role label")

@@ -17,7 +17,16 @@ When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repos
 
 ## Before you start
 
-Install AWS CLI. Refer to [Installing or updating the latest version of the AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) for details.
+* Install AWS CLI. Refer to [Installing or updating the latest version of the AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) for details.
+* Make sure the following tools are installed on your local host.
+  * Docker: v20.10.5 (runc ≥ v1.0.0-rc93) or above. For installation details, refer to [Get Docker](https://docs.docker.com/get-docker/).
+  * `kubectl`: It is used to interact with Kubernetes clusters. For installation details, refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
+  * `kbcli`: It is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. Follow the steps below to install `kbcli`.
+    1. Install `kbcli`.
+         ```bash
+         curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
+         ```
+    2. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.
 
 ## Configure access key
 

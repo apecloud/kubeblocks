@@ -71,13 +71,13 @@ type reconfigureParams struct {
 	Restart bool
 
 	// Name is a config template name.
-	TplName string
+	ConfigSpecName string
 
 	// Configuration files patch.
 	ConfigPatch *cfgcore.ConfigPatchInfo
 
 	// Configmap object of the configuration template instance in the component.
-	CfgCM *corev1.ConfigMap
+	ConfigMap *corev1.ConfigMap
 
 	// ConfigConstraint pointer
 	ConfigConstraint *appsv1alpha1.ConfigConstraintSpec
@@ -130,16 +130,16 @@ func GetClientFactory() createReconfigureClient {
 }
 
 func (param *reconfigureParams) getConfigKey() string {
-	for _, tpl := range param.Component.ConfigSpecs {
-		if tpl.Name == param.TplName {
-			return tpl.VolumeName
+	for _, configSpec := range param.Component.ConfigSpecs {
+		if configSpec.Name == param.ConfigSpecName {
+			return configSpec.VolumeName
 		}
 	}
 	return ""
 }
 
 func (param *reconfigureParams) getTargetVersionHash() string {
-	hash, err := cfgcore.ComputeHash(param.CfgCM.Data)
+	hash, err := cfgcore.ComputeHash(param.ConfigMap.Data)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to cal configuration version!")
 		return ""

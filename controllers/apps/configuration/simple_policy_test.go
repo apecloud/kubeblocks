@@ -57,7 +57,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 
 			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
 				withMockStatefulSet(2, nil),
-				withConfigTpl("for_test", map[string]string{
+				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
 				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
@@ -119,7 +119,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 		It("Should success", func() {
 			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
 				withMockStatefulSet(2, nil),
-				withConfigTpl("for_test", map[string]string{
+				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
 				withCDComponent(appsv1alpha1.Replication, []appsv1alpha1.ComponentConfigSpec{{
@@ -156,7 +156,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 			// not support type
 			mockParam := newMockReconfigureParams("simplePolicy", nil,
 				withMockStatefulSet(2, nil),
-				withConfigTpl("for_test", map[string]string{
+				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
 				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ComponentConfigSpec{{
@@ -176,7 +176,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 			// mock not cc
 			mockParam := newMockReconfigureParams("simplePolicy", nil,
 				withMockStatefulSet(2, nil),
-				withConfigTpl("not_tpl_name", map[string]string{
+				withConfigSpec("not_tpl_name", map[string]string{
 					"key": "value",
 				}),
 				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{

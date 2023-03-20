@@ -49,7 +49,7 @@ var _ = Describe("config_util", func() {
 				cmKeys           []string
 			}
 
-			configConstraintObj := testapps.NewCustomizedObj("resources/mysql_config_template.yaml",
+			configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
 				&v1alpha1.ConfigConstraint{}, func(cc *v1alpha1.ConfigConstraint) {
 					if ccContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.cue"); err == nil {
 						cc.Spec.ConfigurationSchema = &v1alpha1.CustomParametersValidation{

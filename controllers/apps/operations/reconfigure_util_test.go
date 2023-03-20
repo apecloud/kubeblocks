@@ -40,10 +40,10 @@ var _ = Describe("Reconfigure util test", func() {
 
 	mockCfgTplObj := func(tpl appsv1alpha1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 		By("By assure an cm obj")
-		cfgCM := testapps.NewCustomizedObj("operations_config/configcm.yaml",
+		cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
 			&corev1.ConfigMap{},
 			testapps.WithNamespacedName(tpl.TemplateRef, tpl.Namespace))
-		cfgTpl := testapps.NewCustomizedObj("operations_config/configtpl.yaml",
+		cfgTpl := testapps.NewCustomizedObj("operations_config/config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{},
 			testapps.WithNamespacedName(tpl.ConfigConstraintRef, tpl.Namespace))
 		return cfgCM, cfgTpl

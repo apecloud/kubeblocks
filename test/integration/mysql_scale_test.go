@@ -227,7 +227,7 @@ var _ = Describe("MySQL Scaling function", func() {
 
 	Context("with MySQL defined as a stateful component", func() {
 		BeforeEach(func() {
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
 				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
 			By("Create a clusterDef obj")
@@ -255,7 +255,7 @@ var _ = Describe("MySQL Scaling function", func() {
 	Context("with MySQL defined as a consensus component", func() {
 		BeforeEach(func() {
 			By("Create configmap")
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
 				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
 			By("Create a clusterDef obj")

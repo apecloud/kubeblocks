@@ -83,7 +83,7 @@ func (factory *MockClusterVersionFactory) AddContainerShort(name string, image s
 }
 
 func (factory *MockClusterVersionFactory) AddConfigTemplate(name string,
-	configTplRef string, configConstraintRef string, volumeName string) *MockClusterVersionFactory {
+	configTemplateRef string, configConstraintRef string, volumeName string) *MockClusterVersionFactory {
 	comps := factory.get().Spec.ComponentVersions
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
@@ -91,7 +91,7 @@ func (factory *MockClusterVersionFactory) AddConfigTemplate(name string,
 			appsv1alpha1.ComponentConfigSpec{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 					Name:        name,
-					TemplateRef: configTplRef,
+					TemplateRef: configTemplateRef,
 					VolumeName:  volumeName,
 				},
 				ConfigConstraintRef: configConstraintRef,

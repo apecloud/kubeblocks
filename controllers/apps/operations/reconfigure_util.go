@@ -132,12 +132,12 @@ func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) recon
 	return result
 }
 
-func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, tpl *appsv1alpha1.ComponentConfigSpec) []*metav1.Condition {
+func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1alpha1.ComponentConfigSpec) []*metav1.Condition {
 	if result.configPatch.IsModify {
 		return []*metav1.Condition{appsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,
 			appsv1alpha1.ReasonReconfigureMerged,
-			tpl.Name,
+			configSpec.Name,
 			formatConfigPatchToMessage(result.configPatch, nil)),
 		}
 	}
@@ -145,7 +145,7 @@ func constructReconfiguringConditions(result reconfiguringResult, resource *OpsR
 		appsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,
 			appsv1alpha1.ReasonReconfigureInvalidUpdated,
-			tpl.Name,
+			configSpec.Name,
 			formatConfigPatchToMessage(result.configPatch, nil)),
 		appsv1alpha1.NewSucceedCondition(resource.OpsRequest),
 	}

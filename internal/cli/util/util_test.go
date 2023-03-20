@@ -197,7 +197,7 @@ var _ = Describe("util", func() {
 			testNS = "default"
 		)
 
-		configConstraintObj := testapps.NewCustomizedObj("resources/mysql_config_template.yaml",
+		configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{}, testapps.WithNamespacedName(ccName, ""), func(cc *appsv1alpha1.ConfigConstraint) {
 				if ccContext, err := testdata.GetTestDataFileContent("/cue_testdata/mysql_for_cli.cue"); err == nil {
 					cc.Spec.ConfigurationSchema = &appsv1alpha1.CustomParametersValidation{

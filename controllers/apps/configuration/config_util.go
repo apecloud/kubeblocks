@@ -329,20 +329,20 @@ func updateLabelsByConfiguration[T generics.Object, PT generics.PObject[T]](cli 
 
 func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, configTemplates []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 	// check ConfigTemplate Validate
-	foundTemplateFn := func(configTpl appsv1alpha1.ComponentConfigSpec, logger logr.Logger) (*appsv1alpha1.ConfigConstraint, error) {
-		if _, err := getConfigMapByName(cli, ctx, configTpl.TemplateRef, configTpl.Namespace); err != nil {
+	foundTemplateFn := func(configSpec appsv1alpha1.ComponentConfigSpec, logger logr.Logger) (*appsv1alpha1.ConfigConstraint, error) {
+		if _, err := getConfigMapByName(cli, ctx, configSpec.TemplateRef, configSpec.Namespace); err != nil {
 			logger.Error(err, "failed to get config template cm object!")
 			return nil, err
 		}
 
-		if len(configTpl.ConfigConstraintRef) == 0 {
+		if len(configSpec.ConfigConstraintRef) == 0 {
 			return nil, nil
 		}
 
 		configObj := &appsv1alpha1.ConfigConstraint{}
 		if err := cli.Get(ctx.Ctx, client.ObjectKey{
 			Namespace: "",
-			Name:      configTpl.ConfigConstraintRef,
+			Name:      configSpec.ConfigConstraintRef,
 		}, configObj); err != nil {
 			logger.Error(err, "failed to get template cm object!")
 			return nil, err

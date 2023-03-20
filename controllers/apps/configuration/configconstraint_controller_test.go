@@ -39,7 +39,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 
 	const statefulCompType = "replicasets"
 
-	const configTplName = "mysql-config-tpl"
+	const configSpecName = "mysql-config-tpl"
 
 	const configVolumeName = "mysql-config"
 
@@ -71,26 +71,26 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			By("creating a configmap and a config constraint")
 
 			configmap := testapps.CreateCustomizedObj(&testCtx,
-				"resources/mysql_config_cm.yaml", &corev1.ConfigMap{},
+				"resources/mysql-config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
 
 			constraint := testapps.CreateCustomizedObj(&testCtx,
-				"resources/mysql_config_template.yaml",
+				"resources/mysql-config-constraint.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 			constraintKey := client.ObjectKeyFromObject(constraint)
 
 			By("Create a clusterDefinition obj")
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
-				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
-				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
+				AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
+				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).
-				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
+				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()
 
@@ -121,10 +121,10 @@ var _ = Describe("ConfigConstraint Controller", func() {
 		It("Should ready", func() {
 			By("creating a configmap and a config constraint")
 
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql_config_cm.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
 
-			constraint := testapps.CreateCustomizedObj(&testCtx, "resources/mysql_config_tpl_not_validate.yaml",
+			constraint := testapps.CreateCustomizedObj(&testCtx, "resources/mysql-config-constraint-not-validate.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 
 			By("check config constraint status")

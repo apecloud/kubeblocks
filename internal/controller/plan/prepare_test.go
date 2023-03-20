@@ -170,10 +170,10 @@ var _ = Describe("Cluster Controller", func() {
 			mysqlCompName = "mysql"
 		)
 		BeforeEach(func() {
-			cm := testapps.CreateCustomizedObj(&testCtx, "config/configcm.yaml", &corev1.ConfigMap{},
+			cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
 
-			cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/configtpl.yaml",
+			cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
@@ -222,10 +222,10 @@ var _ = Describe("Cluster Controller", func() {
 			mysqlCompName = "mysql"
 		)
 		BeforeEach(func() {
-			cm := testapps.CreateCustomizedObj(&testCtx, "config/configcm.yaml", &corev1.ConfigMap{},
+			cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
 
-			cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/configtpl.yaml",
+			cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).

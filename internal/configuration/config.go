@@ -59,9 +59,9 @@ type ConfigEventContext struct {
 	Component        *appsv1alpha1.ClusterComponentDefinition
 	ComponentUnits   []appv1.StatefulSet
 
-	TplName          string
+	ConfigSpecName   string
 	ConfigPatch      *ConfigPatchInfo
-	CfgCM            *corev1.ConfigMap
+	ConfigMap        *corev1.ConfigMap
 	ConfigConstraint *appsv1alpha1.ConfigConstraintSpec
 
 	PolicyStatus PolicyExecStatus

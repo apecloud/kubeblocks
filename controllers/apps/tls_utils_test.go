@@ -45,7 +45,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 		statefulCompType   = "replicasets"
 		statefulCompName   = "mysql"
 		mysqlContainerName = "mysql"
-		configTplName      = "mysql-config-tpl"
+		configSpecName     = "mysql-config-tpl"
 	)
 
 	ctx := context.Background()
@@ -79,19 +79,19 @@ var _ = Describe("TLS self-signed cert function", func() {
 	Context("tls is enabled/disabled", func() {
 		BeforeEach(func() {
 			configMapObj := testapps.CheckedCreateCustomizedObj(&testCtx,
-				"resources/mysql_tls_config_cm.yaml",
+				"resources/mysql-tls-config-template.yaml",
 				&corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
 
 			configConstraintObj := testapps.CheckedCreateCustomizedObj(&testCtx,
-				"resources/mysql_config_template.yaml",
+				"resources/mysql-config-constraint.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 
 			By("Create a clusterDef obj")
 			testapps.NewClusterDefFactory(clusterDefName).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
 				AddComponent(testapps.ConsensusMySQLComponent, statefulCompType).
-				AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
+				AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				CheckedCreate(&testCtx).GetObject()
 

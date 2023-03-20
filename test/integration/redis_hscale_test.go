@@ -168,13 +168,13 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 	Context("with Redis defined as replication Type and doing Horizontal scale", func() {
 		BeforeEach(func() {
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis_scripts.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis-scripts.yaml", &corev1.ConfigMap{},
 				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis_primary_config_cm.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis-primary-config-template.yaml", &corev1.ConfigMap{},
 				testapps.WithName(primaryConfigName), testCtx.UseDefaultNamespace())
 
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis_secondary_config_cm.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis-secondary-config-template.yaml", &corev1.ConfigMap{},
 				testapps.WithName(secondaryConfigName), testCtx.UseDefaultNamespace())
 
 			replicationRedisConfigVolumeMounts := []corev1.VolumeMount{

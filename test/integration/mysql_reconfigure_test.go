@@ -41,9 +41,9 @@ var _ = Describe("MySQL Reconfigure function", func() {
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 
-	const mysqlConfigTemplatePath = "resources/mysql_consensus_config_template.yaml"
-	const mysqlConfigConstraintPath = "resources/mysql_consensus_config_constraint.yaml"
-	const mysqlScriptsPath = "resources/mysql_consensus_scripts.yaml"
+	const mysqlConfigTemplatePath = "resources/mysql-consensus-config-template.yaml"
+	const mysqlConfigConstraintPath = "resources/mysql-consensus-config-constraint.yaml"
+	const mysqlScriptsPath = "resources/mysql-consensus-scripts.yaml"
 
 	const leader = "leader"
 	const follower = "follower"

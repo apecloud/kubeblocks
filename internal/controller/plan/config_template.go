@@ -70,14 +70,14 @@ type componentTemplateValues struct {
 	Replicas    int32
 
 	// Container *corev1.Container
-	Resource  *ResourceDefinition
-	ConfigTpl []appsv1alpha1.ComponentConfigSpec
+	Resource    *ResourceDefinition
+	ConfigSpecs []appsv1alpha1.ComponentConfigSpec
 }
 
 type configTemplateBuilder struct {
-	namespace   string
-	clusterName string
-	tplName     string
+	namespace    string
+	clusterName  string
+	templateName string
 
 	// Global Var
 	componentValues  *componentTemplateValues
@@ -93,7 +93,7 @@ type configTemplateBuilder struct {
 	cli client.Client
 }
 
-func newCfgTemplateBuilder(
+func newTemplateBuilder(
 	clusterName, namespace string,
 	cluster *appsv1alpha1.Cluster,
 	version *appsv1alpha1.ClusterVersion,
@@ -104,18 +104,18 @@ func newCfgTemplateBuilder(
 		clusterName:    clusterName,
 		cluster:        cluster,
 		clusterVersion: version,
-		tplName:        "KBTPL",
+		templateName:   "KbTemplate",
 		ctx:            ctx,
 		cli:            cli,
 	}
 }
 
-func (c *configTemplateBuilder) setTplName(tplName string) {
-	c.tplName = tplName
+func (c *configTemplateBuilder) setTemplateName(templateName string) {
+	c.templateName = templateName
 }
 
 func (c *configTemplateBuilder) formatError(file string, err error) error {
-	return fmt.Errorf("failed to render configuration template[cm:%s][key:%s], error: [%v]", c.tplName, file, err)
+	return fmt.Errorf("failed to render configuration template[cm:%s][key:%s], error: [%v]", c.templateName, file, err)
 }
 
 func (c *configTemplateBuilder) render(configs map[string]string) (map[string]string, error) {
@@ -124,7 +124,7 @@ func (c *configTemplateBuilder) render(configs map[string]string) (map[string]st
 	if err != nil {
 		return nil, err
 	}
-	engine := gotemplate.NewTplEngine(values, c.builtInFunctions, c.tplName, c.cli, c.ctx)
+	engine := gotemplate.NewTplEngine(values, c.builtInFunctions, c.templateName, c.cli, c.ctx)
 	for file, configContext := range configs {
 		newContext, err := engine.Render(configContext)
 		if err != nil {
@@ -185,9 +185,9 @@ func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.Synt
 	return nil
 }
 
-func (c *configTemplateBuilder) injectBuiltInObjects(podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configs []appsv1alpha1.ComponentConfigSpec) error {
+func (c *configTemplateBuilder) injectBuiltInObjects(podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configSpecs []appsv1alpha1.ComponentConfigSpec) error {
 	var resource *ResourceDefinition
-	container := intctrlutil.GetContainerByConfigTemplate(podSpec, configs)
+	container := intctrlutil.GetContainerByConfigTemplate(podSpec, configSpecs)
 	if container != nil && len(container.Resources.Limits) > 0 {
 		resource = &ResourceDefinition{
 			MemorySize: intctrlutil.GetMemorySize(*container),
@@ -195,10 +195,10 @@ func (c *configTemplateBuilder) injectBuiltInObjects(podSpec *corev1.PodSpec, co
 		}
 	}
 	c.componentValues = &componentTemplateValues{
-		TypeName:  component.Type,
-		Replicas:  component.Replicas,
-		Resource:  resource,
-		ConfigTpl: configs,
+		TypeName:    component.Type,
+		Replicas:    component.Replicas,
+		Resource:    resource,
+		ConfigSpecs: configSpecs,
 	}
 	c.podSpec = podSpec
 	c.component = component

@@ -102,9 +102,9 @@ func updateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 	return true, nil
 }
 
-func getLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
+func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
 	data := make(map[string]string, 0)
-	cfgContent, ok := cfg.GetAnnotations()[constant.LastAppliedConfigAnnotation]
+	cfgContent, ok := cm.GetAnnotations()[constant.LastAppliedConfigAnnotation]
 	if !ok {
 		return data, nil
 	}
@@ -116,12 +116,12 @@ func getLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
 	return data, nil
 }
 
-func getUpgradePolicy(cfg *corev1.ConfigMap) appsv1alpha1.UpgradePolicy {
+func getUpgradePolicy(cm *corev1.ConfigMap) appsv1alpha1.UpgradePolicy {
 	const (
 		DefaultUpgradePolicy = appsv1alpha1.NormalPolicy
 	)
 
-	annotations := cfg.GetAnnotations()
+	annotations := cm.GetAnnotations()
 	value, ok := annotations[constant.UpgradePolicyAnnotationKey]
 	if !ok {
 		return DefaultUpgradePolicy

@@ -1306,9 +1306,10 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(mysqlCompName, mysqlCompType).
 				SetReplicas(3).
 				AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
-			sts := stsList.Items[0]
-			Expect(sts.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
+			Eventually(func(g Gomega) {
+				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
+				g.Expect(stsList.Items[0].Spec.Template.Spec.InitContainers).Should(HaveLen(1))
+			}).Should(Succeed())
 
 			By("remove init container after all components are Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
@@ -1316,9 +1317,10 @@ var _ = Describe("Cluster Controller", func() {
 					mysqlCompName: {Phase: appsv1alpha1.RunningPhase},
 				}
 			})).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
-				g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
-			})).Should(Succeed())
+			Eventually(func(g Gomega) {
+				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
+				g.Expect(stsList.Items[0].Spec.Template.Spec.InitContainers).Should(BeEmpty())
+			}).Should(Succeed())
 
 			By("clean up annotations after cluster running")
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {

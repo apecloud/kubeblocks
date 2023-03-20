@@ -556,8 +556,10 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
 		By("Checking updated sts replicas")
-		stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
-		Expect(*stsList.Items[0].Spec.Replicas).To(BeEquivalentTo(updatedReplicas))
+		Eventually(func() int32 {
+			stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
+			return *stsList.Items[0].Spec.Replicas
+		}).Should(BeEquivalentTo(updatedReplicas))
 	}
 
 	horizontalScale := func(updatedReplicas int) {

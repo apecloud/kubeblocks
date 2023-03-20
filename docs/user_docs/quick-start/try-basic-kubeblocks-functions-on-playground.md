@@ -3,14 +3,14 @@ title: Try out basic function of KubeBlocks on Playground
 description: How to run KubeBlocks on Playground
 sidebar_position: 1
 sidebar_label: Try out basic functions on Playground
+---
+
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
----
 
 # Try out basic functions of KubeBlocks on Playground 
 This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command. 
 With Playground, you can try out KubeBlocks both on your local host(maszXaacOS) and on cloud environment(AWS).
-
 
 <Tabs>
   <TabItem value="macOS" label="Local Host(macOS)" default>
@@ -263,18 +263,7 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
    kbcli app uninstall nyancat
    ```
 
-## Destroy Playground
 
-Destroying Playground cleans up relevant component services and data:
-
-* Delete all KubeBlocks database clusters, such as ApeCloud MySQL Paxos Group.
-* Uninstall KubeBlocks.
-* Delete the local Kubernetes clusters created by K3d.
-  
-Destroy Playground.
-```bash
-kbcli playground destroy
-```
 
   </TabItem>
   <TabItem value="Cloud" label="Cloud(AWS)">
@@ -568,7 +557,8 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
    kbcli app uninstall nyancat
    ```
 
-
+</TabItem>
+</Tabs>
 
 ## Destroy Playground
 
@@ -600,6 +590,5 @@ Like the parameters in `kbcli playground init`, use `--cloud-provider` and `--re
 `kbcli playground destroy` directly deletes the Kubernetes cluster on the cloud but there might be residual resources in cloud, such as volumes. Please confirm whether there are residual resources after uninstalling and delete them in time to avoid unnecessary fees.
 
 :::
-</Tabs>
 
 

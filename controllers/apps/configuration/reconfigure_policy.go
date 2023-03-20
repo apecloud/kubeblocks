@@ -195,7 +195,7 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(appsv1alpha1.AutoReload)
 }
 
-func NewReconfigurePolicy(tpl *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgcore.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
+func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgcore.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
 	if !cfgPatch.IsModify {
 		// not exec here
 		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfgPatch)
@@ -203,8 +203,7 @@ func NewReconfigurePolicy(tpl *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgc
 
 	actionType := policy
 	if !restart {
-		if dynamicUpdate, err := cfgcore.IsUpdateDynamicParameters(tpl, cfgPatch); err != nil {
-			return nil, err
+		if dynamicUpdate, err := cfgcore.IsUpdateDynamicParameters(cc, cfgPatch); err != nil {
 		} else if dynamicUpdate {
 			actionType = appsv1alpha1.AutoReload
 		}

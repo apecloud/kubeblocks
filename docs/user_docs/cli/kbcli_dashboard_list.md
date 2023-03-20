@@ -8,6 +8,13 @@ List all dashboards.
 kbcli dashboard list [flags]
 ```
 
+### Examples
+
+```
+  # List all dashboards
+  kbcli dashboard list
+```
+
 ### Options
 
 ```

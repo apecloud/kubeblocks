@@ -17,22 +17,6 @@ During the vertical scaling process, all pods restart in the order of learner ->
 
 :::
 
-### How KubeBlocks vertically scales a cluster
-
-![Vertical scaling](./../../../img/mysql_cluster_vertical_scaling.png)
-
-1. A user creates a vertical scaling OpsRequest CR (custom resources).
-2. This OpsRequest CR passes the webhook validation.
-3. The OpsRequest controller applies the specified resource size of this OpsRequest to the corresponding components of the cluster.
-4. The OpsRequest controller updates the cluster phase to VerticalScaling.
-5. The cluster controller watches the cluster CR.
-6. The cluster controller updates the parameter changes to the corresponding StatefulSet/Deployment controller.
-7. The component controller watches the StatefulSet/Deployment controller and pods.
-8. When the component type is Stateful or Stateless, the Kubernetes StatefulSet/Deployment controller applies a rolling update to pods. The component controller applies vertical scaling to pods when the component type is Consensus/Replication.
-9. After the vertical scaling is completed, the component controller updates the cluster component phase to `Running`.
-10. The cluster controller watches component changes and when all components are `Running`, the cluster controller changes the cluster phase to `Running`.
-11. The OpsRequest controller reconciles the status when the cluster component status changes.
-
 ### Before you start
 
 Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
@@ -149,22 +133,6 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 ## Horizontal scaling
 Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale up from three pods to five pods. The scaling process includes the backup and restoration of data.
-
-### How KubeBlocks horizontally scales a cluster
-
-![Horizontal scaling](./../../../img/mysql_cluster_horizontal_scaling.png)
-
-1. A user creates a horizontal scaling OpsRequest CR.
-2. This CR passes the webhook validation.
-3. The OpsRequest controller applies the replicas specified by the OpsRequest to the corresponding cluster component.
-4. The OpsRequest controller updates the cluster phase to `HorizontalScaling`.
-5. The cluster controller watches the cluster CR.
-6. The cluster controller updates the parameter changes to the corresponding StatefulSet/Deployment controller.
-7. The component controller watches the StatefulSet/Deployment controller and pods.
-8. The Kubernetes StatefulSet/Deployment controller applies the scaling operations to replicas in pods.
-9. After the scaling operation is completed, the component controller updates the cluster component phase to `Running`.
-10. The cluster controller watches component changes and when all components are `Running`, the cluster controller changes the cluster phase to `Running`.
-11. The OpsRequest controller reconciles the status when the cluster component status changes.
 
 ### Before you start
 

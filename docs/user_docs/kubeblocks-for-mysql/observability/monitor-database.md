@@ -7,16 +7,6 @@ sidebar_position: 1
 # Observability of KubeBlocks
 With the built-in database observability, you can observe the database health status and track and measure your database in real-time to optimize database performance. This section shows you how database observability works with KubeBlocks and how to use the function.
 
-## Monitor MySQL database 
-
-KubeBlocks integrates open-source monitoring components such as Prometheus, AlertManager, and Granfana by add-ons in a native way. KubeBlocks also uses open-source and customized Prometheus Exporter for exporting database indicators. The monitoring function is enabled by default when you install KubeBlocks and no other operation is required.
-
-KubeBlocks has three monitoring add-ons.
-
-* prometheus add-on: It includes Prometheus and AlertManager components.
-* granfana add-on: It includes the Granfana component.
-* alertmanager-webhook-adaptor add-on: It includes instant message notification components and is used as an extension of the capability of AlertManager. Currently, Feishu custom bot, DingTalk custombot, and WeChat Enterprise custom bot are supported.
-
 ## Enable database monitor
 
 ***Steps:***

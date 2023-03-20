@@ -78,6 +78,7 @@ var _ = Describe("Cluster Controller", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
@@ -1274,12 +1275,10 @@ var _ = Describe("Cluster Controller", func() {
 			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 				&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 			By("creating backup")
-			// REVIEW: caught backups.dataprotection.kubeblocks.io "test-backup" already exists
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
-				// Create(&testCtx).GetObject() // HACK: tmp hack with CheckedCreate
-				CheckedCreate(&testCtx).GetObject()
+				Create(&testCtx).GetObject()
 
 			By("waiting for backup failed, because no backup policy exists")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),

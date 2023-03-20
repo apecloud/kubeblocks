@@ -31,7 +31,7 @@ import (
 
 func checkEnableCfgUpgrade(object client.Object) bool {
 	// check user disable upgrade
-	// configuration.kubeblocks.io/disable-reconfigure = "false"
+	// config.kubeblocks.io/disable-reconfigure = "false"
 	annotations := object.GetAnnotations()
 	value, ok := annotations[constant.DisableUpgradeInsConfigurationAnnotationKey]
 	if !ok {

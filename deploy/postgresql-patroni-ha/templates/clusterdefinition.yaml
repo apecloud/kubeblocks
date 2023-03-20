@@ -31,24 +31,18 @@ spec:
           filePathPattern: {{ $pattern }}
         {{- end }}
       configSpecs:
-        - name: postgresql-configuration
-          templateRef: postgresql-configuration
-          constraintRef: postgresql14-cc
+        - name: postgresql-ha-configuration
+          templateRef: postgresql-ha-configuration
+          constraintRef: postgresql14-ha-cc
           keys:
             - postgresql.conf
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-config
           defaultMode: 0777
-        - name: postgresql-custom-metrics
-          templateRef: postgresql-custom-metrics
+        - name: postgresql-ha-custom-metrics
+          templateRef: postgresql-ha-custom-metrics
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-custom-metrics
-          defaultMode: 0777
-      scriptSpecs:
-        - name: postgresql-scripts
-          templateRef: postgresql-scripts
-          namespace: {{ .Release.Namespace }}
-          volumeName: scripts
           defaultMode: 0777
       service:
         ports:

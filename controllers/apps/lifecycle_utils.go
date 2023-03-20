@@ -422,7 +422,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			if err := cli.Update(ctx, cm); err != nil {
 				return err
 			}
-		case len(cm.Labels[constant.CMConfigurationProviderTplLabelKey]) > 0:
+		case len(cm.Labels[constant.CMConfigurationSpecProviderLabelKey]) > 0:
 			// if tls settings updated, do Update
 			// FIXME: very hacky way. should allow config to be updated
 			oldCm := &corev1.ConfigMap{}

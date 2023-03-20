@@ -26,10 +26,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
-
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -1361,15 +1360,12 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
 
-			// REVIEW: following expect always failed
-			//   [FAILED] Timed out after 10.000s.
-			//   Expected
-			//   <int>: 1
-			// to be equivalent to
-			//   <int>: 2
 			By("Checking statefulSet number")
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			Eventually(len(stsList.Items)).Should(BeEquivalentTo(2))
+			var stsList *appsv1.StatefulSetList
+			Eventually(func(g Gomega) {
+				stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+				g.Expect(len(stsList.Items)).Should(HaveLen(2))
+			}).Should(Succeed())
 
 			By("Checking statefulSet role label")
 			for _, sts := range stsList.Items {

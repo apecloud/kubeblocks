@@ -150,7 +150,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		podSpec := stsList.Items[0].Spec.Template.Spec
 		By("Checking created sts pods template with built-in toleration")
-		Expect(len(podSpec.Tolerations) == 1).Should(BeTrue())
+		Expect(podSpec.Tolerations).Should(HaveLen(1))
 		Expect(podSpec.Tolerations[0].Key).To(Equal(constant.KubeBlocksDataNodeTolerationKey))
 
 		By("Checking created sts pods template with built-in Affinity")
@@ -160,7 +160,7 @@ var _ = Describe("Cluster Controller", func() {
 			Equal(constant.KubeBlocksDataNodeLabelKey))
 
 		By("Checking created sts pods template without TopologySpreadConstraints")
-		Expect(len(podSpec.TopologySpreadConstraints) == 0).Should(BeTrue())
+		Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
 
 		By("Check should create env configmap")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.ConfigMapSignature,
@@ -272,8 +272,8 @@ var _ = Describe("Cluster Controller", func() {
 			constant.KBAppComponentLabelKey: nginxCompName,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 		// TODO: fix me later, proxy should not have internal headless service
-		// Expect(len(svcList1.Items) == 1).Should(BeTrue())
-		Expect(len(svcList1.Items) > 0).Should(BeTrue())
+		// Expect(svcList1.Items).Should(HaveLen(1))
+		Expect(svcList1.Items).ShouldNot(BeEmpty())
 		var existsExternalClusterIP bool
 		for _, svc := range svcList1.Items {
 			Expect(svc.Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
@@ -310,7 +310,7 @@ var _ = Describe("Cluster Controller", func() {
 			constant.AppInstanceLabelKey:    clusterKey.Name,
 			constant.KBAppComponentLabelKey: mysqlCompName,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-		Expect(len(svcList2.Items)).Should(BeEquivalentTo(2))
+		Expect(svcList2.Items).Should(HaveLen(2))
 
 		idx := slices.IndexFunc(svcList2.Items, func(e corev1.Service) bool {
 			if e.Spec.Type != corev1.ServiceTypeClusterIP {
@@ -364,7 +364,7 @@ var _ = Describe("Cluster Controller", func() {
 			func(g Gomega, fetched *appsv1alpha1.Cluster) {
 				g.Expect(fetched.Status.Message).To(ContainSubstring(
 					fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", fetched.Spec.TerminationPolicy)))
-				g.Expect(len(fetched.Finalizers) > 0).To(BeTrue())
+				g.Expect(fetched.Finalizers).ShouldNot(BeEmpty())
 			})
 		Eventually(checkClusterDoNotTerminate).Should(Succeed())
 		Consistently(checkClusterDoNotTerminate).Should(Succeed())
@@ -390,7 +390,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	changeStatefulSetReplicas := func(clusterName types.NamespacedName, replicas int32) {
 		Eventually(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *appsv1alpha1.Cluster) {
-			if cluster.Spec.ComponentSpecs == nil || len(cluster.Spec.ComponentSpecs) == 0 {
+			if len(cluster.Spec.ComponentSpecs) == 0 {
 				cluster.Spec.ComponentSpecs = []appsv1alpha1.ClusterComponentSpec{
 					{
 						Name:            mysqlCompName,
@@ -740,7 +740,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(lableKey))
 		Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
 		Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
-		Expect(len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)).To(Equal(1))
+		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
 		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
 	}
 
@@ -774,7 +774,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.ScheduleAnyway))
 		Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(compTopologyKey))
 		Expect(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
-		Expect(len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)).To(Equal(1))
+		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
 		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(corev1.LabelHostname))
 	}
 
@@ -801,7 +801,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking the tolerations")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 		podSpec := stsList.Items[0].Spec.Template.Spec
-		Expect(len(podSpec.Tolerations)).To(Equal(2))
+		Expect(podSpec.Tolerations).Should(HaveLen(2))
 		toleration = podSpec.Tolerations[0]
 		Expect(toleration.Key == tolerationKey &&
 			toleration.Value == tolerationValue).Should(BeTrue())
@@ -838,7 +838,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking the tolerations")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 		podSpec := stsList.Items[0].Spec.Template.Spec
-		Expect(len(podSpec.Tolerations)).To(Equal(2))
+		Expect(podSpec.Tolerations).Should(HaveLen(2))
 		toleration = podSpec.Tolerations[0]
 		Expect(toleration.Key == compTolerationKey &&
 			toleration.Value == compTolerationValue).Should(BeTrue())
@@ -929,9 +929,9 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking pods' role are changed accordingly")
 		Eventually(func(g Gomega) {
 			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
-			g.Expect(err).To(Succeed())
+			g.Expect(err).ShouldNot(HaveOccurred())
 			// should have 3 pods
-			g.Expect(len(pods)).To(Equal(3))
+			g.Expect(pods).Should(HaveLen(3))
 			// 1 leader
 			// 2 followers
 			leaderCount, followerCount := 0, 0
@@ -968,7 +968,7 @@ var _ = Describe("Cluster Controller", func() {
 			consensusStatus := compStatus.ConsensusSetStatus
 			g.Expect(consensusStatus != nil).To(BeTrue())
 			g.Expect(consensusStatus.Leader.Pod).To(BeElementOf(getStsPodsName(sts)))
-			g.Expect(len(consensusStatus.Followers) == 2).To(BeTrue())
+			g.Expect(consensusStatus.Followers).Should(HaveLen(2))
 			g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
 			g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
 		}).Should(Succeed())
@@ -1016,8 +1016,8 @@ var _ = Describe("Cluster Controller", func() {
 		names := make([]string, 0)
 		for _, sts := range stsList {
 			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
-			Expect(err).To(Succeed())
-			Expect(len(pods)).To(BeEquivalentTo(1))
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(pods).Should(HaveLen(1))
 			names = append(names, pods[0].Name)
 		}
 		return names
@@ -1274,10 +1274,13 @@ var _ = Describe("Cluster Controller", func() {
 			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 				&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 			By("creating backup")
+			// REVIEW: caught backups.dataprotection.kubeblocks.io "test-backup" already exists
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
-				Create(&testCtx).GetObject()
+				// Create(&testCtx).GetObject() // HACK: tmp hack with CheckedCreate
+				CheckedCreate(&testCtx).GetObject()
+
 			By("waiting for backup failed, because no backup policy exists")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
 				func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
@@ -1305,7 +1308,7 @@ var _ = Describe("Cluster Controller", func() {
 				AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
 			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
 			sts := stsList.Items[0]
-			Expect(len(sts.Spec.Template.Spec.InitContainers) == 1).Should(BeTrue())
+			Expect(sts.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
 
 			By("remove init container after all components are Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
@@ -1314,7 +1317,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
-				g.Expect(len(tmpSts.Spec.Template.Spec.InitContainers)).Should(Equal(0))
+				g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 			})).Should(Succeed())
 
 			By("clean up annotations after cluster running")
@@ -1322,7 +1325,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterObj.Status.Phase = appsv1alpha1.RunningPhase
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(Equal(""))
+				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())
 		})
 	})
@@ -1423,7 +1426,7 @@ var _ = Describe("Cluster Controller", func() {
 				replicationStatus := compStatus.ReplicationSetStatus
 				g.Expect(replicationStatus).NotTo(BeNil())
 				g.Expect(replicationStatus.Primary.Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
-				g.Expect(len(replicationStatus.Secondaries)).To(BeEquivalentTo(1))
+				g.Expect(replicationStatus.Secondaries).Should(HaveLen(1))
 				g.Expect(replicationStatus.Secondaries[0].Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
 			})).Should(Succeed())
 		})
@@ -1474,7 +1477,7 @@ var _ = Describe("Cluster Controller", func() {
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: testapps.DefaultRedisCompName,
 				}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-				g.Expect(len(pvcList.Items) == testapps.DefaultReplicationReplicas).To(BeTrue())
+				g.Expect(pvcList.Items).Should(HaveLen(testapps.DefaultReplicationReplicas))
 				for _, pvc := range pvcList.Items {
 					g.Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).Should(BeEquivalentTo(updatedPVCSpec.Resources.Requests[corev1.ResourceStorage]))
 				}

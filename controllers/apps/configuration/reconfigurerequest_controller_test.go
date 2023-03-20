@@ -161,7 +161,7 @@ var _ = Describe("Reconfigure Controller", func() {
 				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
 				g.Expect(newHash).NotTo(Equal(configHash))
 				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureAutoReloadType))
-			}, "10s", "1ms").Should(Succeed())
+			}).Should(Succeed())
 
 			By("invalid Update")
 			invalidUpdatedCM := testapps.NewCustomizedObj("resources/mysql_ins_config_invalid_update.yaml", &corev1.ConfigMap{})

@@ -299,6 +299,12 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 				return err
 			}
 		}
+		if node.isOrphan {
+			err := c.cli.Delete(c.ctx.Ctx, node.obj)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
 		// TODO: delete backup objects created in scale-out
 		// TODO: should manage backup objects in a better way
 		if isTypeOf[*snapshotv1.VolumeSnapshot](node.obj) ||

@@ -79,10 +79,12 @@ type clusterRefResources struct {
 // the root vertex(i.e. the cluster vertex) will be treated specially:
 // as all its meta, spec and status can be updated in one reconciliation loop
 // Update is ignored when immutable=true
+// orphan object will be force deleted when action is DELETE
 type lifecycleVertex struct {
 	obj       client.Object
 	oriObj    client.Object
 	immutable bool
+	isOrphan  bool
 	action    *Action
 }
 

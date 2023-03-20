@@ -1,13 +1,13 @@
 ---
-title: Try basic fucntion of KubeBlocks on Playground
+title: Try out basic function of KubeBlocks on Playground
 description: How to run KubeBlocks on Playground
 sidebar_position: 1
-sidebar_label: Try basic fucntion on Local Host
+sidebar_label: Try out basic functions on Playground
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 ---
 
-# Try out basic fucntion of KubeBlocks on Playground 
+# Try out basic functions of KubeBlocks on Playground 
 This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command. 
 With Playground, you can try out KubeBlocks both on your local host(maszXaacOS) and on cloud environment(AWS).
 

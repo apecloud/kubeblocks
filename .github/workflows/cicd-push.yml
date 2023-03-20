@@ -34,6 +34,7 @@ jobs:
   pre-push:
     needs: trigger-mode
     runs-on: ubuntu-latest
+    if: ${{ github.ref_name != 'main' }}
     name: Push Pre-Check
     steps:
       - uses: actions/checkout@v3
@@ -178,7 +179,7 @@ jobs:
 
   check-image:
     needs: trigger-mode
-    if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
     uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
     with:
       MAKE_OPS_PRE: "generate"
@@ -190,7 +191,7 @@ jobs:
 
   check-helm:
     needs: trigger-mode
-    if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') && github.ref_name != 'main' }}
     uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.0
     with:
       MAKE_OPS: "bump-chart-ver"
@@ -198,4 +199,14 @@ jobs:
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
       PUSH_ENABLE: false
+    secrets: inherit
+
+  deploy-kubeblocks-io:
+    needs: trigger-mode
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docs]') && (github.ref_name == 'main' || startsWith(github.ref_name, 'release')) }}
+    uses: apecloud/apecd/.github/workflows/trigger-workflow.yml@v0.5.0
+    with:
+      GITHUB_REPO: "apecloud/kubeblocks.io"
+      BRANCH_NAME: "master"
+      WORKFLOW_ID: "deploy.yml"
     secrets: inherit

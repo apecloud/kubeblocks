@@ -8,34 +8,12 @@ sidebar_position: 1
 
 The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter change interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
 
-
-
-## How KubeBlocks configuration works
-
-### How configuration rendering works
-
-1. A cluster is created by `kbcli`.
-2. After the CR (custom resource) of the cluster is created, the cluster operator of KubeBlocks detects a newly created cluster object. During the reconciliation process, one process is to call the configuration module engine to generate the appropriate resource parameters. For example, for MySQL, the TPLEngine generates the appropriate buffer and max_connection parameters. If no resource information is specified when you create a cluster, a default configuration parameter still will be generated.
-3. After the config file of MySQL is created, when creating MySQL pod, the system correspondingly generates a sidecar container, named ConfigManager, to manage the MySQL local configuration.
-
-### How parameter reconfiguration works
-
-1. An OpsRequest is created by `kbcli` or a YAML file, whose type is `reconfiguring`. You need to modify the names and values of parameters in the OpsRequest. If you use `kbcli` to create an OpsRequest, `kbcli` verifies the parameter changes before the OpsRequest is submitted. If the verification fails, the system prompts that the parameter setting is abnormal.
-2. After the OpsRequest Operator detects the OpsRequest resources, it first verifies the effectiveness of the parameters. If the verification fails, the OpsRequest will be set to `Failed`. If the verification passes, the changes will be merged into the ConfigMap of the configuration object and a new version will be generated.
-3. When the Reconfigure Operator detects the ConfigMap changes, it first checks the effective parameter list and then adopts different execution strategies based on how the parameters take effect:
-   1. If the effectiveness type of changed parameters is **dynamic**, the Reconfigure Operator adopts the dynamic change strategy in which the ConfigManager performs OnlineUpdate to the parameters.
-   2. If the effectiveness type of changed parameters is **static**, the Reconfigure Operator adopts the pod restarting strategy.
-
-![Configuration](./../../../img/configuration.png)
-
-## Reconfigure the parameters
-
-### Before you start
+## Before you start
 
 1. Install KubeBlocks. For details, refer to [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md). 
 2. Create a MySQL standalone and wait until the cluster status is Running.
 
-### View the parameter information
+## View the parameter information
 
 1. Run the command below to search for parameter information.
    
@@ -85,7 +63,7 @@ The KubeBlocks configuration function provides a set of consistent default confi
     * Description: It describes the parameter definition.
 
 
-### Reconfigure dynamic parameters
+## Reconfigure dynamic parameters
 
 Here we take reconfiguring `max_connection` and `beb_buffer_pool_size` as an example.
 
@@ -193,7 +171,7 @@ Here we take reconfiguring `max_connection` and `beb_buffer_pool_size` as an exa
    1 row in set (0.00 sec)
    ```
 
-### Reconfigure static parameters
+## Reconfigure static parameters
 
 Static parameter reconfiguring requires restarting the pod. Here we take reconfiguring `ngram_token_size` as an example.
 

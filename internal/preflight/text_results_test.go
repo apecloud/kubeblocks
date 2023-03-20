@@ -17,8 +17,6 @@ limitations under the License.
 package preflight
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -27,7 +25,6 @@ import (
 
 var _ = Describe("text_results_test", func() {
 	var (
-		timeOut       = time.Second * 10
 		preflightName = "stdoutPreflightName"
 		humanFormat   = "human"
 		jsonFormat    = "json"
@@ -65,6 +62,6 @@ var _ = Describe("text_results_test", func() {
 			g.Expect(err).NotTo(HaveOccurred())
 			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false)
 			g.Expect(err).To(HaveOccurred())
-		}, timeOut).Should(Succeed())
+		}).Should(Succeed())
 	})
 })

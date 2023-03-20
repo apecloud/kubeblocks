@@ -19,13 +19,10 @@ package appstest
 import (
 	"fmt"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	corev1 "k8s.io/api/core/v1"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/internal/generics"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,6 +30,8 @@ import (
 	util "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	clitypes "github.com/apecloud/kubeblocks/internal/cli/types"
 	cliutil "github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )

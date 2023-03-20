@@ -564,7 +564,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
 			return false, err
 		}
-
 		kind := obj.GetObjectKind().GroupVersionKind().Kind
 		objsByKind[kind] = append(objsByKind[kind], obj)
 

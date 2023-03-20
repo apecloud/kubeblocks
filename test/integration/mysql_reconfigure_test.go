@@ -166,7 +166,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		componentName, tpl, cmObj := getClusterConfig(clusterObj)
 		configFile := ""
 		// get first config file
-		for k, _ := range cmObj.Data {
+		for k := range cmObj.Data {
 			configFile = k
 			break
 		}

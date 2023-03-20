@@ -139,6 +139,13 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		complete:         addonEnableDisableHandler,
 	}
 
+	o.Options.OutputOperation = func(didPatch bool) string {
+		if didPatch {
+			return "enabled"
+		}
+		return "enabled (no change)"
+	}
+
 	// # kbcli addon enable flags:
 	// # [--memory [extraName:]<request>/<limit> (can specify multiple if has extra items)]
 	// # [--cpu [extraName:]<request>/<limit> (can specify multiple if has extra items)]
@@ -203,6 +210,14 @@ func newDisableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		IOStreams: streams,
 		complete:  addonEnableDisableHandler,
 	}
+
+	o.Options.OutputOperation = func(didPatch bool) string {
+		if didPatch {
+			return "disabled"
+		}
+		return "disabled (no change)"
+	}
+
 	cmd := &cobra.Command{
 		Use:               "disable ADDON_NAME",
 		Short:             "Disable an addon.",

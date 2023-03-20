@@ -608,7 +608,7 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return []string{
 				"SharedNode\tpods of the cluster may share the same node",
-				"DedicatedNode\teach pod of the cluster will runs on their own dedicated node",
+				"DedicatedNode\teach pod of the cluster will run on their own dedicated node",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}))
 }

@@ -1,11 +1,11 @@
 ---
-title: Try basic fucntion and PAXOS MySQL on Local Host
+title: Try basic function and PAXOS MySQL on Local Host
 description: How to run KubeBlocks on Playground
 sidebar_position: 1
-sidebar_label: Try basic fucntion on Local Host
+sidebar_label: Try basic function on Local Host
 ---
 
-# Try basic fucntion and PAXOS MySQL on Local Host with Playground (MacOS)
+# Try basic function and PAXOS MySQL on Local Host with Playground (MacOS)
 This guide demonstrates how to easily create a KubeBlocks demo environment (Playground) on your local host using a single `kbcli` command. The Playground allows you to try out KubeBlocks and some ApeCloud MySQL features. Follow the steps below to install the Playground and test KubeBlocks with ease.
 
 ## Before you start

@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -113,26 +114,6 @@ func init() {
 	k8score.EventHandlerMap["cluster-status-handler"] = &ClusterStatusEventHandler{}
 }
 
-// Handle is the event handler for the cluster status event.
-func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
-		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
-	}
-
-	// parse probe event message when field path is probe-role-changed-check
-	message := k8score.ParseProbeEventMessage(reqCtx, event)
-	if message == nil {
-		reqCtx.Log.Info("parse probe event message failed", "message", event.Message)
-		return nil
-	}
-
-	// if probe message event is checkRoleFailed, it means the cluster is abnormal, need to handle the cluster status
-	if message.Event == k8score.ProbeEventCheckRoleFailed {
-		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
-	}
-	return nil
-}
-
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
@@ -177,10 +158,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}, clusterDefinition); err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
+		if setErr := clusterConditionMgr.setPreCheckErrorCondition(err); setErr != nil {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		}
+
 		// If using RequeueWithError and the user fixed this error,
 		// it may take up to 1000s to reconcile again, causing the user to think that the repair is not effective.
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.Generation {
@@ -213,7 +197,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// this is a block to handle error.
 			// so when update cluster conditions failed, we can ignore it.
 			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-			return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+			return intctrlutil.RequeueAfter(
+				time.Millisecond*requeueDuration, reqCtx.Log, "")
 		}
 		if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
 			appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
@@ -229,7 +214,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// validate config and send warning event log necessarily
 	if err = cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(
+			time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
 
 	// preCheck succeed, starting the cluster provisioning
@@ -242,19 +228,37 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(
+			time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
 	if shouldRequeue {
 		if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(
+			time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
 
 	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDeepCopy, clusterDefinition); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	requeueDuration = time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS))
+	// TODO: add filter predicate for core API objects
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&appsv1alpha1.Cluster{}).
+		Owns(&appsv1.StatefulSet{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&policyv1.PodDisruptionBudget{}).
+		Complete(r)
 }
 
 // patchClusterStatus patches the cluster status.
@@ -306,21 +310,6 @@ func (r *ClusterReconciler) patchClusterLabelsIfNotExist(
 	cluster.Labels[clusterDefLabelKey] = cdName
 	cluster.Labels[clusterVersionLabelKey] = cvName
 	return r.Client.Patch(ctx, cluster, patch)
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// TODO: add filter predicate for core API objects
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1alpha1.Cluster{}).
-		Owns(&appsv1.StatefulSet{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&corev1.Service{}).
-		Owns(&corev1.Secret{}).
-		Owns(&corev1.ConfigMap{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
-		Owns(&policyv1.PodDisruptionBudget{}).
-		Complete(r)
 }
 
 func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) (*ctrl.Result, error) {
@@ -489,7 +478,7 @@ func (r *ClusterReconciler) checkReferencedCRStatus(
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
-	res, err := intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+	res, err := intctrlutil.RequeueAfter(time.Millisecond*requeueDuration, reqCtx.Log, "")
 	return &res, err
 }
 
@@ -518,6 +507,8 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 	if !needPatch {
 		return nil
 	}
+	// TODO: should patch ObservedGeneration
+	// cluster.Status.ObservedGeneration = cluster.GetGeneration()
 	if err := r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
 		return err
 	}
@@ -771,4 +762,24 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 		cluster.Status.SetComponentStatus(componentName, compStatus)
 	}
 	return doRemoveInitContainers, nil
+}
+
+// Handle is the event handler for the cluster status event.
+func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
+		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
+	}
+
+	// parse probe event message when field path is probe-role-changed-check
+	message := k8score.ParseProbeEventMessage(reqCtx, event)
+	if message == nil {
+		reqCtx.Log.Info("parse probe event message failed", "message", event.Message)
+		return nil
+	}
+
+	// if probe message event is checkRoleFailed, it means the cluster is abnormal, need to handle the cluster status
+	if message.Event == k8score.ProbeEventCheckRoleFailed {
+		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
+	}
+	return nil
 }

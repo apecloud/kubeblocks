@@ -36,6 +36,23 @@ import (
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
+var ToIgnoreFinalizers []string
+
+func init() {
+	ResetToIgnoreFinalizers()
+}
+
+func ResetToIgnoreFinalizers() {
+	ToIgnoreFinalizers = []string{
+		"orphan",
+		"kubernetes.io/pvc-protection",
+		// REVIEW: adding following is a hack, if tests are running as
+		// controller-runtime manager setup.
+		constant.ConfigurationTemplateFinalizerName,
+		"cluster.kubeblocks.io/finalizer",
+	}
+}
+
 // Helper functions to change object's fields in input closure and then update it.
 // Each helper is a wrapper of k8sClient.Patch.
 // Example:
@@ -298,8 +315,7 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 			finalizers := pobj.GetFinalizers()
 			if len(finalizers) > 0 {
 				// PVCs are protected by the "kubernetes.io/pvc-protection" finalizer
-				g.Expect(finalizers[0]).Should(gomega.BeElementOf([]string{"orphan", "kubernetes.io/pvc-protection",
-					"configuration.kubeblocks.io/finalizer"}))
+				g.Expect(finalizers[0]).Should(gomega.BeElementOf(ToIgnoreFinalizers))
 				g.Expect(len(finalizers)).Should(gomega.Equal(1))
 				g.Expect(ChangeObj(testCtx, pobj, func() {
 					pobj.SetFinalizers([]string{})

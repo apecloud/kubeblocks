@@ -19,7 +19,6 @@ package extensions
 import (
 	"context"
 	"runtime"
-	"time"
 
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"github.com/spf13/viper"
@@ -45,6 +44,8 @@ type AddonReconciler struct {
 	Recorder   record.EventRecorder
 	RestConfig *rest.Config
 }
+
+var _ record.EventRecorder = &AddonReconciler{}
 
 func init() {
 	viper.SetDefault(maxConcurrentReconcilesKey, runtime.NumCPU()*2)
@@ -194,49 +195,27 @@ func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx,
 	return nil, nil
 }
 
-const (
-	resultValueKey  = "result"
-	errorValueKey   = "err"
-	operandValueKey = "operand"
-)
+// following provide r.Recorder wrapper for safe operation if r.Recorder is not provided
 
-type stageCtx struct {
-	reqCtx     *intctrlutil.RequestCtx
-	reconciler *AddonReconciler
-	next       ctrlerihandler.Handler
-}
-
-func (r *stageCtx) setReconciled() {
-	res, err := intctrlutil.Reconciled()
-	r.updateResultNErr(&res, err)
-}
-
-func (r *stageCtx) setRequeueAfter(duration time.Duration, msg string) {
-	res, err := intctrlutil.RequeueAfter(time.Second, r.reqCtx.Log, msg)
-	r.updateResultNErr(&res, err)
-}
-
-func (r *stageCtx) setRequeueWithErr(err error, msg string) {
-	res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, msg)
-	r.updateResultNErr(&res, err)
-}
-
-func (r *stageCtx) updateResultNErr(res *ctrl.Result, err error) {
-	r.reqCtx.UpdateCtxValue(errorValueKey, err)
-	r.reqCtx.UpdateCtxValue(resultValueKey, res)
-}
-
-func (r *stageCtx) doReturn() (*ctrl.Result, error) {
-	res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result)
-	err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error)
-	return res, err
-}
-
-func (r *stageCtx) process(processor func(*extensionsv1alpha1.Addon)) {
-	res, _ := r.doReturn()
-	if res != nil {
+func (r *AddonReconciler) Event(object k8sruntime.Object, eventtype, reason, message string) {
+	if r == nil || r.Recorder == nil {
 		return
 	}
-	addon := r.reqCtx.Ctx.Value(operandValueKey).(*extensionsv1alpha1.Addon)
-	processor(addon)
+	r.Event(object, eventtype, reason, message)
+}
+
+// Eventf is just like Event, but with Sprintf for the message field.
+func (r *AddonReconciler) Eventf(object k8sruntime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	if r == nil || r.Recorder == nil {
+		return
+	}
+	r.Eventf(object, eventtype, reason, messageFmt, args...)
+}
+
+// AnnotatedEventf is just like eventf, but with annotations attached
+func (r *AddonReconciler) AnnotatedEventf(object k8sruntime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	if r == nil || r.Recorder == nil {
+		return
+	}
+	r.AnnotatedEventf(object, annotations, eventtype, reason, messageFmt, args...)
 }

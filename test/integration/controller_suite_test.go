@@ -152,9 +152,9 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 			constant.AppNameLabelKey, clusterName,
 			constant.AppInstanceLabelKey, clusterName,
 			constant.KBAppComponentLabelKey, mysqlConsensusType,
-			constant.CMConfigurationTplNameLabelKey, mysqlConfigName,
+			constant.CMConfigurationTemplateNameLabelKey, mysqlConfigName,
 			constant.CMConfigurationConstraintsNameLabelKey, mysqlConfigConstraintName,
-			constant.CMConfigurationProviderTplLabelKey, mysqlConfigName,
+			constant.CMConfigurationSpecProviderLabelKey, mysqlConfigName,
 			constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 		))
 
@@ -187,8 +187,8 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 		SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
 		AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
 		AddConfigTemplate(mysqlConfigName, configmap.Name, constraint.Name,
-			testCtx.DefaultNamespace, mysqlConfigVolumeName, nil).
-		AddConfigTemplate(mysqlScriptsConfigName, mysqlScriptsConfigName, "",
+			testCtx.DefaultNamespace, mysqlConfigVolumeName).
+		AddScriptTemplate(mysqlScriptsConfigName, mysqlScriptsConfigName,
 			testCtx.DefaultNamespace, mysqlScriptsVolumeName, &mode).
 		AddContainerVolumeMounts(testapps.DefaultMySQLContainerName, mysqlVolumeMounts).
 		AddLogConfig("error", mysqlErrorFilePath).

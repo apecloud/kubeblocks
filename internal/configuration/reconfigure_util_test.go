@@ -23,7 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 func TestGetUpdateParameterList(t *testing.T) {
@@ -49,13 +48,13 @@ func TestGetUpdateParameterList(t *testing.T) {
 `
 	params, err := getUpdateParameterList(newCfgDiffMeta(testData, nil, nil))
 	require.Nil(t, err)
-	require.True(t, cfgcore.EqSet(
+	require.True(t, EqSet(
 		set.NewLinkedHashSetString("a", "c_1", "c_0", "msld", "cd", "f", "test1", "test2"),
 		set.NewLinkedHashSetString(params...)))
 }
 
-func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *cfgcore.ConfigPatchInfo {
-	return &cfgcore.ConfigPatchInfo{
+func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *ConfigPatchInfo {
+	return &ConfigPatchInfo{
 		UpdateConfig: map[string][]byte{
 			"test": []byte(testData),
 		},
@@ -67,7 +66,7 @@ func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *cfgcor
 func TestIsUpdateDynamicParameters(t *testing.T) {
 	type args struct {
 		tpl  *appsv1alpha1.ConfigConstraintSpec
-		diff *cfgcore.ConfigPatchInfo
+		diff *ConfigPatchInfo
 	}
 	tests := []struct {
 		name    string
@@ -169,13 +168,13 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := isUpdateDynamicParameters(tt.args.tpl, tt.args.diff)
+			got, err := IsUpdateDynamicParameters(tt.args.tpl, tt.args.diff)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("isUpdateDynamicParameters() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("IsUpdateDynamicParameters() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("isUpdateDynamicParameters() got = %v, want %v", got, tt.want)
+				t.Errorf("IsUpdateDynamicParameters() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

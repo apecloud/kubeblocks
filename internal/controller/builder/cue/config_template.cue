@@ -44,18 +44,13 @@ config: {
 
 			"apps.kubeblocks.io/component-name": "\(meta.component.name)"
 			// configmap selector for ConfigureController
-			"configuration.kubeblocks.io/configuration-type": "instance"
+			"config.kubeblocks.io/config-type": "instance"
 			// config template name
-			"configuration.kubeblocks.io/configuration-tpl-name": "\(meta.component.templateName)"
-			if meta.component.configConstraintsName != _|_ && meta.component.configConstraintsName != "" {
-				"configuration.kubeblocks.io/configuration-constraints-name": "\(meta.component.configConstraintsName)"
-			}
-
-			"configuration.kubeblocks.io/configtemplate-name": "\(meta.component.configTemplateName)"
+			"config.kubeblocks.io/template-name": "\(meta.component.templateName)"
 		}
 		annotations: {
 			// enable configmap upgrade
-			"configuration.kubeblocks.io/disable-reconfigure": "false"
+			"config.kubeblocks.io/disable-reconfigure": "false"
 		}
 
 		data: {

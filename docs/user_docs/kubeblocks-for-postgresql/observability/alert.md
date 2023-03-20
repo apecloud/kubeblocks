@@ -8,12 +8,6 @@ sidebar_position: 2
 
 Alerts are mainly used for daily error response to improve system availability. Kubeblocks has a set of built-in common alert rules and integrates multiple notification channels. The alert capability of Kubeblocks can meet the operation and maintenance requirements of production-level online clusters.
 
-## How KubeBlocks alert works
-
-KubeBlocks built-in alert system adopts the mainstream open-source solution in the cloud native scenario, i.e. the combined solution of Prometheus and AlertManager. KubeBlocks also uses the AlertManager Webhook extension to integrate new notification channels, such as Feishu custom bot, Dingtalk custom bot, Wechat custom bot.
-
-![Alert](./../../../img/observability_alert.png)
-
 ## Alert rules
 
 KubeBlocks has a set of general built-in alter rules to meet the alert needs of different types of data products and provides an out-of-the-box experience without further configurations. These alert rules provide the best practice for cluster operation and maintenance. These alarm rules further improve alert accuracy and reduce the probability of false negatives and false positives through experience-based smoothing windows, alarm thresholds, alarm levels, and alarm indicators.

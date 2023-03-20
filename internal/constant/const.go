@@ -18,11 +18,12 @@ package constant
 
 const (
 	// config keys used in viper, DON'T refactor the value without careful inspections
-	CfgKeyServerInfo           = "_KUBE_SERVER_INFO"
-	CfgKeyCtrlrMgrNS           = "CM_NAMESPACE"
-	CfgKeyCtrlrMgrAffinity     = "CM_AFFINITY"
-	CfgKeyCtrlrMgrNodeSelector = "CM_NODE_SELECTOR"
-	CfgKeyCtrlrMgrTolerations  = "CM_TOLERATIONS"
+	CfgKeyServerInfo                    = "_KUBE_SERVER_INFO"
+	CfgKeyCtrlrMgrNS                    = "CM_NAMESPACE"
+	CfgKeyCtrlrMgrAffinity              = "CM_AFFINITY"
+	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
+	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
+	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS" // accept time
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
@@ -78,32 +79,34 @@ const (
 	ClusterSnapshotAnnotationKey     = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
-	ConfigurationTplLabelPrefixKey         = "configuration.kubeblocks.io/cfg-tpl"
-	ConfigurationConstraintsLabelPrefixKey = "configuration.kubeblocks.io/cfg-constraints"
+	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
+	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
 
-	LastAppliedOpsCRAnnotation                  = "configuration.kubeblocks.io/last-applied-ops-name"
-	LastAppliedConfigAnnotation                 = "configuration.kubeblocks.io/last-applied-configuration"
-	DisableUpgradeInsConfigurationAnnotationKey = "configuration.kubeblocks.io/disable-reconfigure"
-	UpgradePolicyAnnotationKey                  = "configuration.kubeblocks.io/reconfigure-policy"
-	UpgradeRestartAnnotationKey                 = "configuration.kubeblocks.io/restart"
+	LastAppliedOpsCRAnnotation                  = "config.kubeblocks.io/last-applied-ops-name"
+	LastAppliedConfigAnnotation                 = "config.kubeblocks.io/last-applied-configuration"
+	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
+	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
+	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 
 	// CMConfigurationTypeLabelKey configmap is config template type, e.g: "tpl", "instance"
-	CMConfigurationTypeLabelKey            = "configuration.kubeblocks.io/configuration-type"
-	CMConfigurationTplNameLabelKey         = "configuration.kubeblocks.io/configuration-tpl-name"
-	CMConfigurationConstraintsNameLabelKey = "configuration.kubeblocks.io/configuration-constraints-name"
-	CMInsConfigurationHashLabelKey         = "configuration.kubeblocks.io/configuration-hash"
-	CMConfigurationProviderTplLabelKey     = "configuration.kubeblocks.io/configtemplate-name"
+	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
+	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
+	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
+	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
+
+	// CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
+	CMConfigurationSpecProviderLabelKey = "config.kubeblocks.io/config-spec"
 
 	// CMConfigurationCMKeysLabelKey Specify keys
-	CMConfigurationCMKeysLabelKey = "configuration.kubeblocks.io/configmap-keys"
+	CMConfigurationCMKeysLabelKey = "config.kubeblocks.io/configmap-keys"
 
 	// CMInsConfigurationLabelKey configmap is configuration file for component
-	// CMInsConfigurationLabelKey = "configuration.kubeblocks.io/ins-configure"
+	// CMInsConfigurationLabelKey = "config.kubeblocks.io/ins-configure"
 
-	CMInsLastReconfigureMethodLabelKey = "configuration.kubeblocks.io/last-applied-reconfigure-policy"
+	CMInsLastReconfigureMethodLabelKey = "config.kubeblocks.io/last-applied-reconfigure-policy"
 
 	// configuration finalizer
-	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
+	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
 )
 
 const (

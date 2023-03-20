@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -90,7 +91,8 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return *res, err
 	}
 
-	if dbClusterDef.Status.ObservedGeneration == dbClusterDef.Generation {
+	if dbClusterDef.Status.ObservedGeneration == dbClusterDef.Generation &&
+		slices.Contains(dbClusterDef.Status.GetTerminalPhases(), dbClusterDef.Status.Phase) {
 		return intctrlutil.Reconciled()
 	}
 

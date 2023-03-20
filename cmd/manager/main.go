@@ -85,6 +85,7 @@ func init() {
 	viper.AddConfigPath(".")                               // optionally look for config in the working directory
 	viper.AutomaticEnv()
 
+	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 100)
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")

@@ -25,7 +25,9 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -49,6 +51,8 @@ type TestContext struct {
 	CheckedCreateObj                   func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
 }
 
+var ErrUninitError = fmt.Errorf("cli uninitialized error")
+
 const (
 	envExistingClusterType = "EXISTING_CLUSTER_TYPE"
 	envUseExistingCluster  = "USE_EXISTING_CLUSTER"
@@ -57,14 +61,19 @@ const (
 func init() {
 	viper.AutomaticEnv()
 	viper.SetDefault("EventuallyTimeout", time.Second*10)
-	viper.SetDefault("EventuallyPollingInterval", time.Second*1)
+	viper.SetDefault("EventuallyPollingInterval", time.Millisecond)
 	viper.SetDefault("ConsistentlyDuration", time.Second*3)
-	viper.SetDefault("ConsistentlyPollingInterval", time.Second*1)
-	viper.SetDefault("ClearResourceTimeout", time.Second*60)
-	viper.SetDefault("ClearResourcePollingInterval", time.Second*1)
+	viper.SetDefault("ConsistentlyPollingInterval", time.Millisecond)
+	viper.SetDefault("ClearResourceTimeout", time.Second*10)
+	viper.SetDefault("ClearResourcePollingInterval", time.Millisecond)
 }
 
-func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envtest.Environment) TestContext {
+// NewDefaultTestContext create default test context, if provided namespace optional arg, a namespace
+// will be created if not exist
+func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envtest.Environment, namespace ...string) TestContext {
+	if cli == nil {
+		panic("missing required cli arg")
+	}
 	t := TestContext{
 		TestObjLabelKey:                    "kubeblocks.io/test",
 		DefaultNamespace:                   "default",
@@ -74,10 +83,10 @@ func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envt
 		DefaultConsistentlyPollingInterval: viper.GetDuration("ConsistentlyPollingInterval"),
 		ClearResourceTimeout:               viper.GetDuration("ClearResourceTimeout"),
 		ClearResourcePollingInterval:       viper.GetDuration("ClearResourcePollingInterval"),
+		Ctx:                                ctx,
+		Cli:                                cli,
+		TestEnv:                            testEnv,
 	}
-	t.Ctx = ctx
-	t.Cli = cli
-	t.TestEnv = testEnv
 	t.CreateObj = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 		l := obj.GetLabels()
 		if l == nil {
@@ -85,7 +94,7 @@ func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envt
 		}
 		l[t.TestObjLabelKey] = "true"
 		obj.SetLabels(l)
-		return cli.Create(ctx, obj, opts...)
+		return t.Cli.Create(ctx, obj, opts...)
 	}
 
 	t.CheckedCreateObj = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
@@ -100,7 +109,38 @@ func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envt
 	gomega.SetDefaultConsistentlyDuration(t.DefaultConsistentlyDuration)
 	gomega.SetDefaultConsistentlyPollingInterval(t.DefaultConsistentlyPollingInterval)
 
+	if len(namespace) > 0 && len(namespace[0]) > 0 && namespace[0] != "default" {
+		t.DefaultNamespace = namespace[0]
+		err := t.CreateNamespace()
+		gomega.Expect(client.IgnoreAlreadyExists(err)).To(gomega.Not(gomega.HaveOccurred()))
+	}
 	return t
+}
+
+func (testCtx TestContext) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	return testCtx.CreateObj(ctx, obj, opts...)
+}
+
+func (testCtx TestContext) GetNamespaceKey() client.ObjectKey {
+	return client.ObjectKey{
+		Name: testCtx.DefaultNamespace,
+	}
+}
+
+func (testCtx TestContext) GetNamespaceObj() corev1.Namespace {
+	return corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testCtx.DefaultNamespace,
+		},
+	}
+}
+
+func (testCtx TestContext) CreateNamespace() error {
+	if testCtx.DefaultNamespace == "default" {
+		return nil
+	}
+	namespace := testCtx.GetNamespaceObj()
+	return testCtx.Create(testCtx.Ctx, &namespace)
 }
 
 func (testCtx TestContext) GetRandomStr() string {

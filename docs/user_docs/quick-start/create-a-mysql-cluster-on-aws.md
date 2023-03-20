@@ -151,7 +151,7 @@ The MySQL cluster provides high availability to ensure RPO=0. When a failure occ
 
 Run the commands below if you want to delete the created cluster and uninstall `kbcli` and KubeBlocks after your trial.
 
-1. Delete the PostgreSQL cluster.
+1. Delete the MySQL cluster.
     ```bash
     kbcli cluster delete maple05
     ```

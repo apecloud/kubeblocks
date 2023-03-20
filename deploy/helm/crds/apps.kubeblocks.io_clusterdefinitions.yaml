@@ -8985,10 +8985,9 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: ClusterDefinition phase - Available is ClusterDefinition
-                  become available, and can be referenced for co-related objects.
-                enum:
-                - Available
+                description: ClusterDefinition phase, valid values are <empty>, Available.
+                  Available is ClusterDefinition become available, and can be referenced
+                  for co-related objects.
                 type: string
             type: object
         type: object

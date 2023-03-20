@@ -58,9 +58,10 @@ var _ = Describe("test clusterVersion controller", func() {
 				Create(&testCtx).GetObject()
 
 			By("wait for clusterVersion phase is unavailable when clusterDef is not found")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj), func(g Gomega, tmpCV *appsv1alpha1.ClusterVersion) {
-				g.Expect(tmpCV.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
-			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj),
+				func(g Gomega, tmpCV *appsv1alpha1.ClusterVersion) {
+					g.Expect(tmpCV.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
+				})).Should(Succeed())
 
 			By("create a clusterDefinition obj")
 			testapps.NewClusterDefFactory(clusterDefName).
@@ -68,9 +69,11 @@ var _ = Describe("test clusterVersion controller", func() {
 				Create(&testCtx).GetObject()
 
 			By("wait for clusterVersion phase is available")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj), func(g Gomega, tmpCV *appsv1alpha1.ClusterVersion) {
-				g.Expect(tmpCV.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
-			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx,
+				client.ObjectKeyFromObject(clusterVersionObj),
+				func(g Gomega, tmpCV *appsv1alpha1.ClusterVersion) {
+					g.Expect(tmpCV.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+				})).Should(Succeed())
 		})
 	})
 

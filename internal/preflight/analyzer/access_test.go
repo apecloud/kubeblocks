@@ -19,7 +19,6 @@ package analyzer
 import (
 	"encoding/json"
 	"errors"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -35,7 +34,6 @@ var _ = Describe("access_test", func() {
 	var (
 		analyzer AnalyzeClusterAccess
 		resInfo  collect.ClusterVersion
-		timeOut  = time.Second * 10
 	)
 	Context("AnalyzeHostUtility test", func() {
 		BeforeEach(func() {
@@ -60,7 +58,7 @@ var _ = Describe("access_test", func() {
 				res, err := analyzer.Analyze(getCollectedFileContents, nil)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(res[0].IsFail).Should(BeTrue())
-			}, timeOut).Should(Succeed())
+			}).Should(Succeed())
 		})
 
 		It("Analyze test, and return of get file is not version.Info", func() {
@@ -71,7 +69,7 @@ var _ = Describe("access_test", func() {
 				res, err := analyzer.Analyze(getCollectedFileContents, nil)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(res[0].IsFail).Should(BeTrue())
-			}, timeOut).Should(Succeed())
+			}).Should(Succeed())
 		})
 
 		It("Analyze test, and analyzer result is expected that pass is true", func() {
@@ -99,7 +97,7 @@ var _ = Describe("access_test", func() {
 				res, err := analyzer.Analyze(getCollectedFileContents, nil)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(res[0].IsPass).Should(BeTrue())
-			}, timeOut).Should(Succeed())
+			}).Should(Succeed())
 		})
 	})
 })

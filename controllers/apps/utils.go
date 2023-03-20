@@ -16,9 +16,14 @@ limitations under the License.
 
 package apps
 
+import "time"
+
 func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
 	return map[string]string{
 		"$(USERNAME)": name,
 		"$(PASSWD)":   passwd,
 	}
 }
+
+// default reconcile requeue after duration
+var requeueDuration time.Duration = time.Millisecond * 100

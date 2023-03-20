@@ -23,30 +23,31 @@ import (
 	"github.com/StudioSol/set"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-func getUpdateParameterList(cfg *cfgcore.ConfigPatchInfo) ([]string, error) {
+func getUpdateParameterList(cfg *ConfigPatchInfo) ([]string, error) {
 	params := make([]string, 0)
+	walkFn := func(parent, cur string, v reflect.Value, fn UpdateFn) error {
+		if cur != "" {
+			params = append(params, cur)
+		}
+		return nil
+	}
+
 	for _, diff := range cfg.UpdateConfig {
 		var updatedParams any
 		if err := json.Unmarshal(diff, &updatedParams); err != nil {
 			return nil, err
 		}
-		if err := cfgcore.UnstructuredObjectWalk(updatedParams,
-			func(parent, cur string, v reflect.Value, fn cfgcore.UpdateFn) error {
-				if cur != "" {
-					params = append(params, cur)
-				}
-				return nil
-			}, true); err != nil {
-			return nil, cfgcore.WrapError(err, "failed to walk params: [%s]", diff)
+		if err := UnstructuredObjectWalk(updatedParams, walkFn, true); err != nil {
+			return nil, WrapError(err, "failed to walk params: [%s]", diff)
 		}
 	}
 	return params, nil
 }
 
-func isUpdateDynamicParameters(tpl *appsv1alpha1.ConfigConstraintSpec, cfg *cfgcore.ConfigPatchInfo) (bool, error) {
+// IsUpdateDynamicParameters is used to check whether the changed parameters require a restart
+func IsUpdateDynamicParameters(tpl *appsv1alpha1.ConfigConstraintSpec, cfg *ConfigPatchInfo) (bool, error) {
 	// TODO(zt) how to process new or delete file
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
 		return false, nil
@@ -61,7 +62,7 @@ func isUpdateDynamicParameters(tpl *appsv1alpha1.ConfigConstraintSpec, cfg *cfgc
 	// if ConfigConstraint has StaticParameters, check updated parameter
 	if len(tpl.StaticParameters) > 0 {
 		staticParams := set.NewLinkedHashSetString(tpl.StaticParameters...)
-		union := cfgcore.Union(staticParams, updateParams)
+		union := Union(staticParams, updateParams)
 		if union.Length() > 0 {
 			return false, nil
 		}
@@ -74,7 +75,7 @@ func isUpdateDynamicParameters(tpl *appsv1alpha1.ConfigConstraintSpec, cfg *cfgc
 	// if ConfigConstraint has DynamicParameter, all updated param in dynamic params
 	if len(tpl.DynamicParameters) > 0 {
 		dynamicParams := set.NewLinkedHashSetString(tpl.DynamicParameters...)
-		union := cfgcore.Difference(updateParams, dynamicParams)
+		union := Difference(updateParams, dynamicParams)
 		return union.Length() == 0, nil
 	}
 

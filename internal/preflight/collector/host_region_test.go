@@ -18,7 +18,6 @@ package collector
 
 import (
 	"errors"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -31,7 +30,6 @@ import (
 
 var _ = Describe("host_region_test", func() {
 	var (
-		timeOut       = 10 * time.Second
 		clusterRegion CollectClusterRegion
 		testName      = "testName"
 		config        *rest.Config
@@ -57,7 +55,7 @@ var _ = Describe("host_region_test", func() {
 			}, "eks")
 			g.Expect(err).Should(HaveOccurred())
 			g.Expect(data).Should(BeNil())
-		}, timeOut).Should(Succeed())
+		}).Should(Succeed())
 	})
 
 	It("CollectClusterRegion test, and expect success", func() {
@@ -69,6 +67,6 @@ var _ = Describe("host_region_test", func() {
 			}, "eks")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(string(data)).Should(Equal(`{"regionName":"cn-northwest-1"}`))
-		}, timeOut).Should(Succeed())
+		}).Should(Succeed())
 	})
 })

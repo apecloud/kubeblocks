@@ -18,13 +18,11 @@ package appstest
 
 import (
 	"fmt"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/internal/generics"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,6 +30,8 @@ import (
 	util "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	clitypes "github.com/apecloud/kubeblocks/internal/cli/types"
 	cliutil "github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -110,7 +110,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 	}
 
 	getClusterConfig := func(clusterObj *appsv1alpha1.Cluster) (
-		componentName string, tpl *appsv1alpha1.ConfigTemplate, cmObj *corev1.ConfigMap) {
+		componentName string, tpl *appsv1alpha1.ComponentConfigSpec, cmObj *corev1.ConfigMap) {
 
 		By("Get configuration information from cluster")
 		componentName = clusterObj.Spec.ComponentSpecs[0].ComponentDefRef
@@ -120,9 +120,9 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		Expect(len(tpls) > 0).Should(BeTrue())
 
 		By("Should have at least one valid config")
-		validTpls := make([]appsv1alpha1.ConfigTemplate, 0, len(tpls))
+		validTpls := make([]appsv1alpha1.ComponentConfigSpec, 0, len(tpls))
 		for _, tpl := range tpls {
-			if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
+			if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
 				validTpls = append(validTpls, tpl)
 			}
 		}

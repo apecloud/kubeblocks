@@ -1431,8 +1431,11 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Should successfully doing volume expansion", func() {
+			storageClassName := "test-storage"
 			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec.StorageClassName = &storageClassName
 			updatedPVCSpec := testapps.NewPVC("2Gi")
+			updatedPVCSpec.StorageClassName = &storageClassName
 
 			By("Mock a cluster obj with replication componentDefRef.")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -1445,16 +1448,13 @@ var _ = Describe("Cluster Controller", func() {
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 			By("Waiting for cluster creation")
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
 
-			By("Updating PVC volume size")
-			patch := client.MergeFrom(clusterObj.DeepCopy())
-			componentSpec := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
-			componentSpec.VolumeClaimTemplates[0].Spec = &updatedPVCSpec
-			Expect(testCtx.Cli.Patch(ctx, clusterObj, patch)).Should(Succeed())
+			By("Checking statefulset count")
+			stsList := testk8s.ListAndCheckStatefulSetCount(&testCtx, clusterKey, testapps.DefaultReplicationReplicas)
 
 			By("Creating mock pods in StatefulSet")
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 			pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
 			for _, pod := range pods {
 				Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
@@ -1462,15 +1462,71 @@ var _ = Describe("Cluster Controller", func() {
 					Type:   corev1.PodReady,
 					Status: corev1.ConditionTrue,
 				}}
-				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+				Expect(testCtx.Cli.Status().Update(testCtx.Ctx, &pod)).Should(Succeed())
 			}
 
-			// // REVIEW: why is Cluster.status.observerdGeneration bump to 2 from 0, our code handling cluster.spec get updated?
-			// By("Waiting cluster update reconcile succeed")
-			// Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+			By("Checking pod count and ready")
+			Eventually(func(g Gomega) {
+				podList := testk8s.ListAndCheckPodCountWithComponent(&testCtx, clusterKey, testapps.DefaultRedisCompName, testapps.DefaultReplicationReplicas)
+				for _, pod := range podList.Items {
+					g.Expect(len(pod.Status.Conditions) > 0).Should(BeTrue())
+					g.Expect(pod.Status.Conditions[0].Status).Should(Equal(corev1.ConditionTrue))
+				}
+			}).Should(Succeed())
+
+			By("Mocking statefulset status to ready")
+			for _, sts := range stsList.Items {
+				sts.Status.ObservedGeneration = sts.Generation
+				sts.Status.AvailableReplicas = 1
+				sts.Status.Replicas = 1
+				sts.Status.ReadyReplicas = 1
+				err := testCtx.Cli.Status().Update(testCtx.Ctx, &sts)
+				Expect(err).ShouldNot(HaveOccurred())
+			}
+
+			By("Checking reconcile succeeded")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.RunningPhase))
+
+			By("Creating storageclass")
+			_ = testapps.CreateStorageClass(testCtx, storageClassName, true)
+
+			pvcList := &corev1.PersistentVolumeClaimList{}
+
+			By("Mocking PVCs status to bound")
+			Expect(testCtx.Cli.List(testCtx.Ctx, pvcList, client.MatchingLabels{
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: testapps.DefaultRedisCompName,
+			}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+			Expect(pvcList.Items).Should(HaveLen(testapps.DefaultReplicationReplicas))
+			for _, pvc := range pvcList.Items {
+				pvc.Status.Phase = corev1.ClaimBound
+				Expect(testCtx.Cli.Status().Update(testCtx.Ctx, &pvc)).Should(Succeed())
+			}
+
+			By("Checking PVCs status bound")
+			Eventually(func(g Gomega) {
+				g.Expect(testCtx.Cli.List(testCtx.Ctx, pvcList, client.MatchingLabels{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: testapps.DefaultRedisCompName,
+				}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+				Expect(pvcList.Items).Should(HaveLen(testapps.DefaultReplicationReplicas))
+				for _, pvc := range pvcList.Items {
+					g.Expect(pvc.Status.Phase).Should(Equal(corev1.ClaimBound))
+				}
+			}).Should(Succeed())
+
+			By("Updating PVC volume size")
+			patch := client.MergeFrom(clusterObj.DeepCopy())
+			componentSpec := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
+			componentSpec.VolumeClaimTemplates[0].Spec = &updatedPVCSpec
+			Expect(testCtx.Cli.Patch(ctx, clusterObj, patch)).Should(Succeed())
+
+			By("Waiting cluster update reconcile succeed")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.SpecUpdatingPhase))
 
 			By("Checking pvc volume size")
-			pvcList := &corev1.PersistentVolumeClaimList{}
 			Eventually(func(g Gomega) {
 				g.Expect(testCtx.Cli.List(testCtx.Ctx, pvcList, client.MatchingLabels{
 					constant.AppInstanceLabelKey:    clusterKey.Name,

@@ -23,7 +23,6 @@ kbcli kubeblocks upgrade [flags]
 ```
       --check                    Check kubernetes environment before upgrade (default true)
   -h, --help                     help for upgrade
-      --monitor                  Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)
       --set stringArray          Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
       --set-file stringArray     Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)
       --set-json stringArray     Set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)

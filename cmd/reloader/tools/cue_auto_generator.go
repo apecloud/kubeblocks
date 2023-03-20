@@ -307,7 +307,8 @@ func parseValue(s string, valueType ValueType) (interface{}, error) {
 func parseParameterRestrict(s string, valueType ValueType) (*ParameterRestrict, error) {
 	var (
 		IntegerRangeRegex = regexp.MustCompile(`([\+\-]?\d+)-([\+\-]?\d+)`)
-		FloatRangeRegex   = regexp.MustCompile(`([\+\-]?\d+(\.\d*)?)-([\+\-]?\d+(\.\d*)?)`)
+		// support format: 0-1.79769e+308
+		FloatRangeRegex = regexp.MustCompile(`([\+\-]?\d+(\.\d*(e[\+\-]\d+))?)-([\+\-]?\d+(\.\d*(e[\+\-]\d+))?)`)
 
 		pr  *ParameterRestrict
 		err error
@@ -348,7 +349,7 @@ func parseParameterRestrict(s string, valueType ValueType) (*ParameterRestrict, 
 		if err := setValueHelper(reflect.ValueOf(&t.Min), r[1], valueType); err != nil {
 			return nil, err
 		}
-		if err := setValueHelper(reflect.ValueOf(&t.Max), r[3], valueType); err != nil {
+		if err := setValueHelper(reflect.ValueOf(&t.Max), r[4], valueType); err != nil {
 			return nil, err
 		}
 		return t, nil

@@ -394,6 +394,23 @@ func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) erro
 			RoleDetectInfo:   nil,
 			LagDetectInfo:    nil,
 		}
+
+		// because the first sts is named differently than the other sts, special handling is required here.
+		// TODO: The following code is not very elegant, and it is recommended to be optimized in the future.
+		clusterCompName := fmt.Sprintf("%s-%s", s.SwitchResource.Cluster.GetName(), s.SwitchResource.CompSpec.Name)
+		if sts.GetName() == clusterCompName {
+			if oldPrimaryIndex == 0 {
+				s.SwitchInstance.OldPrimaryRole = sri
+				continue
+			}
+			if newPrimaryIndex == 0 {
+				s.SwitchInstance.CandidatePrimaryRole = sri
+				continue
+			}
+			s.SwitchInstance.SecondariesRole = append(s.SwitchInstance.SecondariesRole, sri)
+			continue
+		}
+
 		switch int32(utils.GetOrdinalSts(&sts)) {
 		case oldPrimaryIndex:
 			s.SwitchInstance.OldPrimaryRole = sri

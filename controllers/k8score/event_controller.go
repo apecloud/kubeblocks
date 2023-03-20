@@ -36,7 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -117,7 +116,7 @@ func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // Handle handles role changed event.
 func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != component.ProbeRoleChangedCheckPath {
+	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
 		return nil
 	}
 	var (

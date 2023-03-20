@@ -94,11 +94,17 @@ func TestPostgresIntegration(t *testing.T) {
 	t.Run("Invoke checkRole", func(t *testing.T) {
 		req.Operation = "checkRole"
 		res, err := b.Invoke(ctx, req)
-		assertResponse(t, res, err, "Changed")
+		assertResponse(t, res, err, "Success")
 	})
 
 	t.Run("Invoke getRole", func(t *testing.T) {
 		req.Operation = "getRole"
+		res, err := b.Invoke(ctx, req)
+		assertResponse(t, res, err, "Success")
+	})
+
+	t.Run("Invoke checkStatus", func(t *testing.T) {
+		req.Operation = "checkStatus"
 		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -36,6 +37,8 @@ import (
 const (
 	connectionURLKey = "url"
 	commandSQLKey    = "sql"
+	PRIMARY          = "primary"
+	SECONDARY        = "secondary"
 )
 
 var (
@@ -74,7 +77,7 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.DBPort = pgOps.GetRunningPort()
 	pgOps.RegisterOperation(GetRoleOperation, pgOps.GetRoleOps)
 	// pgOps.RegisterOperation(GetLagOperation, pgOps.GetLagOps)
-	// pgOps.RegisterOperation(CheckStatusOperation, pgOps.CheckStatusOps)
+	pgOps.RegisterOperation(CheckStatusOperation, pgOps.CheckStatusOps)
 	pgOps.RegisterOperation(ExecOperation, pgOps.ExecOps)
 	pgOps.RegisterOperation(QueryOperation, pgOps.QueryOps)
 	return nil
@@ -84,7 +87,7 @@ func (pgOps *PostgresOperations) initIfNeed() bool {
 	if pgOps.db == nil {
 		go func() {
 			err := pgOps.InitDelay()
-			pgOps.Logger.Errorf("MySQl connection init failed: %v", err)
+			pgOps.Logger.Errorf("Postgres connection init failed: %v", err)
 		}()
 		return true
 	}
@@ -154,37 +157,77 @@ func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
-	var role string
 	var isRecovery bool
 	for rows.Next() {
 		if err = rows.Scan(&isRecovery); err != nil {
 			pgOps.Logger.Errorf("Role query error: %v", err)
-			return role, err
+			return "", err
 		}
 	}
-	role = "primary"
+	pgOps.OriRole = PRIMARY
 	if isRecovery {
-		role = "secondary"
+		pgOps.OriRole = SECONDARY
 	}
-	return role, nil
+	return pgOps.OriRole, nil
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
-		result["event"] = "ExecFailed"
+		result["event"] = OperationFailed
 		result["message"] = "no sql provided"
 		return result, nil
 	}
 	count, err := pgOps.exec(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Infof("exec error: %v", err)
-		result["event"] = "ExecFailed"
+		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = "ExecSuccess"
+		result["event"] = OperationSuccess
 		result["count"] = count
+	}
+	return result, nil
+}
+
+// CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
+func (pgOps *PostgresOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	rwSQL := fmt.Sprintf(`begin;
+create table if not exists kb_health_check(type int, check_ts timestamp, primary key(type));	
+insert into kb_health_check values(%d, CURRENT_TIMESTAMP) on conflict(type) do update set check_ts = CURRENT_TIMESTAMP;
+	commit;
+	select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType, CheckStatusType)
+	roSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType)
+	var err error
+	var data []byte
+	switch pgOps.OriRole {
+	case PRIMARY:
+		var count int64
+		count, err = pgOps.exec(ctx, rwSQL)
+		data = []byte(strconv.FormatInt(count, 10))
+	case SECONDARY:
+		data, err = pgOps.query(ctx, roSQL)
+	default:
+		msg := fmt.Sprintf("unknown role %s: %v", pgOps.OriRole, pgOps.DBRoles)
+		pgOps.Logger.Info(msg)
+		data = []byte(msg)
+	}
+
+	result := OpsResult{}
+	if err != nil {
+		pgOps.Logger.Infof("CheckStatus error: %v", err)
+		result["event"] = OperationFailed
+		result["message"] = err.Error()
+		if pgOps.CheckStatusFailedCount%pgOps.FailedEventReportFrequency == 0 {
+			pgOps.Logger.Infof("status checks failed %v times continuously", pgOps.CheckStatusFailedCount)
+			resp.Metadata[StatusCode] = OperationFailedHTTPCode
+		}
+		pgOps.CheckStatusFailedCount++
+	} else {
+		result["event"] = OperationSuccess
+		result["message"] = string(data)
+		pgOps.CheckStatusFailedCount = 0
 	}
 	return result, nil
 }
@@ -193,17 +236,17 @@ func (pgOps *PostgresOperations) QueryOps(ctx context.Context, req *bindings.Inv
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
-		result["event"] = "QueryFailed"
+		result["event"] = OperationFailed
 		result["message"] = "no sql provided"
 		return result, nil
 	}
 	data, err := pgOps.query(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Infof("Query error: %v", err)
-		result["event"] = "QueryFailed"
+		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = "QuerySuccess"
+		result["event"] = OperationSuccess
 		result["message"] = string(data)
 	}
 	return result, nil

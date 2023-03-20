@@ -67,6 +67,7 @@ const (
 	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
 	ClusterAccountLabelKey          = "account.kubeblocks.io/name"
 	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
+	KBManagedByKey                  = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -148,8 +149,16 @@ const (
 
 const (
 	// Container port name
-	ProbeHTTPPortName = "probe-http-port"
-	ProbeGRPCPortName = "probe-grpc-port"
+	ProbeHTTPPortName         = "probe-http-port"
+	ProbeGRPCPortName         = "probe-grpc-port"
+	RoleProbeContainerName    = "kb-checkrole"
+	StatusProbeContainerName  = "kb-checkstatus"
+	RunningProbeContainerName = "kb-runningcheck"
+
+	// the filedpath name used in event.InvolvedObject.FieldPath
+	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
+	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
+	ProbeCheckRunningPath = "spec.containers{" + RunningProbeContainerName + "}"
 
 	// KubeBlocksDataNodeLabelKey is the node label key of the built-in data node label
 	KubeBlocksDataNodeLabelKey = "kb-data"

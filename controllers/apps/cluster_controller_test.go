@@ -188,7 +188,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster initialized")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
-		existSvc := func(total int, svcName string) bool {
+		validateSvc := func(total int, svcName string) bool {
 			svcList := &corev1.ServiceList{}
 			Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
@@ -197,13 +197,24 @@ var _ = Describe("Cluster Controller", func() {
 			if len(svcList.Items) != total {
 				return false
 			}
-			return slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
+
+			idx := slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
 				return strings.HasSuffix(e.Name, svcName)
-			}) >= 0
+			})
+			if idx < 0 {
+				return false
+			}
+
+			svc := svcList.Items[idx]
+			if svc.Spec.Type == corev1.ServiceTypeLoadBalancer &&
+				svc.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyTypeLocal {
+				return false
+			}
+			return true
 		}
 
-		Expect(existSvc(4, testapps.ServiceVPCName)).Should(BeTrue())
-		Expect(existSvc(4, testapps.ServiceInternetName)).Should(BeTrue())
+		Expect(validateSvc(4, testapps.ServiceVPCName)).Should(BeTrue())
+		Expect(validateSvc(4, testapps.ServiceInternetName)).Should(BeTrue())
 
 		By("Delete a LoadBalancer service")
 		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
@@ -223,7 +234,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 
 		})).Should(Succeed())
-		Eventually(func() bool { return existSvc(3, testapps.ServiceVPCName) }).Should(BeFalse())
+		Eventually(validateSvc(3, testapps.ServiceVPCName)).Should(BeFalse())
 
 		By("Add the deleted LoadBalancer service back")
 		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
@@ -239,7 +250,7 @@ var _ = Describe("Cluster Controller", func() {
 				return
 			}
 		}))
-		Eventually(func() bool { return existSvc(4, testapps.ServiceVPCName) }).Should(BeTrue())
+		Eventually(validateSvc(4, testapps.ServiceVPCName)).Should(BeTrue())
 	}
 
 	checkAllServicesCreate := func() {
@@ -506,7 +517,7 @@ var _ = Describe("Cluster Controller", func() {
 				Name:      snapshotKey.Name,
 				Namespace: snapshotKey.Namespace,
 				Labels: map[string]string{
-					constant.AppManagedByLabelKey:   constant.AppName,
+					constant.KBManagedByKey:         "cluster",
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: comp.Name,
 				}},
@@ -849,17 +860,17 @@ var _ = Describe("Cluster Controller", func() {
 					Namespace: testCtx.DefaultNamespace,
 				},
 				Reason:  "Unhealthy",
-				Message: `Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Follower"}`,
+				Message: `Readiness probe failed: {"event":"Success","originalRole":"Leader","role":"Follower"}`,
 				InvolvedObject: corev1.ObjectReference{
 					Name:      pod.Name,
 					Namespace: testCtx.DefaultNamespace,
 					UID:       pod.UID,
-					FieldPath: "spec.containers{kb-rolechangedcheck}",
+					FieldPath: constant.ProbeCheckRolePath,
 				},
 			}
 			events = append(events, event)
 		}
-		events[0].Message = `Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Leader"}`
+		events[0].Message = `Readiness probe failed: {"event":"Success","originalRole":"Leader","role":"Leader"}`
 		return events
 	}
 
@@ -1041,7 +1052,7 @@ var _ = Describe("Cluster Controller", func() {
 				Labels: map[string]string{
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: mysqlCompName,
-					constant.AppManagedByLabelKey:   constant.AppName,
+					constant.KBManagedByKey:         "cluster",
 				},
 			},
 			Spec: dataprotectionv1alpha1.BackupSpec{

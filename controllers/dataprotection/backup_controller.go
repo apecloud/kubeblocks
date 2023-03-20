@@ -488,6 +488,10 @@ func (r *BackupReconciler) ensureVolumeSnapshotReady(reqCtx intctrlutil.RequestC
 	}
 	ready := false
 	if exists && snap.Status != nil {
+		// check if snapshot status throw error, e.g. csi does not support volume snapshot
+		if snap.Status.Error != nil && snap.Status.Error.Message != nil {
+			return ready, errors.New(*snap.Status.Error.Message)
+		}
 		if snap.Status.ReadyToUse != nil {
 			ready = *(snap.Status.ReadyToUse)
 		}

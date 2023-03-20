@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -53,6 +54,7 @@ var (
 type baseOptions struct {
 	cloudProvider string
 	region        string
+	startTime     time.Time
 }
 
 type initOptions struct {
@@ -136,6 +138,7 @@ func (o *initOptions) local() error {
 	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
 	provider.VerboseLog(o.verbose)
 
+	o.startTime = time.Now()
 	// Set up K3s as KubeBlocks control plane cluster
 	spinner := util.Spinner(o.Out, "%-40s", "Create k3d cluster: "+k8sClusterName)
 	defer spinner(false)
@@ -169,7 +172,19 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 	spinner(true)
 
 	// Print guide information
-	printGuide(true, k8sClusterName)
+	fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n\n")
+	if k8sClusterName != "" {
+		fmt.Fprintf(os.Stdout, "Kubernetes cluster \"%s\" has been created.\n", k8sClusterName)
+	}
+	fmt.Fprintf(os.Stdout, "Cluster \"%s\" has been created.\n", kbClusterName)
+
+	// output elapsed time
+	if !o.startTime.IsZero() {
+		fmt.Fprintf(o.Out, "Elapsed time: %s\n", time.Since(o.startTime).Truncate(time.Second))
+	}
+
+	printGuide()
+
 	return nil
 }
 
@@ -180,6 +195,11 @@ func (o *initOptions) cloud() error {
   additional charges. We are not responsible for any charges you may incur.
 `)
 
+	fmt.Fprintf(o.Out, `
+The whole process takes about %s, please wait patiently,
+if it takes a long time, please check the network environment and try again.
+`, printer.BoldRed("20~30 minutes"))
+
 	// confirm to run
 	fmt.Fprintf(o.Out, "\nDo you want to perform this action?\n  Only 'yes' will be accepted to approve.\n\n")
 	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
@@ -188,8 +208,8 @@ func (o *initOptions) cloud() error {
 		return cmdutil.ErrExit
 	}
 
-	fmt.Fprintln(o.Out)
-
+	o.startTime = time.Now()
+	printer.PrintBlankLine(o.Out)
 	cpPath, err := cloudProviderRepoDir()
 	if err != nil {
 		return err
@@ -230,18 +250,12 @@ func (o *initOptions) cloud() error {
 		return err
 	}
 
+	printer.PrintBlankLine(o.Out)
 	// CreateK8sCluster KubeBlocks and create cluster
 	return o.installKBAndCluster(clusterName)
 }
 
-func printGuide(init bool, k8sClusterName string) {
-	if init {
-		fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n\n")
-		if k8sClusterName != "" {
-			fmt.Fprintf(os.Stdout, "Kubernetes cluster \"%s\" has been created.\n", k8sClusterName)
-		}
-		fmt.Fprintf(os.Stdout, "Cluster \"%s\" has been created.\n", kbClusterName)
-	}
+func printGuide() {
 	fmt.Fprintf(os.Stdout, guideStr, kbClusterName)
 }
 
@@ -267,6 +281,10 @@ func (o *initOptions) installKubeBlocks() error {
 		Monitor: true,
 		Quiet:   true,
 		Check:   true,
+	}
+	if o.cloudProvider == cp.Local {
+		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
+			"snapshot-controller.enabled=true", "csi-hostpath-driver.enabled=true")
 	}
 	return insOpts.Install()
 }

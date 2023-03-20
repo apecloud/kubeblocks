@@ -115,7 +115,7 @@ func init() {
 
 // Handle is the event handler for the cluster status event.
 func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != component.ProbeRoleChangedCheckPath {
+	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 

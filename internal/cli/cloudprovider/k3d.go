@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/docker/go-connections/nat"
+	"github.com/k3d-io/k3d/v5/pkg/actions"
 	k3dClient "github.com/k3d-io/k3d/v5/pkg/client"
 	config "github.com/k3d-io/k3d/v5/pkg/config/v1alpha4"
 	l "github.com/k3d-io/k3d/v5/pkg/logger"
@@ -273,7 +274,7 @@ func buildClusterConfig(clusterName string, opts k3d.ClusterCreateOpts) (k3d.Clu
 		Role:       k3d.ServerRole,
 		Image:      K3sImage,
 		ServerOpts: k3d.ServerOpts{},
-		Args:       []string{"--disable=metrics-server", "--disable=traefik"},
+		Args:       []string{"--disable=metrics-server", "--disable=traefik", "--disable=local-storage"},
 	}
 
 	nodes = append(nodes, &serverNode)
@@ -368,6 +369,19 @@ func setUpK3d(ctx context.Context, cluster *config.ClusterConfig) error {
 			break
 		}
 	}
+
+	// exec "mount --make-rshared /" to fix csi driver plugins crash
+	cluster.ClusterCreateOpts.NodeHooks = append(cluster.ClusterCreateOpts.NodeHooks, k3d.NodeHook{
+		Stage: k3d.LifecycleStagePostStart,
+		Action: actions.ExecAction{
+			Runtime: runtimes.SelectedRuntime,
+			Command: []string{
+				"sh", "-c", "mount --make-rshared /",
+			},
+			Retries:     0,
+			Description: "Inject 'mount --make-rshared /' for csi driver",
+		},
+	})
 
 	if err := k3dClient.ClusterRun(ctx, runtimes.SelectedRuntime, cluster); err != nil {
 		return err

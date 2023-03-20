@@ -7,7 +7,7 @@ sidebar_position: 7
 # Handle an exception
 When there is an exception during your operation, you can perform the following procedure to solve it.
 
-***Steps:***
+## Steps
 
 1. Check the cluster status. Fill in the name of the cluster you want to check and run the command below.
    ```bash
@@ -29,7 +29,7 @@ When there is an exception during your operation, you can perform the following 
    
    You can check the cluster's status for more information.
 
-***Fallback strategies***
+## Fallback strategies
 
 If the above operation can not solve the problem, try the following steps:
   - Restart this cluster. If the restart fails, you can delete the pod manually.

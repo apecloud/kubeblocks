@@ -4,5 +4,5 @@ metadata:
   name: {{ include "nyancat.fullname" . }}
 rules:
   - apiGroups: [""]
-    resources: ["services", "pods"]
+    resources: ["services", "pods", "secrets"]
     verbs: ["get", "list"]

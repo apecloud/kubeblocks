@@ -77,6 +77,12 @@ var (
 			Label:      "app=prometheus,component=server,release=kb-addon-prometheus",
 			TargetPort: "19090",
 		},
+		{
+			Name:       "kubeblocks-nyancat",
+			AddonName:  "kb-addon-nyancat",
+			Label:      "app.kubernetes.io/instance=kb-addon-nyancat",
+			TargetPort: "8087",
+		},
 	}
 )
 

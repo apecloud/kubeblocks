@@ -30,7 +30,6 @@ import (
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -42,6 +41,7 @@ import (
 	// +kubebuilder:scaffold:imports
 
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -100,27 +100,9 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
-	scheme := scheme.Scheme
-	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: "0",
-	})
-	Expect(err).ToNot(HaveOccurred())
 
-	err = (&AddonReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("addon-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
-
-	go func() {
-		defer GinkgoRecover()
-		err = k8sManager.Start(ctx)
-		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
-	}()
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv, "extensions-test")
+	testapps.ToIgnoreFinalizers = append(testapps.ToIgnoreFinalizers, addonFinalizerName)
 })
 
 var _ = AfterSuite(func() {

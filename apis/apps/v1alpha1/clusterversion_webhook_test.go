@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -32,8 +30,6 @@ var _ = Describe("clusterVersion webhook", func() {
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "webhook-mysql-definition-" + randomStr
 		clusterVersionName    = "webhook-mysql-clusterversion-" + randomStr
-		timeout               = time.Second * 10
-		interval              = time.Second
 	)
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
@@ -70,7 +66,7 @@ var _ = Describe("clusterVersion webhook", func() {
 				clusterVersion.Spec.ComponentVersions[1].ComponentDefRef = "proxy"
 				err := testCtx.CheckedCreateObj(ctx, clusterVersion)
 				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			By("By testing create a new clusterVersion with invalid config template")
 			clusterVersionDup := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName+"-for-config")

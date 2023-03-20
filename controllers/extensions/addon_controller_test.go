@@ -18,7 +18,6 @@ package extensions
 
 import (
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,7 +28,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -39,11 +40,6 @@ import (
 )
 
 var _ = Describe("Addon controller", func() {
-	const (
-		timeout  = time.Second * 10
-		interval = time.Second
-	)
-
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -63,6 +59,15 @@ var _ = Describe("Addon controller", func() {
 		// delete rest mocked objects
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
+
+		// By("deleting the Namespace to perform the tests")
+		// Eventually(func(g Gomega) {
+		// 	namespace := testCtx.GetNamespaceObj()
+		// 	err := testCtx.Cli.Delete(testCtx.Ctx, &namespace)
+		// 	g.Expect(client.IgnoreNotFound(err)).To(Not(HaveOccurred()))
+		// 	g.Expect(client.IgnoreNotFound(testCtx.Cli.Get(
+		// 		testCtx.Ctx, testCtx.GetNamespaceKey(), &namespace))).To(Not(HaveOccurred()))
+		// }).Should(Succeed())
 	}
 
 	BeforeEach(func() {
@@ -77,8 +82,10 @@ var _ = Describe("Addon controller", func() {
 		var addon *extensionsv1alpha1.Addon
 		var key types.NamespacedName
 		BeforeEach(func() {
+			cleanEnv()
 			const distro = "kubeblocks"
 			testutil.SetKubeServerVersionWithDistro("1", "24", "0", distro)
+			Expect(client.IgnoreAlreadyExists(testCtx.CreateNamespace())).To(Not(HaveOccurred()))
 		})
 
 		AfterEach(func() {
@@ -88,10 +95,55 @@ var _ = Describe("Addon controller", func() {
 			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
 		})
 
-		fakeCompletedJob := func(g Gomega, jobKey client.ObjectKey) {
+		doReconcile := func() (ctrl.Result, error) {
+			addonReconciler := &AddonReconciler{
+				Client: testCtx.Cli,
+				Scheme: testCtx.Cli.Scheme(),
+			}
+			req := reconcile.Request{
+				NamespacedName: key,
+			}
+			return addonReconciler.Reconcile(ctx, req)
+		}
+
+		doReconcileOnce := func(g Gomega) {
+			By("Reconciling once")
+			result, err := doReconcile()
+			Expect(err).To(Not(HaveOccurred()))
+			Expect(result.Requeue).Should(BeFalse())
+		}
+
+		getJob := func(g Gomega, jobKey client.ObjectKey) *batchv1.Job {
 			job := &batchv1.Job{}
-			g.Eventually(testCtx.Cli.Get(ctx, jobKey, job)).Should(Succeed())
+			g.Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				g.Expect(testCtx.Cli.Get(ctx, jobKey, job)).Should(Succeed())
+			}).Should(Succeed())
+			return job
+		}
+
+		fakeCompletedJob := func(g Gomega, jobKey client.ObjectKey) {
+			job := getJob(g, jobKey)
 			job.Status.Succeeded = 1
+			job.Status.Active = 0
+			job.Status.Failed = 0
+			g.Expect(testCtx.Cli.Status().Update(ctx, job)).Should(Succeed())
+		}
+
+		fakeFailedJob := func(g Gomega, jobKey client.ObjectKey) {
+			job := getJob(g, jobKey)
+			job.Status.Failed = 1
+			job.Status.Active = 0
+			job.Status.Succeeded = 0
+			g.Expect(testCtx.Cli.Status().Update(ctx, job)).Should(Succeed())
+		}
+
+		fakeActiveJob := func(g Gomega, jobKey client.ObjectKey) {
+			job := getJob(g, jobKey)
+			job.Status.Active = 1
+			job.Status.Succeeded = 0
+			job.Status.Failed = 0
 			g.Expect(testCtx.Cli.Status().Update(ctx, job)).Should(Succeed())
 		}
 
@@ -105,21 +157,59 @@ var _ = Describe("Addon controller", func() {
 			g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 		}
 
-		fakeIntallationCompletedJob := func(expectedObservedGeneration int) {
+		fakeInstallationCompletedJob := func(expectedObservedGeneration int) {
 			jobKey := client.ObjectKey{
 				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 				Name:      getInstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
 				fakeCompletedJob(g, jobKey)
-			}, timeout, interval).Should(Succeed())
+			}).Should(Succeed())
 			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
 				addon = &extensionsv1alpha1.Addon{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabled))
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(expectedObservedGeneration))
 				checkedJobDeletion(g, jobKey)
-			}, timeout, interval).Should(Succeed())
+			}).Should(Succeed())
+		}
+
+		fakeInstallationFailedJob := func(expectedObservedGeneration int) {
+			jobKey := client.ObjectKey{
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+				Name:      getInstallJobName(addon),
+			}
+			Eventually(func(g Gomega) {
+				fakeFailedJob(g, jobKey)
+			}).Should(Succeed())
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(expectedObservedGeneration))
+			}).Should(Succeed())
+		}
+
+		fakeUninstallationFailedJob := func(expectedObservedGeneration int) {
+			jobKey := client.ObjectKey{
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+				Name:      getUninstallJobName(addon),
+			}
+			Eventually(func(g Gomega) {
+				fakeFailedJob(g, jobKey)
+			}).Should(Succeed())
+			Eventually(func(g Gomega) {
+				result, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				g.Expect(result.Requeue).To(BeTrue())
+			}).Should(Succeed())
+			Eventually(func(g Gomega) {
+				checkedJobDeletion(g, jobKey)
+			}).Should(Succeed())
 		}
 
 		createAddonSpecWithRequiredAttributes := func(modifiers func(newOjb *extensionsv1alpha1.Addon)) {
@@ -136,40 +226,67 @@ var _ = Describe("Addon controller", func() {
 			Expect(addon.Spec.DefaultInstallValues).ShouldNot(BeEmpty())
 		}
 
-		enablingPhaseCheck := func(genID int) {
+		progressingPhaseCheck := func(genID int, expectPhase extensionsv1alpha1.AddonPhase, handler func()) {
 			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				Expect(err).To(Not(HaveOccurred()))
 				addon = &extensionsv1alpha1.Addon{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Generation).Should(BeEquivalentTo(genID))
 				g.Expect(addon.Spec.InstallSpec).ShouldNot(BeNil())
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(genID))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
-			}, timeout, interval).Should(Succeed())
+				g.Expect(addon.Status.Phase).Should(Equal(expectPhase))
+			}).Should(Succeed())
+
+			if handler == nil {
+				return
+			}
+
+			handler()
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				Expect(err).To(Not(HaveOccurred()))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Generation).Should(BeEquivalentTo(genID))
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(genID))
+				g.Expect(addon.Status.Phase).Should(Equal(expectPhase))
+			}).Should(Succeed())
 		}
 
-		It("should successfully reconcile a custom resource for Addon", func() {
-			By("By create an addon")
-			createAddonSpecWithRequiredAttributes(nil)
+		enablingPhaseCheck := func(genID int) {
+			progressingPhaseCheck(genID, extensionsv1alpha1.AddonEnabling, func() {
+				By("By fake active install job")
+				jobKey := client.ObjectKey{
+					Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+					Name:      getInstallJobName(addon),
+				}
+				Eventually(func(g Gomega) {
+					fakeActiveJob(g, jobKey)
+				}).Should(Succeed())
+			})
+		}
 
-			By("By checking status.observedGeneration and status.phase=disabled")
-			Eventually(func(g Gomega) {
-				addon = &extensionsv1alpha1.Addon{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
-				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
-			}, timeout, interval).Should(Succeed())
+		disablingPhaseCheck := func(genID int) {
+			progressingPhaseCheck(genID, extensionsv1alpha1.AddonDisabling, nil)
+		}
 
-			By("By enabling addon with default install")
-			defaultInstall := addon.Spec.DefaultInstallValues[0].AddonInstallSpec
-			addon.Spec.InstallSpec = defaultInstall.DeepCopy()
-			addon.Spec.InstallSpec.Enabled = true
+		checkAddonDeleted := func(g Gomega) {
+			addon = &extensionsv1alpha1.Addon{}
+			err := testCtx.Cli.Get(ctx, key, addon)
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+		}
+
+		disableAddon := func(genID int) {
+			addon = &extensionsv1alpha1.Addon{}
+			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+			addon.Spec.InstallSpec.Enabled = false
 			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
-			enablingPhaseCheck(2)
+			disablingPhaseCheck(genID)
+		}
 
-			By("By enabled addon with fake completed install job status")
-			fakeIntallationCompletedJob(2)
-
-			By("By disabling enabled addon")
+		fakeHelmRelease := func() {
 			// create fake helm release
 			helmRelease := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -182,37 +299,62 @@ var _ = Describe("Addon controller", func() {
 				},
 				Type: "helm.sh/release.v1",
 			}
-			Expect(testCtx.Cli.Create(ctx, helmRelease)).Should(Succeed())
-			addon.Spec.InstallSpec = nil
-			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
-			Eventually(func(g Gomega) {
-				addon = &extensionsv1alpha1.Addon{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
-				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(3))
-				// g.Expect(addon.Status.Phase).Should(BeElementOf(
-				//	[]extensionsv1alpha1.AddonPhase{
-				//		extensionsv1alpha1.AddonDisabling,
-				//		extensionsv1alpha1.AddonDisabled,
-				//	}))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabling))
-			}, timeout, interval).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, helmRelease)).Should(Succeed())
+		}
 
-			By("By disabled enabled addon with fake completed uninstall job status")
-			jobKey := client.ObjectKey{
+		It("should successfully reconcile a custom resource for Addon", func() {
+			By("By create an addon")
+			createAddonSpecWithRequiredAttributes(nil)
+
+			By("By checking status.observedGeneration and status.phase=disabled")
+			Eventually(func(g Gomega) {
+				doReconcileOnce(g)
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
+			}).Should(Succeed())
+
+			By("By enabling addon with default install")
+			defaultInstall := addon.Spec.DefaultInstallValues[0].AddonInstallSpec
+			addon.Spec.InstallSpec = defaultInstall.DeepCopy()
+			addon.Spec.InstallSpec.Enabled = true
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
+			enablingPhaseCheck(2)
+
+			By("By enabled addon with fake completed install job status")
+			fakeInstallationCompletedJob(2)
+
+			By("By disabling enabled addon")
+			// create fake helm release
+			fakeHelmRelease()
+			disableAddon(3)
+
+			By("By disabled an enabled addon with fake completed uninstall job status")
+			uninstallJobKey := client.ObjectKey{
 				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 				Name:      getUninstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
-				fakeCompletedJob(g, jobKey)
-			}, timeout, interval).Should(Succeed())
+				fakeCompletedJob(g, uninstallJobKey)
+			}).Should(Succeed())
+
 			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
 				addon = &extensionsv1alpha1.Addon{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(3))
 				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
-				checkedJobDeletion(g, jobKey)
-			}, timeout, interval).Should(Succeed())
+				checkedJobDeletion(g, uninstallJobKey)
+			}).Should(Succeed())
 
+			By("By delete addon with disabled status")
+			Expect(testCtx.Cli.Delete(ctx, addon)).To(Not(HaveOccurred()))
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+			}).Should(Succeed())
 		})
 
 		It("should successfully reconcile a custom resource for Addon with autoInstall=true", func() {
@@ -224,8 +366,125 @@ var _ = Describe("Addon controller", func() {
 			By("By addon autoInstall auto added")
 			enablingPhaseCheck(2)
 
-			By("By enabled addon with fake completed install job status")
-			fakeIntallationCompletedJob(2)
+			By("By enable addon with fake completed install job status")
+			fakeInstallationCompletedJob(2)
+
+			By("By delete addon with enabled status")
+			Expect(testCtx.Cli.Delete(ctx, addon)).To(Not(HaveOccurred()))
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				checkAddonDeleted(g)
+			}).Should(Succeed())
+		})
+
+		It("should successfully reconcile a custom resource for Addon with autoInstall=true with failed uninstall job", func() {
+			By("By create an addon with auto-install")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+			})
+
+			By("By addon autoInstall auto added")
+			enablingPhaseCheck(2)
+
+			By("By enable addon with fake completed install job status")
+			fakeInstallationCompletedJob(2)
+
+			By("By disabling enabled addon")
+			fakeHelmRelease()
+			disableAddon(3)
+
+			By("By failed an uninstallation job")
+			fakeUninstallationFailedJob(3)
+
+			By("By delete addon with disabling status")
+			Expect(testCtx.Cli.Delete(ctx, addon)).To(Not(HaveOccurred()))
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				checkAddonDeleted(g)
+			}).Should(Succeed())
+		})
+
+		It("should successfully reconcile a custom resource for Addon deletion while enabling", func() {
+			By("By create an addon with auto-install")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+			})
+
+			By("By addon autoInstall auto added")
+			enablingPhaseCheck(2)
+
+			By("By delete addon with enabling status")
+			Expect(testCtx.Cli.Delete(ctx, addon)).To(Not(HaveOccurred()))
+			jobKey := client.ObjectKey{
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+				Name:      getUninstallJobName(addon),
+			}
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				checkAddonDeleted(g)
+				checkedJobDeletion(g, jobKey)
+			}).Should(Succeed())
+		})
+
+		It("should successfully reconcile a custom resource for Addon deletion while disabling", func() {
+			By("By create an addon with auto-install")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+			})
+
+			By("By addon autoInstall auto added")
+			enablingPhaseCheck(2)
+
+			By("By enable addon with fake completed install job status")
+			fakeInstallationCompletedJob(2)
+
+			By("By disabling addon")
+			disableAddon(3)
+
+			By("By delete addon with disabling status")
+			Expect(testCtx.Cli.Delete(ctx, addon)).To(Not(HaveOccurred()))
+			jobKey := client.ObjectKey{
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+				Name:      getUninstallJobName(addon),
+			}
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				checkAddonDeleted(g)
+				checkedJobDeletion(g, jobKey)
+			}).Should(Succeed())
+		})
+
+		It("should successfully reconcile a custom resource for Addon with autoInstall=true with status.phase=Failed", func() {
+			By("By create an addon with auto-install")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+			})
+
+			By("By addon autoInstall auto added")
+			enablingPhaseCheck(2)
+
+			By("By enabled addon with fake failed install job status")
+			fakeInstallationFailedJob(2)
+
+			By("By disabling addon with failed status")
+			disableAddon(3)
+
+			By("By delete addon with failed status")
+			Expect(testCtx.Cli.Delete(ctx, addon)).To(Not(HaveOccurred()))
+			jobKey := client.ObjectKey{
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+				Name:      getUninstallJobName(addon),
+			}
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				checkAddonDeleted(g)
+				checkedJobDeletion(g, jobKey)
+			}).Should(Succeed())
 		})
 
 		It("should successfully reconcile a custom resource for Addon run job with controller manager schedule settings", func() {
@@ -249,13 +508,15 @@ var _ = Describe("Addon controller", func() {
 				Name:      getInstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
 				job := &batchv1.Job{}
 				g.Eventually(testCtx.Cli.Get(ctx, jobKey, job)).Should(Succeed())
 				g.Expect(job.Spec.Template.Spec.Tolerations).ShouldNot(BeEmpty())
 				g.Expect(job.Spec.Template.Spec.NodeSelector).ShouldNot(BeEmpty())
 				g.Expect(job.Spec.Template.Spec.Affinity).ShouldNot(BeNil())
 				g.Expect(job.Spec.Template.Spec.Affinity.NodeAffinity).ShouldNot(BeNil())
-			}, timeout, interval).Should(Succeed())
+			}).Should(Succeed())
 		})
 
 		It("should successfully reconcile a custom resource for Addon with no matching installable selector", func() {
@@ -266,12 +527,13 @@ var _ = Describe("Addon controller", func() {
 
 			By("By checking status.observedGeneration and status.phase=disabled")
 			Eventually(func(g Gomega) {
+				doReconcileOnce(g)
 				addon = &extensionsv1alpha1.Addon{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
 				g.Expect(addon.Status.Conditions).ShouldNot(BeEmpty())
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
-			}, timeout, interval).Should(Succeed())
+			}).Should(Succeed())
 
 			By("By addon with failed installable check")
 			// "extensions.kubeblocks.io/skip-installable-check"
@@ -309,7 +571,7 @@ var _ = Describe("Addon controller", func() {
 			enablingPhaseCheck(2)
 
 			By("By enabled addon with fake completed install job status")
-			fakeIntallationCompletedJob(2)
+			fakeInstallationCompletedJob(2)
 		})
 	})
 })

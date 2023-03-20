@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,8 +41,6 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		clusterName        = "mysql-" + randomStr
 		clusterDefName     = "mysql-definition-" + randomStr
 		clusterVersionName = "mysql-cluster-version-" + randomStr
-		timeout            = time.Second * 10
-		interval           = time.Second
 		consensusCompName  = "consensus"
 		consensusCompType  = "consensus"
 	)
@@ -81,13 +80,13 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("test conditionsError phase")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeProvisioningStarted)
-				condition.LastTransitionTime = metav1.Time{Time: time.Now().Add(-(ClusterControllerErrorDuration + time.Second))}
+				condition.LastTransitionTime = metav1.Time{Time: time.Now().Add(-(time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)) + time.Second))}
 				tmpCluster.SetStatusCondition(*condition)
 			})()).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Status.Phase == appsv1alpha1.ConditionsErrorPhase).Should(BeTrue())
-			}), timeout*2, interval).Should(Succeed())
+			})).Should(Succeed())
 
 			By("test when clusterVersion not Available")
 			_ = testapps.CreateConsensusMysqlClusterDef(testCtx, clusterDefName, consensusCompType)
@@ -99,7 +98,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(g Gomega, clusterVersion *appsv1alpha1.ClusterVersion) {
 				g.Expect(clusterVersion.Status.Phase == appsv1alpha1.UnavailablePhase).Should(BeTrue())
-			}), timeout*2, interval).Should(Succeed())
+			})).Should(Succeed())
 
 			// trigger reconcile
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
@@ -121,7 +120,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(g Gomega, clusterVersion *appsv1alpha1.ClusterVersion) {
 				g.Expect(clusterVersion.Status.Phase == appsv1alpha1.AvailablePhase).Should(BeTrue())
-			}), timeout*2, interval).Should(Succeed())
+			})).Should(Succeed())
 
 			// trigger reconcile
 			updateClusterAnnotation(cluster)
@@ -129,7 +128,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, cluster *appsv1alpha1.Cluster) {
 				condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
 				g.Expect(condition != nil && condition.Reason == ReasonPreCheckFailed).Should(BeTrue())
-			}), timeout*2, interval).Should(Succeed())
+			})).Should(Succeed())
 
 			By("reset and waiting cluster to Creating")
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
@@ -138,7 +137,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Status.Phase == appsv1alpha1.CreatingPhase).Should(BeTrue())
-			}), timeout*2, interval).Should(Succeed())
+			})).Should(Succeed())
 
 			By("test apply resources failed")
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
@@ -148,7 +147,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeApplyResources)
 				g.Expect(condition != nil && condition.Reason == ReasonApplyResourcesFailed).Should(BeTrue())
-			}), timeout*2, interval).Should(Succeed())
+			})).Should(Succeed())
 		})
 	})
 

@@ -41,7 +41,6 @@ type ClusterVersionSpec struct {
 // ClusterVersionStatus defines the observed state of ClusterVersion
 type ClusterVersionStatus struct {
 	// phase - in list of [Available,Unavailable]
-	// +kubebuilder:validation:Enum={Available,Unavailable}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -56,6 +55,10 @@ type ClusterVersionStatus struct {
 	// clusterDefGeneration represents the generation number of ClusterDefinition referenced.
 	// +optional
 	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
+}
+
+func (r ClusterVersionStatus) GetTerminalPhases() []Phase {
+	return []Phase{AvailablePhase}
 }
 
 // ClusterComponentVersion is an application version component spec.

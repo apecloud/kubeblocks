@@ -44,6 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
@@ -79,6 +80,7 @@ var _ = BeforeSuite(func() {
 		}))
 	}
 
+	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 10)
 	ctx, cancel = context.WithCancel(context.TODO())
 	logger = logf.FromContext(ctx).WithValues()
 	logger.Info("logger start")

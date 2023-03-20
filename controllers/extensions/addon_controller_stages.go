@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,8 +38,55 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+type stageCtx struct {
+	reqCtx     *intctrlutil.RequestCtx
+	reconciler *AddonReconciler
+	next       ctrlerihandler.Handler
+}
+
+const (
+	resultValueKey  = "result"
+	errorValueKey   = "err"
+	operandValueKey = "operand"
+)
+
 func init() {
 	viper.SetDefault(addonSANameKey, "kubeblocks-addon-installer")
+}
+
+func (r *stageCtx) setReconciled() {
+	res, err := intctrlutil.Reconciled()
+	r.updateResultNErr(&res, err)
+}
+
+func (r *stageCtx) setRequeueAfter(duration time.Duration, msg string) {
+	res, err := intctrlutil.RequeueAfter(time.Second, r.reqCtx.Log, msg)
+	r.updateResultNErr(&res, err)
+}
+
+func (r *stageCtx) setRequeueWithErr(err error, msg string) {
+	res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, msg)
+	r.updateResultNErr(&res, err)
+}
+
+func (r *stageCtx) updateResultNErr(res *ctrl.Result, err error) {
+	r.reqCtx.UpdateCtxValue(errorValueKey, err)
+	r.reqCtx.UpdateCtxValue(resultValueKey, res)
+}
+
+func (r *stageCtx) doReturn() (*ctrl.Result, error) {
+	res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result)
+	err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error)
+	return res, err
+}
+
+func (r *stageCtx) process(processor func(*extensionsv1alpha1.Addon)) {
+	res, _ := r.doReturn()
+	if res != nil {
+		return
+	}
+	addon := r.reqCtx.Ctx.Value(operandValueKey).(*extensionsv1alpha1.Addon)
+	processor(addon)
 }
 
 type fetchNDeletionCheckStage struct {
@@ -150,7 +198,7 @@ func (r *deletionStage) Handle(ctx context.Context) {
 				return
 			}
 			r.reqCtx.Log.V(1).Info("progress to", "phase", phase)
-			r.reconciler.Recorder.Event(addon, "Normal", reason,
+			r.reconciler.Event(addon, "Normal", reason,
 				fmt.Sprintf("Progress to %s phase", phase))
 			r.setReconciled()
 		}
@@ -200,7 +248,7 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 			return
 		}
 		if addon.Annotations != nil && addon.Annotations[SkipInstallableCheck] == "true" {
-			r.reconciler.Recorder.Event(addon, "Warning", InstallableCheckSkipped,
+			r.reconciler.Event(addon, "Warning", InstallableCheckSkipped,
 				"Installable check skipped.")
 			return
 		}
@@ -228,7 +276,7 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 				r.setRequeueWithErr(err, "")
 				return
 			}
-			r.reconciler.Recorder.Event(addon, "Warning", InstallableRequirementUnmatched,
+			r.reconciler.Event(addon, "Warning", InstallableRequirementUnmatched,
 				fmt.Sprintf("Does not meet installable requirements for key %v", s))
 			r.setReconciled()
 			return
@@ -256,7 +304,7 @@ func (r *autoInstallCheckStage) Handle(ctx context.Context) {
 				r.setRequeueWithErr(err, "")
 				return
 			}
-			r.reconciler.Recorder.Event(addon, "Normal", AddonAutoInstall,
+			r.reconciler.Event(addon, "Normal", AddonAutoInstall,
 				"Addon enabled auto-install")
 			r.setReconciled()
 		}
@@ -292,7 +340,7 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 				r.setRequeueWithErr(err, "")
 				return
 			}
-			r.reconciler.Recorder.Event(addon, "Normal", reason,
+			r.reconciler.Event(addon, "Normal", reason,
 				fmt.Sprintf("Progress to %s phase", phase))
 			r.setReconciled()
 		}
@@ -396,7 +444,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 					r.setRequeueWithErr(err, "")
 					return
 				}
-				r.reconciler.Recorder.Event(addon, "Warning", InstallationFailed,
+				r.reconciler.Event(addon, "Warning", InstallationFailed,
 					fmt.Sprintf("Installation failed, do inspect error from jobs.batch %s", key.String()))
 				r.setReconciled()
 				return
@@ -561,7 +609,7 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 			// info. from conditions.
 			if helmUninstallJob.Status.Failed > 0 {
 				r.reqCtx.Log.V(1).Info("helm uninstall job failed", "job", key)
-				r.reconciler.Recorder.Event(addon, "Warning", UninstallationFailed,
+				r.reconciler.Event(addon, "Warning", UninstallationFailed,
 					fmt.Sprintf("Uninstallation failed, do inspect error from jobs.batch %s",
 						key.String()))
 
@@ -678,7 +726,7 @@ func (r *terminalStateStage) Handle(ctx context.Context) {
 				r.setRequeueWithErr(err, "")
 				return
 			}
-			r.reconciler.Recorder.Event(addon, "Normal", reason,
+			r.reconciler.Event(addon, "Normal", reason,
 				fmt.Sprintf("Progress to %s phase", phase))
 			r.setReconciled()
 		}

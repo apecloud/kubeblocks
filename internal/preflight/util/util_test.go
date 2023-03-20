@@ -17,8 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -27,8 +25,6 @@ import (
 )
 
 var _ = Describe("util_test", func() {
-	var timeout = time.Second * 10
-
 	It("IsExcluded test", func() {
 		Eventually(func(g Gomega) {
 			By("tests with normal case, and expect success")
@@ -45,7 +41,7 @@ var _ = Describe("util_test", func() {
 			res, err := IsExcluded(cornerTest)
 			g.Expect(err).To(HaveOccurred())
 			g.Expect(res).Should(Equal(false))
-		}, timeout).Should(Succeed())
+		}).Should(Succeed())
 	})
 
 	It("TitleOrDefault test", func() {
@@ -58,7 +54,7 @@ var _ = Describe("util_test", func() {
 			g.Expect(res).Should(Equal("default"))
 			res = TitleOrDefault(troubleshoot.AnalyzeMeta{CheckName: "checkName"}, "default")
 			g.Expect(res).Should(Equal("checkName"))
-		}, timeout).Should(Succeed())
+		}).Should(Succeed())
 	})
 
 })

@@ -48,7 +48,7 @@ func ResetToIgnoreFinalizers() {
 		"kubernetes.io/pvc-protection",
 		// REVIEW: adding following is a hack, if tests are running as
 		// controller-runtime manager setup.
-		"configuration.kubeblocks.io/finalizer",
+		constant.ConfigurationTemplateFinalizerName,
 		"cluster.kubeblocks.io/finalizer",
 	}
 }

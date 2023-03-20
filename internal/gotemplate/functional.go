@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	GoTemplateLibraryAnnotationKey = "configuration.kubeblocks.io/go-template-library"
+	GoTemplateLibraryAnnotationKey = "config.kubeblocks.io/go-template-library"
 )
 
 func isSystemFuncsCM(cm *corev1.ConfigMap) bool {

@@ -152,9 +152,9 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 			constant.AppNameLabelKey, clusterName,
 			constant.AppInstanceLabelKey, clusterName,
 			constant.KBAppComponentLabelKey, mysqlConsensusType,
-			constant.CMConfigurationTplNameLabelKey, mysqlConfigName,
+			constant.CMConfigurationTemplateNameLabelKey, mysqlConfigName,
 			constant.CMConfigurationConstraintsNameLabelKey, mysqlConfigConstraintName,
-			constant.CMConfigurationProviderTplLabelKey, mysqlConfigName,
+			constant.CMConfigurationSpecProviderLabelKey, mysqlConfigName,
 			constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 		))
 

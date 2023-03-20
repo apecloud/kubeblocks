@@ -323,8 +323,8 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 		return nil, err
 	}
 
-	if sts, ok := obj.(*appsv1.StatefulSet); ok {
-		updateStatefulLabelsWithTemplate(sts, renderWrapper.templateLabels)
+	if len(renderWrapper.templateAnnotations) > 0 {
+		updateResourceAnnotationsWithTemplate(obj, renderWrapper.templateAnnotations)
 	}
 
 	// Generate Pod Volumes for ConfigMap objects
@@ -339,24 +339,29 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	return renderWrapper.renderedObjs, nil
 }
 
-func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[string]string) {
+func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotations map[string]string) {
 	// full configmap upgrade
 	existLabels := make(map[string]string)
-	for key, val := range sts.Labels {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	for key, val := range annotations {
 		if strings.HasPrefix(key, constant.ConfigurationTplLabelPrefixKey) {
 			existLabels[key] = val
 		}
 	}
 
 	// delete not exist configmap label
-	deletedLabels := cfgcore.MapKeyDifference(existLabels, allLabels)
+	deletedLabels := cfgcore.MapKeyDifference(existLabels, allTemplateAnnotations)
 	for l := range deletedLabels.Iter() {
-		delete(sts.Labels, l)
+		delete(annotations, l)
 	}
 
-	for key, val := range allLabels {
-		sts.Labels[key] = val
+	for key, val := range allTemplateAnnotations {
+		annotations[key] = val
 	}
+	obj.SetAnnotations(annotations)
 }
 
 // updateConfigManagerWithComponent build the configmgr sidecar container and update it

@@ -319,7 +319,6 @@ type ClusterComponentDefinition struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	// +optional
 	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty"`
 
 	// The scriptSpec field provided by provider, and

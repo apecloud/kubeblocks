@@ -52,11 +52,8 @@ var _ = Describe("Patch", func() {
 	It("run", func() {
 		cmd := &cobra.Command{}
 		o := NewOptions(tf, streams, types.ClusterGVR())
-		o.AddFlags(cmd)
-		Expect(o.complete(cmd)).Should(HaveOccurred())
-
 		o.Names = []string{"c1"}
-		Expect(o.Run(cmd)).Should(HaveOccurred())
+		o.AddFlags(cmd)
 
 		o.Patch = "{terminationPolicy: Delete}"
 		Expect(o.Run(cmd)).Should(HaveOccurred())

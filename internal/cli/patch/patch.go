@@ -61,7 +61,6 @@ type Options struct {
 	enforceNamespace             bool
 	dryRunStrategy               cmdutil.DryRunStrategy
 	dryRunVerifier               *resource.QueryParamVerifier
-	outputFormat                 string
 	args                         []string
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -91,7 +90,6 @@ func (o *Options) complete(cmd *cobra.Command) error {
 		return fmt.Errorf("missing %s name", o.GVR.Resource)
 	}
 
-	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
 		return err
@@ -100,7 +98,6 @@ func (o *Options) complete(cmd *cobra.Command) error {
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-
 		return o.PrintFlags.ToPrinter()
 	}
 
@@ -218,8 +215,7 @@ func (o *Options) Run(cmd *cobra.Command) error {
 	return nil
 }
 
-// getPatchedJson copied from k8s.io/kubectl/pkg/cmd/patch/patch.go
-func getPatchedJSON(patchType types.PatchType, originalJS, patchJS []byte, gvk schema.GroupVersionKind, creater runtime.ObjectCreater) ([]byte, error) {
+func getPatchedJSON(patchType types.PatchType, originalJS, patchJS []byte, gvk schema.GroupVersionKind, oc runtime.ObjectCreater) ([]byte, error) {
 	switch patchType {
 	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(patchJS)
@@ -241,7 +237,7 @@ func getPatchedJSON(patchType types.PatchType, originalJS, patchJS []byte, gvk s
 
 	case types.StrategicMergePatchType:
 		// get a typed object for this GVK if we need to apply a strategic merge patch
-		obj, err := creater.New(gvk)
+		obj, err := oc.New(gvk)
 		if err != nil {
 			return nil, fmt.Errorf("strategic merge patch is not supported for %s locally, try --type merge", gvk.String())
 		}

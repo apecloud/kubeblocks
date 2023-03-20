@@ -92,5 +92,13 @@ var _ = Describe("cluster update", func() {
 			Expect(cmd.Flags().Set("enable-all-logs", "false")).Should(Succeed())
 			Expect(o.complete(cmd, args)).Should(Succeed())
 		})
+
+		It("set node-labels", func() {
+			fakeCluster := testing.FakeCluster("c1", "default")
+			tf.FakeDynamicClient = testing.FakeDynamicClient(fakeCluster)
+			Expect(cmd.Flags().Set("node-labels", "k1=v1,k2=v2")).Should(Succeed())
+			Expect(o.complete(cmd, args)).Should(Succeed())
+			Expect(o.Patch).Should(ContainSubstring("k1"))
+		})
 	})
 })

@@ -957,6 +957,7 @@ spec:
                   are still healthy, but some update/create API fails due to invalid
                   parameters.'
                 enum:
+                - Creating
                 - Running
                 - Failed
                 - Abnormal

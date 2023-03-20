@@ -134,7 +134,7 @@ func CreateTPLScriptHandler(tplScripts string, dirs []string, fileRegex string, 
 	if err != nil {
 		return nil, err
 	}
-	if err := backupConfigurationFiles(dirs, filter, backupPath); err != nil {
+	if err := backupConfigFiles(dirs, filter, backupPath); err != nil {
 		return nil, err
 	}
 	return func(event fsnotify.Event) error {
@@ -142,11 +142,11 @@ func CreateTPLScriptHandler(tplScripts string, dirs []string, fileRegex string, 
 			lastVersion = []string{backupPath}
 			currVersion = []string{filepath.Dir(event.Name)}
 		)
-		currFiles, err := scanConfigurationFiles(currVersion, filter)
+		currFiles, err := scanConfigFiles(currVersion, filter)
 		if err != nil {
 			return err
 		}
-		lastFiles, err := scanConfigurationFiles(lastVersion, filter)
+		lastFiles, err := scanConfigFiles(lastVersion, filter)
 		if err != nil {
 			return err
 		}
@@ -157,7 +157,7 @@ func CreateTPLScriptHandler(tplScripts string, dirs []string, fileRegex string, 
 		if err := wrapGoTemplateRun(tplScripts, string(tplContent), updatedParams); err != nil {
 			return err
 		}
-		return backupLastConfigurationFiles(currFiles, backupPath)
+		return backupLastConfigFiles(currFiles, backupPath)
 	}, nil
 }
 

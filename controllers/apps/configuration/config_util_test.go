@@ -160,11 +160,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			ok, err = updateLabelsByConfigSpec(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			_, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err = updateLabelsByConfigSpec(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 
 			err = DeleteConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterDefObj)
@@ -181,7 +181,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 				if len(component.ConfigSpecs) == 0 {
 					return nil
 				}
-
 				for i := range component.ConfigSpecs {
 					tpl := &component.ConfigSpecs[i]
 					tpl.ConfigConstraintRef = ""
@@ -276,11 +275,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			ok, err = updateLabelsByConfigSpec(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			_, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			_, err = updateLabelsByConfigSpec(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 
 			err = DeleteConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterVersionObj)

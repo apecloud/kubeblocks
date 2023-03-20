@@ -71,12 +71,12 @@ func updateCfgParams(config appsv1alpha1.Configuration,
 	}
 
 	fc := cfgTpl.Spec.FormatterConfig
-	newCfg, err = cfgcore.MergeAndValidateConfiguration(cfgTpl.Spec, cm.Data, tpl.Keys, params)
+	newCfg, err = cfgcore.MergeAndValidateConfigs(cfgTpl.Spec, cm.Data, tpl.Keys, params)
 	if err != nil {
 		return makeReconfiguringResult(err, withFailed(true))
 	}
 
-	configPatch, _, err := cfgcore.CreateConfigurePatch(cm.Data, newCfg, fc.Format, tpl.Keys, false)
+	configPatch, _, err := cfgcore.CreateConfigPatch(cm.Data, newCfg, fc.Format, tpl.Keys, false)
 	if err != nil {
 		return makeReconfiguringResult(err)
 	}

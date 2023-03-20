@@ -40,7 +40,7 @@ var _ = Describe("config_util", func() {
 		// Add any teardown steps that needs to be executed after each test
 	})
 
-	Context("MergeAndValidateConfiguration", func() {
+	Context("MergeAndValidateConfigs", func() {
 		It("Should success with no error", func() {
 			type args struct {
 				configConstraint v1alpha1.ConfigConstraintSpec
@@ -114,7 +114,7 @@ var _ = Describe("config_util", func() {
 				wantErr: true,
 			}}
 			for _, tt := range tests {
-				got, err := MergeAndValidateConfiguration(tt.args.configConstraint, tt.args.baseCfg, tt.args.cmKeys, tt.args.updatedParams)
+				got, err := MergeAndValidateConfigs(tt.args.configConstraint, tt.args.baseCfg, tt.args.cmKeys, tt.args.updatedParams)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 				if tt.wantErr {
 					continue

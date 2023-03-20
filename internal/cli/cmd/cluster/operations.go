@@ -203,7 +203,7 @@ func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConf
 		return err
 	}
 
-	newConfigData, err := cfgcore.MergeAndValidateConfiguration(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
+	newConfigData, err := cfgcore.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
 		Key:           o.CfgFile,
 		UpdatedParams: transKeyPair(o.KeyValues),
 	}})
@@ -222,7 +222,7 @@ func (o *OperationsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.
 		return r
 	}
 
-	configPatch, _, err := cfgcore.CreateConfigurePatch(mockEmptyData(data), data, cc.FormatterConfig.Format, tpl.Keys, false)
+	configPatch, _, err := cfgcore.CreateConfigPatch(mockEmptyData(data), data, cc.FormatterConfig.Format, tpl.Keys, false)
 	if err != nil {
 		return err
 	}

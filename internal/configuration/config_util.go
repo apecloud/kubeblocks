@@ -31,8 +31,8 @@ type ParamPairs struct {
 	UpdatedParams map[string]interface{}
 }
 
-// MergeAndValidateConfiguration does merge configuration files and validate
-func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstraintSpec, baseCfg map[string]string, cmKey []string, updatedParams []ParamPairs) (map[string]string, error) {
+// MergeAndValidateConfigs does merge configuration files and validate
+func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []ParamPairs) (map[string]string, error) {
 	var (
 		err error
 		fc  = configConstraint.FormatterConfig
@@ -50,7 +50,7 @@ func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstrain
 		K8sKey: &K8sConfig{
 			CfgKey: client.ObjectKey{},
 			ResourceFn: func(key client.ObjectKey) (map[string]string, error) {
-				return baseCfg, nil
+				return baseConfigs, nil
 			},
 			CMKeys: cmKeySet,
 		}}); err != nil {
@@ -86,7 +86,7 @@ func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstrain
 	if err = NewConfigValidator(&configConstraint, WithKeySelector(cmKey)).Validate(updatedCfg); err != nil {
 		return nil, WrapError(err, "failed to validate updated config")
 	}
-	return mergeUpdatedConfig(baseCfg, updatedCfg), nil
+	return mergeUpdatedConfig(baseConfigs, updatedCfg), nil
 }
 
 // mergeUpdatedConfig replaces the file content of the changed key.

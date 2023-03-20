@@ -187,7 +187,7 @@ func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.Synt
 
 func (c *configTemplateBuilder) injectBuiltInObjects(podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configSpecs []appsv1alpha1.ComponentConfigSpec) error {
 	var resource *ResourceDefinition
-	container := intctrlutil.GetContainerByConfigTemplate(podSpec, configSpecs)
+	container := intctrlutil.GetContainerByConfigSpec(podSpec, configSpecs)
 	if container != nil && len(container.Resources.Limits) > 0 {
 		resource = &ResourceDefinition{
 			MemorySize: intctrlutil.GetMemorySize(*container),

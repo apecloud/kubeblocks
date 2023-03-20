@@ -125,7 +125,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.Reconciled()
 	}
 
-	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
+	if err := appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 

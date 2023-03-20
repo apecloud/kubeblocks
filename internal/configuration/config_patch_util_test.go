@@ -286,16 +286,16 @@ max_connections=666
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, excludeDiff, err := CreateConfigurePatch(tt.args.oldVersion, tt.args.newVersion, tt.args.format, tt.args.keys, tt.args.enableExcludeDiff)
+			got, excludeDiff, err := CreateConfigPatch(tt.args.oldVersion, tt.args.newVersion, tt.args.format, tt.args.keys, tt.args.enableExcludeDiff)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("CreateConfigurePatch() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CreateConfigPatch() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && got.IsModify != tt.want.IsModify {
-				t.Errorf("CreateConfigurePatch() got = %v, want %v", got, tt.want)
+				t.Errorf("CreateConfigPatch() got = %v, want %v", got, tt.want)
 			}
 			if excludeDiff != tt.excludeDiff {
-				t.Errorf("CreateConfigurePatch() got1 = %v, want %v", excludeDiff, tt.excludeDiff)
+				t.Errorf("CreateConfigPatch() got1 = %v, want %v", excludeDiff, tt.excludeDiff)
 			}
 		})
 	}

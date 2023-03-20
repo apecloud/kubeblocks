@@ -91,10 +91,10 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
-	isAppliedCfg, err := applyConfigurationChange(r.Client, reqCtx, config)
+	isAppliedConfigs, err := checkAndApplyConfigsChanged(r.Client, reqCtx, config)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
-	} else if isAppliedCfg {
+	} else if isAppliedConfigs {
 		return intctrlutil.Reconciled()
 	}
 
@@ -123,7 +123,7 @@ func (r *ReconfigureRequestReconciler) SetupWithManager(mgr ctrl.Manager) error 
 }
 
 func checkConfigurationObject(object client.Object) bool {
-	return checkConfigurationLabels(object, ConfigurationRequiredLabels)
+	return checkConfigLabels(object, ConfigurationRequiredLabels)
 }
 
 func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *appsv1alpha1.ConfigConstraint) (ctrl.Result, error) {
@@ -153,7 +153,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		keySelector = strings.Split(keysLabel, ",")
 	}
 
-	configPatch, forceRestart, err := createConfigurePatch(config, tpl.Spec.FormatterConfig.Format, keySelector)
+	configPatch, forceRestart, err := createConfigPatch(config, tpl.Spec.FormatterConfig.Format, keySelector)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
@@ -241,7 +241,7 @@ func (r *ReconfigureRequestReconciler) updateConfigCMStatus(reqCtx intctrlutil.R
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
 	}
 
-	if ok, err := updateAppliedConfiguration(r.Client, reqCtx, cfg, configData, reconfigureType); err != nil || !ok {
+	if ok, err := updateAppliedConfigs(r.Client, reqCtx, cfg, configData, reconfigureType); err != nil || !ok {
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
 	}
 

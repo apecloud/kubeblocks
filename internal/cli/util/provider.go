@@ -34,6 +34,7 @@ const (
 	AKSProvider     K8sProvider = "AKS"
 	ACKProvider     K8sProvider = "ACK"
 	TKEProvider     K8sProvider = "TKE"
+	K3SProvider     K8sProvider = "k3s"
 	UnknownProvider K8sProvider = "unknown"
 )
 
@@ -70,12 +71,20 @@ var (
 		Kustomize Version: v4.5.7
 		Server Version: version.Info{Major:"1", Minor:"24+", GitVersion:"v1.24.4-tke.5", GitCommit:"c52d4f7343b73cbdf73e5bf0ca82ccdc2d54a07a", GitTreeState:"clean", BuildDate:"2023-02-07T01:40:47Z", GoVersion:"go1.18.8", Compiler:"gc", Platform:"linux/amd64"}
 		WARNING: version difference between client (1.26) and server (1.24) exceeds the supported minor version skew of +/-1
+
+		K3s version info:
+		WARNING: This version information is deprecated and will be replaced with the output from kubectl version --short.  Use --output=yaml|json to get the full version.
+		Client Version: version.Info{Major:"1", Minor:"26", GitVersion:"v1.26.1", GitCommit:"8f94681cd294aa8cfd3407b8191f6c70214973a4", GitTreeState:"clean", BuildDate:"2023-01-18T15:51:24Z", GoVersion:"go1.19.5", Compiler:"gc", Platform:"darwin/arm64"}
+		Kustomize Version: v4.5.7
+		Server Version: version.Info{Major:"1", Minor:"23", GitVersion:"v1.23.8+k3s1", GitCommit:"53f2d4e7d80c09a7db1858e3f4e7ddfa13256c45", GitTreeState:"clean", BuildDate:"2022-06-27T21:49:50Z", GoVersion:"go1.17.5", Compiler:"gc", Platform:"linux/arm64"}
+		WARNING: version difference between client (1.26) and server (1.23) exceeds the supported minor version skew of +/-1
 	*/
 	k8sVersionRegex = map[K8sProvider]string{
 		EKSProvider: "v.*-eks-.*",
 		GKEProvider: "v.*-gke.*",
 		ACKProvider: "v.*-aliyun.*",
 		TKEProvider: "v.*-tke.*",
+		K3SProvider: "v.*k3s.*",
 	}
 )
 

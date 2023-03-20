@@ -581,6 +581,7 @@ func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
 type ExposeType string
 
 const (
+	ExposeToLocal    ExposeType = "local"
 	ExposeToVPC      ExposeType = "vpc"
 	ExposeToInternet ExposeType = "internet"
 
@@ -625,6 +626,9 @@ var ProviderExposeAnnotations = map[K8sProvider]map[ExposeType]map[string]string
 	// reference: https://cloud.tencent.com/document/product/457/45487
 	TKEProvider: {
 		ExposeToInternet: map[string]string{},
+	},
+	K3SProvider: {
+		ExposeToLocal: map[string]string{},
 	},
 }
 

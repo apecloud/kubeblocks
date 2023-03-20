@@ -20,8 +20,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	k3dClient "github.com/k3d-io/k3d/v5/pkg/client"
+	config "github.com/k3d-io/k3d/v5/pkg/config/v1alpha4"
+	"github.com/k3d-io/k3d/v5/pkg/runtimes"
+	k3d "github.com/k3d-io/k3d/v5/pkg/types"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -215,7 +221,7 @@ func buildOperationsInputs(f cmdutil.Factory, o *OperationsOptions) create.Input
 
 func (o *OperationsOptions) validateExpose() error {
 	switch util.ExposeType(o.ExposeType) {
-	case "", util.ExposeToVPC, util.ExposeToInternet:
+	case "", util.ExposeToVPC, util.ExposeToInternet, util.ExposeToLocal:
 	default:
 		return fmt.Errorf("invalid expose type %q", o.ExposeType)
 	}
@@ -224,6 +230,96 @@ func (o *OperationsOptions) validateExpose() error {
 	case util.EnableValue, util.DisableValue:
 	default:
 		return fmt.Errorf("invalid value for enable flag: %s", o.ExposeEnabled)
+	}
+	return nil
+}
+
+func (o *OperationsOptions) localExpose(clusterName string) error {
+	clusterGVR := schema.GroupVersionResource{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion, Resource: types.ResourceClusters}
+	unstructuredObj, err := o.Dynamic.Resource(clusterGVR).Namespace(o.Namespace).Get(context.TODO(), clusterName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	cluster := appsv1alpha1.Cluster{}
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.UnstructuredContent(), &cluster); err != nil {
+		return err
+	}
+
+	var (
+		errNotReady    = fmt.Errorf("services is not ready")
+		exposedSvcList *corev1.ServiceList
+	)
+	waitForSvcReady := func() error {
+		exposedSvcList = &corev1.ServiceList{}
+		svcGVR := schema.GroupVersionResource{Group: corev1.GroupName, Version: corev1.SchemeGroupVersion.Version, Resource: corev1.ResourceServices.String()}
+		unstructuredSvcList, err := o.Dynamic.Resource(svcGVR).Namespace(o.Namespace).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf(""),
+		})
+		if err != nil {
+			return err
+		}
+		var svcList *corev1.ServiceList
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredSvcList.UnstructuredContent(), &svcList); err != nil {
+			return err
+		}
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			var ready *corev1.Service
+			name := fmt.Sprintf("%s-%s-%s", cluster.Name, comp.Name, o.ExposeType)
+			for _, svc := range svcList.Items {
+				if name != svc.Name {
+					continue
+				}
+				for _, item := range svc.Spec.Ports {
+					if item.NodePort != 0 {
+						ready = &svc
+						break
+					}
+				}
+				if ready != nil {
+					break
+				}
+			}
+			if ready == nil {
+				return errNotReady
+			}
+			exposedSvcList.Items = append(exposedSvcList.Items, *ready)
+		}
+		return nil
+	}
+
+	for i := 0; i < 10; i++ {
+		if err = waitForSvcReady(); err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	k3dClusterList, err := k3dClient.ClusterList(context.Background(), runtimes.SelectedRuntime)
+	if err != nil {
+		return err
+	}
+
+	idx := slices.IndexFunc(k3dClusterList, func(c *k3d.Cluster) bool { return c.Name == "k3s" })
+	if idx < 0 {
+		return fmt.Errorf("can not find playground k3d cluster")
+	}
+	k3dCluster, err := k3dClient.ClusterGet(context.Background(), runtimes.SelectedRuntime, k3dClusterList[idx])
+	if err != nil {
+		return err
+	}
+
+	var ports []config.PortWithNodeFilters
+	for _, svc := range exposedSvcList.Items {
+		for _, item := range svc.Spec.Ports {
+			ports = append(ports, config.PortWithNodeFilters{
+				Port:        fmt.Sprintf("%v:%v", item.NodePort, item.NodePort),
+				NodeFilters: []string{"loadbalancer"},
+			})
+		}
+	}
+	clusterConfig := &config.SimpleConfig{Ports: ports}
+	if err = k3dClient.ClusterEditChangesetSimple(context.Background(), runtimes.SelectedRuntime, k3dCluster, clusterConfig); err != nil {
+		return err
 	}
 	return nil
 }
@@ -443,6 +539,19 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	}
 	inputs.Validate = o.validateExpose
 	inputs.Complete = o.fillExpose
+	inputs.Run = func() error {
+		provider, err := util.GetK8SProvider(o.Client)
+		if err != nil {
+			return err
+		}
+
+		clusterName := o.Name
+		err = inputs.BaseOptionsObj.Run(inputs)
+		if provider == util.K3SProvider && strings.ToLower(o.ExposeEnabled) == "true" {
+			err = o.localExpose(clusterName)
+		}
+		return err
+	}
 	return create.BuildCommand(inputs)
 }
 

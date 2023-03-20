@@ -84,6 +84,9 @@ type Inputs struct {
 	// Complete optional, do custom complete options
 	Complete func() error
 
+	// Run optional, custom running business
+	Run func() error
+
 	BuildFlags func(*cobra.Command)
 
 	// PreCreate optional, make changes on yaml before create
@@ -126,7 +129,11 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
 			util.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
-			util.CheckErr(inputs.BaseOptionsObj.Run(inputs))
+			if inputs.Run != nil {
+				util.CheckErr(inputs.Run())
+			} else {
+				util.CheckErr(inputs.BaseOptionsObj.Run(inputs))
+			}
 		},
 	}
 	if inputs.BuildFlags != nil {

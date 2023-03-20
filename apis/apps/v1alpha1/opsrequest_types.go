@@ -223,6 +223,10 @@ type Expose struct {
 // OpsRequestStatus defines the observed state of OpsRequest
 type OpsRequestStatus struct {
 
+	// ClusterGeneration records the cluster generation after handling the opsRequest action.
+	// +optional
+	ClusterGeneration int64 `json:"clusterGeneration,omitempty"`
+
 	// phase describes OpsRequest phase.
 	Phase OpsPhase `json:"phase,omitempty"`
 
@@ -321,7 +325,7 @@ type LastConfiguration struct {
 
 type OpsRequestComponentStatus struct {
 	// phase describes the component phase, reference Cluster.status.component.phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting,Exposing}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting,Exposing}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 

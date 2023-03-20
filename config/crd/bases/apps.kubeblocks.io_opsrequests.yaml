@@ -359,6 +359,11 @@ spec:
           status:
             description: OpsRequestStatus defines the observed state of OpsRequest
             properties:
+              clusterGeneration:
+                description: ClusterGeneration records the cluster generation after
+                  handling the opsRequest action.
+                format: int64
+                type: integer
               completionTimestamp:
                 description: completionTimestamp defines the OpsRequest completion
                   time.
@@ -375,7 +380,7 @@ spec:
                       - Failed
                       - Abnormal
                       - Creating
-                      - SpecUpdating
+                      - Updating
                       - Deleting
                       - Deleted
                       - VolumeExpanding

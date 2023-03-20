@@ -41,7 +41,7 @@ const (
 	CreatingPhase          Phase = "Creating"
 	RunningPhase           Phase = "Running"
 	FailedPhase            Phase = "Failed"
-	SpecUpdatingPhase      Phase = "SpecUpdating"
+	SpecUpdatingPhase      Phase = "Updating"
 	VolumeExpandingPhase   Phase = "VolumeExpanding"
 	HorizontalScalingPhase Phase = "HorizontalScaling"
 	VerticalScalingPhase   Phase = "VerticalScaling"

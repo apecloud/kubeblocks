@@ -45,9 +45,9 @@ func Reconciled() (reconcile.Result, error) {
 	return reconcile.Result{}, nil
 }
 
-// ReconciledP returns an empty result pointer with nil error to signal a successful reconcile.
-func ReconciledP() (*reconcile.Result, error) {
-	return &reconcile.Result{}, nil
+// ResultToP converts a Result object to a pointer.
+func ResultToP(res reconcile.Result, err error) (*reconcile.Result, error) {
+	return &res, err
 }
 
 // CheckedRequeueWithError is a convenience wrapper around logging an error message
@@ -58,12 +58,6 @@ func CheckedRequeueWithError(err error, logger logr.Logger, msg string, keysAndV
 		return Reconciled()
 	}
 	return RequeueWithError(err, logger, msg, keysAndValues...)
-}
-
-// CheckedRequeueWithErrorP is a convenience wrapper of CheckedRequeueWithError to return a pointer of Result.
-func CheckedRequeueWithErrorP(err error, logger logr.Logger, msg string, keysAndValues ...interface{}) (*reconcile.Result, error) {
-	res, err := CheckedRequeueWithError(err, logger, msg, keysAndValues...)
-	return &res, err
 }
 
 // RequeueWithErrorAndRecordEvent requeue when an error occurs. if it is a not found error, send an event
@@ -85,12 +79,6 @@ func RequeueWithError(err error, logger logr.Logger, msg string, keysAndValues .
 	return reconcile.Result{}, err
 }
 
-// RequeueWithErrorP is a convenience wrapper of RequeueWithError to return a pointer of Result.
-func RequeueWithErrorP(err error, logger logr.Logger, msg string, keysAndValues ...interface{}) (*reconcile.Result, error) {
-	res, err := RequeueWithError(err, logger, msg, keysAndValues...)
-	return &res, err
-}
-
 func RequeueAfter(duration time.Duration, logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {
 	keysAndValues = append(keysAndValues, "duration")
 	keysAndValues = append(keysAndValues, duration)
@@ -104,12 +92,6 @@ func RequeueAfter(duration time.Duration, logger logr.Logger, msg string, keysAn
 		Requeue:      true,
 		RequeueAfter: duration,
 	}, nil
-}
-
-// RequeueAfterP is a convenience wrapper of RequeueAfter to return a pointer of Result.
-func RequeueAfterP(duration time.Duration, logger logr.Logger, msg string, keysAndValues ...interface{}) (*reconcile.Result, error) {
-	res, err := RequeueAfter(duration, logger, msg, keysAndValues...)
-	return &res, err
 }
 
 func Requeue(logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {

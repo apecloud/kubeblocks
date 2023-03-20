@@ -45,26 +45,6 @@ type OpsRequestReconciler struct {
 	Recorder record.EventRecorder
 }
 
-type opsRequestStep func(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error)
-
-type opsControllerHandler struct {
-}
-
-func (h *opsControllerHandler) Handle(reqCtx intctrlutil.RequestCtx,
-	opsRes *operations.OpsResource,
-	steps ...opsRequestStep) (ctrl.Result, error) {
-	for _, step := range steps {
-		res, err := step(reqCtx, opsRes)
-		if res != nil {
-			return *res, err
-		}
-		if err != nil {
-			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
-		}
-	}
-	return intctrlutil.Reconciled()
-}
-
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=opsrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=opsrequests/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=opsrequests/finalizers,verbs=update
@@ -101,13 +81,13 @@ func (r *OpsRequestReconciler) fetchOpsRequestAndCluster(reqCtx intctrlutil.Requ
 	opsRequest := &appsv1alpha1.OpsRequest{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, opsRequest); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return intctrlutil.RequeueWithErrorP(err, reqCtx.Log, "")
+			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
 		}
 		// if the opsRequest is not found, we need to check if this opsRequest is deleted abnormally
 		if err = r.handleClusterAnnotationIfOpsABEnd(reqCtx); err != nil {
-			return intctrlutil.CheckedRequeueWithErrorP(err, reqCtx.Log, "")
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}
-		return intctrlutil.ReconciledP()
+		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
 	opsRes.OpsRequest = opsRequest
 	cluster := &appsv1alpha1.Cluster{}
@@ -118,7 +98,7 @@ func (r *OpsRequestReconciler) fetchOpsRequestAndCluster(reqCtx intctrlutil.Requ
 		if apierrors.IsNotFound(err) {
 			_ = operations.PatchClusterNotFound(reqCtx.Ctx, r.Client, opsRes)
 		}
-		return intctrlutil.CheckedRequeueWithErrorP(err, reqCtx.Log, "")
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	// set cluster variable
 	opsRes.Cluster = cluster
@@ -143,9 +123,9 @@ func (r *OpsRequestReconciler) handleOpsRequestByPhase(reqCtx intctrlutil.Reques
 	case "":
 		// update status.phase to pending
 		if err := operations.PatchOpsStatus(reqCtx.Ctx, r.Client, opsRes, appsv1alpha1.OpsPendingPhase, appsv1alpha1.NewProgressingCondition(opsRes.OpsRequest)); err != nil {
-			return intctrlutil.CheckedRequeueWithErrorP(err, reqCtx.Log, "")
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}
-		return intctrlutil.ReconciledP()
+		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	case appsv1alpha1.OpsPendingPhase, appsv1alpha1.OpsCreatingPhase:
 		return r.doOpsRequestAction(reqCtx, opsRes)
 	case appsv1alpha1.OpsRunningPhase:
@@ -153,25 +133,25 @@ func (r *OpsRequestReconciler) handleOpsRequestByPhase(reqCtx intctrlutil.Reques
 	case appsv1alpha1.OpsSucceedPhase:
 		return r.handleSucceedOpsRequest(reqCtx, opsRes.OpsRequest)
 	case appsv1alpha1.OpsFailedPhase:
-		return intctrlutil.ReconciledP()
+		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
-	return intctrlutil.ReconciledP()
+	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }
 
 // handleSucceedOpsRequest the opsRequest will be deleted after one hour when status.phase is Succeed
 func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.RequestCtx, opsRequest *appsv1alpha1.OpsRequest) (*ctrl.Result, error) {
 	if opsRequest.Status.CompletionTimestamp.IsZero() || opsRequest.Spec.TTLSecondsAfterSucceed == 0 {
-		return intctrlutil.ReconciledP()
+		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
 	deadline := opsRequest.Status.CompletionTimestamp.Add(time.Duration(opsRequest.Spec.TTLSecondsAfterSucceed) * time.Second)
 	if time.Now().Before(deadline) {
-		return intctrlutil.RequeueAfterP(time.Until(deadline), reqCtx.Log, "")
+		return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Until(deadline), reqCtx.Log, ""))
 	}
 	// the opsRequest will be deleted after spec.ttlSecondsAfterSucceed seconds when status.phase is Succeed
 	if err := r.Client.Delete(reqCtx.Ctx, opsRequest); err != nil {
-		return intctrlutil.CheckedRequeueWithErrorP(err, reqCtx.Log, "")
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
-	return intctrlutil.ReconciledP()
+	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }
 
 // reconcileStatusDuringRunning reconciles the status of OpsRequest when it is running.
@@ -180,12 +160,12 @@ func (r *OpsRequestReconciler) reconcileStatusDuringRunning(reqCtx intctrlutil.R
 	// wait for OpsRequest.status.phase to Succeed
 	if requeueAfter, err := operations.GetOpsManager().Reconcile(reqCtx, r.Client, opsRes); err != nil {
 		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, "ReconcileStatusFailed", "Failed to reconcile the status of OpsRequest: %s", err.Error())
-		return intctrlutil.CheckedRequeueWithErrorP(err, reqCtx.Log, "")
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	} else if requeueAfter != 0 {
 		// if the reconcileAction need requeue, do it
-		return intctrlutil.RequeueAfterP(requeueAfter, reqCtx.Log, "")
+		return intctrlutil.ResultToP(intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, ""))
 	}
-	return intctrlutil.ReconciledP()
+	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }
 
 // addClusterLabelAndSetOwnerReference adds the cluster label and set the owner reference of the OpsRequest.
@@ -203,12 +183,12 @@ func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctr
 	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	if err := controllerutil.SetOwnerReference(opsRes.Cluster, opsRequest, scheme); err != nil {
-		return intctrlutil.CheckedRequeueWithErrorP(err, reqCtx.Log, "")
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	if err := r.Client.Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
-		return intctrlutil.CheckedRequeueWithErrorP(err, reqCtx.Log, "")
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
-	return intctrlutil.ReconciledP()
+	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }
 
 // doOpsRequestAction will do the action of the OpsRequest.
@@ -221,19 +201,20 @@ func (r *OpsRequestReconciler) doOpsRequestAction(reqCtx intctrlutil.RequestCtx,
 		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, "DoActionFailed", "Failed to process the operation of OpsRequest: %s", err.Error())
 		if !reflect.DeepEqual(opsRequest.Status, opsDeepCopy.Status) {
 			if patchErr := r.Client.Status().Patch(reqCtx.Ctx, opsRequest, client.MergeFrom(opsDeepCopy)); patchErr != nil {
-				return intctrlutil.CheckedRequeueWithErrorP(err, reqCtx.Log, "")
+				return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 			}
 		}
-		return intctrlutil.CheckedRequeueWithErrorP(err, reqCtx.Log, "")
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	if res != nil {
 		return res, nil
 	}
 	opsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
+	opsRequest.Status.ClusterGeneration = opsRes.Cluster.Generation
 	if err = r.Client.Status().Patch(reqCtx.Ctx, opsRequest, client.MergeFrom(opsDeepCopy)); err != nil {
-		return intctrlutil.CheckedRequeueWithErrorP(err, reqCtx.Log, "")
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
-	return intctrlutil.ReconciledP()
+	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }
 
 // handleClusterAnnotationIfOpsABEnd will handle the cluster annotation if the OpsRequest is abnormal end.
@@ -266,4 +247,24 @@ func (r *OpsRequestReconciler) handleClusterAnnotationIfOpsABEnd(reqCtx intctrlu
 		return opsutil.PatchClusterOpsAnnotations(reqCtx.Ctx, r.Client, &cluster, opsRequestSlice)
 	}
 	return nil
+}
+
+type opsRequestStep func(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error)
+
+type opsControllerHandler struct {
+}
+
+func (h *opsControllerHandler) Handle(reqCtx intctrlutil.RequestCtx,
+	opsRes *operations.OpsResource,
+	steps ...opsRequestStep) (ctrl.Result, error) {
+	for _, step := range steps {
+		res, err := step(reqCtx, opsRes)
+		if res != nil {
+			return *res, err
+		}
+		if err != nil {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		}
+	}
+	return intctrlutil.Reconciled()
 }

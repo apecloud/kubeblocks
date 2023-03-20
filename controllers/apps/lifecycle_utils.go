@@ -558,6 +558,36 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return false, err
 	}
 
+	// processing function after k8s object creation
+	postCreateFunc := func(obj client.Object) {
+		switch obj.(type) {
+		case *appsv1.StatefulSet:
+			// h-scale operation may create a new Sts if workloadType is Replication,
+			// so we need to sync component phase here.
+			syncComponentPhaseByClusterPhase(cluster, obj.GetLabels()[constant.KBAppComponentLabelKey])
+		}
+	}
+
+	handleObjectUpdate := func(obj client.Object) (bool, error) {
+		switch obj.(type) {
+		case *corev1.ConfigMap:
+			return false, handleConfigMap(obj.(*corev1.ConfigMap))
+		case *appsv1.StatefulSet:
+			return handleSts(obj.(*appsv1.StatefulSet))
+		case *appsv1.Deployment:
+			// The Config is not allowed to be modified.
+			// Once ClusterDefinition provider adjusts the TemplateRef field of CusterDefinition,
+			// or provider modifies the wrong config file, it may cause the application cluster may fail.
+			return false, handleDeploy(obj.(*appsv1.Deployment))
+		case *corev1.Service:
+			return false, handleSvc(obj.(*corev1.Service))
+		case *corev1.PersistentVolumeClaim:
+			// do volume expansion when workload type is `replication`
+			return false, handlePVC(obj.(*corev1.PersistentVolumeClaim))
+		}
+		return false, nil
+	}
+
 	objsByKind := make(map[string][]client.Object)
 	for _, obj := range objs {
 		logger.V(1).Info("create or update", "objs", obj)
@@ -568,65 +598,19 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		objsByKind[kind] = append(objsByKind[kind], obj)
 
 		if err = cli.Create(ctx, obj); err == nil {
-			if kind == constant.StatefulSetKind {
-				// h-scale operation may create a new Sts if workloadType is Replication,
-				// so we need to sync component phase here.
-				syncComponentPhaseByClusterPhase(cluster, obj.GetLabels()[constant.KBAppComponentLabelKey])
-			}
+			postCreateFunc(obj)
 			continue
 		} else if !apierrors.IsAlreadyExists(err) {
 			return false, err
 		}
 
-		// Secret kind objects should only be applied once
-		if _, ok := obj.(*corev1.Secret); ok {
-			continue
+		// handle object changes
+		requeue, err := handleObjectUpdate(obj)
+		if err != nil {
+			return false, err
 		}
-
-		// ConfigMap kind objects should only be applied once
-		//
-		// The Config is not allowed to be modified.
-		// Once ClusterDefinition provider adjusts the TemplateRef field of CusterDefinition,
-		// or provider modifies the wrong config file, it may cause the application cluster may fail.
-		if cm, ok := obj.(*corev1.ConfigMap); ok {
-			if err := handleConfigMap(cm); err != nil {
-				return false, err
-			}
-			continue
-		}
-
-		stsProto, ok := obj.(*appsv1.StatefulSet)
-		if ok {
-			requeue, err := handleSts(stsProto)
-			if err != nil {
-				return false, err
-			}
-			if requeue {
-				shouldRequeue = true
-			}
-			continue
-		}
-		deployProto, ok := obj.(*appsv1.Deployment)
-		if ok {
-			if err := handleDeploy(deployProto); err != nil {
-				return false, err
-			}
-			continue
-		}
-		svcProto, ok := obj.(*corev1.Service)
-		if ok {
-			if err := handleSvc(svcProto); err != nil {
-				return false, err
-			}
-			continue
-		}
-		// do volume expansion when workload type is `replication`
-		pvcProto, ok := obj.(*corev1.PersistentVolumeClaim)
-		if ok {
-			if err := handlePVC(pvcProto); err != nil {
-				return false, err
-			}
-			continue
+		if requeue {
+			shouldRequeue = true
 		}
 	}
 

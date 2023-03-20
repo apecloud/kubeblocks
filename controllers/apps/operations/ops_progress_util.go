@@ -516,18 +516,19 @@ func handleScaleDownProgress(
 
 	lastComponentPodNames := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.clusterComponent.Name].PodNames
 	for _, v := range lastComponentPodNames {
-		// if the pod is not in the podList, it means the pod has been deleted.
 		objectKey := GetProgressObjectKey(constant.PodKind, v)
-		if _, ok := podMap[objectKey]; !ok {
-			progressDetail := appsv1alpha1.ProgressStatusDetail{
-				ObjectKey: objectKey,
-				Status:    appsv1alpha1.SucceedProgressStatus,
-				Message:   fmt.Sprintf("Successfully deleted pod: %s in Component: %s", objectKey, pgRes.clusterComponent.Name),
-			}
-			completedCount += 1
-			SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
-				&compStatus.ProgressDetails, progressDetail)
+		if _, ok := podMap[objectKey]; ok {
+			continue
 		}
+		// if the pod is not in the podList, it means the pod has been deleted.
+		progressDetail := appsv1alpha1.ProgressStatusDetail{
+			ObjectKey: objectKey,
+			Status:    appsv1alpha1.SucceedProgressStatus,
+			Message:   fmt.Sprintf("Successfully deleted pod: %s in Component: %s", objectKey, pgRes.clusterComponent.Name),
+		}
+		completedCount += 1
+		SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
+			&compStatus.ProgressDetails, progressDetail)
 	}
 	return completedCount, nil
 }

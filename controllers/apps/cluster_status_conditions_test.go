@@ -137,7 +137,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.CreatingPhase))
-				g.Expect(tmpCluster.Status.ObservedGeneration > 0).Should(BeTrue())
+				g.Expect(tmpCluster.Status.ObservedGeneration).ShouldNot(BeZero())
 			})).Should(Succeed())
 
 			By("test apply resources failed")

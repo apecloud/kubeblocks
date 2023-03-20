@@ -15,6 +15,7 @@ Meet the following requirements for smooth operation of Playground and other fun
 * Minimum system requirements:
   * CPU: 4 cores
   * RAM: 4 GB
+  
   To check CPU, use `sysctl hw.physicalcpu` command;
   To check memory, use `top -d` command.
 
@@ -27,10 +28,7 @@ Meet the following requirements for smooth operation of Playground and other fun
          curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
          ```
     2. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.
-    3. (Optional) If required, run the command below to uninstall `kbcli` and delete `kbcli` after your trial.
-         ```bash
-         sudo rm /usr/local/bin/kbcli
-         ```
+   
 
 ## Install Playground
 ***Steps***

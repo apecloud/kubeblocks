@@ -91,10 +91,10 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
-	isAppliedCfg, err := applyConfigurationChange(r.Client, reqCtx, config)
+	isAppliedConfigs, err := checkAndApplyConfigsChanged(r.Client, reqCtx, config)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
-	} else if isAppliedCfg {
+	} else if isAppliedConfigs {
 		return intctrlutil.Reconciled()
 	}
 
@@ -123,7 +123,7 @@ func (r *ReconfigureRequestReconciler) SetupWithManager(mgr ctrl.Manager) error 
 }
 
 func checkConfigurationObject(object client.Object) bool {
-	return checkConfigurationLabels(object, ConfigurationRequiredLabels)
+	return checkConfigLabels(object, ConfigurationRequiredLabels)
 }
 
 func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *appsv1alpha1.ConfigConstraint) (ctrl.Result, error) {
@@ -153,7 +153,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		keySelector = strings.Split(keysLabel, ",")
 	}
 
-	configPatch, forceRestart, err := createConfigurePatch(config, tpl.Spec.FormatterConfig.Format, keySelector)
+	configPatch, forceRestart, err := createConfigPatch(config, tpl.Spec.FormatterConfig.Format, keySelector)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
@@ -219,9 +219,9 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	return r.performUpgrade(reconfigureParams{
-		TplName:                  configSpecName,
+		ConfigSpecName:           configSpecName,
 		ConfigPatch:              configPatch,
-		CfgCM:                    config,
+		ConfigMap:                config,
 		ConfigConstraint:         &tpl.Spec,
 		Client:                   r.Client,
 		Ctx:                      reqCtx,
@@ -241,7 +241,7 @@ func (r *ReconfigureRequestReconciler) updateConfigCMStatus(reqCtx intctrlutil.R
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
 	}
 
-	if ok, err := updateAppliedConfiguration(r.Client, reqCtx, cfg, configData, reconfigureType); err != nil || !ok {
+	if ok, err := updateAppliedConfigs(r.Client, reqCtx, cfg, configData, reconfigureType); err != nil || !ok {
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
 	}
 
@@ -249,9 +249,9 @@ func (r *ReconfigureRequestReconciler) updateConfigCMStatus(reqCtx intctrlutil.R
 }
 
 func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) (ctrl.Result, error) {
-	policy, err := NewReconfigurePolicy(params.ConfigConstraint, params.ConfigPatch, getUpgradePolicy(params.CfgCM), params.Restart)
+	policy, err := NewReconfigurePolicy(params.ConfigConstraint, params.ConfigPatch, getUpgradePolicy(params.ConfigMap), params.Restart)
 	if err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(params.CfgCM, r.Recorder, err, params.Ctx.Log)
+		return intctrlutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
 	}
 
 	returnedStatus, err := policy.Upgrade(params)
@@ -261,19 +261,19 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 		SucceedCount:  returnedStatus.SucceedCount,
 		ExpectedCount: returnedStatus.ExpectedCount,
 	}, err); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(params.CfgCM, r.Recorder, err, params.Ctx.Log)
+		return intctrlutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
 	}
 	if err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(params.CfgCM, r.Recorder, err, params.Ctx.Log)
+		return intctrlutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
 	}
 
 	switch returnedStatus.Status {
 	case ESRetry, ESAndRetryFailed:
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
 	case ESNone:
-		return r.updateConfigCMStatus(params.Ctx, params.CfgCM, policy.GetPolicyName())
+		return r.updateConfigCMStatus(params.Ctx, params.ConfigMap, policy.GetPolicyName())
 	case ESFailed:
-		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.CfgCM, false); err != nil {
+		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.ConfigMap, false); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")
 		}
 		return intctrlutil.Reconciled()
@@ -284,7 +284,7 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 
 func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status cfgcore.PolicyExecStatus, err error) error {
 	var (
-		cm             = params.CfgCM
+		cm             = params.ConfigMap
 		lastOpsRequest = ""
 	)
 
@@ -293,14 +293,14 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 	}
 
 	eventContext := cfgcore.ConfigEventContext{
-		TplName:          params.TplName,
+		ConfigSpecName:   params.ConfigSpecName,
 		Client:           params.Client,
 		ReqCtx:           params.Ctx,
 		Cluster:          params.Cluster,
 		Component:        params.Component,
 		ConfigPatch:      params.ConfigPatch,
 		ConfigConstraint: params.ConfigConstraint,
-		CfgCM:            params.CfgCM,
+		ConfigMap:        params.ConfigMap,
 		ComponentUnits:   params.ComponentUnits,
 		PolicyStatus:     status,
 	}

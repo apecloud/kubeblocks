@@ -100,12 +100,12 @@ func withGRPCClient(clientFactory createReconfigureClient) ParamsOps {
 	}
 }
 
-func withConfigTpl(tplName string, data map[string]string) ParamsOps {
+func withConfigSpec(configSpecName string, data map[string]string) ParamsOps {
 	return func(params *reconfigureParams) {
-		params.CfgCM = &corev1.ConfigMap{
+		params.ConfigMap = &corev1.ConfigMap{
 			Data: data,
 		}
-		params.TplName = tplName
+		params.ConfigSpecName = configSpecName
 	}
 }
 

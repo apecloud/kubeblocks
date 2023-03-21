@@ -73,9 +73,9 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 		By("Assuring an cm obj")
-		cfgCM := testapps.NewCustomizedObj("operations_config/configcm.yaml",
+		cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
 			&corev1.ConfigMap{}, testapps.WithNamespacedName(cmName, ns))
-		cfgTpl := testapps.NewCustomizedObj("operations_config/configtpl.yaml",
+		cfgTpl := testapps.NewCustomizedObj("operations_config/config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{}, testapps.WithNamespacedName(tplName, ns))
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
@@ -88,18 +88,18 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			return nil
 		}
 		var cmObj *corev1.ConfigMap
-		for _, tpl := range cdComponent.ConfigSpecs {
-			cmInsName := cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName)
-			cfgCM := testapps.NewCustomizedObj("operations_config/configcm.yaml",
+		for _, configSpec := range cdComponent.ConfigSpecs {
+			cmInsName := cfgcore.GetComponentCfgName(clusterName, componentName, configSpec.VolumeName)
+			cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
 				&corev1.ConfigMap{},
 				testapps.WithNamespacedName(cmInsName, ns),
 				testapps.WithLabels(
 					constant.AppNameLabelKey, clusterName,
 					constant.AppInstanceLabelKey, clusterName,
 					constant.KBAppComponentLabelKey, componentName,
-					constant.CMConfigurationTemplateNameLabelKey, tpl.TemplateRef,
-					constant.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
-					constant.CMConfigurationSpecProviderLabelKey, tpl.Name,
+					constant.CMConfigurationTemplateNameLabelKey, configSpec.TemplateRef,
+					constant.CMConfigurationConstraintsNameLabelKey, configSpec.ConfigConstraintRef,
+					constant.CMConfigurationSpecProviderLabelKey, configSpec.Name,
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 				),
 			)
@@ -155,7 +155,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 		By("mock event context")
 		eventContext := cfgcore.ConfigEventContext{
-			CfgCM:     cfgObj,
+			ConfigMap: cfgObj,
 			Component: &clusterDef.Spec.ComponentDefs[0],
 			Client:    k8sClient,
 			ReqCtx: intctrlutil.RequestCtx{
@@ -163,8 +163,8 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 				Log:      log.FromContext(opsRes.Ctx),
 				Recorder: opsRes.Recorder,
 			},
-			Cluster: clusterObject,
-			TplName: "mysql-test",
+			Cluster:        clusterObject,
+			ConfigSpecName: "mysql-test",
 			ConfigPatch: &cfgcore.ConfigPatchInfo{
 				AddConfig:    map[string]interface{}{},
 				UpdateConfig: map[string][]byte{},

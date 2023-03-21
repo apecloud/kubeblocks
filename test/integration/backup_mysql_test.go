@@ -89,7 +89,7 @@ var _ = Describe("MySQL data protection function", func() {
 
 	createClusterObj := func() {
 		By("Create configmap")
-		_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
+		_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
 			testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
 		By("Create a clusterDef obj")

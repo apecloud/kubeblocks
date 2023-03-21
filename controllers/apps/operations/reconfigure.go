@@ -64,7 +64,7 @@ func (r *reconfigureAction) GetRealAffectedComponentMap(opsRequest *appsv1alpha1
 func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.Phase, err error) error {
 	var (
 		opsRequest = &appsv1alpha1.OpsRequest{}
-		cm         = eventContext.CfgCM
+		cm         = eventContext.ConfigMap
 		cli        = eventContext.Client
 		ctx        = eventContext.ReqCtx.Ctx
 	)
@@ -87,7 +87,7 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 		return err
 	}
 
-	if err := patchReconfigureOpsStatus(opsRes, eventContext.TplName,
+	if err := patchReconfigureOpsStatus(opsRes, eventContext.ConfigSpecName,
 		handleReconfigureStatusProgress(eventContext.PolicyStatus, phase, &opsRequest.Status)); err != nil {
 		return err
 	}
@@ -97,21 +97,21 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 		return PatchOpsStatus(opsRes, appsv1alpha1.RunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureSucceed,
-				eventContext.TplName,
+				eventContext.ConfigSpecName,
 				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			appsv1alpha1.NewSucceedCondition(opsRequest))
 	case appsv1alpha1.FailedPhase:
 		return PatchOpsStatus(opsRes, appsv1alpha1.RunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureFailed,
-				eventContext.TplName,
+				eventContext.ConfigSpecName,
 				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			appsv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
 		return PatchOpsStatus(opsRes, appsv1alpha1.RunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureRunning,
-				eventContext.TplName))
+				eventContext.ConfigSpecName))
 	}
 }
 

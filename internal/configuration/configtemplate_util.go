@@ -63,51 +63,51 @@ func GetConfigTemplatesFromComponent(
 	})
 
 	var (
-		avTpls []appsv1alpha1.ComponentConfigSpec
-		cdTpls []appsv1alpha1.ComponentConfigSpec
+		cvConfigSpecs []appsv1alpha1.ComponentConfigSpec
+		cdConfigSpecs []appsv1alpha1.ComponentConfigSpec
 	)
 
 	if aCom != nil {
-		avTpls = aCom.ConfigSpecs
+		cvConfigSpecs = aCom.ConfigSpecs
 	}
 	if dCom != nil {
-		cdTpls = dCom.ConfigSpecs
+		cdConfigSpecs = dCom.ConfigSpecs
 	}
 
-	return MergeConfigTemplates(avTpls, cdTpls), nil
+	return MergeConfigTemplates(cvConfigSpecs, cdConfigSpecs), nil
 }
 
 // MergeConfigTemplates merge ClusterVersion.ComponentDefs[*].ConfigTemplateRefs and ClusterDefinition.ComponentDefs[*].ConfigTemplateRefs
-func MergeConfigTemplates(clusterVersionTpl []appsv1alpha1.ComponentConfigSpec,
-	cdTpl []appsv1alpha1.ComponentConfigSpec) []appsv1alpha1.ComponentConfigSpec {
-	if len(clusterVersionTpl) == 0 {
-		return cdTpl
+func MergeConfigTemplates(cvConfigSpecs []appsv1alpha1.ComponentConfigSpec,
+	cdConfigSpecs []appsv1alpha1.ComponentConfigSpec) []appsv1alpha1.ComponentConfigSpec {
+	if len(cvConfigSpecs) == 0 {
+		return cdConfigSpecs
 	}
 
-	if len(cdTpl) == 0 {
-		return clusterVersionTpl
+	if len(cdConfigSpecs) == 0 {
+		return cvConfigSpecs
 	}
 
-	mergedCfgTpl := make([]appsv1alpha1.ComponentConfigSpec, 0, len(clusterVersionTpl)+len(cdTpl))
+	mergedCfgTpl := make([]appsv1alpha1.ComponentConfigSpec, 0, len(cvConfigSpecs)+len(cdConfigSpecs))
 	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
 
-	for _, tpl := range clusterVersionTpl {
-		tplName := tpl.Name
+	for _, configSpec := range cvConfigSpecs {
+		tplName := configSpec.Name
 		if _, ok := (mergedTplMap)[tplName]; ok {
 			// It's been checked in validation webhook
 			continue
 		}
-		mergedCfgTpl = append(mergedCfgTpl, tpl)
+		mergedCfgTpl = append(mergedCfgTpl, configSpec)
 		mergedTplMap[tplName] = struct{}{}
 	}
 
-	for _, tpl := range cdTpl {
+	for _, configSpec := range cdConfigSpecs {
 		// ClusterVersion replace clusterDefinition
-		tplName := tpl.Name
+		tplName := configSpec.Name
 		if _, ok := (mergedTplMap)[tplName]; ok {
 			continue
 		}
-		mergedCfgTpl = append(mergedCfgTpl, tpl)
+		mergedCfgTpl = append(mergedCfgTpl, configSpec)
 		mergedTplMap[tplName] = struct{}{}
 	}
 
@@ -118,20 +118,21 @@ func GetClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, c
 	if cvName == "" {
 		return nil
 	}
-	if err := cli.Get(ctx, client.ObjectKey{
+	clusterVersionKey := client.ObjectKey{
 		Namespace: "",
 		Name:      cvName,
-	}, cv); err != nil {
+	}
+	if err := cli.Get(ctx, clusterVersionKey, cv); err != nil {
 		return WrapError(err, "failed to get clusterversion[%s]", cvName)
 	}
 	return nil
 }
 
-func CheckConfigTemplateReconfigureKey(tpl appsv1alpha1.ComponentConfigSpec, key string) bool {
-	if len(tpl.Keys) == 0 {
+func CheckConfigTemplateReconfigureKey(configSpec appsv1alpha1.ComponentConfigSpec, key string) bool {
+	if len(configSpec.Keys) == 0 {
 		return true
 	}
-	for _, keySelector := range tpl.Keys {
+	for _, keySelector := range configSpec.Keys {
 		if keySelector == key {
 			return true
 		}

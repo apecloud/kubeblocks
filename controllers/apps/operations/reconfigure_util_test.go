@@ -40,10 +40,10 @@ var _ = Describe("Reconfigure util test", func() {
 
 	mockCfgTplObj := func(tpl appsv1alpha1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 		By("By assure an cm obj")
-		cfgCM := testapps.NewCustomizedObj("operations_config/configcm.yaml",
+		cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
 			&corev1.ConfigMap{},
 			testapps.WithNamespacedName(tpl.TemplateRef, tpl.Namespace))
-		cfgTpl := testapps.NewCustomizedObj("operations_config/configtpl.yaml",
+		cfgTpl := testapps.NewCustomizedObj("operations_config/config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{},
 			testapps.WithNamespacedName(tpl.ConfigConstraintRef, tpl.Namespace))
 		return cfgCM, cfgTpl
@@ -157,18 +157,14 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 				oldConfig := cmObj.Data
 				r := updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 				Expect(r.err).Should(Succeed())
-				option := cfgcore.CfgOption{
-					Type:    cfgcore.CfgTplType,
-					CfgType: appsv1alpha1.Ini,
-					Log:     log.FromContext(context.Background()),
-				}
-				diff, err := cfgcore.CreateMergePatch(&cfgcore.K8sConfig{
-					CfgKey:         client.ObjectKeyFromObject(cmObj),
-					Configurations: oldConfig,
-				}, &cfgcore.K8sConfig{
-					CfgKey:         client.ObjectKeyFromObject(cmObj),
-					Configurations: cmObj.Data,
-				}, option)
+				diff, err := cfgcore.CreateMergePatch(
+					cfgcore.FromConfigData(oldConfig, nil),
+					cfgcore.FromConfigData(cmObj.Data, nil),
+					cfgcore.CfgOption{
+						Type:    cfgcore.CfgTplType,
+						CfgType: appsv1alpha1.Ini,
+						Log:     log.FromContext(context.Background()),
+					})
 				Expect(err).Should(Succeed())
 				Expect(diff.IsModify).Should(BeTrue())
 				Expect(diff.UpdateConfig["my.cnf"]).Should(BeEquivalentTo(diffCfg))

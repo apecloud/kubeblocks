@@ -47,51 +47,51 @@ type renderWrapper struct {
 	params  builder.BuilderParams
 }
 
-func newTemplateRenderWrapper(cfgTplBuilder *configTemplateBuilder, cluster *appsv1alpha1.Cluster, params builder.BuilderParams, ctx context.Context, cli client.Client) renderWrapper {
+func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *appsv1alpha1.Cluster, params builder.BuilderParams, ctx context.Context, cli client.Client) renderWrapper {
 	return renderWrapper{
 		ctx:     ctx,
 		cli:     cli,
 		cluster: cluster,
 		params:  params,
 
-		templateBuilder:     cfgTplBuilder,
+		templateBuilder:     templateBuilder,
 		templateAnnotations: make(map[string]string),
 		volumes:             make(map[string]appsv1alpha1.ComponentTemplateSpec),
 	}
 }
 
-func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileTask, obj client.Object) error {
+func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileTask) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	for _, tpl := range task.Component.ConfigTemplates {
-		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, tpl.VolumeName)
+	for _, configSpec := range task.Component.ConfigTemplates {
+		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, configSpec.VolumeName)
 
 		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, tpl.ConfigConstraintRef, tpl.ComponentTemplateSpec, wrapper.params, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
-			return validateRenderedData(m, tpl, wrapper.ctx, wrapper.cli)
+		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef, configSpec.ComponentTemplateSpec, wrapper.params, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
+			return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
 		})
 		if err != nil {
 			return err
 		}
-		updateCMConfigSpecLabels(cm, tpl)
+		updateCMConfigSpecLabels(cm, configSpec)
 
-		if err := wrapper.addRenderObject(tpl.ComponentTemplateSpec, cm, scheme); err != nil {
+		if err := wrapper.addRenderObject(configSpec.ComponentTemplateSpec, cm, scheme); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (wrapper *renderWrapper) renderScriptTemplate(task *intctrltypes.ReconcileTask, obj client.Object) error {
+func (wrapper *renderWrapper) renderScriptTemplate(task *intctrltypes.ReconcileTask) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	for _, tpl := range task.Component.ScriptTemplates {
-		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, tpl.VolumeName)
+	for _, templateSpec := range task.Component.ScriptTemplates {
+		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, templateSpec.VolumeName)
 
 		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, "", tpl, wrapper.params, wrapper.ctx, wrapper.cli, nil)
+		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, "", templateSpec, wrapper.params, wrapper.ctx, wrapper.cli, nil)
 		if err != nil {
 			return err
 		}
-		if err := wrapper.addRenderObject(tpl, cm, scheme); err != nil {
+		if err := wrapper.addRenderObject(templateSpec, cm, scheme); err != nil {
 			return err
 		}
 	}
@@ -112,19 +112,19 @@ func (wrapper *renderWrapper) addRenderObject(tpl appsv1alpha1.ComponentTemplate
 	return nil
 }
 
-func updateCMConfigSpecLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ComponentConfigSpec) {
+func updateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {
 	if cm.Labels == nil {
 		cm.Labels = make(map[string]string)
 	}
 
-	cm.Labels[constant.CMConfigurationSpecProviderLabelKey] = tpl.Name
-	cm.Labels[constant.CMConfigurationTemplateNameLabelKey] = tpl.TemplateRef
-	if tpl.ConfigConstraintRef != "" {
-		cm.Labels[constant.CMConfigurationConstraintsNameLabelKey] = tpl.ConfigConstraintRef
+	cm.Labels[constant.CMConfigurationSpecProviderLabelKey] = configSpec.Name
+	cm.Labels[constant.CMConfigurationTemplateNameLabelKey] = configSpec.TemplateRef
+	if configSpec.ConfigConstraintRef != "" {
+		cm.Labels[constant.CMConfigurationConstraintsNameLabelKey] = configSpec.ConfigConstraintRef
 	}
 
-	if len(tpl.Keys) != 0 {
-		cm.Labels[constant.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
+	if len(configSpec.Keys) != 0 {
+		cm.Labels[constant.CMConfigurationCMKeysLabelKey] = strings.Join(configSpec.Keys, ",")
 	}
 }
 
@@ -132,13 +132,13 @@ func updateCMConfigSpecLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ComponentCo
 func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 	cmName string,
 	configConstraintName string,
-	tplCfg appsv1alpha1.ComponentTemplateSpec,
+	templateSpec appsv1alpha1.ComponentTemplateSpec,
 	params builder.BuilderParams,
 	ctx context.Context,
 	cli client.Client, dataValidator templateRenderValidator) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
-	configs, err := renderConfigMapTemplate(tplBuilder, tplCfg, ctx, cli)
+	configs, err := renderConfigMapTemplate(tplBuilder, templateSpec, ctx, cli)
 	if err != nil {
 		return nil, err
 	}
@@ -150,20 +150,20 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 	}
 
 	// Using ConfigMap cue template render to configmap of config
-	return builder.BuildConfigMapWithTemplate(configs, params, cmName, configConstraintName, tplCfg)
+	return builder.BuildConfigMapWithTemplate(configs, params, cmName, configConstraintName, templateSpec)
 }
 
 // renderConfigMapTemplate render config file using template engine
 func renderConfigMapTemplate(
-	tplBuilder *configTemplateBuilder,
-	tplCfg appsv1alpha1.ComponentTemplateSpec,
+	templateBuilder *configTemplateBuilder,
+	templateSpec appsv1alpha1.ComponentTemplateSpec,
 	ctx context.Context,
 	cli client.Client) (map[string]string, error) {
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: tplCfg.Namespace,
-		Name:      tplCfg.TemplateRef,
+		Namespace: templateSpec.Namespace,
+		Name:      templateSpec.TemplateRef,
 	}, cmObj); err != nil {
 		return nil, err
 	}
@@ -172,36 +172,36 @@ func renderConfigMapTemplate(
 		return map[string]string{}, nil
 	}
 
-	tplBuilder.setTplName(tplCfg.TemplateRef)
-	renderedCfg, err := tplBuilder.render(cmObj.Data)
+	templateBuilder.setTemplateName(templateSpec.TemplateRef)
+	renderedData, err := templateBuilder.render(cmObj.Data)
 	if err != nil {
 		return nil, cfgcore.WrapError(err, "failed to render configmap")
 	}
-	return renderedCfg, nil
+	return renderedData, nil
 }
 
 // validateRenderedData validate config file against constraint
 func validateRenderedData(
-	renderedCfg map[string]string,
-	tplCfg appsv1alpha1.ComponentConfigSpec,
+	renderedData map[string]string,
+	configSpec appsv1alpha1.ComponentConfigSpec,
 	ctx context.Context,
 	cli client.Client) error {
-	cfgTemplate := &appsv1alpha1.ConfigConstraint{}
-	if tplCfg.ConfigConstraintRef == "" {
+	configConstraint := &appsv1alpha1.ConfigConstraint{}
+	if configSpec.ConfigConstraintRef == "" {
 		return nil
 	}
 	if err := cli.Get(ctx, client.ObjectKey{
 		Namespace: "",
-		Name:      tplCfg.ConfigConstraintRef,
-	}, cfgTemplate); err != nil {
-		return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", tplCfg)
+		Name:      configSpec.ConfigConstraintRef,
+	}, configConstraint); err != nil {
+		return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
 	}
 
 	// NOTE: not require checker configuration template status
-	cfgChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec, cfgcore.WithKeySelector(tplCfg.Keys))
+	configChecker := cfgcore.NewConfigValidator(&configConstraint.Spec, cfgcore.WithKeySelector(configSpec.Keys))
 
 	// NOTE: It is necessary to verify the correctness of the data
-	if err := cfgChecker.Validate(renderedCfg); err != nil {
+	if err := configChecker.Validate(renderedData); err != nil {
 		return cfgcore.WrapError(err, "failed to validate configmap")
 	}
 

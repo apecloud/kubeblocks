@@ -365,9 +365,9 @@ spec:
         filePathPattern: /data/mysql/log/mysqld.err
       - name: slow
         filePathPattern: /data/mysql/mysqld-slow.log
-    configTemplateRefs:
+    configSpecs:
       - name: mysql-tree-node-template-8.0
-        configTplRef: mysql-tree-node-template-8.0
+        templateRef: mysql-tree-node-template-8.0
         volumeName: mysql-config
     workloadType: Consensus
     consensusSpec:

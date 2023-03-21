@@ -133,12 +133,12 @@ func TestConfigMapConfig(t *testing.T) {
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
 		CfgType: appsv1alpha1.Ini,
-		K8sKey: &K8sConfig{
+		ConfigResource: &ConfigResource{
 			CfgKey: client.ObjectKey{
 				Name:      "xxxx",    // set cm name
 				Namespace: "default", // set cm namespace
 			},
-			ResourceFn: func(key client.ObjectKey) (map[string]string, error) {
+			ResourceReader: func(key client.ObjectKey) (map[string]string, error) {
 				return map[string]string{
 					"my.cnf":      iniConfig,
 					"my_test.cnf": iniConfig,
@@ -177,15 +177,12 @@ func TestConfigMapConfig(t *testing.T) {
 			}, ctx))
 
 		content, _ := cfg.ToCfgContent()
-
-		patch, err := CreateMergePatch(&K8sConfig{
-			Configurations: map[string]string{
+		patch, err := CreateMergePatch(&ConfigResource{
+			ConfigData: map[string]string{
 				"my.cnf":  iniConfig,
 				"my2.cnf": iniConfig,
 			},
-		}, &K8sConfig{
-			Configurations: content,
-		}, cfg.Option)
+		}, FromConfigData(content, nil), cfg.Option)
 
 		require.Nil(t, err)
 		require.NotNil(t, patch)

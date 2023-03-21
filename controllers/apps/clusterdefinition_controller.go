@@ -96,7 +96,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.Reconciled()
 	}
 
-	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, dbClusterDef); err != nil {
+	if err := appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, reqCtx, dbClusterDef); err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 

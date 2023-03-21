@@ -194,7 +194,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 	Context("with MySQL defined as Consensus type and three replicas", func() {
 		BeforeEach(func() {
 			By("Create configmap")
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
 				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
 			By("Create a clusterDef obj")

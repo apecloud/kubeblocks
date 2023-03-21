@@ -53,7 +53,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 	return parent, ordinal
 }
 
-// GetContainerByConfigTemplate function description:
+// GetContainerByConfigSpec function description:
 // Search the container using the configmap of config from the pod
 //
 // Return: The first container pointer of using configs
@@ -71,7 +71,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 //		   name: data
 //		 - mountPath: /log
 //		   name: log
-func GetContainerByConfigTemplate(podSpec *corev1.PodSpec, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
+func GetContainerByConfigSpec(podSpec *corev1.PodSpec, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
 	containers := podSpec.Containers
 	initContainers := podSpec.InitContainers
 	if container := getContainerWithTplList(containers, configs); container != nil {

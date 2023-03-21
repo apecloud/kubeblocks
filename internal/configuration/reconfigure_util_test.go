@@ -65,8 +65,8 @@ func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *Config
 
 func TestIsUpdateDynamicParameters(t *testing.T) {
 	type args struct {
-		tpl  *appsv1alpha1.ConfigConstraintSpec
-		diff *ConfigPatchInfo
+		ccSpec *appsv1alpha1.ConfigConstraintSpec
+		diff   *ConfigPatchInfo
 	}
 	tests := []struct {
 		name    string
@@ -77,8 +77,8 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// null
 		args: args{
-			tpl:  &appsv1alpha1.ConfigConstraintSpec{},
-			diff: newCfgDiffMeta(`null`, nil, nil),
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{},
+			diff:   newCfgDiffMeta(`null`, nil, nil),
 		},
 		want:    false,
 		wantErr: false,
@@ -86,8 +86,8 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// error
 		args: args{
-			tpl:  &appsv1alpha1.ConfigConstraintSpec{},
-			diff: newCfgDiffMeta(`invalid json formatter`, nil, nil),
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{},
+			diff:   newCfgDiffMeta(`invalid json formatter`, nil, nil),
 		},
 		want:    false,
 		wantErr: true,
@@ -95,8 +95,8 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// add/delete config file
 		args: args{
-			tpl:  &appsv1alpha1.ConfigConstraintSpec{},
-			diff: newCfgDiffMeta(`{}`, map[string]interface{}{"a": "b"}, nil),
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{},
+			diff:   newCfgDiffMeta(`{}`, map[string]interface{}{"a": "b"}, nil),
 		},
 		want:    false,
 		wantErr: false,
@@ -104,8 +104,8 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// not set static or dynamic parameters
 		args: args{
-			tpl:  &appsv1alpha1.ConfigConstraintSpec{},
-			diff: newCfgDiffMeta(`{"a":"b"}`, nil, nil),
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{},
+			diff:   newCfgDiffMeta(`{"a":"b"}`, nil, nil),
 		},
 		want:    false,
 		wantErr: false,
@@ -113,7 +113,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// static parameters contains
 		args: args{
-			tpl: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
 				StaticParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param3":"b"}`, nil, nil),
@@ -124,7 +124,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// static parameters not contains
 		args: args{
-			tpl: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
 				StaticParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param4":"b"}`, nil, nil),
@@ -135,7 +135,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// dynamic parameters contains
 		args: args{
-			tpl: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
 				DynamicParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param1":"b", "param3": 20}`, nil, nil),
@@ -146,7 +146,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// dynamic parameters not contains
 		args: args{
-			tpl: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
 				DynamicParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param1":"b", "param4": 20}`, nil, nil),
@@ -157,7 +157,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// dynamic/static parameters not contains
 		args: args{
-			tpl: &appsv1alpha1.ConfigConstraintSpec{
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
 				DynamicParameters: []string{"dparam1", "dparam2", "dparam3"},
 				StaticParameters:  []string{"sparam1", "sparam2", "sparam3"},
 			},
@@ -168,7 +168,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := IsUpdateDynamicParameters(tt.args.tpl, tt.args.diff)
+			got, err := IsUpdateDynamicParameters(tt.args.ccSpec, tt.args.diff)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("IsUpdateDynamicParameters() error = %v, wantErr %v", err, tt.wantErr)
 				return

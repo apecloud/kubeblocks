@@ -168,7 +168,7 @@ single_thread_memory = 294912
 	// for test GetContainerWithVolumeMount
 	Context("ConfigTemplateBuilder sample test", func() {
 		It("test render", func() {
-			cfgBuilder := newCfgTemplateBuilder(
+			cfgBuilder := newTemplateBuilder(
 				"my_test",
 				"default",
 				&appsv1alpha1.Cluster{
@@ -187,7 +187,7 @@ single_thread_memory = 294912
 				CoreNum:    4,
 			}
 
-			cfgBuilder.setTplName("for_test")
+			cfgBuilder.setTemplateName("for_test")
 			rendered, err := cfgBuilder.render(map[string]string{
 				mysqlCfgName: mysqlCfgTmpContext,
 			})
@@ -196,7 +196,7 @@ single_thread_memory = 294912
 			Expect(rendered[mysqlCfgName]).Should(Equal(mysqlCfgRenderedContext))
 		})
 		It("test built-in function", func() {
-			cfgBuilder := newCfgTemplateBuilder(
+			cfgBuilder := newTemplateBuilder(
 				"my_test",
 				"default",
 				&appsv1alpha1.Cluster{
@@ -257,7 +257,7 @@ single_thread_memory = 294912
 		})
 
 		It("test array null check", func() {
-			cfgBuilder := newCfgTemplateBuilder(
+			cfgBuilder := newTemplateBuilder(
 				"my_test",
 				"default",
 				&appsv1alpha1.Cluster{

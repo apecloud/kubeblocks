@@ -657,7 +657,7 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.Visualized
 
 	base := findTemplateStatusByName(o.baseVersion.Status.ReconfiguringStatus, tplName)
 	diff := findTemplateStatusByName(o.diffVersion.Status.ReconfiguringStatus, tplName)
-	patch, _, err := cfgcore.CreateConfigurePatch(base.LastAppliedConfiguration, diff.LastAppliedConfiguration, formatCfg.Format, tpl.Keys, false)
+	patch, _, err := cfgcore.CreateConfigPatch(base.LastAppliedConfiguration, diff.LastAppliedConfiguration, formatCfg.Format, tpl.Keys, false)
 	if err != nil {
 		return nil, nil, err
 	}

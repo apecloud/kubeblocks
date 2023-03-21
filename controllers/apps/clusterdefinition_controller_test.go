@@ -127,10 +127,10 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 	assureCfgTplConfigMapObj := func() *corev1.ConfigMap {
 		By("Create a configmap and config template obj")
-		cm := testapps.CreateCustomizedObj(&testCtx, "config/configcm.yaml", &corev1.ConfigMap{},
+		cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
 			testCtx.UseDefaultNamespace())
 
-		cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/configtpl.yaml",
+		cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{})
 		Expect(testapps.ChangeObjStatus(&testCtx, cfgTpl, func() {
 			cfgTpl.Status.Phase = appsv1alpha1.AvailablePhase
@@ -171,9 +171,9 @@ var _ = Describe("ClusterDefinition Controller", func() {
 					// check labels and finalizers
 					g.Expect(cd.Finalizers).ShouldNot(BeEmpty())
 					configCMLabel := cfgcore.GenerateTPLUniqLabelKeyWithConfig(cmName)
-					configTPLLabel := cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(cmName)
+					configConstraintLabel := cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(cmName)
 					g.Expect(cd.Labels[configCMLabel]).Should(BeEquivalentTo(cmName))
-					g.Expect(cd.Labels[configTPLLabel]).Should(BeEquivalentTo(cmName))
+					g.Expect(cd.Labels[configConstraintLabel]).Should(BeEquivalentTo(cmName))
 				})).Should(Succeed())
 
 			By("check the reconciler update configmap.Finalizer after configmap is created.")

@@ -41,7 +41,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 	const statefulCompType = "replicasets"
 
-	const configTplName = "mysql-config-tpl"
+	const configSpecName = "mysql-config-tpl"
 
 	const configVolumeName = "mysql-config"
 
@@ -89,17 +89,17 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 		By("creating a cluster")
 		configMapObj = testapps.CreateCustomizedObj(&testCtx,
-			"resources/mysql_config_cm.yaml", &corev1.ConfigMap{},
+			"resources/mysql-config-template.yaml", &corev1.ConfigMap{},
 			testCtx.UseDefaultNamespace())
 
 		configConstraintObj = testapps.CreateCustomizedObj(&testCtx,
-			"resources/mysql_config_template.yaml",
+			"resources/mysql-config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{})
 
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
-			AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, configVolumeName).
+			AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, configVolumeName).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
@@ -160,11 +160,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			ok, err = updateLabelsByConfigSpec(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			_, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err = updateLabelsByConfigSpec(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 
 			err = DeleteConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterDefObj)
@@ -181,7 +181,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 				if len(component.ConfigSpecs) == 0 {
 					return nil
 				}
-
 				for i := range component.ConfigSpecs {
 					tpl := &component.ConfigSpecs[i]
 					tpl.ConfigConstraintRef = ""
@@ -276,11 +275,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			ok, err = updateLabelsByConfigSpec(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			_, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			_, err = updateLabelsByConfigSpec(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 
 			err = DeleteConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterVersionObj)

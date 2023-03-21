@@ -483,8 +483,8 @@ func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) boo
 	return false
 }
 
-// IsSupportConfigureParams check whether all updated parameters belong to config template parameters.
-func IsSupportConfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map[string]string, cli dynamic.Interface) (bool, error) {
+// IsSupportReconfigureParams check whether all updated parameters belong to config template parameters.
+func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map[string]string, cli dynamic.Interface) (bool, error) {
 	var (
 		err              error
 		configConstraint = appsv1alpha1.ConfigConstraint{}

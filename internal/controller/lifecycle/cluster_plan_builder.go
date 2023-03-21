@@ -251,12 +251,12 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 				// TODO: we should Update instead of Patch cluster object,
 				// TODO: but Update failure happens too frequently as other controllers are updating cluster object too.
 				// TODO: use Patch here, revert to Update after refactoring done
-				//if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
+				// if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
 				//	tmpCluster := &appsv1alpha1.Cluster{}
 				//	err = c.cli.Get(c.ctx.Ctx,client.ObjectKeyFromObject(origCluster), tmpCluster)
 				//	c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v, api-server: %v", origCluster, origCluster, cluster, tmpCluster))
 				//	return err
-				//}
+				// }
 				patch := client.MergeFrom(origCluster.DeepCopy())
 				if err := c.cli.Patch(c.ctx.Ctx, cluster, patch); err != nil {
 					c.ctx.Log.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
@@ -377,17 +377,17 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		return pvcObj, nil
 	}
 
-	switch node.obj.(type) {
+	switch obj := node.obj.(type) {
 	case *appsv1.StatefulSet:
-		return handleSts(node.oriObj.(*appsv1.StatefulSet), node.obj.(*appsv1.StatefulSet))
+		return handleSts(node.oriObj.(*appsv1.StatefulSet), obj)
 	case *appsv1.Deployment:
-		return handleDeploy(node.oriObj.(*appsv1.Deployment), node.obj.(*appsv1.Deployment))
+		return handleDeploy(node.oriObj.(*appsv1.Deployment), obj)
 	case *corev1.Service:
-		return handleSvc(node.oriObj.(*corev1.Service), node.obj.(*corev1.Service))
+		return handleSvc(node.oriObj.(*corev1.Service), obj)
 	case *corev1.PersistentVolumeClaim:
-		return handlePVC(node.oriObj.(*corev1.PersistentVolumeClaim), node.obj.(*corev1.PersistentVolumeClaim))
+		return handlePVC(node.oriObj.(*corev1.PersistentVolumeClaim), obj)
 	case *corev1.Secret, *corev1.ConfigMap:
-		return node.obj, nil
+		return obj, nil
 	}
 
 	return node.obj, nil

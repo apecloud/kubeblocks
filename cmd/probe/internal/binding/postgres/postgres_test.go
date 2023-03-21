@@ -60,7 +60,6 @@ func TestOperations(t *testing.T) {
 	assert.NotNil(t, pgOps.OperationMap[GetRoleOperation])
 	assert.NotNil(t, pgOps.OperationMap[ExecOperation])
 	assert.NotNil(t, pgOps.OperationMap[QueryOperation])
-	assert.NotNil(t, pgOps.OperationMap[CheckStatusOperation])
 }
 
 // SETUP TESTS
@@ -92,11 +91,6 @@ func TestPostgresIntegration(t *testing.T) {
 		Metadata:  map[string]string{commandSQLKey: testTableDDL},
 	}
 	ctx := context.TODO()
-	t.Run("Prepase Data", func(t *testing.T) {
-		res, err := b.Invoke(ctx, req)
-		assertResponse(t, res, err, "Success")
-	})
-
 	t.Run("Invoke checkRole", func(t *testing.T) {
 		req.Operation = "checkRole"
 		res, err := b.Invoke(ctx, req)
@@ -182,6 +176,7 @@ func TestPostgresIntegration(t *testing.T) {
 		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
+
 }
 
 func assertResponse(t *testing.T, res *bindings.InvokeResponse, err error, event string) {

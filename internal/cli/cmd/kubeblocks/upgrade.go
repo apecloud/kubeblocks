@@ -109,7 +109,7 @@ func (o *InstallOptions) Upgrade() error {
 	}
 
 	// add helm repo
-	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
+	spinner := printer.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
 	defer spinner(false)
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
@@ -122,7 +122,7 @@ func (o *InstallOptions) Upgrade() error {
 	if o.Version != "" {
 		msg = "to " + o.Version
 	}
-	spinner = util.Spinner(o.Out, "%-40s", "Upgrading KubeBlocks "+msg)
+	spinner = printer.Spinner(o.Out, "%-40s", "Upgrading KubeBlocks "+msg)
 	defer spinner(false)
 	// upgrade KubeBlocks chart
 	if err = o.upgradeChart(); err != nil {

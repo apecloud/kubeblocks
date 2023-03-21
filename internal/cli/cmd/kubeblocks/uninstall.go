@@ -162,7 +162,7 @@ func (o *uninstallOptions) uninstall() error {
 		fmt.Fprintf(o.Out, "  %s\n", err.Error())
 	}
 	newSpinner := func(msg string) func(result bool) {
-		return util.Spinner(o.Out, fmt.Sprintf("%-50s", msg))
+		return printer.Spinner(o.Out, fmt.Sprintf("%-50s", msg))
 	}
 
 	// uninstall all KubeBlocks addons

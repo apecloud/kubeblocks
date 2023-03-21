@@ -24,9 +24,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -185,7 +187,7 @@ func (o *InstallOptions) Install() error {
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// add helm repo
-	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksRepoName)
+	spinner := printer.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksRepoName)
 	defer spinner(false)
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()}); err != nil {
@@ -194,7 +196,7 @@ func (o *InstallOptions) Install() error {
 	spinner(true)
 
 	// install KubeBlocks chart
-	spinner = util.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
+	spinner = printer.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
 	defer spinner(false)
 	if err = o.installChart(); err != nil {
 		return err
@@ -202,12 +204,9 @@ func (o *InstallOptions) Install() error {
 	spinner(true)
 
 	// wait for auto-install addons to be ready
-	spinner = util.Spinner(o.Out, "%-40s", "Wait installable addons ready")
-	defer spinner(false)
 	if err = o.waitAddonsEnabled(); err != nil {
 		return err
 	}
-	spinner(true)
 
 	// create VolumeSnapshotClass
 	if err = o.createVolumeSnapshotClass(); err != nil {
@@ -224,6 +223,7 @@ func (o *InstallOptions) Install() error {
 
 // waitAddonsEnabled waits for auto-install addons status to be enabled
 func (o *InstallOptions) waitAddonsEnabled() error {
+	addons := make(map[string]bool)
 	checkAddons := func() (bool, error) {
 		allEnabled := true
 		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
@@ -233,7 +233,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 			return false, err
 		}
 		if objects == nil || len(objects.Items) == 0 {
-			klog.V(1).InfoS("No Addons found")
+			klog.V(1).Info("No Addons found")
 			return true, nil
 		}
 
@@ -258,8 +258,10 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 				addon.Name, addon.Spec.InstallSpec.GetEnabled(), addon.Status.Phase, installable)
 			// addon is enabled, then check its status
 			if addon.Spec.InstallSpec.GetEnabled() {
+				addons[addon.Name] = true
 				if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
 					klog.V(1).Infof("Addon %s is not enabled yet", addon.Name)
+					addons[addon.Name] = false
 					allEnabled = false
 				}
 			}
@@ -267,17 +269,77 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		return allEnabled, nil
 	}
 
+	okMsg := func(msg string) string {
+		return fmt.Sprintf("%-40s %s\n", msg, printer.BoldGreen("OK"))
+	}
+	failMsg := func(msg string) string {
+		return fmt.Sprintf("%-40s %s\n", msg, printer.BoldRed("FAIL"))
+	}
+	suffixMsg := func(msg string) string {
+		return fmt.Sprintf(" %-40s", msg)
+	}
+
+	// create spinner
+	msg := "Wait for addons to be ready"
+	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+	s.Writer = o.Out
+	_ = s.Color("cyan")
+	s.Suffix = suffixMsg(msg)
+	s.Start()
+
+	var prevUnready []string
+	// check addon installing progress
+	checkProgress := func() {
+		if len(addons) == 0 {
+			return
+		}
+		unready := make([]string, 0)
+		ready := make([]string, 0)
+		for k, v := range addons {
+			if v {
+				ready = append(ready, k)
+			} else {
+				unready = append(unready, k)
+			}
+		}
+		sort.Strings(unready)
+		s.Suffix = suffixMsg(fmt.Sprintf("%s\n  %s", msg, strings.Join(unready, "\n  ")))
+		for _, r := range ready {
+			if !slices.Contains(prevUnready, r) {
+				continue
+			}
+			s.FinalMSG = okMsg("Addon " + r)
+			s.Stop()
+			s.Suffix = suffixMsg(fmt.Sprintf("%s\n  %s", msg, strings.Join(unready, "\n  ")))
+			s.Start()
+		}
+		prevUnready = unready
+	}
+
+	var (
+		allEnabled bool
+		err        error
+	)
 	// wait for all auto-install addons to be enabled
 	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_TIMES"); i++ {
-		allEnabled, err := checkAddons()
+		allEnabled, err = checkAddons()
 		if err != nil {
+			s.FinalMSG = failMsg(msg)
+			s.Stop()
 			return err
 		}
+		checkProgress()
 		if allEnabled {
+			s.FinalMSG = okMsg(msg)
+			s.Stop()
 			return nil
 		}
 		time.Sleep(5 * time.Second)
 	}
+
+	// timeout to wait for all auto-install addons to be enabled
+	s.FinalMSG = fmt.Sprintf("%-40s %s\n", msg, printer.BoldRed("TIMEOUT"))
+	s.Stop()
 	return nil
 }
 
@@ -410,7 +472,7 @@ func (o *InstallOptions) createVolumeSnapshotClass() error {
 		options.BaseOptions.IOStreams = o.IOStreams
 		options.BaseOptions.Quiet = true
 
-		spinner := util.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
+		spinner := printer.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
 		defer spinner(false)
 
 		if err := options.Complete(); err != nil {

@@ -172,7 +172,7 @@ This guide shows a simple failure simulation to show you the failure recovery ca
 
 #### Delete ApeCloud MySQL Standalone
 
-Delete the ApeCloud MySQL Standalone before try out high availability.
+Delete the ApeCloud MySQL Standalone before trying out high availability.
 ```bash
 kbcli cluster delete mycluster
 ```
@@ -445,13 +445,6 @@ mysql> show databases;
 5 rows in set (0.02 sec)
 ```
 
-#### (Optional) Delete an ApeCloud MySQL cluster
-
-Delete a specified database cluster with `kbcli cluster delete`. For example, 
-```bash
-kbcli cluster delete mycluster
-```
-
 ### Observability
 
 KubeBlocks has complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks. 
@@ -476,6 +469,13 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
 
 ApeCloud MySQL Paxos Group delivers high availability with RPO=0 and RTO in less than 30 seconds.
 This section use a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
+
+#### Delete ApeCloud MySQL Standalone
+
+Delete the ApeCloud MySQL Standalone before trying out high availability.
+```bash
+kbcli cluster delete mycluster
+```
 
 #### Create an ApeCloud MySQL Paxos Group
 

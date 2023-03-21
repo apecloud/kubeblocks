@@ -10,12 +10,12 @@ import TabItem from '@theme/TabItem';
 
 # Try out basic functions of KubeBlocks on Playground 
 This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command. 
-With Playground, you can try out KubeBlocks both on your local host(maszXaacOS) and on cloud environment(AWS).
+With Playground, you can try out KubeBlocks both on your local host (macOS) and on cloud environment (AWS).
 
 <Tabs>
 <TabItem value="macOS" label="Local Host(macOS)" default>
 
-## Before you start try KubeBlocks on Local Host (macOS)
+## Before you start to try KubeBlocks on Local Host (macOS)
 
 Meet the following requirements for smooth operation of Playground and other functions.
 
@@ -39,7 +39,7 @@ Meet the following requirements for smooth operation of Playground and other fun
 
 ## Initialize Playground
 
-***Steps***
+***Steps:***
 
 1. Install Playground.
 
@@ -50,7 +50,7 @@ Meet the following requirements for smooth operation of Playground and other fun
    This command:
    1. Creates a Kubernetes cluster in the container with [K3d](https://k3d.io/v5.4.6/).
    2. Deploys KubeBlocks in this Kubernetes cluster.
-   3. Creates an ApeCloud MySQL Paxos group by KubeBlocks.
+   3. Creates an ApeCloud MySQL Standalone by KubeBlocks.
 
 2. Run `kbcli cluster list` to view the created cluster and when the status is `Running`, this cluster is created successfully. 
    
@@ -145,13 +145,6 @@ mysql> show databases;
 5 rows in set (0.02 sec)
 ```
 
-#### (Optional) Delete an ApeCloud MySQL cluster
-
-Delete a specified database cluster with `kbcli cluster delete`. For example, 
-```bash
-kbcli cluster delete mycluster
-```
-
 ### Observability
 
 KubeBlocks supports complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks. 
@@ -177,6 +170,13 @@ KubeBlocks supports complete observability capabilities. This section demonstrat
 ApeCloud MySQL Paxos group delivers high availability with RPO=0 and RTO in less than 30 seconds.
 This guide shows a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
 
+#### Delete ApeCloud MySQL Standalone
+
+Delete the ApeCloud MySQL Standalone before try out high availability.
+```bash
+kbcli cluster delete mycluster
+```
+
 #### Create an ApeCloud MySQL Paxos group
 
 Playground creates an ApeCloud MySQL standalone by default. You can also use `kbcli` to create a new Paxos group. The following is an example of creating an ApeCloud MySQL Paxos group with default configurations.
@@ -191,7 +191,7 @@ In this example, delete the leader pod to simulate a failure.
 
 ***Steps:***
 
-1. Run `kbcli cluster describe ` to view the ApeCloud MySQL Paxos group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
+1. Run `kbcli cluster describe` to view the ApeCloud MySQL Paxos group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
    ```bash
    kbcli cluster describe maple05
    >
@@ -372,7 +372,7 @@ The initialization lasts about 20 minutes. If the installation fails after a lon
 
 ## Try KubeBlocks with Playground
 
-You can explore three parts of KubeBlocks, the [Basic functions](#basic-functions), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Feature list](./../introduction/introduction.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
+You can explore three parts of KubeBlocks, the [Basic functions](#basic-functions-1), [Observability](#observability-1), and [High availability](#high-availability-of-apecloud-mysql-1). Refer to [Feature list](./../introduction/introduction.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
 
 ### Basic functions
 

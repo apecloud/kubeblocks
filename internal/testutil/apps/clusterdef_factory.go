@@ -150,6 +150,15 @@ func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envV
 	return factory
 }
 
+func (factory *MockClusterDefFactory) AddHorizontalScalePolicy(policy appsv1alpha1.HorizontalScalePolicy) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return nil
+	}
+	comp.HorizontalScalePolicy = &policy
+	return factory
+}
+
 func (factory *MockClusterDefFactory) SetConnectionCredential(
 	connectionCredential map[string]string, svc *corev1.ServiceSpec) *MockClusterDefFactory {
 	factory.get().Spec.ConnectionCredential = connectionCredential

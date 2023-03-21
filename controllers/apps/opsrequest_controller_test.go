@@ -219,7 +219,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
-				Create(&testCtx).GetObject()
+				AddHorizontalScalePolicy(appsv1alpha1.HorizontalScalePolicy{
+					Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
+				}).Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
@@ -235,6 +237,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("init backup policy template")
 			viper.Set("VOLUMESNAPSHOT", false)
 			createBackupPolicyTpl(clusterDefObj)
+			replicas := int32(3)
 
 			By("set component to horizontal with snapshot policy and create a cluster")
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
@@ -246,19 +249,32 @@ var _ = Describe("OpsRequest Controller", func() {
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(mysqlCompName, mysqlCompType).
-				SetReplicas(1).
+				SetReplicas(replicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
-			By("mock pvc created")
-			pvcName := fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, mysqlCompName, 0)
-			pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterKey.Name,
-				mysqlCompName, "data").SetStorage("1Gi").Create(&testCtx).GetObject()
-			// mock pvc bound
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
-				pvc.Status.Phase = corev1.ClaimBound
-			})).Should(Succeed())
 
+			By("mock component is Running")
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, mysqlCompName)
+			sts := &stsList.Items[0]
+			Expect(int(*sts.Spec.Replicas)).To(BeEquivalentTo(replicas))
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				testk8s.MockStatefulSetReady(sts)
+			})).Should(Succeed())
+			testapps.MockConsensusComponentPods(testCtx, sts, clusterKey.Name, mysqlCompName)
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningPhase))
+
+			By("mock pvc created")
+			for i := 0; i < int(replicas); i++ {
+				pvcName := fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, mysqlCompName, i)
+				pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterKey.Name,
+					mysqlCompName, "data").SetStorage("1Gi").Create(&testCtx).GetObject()
+				// mock pvc bound
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
+					pvc.Status.Phase = corev1.ClaimBound
+				})).Should(Succeed())
+			}
+			// wait for cluster observed generation
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 			mockSetClusterStatusPhaseToRunning(clusterKey)
 
@@ -269,11 +285,13 @@ var _ = Describe("OpsRequest Controller", func() {
 			ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
 				{
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
-					Replicas:     int32(3),
+					Replicas:     int32(5),
 				},
 			}
 			opsKey := client.ObjectKeyFromObject(ops)
 			Expect(testCtx.CreateObj(testCtx.Ctx, ops)).Should(Succeed())
+
+			By("expect component is Running if don't support volume snapshot during doing h-scale ops")
 			// cluster phase changes to HorizontalScalingPhase first. then, it will be ConditionsError because it does not support snapshot backup after a period of time.
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeElementOf(appsv1alpha1.HorizontalScalingPhase, appsv1alpha1.ConditionsErrorPhase))
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
@@ -287,7 +305,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("reset replicas to 1 and cluster should reconcile to Running")
 			Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-				cluster.Spec.ComponentSpecs[0].Replicas = int32(1)
+				cluster.Spec.ComponentSpecs[0].Replicas = int32(3)
 			})).Should(Succeed())
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
 		})

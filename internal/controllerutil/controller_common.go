@@ -39,6 +39,11 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
+// ResultToP converts a Result object to a pointer.
+func ResultToP(res reconcile.Result, err error) (*reconcile.Result, error) {
+	return &res, err
+}
+
 // Reconciled returns an empty result with nil error to signal a successful reconcile
 // to the controller manager
 func Reconciled() (reconcile.Result, error) {

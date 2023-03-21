@@ -41,6 +41,7 @@ var (
 	ErrReqClusterObj              = errors.New("required arg *appsv1alpha1.Cluster is nil")
 	ErrReqClusterComponentDefObj  = errors.New("required arg *appsv1alpha1.ClusterComponentDefinition is nil")
 	ErrReqClusterComponentSpecObj = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
+	ErrNoOps                      = errors.New("no operation required")
 )
 
 func ComponentRuntimeReqArgsCheck(cli client.Client,

@@ -82,7 +82,11 @@ const (
 	// ControllerErrorRequeueTime = 5 * time.Second
 )
 
+// REVIEW: this handling patches co-relation object upon condition patch succeed (cascade issue),
+// need better handling technique; function handling is monolithic, call for refactor.
+//
 // updateClusterConditions updates cluster.status condition and records event.
+// Deprecated: avoid monolithic and cascade processing
 func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Condition) error {
 	patch := client.MergeFrom(conMgr.cluster.DeepCopy())
 	oldCondition := meta.FindStatusCondition(conMgr.cluster.Status.Conditions, condition.Type)
@@ -105,20 +109,19 @@ func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Co
 		// if cluster status changed, do it
 		return opsutil.MarkRunningOpsRequestAnnotation(conMgr.ctx, conMgr.Client, conMgr.cluster)
 	}
-	return nil
+	return util.ErrNoOps
 }
 
 // handleConditionForClusterPhase checks whether the condition can be repaired by cluster.
 // if it cannot be repaired after 30 seconds, set the cluster status to ConditionsError
-func (conMgr clusterConditionManager) handleConditionForClusterPhase(oldCondition *metav1.Condition, condition metav1.Condition) bool {
+func (conMgr clusterConditionManager) handleConditionForClusterPhase(
+	oldCondition *metav1.Condition, condition metav1.Condition) bool {
 	if condition.Status == metav1.ConditionTrue {
 		return false
 	}
-
 	if oldCondition == nil || oldCondition.Reason != condition.Reason {
 		return false
 	}
-
 	if time.Now().Before(oldCondition.LastTransitionTime.Add(
 		time.Millisecond * requeueDuration)) {
 		return false
@@ -133,6 +136,7 @@ func (conMgr clusterConditionManager) handleConditionForClusterPhase(oldConditio
 }
 
 // setProvisioningStartedCondition sets the provisioning started condition in cluster conditions.
+// Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager) setProvisioningStartedCondition() error {
 	condition := metav1.Condition{
 		Type:    ConditionTypeProvisioningStarted,
@@ -144,6 +148,7 @@ func (conMgr clusterConditionManager) setProvisioningStartedCondition() error {
 }
 
 // setPreCheckErrorCondition sets the error condition when preCheck failed.
+// Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager) setPreCheckErrorCondition(err error) error {
 	var message string
 	if err != nil {
@@ -153,35 +158,30 @@ func (conMgr clusterConditionManager) setPreCheckErrorCondition(err error) error
 	if apierrors.IsNotFound(err) {
 		reason = constant.ReasonNotFoundCR
 	}
-	condition := metav1.Condition{
+	return conMgr.updateStatusConditions(newFailedProvisioningStartedCondition(err.Error(), reason))
+}
+
+// setUnavailableCondition sets the condition that reference CRs are unavailable.
+// Deprecated: avoid monolithic handling
+func (conMgr clusterConditionManager) setReferenceCRUnavailableCondition(message string) error {
+	return conMgr.updateStatusConditions(newFailedProvisioningStartedCondition(
+		message, constant.ReasonRefCRUnavailable))
+}
+
+// setApplyResourcesFailedCondition sets applied resources failed condition in cluster conditions.
+// Deprecated: avoid monolithic handling
+func (conMgr clusterConditionManager) setApplyResourcesFailedCondition(message string) error {
+	return conMgr.updateStatusConditions(newFailedApplyResourcesCondition(message))
+}
+
+// newApplyResourcesCondition creates a condition when applied resources succeed.
+func newFailedProvisioningStartedCondition(message, reason string) metav1.Condition {
+	return metav1.Condition{
 		Type:    ConditionTypeProvisioningStarted,
 		Status:  metav1.ConditionFalse,
 		Message: message,
 		Reason:  reason,
 	}
-	return conMgr.updateStatusConditions(condition)
-}
-
-// setUnavailableCondition sets the condition that reference CRs are unavailable.
-func (conMgr clusterConditionManager) setReferenceCRUnavailableCondition(message string) error {
-	condition := metav1.Condition{
-		Type:    ConditionTypeProvisioningStarted,
-		Status:  metav1.ConditionFalse,
-		Message: message,
-		Reason:  constant.ReasonRefCRUnavailable,
-	}
-	return conMgr.updateStatusConditions(condition)
-}
-
-// setApplyResourcesFailedCondition sets applied resources failed condition in cluster conditions.
-func (conMgr clusterConditionManager) setApplyResourcesFailedCondition(message string) error {
-	condition := metav1.Condition{
-		Type:    ConditionTypeApplyResources,
-		Status:  metav1.ConditionFalse,
-		Message: message,
-		Reason:  ReasonApplyResourcesFailed,
-	}
-	return conMgr.updateStatusConditions(condition)
 }
 
 // newApplyResourcesCondition creates a condition when applied resources succeed.
@@ -191,6 +191,16 @@ func newApplyResourcesCondition() metav1.Condition {
 		Status:  metav1.ConditionTrue,
 		Message: "Successfully applied for resources",
 		Reason:  ReasonApplyResourcesSucceed,
+	}
+}
+
+// newApplyResourcesCondition creates a condition when applied resources succeed.
+func newFailedApplyResourcesCondition(message string) metav1.Condition {
+	return metav1.Condition{
+		Type:    ConditionTypeApplyResources,
+		Status:  metav1.ConditionFalse,
+		Message: message,
+		Reason:  ReasonApplyResourcesFailed,
 	}
 }
 

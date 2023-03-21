@@ -92,7 +92,7 @@ func TestPostgresIntegration(t *testing.T) {
 		Metadata:  map[string]string{commandSQLKey: testTableDDL},
 	}
 	ctx := context.TODO()
-	t.Run("Prepase Data", func(t *testing.T) {
+	t.Run("Prepare Data", func(t *testing.T) {
 		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})

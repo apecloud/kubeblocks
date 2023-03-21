@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -215,6 +216,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return cluster.Status.ObservedGeneration != cluster.Generation
 	}, func() error {
 		cluster.Status.ObservedGeneration = cluster.Generation
+		if cluster.Status.Phase == "" {
+			cluster.Status.Phase = appsv1alpha1.CreatingPhase
+		}
 		return nil
 	}, nil)
 	if err != nil {
@@ -284,7 +288,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
-	reqCtx.Log.Info("update cluster phase")
+	// cluster status progressing phase update stage
+	reqCtx.Log.V(1).Info("update cluster status")
 	if res, err = r.updateClusterPhaseWithOperations(reqCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if res != nil {
@@ -293,7 +298,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// progressing process stage
 	// preCheck succeed, starting the cluster provisioning
-	if err = clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
+	if err = clusterConditionMgr.setProvisioningStartedCondition(); err == nil {
 		return intctrlutil.Reconciled()
 	} else if err != componentutil.ErrNoOps {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -368,12 +373,9 @@ func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 	patch := client.MergeFrom(clusterDeepCopy)
 	// apply resources succeed, record the condition and event
 	applyResourcesCondition := newApplyResourcesCondition()
-	cluster.SetStatusCondition(applyResourcesCondition)
+	meta.SetStatusCondition(&cluster.Status.Conditions, applyResourcesCondition)
 	// if cluster status is ConditionsError, do it before updated the observedGeneration.
 	r.updateClusterPhaseWhenConditionsError(cluster)
-	// update observed generation
-	// cluster.Status.ObservedGeneration = cluster.Generation
-	// cluster.Status.ClusterDefGeneration = clusterDef.Generation
 	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
 	}
@@ -762,10 +764,12 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		}
 		message := fmt.Sprintf("Cluster: %s is ready, current phase is Running.", cluster.Name)
 		action := func(currCluster *appsv1alpha1.Cluster) {
-			currCluster.SetStatusCondition(newClusterReadyCondition(currCluster.Name))
+			meta.SetStatusCondition(&currCluster.Status.Conditions,
+				newClusterReadyCondition(currCluster.Name))
 		}
 		oldPhase := cluster.Status.Phase
-		return processClusterPhaseChanges(cluster, oldPhase, currentClusterPhase, corev1.EventTypeNormal, message, action)
+		return processClusterPhaseChanges(cluster, oldPhase, currentClusterPhase,
+			corev1.EventTypeNormal, message, action)
 	}
 	return doChainClusterStatusHandler(ctx, r.Client, cluster, removeInvalidComponentsAndAnalysis,
 		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsStopped, handleClusterIsRunning)

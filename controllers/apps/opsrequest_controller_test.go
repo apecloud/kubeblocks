@@ -123,7 +123,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
+		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
 
 		By("mock cluster status running")
 		// MOCK pods are created and running, so as the cluster
@@ -170,7 +172,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		mockSetClusterStatusPhaseToRunning(clusterKey)
 
 		By("patch opsrequest controller to run")
-		Eventually(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
+		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
 			if verticalScalingOpsRequest.Annotations == nil {
 				verticalScalingOpsRequest.Annotations = map[string]string{}
 			}

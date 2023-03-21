@@ -191,7 +191,7 @@ var _ = Describe("util", func() {
 		Expect(len(GVRToString(types.ClusterGVR())) > 0).Should(BeTrue())
 	})
 
-	It("IsSupportConfigureParams", func() {
+	It("IsSupportReconfigureParams", func() {
 		const (
 			ccName = "mysql_cc"
 			testNS = "default"
@@ -211,7 +211,7 @@ var _ = Describe("util", func() {
 
 		Expect(appsv1alpha1.AddToScheme(scheme.Scheme)).Should(Succeed())
 		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, configConstraintObj)
-		tpl := appsv1alpha1.ComponentConfigSpec{
+		configSpec := appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 				Name:        "for_test",
 				TemplateRef: ccName,
@@ -221,7 +221,7 @@ var _ = Describe("util", func() {
 		}
 
 		type args struct {
-			tpl           appsv1alpha1.ComponentConfigSpec
+			configSpec    appsv1alpha1.ComponentConfigSpec
 			updatedParams map[string]string
 		}
 		tests := []struct {
@@ -231,21 +231,21 @@ var _ = Describe("util", func() {
 		}{{
 			name: "normal test",
 			args: args{
-				tpl:           tpl,
+				configSpec:    configSpec,
 				updatedParams: testapps.WithMap("automatic_sp_privileges", "OFF", "innodb_autoinc_lock_mode", "1"),
 			},
 			expected: true,
 		}, {
 			name: "not match test",
 			args: args{
-				tpl:           tpl,
+				configSpec:    configSpec,
 				updatedParams: testapps.WithMap("not_exist_field", "1"),
 			},
 			expected: false,
 		}}
 
 		for _, tt := range tests {
-			Expect(IsSupportConfigureParams(tt.args.tpl, tt.args.updatedParams, mockClient)).Should(BeEquivalentTo(tt.expected))
+			Expect(IsSupportReconfigureParams(tt.args.configSpec, tt.args.updatedParams, mockClient)).Should(BeEquivalentTo(tt.expected))
 		}
 	})
 

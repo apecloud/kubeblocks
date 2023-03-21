@@ -391,7 +391,7 @@ func (o *OperationsOptions) fillTemplateArgForReconfiguring() error {
 
 	supportUpdatedTpl := make([]appsv1alpha1.ComponentConfigSpec, 0)
 	for _, tpl := range tplList {
-		if ok, err := util.IsSupportConfigureParams(tpl, o.KeyValues, o.Dynamic); err == nil && ok {
+		if ok, err := util.IsSupportReconfigureParams(tpl, o.KeyValues, o.Dynamic); err == nil && ok {
 			supportUpdatedTpl = append(supportUpdatedTpl, tpl)
 		}
 	}

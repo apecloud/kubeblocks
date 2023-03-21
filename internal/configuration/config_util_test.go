@@ -125,10 +125,10 @@ var _ = Describe("config_util", func() {
 					CfgType: tt.args.configConstraint.FormatterConfig.Format,
 				}
 
-				patch, err := CreateMergePatch(&K8sConfig{
-					Configurations: tt.args.baseCfg,
-				}, &K8sConfig{
-					Configurations: got,
+				patch, err := CreateMergePatch(&ConfigResource{
+					ConfigData: tt.args.baseCfg,
+				}, &ConfigResource{
+					ConfigData: got,
 				}, option)
 				Expect(err).Should(Succeed())
 

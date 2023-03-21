@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/StudioSol/set"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -43,17 +42,13 @@ func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec,
 	)
 
 	cmKeySet := FromCMKeysSelector(cmKey)
-	if configOperator, err = NewConfigLoader(CfgOption{
-		Type:    CfgCmType,
-		Log:     log.FromContext(context.TODO()),
-		CfgType: fc.Format,
-		K8sKey: &K8sConfig{
-			CfgKey: client.ObjectKey{},
-			ResourceFn: func(key client.ObjectKey) (map[string]string, error) {
-				return baseConfigs, nil
-			},
-			CMKeys: cmKeySet,
-		}}); err != nil {
+	configOption := CfgOption{
+		Type:           CfgCmType,
+		Log:            log.FromContext(context.TODO()),
+		CfgType:        fc.Format,
+		ConfigResource: FromConfigData(baseConfigs, cmKeySet),
+	}
+	if configOperator, err = NewConfigLoader(configOption); err != nil {
 		return nil, err
 	}
 

@@ -110,20 +110,20 @@ func init() {
 
 	// For CM/TPL
 	loaderProvider[CfgCmType] = func(option CfgOption) (*cfgWrapper, error) {
-		if option.K8sKey == nil {
+		if option.ConfigResource == nil {
 			return nil, MakeError("invalid k8s resource[%v]", option)
 		}
 
-		ctx := option.K8sKey
-		if ctx.Configurations == nil && ctx.ResourceFn != nil {
-			configs, err := ctx.ResourceFn(ctx.CfgKey)
+		ctx := option.ConfigResource
+		if ctx.ConfigData == nil && ctx.ResourceReader != nil {
+			configs, err := ctx.ResourceReader(ctx.CfgKey)
 			if err != nil {
 				return nil, WrapError(err, "failed to get cm, cm key: [%v]", ctx.CfgKey)
 			}
-			ctx.Configurations = configs
+			ctx.ConfigData = configs
 		}
 
-		fileCount := len(ctx.Configurations)
+		fileCount := len(ctx.ConfigData)
 		meta := cfgWrapper{
 			name:      path.Base(ctx.CfgKey.Name),
 			fileCount: fileCount,
@@ -134,7 +134,7 @@ func init() {
 		var err error
 		var index = 0
 		var v unstructured.ConfigObject
-		for fileName, content := range ctx.Configurations {
+		for fileName, content := range ctx.ConfigData {
 			if ctx.CMKeys != nil && !ctx.CMKeys.InArray(fileName) {
 				continue
 			}
@@ -353,25 +353,23 @@ func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
 	return cmKeySet
 }
 
-func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigPatchInfo, error) {
+func CreateMergePatch(oldVersion, newVersion interface{}, option CfgOption) (*ConfigPatchInfo, error) {
 
-	ok, err := compareWithConfig(oldcfg, target, option)
+	ok, err := compareWithConfig(oldVersion, newVersion, option)
 	if err != nil {
 		return nil, err
 	} else if ok {
-		return &ConfigPatchInfo{
-			IsModify: false,
-		}, err
+		return &ConfigPatchInfo{IsModify: false}, err
 	}
 
-	old, err := NewConfigLoader(withOption(option, oldcfg))
+	old, err := NewConfigLoader(withOption(option, oldVersion))
 	if err != nil {
-		return nil, WrapError(err, "failed to create config: [%s]", oldcfg)
+		return nil, WrapError(err, "failed to create config: [%s]", oldVersion)
 	}
 
-	new, err := NewConfigLoader(withOption(option, target))
+	new, err := NewConfigLoader(withOption(option, newVersion))
 	if err != nil {
-		return nil, WrapError(err, "failed to create config: [%s]", oldcfg)
+		return nil, WrapError(err, "failed to create config: [%s]", oldVersion)
 	}
 
 	return old.Diff(new.cfgWrapper)

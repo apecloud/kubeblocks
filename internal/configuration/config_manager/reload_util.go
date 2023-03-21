@@ -90,7 +90,7 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 	if err != nil {
 		return nil, err
 	}
-	patch, err := cfgutil.CreateMergePatch(&cfgutil.K8sConfig{Configurations: oldData}, &cfgutil.K8sConfig{Configurations: newData}, patchOption)
+	patch, err := cfgutil.CreateMergePatch(&cfgutil.ConfigResource{ConfigData: oldData}, &cfgutil.ConfigResource{ConfigData: newData}, patchOption)
 	if err != nil {
 		return nil, err
 	}

@@ -35,13 +35,9 @@ func CreateConfigPatch(oldVersion, newVersion map[string]string, format appsv1al
 
 	cmKeySet := FromCMKeysSelector(keys)
 	patch, err := CreateMergePatch(
-		&K8sConfig{
-			Configurations: oldVersion,
-			CMKeys:         cmKeySet,
-		}, &K8sConfig{
-			Configurations: newVersion,
-			CMKeys:         cmKeySet,
-		}, CfgOption{
+		FromConfigData(oldVersion, cmKeySet),
+		FromConfigData(newVersion, cmKeySet),
+		CfgOption{
 			CfgType: format,
 			Type:    CfgTplType,
 			Log:     log.FromContext(context.TODO()),

@@ -284,7 +284,9 @@ func (o *initOptions) installKubeBlocks() error {
 	}
 	if o.cloudProvider == cp.Local {
 		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
-			"snapshot-controller.enabled=true", "csi-hostpath-driver.enabled=true")
+			"snapshot-controller.enabled=true", "csi-hostpath-driver.enabled=true",
+			"prometheus.server.persistentVolume.enabled=false", "prometheus.server.statefulSet.enabled=false",
+			"prometheus.alertmanager.persistentVolume.enabled=false", "prometheus.alertmanager.statefulSet.enabled=false")
 	}
 	return insOpts.Install()
 }

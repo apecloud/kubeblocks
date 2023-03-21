@@ -202,11 +202,13 @@ var _ = Describe("create", func() {
 			values       []string
 			compDefNames []string
 			expected     map[string]map[setKey]string
+			success      bool
 		}{
 			{
 				nil,
 				nil,
 				map[string]map[setKey]string{},
+				true,
 			},
 			{
 				[]string{"cpu=1"},
@@ -216,6 +218,7 @@ var _ = Describe("create", func() {
 						keyCPU: "1",
 					},
 				},
+				true,
 			},
 			{
 				[]string{"cpu=1,memory=2Gi,storage=10Gi"},
@@ -227,6 +230,7 @@ var _ = Describe("create", func() {
 						keyStorage: "10Gi",
 					},
 				},
+				true,
 			},
 			// values with unknown set key that will be ignored
 			{
@@ -239,6 +243,7 @@ var _ = Describe("create", func() {
 						keyStorage: "10Gi",
 					},
 				},
+				false,
 			},
 			// values with type
 			{
@@ -252,6 +257,7 @@ var _ = Describe("create", func() {
 						keyStorage: "10Gi",
 					},
 				},
+				false,
 			},
 			// set more than one time
 			{
@@ -264,6 +270,7 @@ var _ = Describe("create", func() {
 						keyStorage: "10Gi",
 					},
 				},
+				true,
 			},
 			{
 				[]string{"type=my-comp,cpu=1,memory=2Gi", "storage=10Gi,cpu=2"},
@@ -276,6 +283,7 @@ var _ = Describe("create", func() {
 						keyStorage: "10Gi",
 					},
 				},
+				true,
 			},
 			{
 				[]string{"type=comp1,cpu=1,memory=2Gi", "type=comp2,storage=10Gi,cpu=2"},
@@ -292,14 +300,19 @@ var _ = Describe("create", func() {
 						keyStorage: "10Gi",
 					},
 				},
+				true,
 			},
 		}
 
 		for _, t := range testCases {
 			By(strings.Join(t.values, " "))
 			res, err := buildCompSetsMap(t.values, mockCD(t.compDefNames))
-			Expect(err).Should(Succeed())
-			Expect(reflect.DeepEqual(res, t.expected)).Should(BeTrue())
+			if t.success {
+				Expect(err).Should(Succeed())
+				Expect(reflect.DeepEqual(res, t.expected)).Should(BeTrue())
+			} else {
+				Expect(err).Should(HaveOccurred())
+			}
 		}
 	})
 

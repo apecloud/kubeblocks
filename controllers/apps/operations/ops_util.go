@@ -324,9 +324,8 @@ func addOpsRequestAnnotationToCluster(ctx context.Context, cli client.Client, op
 		opsRequestSlice = make([]appsv1alpha1.OpsRecorder, 0)
 	}
 	opsRequestSlice = append(opsRequestSlice, appsv1alpha1.OpsRecorder{
-		Name:                   opsRes.OpsRequest.Name,
-		ToClusterPhase:         opsBehaviour.ToClusterPhase,
-		ResetClusterAfterABEnd: opsBehaviour.MaintainClusterPhaseBySelf,
+		Name:           opsRes.OpsRequest.Name,
+		ToClusterPhase: opsBehaviour.ToClusterPhase,
 	})
 	return opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
 }

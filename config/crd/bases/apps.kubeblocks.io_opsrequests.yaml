@@ -560,14 +560,6 @@ spec:
                           description: 'Limits describes the maximum amount of compute
                             resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
-                        relatedResources:
-                          additionalProperties:
-                            items:
-                              type: string
-                            type: array
-                          description: relatedResources records the related resources
-                            information of the component.
-                          type: object
                         replicas:
                           description: replicas are the last replicas of the component.
                           format: int32
@@ -627,6 +619,14 @@ spec:
                             - name
                             type: object
                           type: array
+                        targetResources:
+                          additionalProperties:
+                            items:
+                              type: string
+                            type: array
+                          description: targetResources records the affecting target
+                            resources information for the component.
+                          type: object
                         volumeClaimTemplates:
                           description: volumeClaimTemplates records the last volumeClaimTemplates
                             of the component.

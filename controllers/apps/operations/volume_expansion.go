@@ -49,7 +49,8 @@ func init() {
 			appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase,
 			appsv1alpha1.AbnormalPhase, appsv1alpha1.ConditionsErrorPhase,
 		},
-		ToClusterPhase:             appsv1alpha1.VolumeExpandingPhase,
+		ToClusterPhase: appsv1alpha1.VolumeExpandingPhase,
+		// TODO: add cluster reconcile VolumeExpanding phase.
 		MaintainClusterPhaseBySelf: true,
 		OpsHandler:                 volumeExpansionOpsHandler{},
 	}

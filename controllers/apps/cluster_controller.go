@@ -527,7 +527,7 @@ func (r *ClusterReconciler) setClusterPhaseWithOperations(cluster *appsv1alpha1.
 	if len(opsSlice) > 0 {
 		cluster.Status.Phase = opsSlice[0].ToClusterPhase
 	} else {
-		cluster.Status.Phase = appsv1alpha1.SpecUpdatingPhase
+		cluster.Status.Phase = appsv1alpha1.SpecReconcilingPhase
 	}
 }
 
@@ -544,7 +544,7 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *appsv
 	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 	// if no operations in cluster, means user update the cluster.spec directly
 	if len(opsRequestSlice) == 0 {
-		cluster.Status.Phase = appsv1alpha1.SpecUpdatingPhase
+		cluster.Status.Phase = appsv1alpha1.SpecReconcilingPhase
 		return
 	}
 	// if exits opsRequests are running, set the cluster phase to the early target phase with the OpsRequest
@@ -703,6 +703,7 @@ func (r *ClusterReconciler) cleanupAnnotationsAfterRunning(reqCtx intctrlutil.Re
 }
 
 // handleRestoreGarbageBeforeRunning handles the garbage for restore before cluster phase changes to Running.
+// TODO: removed by PITR feature.
 func (r *ClusterReconciler) handleGarbageOfRestoreBeforeRunning(ctx context.Context, cluster *appsv1alpha1.Cluster) (bool, error) {
 	clusterBackupResourceMap, err := getClusterBackupSourceMap(cluster)
 	if err != nil {

@@ -57,6 +57,9 @@ var _ = Describe("lifecycle_utils", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
 		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
+		// non-namespaced
+		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 	}
 
 	BeforeEach(cleanAll)

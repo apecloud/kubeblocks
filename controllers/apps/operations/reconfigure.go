@@ -39,6 +39,7 @@ func init() {
 			appsv1alpha1.FailedPhase,
 			appsv1alpha1.AbnormalPhase,
 		},
+		// TODO: add cluster reconcile Reconfiguring phase.
 		ToClusterPhase:             appsv1alpha1.ReconfiguringPhase,
 		MaintainClusterPhaseBySelf: true,
 		OpsHandler:                 &reAction,

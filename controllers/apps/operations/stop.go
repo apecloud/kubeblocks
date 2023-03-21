@@ -101,7 +101,7 @@ func (stop StopOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 			copyReplicas := v.Replicas
 			lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
 				Replicas: &copyReplicas,
-				RelatedResources: map[appsv1alpha1.ComponentResourceKey][]string{
+				TargetResources: map[appsv1alpha1.ComponentResourceKey][]string{
 					appsv1alpha1.PodsCompResourceKey: podNames,
 				},
 			}

@@ -427,14 +427,11 @@ var _ = Describe("OpsRequest Controller", func() {
 				volumeExpandOps.Finalizers = []string{}
 			})).Should(Succeed())
 
-			By("check the cluster phase")
+			By("check the cluster annotation")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmlCluster *appsv1alpha1.Cluster) {
 				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(tmlCluster)
 				g.Expect(opsSlice).Should(HaveLen(0))
-				g.Expect(tmlCluster.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.RunningPhase))
 			})).Should(Succeed())
-			// cluster will change phase to SpecUpdating when volume expansion completed.
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecUpdatingPhase))
 		})
 
 	})

@@ -45,8 +45,6 @@ func GetUncachedObjects() []client.Object {
 		// avoid to cache potential large data objects
 		&corev1.ConfigMap{},
 		&corev1.Secret{},
-		//
 		&appsv1alpha1.Cluster{},
-		&appsv1alpha1.ConfigConstraint{},
 	}
 }

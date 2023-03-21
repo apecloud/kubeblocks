@@ -514,7 +514,7 @@ func handleScaleDownProgress(
 			&compStatus.ProgressDetails, progressDetail)
 	}
 	lastComponentConfigs := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.clusterComponent.Name]
-	lastComponentPodNames := lastComponentConfigs.RelatedResources[appsv1alpha1.PodsCompResourceKey]
+	lastComponentPodNames := lastComponentConfigs.TargetResources[appsv1alpha1.PodsCompResourceKey]
 	for _, v := range lastComponentPodNames {
 		objectKey := GetProgressObjectKey(constant.PodKind, v)
 		if _, ok := podMap[objectKey]; ok {

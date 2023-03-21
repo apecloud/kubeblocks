@@ -84,7 +84,7 @@ func (r *OpsRequestReconciler) fetchOpsRequestAndCluster(reqCtx intctrlutil.Requ
 			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
 		}
 		// if the opsRequest is not found, we need to check if this opsRequest is deleted abnormally
-		if err = r.handleClusterAnnotationIfOpsABEnd(reqCtx); err != nil {
+		if err = r.handleOpsDeletedDuringRunning(reqCtx); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
@@ -217,30 +217,17 @@ func (r *OpsRequestReconciler) doOpsRequestAction(reqCtx intctrlutil.RequestCtx,
 	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }
 
-// handleClusterAnnotationIfOpsABEnd will handle the cluster annotation if the OpsRequest is abnormal end.
-func (r *OpsRequestReconciler) handleClusterAnnotationIfOpsABEnd(reqCtx intctrlutil.RequestCtx) error {
+// handleOpsDeletedDuringRunning handles the cluster annotation if the OpsRequest is deleted during running.
+func (r *OpsRequestReconciler) handleOpsDeletedDuringRunning(reqCtx intctrlutil.RequestCtx) error {
 	clusterList := &appsv1alpha1.ClusterList{}
 	if err := r.Client.List(reqCtx.Ctx, clusterList, client.InNamespace(reqCtx.Req.Namespace)); err != nil {
 		return err
 	}
 	for _, cluster := range clusterList.Items {
 		opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(&cluster)
-		index, record := operations.GetOpsRecorderFromSlice(opsRequestSlice, reqCtx.Req.Name)
+		index, _ := operations.GetOpsRecorderFromSlice(opsRequestSlice, reqCtx.Req.Name)
 		if index == -1 {
 			continue
-		}
-		if record.ResetClusterAfterABEnd {
-			// if the OpsRequest should reset cluster phase after abnormal end, do it.
-			patch := client.MergeFrom(cluster.DeepCopy())
-			for k, comp := range cluster.Status.Components {
-				if comp.Phase == record.ToClusterPhase {
-					comp.Phase = appsv1alpha1.RunningPhase
-					cluster.Status.SetComponentStatus(k, comp)
-				}
-			}
-			if err := r.Client.Status().Patch(reqCtx.Ctx, &cluster, patch); err != nil {
-				return err
-			}
 		}
 		// if the OpsRequest is abnormal end, we should clear the OpsRequest annotation in reference cluster.
 		opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)

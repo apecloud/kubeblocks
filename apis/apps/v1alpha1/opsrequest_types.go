@@ -308,9 +308,9 @@ type LastComponentConfiguration struct {
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
-	// relatedResources records the related resources information of the component.
+	// targetResources records the affecting target resources information for the component.
 	// +optional
-	RelatedResources map[ComponentResourceKey][]string `json:"relatedResources,omitempty"`
+	TargetResources map[ComponentResourceKey][]string `json:"targetResources,omitempty"`
 }
 
 type LastConfiguration struct {

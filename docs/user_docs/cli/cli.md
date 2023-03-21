@@ -49,10 +49,10 @@ Cluster command.
 * [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete an OpsRequest.
 * [kbcli cluster delete-restore](kbcli_cluster_delete-restore.md)	 - Delete a restore job.
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster.
-* [kbcli cluster describe-configure](kbcli_cluster_describe-configure.md)	 - Show details of a specific reconfiguring.
+* [kbcli cluster describe-config](kbcli_cluster_describe-config.md)	 - Show details of a specific reconfiguring.
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest.
-* [kbcli cluster diff-configure](kbcli_cluster_diff-configure.md)	 - Show the difference in parameters between the two submitted OpsRequest.
-* [kbcli cluster explain-configure](kbcli_cluster_explain-configure.md)	 - List the constraint for supported configuration params.
+* [kbcli cluster diff-config](kbcli_cluster_diff-config.md)	 - Show the difference in parameters between the two submitted OpsRequest.
+* [kbcli cluster explain-config](kbcli_cluster_explain-config.md)	 - List the constraint for supported configuration params.
 * [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster.
 * [kbcli cluster hscale](kbcli_cluster_hscale.md)	 - Horizontally scale the specified components in the cluster.
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters.

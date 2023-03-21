@@ -22,6 +22,8 @@ import (
 	"github.com/StudioSol/set"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/internal/unstructured"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
@@ -63,4 +65,23 @@ func checkExcludeConfigDifference(oldVersion map[string]string, newVersion map[s
 		}
 	}
 	return false
+}
+
+func LoadRawConfigObject(data map[string]string, formatConfig *appsv1alpha1.FormatterConfig, keys []string) (map[string]unstructured.ConfigObject, error) {
+	r := make(map[string]unstructured.ConfigObject)
+	cmKeySet := FromCMKeysSelector(keys)
+	for key, val := range data {
+		if cmKeySet != nil && !cmKeySet.InArray(key) {
+			continue
+		}
+		configObject, err := unstructured.LoadConfig(key, val, formatConfig.Format)
+		if err != nil {
+			return nil, err
+		}
+		if formatConfig.IniConfig != nil {
+			configObject = configObject.SubConfig(formatConfig.IniConfig.SectionName)
+		}
+		r[key] = configObject
+	}
+	return r, nil
 }

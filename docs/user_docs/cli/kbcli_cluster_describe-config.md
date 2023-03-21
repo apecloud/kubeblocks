@@ -1,11 +1,11 @@
 ---
-title: kbcli cluster describe-configure
+title: kbcli cluster describe-config
 ---
 
 Show details of a specific reconfiguring.
 
 ```
-kbcli cluster describe-configure [flags]
+kbcli cluster describe-config [flags]
 ```
 
 ### Examples
@@ -29,7 +29,7 @@ kbcli cluster describe-configure [flags]
 ```
       --component-name string    Specify the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter."
       --configure-file strings   Specify the name of the configuration file to be describe (e.g. for mysql: --configure-file=my.cnf). If unset, all files.
-  -h, --help                     help for describe-configure
+  -h, --help                     help for describe-config
       --show-detail              If true, the content of the files specified by configure-file will be printed.
       --template-names strings   Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --template-names=mysql-3node-tpl)
 ```

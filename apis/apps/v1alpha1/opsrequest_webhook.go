@@ -108,12 +108,11 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 		opsRecorder     []OpsRecorder
 		ok              bool
 	)
-	if opsRequestValue, ok = cluster.Annotations[opsRequestAnnotationKey]; !ok {
-		return nil
-	}
-	// opsRequest annotation value in cluster to map
-	if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorder); err != nil {
-		return nil
+	if opsRequestValue, ok = cluster.Annotations[opsRequestAnnotationKey]; ok {
+		// opsRequest annotation value in cluster to map
+		if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorder); err != nil {
+			return nil
+		}
 	}
 	opsNamesInQueue := make([]string, len(opsRecorder))
 	for i, v := range opsRecorder {

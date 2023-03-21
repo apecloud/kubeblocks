@@ -139,6 +139,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		cluster:  cluster,
 	}
 
+	// deletion check stage
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
 		return r.deleteExternalResources(reqCtx, cluster)
 	})
@@ -203,13 +204,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		} else if handlingRestoreGarbage {
 			return intctrlutil.Reconciled()
 		}
-		// // reconcile the phase and conditions of the Cluster.status
-		// if err = r.reconcileClusterStatus(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
-		// 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		// }
-		// if err = r.cleanupAnnotationsAfterRunning(reqCtx, cluster); err != nil {
-		// 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		// }
+		if err = r.cleanupAnnotationsAfterRunning(reqCtx, cluster); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 		return intctrlutil.Reconciled()
 	}
 
@@ -774,18 +771,15 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsStopped, handleClusterIsRunning)
 }
 
-// // cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.
-// func (r *ClusterReconciler) cleanupAnnotationsAfterRunning(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
-// 	if cluster.Status.Phase != appsv1alpha1.RunningPhase {
-// 		return nil
-// 	}
-// 	if _, ok := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]; !ok {
-// 		return nil
-// 	}
-// 	patch := client.MergeFrom(cluster.DeepCopy())
-// 	delete(cluster.Annotations, constant.RestoreFromBackUpAnnotationKey)
-// 	return r.Client.Patch(reqCtx.Ctx, cluster, patch)
-// }
+// cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.
+func (r *ClusterReconciler) cleanupAnnotationsAfterRunning(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
+	if _, ok := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]; !ok {
+		return nil
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	delete(cluster.Annotations, constant.RestoreFromBackUpAnnotationKey)
+	return r.Client.Patch(reqCtx.Ctx, cluster, patch)
+}
 
 // REVIEW: this handling is rather hackish, call for refactor.
 // handleRestoreGarbageBeforeRunning handles the garbage for restore before cluster phase changes to Running.

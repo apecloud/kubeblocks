@@ -27,6 +27,7 @@ import (
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -61,7 +62,6 @@ type initOptions struct {
 	genericclioptions.IOStreams
 	helmCfg        *helm.Config
 	clusterDef     string
-	verbose        bool
 	kbVersion      string
 	clusterVersion string
 
@@ -88,7 +88,6 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of [%s]", strings.Join(cp.CloudProviders(), ",")))
 	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")
-	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Output more log info")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cloud-provider",
@@ -136,7 +135,7 @@ func (o *initOptions) run() error {
 func (o *initOptions) local() error {
 	var err error
 	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
-	provider.VerboseLog(o.verbose)
+	provider.VerboseLog(klog.V(1).Enabled())
 
 	o.startTime = time.Now()
 	// Set up K3s as KubeBlocks control plane cluster
@@ -152,10 +151,15 @@ func (o *initOptions) local() error {
 
 func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 	var err error
+
+	// playground always use the default kubeconfig in ~/.kube/config
 	configPath := util.ConfigPath("config")
+	if err = SetKubeConfig(configPath); err != nil {
+		return err
+	}
 
 	// create helm config
-	o.helmCfg = helm.NewConfig("", configPath, "", o.verbose)
+	o.helmCfg = helm.NewConfig("", configPath, "", klog.V(1).Enabled())
 
 	// Install KubeBlocks
 	if err = o.installKubeBlocks(); err != nil {
@@ -216,7 +220,7 @@ if it takes a long time, please check the network environment and try again.
 	}
 
 	// clone apecloud/cloud-provider repo to local path
-	fmt.Fprintf(o.Out, "Clone cloud provider terraform script to %s...\n", cpPath)
+	fmt.Fprintf(o.Out, "Clone ApeCloud cloud-provider repo to %s...\n", cpPath)
 	if err = util.CloneGitRepo(cp.GitRepoURL, cpPath); err != nil {
 		return err
 	}
@@ -229,7 +233,7 @@ if it takes a long time, please check the network environment and try again.
 
 	var init bool
 	// check if previous cluster exists
-	clusterName, _ := getExistedCluster(provider, cpPath)
+	clusterName, _ := getExistedCluster(provider)
 
 	// if cluster exists, continue or not, if not, user should destroy the old cluster first
 	if clusterName != "" {
@@ -289,8 +293,8 @@ func (o *initOptions) installKubeBlocks() error {
 	return insOpts.Install()
 }
 
+// createCluster construct a cluster create options and run
 func (o *initOptions) createCluster() error {
-	// construct a cluster create options and run
 	options, err := newCreateOptions(o.clusterDef, o.clusterVersion)
 	if err != nil {
 		return err

@@ -33,9 +33,11 @@ var _ = Describe("playground destroy", func() {
 	It("destroy command", func() {
 		cmd := newDestroyCmd(streams)
 		Expect(cmd).ShouldNot(BeNil())
-
 		o := &destroyOptions{
 			IOStreams: streams,
+			baseOptions: baseOptions{
+				cloudProvider: defaultCloudProvider,
+			},
 		}
 		Expect(o.destroy()).Should(HaveOccurred())
 	})

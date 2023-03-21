@@ -23,6 +23,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
@@ -39,8 +40,9 @@ var _ = Describe("playground", func() {
 		Expect(cmd != nil).Should(BeTrue())
 
 		o := &initOptions{
-			clusterDef: "test-cd",
-			IOStreams:  streams,
+			clusterDef:     clitesting.ClusterDefName,
+			clusterVersion: clitesting.ClusterVersionName,
+			IOStreams:      streams,
 			baseOptions: baseOptions{
 				cloudProvider: defaultCloudProvider,
 			},
@@ -54,11 +56,12 @@ var _ = Describe("playground", func() {
 
 	It("init at remote cloud", func() {
 		o := &initOptions{
-			IOStreams: streams,
+			IOStreams:      streams,
+			clusterDef:     clitesting.ClusterDefName,
+			clusterVersion: clitesting.ClusterVersionName,
 			baseOptions: baseOptions{
 				cloudProvider: cp.AWS,
 			},
-			clusterDef: "test-cd",
 		}
 		Expect(o.validate()).Should(HaveOccurred())
 	})

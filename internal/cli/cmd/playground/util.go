@@ -18,6 +18,7 @@ package playground
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
@@ -42,7 +43,7 @@ func cloudProviderRepoDir() (string, error) {
 }
 
 // getExistedCluster get existed playground kubernetes cluster, we should only have one cluster
-func getExistedCluster(provider cp.Interface, path string) (string, error) {
+func getExistedCluster(provider cp.Interface) (string, error) {
 	clusterNames, err := provider.GetExistedClusters()
 	if err != nil {
 		return "", err
@@ -54,4 +55,9 @@ func getExistedCluster(provider cp.Interface, path string) (string, error) {
 		return "", nil
 	}
 	return clusterNames[0], nil
+}
+
+// SetKubeConfig set KUBECONFIG environment
+func SetKubeConfig(cfg string) error {
+	return os.Setenv("KUBECONFIG", cfg)
 }

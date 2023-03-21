@@ -63,7 +63,6 @@ type Options struct {
 	Namespace string
 	Client    kubernetes.Interface
 	Dynamic   dynamic.Interface
-	verbose   bool
 }
 
 type InstallOptions struct {
@@ -115,7 +114,6 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before install")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks")
-	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Show logs in detail")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -146,7 +144,7 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 	})
 
-	o.HelmCfg = helm.NewConfig(targetNamespace, config, ctx, o.verbose)
+	o.HelmCfg = helm.NewConfig(targetNamespace, config, ctx, klog.V(1).Enabled())
 	if o.Dynamic, err = f.DynamicClient(); err != nil {
 		return err
 	}

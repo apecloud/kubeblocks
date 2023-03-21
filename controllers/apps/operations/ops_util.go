@@ -51,6 +51,9 @@ func ReconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	opsMessageKey string,
 	handleStatusProgress handleStatusProgressWithComponent,
 ) (appsv1alpha1.OpsPhase, time.Duration, error) {
+	if opsRes == nil {
+		return "", 0, nil
+	}
 	opsRequestPhase := appsv1alpha1.OpsRunningPhase
 	clusterDef, err := GetClusterDefByName(reqCtx.Ctx, cli,
 		opsRes.Cluster.Spec.ClusterDefRef)

@@ -96,7 +96,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
 				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeProvisioningStarted)
 				condition.LastTransitionTime = metav1.Time{Time: time.Now().Add(-(time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)) + time.Second))}
-				tmpCluster.SetStatusCondition(*condition)
+				meta.SetStatusCondition(&tmpCluster.Status.Conditions, *condition)
 			})()).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {

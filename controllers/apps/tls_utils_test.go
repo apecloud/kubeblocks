@@ -125,8 +125,9 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 				clusterKey := client.ObjectKeyFromObject(clusterObj)
 
-				By("Waiting for the cluster initialized")
+				By("Waiting for the cluster enter creating phase")
 				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
 
 				By("By inspect that TLS cert. secret")
 				ns := clusterObj.Namespace
@@ -228,8 +229,9 @@ var _ = Describe("TLS self-signed cert function", func() {
 			// 		GetObject()
 
 			// 	clusterKey := client.ObjectKeyFromObject(clusterObj)
-			// 	By("Waiting for the cluster initialized")
-			// 	Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+			// By("Waiting for the cluster enter creating phase")
+			// Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+			// Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
 
 			// 	By("By check cluster status.phase=ConditionsError")
 			// 	Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).

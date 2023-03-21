@@ -22,7 +22,6 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -420,13 +419,6 @@ type ClusterList struct {
 
 func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
-}
-
-func (r *Cluster) SetStatusCondition(condition metav1.Condition) {
-	if r == nil {
-		return
-	}
-	meta.SetStatusCondition(&r.Status.Conditions, condition)
 }
 
 // ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detect invalid values.

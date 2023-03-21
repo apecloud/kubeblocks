@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 
 # Try out basic functions of KubeBlocks on Playground 
 This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command. 
-With Playground, you can try out KubeBlocks both on your local host (macOS) and on cloud environment (AWS).
+With Playground, you can try out KubeBlocks both on your local host (macOS) and on a cloud environment (AWS).
 
 <Tabs>
 <TabItem value="macOS" label="Local Host (macOS)" default>
@@ -265,7 +265,7 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
    ```bash
    kbcli dashboard open kubeblocks-nyancat
    ```
-4. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
+4. Delete the leader pod and view the influences on the ApeCloud MySQL cluster through the NYAN CAT page.
    
    ![NYAN CAT](./../../img/quick_start_nyan_cat.png)
 
@@ -393,7 +393,6 @@ For the full feature set, refer to [KubeBlocks Documentation](./../introduction/
 1. Run the command below to view the database cluster list.
     ```bash
     kbcli cluster list
-   
     ```
 
 2. Run `kbcli cluster describe` to view the details of a specified database cluster, such as `STATUS`, `Endpoints`, `Topology`, `Images`, and `Events`.
@@ -416,17 +415,11 @@ Get the MySQL client connection example.
 
 ```bash
 kbcli cluster connect --show-example --client=cli mycluster
-# cluster mycluster does not have public endpoints, you can run following command and connect cluster from local host
-kubectl port-forward service/mycluster-mysql 3306:3306
-
-# mysql client connection example
-mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
 ```
 
 **Example**
 
 ```bash
-
 kubectl port-forward service/mycluster-mysql 3306:3306
 >
 Forwarding from 127.0.0.1:3306 -> 3306
@@ -475,7 +468,7 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
 ### High availability of ApeCloud MySQL
 
 ApeCloud MySQL Paxos Group delivers high availability with RPO=0 and RTO in less than 30 seconds.
-This section use a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
+This section uses a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
 
 #### Delete ApeCloud MySQL Standalone
 

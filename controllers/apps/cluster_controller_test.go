@@ -227,8 +227,8 @@ var _ = Describe("Cluster Controller", func() {
 				cluster.Spec.ComponentSpecs[idx].Services = services
 				return
 			}
-
 		})()).ShouldNot(HaveOccurred())
+
 		// REVIEW: not so BDD as need to implement condition logics.
 		Eventually(func(g Gomega) bool {
 			return validateSvc(g, 3, testapps.ServiceVPCName,

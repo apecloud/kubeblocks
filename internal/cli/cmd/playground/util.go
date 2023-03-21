@@ -18,7 +18,6 @@ package playground
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
@@ -55,9 +54,4 @@ func getExistedCluster(provider cp.Interface) (string, error) {
 		return "", nil
 	}
 	return clusterNames[0], nil
-}
-
-// SetKubeConfig set KUBECONFIG environment
-func SetKubeConfig(cfg string) error {
-	return os.Setenv("KUBECONFIG", cfg)
 }

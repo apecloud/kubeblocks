@@ -222,6 +222,11 @@ func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
 	return nil
 }
 
+// SetKubeConfig set KUBECONFIG environment
+func SetKubeConfig(cfg string) error {
+	return os.Setenv("KUBECONFIG", cfg)
+}
+
 var addToScheme sync.Once
 
 func NewFactory() cmdutil.Factory {

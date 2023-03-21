@@ -33,8 +33,4 @@ var _ = Describe("util", func() {
 		Expect(err).Should(Succeed())
 		Expect(dir).ShouldNot(BeEmpty())
 	})
-
-	It("set kubeconfig env", func() {
-		Expect(SetKubeConfig("test")).Should(Succeed())
-	})
 })

@@ -152,9 +152,9 @@ func (o *initOptions) local() error {
 func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 	var err error
 
-	// playground always use the default kubeconfig in ~/.kube/config
+	// playground always use the default kubeconfig at ~/.kube/config
 	configPath := util.ConfigPath("config")
-	if err = SetKubeConfig(configPath); err != nil {
+	if err = util.SetKubeConfig(configPath); err != nil {
 		return err
 	}
 

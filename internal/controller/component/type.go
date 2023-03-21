@@ -18,9 +18,20 @@ package component
 
 import (
 	v12 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+)
+
+var (
+	// TODO: remove it
+	scheme = runtime.NewScheme()
+)
+
+const (
+	// TODO: remove it
+	dbClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
 )
 
 type MonitorConfig struct {

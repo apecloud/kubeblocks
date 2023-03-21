@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -156,6 +158,17 @@ func updateClusterPhaseWhenConditionsError(cluster *appsv1alpha1.Cluster) {
 	}
 	// if exits opsRequests are running, set the cluster phase to the early target phase with the OpsRequest
 	cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
+}
+
+// getClusterBackupSourceMap gets the backup source map from cluster.annotations
+func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string, error) {
+	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	if len(compBackupMapString) == 0 {
+		return nil, nil
+	}
+	compBackupMap := map[string]string{}
+	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
+	return compBackupMap, err
 }
 
 func getBackupObjects(reqCtx intctrlutil.RequestCtx,

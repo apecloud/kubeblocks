@@ -141,26 +141,28 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&initTransformer{cluster: c.cluster},
 		// fix cd&cv labels of cluster
 		&fixClusterLabelsTransformer{},
-		// cluster to K8s objects and put them into dag
-		&clusterTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
-		// tls certs secret
-		&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
+		// create cluster connection credential secret object
+		&clusterCredentialTransformer{cc: *cr},
+		// components to K8s objects and put them into dag
+		&componentTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
+		//// tls certs secret
+		//&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 		// add our finalizer to all objects
 		&ownershipTransformer{finalizer: dbClusterFinalizerName},
-		// make all workload objects depending on credential secret
-		&credentialTransformer{},
+		// make all non-secret workload objects depending on all secrets
+		&secretDependencyTransformer{},
 		// make config configmap immutable
 		&configTransformer{},
 		// read old snapshot from cache, and generate diff plan
 		&objectActionTransformer{cli: roClient, ctx: c.ctx},
 		// handle TerminationPolicyType=DoNotTerminate
 		&doNotTerminateTransformer{},
-		// horizontal scaling
-		&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
-		// stateful set pvc Update
-		&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
-		// replication set horizontal scaling
-		&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
+		//// horizontal scaling
+		//&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
+		//// stateful set pvc Update
+		//&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
+		//// replication set horizontal scaling
+		//&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
 		&clusterStatusTransformer{cc: *cr, cli: c.cli, ctx: c.ctx, recorder: c.recorder},
 	}

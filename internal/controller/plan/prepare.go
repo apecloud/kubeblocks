@@ -32,7 +32,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
@@ -41,104 +40,110 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+func PrepareStatelessComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+	if err := prepareComponentWorkloads(reqCtx, cli, task,
+		func(envConfig *corev1.ConfigMap) (client.Object, error) {
+			return builder.BuildDeploy(reqCtx, task.GetBuilderParams())
+		}); err != nil {
+		return err
+	}
+	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	for _, svc := range svcList {
+		task.AppendResource(svc)
+	}
+	return nil
+}
+
+func PrepareStatefulComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+	if err := prepareComponentWorkloads(reqCtx, cli, task,
+		func(envConfig *corev1.ConfigMap) (client.Object, error) {
+			return builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfig.Name)
+		}); err != nil {
+		return err
+	}
+	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	for _, svc := range svcList {
+		task.AppendResource(svc)
+	}
+	return nil
+}
+
+//
+//func PrepareReplicationComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+//	// get the number of existing statefulsets under the current component
+//	var existStsList = &appsv1.StatefulSetList{}
+//	if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, *task.Cluster, existStsList, task.Component.Name); err != nil {
+//		return err
+//	}
+//
+//	// If the statefulSets already exists, check whether there is an HA switching and the HA process is prioritized to handle.
+//	// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
+//	if len(existStsList.Items) > 0 {
+//		primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster,
+//			task.Component.Name, task.Component.GetPrimaryIndex())
+//		if err != nil {
+//			return err
+//		}
+//		if primaryIndexChanged {
+//			if err := replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster,
+//				componentutil.GetClusterComponentSpecByName(*task.Cluster, task.Component.Name)); err != nil {
+//				return err
+//			}
+//		}
+//	}
+//
+//	// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
+//	//  then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
+//	replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
+//	for index := int32(0); index < int32(replicaCount); index++ {
+//		if err := prepareComponentWorkloads(reqCtx, cli, task,
+//			func(envConfig *corev1.ConfigMap) (client.Object, error) {
+//				return buildReplicationSet(reqCtx, task, envConfig.Name, index)
+//			}); err != nil {
+//			return err
+//		}
+//	}
+//
+//	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
+//	if err != nil {
+//		return err
+//	}
+//	for _, svc := range svcList {
+//		svc.Spec.Selector[constant.RoleLabelKey] = string(replicationset.Primary)
+//		task.AppendResource(svc)
+//	}
+//
+//	return nil
+//}
+
 // PrepareComponentResources generate all necessary sub-resources objects used in component,
 // like Secret, ConfigMap, Service, StatefulSet, Deployment, Volume, PodDisruptionBudget etc.
 // Generated resources are cached in task.applyObjs.
 func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
-	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := builder.BuildEnvConfig(task.GetBuilderParams(), reqCtx, cli)
-		if err != nil {
-			return err
-		}
-		task.AppendResource(envConfig)
-
-		workload, err := customSetup(envConfig)
-		if err != nil {
-			return err
-		}
-
-		defer func() {
-			// workload object should be appended last
-			task.AppendResource(workload)
-		}()
-
-		svc, err := builder.BuildHeadlessSvc(task.GetBuilderParams())
-		if err != nil {
-			return err
-		}
-		task.AppendResource(svc)
-
-		var podSpec *corev1.PodSpec
-		sts, ok := workload.(*appsv1.StatefulSet)
-		if ok {
-			podSpec = &sts.Spec.Template.Spec
-		} else {
-			deploy, ok := workload.(*appsv1.Deployment)
-			if ok {
-				podSpec = &deploy.Spec.Template.Spec
-			}
-		}
-		if podSpec == nil {
-			return nil
-		}
-
-		defer func() {
-			for _, cc := range []*[]corev1.Container{
-				&podSpec.Containers,
-				&podSpec.InitContainers,
-			} {
-				volumes := podSpec.Volumes
-				for _, c := range *cc {
-					for _, v := range c.VolumeMounts {
-						// if persistence is not found, add emptyDir pod.spec.volumes[]
-						volumes, _ = intctrlutil.CreateOrUpdateVolume(volumes, v.Name, func(volumeName string) corev1.Volume {
-							return corev1.Volume{
-								Name: v.Name,
-								VolumeSource: corev1.VolumeSource{
-									EmptyDir: &corev1.EmptyDirVolumeSource{},
-								},
-							}
-						}, nil)
-					}
-				}
-				podSpec.Volumes = volumes
-			}
-		}()
-
-		// render config template
-		configs, err := buildCfg(task, workload, podSpec, reqCtx.Ctx, cli)
-		if err != nil {
-			return err
-		}
-		if configs != nil {
-			task.AppendResource(configs...)
-		}
-		// end render config
-
-		// tls certs secret volume and volumeMount
-		if err := updateTLSVolumeAndVolumeMount(podSpec, task.Cluster.Name, *task.Component); err != nil {
-			return err
-		}
-		return nil
-	}
 
 	switch task.Component.WorkloadType {
 	case appsv1alpha1.Stateless:
-		if err := workloadProcessor(
+		if err := prepareComponentWorkloads(reqCtx, cli, task,
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return builder.BuildDeploy(reqCtx, task.GetBuilderParams())
 			}); err != nil {
 			return err
 		}
 	case appsv1alpha1.Stateful:
-		if err := workloadProcessor(
+		if err := prepareComponentWorkloads(reqCtx, cli, task,
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfig.Name)
 			}); err != nil {
 			return err
 		}
 	case appsv1alpha1.Consensus:
-		if err := workloadProcessor(
+		if err := prepareComponentWorkloads(reqCtx, cli, task,
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return buildConsensusSet(reqCtx, task, envConfig.Name)
 			}); err != nil {
@@ -171,7 +176,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		//  then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
 		replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
 		for index := int32(0); index < int32(replicaCount); index++ {
-			if err := workloadProcessor(
+			if err := prepareComponentWorkloads(reqCtx, cli, task,
 				func(envConfig *corev1.ConfigMap) (client.Object, error) {
 					return buildReplicationSet(reqCtx, task, envConfig.Name, index)
 				}); err != nil {
@@ -218,6 +223,84 @@ func addLeaderSelectorLabels(service *corev1.Service, component *component.Synth
 	if len(leader.Name) > 0 {
 		service.Spec.Selector[constant.RoleLabelKey] = leader.Name
 	}
+}
+
+func prepareComponentWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask,
+	customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
+	envConfig, err := builder.BuildEnvConfig(task.GetBuilderParams(), reqCtx, cli)
+	if err != nil {
+		return err
+	}
+	task.AppendResource(envConfig)
+
+	workload, err := customSetup(envConfig)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		// workload object should be appended last
+		task.AppendResource(workload)
+	}()
+
+	svc, err := builder.BuildHeadlessSvc(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	task.AppendResource(svc)
+
+	var podSpec *corev1.PodSpec
+	sts, ok := workload.(*appsv1.StatefulSet)
+	if ok {
+		podSpec = &sts.Spec.Template.Spec
+	} else {
+		deploy, ok := workload.(*appsv1.Deployment)
+		if ok {
+			podSpec = &deploy.Spec.Template.Spec
+		}
+	}
+	if podSpec == nil {
+		return nil
+	}
+
+	defer func() {
+		for _, cc := range []*[]corev1.Container{
+			&podSpec.Containers,
+			&podSpec.InitContainers,
+		} {
+			volumes := podSpec.Volumes
+			for _, c := range *cc {
+				for _, v := range c.VolumeMounts {
+					// if persistence is not found, add emptyDir pod.spec.volumes[]
+					volumes, _ = intctrlutil.CreateOrUpdateVolume(volumes, v.Name, func(volumeName string) corev1.Volume {
+						return corev1.Volume{
+							Name: v.Name,
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						}
+					}, nil)
+				}
+			}
+			podSpec.Volumes = volumes
+		}
+	}()
+
+	// render config template
+	configs, err := buildCfg(task, workload, podSpec, reqCtx.Ctx, cli)
+	if err != nil {
+		return err
+	}
+	if configs != nil {
+		task.AppendResource(configs...)
+	}
+	// end render config
+
+	// tls certs secret volume and volumeMount
+	if err := updateTLSVolumeAndVolumeMount(podSpec, task.Cluster.Name, *task.Component); err != nil {
+		return err
+	}
+	return nil
 }
 
 // buildConsensusSet build on a stateful set
@@ -292,71 +375,6 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	}
 	podSpec.Volumes = podVolumes
 	return nil
-}
-
-// buildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files
-func buildCfg(task *intctrltypes.ReconcileTask,
-	obj client.Object,
-	podSpec *corev1.PodSpec,
-	ctx context.Context,
-	cli client.Client) ([]client.Object, error) {
-	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
-	// ClusterDefinition.Components[*].ConfigTemplateRefs
-	if len(task.Component.ConfigTemplates) == 0 && len(task.Component.ScriptTemplates) == 0 {
-		return nil, nil
-	}
-
-	clusterName := task.Cluster.Name
-	namespaceName := task.Cluster.Namespace
-	// New ConfigTemplateBuilder
-	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, task.Cluster, task.ClusterVersion, ctx, cli)
-	// Prepare built-in objects and built-in functions
-	if err := cfgTemplateBuilder.injectBuiltInObjectsAndFunctions(podSpec, task.Component.ConfigTemplates, task.Component); err != nil {
-		return nil, err
-	}
-
-	renderWrapper := newTemplateRenderWrapper(cfgTemplateBuilder, task.Cluster, task.GetBuilderParams(), ctx, cli)
-	if err := renderWrapper.renderConfigTemplate(task, obj); err != nil {
-		return nil, err
-	}
-	if err := renderWrapper.renderScriptTemplate(task, obj); err != nil {
-		return nil, err
-	}
-
-	if sts, ok := obj.(*appsv1.StatefulSet); ok {
-		updateStatefulLabelsWithTemplate(sts, renderWrapper.templateLabels)
-	}
-
-	// Generate Pod Volumes for ConfigMap objects
-	if err := intctrlutil.CreateOrUpdatePodVolumes(podSpec, renderWrapper.volumes); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
-	}
-
-	if err := updateConfigManagerWithComponent(podSpec, task.Component.ConfigTemplates, ctx, cli, task.GetBuilderParams()); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
-	}
-
-	return renderWrapper.renderedObjs, nil
-}
-
-func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[string]string) {
-	// full configmap upgrade
-	existLabels := make(map[string]string)
-	for key, val := range sts.Labels {
-		if strings.HasPrefix(key, constant.ConfigurationTplLabelPrefixKey) {
-			existLabels[key] = val
-		}
-	}
-
-	// delete not exist configmap label
-	deletedLabels := cfgcore.MapKeyDifference(existLabels, allLabels)
-	for l := range deletedLabels.Iter() {
-		delete(sts.Labels, l)
-	}
-
-	for key, val := range allLabels {
-		sts.Labels[key] = val
-	}
 }
 
 // updateConfigManagerWithComponent build the configmgr sidecar container and update it

@@ -13,7 +13,7 @@ require (
 	github.com/authzed/controller-idioms v0.7.0
 	github.com/aws/aws-sdk-go v1.44.122
 	github.com/bhmj/jsonslice v1.1.2
-	github.com/briandowns/spinner v1.18.1
+	github.com/briandowns/spinner v1.23.0
 	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/containerd/stargz-snapshotter/estargz v0.13.0
 	github.com/containers/common v0.49.1

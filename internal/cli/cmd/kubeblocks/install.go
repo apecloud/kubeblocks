@@ -305,12 +305,13 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		sort.Strings(unready)
 		s.Suffix = suffixMsg(fmt.Sprintf("%s\n  %s", msg, strings.Join(unready, "\n  ")))
 		for _, r := range ready {
-			if slices.Contains(prevUnready, r) {
-				s.FinalMSG = okMsg("Addon " + r)
-				s.Stop()
-				s.Suffix = suffixMsg(fmt.Sprintf("%s\n  %s", msg, strings.Join(unready, "\n  ")))
-				s.Start()
+			if !slices.Contains(prevUnready, r) {
+				continue
 			}
+			s.FinalMSG = okMsg("Addon " + r)
+			s.Stop()
+			s.Suffix = suffixMsg(fmt.Sprintf("%s\n  %s", msg, strings.Join(unready, "\n  ")))
+			s.Start()
 		}
 		prevUnready = unready
 	}

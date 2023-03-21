@@ -85,7 +85,10 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 			}
 		}
 		// --end hack--
-
+		defer func() {
+			// others, set root(cluster) vertex.action to STATUS
+			rootVertex.action = actionPtr(STATUS)
+		}()
 		// TODO: cluster.status Patch called in c.handleGarbageOfRestoreBeforeRunning, refactor it
 		// checks if the controller is handling the garbage of restore.
 		if handlingRestoreGarbage, err := c.handleGarbageOfRestoreBeforeRunning(cluster); err != nil {
@@ -100,8 +103,6 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		}
 		rootVertex.oriObj = cluster.DeepCopy()
 		c.cleanupAnnotationsAfterRunning(cluster)
-		// others, set root(cluster) vertex.action to STATUS
-		rootVertex.action = actionPtr(STATUS)
 	}
 
 	return nil

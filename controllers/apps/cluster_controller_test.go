@@ -1329,6 +1329,8 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(sts.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
 
 			By("remove init container after all components are Running")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(clusterObj))).Should(BeEquivalentTo(1))
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
 				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 					mysqlCompName: {Phase: appsv1alpha1.RunningPhase},

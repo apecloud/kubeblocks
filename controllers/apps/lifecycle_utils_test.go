@@ -286,8 +286,8 @@ spec:
 
 			By("doBackup should create volumesnapshot and return requeue=true")
 			shouldRequeue, err := doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
-			Expect(shouldRequeue).Should(BeTrue())
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(shouldRequeue).Should(BeTrue())
 
 			newVS := snapshotv1.VolumeSnapshot{}
 			By("checking volumesnapshot created by doBackup exists")

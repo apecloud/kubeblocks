@@ -86,6 +86,13 @@ const (
 	ExposeType            OpsType = "Expose"
 )
 
+// ComponentResourceKey defines the resource key of component.
+// +enum
+// +kubebuilder:validation:Enum={pods}
+type ComponentResourceKey string
+
+const PodsCompResourceKey ComponentResourceKey = "pods"
+
 // AccessMode define SVC access mode enums.
 // +enum
 // +kubebuilder:validation:Enum={None,Readonly,ReadWrite}

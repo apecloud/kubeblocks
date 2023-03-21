@@ -116,7 +116,9 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 			if err != nil {
 				return err
 			}
-			lastCompConfiguration.PodNames = podNames
+			lastCompConfiguration.RelatedResources = map[appsv1alpha1.ComponentResourceKey][]string{
+				appsv1alpha1.PodsCompResourceKey: podNames,
+			}
 		}
 		lastComponentInfo[v.Name] = lastCompConfiguration
 	}

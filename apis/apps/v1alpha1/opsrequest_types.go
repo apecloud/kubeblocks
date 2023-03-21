@@ -308,9 +308,9 @@ type LastComponentConfiguration struct {
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
-	// PodNames records the pod names of the component before scale down replicas.
+	// relatedResources records the related resources information of the component.
 	// +optional
-	PodNames []string `json:"pods,omitempty"`
+	RelatedResources map[ComponentResourceKey][]string `json:"relatedResources,omitempty"`
 }
 
 type LastConfiguration struct {

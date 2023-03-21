@@ -110,5 +110,5 @@ var _ = AfterSuite(func() {
 	Eventually(func(g Gomega) {
 		err := testEnv.Stop()
 		Expect(err).NotTo(HaveOccurred())
-	})
+	}).Should(Succeed())
 })

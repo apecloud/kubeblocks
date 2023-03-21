@@ -39,52 +39,39 @@ func CreateOrCheckTLSCerts(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
 	scheme *runtime.Scheme,
-	finalizer string) error {
+	finalizer string) (*v1.Secret, error) {
 	if cluster == nil {
-		return nil
+		return nil, nil
 	}
-
-	// secretList contains all secrets successfully created
-	var secretList []v1.Secret
 
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		if !comp.TLS {
 			continue
 		}
-
+		// REVIEW/TODO: should do spec validation during validation stage
 		if comp.Issuer == nil {
-			return errors.New("issuer shouldn't be nil when tls enabled")
+			return nil, errors.New("issuer shouldn't be nil when tls enabled")
 		}
-
-		var err error
-		var secret *v1.Secret
 		switch comp.Issuer.Name {
 		case dbaasv1alpha1.IssuerUserProvided:
-			err = checkTLSSecretRef(reqCtx, cli, cluster.Namespace, comp.Issuer.SecretRef)
-		case dbaasv1alpha1.IssuerKubeBlocks:
-			secret, err = createTLSSecret(reqCtx, cli, cluster, comp.Name, scheme, finalizer)
-			if secret != nil {
-				secretList = append(secretList, *secret)
+			if err := checkTLSSecretRef(reqCtx, cli, cluster.Namespace, comp.Issuer.SecretRef); err != nil {
+				return nil, err
 			}
-		}
-		if err != nil {
-			// best-effort to make tls secret creation atomic
-			deleteTLSSecrets(reqCtx, cli, secretList)
-			return err
+		case dbaasv1alpha1.IssuerKubeBlocks:
+			return createTLSSecret(reqCtx, cli, cluster, comp.Name, scheme, finalizer)
 		}
 	}
-
-	return nil
+	return nil, nil
 }
 
-func deleteTLSSecrets(reqCtx controllerutil.RequestCtx, cli client.Client, secretList []v1.Secret) {
-	for _, secret := range secretList {
-		err := cli.Delete(reqCtx.Ctx, &secret)
-		if err != nil {
-			reqCtx.Log.Info("delete tls secret error", "err", err)
-		}
-	}
-}
+// func deleteTLSSecrets(reqCtx controllerutil.RequestCtx, cli client.Client, secretList []v1.Secret) {
+// 	for _, secret := range secretList {
+// 		err := cli.Delete(reqCtx.Ctx, &secret)
+// 		if err != nil {
+// 			reqCtx.Log.Info("delete tls secret error", "err", err)
+// 		}
+// 	}
+// }
 
 func createTLSSecret(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
@@ -99,12 +86,14 @@ func createTLSSecret(reqCtx controllerutil.RequestCtx,
 	if err := controllerutil.SetOwnership(cluster, secret, scheme, finalizer); err != nil {
 		return nil, err
 	}
-	if err := cli.Create(reqCtx.Ctx, secret); err != nil {
-		return nil, err
-	}
 	return secret, nil
 }
 
+// ComposeTLSSecret compose a TSL secret object.
+// REVIEW/TODO:
+//  1. missing public function doc
+//  2. should avoid using Go template to call a function, this is too hack & costly,
+//     should just call underlying registered Go template function.
 func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret, error) {
 	secret, err := builder.BuildTLSSecret(namespace, clusterName, componentName)
 	if err != nil {
@@ -129,7 +118,6 @@ func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret,
 	secret.StringData[builder.CAName] = cert
 	secret.StringData[builder.CertName] = cert
 	secret.StringData[builder.KeyName] = key
-
 	return secret, nil
 }
 
@@ -148,7 +136,8 @@ func buildFromTemplate(tpl string, vars interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func checkTLSSecretRef(reqCtx controllerutil.RequestCtx, cli client.Client, namespace string, secretRef *dbaasv1alpha1.TLSSecretRef) error {
+func checkTLSSecretRef(reqCtx controllerutil.RequestCtx, cli client.Client, namespace string,
+	secretRef *dbaasv1alpha1.TLSSecretRef) error {
 	if secretRef == nil {
 		return errors.New("issuer.secretRef shouldn't be nil when issuer is UserProvided")
 	}
@@ -166,7 +155,6 @@ func checkTLSSecretRef(reqCtx controllerutil.RequestCtx, cli client.Client, name
 			return errors.Errorf("tls secret's data[%s] field shouldn't be empty", key)
 		}
 	}
-
 	return nil
 }
 
@@ -202,10 +190,10 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 	if component.Issuer == nil {
 		return nil, errors.New("issuer shouldn't be nil when TLS enabled")
 	}
-	if component.Issuer.Name == dbaasv1alpha1.IssuerUserProvided && component.Issuer.SecretRef == nil {
+	if component.Issuer.Name == dbaasv1alpha1.IssuerUserProvided &&
+		component.Issuer.SecretRef == nil {
 		return nil, errors.New("secret ref shouldn't be nil when issuer is UserProvided")
 	}
-
 	var secretName, ca, cert, key string
 	switch component.Issuer.Name {
 	case dbaasv1alpha1.IssuerKubeBlocks:
@@ -233,7 +221,6 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 			},
 		},
 	}
-
 	return &volume, nil
 }
 

@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
@@ -109,7 +109,7 @@ func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Co
 		// if cluster status changed, do it
 		return opsutil.MarkRunningOpsRequestAnnotation(conMgr.ctx, conMgr.Client, conMgr.cluster)
 	}
-	return util.ErrNoOps
+	return componentutil.ErrNoOps
 }
 
 // handleConditionForClusterPhase checks whether the condition can be repaired by cluster.
@@ -126,7 +126,7 @@ func (conMgr clusterConditionManager) handleConditionForClusterPhase(
 		time.Millisecond * requeueDuration)) {
 		return false
 	}
-	if !util.IsFailedOrAbnormal(conMgr.cluster.Status.Phase) &&
+	if !componentutil.IsFailedOrAbnormal(conMgr.cluster.Status.Phase) &&
 		conMgr.cluster.Status.Phase != appsv1alpha1.ConditionsErrorPhase {
 		// the condition has occurred for more than 30 seconds and cluster status is not Failed/Abnormal, do it
 		conMgr.cluster.Status.Phase = appsv1alpha1.ConditionsErrorPhase
@@ -136,6 +136,7 @@ func (conMgr clusterConditionManager) handleConditionForClusterPhase(
 }
 
 // setProvisioningStartedCondition sets the provisioning started condition in cluster conditions.
+// @return could return ErrNoOps
 // Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager) setProvisioningStartedCondition() error {
 	condition := metav1.Condition{
@@ -148,6 +149,7 @@ func (conMgr clusterConditionManager) setProvisioningStartedCondition() error {
 }
 
 // setPreCheckErrorCondition sets the error condition when preCheck failed.
+// @return could return ErrNoOps
 // Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager) setPreCheckErrorCondition(err error) error {
 	var message string
@@ -162,6 +164,7 @@ func (conMgr clusterConditionManager) setPreCheckErrorCondition(err error) error
 }
 
 // setUnavailableCondition sets the condition that reference CRs are unavailable.
+// @return could return ErrNoOps
 // Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager) setReferenceCRUnavailableCondition(message string) error {
 	return conMgr.updateStatusConditions(newFailedProvisioningStartedCondition(
@@ -169,6 +172,7 @@ func (conMgr clusterConditionManager) setReferenceCRUnavailableCondition(message
 }
 
 // setApplyResourcesFailedCondition sets applied resources failed condition in cluster conditions.
+// @return could return ErrNoOps
 // Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager) setApplyResourcesFailedCondition(message string) error {
 	return conMgr.updateStatusConditions(newFailedApplyResourcesCondition(message))
@@ -257,28 +261,29 @@ func checkConditionIsChanged(oldCondition *metav1.Condition, newCondition metav1
 }
 
 // handleClusterReadyCondition handles the cluster conditions with ClusterReady and ReplicasReady type.
+// @return could return ErrNoOps
 func handleNotReadyConditionForCluster(cluster *appsv1alpha1.Cluster,
 	recorder record.EventRecorder,
 	replicasNotReadyCompNames map[string]struct{},
-	notReadyCompNames map[string]struct{}) (needPatch bool, postFunc postHandler) {
+	notReadyCompNames map[string]struct{}) (postHandler, error) {
 	oldReplicasReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReplicasReady)
 	if len(replicasNotReadyCompNames) == 0 {
 		// if all replicas of cluster are ready, set ReasonAllReplicasReady to status.conditions
 		readyCondition := newAllReplicasPodsReadyConditions()
 		if checkConditionIsChanged(oldReplicasReadyCondition, readyCondition) {
 			meta.SetStatusCondition(&cluster.Status.Conditions, readyCondition)
-			needPatch = true
-			postFunc = func(cluster *appsv1alpha1.Cluster) error {
+			postFunc := func(cluster *appsv1alpha1.Cluster) error {
 				// send an event when all pods of the components are ready.
 				recorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
 				return nil
 			}
+			return postFunc, nil
 		}
 	} else {
 		replicasNotReadyCond := newReplicasNotReadyCondition(replicasNotReadyCompNames)
 		if checkConditionIsChanged(oldReplicasReadyCondition, replicasNotReadyCond) {
 			meta.SetStatusCondition(&cluster.Status.Conditions, replicasNotReadyCond)
-			needPatch = true
+			return nil, nil
 		}
 	}
 
@@ -287,8 +292,8 @@ func handleNotReadyConditionForCluster(cluster *appsv1alpha1.Cluster,
 		clusterNotReadyCondition := newComponentsNotReadyCondition(notReadyCompNames)
 		if checkConditionIsChanged(oldClusterReadyCondition, clusterNotReadyCondition) {
 			meta.SetStatusCondition(&cluster.Status.Conditions, clusterNotReadyCondition)
-			needPatch = true
+			return nil, nil
 		}
 	}
-	return needPatch, postFunc
+	return nil, componentutil.ErrNoOps
 }

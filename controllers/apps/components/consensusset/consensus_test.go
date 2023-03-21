@@ -70,7 +70,7 @@ var _ = Describe("Consensus Component", func() {
 
 	mockClusterStatusProbeTimeout := func(cluster *appsv1alpha1.Cluster) {
 		// mock pods ready in component status and probe timed out
-		Eventually(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+		Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 			podsReady := true
 			cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 				consensusCompName: {
@@ -78,7 +78,7 @@ var _ = Describe("Consensus Component", func() {
 					PodsReadyTime: &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
 				},
 			}
-		})).Should(Succeed())
+		})).ShouldNot(HaveOccurred())
 
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 			g.Expect(tmpCluster.Status.Components).ShouldNot(BeEmpty())

@@ -309,6 +309,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if patchErr := r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); patchErr != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
+		// REVIEW: got following error:
+		// - "PersistentVolumeClaim \"data-test-clusterljdhar-mysql1-0\" not found"
+		// - "secrets \"test-clusternjcfvi-mysql-tls-certs\" already exists" // "clusterdefinitions.apps.kubeblocks.io \"test-clusterdef-tls\" not found" // "clusterdefinitions.apps.kubeblocks.io \"clusterdef-for-status-fgm25k\" not found"
+
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
 		if setErr := clusterConditionMgr.setApplyResourcesFailedCondition(err.Error()); setErr != nil &&
@@ -325,16 +329,21 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueAfter(
 			time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
-	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDeepCopy, clusterDefinition); err != nil {
+	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster); err != nil &&
+		err != componentutil.ErrNoOps {
+		// REVIEW:
+		// cauge err being - "clusters.apps.kubeblocks.io \"test-clusterucasrw\" not found",
+		// how could this possible
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// terminal phase update stage
 	// reconcile the phase and conditions of the Cluster.status
-	if err = r.reconcileClusterStatus(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
+	if err = r.reconcileClusterStatus(reqCtx.Ctx, cluster, clusterDefinition); err != nil &&
+		err != componentutil.ErrNoOps {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	return intctrlutil.Reconciled()
+	return intctrlutil.Reconciled() // "ConditionsError", "Creating"
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -367,15 +376,14 @@ func (r *ClusterReconciler) patchClusterStatus(ctx context.Context,
 // handleClusterStatusAfterApplySucceed when cluster apply resources successful, handle the status
 func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 	ctx context.Context,
-	cluster *appsv1alpha1.Cluster,
-	clusterDeepCopy *appsv1alpha1.Cluster,
-	clusterDef *appsv1alpha1.ClusterDefinition) error {
-	patch := client.MergeFrom(clusterDeepCopy)
+	cluster *appsv1alpha1.Cluster) error {
+	patch := client.MergeFrom(cluster)
 	// apply resources succeed, record the condition and event
 	applyResourcesCondition := newApplyResourcesCondition()
 	meta.SetStatusCondition(&cluster.Status.Conditions, applyResourcesCondition)
 	// if cluster status is ConditionsError, do it before updated the observedGeneration.
 	r.updateClusterPhaseWhenConditionsError(cluster)
+
 	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
 	}
@@ -617,12 +625,11 @@ func (r *ClusterReconciler) setClusterPhaseWithOperations(cluster *appsv1alpha1.
 
 // updateClusterPhaseWhenConditionsError when cluster status is ConditionsError and the cluster applies resources successful,
 // we should update the cluster to the correct state
+// REVIEW: need to review this handling, this function does mutation, but return value
+// doesn't provide any info whether cluster object is being mutated or not.
+// Deprecated:
 func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *appsv1alpha1.Cluster) {
 	if cluster.Status.Phase != appsv1alpha1.ConditionsErrorPhase {
-		return
-	}
-	if cluster.Status.ObservedGeneration == 0 {
-		cluster.Status.Phase = appsv1alpha1.CreatingPhase
 		return
 	}
 	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
@@ -635,7 +642,9 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *appsv
 	cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
 }
 
+// REVIEW: this handling rather monolithic
 // reconcileClusterStatus reconciles phase and conditions of the Cluster.status.
+// Deprecated:
 func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition) error {
@@ -687,7 +696,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	}
 
 	// remove the invalid component in status.components when spec.components changed and analysis the status of components.
-	removeInvalidComponentsAndAnalysis := func(cluster *appsv1alpha1.Cluster) (bool, postHandler) {
+	removeInvalidComponentsAndAnalysis := func(cluster *appsv1alpha1.Cluster) (postHandler, error) {
 		tmpCompsStatus := map[string]appsv1alpha1.ClusterComponentStatus{}
 		compsStatus := cluster.Status.Components
 		for _, v := range cluster.Spec.ComponentSpecs {
@@ -695,18 +704,17 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 				tmpCompsStatus[v.Name] = compStatus
 			}
 		}
-		var needPatch bool
 		if len(tmpCompsStatus) != len(compsStatus) {
 			// keep valid components' status
 			cluster.Status.Components = tmpCompsStatus
-			needPatch = true
+			return nil, nil
 		}
 		analysisComponentsStatus(cluster)
-		return needPatch, nil
+		return nil, componentutil.ErrNoOps
 	}
 
 	// handle the cluster conditions with ClusterReady and ReplicasReady type.
-	handleClusterReadyCondition := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
+	handleClusterReadyCondition := func(cluster *appsv1alpha1.Cluster) (postHandler, error) {
 		return handleNotReadyConditionForCluster(cluster, r.Recorder, replicasNotReadyCompNames, notReadyCompNames)
 	}
 
@@ -716,9 +724,9 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		currPhase appsv1alpha1.Phase,
 		eventType string,
 		eventMessage string,
-		doAction func(cluster *appsv1alpha1.Cluster)) (bool, postHandler) {
+		doAction func(cluster *appsv1alpha1.Cluster)) (postHandler, error) {
 		if oldPhase == currPhase {
-			return false, nil
+			return nil, componentutil.ErrNoOps
 		}
 		cluster.Status.Phase = currPhase
 		if doAction != nil {
@@ -728,39 +736,43 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 			r.Recorder.Event(currCluster, eventType, string(currPhase), eventMessage)
 			return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, currCluster)
 		}
-		return true, postFuncAfterPatch
+		return postFuncAfterPatch, nil
 	}
 	// handle the Cluster.status when some components of cluster are Abnormal or Failed.
-	handleExistAbnormalOrFailed := func(cluster *appsv1alpha1.Cluster) (bool, postHandler) {
+	handleExistAbnormalOrFailed := func(cluster *appsv1alpha1.Cluster) (postHandler, error) {
 		if !existsAbnormalOrFailed {
-			return false, nil
+			return nil, componentutil.ErrNoOps
 		}
 		oldPhase := cluster.Status.Phase
-		componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster, clusterDef, "")
+		componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster,
+			clusterDef, "")
 		// handle the cluster status when some components are not ready.
 		handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
 		currPhase := cluster.Status.Phase
 		if !componentutil.IsFailedOrAbnormal(currPhase) {
-			return false, nil
+			return nil, componentutil.ErrNoOps
 		}
-		message := fmt.Sprintf("Cluster: %s is %s, check according to the components message", cluster.Name, currPhase)
-		return processClusterPhaseChanges(cluster, oldPhase, currPhase, corev1.EventTypeWarning, message, nil)
+		message := fmt.Sprintf("Cluster: %s is %s, check according to the components message",
+			cluster.Name, currPhase)
+		return processClusterPhaseChanges(cluster, oldPhase, currPhase,
+			corev1.EventTypeWarning, message, nil)
 	}
 
 	// handle the Cluster.status when cluster is Stopped.
-	handleClusterIsStopped := func(cluster *appsv1alpha1.Cluster) (bool, postHandler) {
+	handleClusterIsStopped := func(cluster *appsv1alpha1.Cluster) (postHandler, error) {
 		if currentClusterPhase != appsv1alpha1.StoppedPhase {
-			return false, nil
+			return nil, componentutil.ErrNoOps
 		}
 		message := fmt.Sprintf("Cluster: %s stopped successfully.", cluster.Name)
 		oldPhase := cluster.Status.Phase
-		return processClusterPhaseChanges(cluster, oldPhase, currentClusterPhase, corev1.EventTypeNormal, message, nil)
+		return processClusterPhaseChanges(cluster, oldPhase, currentClusterPhase,
+			corev1.EventTypeNormal, message, nil)
 	}
 
 	// handle the Cluster.status when cluster is Running.
-	handleClusterIsRunning := func(cluster *appsv1alpha1.Cluster) (bool, postHandler) {
+	handleClusterIsRunning := func(cluster *appsv1alpha1.Cluster) (postHandler, error) {
 		if currentClusterPhase != appsv1alpha1.RunningPhase {
-			return false, nil
+			return nil, componentutil.ErrNoOps
 		}
 		message := fmt.Sprintf("Cluster: %s is ready, current phase is Running.", cluster.Name)
 		action := func(currCluster *appsv1alpha1.Cluster) {
@@ -771,8 +783,12 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		return processClusterPhaseChanges(cluster, oldPhase, currentClusterPhase,
 			corev1.EventTypeNormal, message, action)
 	}
-	return doChainClusterStatusHandler(ctx, r.Client, cluster, removeInvalidComponentsAndAnalysis,
-		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsStopped, handleClusterIsRunning)
+	return doChainClusterStatusHandler(ctx, r.Client, cluster,
+		removeInvalidComponentsAndAnalysis,
+		handleClusterReadyCondition,
+		handleExistAbnormalOrFailed,
+		handleClusterIsStopped,
+		handleClusterIsRunning)
 }
 
 // cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.

@@ -560,8 +560,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 
 	// processing function after k8s object creation
 	postCreateFunc := func(obj client.Object) {
-		switch obj.(type) {
-		case *appsv1.StatefulSet:
+		if _, ok := obj.(*appsv1.StatefulSet); ok {
 			// h-scale operation may create a new Sts if workloadType is Replication,
 			// so we need to sync component phase here.
 			syncComponentPhaseByClusterPhase(cluster, obj.GetLabels()[constant.KBAppComponentLabelKey])
@@ -569,21 +568,21 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	}
 
 	handleObjectUpdate := func(obj client.Object) (bool, error) {
-		switch obj.(type) {
+		switch newObj := obj.(type) {
 		case *corev1.ConfigMap:
-			return false, handleConfigMap(obj.(*corev1.ConfigMap))
+			return false, handleConfigMap(newObj)
 		case *appsv1.StatefulSet:
-			return handleSts(obj.(*appsv1.StatefulSet))
+			return handleSts(newObj)
 		case *appsv1.Deployment:
 			// The Config is not allowed to be modified.
 			// Once ClusterDefinition provider adjusts the TemplateRef field of CusterDefinition,
 			// or provider modifies the wrong config file, it may cause the application cluster may fail.
-			return false, handleDeploy(obj.(*appsv1.Deployment))
+			return false, handleDeploy(newObj)
 		case *corev1.Service:
-			return false, handleSvc(obj.(*corev1.Service))
+			return false, handleSvc(newObj)
 		case *corev1.PersistentVolumeClaim:
 			// do volume expansion when workload type is `replication`
-			return false, handlePVC(obj.(*corev1.PersistentVolumeClaim))
+			return false, handlePVC(newObj)
 		}
 		return false, nil
 	}

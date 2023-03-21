@@ -14,7 +14,7 @@ sidebar_label: Create and connect
 * `kbcli`: Install `kbcli` on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
   1. Run the command below to install `kbcli`.
      ```bash
-     curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
+     curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
      ```
   2. Run the command below to check the version and verify whether `kbcli` is installed successfully.
      ```bash

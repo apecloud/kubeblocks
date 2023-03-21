@@ -14,7 +14,7 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL Standa
 - [Install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) to ensure that you can connect to the EKS cluster.
 - Install `kbcli`. Refer to [Install kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
    ```bash
-   curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
+   curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
    ```
 
 ***Steps:***

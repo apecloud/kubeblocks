@@ -24,7 +24,7 @@ Running a database cluster on the cloud causes fees. Delete the resources create
 
 1. Run the command below to install `kbcli`. `kbcli` can run on macOS and Linux.
     ```bash
-    curl -fsSL https://kubeblocks.io/installer/install_cli.sh |bash
+    curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh |bash
     ```
 
     :::note

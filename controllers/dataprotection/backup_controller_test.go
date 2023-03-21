@@ -104,20 +104,25 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			Create(&testCtx).GetObject()
 
 		By("By mocking a pod belonging to the statefulset")
+		volume := corev1.Volume{Name: pvc.Name, VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}}}
 		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
 			AddAppInstanceLabel(clusterName).
+			AddRoleLabel("leader").
 			AddAppComponentLabel(componentName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
-			AddVolume(corev1.Volume{Name: pvc.Name}).
+			AddVolume(volume).
 			Create(&testCtx).GetObject()
 		nodeName = pod.Spec.NodeName
 
 		By("By mocking a pod 2 belonging to the statefulset")
+		volume2 := corev1.Volume{Name: pvc2.Name, VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc2.Name}}}
 		_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-1").
 			AddAppInstanceLabel(clusterName).
 			AddAppComponentLabel(componentName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
-			AddVolume(corev1.Volume{Name: pvc2.Name}).
+			AddVolume(volume2).
 			Create(&testCtx).GetObject()
 	})
 
@@ -138,6 +143,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				SetSchedule(defaultSchedule).
 				SetTTL(defaultTTL).
 				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+				AddMatchLabels(constant.RoleLabelKey, "leader").
 				SetTargetSecretName(clusterName).
 				AddHookPreCommand("touch /data/mysql/.restore;sync").
 				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
@@ -171,7 +177,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
 					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
 					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(componentName))
-					g.Expect(len(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]) > 0).Should(BeTrue())
+					g.Expect(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
 				By("Check backup job is deleted after completed")
@@ -226,7 +232,6 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					g.Expect(fetched.Spec.Template.Spec.NodeSelector).ShouldNot(BeEmpty())
 					g.Expect(fetched.Spec.Template.Spec.Affinity).ShouldNot(BeNil())
 					g.Expect(fetched.Spec.Template.Spec.Affinity.NodeAffinity).ShouldNot(BeNil())
-
 				})).Should(Succeed())
 
 				patchVolumeSnapshotStatus(backupKey, true)

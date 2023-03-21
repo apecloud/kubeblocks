@@ -87,7 +87,11 @@ func (pgOps *PostgresOperations) initIfNeed() bool {
 	if pgOps.db == nil {
 		go func() {
 			err := pgOps.InitDelay()
-			pgOps.Logger.Errorf("Postgres connection init failed: %v", err)
+			if err != nil {
+				pgOps.Logger.Errorf("Postgres connection init failed: %v", err)
+			} else {
+				pgOps.Logger.Info("Postgres connection init success: %s", pgOps.db.Config().ConnConfig)
+			}
 		}()
 		return true
 	}
@@ -259,21 +263,34 @@ func (pgOps *PostgresOperations) query(ctx context.Context, sql string) (result 
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
+	defer func() {
+		rows.Close()
+		_ = rows.Err()
+	}()
 
-	rs := make([]any, 0)
+	rs := make([]interface{}, 0)
+	columnTypes := rows.FieldDescriptions()
 	for rows.Next() {
-		val, rowErr := rows.Values()
-		if rowErr != nil {
-			return nil, fmt.Errorf("error parsing result '%v': %w", rows.Err(), rowErr)
+		values := make([]interface{}, len(columnTypes))
+		for i := range values {
+			values[i] = new(interface{})
 		}
-		rs = append(rs, val) //nolint:asasalint
+
+		if err = rows.Scan(values...); err != nil {
+			return
+		}
+
+		r := map[string]interface{}{}
+		for i, ct := range columnTypes {
+			r[ct.Name] = values[i]
+		}
+		rs = append(rs, r)
 	}
 
 	if result, err = json.Marshal(rs); err != nil {
 		err = fmt.Errorf("error serializing results: %w", err)
 	}
-
-	return
+	return result, err
 }
 
 func (pgOps *PostgresOperations) exec(ctx context.Context, sql string) (result int64, err error) {

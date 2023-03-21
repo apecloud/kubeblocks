@@ -44,7 +44,7 @@ import (
 type postHandler func(cluster *appsv1alpha1.Cluster) error
 
 // clusterStatusHandler a cluster status handler which changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
-type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (bool, postHandler)
+type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (postHandler, error)
 
 const (
 	// EventTimeOut timeout of the event
@@ -62,10 +62,14 @@ func doChainClusterStatusHandler(ctx context.Context,
 		postHandlers    = make([]func(cluster *appsv1alpha1.Cluster) error, 0, len(handlers))
 	)
 	for _, statusHandler := range handlers {
-		needPatch, postFunc := statusHandler(cluster)
-		if needPatch {
-			needPatchStatus = true
+		postFunc, err := statusHandler(cluster)
+		if err != nil {
+			if err == util.ErrNoOps {
+				continue
+			}
+			return err
 		}
+		needPatchStatus = true
 		if postFunc != nil {
 			postHandlers = append(postHandlers, postFunc)
 		}

@@ -88,7 +88,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("test when clusterDefinition not found")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeProvisioningStarted)
-				g.Expect(condition != nil && condition.Reason == constant.ReasonNotFoundCR).Should(BeTrue())
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Reason).Should(BeEquivalentTo(constant.ReasonNotFoundCR))
 			})).Should(Succeed())
 
 			By("test conditionsError phase")
@@ -124,7 +125,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				updateClusterAnnotation(cluster)
 				g.Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 					condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
-					g.Expect(condition != nil && condition.Reason == constant.ReasonRefCRUnavailable).Should(BeTrue())
+					g.Expect(condition).ShouldNot(BeNil())
+					g.Expect(condition.Reason).Should(BeEquivalentTo(constant.ReasonRefCRUnavailable))
 				})).Should(Succeed())
 			}).Should(Succeed())
 
@@ -167,10 +169,11 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				tmpCluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
 			})()).ShouldNot(HaveOccurred())
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeApplyResources)
-				g.Expect(condition != nil && condition.Reason == ReasonApplyResourcesFailed).Should(BeTrue())
-			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
+				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeApplyResources)
+					g.Expect(condition != nil && condition.Reason == ReasonApplyResourcesFailed).Should(BeTrue())
+				})).Should(Succeed())
 		})
 	})
 

@@ -62,8 +62,9 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	opsCtrlHandler := &opsControllerHandler{}
 	return opsCtrlHandler.Handle(reqCtx, &operations.OpsResource{Recorder: r.Recorder},
-		r.fetchOpsRequestAndCluster,
+		r.fetchOpsRequest,
 		r.handleDeleteEvent,
+		r.fetchCluster,
 		r.addClusterLabelAndSetOwnerReference,
 		r.handleOpsRequestByPhase,
 	)
@@ -76,8 +77,8 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// fetchOpsRequestAndCluster fetches the OpsRequest and Cluster object from the request.
-func (r *OpsRequestReconciler) fetchOpsRequestAndCluster(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+// fetchOpsRequestAndCluster fetches the OpsRequest from the request.
+func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
 	opsRequest := &appsv1alpha1.OpsRequest{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, opsRequest); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -90,18 +91,6 @@ func (r *OpsRequestReconciler) fetchOpsRequestAndCluster(reqCtx intctrlutil.Requ
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
 	opsRes.OpsRequest = opsRequest
-	cluster := &appsv1alpha1.Cluster{}
-	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
-		Namespace: opsRes.OpsRequest.GetNamespace(),
-		Name:      opsRes.OpsRequest.Spec.ClusterRef,
-	}, cluster); err != nil {
-		if apierrors.IsNotFound(err) {
-			_ = operations.PatchClusterNotFound(reqCtx.Ctx, r.Client, opsRes)
-		}
-		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
-	}
-	// set cluster variable
-	opsRes.Cluster = cluster
 	return nil, nil
 }
 
@@ -115,6 +104,23 @@ func (r *OpsRequestReconciler) handleDeleteEvent(reqCtx intctrlutil.RequestCtx, 
 		// this is mainly to prevent OpsRequest from being deleted by mistake, resulting in inconsistency.
 		return nil, operations.DeleteOpsRequestAnnotationInCluster(reqCtx.Ctx, r.Client, opsRes)
 	})
+}
+
+// fetchCluster fetches the Cluster from the OpsRequest.
+func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+	cluster := &appsv1alpha1.Cluster{}
+	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
+		Namespace: opsRes.OpsRequest.GetNamespace(),
+		Name:      opsRes.OpsRequest.Spec.ClusterRef,
+	}, cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			_ = operations.PatchClusterNotFound(reqCtx.Ctx, r.Client, opsRes)
+		}
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	// set cluster variable
+	opsRes.Cluster = cluster
+	return nil, nil
 }
 
 // handleOpsRequestByPhase handles the OpsRequest by its phase.

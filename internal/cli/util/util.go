@@ -37,8 +37,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/briandowns/spinner"
-	"github.com/fatih/color"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -66,11 +64,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
-)
-
-var (
-	green = color.New(color.FgHiGreen, color.Bold).SprintFunc()
-	red   = color.New(color.FgHiRed, color.Bold).SprintFunc()
 )
 
 func init() {
@@ -232,36 +225,6 @@ func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
 // SetKubeConfig set KUBECONFIG environment
 func SetKubeConfig(cfg string) error {
 	return os.Setenv("KUBECONFIG", cfg)
-}
-
-func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
-	msg := fmt.Sprintf(fmtstr, a...)
-	var once sync.Once
-	var s *spinner.Spinner
-
-	if runtime.GOOS == types.GoosWindows {
-		fmt.Fprintf(w, "%s\n", msg)
-		return func(result bool) {}
-	} else {
-		s = spinner.New(spinner.CharSets[11], 100*time.Millisecond)
-		s.Writer = w
-		_ = s.Color("cyan")
-		s.Suffix = fmt.Sprintf("  %s", msg)
-		s.Start()
-	}
-
-	return func(result bool) {
-		once.Do(func() {
-			if s != nil {
-				s.Stop()
-			}
-			if result {
-				fmt.Fprintf(w, "%s %s\n", msg, green("OK"))
-			} else {
-				fmt.Fprintf(w, "%s %s\n", msg, red("FAIL"))
-			}
-		})
-	}
 }
 
 var addToScheme sync.Once

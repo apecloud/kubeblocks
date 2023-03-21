@@ -87,7 +87,7 @@ func (o *destroyOptions) destroyLocal() error {
 	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
 	provider.VerboseLog(false)
 
-	spinner := util.Spinner(o.Out, "Destroy KubeBlocks playground k3d cluster %s", k8sClusterName)
+	spinner := printer.Spinner(o.Out, "Destroy KubeBlocks playground k3d cluster %s", k8sClusterName)
 	defer spinner(false)
 	// DeleteK8sCluster k3d cluster
 	if err := provider.DeleteK8sCluster(k8sClusterName); err != nil {

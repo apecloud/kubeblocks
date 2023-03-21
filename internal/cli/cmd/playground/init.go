@@ -140,7 +140,7 @@ func (o *initOptions) local() error {
 
 	o.startTime = time.Now()
 	// Set up K3s as KubeBlocks control plane cluster
-	spinner := util.Spinner(o.Out, "%-40s", "Create k3d cluster: "+k8sClusterName)
+	spinner := printer.Spinner(o.Out, "%-40s", "Create k3d cluster: "+k8sClusterName)
 	defer spinner(false)
 	if err = provider.CreateK8sCluster(k8sClusterName, true); err != nil {
 		return errors.Wrap(err, "failed to set up k3d cluster")
@@ -163,7 +163,7 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 	}
 
 	// Install database cluster
-	spinner := util.Spinner(o.Out, "Create cluster %s (ClusterDefinition: %s, ClusterVersion: %s)",
+	spinner := printer.Spinner(o.Out, "Create cluster %s (ClusterDefinition: %s, ClusterVersion: %s)",
 		kbClusterName, o.clusterDef, o.clusterVersion)
 	defer spinner(false)
 	if err = o.createCluster(); err != nil {

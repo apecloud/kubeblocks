@@ -309,7 +309,7 @@ type LastComponentConfiguration struct {
 	Services []ClusterComponentService `json:"services,omitempty"`
 
 	// targetResources records the affecting target resources information for the component.
-	// ComponentResourceKey - in list of [pods].
+	// resource key is in list of [pods].
 	// +optional
 	TargetResources map[ComponentResourceKey][]string `json:"targetResources,omitempty"`
 }

@@ -625,8 +625,8 @@ spec:
                               type: string
                             type: array
                           description: targetResources records the affecting target
-                            resources information for the component. ComponentResourceKey
-                            is the key of the k8s resource such as pod/pvc.
+                            resources information for the component. resource key
+                            is in list of [pods].
                           type: object
                         volumeClaimTemplates:
                           description: volumeClaimTemplates records the last volumeClaimTemplates

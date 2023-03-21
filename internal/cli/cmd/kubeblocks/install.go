@@ -280,7 +280,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	}
 
 	// create spinner
-	msg := "Wait installable addons ready"
+	msg := "Wait for addons to be ready"
 	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
 	s.Writer = o.Out
 	_ = s.Color("cyan")
@@ -302,12 +302,13 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 				unready = append(unready, k)
 			}
 		}
-		s.Suffix = suffixMsg(fmt.Sprintf("Wait addons ready\n  %s", strings.Join(unready, "\n  ")))
+		sort.Strings(unready)
+		s.Suffix = suffixMsg(fmt.Sprintf("%s\n  %s", msg, strings.Join(unready, "\n  ")))
 		for _, r := range ready {
 			if slices.Contains(prevUnready, r) {
 				s.FinalMSG = okMsg("Addon " + r)
 				s.Stop()
-				s.Suffix = suffixMsg(fmt.Sprintf("Wait addons ready\n  %s", strings.Join(unready, "\n  ")))
+				s.Suffix = suffixMsg(fmt.Sprintf("%s\n  %s", msg, strings.Join(unready, "\n  ")))
 				s.Start()
 			}
 		}
@@ -329,7 +330,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		}
 		checkProgress()
 		if allEnabled {
-			s.FinalMSG = okMsg("All installable addons ready")
+			s.FinalMSG = okMsg(msg)
 			s.Stop()
 			return nil
 		}

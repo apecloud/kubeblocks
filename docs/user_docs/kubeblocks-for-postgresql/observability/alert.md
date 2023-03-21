@@ -8,12 +8,6 @@ sidebar_position: 2
 
 Alerts are mainly used for daily error response to improve system availability. Kubeblocks has a set of built-in common alert rules and integrates multiple notification channels. The alert capability of Kubeblocks can meet the operation and maintenance requirements of production-level online clusters.
 
-## How KubeBlocks alert works
-
-KubeBlocks built-in alert system adopts the mainstream open-source solution in the cloud native scenario, i.e. the combined solution of Prometheus and AlertManager. KubeBlocks also uses the AlertManager Webhook extension to integrate new notification channels, such as Feishu custom bot, Dingtalk custom bot, Wechat custom bot.
-
-![Alert](./../../../img/observability_alert.png)
-
 ## Alert rules
 
 KubeBlocks has a set of general built-in alter rules to meet the alert needs of different types of data products and provides an out-of-the-box experience without further configurations. These alert rules provide the best practice for cluster operation and maintenance. These alarm rules further improve alert accuracy and reduce the probability of false negatives and false positives through experience-based smoothing windows, alarm thresholds, alarm levels, and alarm indicators.
@@ -68,11 +62,12 @@ Currently, Feishu custom bot, DingTalk custom bot, WeChat Enterprise custom bot,
 * [WeChat Enterprise custom bot](https://developer.work.weixin.qq.com/document/path/91770)
 * [Slack](https://api.slack.com/messaging/webhooks)
 
-> ***Notes:***
->
-> * Each notification channel has its interface call amount and frequency limits and when the limits are reached, the channel limits traffic and alerts are not sent out. 
-> * The SLA of the service provided by a single channel cannot guarantee the alerts are sent successfully. Therefore, it is recommended to configure multiple notification channels to ensure availability.
+:::note
 
+* Each notification channel has its interface call amount and frequency limits and when the limits are reached, the channel limits traffic and alerts are not sent out. 
+* The SLA of the service provided by a single channel cannot guarantee the alerts are sent successfully. Therefore, it is recommended to configure multiple notification channels to ensure availability.
+
+:::
 
 ### Step 2. Configure the receiver
 
@@ -108,10 +103,12 @@ Add an alert receiver.
    --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=pg --severity=critical
    ```
 
-  > ***Note:***
-  > 
-  > For detailed command description, run `kbcli alert add-receiver -h`.
+:::note
 
+For the detailed command description, run `kbcli alert add-receiver -h`.
+
+:::
+ 
 Run the command below to view the notification configurations.
 
   ```bash
@@ -126,18 +123,18 @@ Run the command below to delete the notification channel and receiver if you wan
 
 ## Troubleshooting
 
-If you cannot receive alert notices, run the commands below to get the logs of AlertManager and AlertManager-Webhook-Adaptor. 
+If you cannot receive alert notices, run the commands below to get the logs of AlertManager and AlertManager-Webhook-Adaptor add-ons. 
 
 ```bash
 # Find the corresponding Pod of AlertManager and get Pod name
-kubectl get pods -l 'release=kubeblocks,app=prometheus,component=alertmanager'
+kubectl get pods -n kb-system -l 'release=kubeblocks,app=prometheus,component=alertmanager'
 
 # Search AlertManeger logs
-kubectl logs <pod-name> -c prometheus-alertmanager
+kubectl logs <pod-name> -n kb-system -c prometheus-alertmanager
 
 # Find the corresponding Pod of AlertManager-Webhook-Adaptor and get Pod name
-kubectl get pods -l 'app.kubernetes.io/instance=kubeblocks,app.kubernetes.io/name=alertmanager-webhook-adaptor'
+kubectl get pods -n kb-system -l 'app.kubernetes.io/instance=kubeblocks,app.kubernetes.io/name=alertmanager-webhook-adaptor'
 
 # Search AlertManager-Webhook-Adaptor logs
-kubectl logs <pod-name> -c alertmanager-webhook-adaptor
+kubectl logs <pod-name> -n kb-system -c alertmanager-webhook-adaptor
 ```

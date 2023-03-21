@@ -1,10 +1,11 @@
 ---
-title: KubeBlocks lifecycle management
+title: Lifecycle
 description: The API of KubeBlocks lifecycle management
 sidebar_position: 1
+sidebar_label: Lifecycle
 ---
 
-# KubeBlocks lifecycle management
+# Lifecycle
 
 This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is declarative and enables providers to describe the database cluster typology and lifecycle by YAML files, thus dynamically generating a management and control task flow to provide users with a consistent database operation experience. KubeBlocks has three APIs, namely `ClusterDefinition`, `ClusterVersion`, and `Cluster`. `ClusterDefinition` and `AppVersion` are designed for providers and `Cluster` is for end users.
 
@@ -12,7 +13,7 @@ This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is 
 
 `ClusterDefinition` is a Kubernetes custom resource definition and enables providers to describe the cluster typology and the dependencies among roles in operation tasks. 
 
-### ClusterDefinition `spec`
+### ClusterDefinition spec
 
 #### spec.workloadType
 
@@ -173,7 +174,7 @@ spec:
         docker-entrypoint.sh mysqld --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
 ```
 
-Note:
+:::note
 
 `envs` automatically injected by KubeBlocks can be used in the above `env` and `args` fields.
 
@@ -188,11 +189,13 @@ Note:
 - KB_COMP_NAME - Running pod's KubeBlock Cluster API object's .spec.components.name
 - KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's <.metadata.name>-<.spec.components..name>, same name is used for Deployment or StatefulSet workload name, and Service object name
 
+:::
+
 ## ClusterVersion (for providers)
 
 `ClusterVersion` enables providers to describe the image versions and condition variables of the corresponding database versions.
 
-### ClusterVersion `spec`
+### ClusterVersion spec
 
 #### spec.clusterDefinitionRef
 
@@ -202,7 +205,7 @@ Note:
 
 `type` should be the same component name as `ClusterDefinition`.
 
-### ClusterVersion `status`
+### ClusterVersion status
 
 You can check `phase` and `message` to view the executing status and result.
 
@@ -228,7 +231,7 @@ spec:
 
 `Cluster` enables end users to describe the database cluster they want to create.
 
-### Cluster `spec`
+### Cluster spec
 
 #### spec.clusterDefinitionRef
 
@@ -251,7 +254,7 @@ It refers to ClusterVersion and its value should be the same as `ClusterVersion`
 `volumeClaimTemplates` is a list of claims that pods are allowed to refer to. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) `volumeMount` in one container in the template. A claim in this list takes precedence over any volumes in the template with the same name.
 `PersistentVolumeClaim` is a user's request for and claim to a persistent volume.
 
-### Cluster `status`
+### Cluster status
 
 `status` describes the current state and progress of the `Cluster`. 
 

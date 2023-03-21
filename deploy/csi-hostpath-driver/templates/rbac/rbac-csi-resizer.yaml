@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: csi-resizer
+  name: csi-resizer-{{ include "csi-hostpath-driver.fullname" . }}
   namespace: {{ .Release.Namespace }}
 
 ---
@@ -9,7 +9,7 @@ metadata:
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: external-resizer-runner
+  name: external-resizer-runner-{{ include "csi-hostpath-driver.fullname" . }}
 rules:
   # The following rule should be uncommented for plugins that require secrets
   # for provisioning.
@@ -36,14 +36,14 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-resizer-role
+  name: csi-resizer-role-{{ include "csi-hostpath-driver.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: csi-resizer
+    name: csi-resizer-{{ include "csi-hostpath-driver.fullname" . }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
-  name: external-resizer-runner
+  name: external-resizer-runner-{{ include "csi-hostpath-driver.fullname" . }}
   apiGroup: rbac.authorization.k8s.io
 
 ---
@@ -53,7 +53,7 @@ kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: external-resizer-cfg
+  name: external-resizer-cfg-{{ include "csi-hostpath-driver.fullname" . }}
 rules:
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]
@@ -63,13 +63,13 @@ rules:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-resizer-role-cfg
+  name: csi-resizer-role-cfg-{{ include "csi-hostpath-driver.fullname" . }}
   namespace: {{ .Release.Namespace }}
 subjects:
   - kind: ServiceAccount
-    name: csi-resizer
+    name: csi-resizer-{{ include "csi-hostpath-driver.fullname" . }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
-  name: external-resizer-cfg
+  name: external-resizer-cfg-{{ include "csi-hostpath-driver.fullname" . }}
   apiGroup: rbac.authorization.k8s.io

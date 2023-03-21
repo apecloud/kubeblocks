@@ -80,12 +80,11 @@ jobs:
     name: check helm
     needs: trigger-mode
     if: needs.trigger-mode.outputs.trigger-mode == '[deploy]'
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.4.0
+    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.0
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      HELM_SET: "prometheus.enabled=true,grafana.enabled=true,dashboards.enabled=true,dataProtection.enableVolumeSnapshot=true,snapshot-controller.enabled=true"
       PUSH_ENABLE: false
     secrets: inherit

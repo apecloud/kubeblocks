@@ -203,7 +203,7 @@ func NewReconfigurePolicy(tpl *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgc
 
 	actionType := policy
 	if !restart {
-		if dynamicUpdate, err := isUpdateDynamicParameters(tpl, cfgPatch); err != nil {
+		if dynamicUpdate, err := cfgcore.IsUpdateDynamicParameters(tpl, cfgPatch); err != nil {
 			return nil, err
 		} else if dynamicUpdate {
 			actionType = appsv1alpha1.AutoReload

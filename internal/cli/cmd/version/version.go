@@ -21,7 +21,7 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
-	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -30,7 +30,6 @@ import (
 
 type versionOptions struct {
 	verbose bool
-	client  clientset.Interface
 }
 
 // NewVersionCmd the version command
@@ -40,24 +39,20 @@ func NewVersionCmd(f cmdutil.Factory) *cobra.Command {
 		Use:   "version",
 		Short: "Print the version information, include kubernetes, KubeBlocks and kbcli version.",
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.Complete(f))
-			o.Run()
+			o.Run(f)
 		},
 	}
 	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "print detailed kbcli information")
 	return cmd
 }
 
-func (o *versionOptions) Complete(f cmdutil.Factory) error {
-	var err error
-	if o.client, err = f.KubernetesClientSet(); err != nil {
-		return err
+func (o *versionOptions) Run(f cmdutil.Factory) {
+	client, err := f.KubernetesClientSet()
+	if err != nil {
+		klog.V(1).Infof("failed to get clientset: %v", err)
 	}
-	return err
-}
 
-func (o *versionOptions) Run() {
-	versionInfo, _ := util.GetVersionInfo(o.client)
+	versionInfo, _ := util.GetVersionInfo(client)
 	if v := versionInfo[util.KubernetesApp]; len(v) > 0 {
 		fmt.Printf("Kubernetes: %s\n", v)
 	}

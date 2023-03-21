@@ -35,7 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -206,7 +206,7 @@ func showEvents(events *corev1.EventList, name string, namespace string, out io.
 	for _, o := range *objs {
 		e := o.(*corev1.Event)
 		// do not output KubeBlocks probe events
-		if e.InvolvedObject.FieldPath == component.ProbeRoleChangedCheckPath {
+		if e.InvolvedObject.FieldPath == constant.ProbeCheckRolePath {
 			continue
 		}
 

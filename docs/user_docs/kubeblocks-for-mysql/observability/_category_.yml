@@ -1,4 +1,4 @@
-position: 4
+position: 5
 label: Observability
 collapsible: true 
-collapsed: false 
+collapsed: true

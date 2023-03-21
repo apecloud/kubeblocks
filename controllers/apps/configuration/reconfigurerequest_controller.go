@@ -50,9 +50,9 @@ var ConfigurationRequiredLabels = []string{
 	constant.AppNameLabelKey,
 	constant.AppInstanceLabelKey,
 	constant.KBAppComponentLabelKey,
-	constant.CMConfigurationTplNameLabelKey,
+	constant.CMConfigurationTemplateNameLabelKey,
 	constant.CMConfigurationTypeLabelKey,
-	constant.CMConfigurationProviderTplLabelKey,
+	constant.CMConfigurationSpecProviderLabelKey,
 }
 
 // +kubebuilder:rbac:groups=core,resources=configmap,verbs=get;list;watch;create;update;patch;delete
@@ -138,16 +138,14 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 		configKey = client.ObjectKeyFromObject(config)
 
-		componentName     = config.Labels[constant.KBAppComponentLabelKey]
-		configTplName     = config.Labels[constant.CMConfigurationProviderTplLabelKey]
-		configTplLabelKey = cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName)
+		componentName  = config.Labels[constant.KBAppComponentLabelKey]
+		configSpecName = config.Labels[constant.CMConfigurationSpecProviderLabelKey]
 	)
 
 	componentLabels := map[string]string{
 		constant.AppNameLabelKey:        config.Labels[constant.AppNameLabelKey],
 		constant.AppInstanceLabelKey:    config.Labels[constant.AppInstanceLabelKey],
 		constant.KBAppComponentLabelKey: config.Labels[constant.KBAppComponentLabelKey],
-		configTplLabelKey:               config.GetName(),
 	}
 
 	var keySelector []string
@@ -214,14 +212,14 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// configmap has never been used
-	sts, containersList := getRelatedComponentsByConfigmap(&stsLists, configKey)
+	sts, containersList := getAssociatedComponentsByConfigmap(&stsLists, configKey, configSpecName)
 	if len(sts) == 0 {
 		reqCtx.Log.Info("configmap is not used by any container.")
 		return intctrlutil.Reconciled()
 	}
 
 	return r.performUpgrade(reconfigureParams{
-		TplName:                  configTplName,
+		TplName:                  configSpecName,
 		ConfigPatch:              configPatch,
 		CfgCM:                    config,
 		ConfigConstraint:         &tpl.Spec,

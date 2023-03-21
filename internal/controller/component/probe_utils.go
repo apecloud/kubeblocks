@@ -36,13 +36,6 @@ import (
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
 	roleObserveURIFormat = "http://localhost:%s/v1.0/bindings/%s"
-
-	roleProbeContainerName    = "kb-rolechangedcheck"
-	statusProbeContainerName  = "kb-statuscheck"
-	runningProbeContainerName = "kb-runningcheck"
-	ProbeRoleChangedCheckPath = "spec.containers{" + roleProbeContainerName + "}"
-	ProbeStatusCheckPath      = "spec.containers{" + statusProbeContainerName + "}"
-	ProbeRunningCheckPath     = "spec.containers{" + runningProbeContainerName + "}"
 )
 
 var (
@@ -191,7 +184,7 @@ func getComponentRoles(component *SynthesizedComponent) map[string]string {
 
 func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	roleChangedContainer.Name = roleProbeContainerName
+	roleChangedContainer.Name = constant.RoleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(characterType)
 	svcPort := strconv.Itoa(probeSvcHTTPPort)
@@ -212,7 +205,7 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 
 func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	statusProbeContainer.Name = statusProbeContainerName
+	statusProbeContainer.Name = constant.StatusProbeContainerName
 	probe := statusProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = "/v1.0/bindings/probe?operation=checkStatus"
@@ -227,7 +220,7 @@ func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 
 func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	runningProbeContainer.Name = runningProbeContainerName
+	runningProbeContainer.Name = constant.RunningProbeContainerName
 	probe := runningProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = "/v1.0/bindings/probe?operation=checkRunning"

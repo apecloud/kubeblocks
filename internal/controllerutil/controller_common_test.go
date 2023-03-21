@@ -107,8 +107,6 @@ func TestReconciled(t *testing.T) {
 var _ = Describe("Cluster Controller", func() {
 
 	const finalizer = "finalizer/protection"
-	const timeout = time.Second * 10
-	const interval = time.Second * 1
 	const referencedLabelKey = "referenced/name"
 
 	getObj := func(key client.ObjectKey) *corev1.ConfigMap {
@@ -159,7 +157,7 @@ var _ = Describe("Cluster Controller", func() {
 			} else {
 				return client.IgnoreNotFound(err)
 			}
-		}, timeout, interval).Should(Succeed())
+		}).Should(Succeed())
 	}
 
 	createReferencedConfigMap := func(label string) *corev1.ConfigMap {

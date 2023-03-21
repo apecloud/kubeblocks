@@ -255,6 +255,28 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
 				})).Should(Succeed())
 			})
+
+			It("should fail if volumesnapshot reports error", func() {
+
+				By("patching job status to pass check")
+				preJobKey := types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}
+				patchK8sJobStatus(preJobKey, batchv1.JobComplete)
+
+				By("patching volumesnapshot status with error")
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(tmpVS *snapshotv1.VolumeSnapshot) {
+					msg := "test-error"
+					vsError := snapshotv1.VolumeSnapshotError{
+						Message: &msg,
+					}
+					snapStatus := snapshotv1.VolumeSnapshotStatus{Error: &vsError}
+					tmpVS.Status = &snapStatus
+				})).Should(Succeed())
+
+				By("checking backup failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
+				})).Should(Succeed())
+			})
 		})
 
 		Context("creates a snapshot backup on error", func() {

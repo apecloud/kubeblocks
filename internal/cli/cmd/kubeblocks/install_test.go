@@ -115,6 +115,7 @@ var _ = Describe("kubeblocks install", func() {
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+				Client:    testing.FakeClientSet(),
 			},
 			Check: true,
 		}

@@ -132,9 +132,10 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 	deleteOrphanVertices := func() {
 		for name := range deleteSet {
 			v := &lifecycleVertex{
-				obj:    oldSnapshot[name],
-				oriObj: oldSnapshot[name],
-				action: actionPtr(DELETE),
+				obj:      oldSnapshot[name],
+				oriObj:   oldSnapshot[name],
+				isOrphan: true,
+				action:   actionPtr(DELETE),
 			}
 			dag.AddVertex(v)
 			dag.Connect(rootVertex, v)

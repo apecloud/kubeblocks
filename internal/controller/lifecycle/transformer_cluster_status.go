@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -75,33 +77,21 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		c.recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
 		rootVertex.action = actionPtr(STATUS)
 	case isClusterStatusUpdating(*origCluster):
-		// TODO: hack before refactoring, Update cluster and reload
-		if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
-			!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
-			patch := client.MergeFrom(origCluster.DeepCopy())
-			if err := c.cli.Patch(c.ctx.Ctx, cluster, patch); err != nil {
-				c.ctx.Log.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
-				return err
-			}
-		}
-		// --end hack--
-
-		// TODO: cluster.status Patch called in c.handleGarbageOfRestoreBeforeRunning, refactor it
+		defer func() {
+			// others, set root(cluster) vertex.action to STATUS
+			rootVertex.action = actionPtr(STATUS)
+		}()
 		// checks if the controller is handling the garbage of restore.
 		if handlingRestoreGarbage, err := c.handleGarbageOfRestoreBeforeRunning(cluster); err != nil {
 			return err
 		} else if handlingRestoreGarbage {
 			return nil
 		}
-		// TODO: cluster.status Patch called in c.reconcileClusterStatus, refactor it
 		// reconcile the phase and conditions of the Cluster.status
-		if err := c.reconcileClusterStatus(cluster, &c.cc.cd); err != nil {
+		if err := c.reconcileClusterStatus(cluster, c.cc.cd); err != nil {
 			return err
 		}
-		rootVertex.oriObj = cluster.DeepCopy()
 		c.cleanupAnnotationsAfterRunning(cluster)
-		// others, set root(cluster) vertex.action to STATUS
-		rootVertex.action = actionPtr(STATUS)
 	}
 
 	return nil
@@ -203,7 +193,7 @@ func (c *clusterStatusTransformer) needCheckClusterForReady(cluster *appsv1alpha
 // reconcileClusterStatus reconciles phase and conditions of the Cluster.status.
 func (c *clusterStatusTransformer) reconcileClusterStatus(
 	cluster *appsv1alpha1.Cluster,
-	clusterDef *appsv1alpha1.ClusterDefinition) error {
+	clusterDef appsv1alpha1.ClusterDefinition) error {
 	if !c.needCheckClusterForReady(cluster) {
 		return nil
 	}
@@ -291,7 +281,7 @@ func (c *clusterStatusTransformer) reconcileClusterStatus(
 		}
 		postFuncAfterPatch := func(currCluster *appsv1alpha1.Cluster) error {
 			c.recorder.Event(currCluster, eventType, string(currPhase), eventMessage)
-			return opsutil.MarkRunningOpsRequestAnnotation(c.ctx.Ctx, c.cli, currCluster)
+			return MarkRunningOpsRequestAnnotation(c.ctx.Ctx, c.cli, currCluster)
 		}
 		return true, postFuncAfterPatch
 	}
@@ -376,18 +366,13 @@ func (c *clusterStatusTransformer) removeGarbageWithRestore(
 		doRemoveInitContainers bool
 		err                    error
 	)
-	clusterPatch := client.MergeFrom(cluster.DeepCopy())
 	for k, v := range clusterBackupResourceMap {
 		// remove the init container for restore
 		if doRemoveInitContainers, err = c.removeStsInitContainerForRestore(cluster, k, v); err != nil {
 			return false, err
 		}
 	}
-	if doRemoveInitContainers {
-		// reset the component phase to Creating during removing the init containers of statefulSet.
-		return doRemoveInitContainers, c.cli.Status().Patch(c.ctx.Ctx, cluster, clusterPatch)
-	}
-	return false, nil
+	return doRemoveInitContainers, nil
 }
 
 // removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
@@ -471,7 +456,7 @@ func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDef
 }
 
 // getComponentRelatedInfo gets componentMap, clusterAvailabilityMap and component definition information
-func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition, componentName string) (map[string]string, map[string]bool, appsv1alpha1.ClusterComponentDefinition) {
+func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef appsv1alpha1.ClusterDefinition, componentName string) (map[string]string, map[string]bool, appsv1alpha1.ClusterComponentDefinition) {
 	var (
 		compDefName  string
 		componentMap = map[string]string{}
@@ -523,6 +508,102 @@ func doChainClusterStatusHandler(ctx context.Context,
 		if err := postFunc(cluster); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// TODO: dedup the following funcs
+
+// PatchOpsRequestReconcileAnnotation patches the reconcile annotation to OpsRequest
+func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, namespace string, opsRequestName string) error {
+	opsRequest := &appsv1alpha1.OpsRequest{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: namespace}, opsRequest); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	if opsRequest.Annotations == nil {
+		opsRequest.Annotations = map[string]string{}
+	}
+	// because many changes may be triggered within one second, if the accuracy is only seconds, the event may be lost.
+	// so we used RFC3339Nano format.
+	opsRequest.Annotations[constant.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+	return cli.Patch(ctx, opsRequest, patch)
+}
+
+// GetOpsRequestSliceFromCluster gets OpsRequest slice from cluster annotations.
+// this records what OpsRequests are running in cluster
+func GetOpsRequestSliceFromCluster(cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.OpsRecorder, error) {
+	var (
+		opsRequestValue string
+		opsRequestSlice []appsv1alpha1.OpsRecorder
+		ok              bool
+	)
+	if cluster == nil || cluster.Annotations == nil {
+		return nil, nil
+	}
+	if opsRequestValue, ok = cluster.Annotations[constant.OpsRequestAnnotationKey]; !ok {
+		return nil, nil
+	}
+	// opsRequest annotation value in cluster to slice
+	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestSlice); err != nil {
+		return nil, err
+	}
+	return opsRequestSlice, nil
+}
+
+// MarkRunningOpsRequestAnnotation marks reconcile annotation to the OpsRequest which is running in the cluster.
+// then the related OpsRequest can reconcile.
+// Note: if the client-go fetches the Cluster resources from cache,
+// it should record the Cluster.ResourceVersion to check if the Cluster object from client-go is the latest in OpsRequest controller.
+func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
+	var (
+		opsRequestSlice []appsv1alpha1.OpsRecorder
+		err             error
+	)
+	if opsRequestSlice, err = GetOpsRequestSliceFromCluster(cluster); err != nil {
+		return err
+	}
+	// mark annotation for operations
+	var notExistOps = map[string]struct{}{}
+	for _, v := range opsRequestSlice {
+		if err = PatchOpsRequestReconcileAnnotation(ctx, cli, cluster.Namespace, v.Name); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		if apierrors.IsNotFound(err) {
+			notExistOps[v.Name] = struct{}{}
+		}
+	}
+	if len(notExistOps) != 0 {
+		return RemoveClusterInvalidOpsRequestAnnotation(cluster, opsRequestSlice, notExistOps)
+	}
+	return nil
+}
+
+// RemoveClusterInvalidOpsRequestAnnotation deletes the OpsRequest annotation in cluster when the OpsRequest not existing.
+func RemoveClusterInvalidOpsRequestAnnotation(cluster *appsv1alpha1.Cluster,
+	opsRequestSlice []appsv1alpha1.OpsRecorder,
+	notExistOps map[string]struct{}) error {
+	// delete the OpsRequest annotation in cluster when the OpsRequest not existing.
+	newOpsRequestSlice := make([]appsv1alpha1.OpsRecorder, 0, len(opsRequestSlice))
+	for _, v := range opsRequestSlice {
+		if _, ok := notExistOps[v.Name]; ok {
+			continue
+		}
+		newOpsRequestSlice = append(newOpsRequestSlice, v)
+	}
+	return PatchClusterOpsAnnotations(cluster, newOpsRequestSlice)
+}
+
+// PatchClusterOpsAnnotations patches OpsRequest annotation in Cluster.annotations
+func PatchClusterOpsAnnotations(cluster *appsv1alpha1.Cluster, opsRequestSlice []appsv1alpha1.OpsRecorder) error {
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	if len(opsRequestSlice) > 0 {
+		result, _ := json.Marshal(opsRequestSlice)
+		cluster.Annotations[constant.OpsRequestAnnotationKey] = string(result)
+	} else {
+		delete(cluster.Annotations, constant.OpsRequestAnnotationKey)
 	}
 	return nil
 }

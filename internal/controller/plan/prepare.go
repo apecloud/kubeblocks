@@ -377,6 +377,76 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	return nil
 }
 
+// buildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files
+func buildCfg(task *intctrltypes.ReconcileTask,
+	obj client.Object,
+	podSpec *corev1.PodSpec,
+	ctx context.Context,
+	cli client.Client) ([]client.Object, error) {
+	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
+	// ClusterDefinition.Components[*].ConfigTemplateRefs
+	if len(task.Component.ConfigTemplates) == 0 && len(task.Component.ScriptTemplates) == 0 {
+		return nil, nil
+	}
+
+	clusterName := task.Cluster.Name
+	namespaceName := task.Cluster.Namespace
+	// New ConfigTemplateBuilder
+	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, task.Cluster, task.ClusterVersion, ctx, cli)
+	// Prepare built-in objects and built-in functions
+	if err := cfgTemplateBuilder.injectBuiltInObjectsAndFunctions(podSpec, task.Component.ConfigTemplates, task.Component); err != nil {
+		return nil, err
+	}
+
+	renderWrapper := newTemplateRenderWrapper(cfgTemplateBuilder, task.Cluster, task.GetBuilderParams(), ctx, cli)
+	if err := renderWrapper.renderConfigTemplate(task, obj); err != nil {
+		return nil, err
+	}
+	if err := renderWrapper.renderScriptTemplate(task, obj); err != nil {
+		return nil, err
+	}
+
+	if len(renderWrapper.templateAnnotations) > 0 {
+		updateResourceAnnotationsWithTemplate(obj, renderWrapper.templateAnnotations)
+	}
+
+	// Generate Pod Volumes for ConfigMap objects
+	if err := intctrlutil.CreateOrUpdatePodVolumes(podSpec, renderWrapper.volumes); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
+	}
+
+	if err := updateConfigManagerWithComponent(podSpec, task.Component.ConfigTemplates, ctx, cli, task.GetBuilderParams()); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
+	}
+
+	return renderWrapper.renderedObjs, nil
+}
+
+func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotations map[string]string) {
+	// full configmap upgrade
+	existLabels := make(map[string]string)
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	for key, val := range annotations {
+		if strings.HasPrefix(key, constant.ConfigurationTplLabelPrefixKey) {
+			existLabels[key] = val
+		}
+	}
+
+	// delete not exist configmap label
+	deletedLabels := cfgcore.MapKeyDifference(existLabels, allTemplateAnnotations)
+	for l := range deletedLabels.Iter() {
+		delete(annotations, l)
+	}
+
+	for key, val := range allTemplateAnnotations {
+		annotations[key] = val
+	}
+	obj.SetAnnotations(annotations)
+}
+
 // updateConfigManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
 func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec, ctx context.Context, cli client.Client, params builder.BuilderParams) error {

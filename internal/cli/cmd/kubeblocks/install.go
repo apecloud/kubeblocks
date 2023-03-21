@@ -268,7 +268,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	}
 
 	// wait for all auto-install addons to be enabled
-	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_READY_TIMES"); i++ {
+	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_TIMES"); i++ {
 		allEnabled, err := checkAddons()
 		if err != nil {
 			return err
@@ -309,7 +309,10 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	fmt.Fprintf(o.Out, "Kubernetes version %s\n", ""+version)
 
 	// disable or enable some features according to the kubernetes environment
-	provider := util.GetK8sProvider(k8sVersionStr)
+	provider, err := util.GetK8sProvider(version, o.Client)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes provider: %v", err)
+	}
 	if provider.IsCloud() {
 		fmt.Fprintf(o.Out, "Kubernetes provider %s\n", provider)
 	}

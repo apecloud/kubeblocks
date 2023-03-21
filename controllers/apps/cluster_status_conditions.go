@@ -93,7 +93,7 @@ func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Co
 	phaseChanged := conMgr.handleConditionForClusterPhase(oldCondition, condition)
 	conditionChanged := !reflect.DeepEqual(oldCondition, condition)
 	if conditionChanged || phaseChanged {
-		conMgr.cluster.SetStatusCondition(condition)
+		meta.SetStatusCondition(&conMgr.cluster.Status.Conditions, condition)
 		if err := conMgr.Client.Status().Patch(conMgr.ctx, conMgr.cluster, patch); err != nil {
 			return err
 		}
@@ -266,7 +266,7 @@ func handleNotReadyConditionForCluster(cluster *appsv1alpha1.Cluster,
 		// if all replicas of cluster are ready, set ReasonAllReplicasReady to status.conditions
 		readyCondition := newAllReplicasPodsReadyConditions()
 		if checkConditionIsChanged(oldReplicasReadyCondition, readyCondition) {
-			cluster.SetStatusCondition(readyCondition)
+			meta.SetStatusCondition(&cluster.Status.Conditions, readyCondition)
 			needPatch = true
 			postFunc = func(cluster *appsv1alpha1.Cluster) error {
 				// send an event when all pods of the components are ready.
@@ -277,7 +277,7 @@ func handleNotReadyConditionForCluster(cluster *appsv1alpha1.Cluster,
 	} else {
 		replicasNotReadyCond := newReplicasNotReadyCondition(replicasNotReadyCompNames)
 		if checkConditionIsChanged(oldReplicasReadyCondition, replicasNotReadyCond) {
-			cluster.SetStatusCondition(replicasNotReadyCond)
+			meta.SetStatusCondition(&cluster.Status.Conditions, replicasNotReadyCond)
 			needPatch = true
 		}
 	}
@@ -286,7 +286,7 @@ func handleNotReadyConditionForCluster(cluster *appsv1alpha1.Cluster,
 		oldClusterReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReady)
 		clusterNotReadyCondition := newComponentsNotReadyCondition(notReadyCompNames)
 		if checkConditionIsChanged(oldClusterReadyCondition, clusterNotReadyCondition) {
-			cluster.SetStatusCondition(clusterNotReadyCondition)
+			meta.SetStatusCondition(&cluster.Status.Conditions, clusterNotReadyCondition)
 			needPatch = true
 		}
 	}

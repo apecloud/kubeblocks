@@ -768,8 +768,9 @@ func createPVCFromSnapshot(ctx context.Context,
 	vct corev1.PersistentVolumeClaimTemplate,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
-	snapshotName string) error {
-	pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName)
+	snapshotName string,
+	component *component.SynthesizedComponent) error {
+	pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName, component)
 	if err != nil {
 		return err
 	}
@@ -875,7 +876,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 	ctx context.Context,
 	pvcKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
-	componentName string,
+	component *component.SynthesizedComponent,
 	vct corev1.PersistentVolumeClaimTemplate,
 	stsObj *appsv1.StatefulSet) error {
 	pvc := corev1.PersistentVolumeClaim{}
@@ -884,13 +885,13 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-		ml := getBackupMatchingLabels(cluster.Name, componentName)
+		ml := getBackupMatchingLabels(cluster.Name, component.Name)
 		vsList := snapshotv1.VolumeSnapshotList{}
 		if err := cli.List(ctx, &vsList, ml); err != nil {
 			return err
 		}
 		if len(vsList.Items) == 0 {
-			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, componentName)
+			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, component.Name)
 		}
 		// exclude volumes that are deleting
 		vsName := ""
@@ -901,7 +902,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 			vsName = vs.Name
 			break
 		}
-		return createPVCFromSnapshot(ctx, cli, vct, stsObj, pvcKey, vsName)
+		return createPVCFromSnapshot(ctx, cli, vct, stsObj, pvcKey, vsName, component)
 	}
 	return nil
 }
@@ -1091,7 +1092,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				ctx,
 				pvcKey,
 				cluster,
-				component.Name,
+				component,
 				vct,
 				stsObj); err != nil {
 				reqCtx.Log.Error(err, "checkedCreatePVCFromSnapshot failed")

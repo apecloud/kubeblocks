@@ -313,7 +313,6 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 			}
 		}
 		prevUnready = unready
-		return
 	}
 
 	var (

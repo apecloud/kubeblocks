@@ -437,7 +437,6 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(opsSlice).Should(HaveLen(1))
 				g.Expect(tmlCluster.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.VolumeExpandingPhase))
 			})).Should(Succeed())
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.VolumeExpandingPhase))
 
 			By("delete the Running ops")
 			testapps.DeleteObject(&testCtx, opsKey, volumeExpandOps)

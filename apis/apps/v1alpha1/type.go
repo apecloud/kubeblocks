@@ -86,7 +86,7 @@ const (
 	ExposeType            OpsType = "Expose"
 )
 
-// ComponentResourceKey defines the resource key of component.
+// ComponentResourceKey defines the resource key of component, such as pod/pvc.
 // +enum
 // +kubebuilder:validation:Enum={pods}
 type ComponentResourceKey string

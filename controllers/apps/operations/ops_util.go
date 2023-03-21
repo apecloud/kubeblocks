@@ -235,6 +235,7 @@ func GetOpsRecorderFromSlice(opsRequestSlice []appsv1alpha1.OpsRecorder,
 			return i, v
 		}
 	}
+	// if not found, return -1 and an empty OpsRecorder object
 	return -1, appsv1alpha1.OpsRecorder{}
 }
 

@@ -102,9 +102,6 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	if len(opsBehaviour.FromClusterPhases) == 0 {
 		return nil
 	}
-	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
-		return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("%s is forbidden when Cluster.status.Phase is %s", r.Spec.Type, cluster.Status.Phase))
-	}
 	// validate whether existing the same type OpsRequest
 	var (
 		opsRequestValue string
@@ -118,13 +115,20 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorder); err != nil {
 		return nil
 	}
-	for _, v := range opsRecorder {
+	opsNamesInQueue := make([]string, len(opsRecorder))
+	for i, v := range opsRecorder {
 		// judge whether the opsRequest meets the following conditions:
 		// 1. the opsRequest is Reentrant.
 		// 2. the opsRequest supports concurrent execution of the same kind.
 		if v.Name != r.Name && !slices.Contains(opsBehaviour.FromClusterPhases, v.ToClusterPhase) {
 			return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", v.Name, cluster.Name))
 		}
+		opsNamesInQueue[i] = v.Name
+	}
+	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
+	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) &&
+		!slices.Contains(opsNamesInQueue, r.Name) {
+		return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("%s is forbidden when Cluster.status.Phase is %s", r.Spec.Type, cluster.Status.Phase))
 	}
 	return nil
 }

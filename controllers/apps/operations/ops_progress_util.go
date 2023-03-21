@@ -417,7 +417,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 		return
 	}
 	if compStatus.Phase == appsv1alpha1.RunningPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
-		err = fmt.Errorf("wait for the pods of component to be synchronized to client-go cache")
+		err = fmt.Errorf("wait for the pods of component to be synchronized")
 		return
 	}
 	dValue := *expectReplicas - *lastComponentReplicas

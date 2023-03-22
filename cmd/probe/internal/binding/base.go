@@ -41,6 +41,12 @@ type OpsResult map[string]interface{}
 // +enum
 type AccessMode string
 
+type BaseInternalOps interface {
+	InternalQuery(ctx context.Context, sql string) ([]byte, error)
+	InternalExec(ctx context.Context, sql string) (int64, error)
+	GetLogger() logger.Logger
+}
+
 type BaseOperations struct {
 	CheckRunningFailedCount    int
 	CheckStatusFailedCount     int

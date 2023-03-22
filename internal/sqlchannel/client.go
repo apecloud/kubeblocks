@@ -168,6 +168,7 @@ func GetMapKeyFromRequest(req *dapr.InvokeBindingRequest) string {
 type OperationHTTPClient struct {
 	httpRequestPrefix string
 	RequestTimeout    time.Duration
+	containerName     string
 	exec              *exec.ExecOptions
 }
 
@@ -185,7 +186,10 @@ func NewHTTPClientWithPod(exec *exec.ExecOptions, pod *corev1.Pod, characterType
 	if ip == "" {
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
-
+	container, err := intctrlutil.GetProbeContainerName(pod)
+	if err != nil {
+		return nil, err
+	}
 	port, err := intctrlutil.GetProbeHTTPPort(pod)
 	if err != nil {
 		return nil, err
@@ -194,6 +198,7 @@ func NewHTTPClientWithPod(exec *exec.ExecOptions, pod *corev1.Pod, characterType
 	client := &OperationHTTPClient{
 		httpRequestPrefix: fmt.Sprintf(HTTPRequestPrefx, port, characterType),
 		RequestTimeout:    10 * time.Second,
+		containerName:     container,
 		exec:              exec,
 	}
 	return client, nil
@@ -211,6 +216,7 @@ func (cli *OperationHTTPClient) SendRequest(request SQLChannelRequest) (SQLChann
 	if jsonData, err := json.Marshal(request); err != nil {
 		return response, err
 	} else {
+		cli.exec.ContainerName = cli.containerName
 		cli.exec.Command = []string{"sh", "-c", cli.httpRequestPrefix + " -d '" + string(jsonData) + "'"}
 	}
 

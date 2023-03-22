@@ -1,0 +1,60 @@
+---
+images:
+  # Source: quay.io/k8scsi/csi-attacher:v3.0.1
+  attacher: cr.yandex/crp9ftr22d26age3hulg/yandex-cloud/csi-s3/csi-attacher:v3.0.1
+  # Source: quay.io/k8scsi/csi-node-driver-registrar:v1.2.0
+  registrar: cr.yandex/crp9ftr22d26age3hulg/yandex-cloud/csi-s3/csi-node-driver-registrar:v1.2.0
+  # Source: quay.io/k8scsi/csi-provisioner:v2.1.0
+  provisioner: cr.yandex/crp9ftr22d26age3hulg/yandex-cloud/csi-s3/csi-provisioner:v2.1.0
+  # Main image
+  csi: cr.yandex/crp9ftr22d26age3hulg/yandex-cloud/csi-s3/csi-s3-driver:0.31.3
+
+storageClass:
+  # Specifies whether the storage class should be created
+  create: true
+  # Name
+  name: csi-s3
+  # Use a single bucket for all dynamically provisioned persistent volumes
+  singleBucket: ""
+  # mounter to use - either geesefs, s3fs or rclone (default geesefs)
+  mounter: geesefs
+  # GeeseFS mount options
+  mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666"
+  # Volume reclaim policy
+  reclaimPolicy: Delete
+  # Annotations for the storage class
+  # Example:
+  # annotations:
+  #   storageclass.kubernetes.io/is-default-class: "true"
+  annotations: {}
+
+secret:
+  # Specifies whether the secret should be created
+  create: true
+  # Name of the secret
+  name: csi-s3-secret
+  # S3 Access Key
+  accessKey: ""
+  # S3 Secret Key
+  secretKey: ""
+  # Endpoint
+  endpoint: https://storage.yandexcloud.net
+
+tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: "Exists"
+
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"

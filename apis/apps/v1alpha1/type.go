@@ -39,16 +39,14 @@ const (
 	UnavailablePhase       Phase = "Unavailable"
 	DeletingPhase          Phase = "Deleting"
 	CreatingPhase          Phase = "Creating"
-	PendingPhase           Phase = "Pending"
 	RunningPhase           Phase = "Running"
 	FailedPhase            Phase = "Failed"
-	SpecUpdatingPhase      Phase = "SpecUpdating"
+	SpecReconcilingPhase   Phase = "Updating"
 	VolumeExpandingPhase   Phase = "VolumeExpanding"
 	HorizontalScalingPhase Phase = "HorizontalScaling"
 	VerticalScalingPhase   Phase = "VerticalScaling"
 	RebootingPhase         Phase = "Rebooting"
 	VersionUpgradingPhase  Phase = "VersionUpgrading"
-	SucceedPhase           Phase = "Succeed"
 	AbnormalPhase          Phase = "Abnormal"
 	ConditionsErrorPhase   Phase = "ConditionsError"
 	ReconfiguringPhase     Phase = "Reconfiguring"
@@ -56,6 +54,19 @@ const (
 	StoppingPhase          Phase = "Stopping"
 	StartingPhase          Phase = "Starting"
 	ExposingPhase          Phase = "Exposing"
+)
+
+// OpsPhase defines opsRequest phase.
+// +enum
+// +kubebuilder:validation:Enum={Pending,Creating,Running,Failed,Succeed}
+type OpsPhase string
+
+const (
+	OpsPendingPhase  OpsPhase = "Pending"
+	OpsCreatingPhase OpsPhase = "Creating"
+	OpsRunningPhase  OpsPhase = "Running"
+	OpsFailedPhase   OpsPhase = "Failed"
+	OpsSucceedPhase  OpsPhase = "Succeed"
 )
 
 // OpsType defines operation types.
@@ -75,7 +86,14 @@ const (
 	ExposeType            OpsType = "Expose"
 )
 
-// AccessMode define SVC access mode enums.
+// ComponentResourceKey defines the resource key of component, such as pod/pvc.
+// +enum
+// +kubebuilder:validation:Enum={pods}
+type ComponentResourceKey string
+
+const PodsCompResourceKey ComponentResourceKey = "pods"
+
+// AccessMode defines SVC access mode enums.
 // +enum
 // +kubebuilder:validation:Enum={None,Readonly,ReadWrite}
 type AccessMode string
@@ -86,7 +104,7 @@ const (
 	None      AccessMode = "None"
 )
 
-// UpdateStrategy define Cluster Component update strategy.
+// UpdateStrategy defines Cluster Component update strategy.
 // +enum
 // +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 type UpdateStrategy string
@@ -116,7 +134,7 @@ const (
 
 var WorkloadTypes = []string{"Stateless", "Stateful", "Consensus", "Replication"}
 
-// TerminationPolicyType define termination policy types.
+// TerminationPolicyType defines termination policy types.
 // +enum
 // +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
 type TerminationPolicyType string
@@ -139,7 +157,7 @@ const (
 	HScaleDataClonePolicyFromBackup   HScaleDataClonePolicyType = "Backup"
 )
 
-// PodAntiAffinity define pod anti-affinity strategy.
+// PodAntiAffinity defines pod anti-affinity strategy.
 // +enum
 // +kubebuilder:validation:Enum={Preferred,Required}
 type PodAntiAffinity string
@@ -171,18 +189,15 @@ const (
 	SucceedProgressStatus    ProgressStatus = "Succeed"
 )
 
-// OpsRequestBehaviour record what cluster status that can trigger this OpsRequest
-// and what status that the cluster enters after trigger OpsRequest.
 type OpsRequestBehaviour struct {
 	FromClusterPhases []Phase
 	ToClusterPhase    Phase
 }
 
-// OpsRecorder recorder the running OpsRequest info in cluster annotation
 type OpsRecorder struct {
-	// Name OpsRequest name
+	// name OpsRequest name
 	Name string `json:"name"`
-	// ToClusterPhase the cluster phase when the OpsRequest is running
+	// clusterPhase the cluster phase when the OpsRequest is running
 	ToClusterPhase Phase `json:"clusterPhase"`
 }
 

@@ -27,7 +27,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -54,9 +55,9 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		// default GracePeriod is 30s
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanEnv)
@@ -65,56 +66,76 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 	initClusterForOps := func(opsRes *OpsResource) {
 		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
-		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningPhase
+		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+			opsRes.Cluster.Status.Phase = appsv1alpha1.RunningPhase
+		})).ShouldNot(HaveOccurred())
 	}
 
 	Context("Test OpsRequest", func() {
 		It("Test HorizontalScaling OpsRequest", func() {
 			By("init operations resources ")
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("Test HorizontalScaling with scale down replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.VerticalScalingPhase, consensusComp)
 			initClusterForOps(opsRes)
 
-			By("mock HorizontalScaling OpsRequest phase is running and do action")
-			Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.RunningPhase))
+			By("mock HorizontalScaling OpsRequest phase is Creating and do action")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			By("Test OpsManager.Reconcile function when horizontal scaling OpsRequest is Running")
 			opsRes.Cluster.Status.Phase = appsv1alpha1.RunningPhase
-			_, err := GetOpsManager().Reconcile(opsRes)
-			Expect(err == nil).Should(BeTrue())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
 
 			By("test GetOpsRequestAnnotation function")
-			patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
-			opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"HorizontalScaling"},{"name":"test-not-exists-ops","clusterPhase":"VolumeExpanding"}]`,
-				opsRes.OpsRequest.Name)
-			opsRes.Cluster.Annotations = map[string]string{
-				constant.OpsRequestAnnotationKey: opsAnnotationString,
-			}
-			Expect(k8sClient.Patch(ctx, opsRes.Cluster, patch)).Should(Succeed())
-			Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func() {
+				opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"HorizontalScaling"},{"name":"test-not-exists-ops","clusterPhase":"VolumeExpanding"}]`,
+					opsRes.OpsRequest.Name)
+				opsRes.Cluster.Annotations = map[string]string{
+					constant.OpsRequestAnnotationKey: opsAnnotationString,
+				}
+			})).ShouldNot(HaveOccurred())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err.Error()).Should(ContainSubstring("Existing OpsRequest:"))
 
-			By("Test OpsManager.Reconcile when opsRequest is succeed")
-			opsRes.OpsRequest.Status.Phase = appsv1alpha1.SucceedPhase
-			opsRes.Cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-				consensusComp: {
-					Phase: appsv1alpha1.RunningPhase,
-				},
-			}
-			_, err = GetOpsManager().Reconcile(opsRes)
-			Expect(err == nil).Should(BeTrue())
+			// reset cluster annotation
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func() {
+				opsRes.Cluster.Annotations = map[string]string{}
+			})).ShouldNot(HaveOccurred())
 
-			By("Test HorizontalScaling with scale up replica")
+			By("Test HorizontalScaling with scale up replicax")
 			initClusterForOps(opsRes)
 			expectClusterComponentReplicas := int32(2)
-			opsRes.Cluster.Spec.ComponentSpecs[1].Replicas = expectClusterComponentReplicas
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 3)
-			Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func() {
+				opsRes.Cluster.Spec.ComponentSpecs[1].Replicas = expectClusterComponentReplicas
+			})).ShouldNot(HaveOccurred())
 
-			_, err = GetOpsManager().Reconcile(opsRes)
-			Expect(err == nil).Should(BeTrue())
+			// mock pod created according to horizontalScaling replicas
+			for _, v := range []int{1, 2} {
+				podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, v)
+				testapps.MockConsensusComponentStsPod(testCtx, nil, clusterName, consensusComp, podName, "follower", "ReadOnly")
+			}
+
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, 3)
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			// do h-scale action
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("test GetRealAffectedComponentMap function")
+			h := horizontalScalingOpsHandler{}
+			Expect(len(h.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(1))
 		})
 
 	})

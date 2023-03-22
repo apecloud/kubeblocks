@@ -21,8 +21,10 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type verticalScalingHandler struct{}
@@ -47,7 +49,7 @@ func (vs verticalScalingHandler) ActionStartedCondition(opsRequest *appsv1alpha1
 
 // Action modifies cluster component resources according to
 // the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
-func (vs verticalScalingHandler) Action(opsRes *OpsResource) error {
+func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	verticalScalingMap := opsRes.OpsRequest.ConvertVerticalScalingListToMap()
 	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
 		if verticalScaling, ok := verticalScalingMap[component.Name]; ok {
@@ -55,17 +57,17 @@ func (vs verticalScalingHandler) Action(opsRes *OpsResource) error {
 			opsRes.Cluster.Spec.ComponentSpecs[index] = component
 		}
 	}
-	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
+	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for vertical scaling opsRequest.
-func (vs verticalScalingHandler) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
-	return ReconcileActionWithComponentOps(opsRes, "vertical scale", handleComponentStatusProgress)
+func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
+	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
-func (vs verticalScalingHandler) SaveLastConfiguration(opsRes *OpsResource) error {
+func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	componentNameMap := opsRes.OpsRequest.GetComponentNameMap()
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
@@ -76,9 +78,7 @@ func (vs verticalScalingHandler) SaveLastConfiguration(opsRes *OpsResource) erro
 			ResourceRequirements: v.Resources,
 		}
 	}
-	opsRes.OpsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
-		Components: lastComponentInfo,
-	}
+	opsRes.OpsRequest.Status.LastConfiguration.Components = lastComponentInfo
 	return nil
 }
 

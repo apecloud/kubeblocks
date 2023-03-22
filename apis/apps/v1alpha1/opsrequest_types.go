@@ -222,15 +222,13 @@ type Expose struct {
 
 // OpsRequestStatus defines the observed state of OpsRequest
 type OpsRequestStatus struct {
-	// observedGeneration is the most recent generation observed for this
-	// Cluster. It corresponds to the Cluster's generation, which is
-	// updated on mutation by the API Server.
+
+	// ClusterGeneration records the cluster generation after handling the opsRequest action.
 	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	ClusterGeneration int64 `json:"clusterGeneration,omitempty"`
 
 	// phase describes OpsRequest phase.
-	// +kubebuilder:validation:Enum={Pending,Running,Failed,Succeed}
-	Phase Phase `json:"phase,omitempty"`
+	Phase OpsPhase `json:"phase,omitempty"`
 
 	// +kubebuilder:validation:Pattern:=`^(\d+|\-)/(\d+|\-)$`
 	// +kubebuilder:default=-/-
@@ -309,6 +307,11 @@ type LastComponentConfiguration struct {
 	// services records the last services of the component.
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
+
+	// targetResources records the affecting target resources information for the component.
+	// resource key is in list of [pods].
+	// +optional
+	TargetResources map[ComponentResourceKey][]string `json:"targetResources,omitempty"`
 }
 
 type LastConfiguration struct {
@@ -323,7 +326,7 @@ type LastConfiguration struct {
 
 type OpsRequestComponentStatus struct {
 	// phase describes the component phase, reference Cluster.status.component.phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting,Exposing}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting,Exposing}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 

@@ -359,6 +359,11 @@ spec:
           status:
             description: OpsRequestStatus defines the observed state of OpsRequest
             properties:
+              clusterGeneration:
+                description: ClusterGeneration records the cluster generation after
+                  handling the opsRequest action.
+                format: int64
+                type: integer
               completionTimestamp:
                 description: completionTimestamp defines the OpsRequest completion
                   time.
@@ -375,7 +380,7 @@ spec:
                       - Failed
                       - Abnormal
                       - Creating
-                      - SpecUpdating
+                      - Updating
                       - Deleting
                       - Deleted
                       - VolumeExpanding
@@ -614,6 +619,15 @@ spec:
                             - name
                             type: object
                           type: array
+                        targetResources:
+                          additionalProperties:
+                            items:
+                              type: string
+                            type: array
+                          description: targetResources records the affecting target
+                            resources information for the component. resource key
+                            is in list of [pods].
+                          type: object
                         volumeClaimTemplates:
                           description: volumeClaimTemplates records the last volumeClaimTemplates
                             of the component.
@@ -640,16 +654,11 @@ spec:
                     description: components records last configuration of the component.
                     type: object
                 type: object
-              observedGeneration:
-                description: observedGeneration is the most recent generation observed
-                  for this Cluster. It corresponds to the Cluster's generation, which
-                  is updated on mutation by the API Server.
-                format: int64
-                type: integer
               phase:
                 description: phase describes OpsRequest phase.
                 enum:
                 - Pending
+                - Creating
                 - Running
                 - Failed
                 - Succeed

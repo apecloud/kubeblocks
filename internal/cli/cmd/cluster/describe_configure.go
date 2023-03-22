@@ -533,10 +533,10 @@ func (o *opsRequestDiffOptions) validate() error {
 		diffStatus = o.diffVersion.Status
 	)
 
-	if baseStatus.Phase != appsv1alpha1.SucceedPhase {
+	if baseStatus.Phase != appsv1alpha1.OpsSucceedPhase {
 		return cfgcore.MakeError("require reconfiguring phase is success!, name: %s, phase: %s", o.baseVersion.Name, baseStatus.Phase)
 	}
-	if diffStatus.Phase != appsv1alpha1.SucceedPhase {
+	if diffStatus.Phase != appsv1alpha1.OpsSucceedPhase {
 		return cfgcore.MakeError("require reconfiguring phase is success!, name: %s, phase: %s", o.diffVersion.Name, diffStatus.Phase)
 	}
 

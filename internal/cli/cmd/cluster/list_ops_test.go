@@ -60,7 +60,7 @@ var _ = Describe("Expose", func() {
 		tf.Cleanup()
 	})
 
-	generateOpsObject := func(opsType appsv1alpha1.OpsType, phase appsv1alpha1.Phase) *appsv1alpha1.OpsRequest {
+	generateOpsObject := func(opsType appsv1alpha1.OpsType, phase appsv1alpha1.OpsPhase) *appsv1alpha1.OpsRequest {
 		ops := &appsv1alpha1.OpsRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "list-ops-" + clitesting.GetRandomStr(),
@@ -91,14 +91,14 @@ var _ = Describe("Expose", func() {
 			appsv1alpha1.VerticalScalingType,
 			appsv1alpha1.VerticalScalingType,
 		}
-		phases := []appsv1alpha1.Phase{
-			appsv1alpha1.PendingPhase,
-			appsv1alpha1.FailedPhase,
-			appsv1alpha1.SucceedPhase,
-			appsv1alpha1.SucceedPhase,
-			appsv1alpha1.RunningPhase,
-			appsv1alpha1.FailedPhase,
-			appsv1alpha1.RunningPhase,
+		phases := []appsv1alpha1.OpsPhase{
+			appsv1alpha1.OpsPendingPhase,
+			appsv1alpha1.OpsFailedPhase,
+			appsv1alpha1.OpsSucceedPhase,
+			appsv1alpha1.OpsSucceedPhase,
+			appsv1alpha1.OpsRunningPhase,
+			appsv1alpha1.OpsFailedPhase,
+			appsv1alpha1.OpsRunningPhase,
 		}
 		opsList := make([]runtime.Object, len(opsTypes))
 		for i := range opsTypes {

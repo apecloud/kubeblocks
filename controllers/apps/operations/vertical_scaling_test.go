@@ -25,7 +25,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -51,7 +52,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -60,7 +61,9 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 	Context("Test OpsRequest", func() {
 		It("Test verticalScaling OpsRequest", func() {
+
 			By("init operations resources ")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("create VerticalScaling ops")
@@ -83,14 +86,18 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			}
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 			By("test save last configuration and OpsRequest phase is Running")
-			Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.RunningPhase))
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			By("test vertical scale action function")
 			vsHandler := verticalScalingHandler{}
-			Expect(vsHandler.Action(opsRes)).Should(Succeed())
-			_, _, err := vsHandler.ReconcileAction(opsRes)
+			Expect(vsHandler.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
+			_, _, err = vsHandler.ReconcileAction(reqCtx, k8sClient, opsRes)
 			Expect(err == nil).Should(BeTrue())
+
+			By("test GetRealAffectedComponentMap function")
+			Expect(len(vsHandler.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(1))
 		})
 	})
 })

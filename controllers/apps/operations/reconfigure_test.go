@@ -159,8 +159,8 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			Component: &clusterDef.Spec.ComponentDefs[0],
 			Client:    k8sClient,
 			ReqCtx: intctrlutil.RequestCtx{
-				Ctx:      opsRes.Ctx,
-				Log:      log.FromContext(opsRes.Ctx),
+				Ctx:      ctx,
+				Log:      log.FromContext(ctx),
 				Recorder: opsRes.Recorder,
 			},
 			Cluster:        clusterObject,
@@ -182,6 +182,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 	Context("Test OpsRequest", func() {
 		It("Test Reconfigure OpsRequest with restart", func() {
 			opsRes, eventContext := assureMockReconfigureData("simple")
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 
 			By("mock reconfigure success")
 			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr, testCtx.DefaultNamespace,
@@ -214,27 +215,32 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			opsManager := GetOpsManager()
 			reAction := reconfigureAction{}
 			By("Reconfigure configure")
-			Expect(reAction.Action(opsRes)).Should(Succeed())
+			Expect(reAction.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
 			By("configuration Reconcile callback")
-			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.ReconfiguringPhase, nil)).Should(Succeed())
-			Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			_, _ = opsManager.Reconcile(opsRes)
+			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsRunningPhase, nil)).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.RunningPhase))
 
 			By("Validate cluster status")
-			Expect(opsManager.Do(opsRes)).Should(Succeed())
+			_, err := opsManager.Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			// do Action
+			_, err = opsManager.Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.Cluster.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.ReconfiguringType))
 
 			By("Reconfigure operation success")
-			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.SucceedPhase, nil)).Should(Succeed())
-			Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			_, _ = opsManager.Reconcile(opsRes)
-			Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.SucceedPhase))
+			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsSucceedPhase, nil)).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.OpsSucceedPhase))
 
 		})
 
 		It("Test Reconfigure OpsRequest with autoReload", func() {
 			opsRes, eventContext := assureMockReconfigureData("autoReload")
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 
 			By("mock reconfigure success")
 			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr+"-reload", testCtx.DefaultNamespace,
@@ -262,21 +268,26 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			opsManager := GetOpsManager()
 			reAction := reconfigureAction{}
 			By("Reconfigure configure")
-			Expect(opsManager.Do(opsRes)).Should(Succeed())
+			_, err := opsManager.Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			// do reconfigure
+			_, err = opsManager.Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
 			By("configuration Reconcile callback")
 
-			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.SucceedPhase, nil)).Should(Succeed())
+			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsSucceedPhase, nil)).Should(Succeed())
 			By("Reconfigure configure")
-			_, _ = opsManager.Reconcile(opsRes)
-			Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
+			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
 
 			By("check cluster.status.components[*].phase == Reconfiguring")
-			Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 			Expect(opsRes.Cluster.Status.Components[consensusComp].Phase).Should(BeEquivalentTo(appsv1alpha1.ReconfiguringPhase))
-			_, _ = opsManager.Reconcile(opsRes)
+			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 
 			By("check cluster.status.components[*].phase == Running")
-			Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
 			Expect(opsRes.Cluster.Status.Components[consensusComp].Phase).Should(BeEquivalentTo(appsv1alpha1.RunningPhase))
 		})
 

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -101,6 +102,13 @@ func TestReconciled(t *testing.T) {
 	}
 	if res.Requeue {
 		t.Error("Expected requeue to be false, got true")
+	}
+}
+
+func TestResultToP(t *testing.T) {
+	res, _ := ResultToP(reconcile.Result{}, nil)
+	if reflect.ValueOf(res).Kind() != reflect.Ptr {
+		t.Error("Expect to get a pointer type, got:", reflect.ValueOf(res).Kind())
 	}
 }
 

@@ -45,6 +45,11 @@ func Reconciled() (reconcile.Result, error) {
 	return reconcile.Result{}, nil
 }
 
+// ResultToP converts a Result object to a pointer.
+func ResultToP(res reconcile.Result, err error) (*reconcile.Result, error) {
+	return &res, err
+}
+
 // CheckedRequeueWithError is a convenience wrapper around logging an error message
 // separate from the stacktrace and then passing the error through to the controller
 // manager, this will ignore not-found errors.

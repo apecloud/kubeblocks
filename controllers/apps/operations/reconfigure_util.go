@@ -132,23 +132,19 @@ func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) recon
 	return result
 }
 
-func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1alpha1.ComponentConfigSpec) []*metav1.Condition {
+func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1alpha1.ComponentConfigSpec) *metav1.Condition {
 	if result.configPatch.IsModify {
-		return []*metav1.Condition{appsv1alpha1.NewReconfigureRunningCondition(
+		return appsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,
 			appsv1alpha1.ReasonReconfigureMerged,
 			configSpec.Name,
-			formatConfigPatchToMessage(result.configPatch, nil)),
-		}
+			formatConfigPatchToMessage(result.configPatch, nil))
 	}
-	return []*metav1.Condition{
-		appsv1alpha1.NewReconfigureRunningCondition(
-			resource.OpsRequest,
-			appsv1alpha1.ReasonReconfigureInvalidUpdated,
-			configSpec.Name,
-			formatConfigPatchToMessage(result.configPatch, nil)),
-		appsv1alpha1.NewSucceedCondition(resource.OpsRequest),
-	}
+	return appsv1alpha1.NewReconfigureRunningCondition(
+		resource.OpsRequest,
+		appsv1alpha1.ReasonReconfigureNoChanged,
+		configSpec.Name,
+		formatConfigPatchToMessage(result.configPatch, nil))
 }
 
 func i2sMap(config map[string]interface{}) map[string]string {
@@ -179,11 +175,9 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 		return cfgcore.WrapError(err, "failed to update param!")
 	}
 
-	// if failed to validate configure, and retry
-	if err := PatchOpsStatus(resource, appsv1alpha1.FailedPhase,
-		appsv1alpha1.NewFailedCondition(resource.OpsRequest, err)); err != nil {
-		return err
-	}
+	// if failed to validate configure, set opsRequest to failed and return
+	failedCondition := appsv1alpha1.NewFailedCondition(resource.OpsRequest, err)
+	resource.OpsRequest.SetStatusCondition(*failedCondition)
 	return nil
 }
 

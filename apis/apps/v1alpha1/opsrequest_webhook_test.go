@@ -110,6 +110,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
 
 		By("Test Cluster Phase")
+		opsRequest.Name = opsRequestName + "-upgrade-cluster-phase"
 		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
 			FromClusterPhases: []Phase{RunningPhase},
@@ -156,7 +157,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		// so we should add eventually block.
 		Eventually(func() bool {
 			patch := client.MergeFrom(opsRequest.DeepCopy())
-			opsRequest.Status.Phase = SucceedPhase
+			opsRequest.Status.Phase = OpsSucceedPhase
 			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
 
 			patch = client.MergeFrom(opsRequest.DeepCopy())

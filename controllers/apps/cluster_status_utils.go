@@ -443,25 +443,16 @@ func updateComponentStatusPhase(cli client.Client,
 	return cli.Status().Patch(ctx, cluster, patch)
 }
 
-// syncComponentPhaseWhenSpecUpdating when workload of the component changed
-// and component phase is not the phase of operations, sync component phase to 'SpecUpdating'.
-func syncComponentPhaseWhenSpecUpdating(cluster *appsv1alpha1.Cluster,
-	componentName string) {
-	if len(componentName) == 0 {
+// syncComponentPhaseByClusterPhase if workload of component changes, we should sync
+// component phase according to cluster phase.
+func syncComponentPhaseByClusterPhase(cluster *appsv1alpha1.Cluster, componentName string) {
+	if len(componentName) == 0 || cluster.Status.Phase == appsv1alpha1.ConditionsErrorPhase {
 		return
 	}
-	if len(cluster.Status.Components) == 0 {
-		cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
-			Phase: appsv1alpha1.SpecUpdatingPhase,
-		})
-		return
-	}
-
-	// if component phase is not the phase of operations, sync component phase to 'SpecUpdating'
-	if compStatus, ok := cluster.Status.Components[componentName]; ok && util.IsCompleted(compStatus.Phase) {
-		compStatus.Phase = appsv1alpha1.SpecUpdatingPhase
-		cluster.Status.SetComponentStatus(componentName, compStatus)
-	}
+	compStatus := cluster.Status.Components[componentName]
+	// synchronous component phase is consistent with cluster phase
+	compStatus.Phase = cluster.Status.Phase
+	cluster.Status.SetComponentStatus(componentName, compStatus)
 }
 
 // existsOperations checks if the cluster is doing operations

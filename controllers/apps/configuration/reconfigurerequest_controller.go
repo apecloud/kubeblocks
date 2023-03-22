@@ -313,13 +313,13 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 	return nil
 }
 
-func fromReconfigureStatus(status ExecStatus) appsv1alpha1.Phase {
+func fromReconfigureStatus(status ExecStatus) appsv1alpha1.OpsPhase {
 	switch status {
 	case ESFailed:
-		return appsv1alpha1.FailedPhase
+		return appsv1alpha1.OpsFailedPhase
 	case ESNone:
-		return appsv1alpha1.SucceedPhase
+		return appsv1alpha1.OpsSucceedPhase
 	default:
-		return appsv1alpha1.ReconfiguringPhase
+		return appsv1alpha1.OpsRunningPhase
 	}
 }

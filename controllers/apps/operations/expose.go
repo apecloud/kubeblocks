@@ -27,7 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type ExposeOpsHandler struct {
@@ -44,7 +45,7 @@ func init() {
 	opsMgr.RegisterOps(appsv1alpha1.ExposeType, exposeBehavior)
 }
 
-func (e ExposeOpsHandler) Action(opsRes *OpsResource) error {
+func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
 		exposeMap = opsRes.OpsRequest.ConvertExposeListToMap()
 	)
@@ -56,14 +57,14 @@ func (e ExposeOpsHandler) Action(opsRes *OpsResource) error {
 		}
 		opsRes.Cluster.Spec.ComponentSpecs[index].Services = expose.Services
 	}
-	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
+	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
-func (e ExposeOpsHandler) ReconcileAction(opsResource *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
+func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	var (
 		opsRequest          = opsResource.OpsRequest
 		oldOpsRequestStatus = opsRequest.Status.DeepCopy()
-		opsRequestPhase     = appsv1alpha1.RunningPhase
+		opsRequestPhase     = appsv1alpha1.OpsRunningPhase
 	)
 
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -83,7 +84,7 @@ func (e ExposeOpsHandler) ReconcileAction(opsResource *OpsResource) (appsv1alpha
 		expectProgressCount int
 	)
 	for _, v := range opsRequest.Spec.ExposeList {
-		actualCount, expectCount, err := e.handleComponentServices(opsResource, v)
+		actualCount, expectCount, err := e.handleComponentServices(reqCtx, cli, opsResource, v)
 		if err != nil {
 			return "", 0, err
 		}
@@ -100,23 +101,23 @@ func (e ExposeOpsHandler) ReconcileAction(opsResource *OpsResource) (appsv1alpha
 
 	// patch OpsRequest.status.components
 	if !reflect.DeepEqual(oldOpsRequestStatus, opsRequest.Status) {
-		if err := opsResource.Client.Status().Patch(opsResource.Ctx, opsRequest, patch); err != nil {
+		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 			return opsRequestPhase, 0, err
 		}
 	}
 
 	if actualProgressCount == expectProgressCount {
-		opsRequestPhase = appsv1alpha1.SucceedPhase
+		opsRequestPhase = appsv1alpha1.OpsSucceedPhase
 	}
 
 	return opsRequestPhase, 5 * time.Second, nil
 }
 
-func (e ExposeOpsHandler) handleComponentServices(opsRes *OpsResource, expose appsv1alpha1.Expose) (int, int, error) {
+func (e ExposeOpsHandler) handleComponentServices(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, expose appsv1alpha1.Expose) (int, int, error) {
 	svcList := &corev1.ServiceList{}
-	if err := opsRes.Client.List(opsRes.Ctx, svcList, client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:    opsRes.Cluster.Name,
-		intctrlutil.KBAppComponentLabelKey: expose.ComponentName,
+	if err := cli.List(reqCtx.Ctx, svcList, client.MatchingLabels{
+		constant.AppInstanceLabelKey:    opsRes.Cluster.Name,
+		constant.KBAppComponentLabelKey: expose.ComponentName,
 	}, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
 		return 0, 0, err
 	}
@@ -167,7 +168,7 @@ func (e ExposeOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsReq
 	return appsv1alpha1.NewExposingCondition(opsRequest)
 }
 
-func (e ExposeOpsHandler) SaveLastConfiguration(opsResource *OpsResource) error {
+func (e ExposeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error {
 	componentNameMap := opsResource.OpsRequest.GetComponentNameMap()
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsResource.Cluster.Spec.ComponentSpecs {
@@ -179,9 +180,7 @@ func (e ExposeOpsHandler) SaveLastConfiguration(opsResource *OpsResource) error 
 			Services: v.Services,
 		}
 	}
-	opsResource.OpsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
-		Components: lastComponentInfo,
-	}
+	opsResource.OpsRequest.Status.LastConfiguration.Components = lastComponentInfo
 	return nil
 }
 

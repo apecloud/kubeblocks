@@ -802,7 +802,7 @@ spec:
                       - Failed
                       - Abnormal
                       - Creating
-                      - SpecUpdating
+                      - Updating
                       - Deleting
                       - Deleted
                       - VolumeExpanding
@@ -940,29 +940,29 @@ spec:
               phase:
                 description: 'phase describes the phase of the Cluster. the detail
                   information of phase is as follows: Creating: creating Cluster.
-                  Running: Cluster is running, all components are available. SpecUpdating:
-                  the Cluster phase will be ''SpecUpdating'' when directly updating
-                  Cluster.spec. VolumeExpanding: volume expansion operation is running.
-                  HorizontalScaling: horizontal scaling operation is running. VerticalScaling:
-                  vertical scaling operation is running. VersionUpgrading: upgrade
-                  operation is running. Rebooting: restart operation is running. Stopping:
-                  stop operation is running. Stopped: all components are stopped,
-                  or some components are stopped and other components are running.
-                  Starting: start operation is running. Reconfiguring: reconfiguration
-                  operation is running. Deleting/Deleted: deleting Cluster/Cluster
-                  is deleted. Failed: Cluster is unavailable. Abnormal: Cluster is
-                  still available, but part of its components are Abnormal. if the
-                  component workload type is Consensus/Replication, the Leader/Primary
-                  pod must be ready in Abnormal phase. ConditionsError: Cluster and
-                  all the components are still healthy, but some update/create API
-                  fails due to invalid parameters.'
+                  Running: Cluster is running, all components are available. Updating:
+                  the Cluster phase will be ''Updating'' when directly updating Cluster.spec.
+                  VolumeExpanding: volume expansion operation is running. HorizontalScaling:
+                  horizontal scaling operation is running. VerticalScaling: vertical
+                  scaling operation is running. VersionUpgrading: upgrade operation
+                  is running. Rebooting: restart operation is running. Stopping: stop
+                  operation is running. Stopped: all components are stopped, or some
+                  components are stopped and other components are running. Starting:
+                  start operation is running. Reconfiguring: reconfiguration operation
+                  is running. Deleting/Deleted: deleting Cluster/Cluster is deleted.
+                  Failed: Cluster is unavailable. Abnormal: Cluster is still available,
+                  but part of its components are Abnormal. if the component workload
+                  type is Consensus/Replication, the Leader/Primary pod must be ready
+                  in Abnormal phase. ConditionsError: Cluster and all the components
+                  are still healthy, but some update/create API fails due to invalid
+                  parameters.'
                 enum:
                 - Running
                 - Failed
                 - Abnormal
                 - ConditionsError
                 - Creating
-                - SpecUpdating
+                - Updating
                 - Deleting
                 - Deleted
                 - VolumeExpanding

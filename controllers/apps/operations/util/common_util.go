@@ -28,12 +28,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
-// PatchClusterOpsAnnotations patches OpsRequest annotation in Cluster.annotations
-func PatchClusterOpsAnnotations(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	opsRequestSlice []appsv1alpha1.OpsRecorder) error {
-	patch := client.MergeFrom(cluster.DeepCopy())
+func setOpsRequestToCluster(cluster *appsv1alpha1.Cluster, opsRequestSlice []appsv1alpha1.OpsRecorder) {
 	if cluster.Annotations == nil {
 		cluster.Annotations = map[string]string{}
 	}
@@ -43,7 +38,25 @@ func PatchClusterOpsAnnotations(ctx context.Context,
 	} else {
 		delete(cluster.Annotations, intctrlutil.OpsRequestAnnotationKey)
 	}
+}
+
+// PatchClusterOpsAnnotations patches OpsRequest annotation in Cluster.annotations
+func PatchClusterOpsAnnotations(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	opsRequestSlice []appsv1alpha1.OpsRecorder) error {
+	patch := client.MergeFrom(cluster.DeepCopy())
+	setOpsRequestToCluster(cluster, opsRequestSlice)
 	return cli.Patch(ctx, cluster, patch)
+}
+
+// UpdateClusterOpsAnnotations updates OpsRequest annotation in Cluster.annotations
+func UpdateClusterOpsAnnotations(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	opsRequestSlice []appsv1alpha1.OpsRecorder) error {
+	setOpsRequestToCluster(cluster, opsRequestSlice)
+	return cli.Update(ctx, cluster)
 }
 
 // PatchOpsRequestReconcileAnnotation patches the reconcile annotation to OpsRequest
@@ -58,7 +71,7 @@ func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, 
 	}
 	// because many changes may be triggered within one second, if the accuracy is only seconds, the event may be lost.
 	// so we used RFC3339Nano format.
-	opsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+	opsRequest.Annotations[intctrlutil.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
 	return cli.Patch(ctx, opsRequest, patch)
 }
 

@@ -76,7 +76,7 @@ type ClusterStatus struct {
 	// phase describes the phase of the Cluster. the detail information of phase is as follows:
 	// Creating: creating Cluster.
 	// Running: Cluster is running, all components are available.
-	// SpecUpdating: the Cluster phase will be 'SpecUpdating' when directly updating Cluster.spec.
+	// Updating: the Cluster phase will be 'Updating' when directly updating Cluster.spec.
 	// VolumeExpanding: volume expansion operation is running.
 	// HorizontalScaling: horizontal scaling operation is running.
 	// VerticalScaling: vertical scaling operation is running.
@@ -91,7 +91,7 @@ type ClusterStatus struct {
 	// Abnormal: Cluster is still available, but part of its components are Abnormal.
 	// if the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// ConditionsError: Cluster and all the components are still healthy, but some update/create API fails due to invalid parameters.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -200,7 +200,7 @@ type ClusterComponentStatus struct {
 	// Stopped: replicas number of component is 0.
 	// If the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
 	Phase Phase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.

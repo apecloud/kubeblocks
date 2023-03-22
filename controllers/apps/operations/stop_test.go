@@ -24,7 +24,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -51,7 +52,7 @@ var _ = Describe("Stop OpsRequest", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -60,6 +61,7 @@ var _ = Describe("Stop OpsRequest", func() {
 
 	Context("Test OpsRequest", func() {
 		It("Test stop OpsRequest", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 			By("create Stop opsRequest")
 			ops := testapps.NewOpsRequestObj("stop-ops-"+randomStr, testCtx.DefaultNamespace,
@@ -67,14 +69,23 @@ var _ = Describe("Stop OpsRequest", func() {
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("test stop action and reconcile function")
-			Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.RunningPhase))
+			// update ops phase to running first
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			// do stop cluster
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
 			Expect(len(opsRes.Cluster.Annotations[constant.SnapShotForStartAnnotationKey]) != 0).Should(BeTrue())
 			for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
 				Expect(v.Replicas).Should(BeEquivalentTo(0))
 			}
-			_, err := GetOpsManager().Reconcile(opsRes)
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err == nil).Should(BeTrue())
+
+			By("test GetRealAffectedComponentMap function")
+			h := StopOpsHandler{}
+			Expect(len(h.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(3))
 		})
 
 	})

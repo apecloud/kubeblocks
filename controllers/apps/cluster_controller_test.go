@@ -1355,8 +1355,11 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Should successfully doing volume expansion", func() {
+			storageClassName := "test-storage"
 			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec.StorageClassName = &storageClassName
 			updatedPVCSpec := testapps.NewPVC("2Gi")
+			updatedPVCSpec.StorageClassName = &storageClassName
 
 			By("Mock a cluster obj with replication componentDefRef.")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -1445,7 +1448,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Waiting cluster update reconcile succeed")
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.SpecUpdatingPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.SpecReconcilingPhase))
 
 			By("Checking pvc volume size")
 			Eventually(func(g Gomega) {

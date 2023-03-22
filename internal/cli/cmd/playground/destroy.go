@@ -89,7 +89,6 @@ func (o *destroyOptions) destroyLocal() error {
 
 	spinner := printer.Spinner(o.Out, "Destroy KubeBlocks playground k3d cluster %s", k8sClusterName)
 	defer spinner(false)
-	// DeleteK8sCluster k3d cluster
 	if err := provider.DeleteK8sCluster(k8sClusterName); err != nil {
 		return err
 	}
@@ -110,7 +109,7 @@ func (o *destroyOptions) destroyCloud() error {
 	}
 
 	// get cluster name to delete
-	name, err := getExistedCluster(provider, cpPath)
+	name, err := getExistedCluster(provider)
 	// do not find any existed cluster
 	if name == "" {
 		fmt.Fprintf(o.Out, "Failed to find playground %s %s cluster in %s\n", o.cloudProvider, cp.K8sService(o.cloudProvider), cpPath)

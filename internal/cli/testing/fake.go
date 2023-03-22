@@ -46,6 +46,7 @@ const (
 	StorageClassName   = "fake-storage-class"
 	PVCName            = "fake-pvc"
 
+	KubeBlocksRepoName  = "fake-kubeblocks-repo"
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupToolName      = "fake-backup-tool"

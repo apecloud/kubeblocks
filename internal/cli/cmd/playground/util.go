@@ -42,7 +42,7 @@ func cloudProviderRepoDir() (string, error) {
 }
 
 // getExistedCluster get existed playground kubernetes cluster, we should only have one cluster
-func getExistedCluster(provider cp.Interface, path string) (string, error) {
+func getExistedCluster(provider cp.Interface) (string, error) {
 	clusterNames, err := provider.GetExistedClusters()
 	if err != nil {
 		return "", err

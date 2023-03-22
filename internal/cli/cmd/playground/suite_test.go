@@ -39,10 +39,11 @@ var _ = BeforeSuite(func() {
 	cp.K3dProxyImage = "fake-k3d-proxy-image"
 
 	// set default cluster name to test
-	k8sClusterName = "playground-test"
-	kbClusterName = "playground-test-cluster"
+	k8sClusterName = "kb-playground-test"
+	kbClusterName = "kb-playground-test-cluster"
 
 	// use a fake URL to test
+	types.KubeBlocksRepoName = clitesting.KubeBlocksRepoName
 	types.KubeBlocksChartName = clitesting.KubeBlocksChartName
 	types.KubeBlocksChartURL = clitesting.KubeBlocksChartURL
 })

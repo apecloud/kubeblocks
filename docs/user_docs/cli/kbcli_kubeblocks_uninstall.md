@@ -23,7 +23,6 @@ kbcli kubeblocks uninstall [flags]
       --remove-namespace   Remove default created "kb-system" namespace or not
       --remove-pvcs        Remove PersistentVolumeClaim or not
       --remove-pvs         Remove PersistentVolume or not
-      --verbose            Show logs in detail.
 ```
 
 ### Options inherited from parent commands

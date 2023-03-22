@@ -799,7 +799,7 @@ func (r *ClusterReconciler) patchClusterResourceCustomLabels(ctx context.Context
 			return errors.New(fmt.Sprintf("kind %s is not supported for custom labels", gvk.Kind))
 		}
 
-		objectList := getObjectListOfResourceKind()[gvk.Kind]
+		objectList := getObjectListMapOfResourceKind()[gvk.Kind]
 		matchLabels := componentutil.GetComponentMatchLabels(cluster.Name, componentName)
 		for k, v := range resource.Selector {
 			matchLabels[k] = v
@@ -862,7 +862,7 @@ func (r *ClusterReconciler) patchClusterResourceCustomLabels(ctx context.Context
 		switch customLabelSpec.Scope.Type {
 		case appsv1alpha1.CustomLabelScopeClusterType:
 			clusterScopeSpec := customLabelSpec.Scope.ClusterScopeSpec
-			if clusterScopeSpec == nil || len(clusterScopeSpec.Resources) <= 0 {
+			if clusterScopeSpec == nil || len(clusterScopeSpec.Resources) == 0 {
 				continue
 			}
 			// patch the labels to all componentSpecs defined in the cluster spec.

@@ -67,8 +67,8 @@ func getCustomLabelSupportKind() []string {
 	}
 }
 
-// getObjectListOfResourceKind returns the mapping of resource kind and its object list.
-func getObjectListOfResourceKind() map[string]client.ObjectList {
+// getObjectListMapOfResourceKind returns the mapping of resource kind and its object list.
+func getObjectListMapOfResourceKind() map[string]client.ObjectList {
 	return map[string]client.ObjectList{
 		constant.CronJob:         &batchv1.CronJobList{},
 		constant.StatefulSetKind: &appsv1.StatefulSetList{},

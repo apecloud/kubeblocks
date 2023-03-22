@@ -124,11 +124,11 @@ spec:
                     apiVersion: v1
                     fieldPath: metadata.namespace
               - name: KUBERNETES_SCOPE_LABEL
-                value: "apps.kubeblocks.io/component-name"
+                value: "apps.kubeblocks.postgresql.patroni/scope"
               - name: KUBERNETES_ROLE_LABEL
-                value: "apps.kubeblocks.pg.patroni/role"
+                value: "apps.kubeblocks.postgresql.patroni/role"
               - name: KUBERNETES_LABELS
-                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
+                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)","app.kubernetes.io/managed-by":"kubeblocks"}'
               - name: SPILO_CONFIGURATION
                 value: | ## https://github.com/zalando/patroni#yaml-configuration
                   bootstrap:
@@ -162,7 +162,7 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
               - name: SCOPE
-                value: "$(KB_COMP_NAME)"
+                value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)"
               - name: PGROOT
                 value: /home/postgres/pgdata/pgroot
               - name: PGUSER

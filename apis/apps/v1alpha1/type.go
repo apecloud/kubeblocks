@@ -405,6 +405,16 @@ const (
 	VolumeTypeLog  VolumeType = "log"
 )
 
+// CustomLabelScopeType defines custom label scope type.
+// +enum
+// +kubebuilder:validation:Enum={cluster, component}
+type CustomLabelScopeType string
+
+const (
+	CustomLabelScopeClusterType   CustomLabelScopeType = "cluster"
+	CustomLabelScopeComponentType CustomLabelScopeType = "component"
+)
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

@@ -168,7 +168,7 @@ func belongToNewReplicaSet(d *appsv1.Deployment, pod *corev1.Pod) bool {
 		return false
 	}
 	for _, v := range pod.OwnerReferences {
-		if v.Kind == constant.ReplicaSet && strings.Contains(condition.Message, v.Name) {
+		if v.Kind == constant.ReplicaSetKind && strings.Contains(condition.Message, v.Name) {
 			return d.Status.ObservedGeneration == d.Generation
 		}
 	}

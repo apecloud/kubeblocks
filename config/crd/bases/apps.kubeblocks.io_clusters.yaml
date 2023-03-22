@@ -629,6 +629,98 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              customLabelSpecs:
+                description: CustomLabelSpecs is used for user-defined label tags
+                  which you want to add to the cluster or component resources.
+                items:
+                  properties:
+                    key:
+                      description: key name of label
+                      type: string
+                    scope:
+                      description: scope spec of label
+                      properties:
+                        clusterScopeSpecs:
+                          description: cluster scope spec when type is cluster.
+                          properties:
+                            resources:
+                              description: Resources defines the resources to be labeled.
+                              items:
+                                properties:
+                                  pattern:
+                                    description: The Pattern of the GVKResource is
+                                      Group/Version/Kind, for example "apps/v1/StatefulSet",
+                                      etc. When the pattern resource filtered by the
+                                      selector already exists, if there is no corresponding
+                                      custom label, it will be added, and if label
+                                      already exists, it will be updated.
+                                    type: string
+                                  selector:
+                                    additionalProperties:
+                                      type: string
+                                    description: Selector is a label query over a
+                                      set of resources.
+                                    type: object
+                                required:
+                                - pattern
+                                type: object
+                              type: array
+                          type: object
+                        componentScopeSpecs:
+                          description: component scope spec when type is component.
+                          items:
+                            properties:
+                              name:
+                                description: name of component, refer to cluster.spec.componentSpecs[x].name.
+                                type: string
+                              resources:
+                                description: Resources defines the resources to be
+                                  labeled.
+                                items:
+                                  properties:
+                                    pattern:
+                                      description: The Pattern of the GVKResource
+                                        is Group/Version/Kind, for example "apps/v1/StatefulSet",
+                                        etc. When the pattern resource filtered by
+                                        the selector already exists, if there is no
+                                        corresponding custom label, it will be added,
+                                        and if label already exists, it will be updated.
+                                      type: string
+                                    selector:
+                                      additionalProperties:
+                                        type: string
+                                      description: Selector is a label query over
+                                        a set of resources.
+                                      type: object
+                                  required:
+                                  - pattern
+                                  type: object
+                                type: array
+                            required:
+                            - name
+                            type: object
+                          type: array
+                        type:
+                          description: 'type of scope. cluster: cluster scope, label
+                            will be applied to all resource objects under the cluster.
+                            component: component scope, label will be applied to the
+                            resource object specified under component.'
+                          enum:
+                          - cluster
+                          - component
+                          type: string
+                      required:
+                      - type
+                      type: object
+                    value:
+                      description: value of label
+                      type: string
+                  required:
+                  - key
+                  - scope
+                  - value
+                  type: object
+                type: array
               terminationPolicy:
                 description: Cluster termination policy. One of DoNotTerminate, Halt,
                   Delete, WipeOut. DoNotTerminate will block delete operation. Halt

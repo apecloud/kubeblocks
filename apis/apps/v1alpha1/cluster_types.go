@@ -63,6 +63,10 @@ type ClusterSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// CustomLabelSpecs is used for user-defined label tags which you want to add to the cluster or component resources.
+	// +optional
+	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -388,6 +392,63 @@ type ClusterComponentService struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type CustomLabelSpec struct {
+	// key name of label
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+
+	// value of label
+	// +kubebuilder:validation:Required
+	Value string `json:"value"`
+
+	// scope spec of label
+	// +kubebuilder:validation:Required
+	Scope *CustomLabelScope `json:"scope"`
+}
+
+type CustomLabelScope struct {
+	// type of scope.
+	// cluster: cluster scope, label will be applied to all resource objects under the cluster.
+	// component: component scope, label will be applied to the resource object specified under component.
+	// +kubebuilder:validation:Required
+	Type CustomLabelScopeType `json:"type"`
+
+	// component scope spec when type is component.
+	// +optional
+	ComponentScopeSpecs []ComponentScopeSpec `json:"componentScopeSpecs,omitempty"`
+
+	// cluster scope spec when type is cluster.
+	// +optional
+	ClusterScopeSpec *ClusterScopeSpec `json:"clusterScopeSpecs,omitempty"`
+}
+
+type ComponentScopeSpec struct {
+	// name of component, refer to cluster.spec.componentSpecs[x].name.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Resources defines the resources to be labeled.
+	// +kubebuilder:validation:Required
+	Resources []GVKResource `json:"resources,omitempty"`
+}
+
+type ClusterScopeSpec struct {
+	// Resources defines the resources to be labeled.
+	// +kubebuilder:validation:Required
+	Resources []GVKResource `json:"resources,omitempty"`
+}
+
+type GVKResource struct {
+	// The Pattern of the GVKResource is Group/Version/Kind, for example "apps/v1/StatefulSet", etc.
+	// When the pattern resource filtered by the selector already exists, if there is no corresponding custom label, it will be added, and if label already exists, it will be updated.
+	// +kubebuilder:validation:Required
+	Pattern string `json:"pattern"`
+
+	// Selector is a label query over a set of resources.
+	// +optional
+	Selector map[string]string `json:"selector,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -22,9 +22,11 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -222,6 +224,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err = clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
+	// patchClusterCustomLabels if cluster has custom labels.
+	if err = r.patchClusterResourceCustomLabels(reqCtx.Ctx, cluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	clusterDeepCopy := cluster.DeepCopy()
 	shouldRequeue, err := reconcileClusterWorkloads(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
 	if err != nil {
@@ -387,7 +395,6 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 	if ret, err := removeFinalizer(r, reqCtx, generics.PodDisruptionBudgetSignature, inNS, ml); err != nil {
 		return ret, err
 	}
-
 	return nil, nil
 }
 
@@ -776,6 +783,107 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 		cluster.Status.SetComponentStatus(componentName, compStatus)
 	}
 	return doRemoveInitContainers, nil
+}
+
+// patchClusterResourceCustomLabels patches the custom labels to GVR(Group/Version/Resource) defined in the cluster spec.
+func (r *ClusterReconciler) patchClusterResourceCustomLabels(ctx context.Context, cluster *appsv1alpha1.Cluster) error {
+	if cluster == nil || cluster.Spec.CustomLabelSpecs == nil {
+		return nil
+	}
+	patchGVRCustomLabels := func(resource appsv1alpha1.GVKResource, componentName, labelKey, labelValue string) error {
+		gvk, err := parseCustomLabelPattern(resource.Pattern)
+		if err != nil {
+			return err
+		}
+		if !slices.Contains(getCustomLabelSupportKind(), gvk.Kind) {
+			return errors.New(fmt.Sprintf("kind %s is not supported for custom labels", gvk.Kind))
+		}
+
+		objectList := getObjectListOfResourceKind()[gvk.Kind]
+		matchLabels := componentutil.GetComponentMatchLabels(cluster.Name, componentName)
+		for k, v := range resource.Selector {
+			matchLabels[k] = v
+		}
+		if err := componentutil.GetObjectListByCustomLabels(ctx, r.Client, *cluster, objectList, client.MatchingLabels(matchLabels)); err != nil {
+			return err
+		}
+
+		switch gvk.Kind {
+		case constant.StatefulSetKind:
+			stsList := objectList.(*appsv1.StatefulSetList)
+			for _, sts := range stsList.Items {
+				if err := componentutil.UpdateObjLabel(ctx, r.Client, sts, labelKey, labelValue); err != nil {
+					return err
+				}
+			}
+		case constant.DeploymentKind:
+			deployList := objectList.(*appsv1.DeploymentList)
+			for _, deploy := range deployList.Items {
+				if err := componentutil.UpdateObjLabel(ctx, r.Client, deploy, labelKey, labelValue); err != nil {
+					return err
+				}
+			}
+		case constant.PodKind:
+			podList := objectList.(*corev1.PodList)
+			for _, pod := range podList.Items {
+				if err := componentutil.UpdateObjLabel(ctx, r.Client, pod, labelKey, labelValue); err != nil {
+					return err
+				}
+			}
+		case constant.ServiceKind:
+			svcList := objectList.(*corev1.ServiceList)
+			for _, svc := range svcList.Items {
+				if err := componentutil.UpdateObjLabel(ctx, r.Client, svc, labelKey, labelValue); err != nil {
+					return err
+				}
+			}
+		case constant.ConfigMapKind:
+			cmList := objectList.(*corev1.ConfigMapList)
+			for _, cm := range cmList.Items {
+				if err := componentutil.UpdateObjLabel(ctx, r.Client, cm, labelKey, labelValue); err != nil {
+					return err
+				}
+			}
+		case constant.CronJob:
+			cjList := objectList.(*batchv1.CronJobList)
+			for _, cj := range cjList.Items {
+				if err := componentutil.UpdateObjLabel(ctx, r.Client, cj, labelKey, labelValue); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	for _, customLabelSpec := range cluster.Spec.CustomLabelSpecs {
+		if customLabelSpec.Scope == nil {
+			continue
+		}
+		switch customLabelSpec.Scope.Type {
+		case appsv1alpha1.CustomLabelScopeClusterType:
+			clusterScopeSpec := customLabelSpec.Scope.ClusterScopeSpec
+			if clusterScopeSpec == nil || len(clusterScopeSpec.Resources) <= 0 {
+				continue
+			}
+			// patch the labels to all componentSpecs defined in the cluster spec.
+			for _, compSpec := range cluster.Spec.ComponentSpecs {
+				for _, resource := range clusterScopeSpec.Resources {
+					if err := patchGVRCustomLabels(resource, compSpec.Name, customLabelSpec.Key, customLabelSpec.Value); err != nil {
+						return err
+					}
+				}
+			}
+		case appsv1alpha1.CustomLabelScopeComponentType:
+			for _, componentScopeSpec := range customLabelSpec.Scope.ComponentScopeSpecs {
+				for _, resource := range componentScopeSpec.Resources {
+					if err := patchGVRCustomLabels(resource, componentScopeSpec.Name, customLabelSpec.Key, customLabelSpec.Value); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // Handle is the event handler for the cluster status event.

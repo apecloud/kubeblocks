@@ -132,9 +132,10 @@ const (
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJob                   = "CronJob"
-	ReplicaSet                = "ReplicaSet"
+	ReplicaSetKind            = "ReplicaSet"
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
+	ConfigMapKind             = "ConfigMap"
 )
 
 const (

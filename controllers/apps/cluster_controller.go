@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -229,6 +230,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// validation stage
+	// validate ClusterDefinition
 	var clusterDefinition = &appsv1alpha1.ClusterDefinition{}
 	res, err = doDependencyCRsCheck("ClusterDefinition", func() error {
 		return r.Client.Get(reqCtx.Ctx, types.NamespacedName{
@@ -245,6 +247,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
+	// validate ClusterVersion
 	var clusterVersion = &appsv1alpha1.ClusterVersion{}
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
 		res, err = doDependencyCRsCheck("ClusterVersion", func() error {
@@ -274,7 +277,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
 
-	// ClusterDefinitnio CR generation update stage
+	// ClusterDefinition CR generation update stage
 	res, err = doStatusPatch(func() bool {
 		return cluster.Status.ClusterDefGeneration != clusterDefinition.Generation
 	}, func() error {
@@ -337,13 +340,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	// terminal phase update stage
+	// reconcile phase update stage
 	// reconcile the phase and conditions of the Cluster.status
 	if err = r.reconcileClusterStatus(reqCtx.Ctx, cluster, clusterDefinition); err != nil &&
 		err != componentutil.ErrNoOps {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	return intctrlutil.Reconciled() // "ConditionsError", "Creating"
+	return intctrlutil.Reconciled() // "Creating"
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -381,9 +384,6 @@ func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 	// apply resources succeed, record the condition and event
 	applyResourcesCondition := newApplyResourcesCondition()
 	meta.SetStatusCondition(&cluster.Status.Conditions, applyResourcesCondition)
-	// if cluster status is ConditionsError, do it before updated the observedGeneration.
-	r.updateClusterPhaseWhenConditionsError(cluster)
-
 	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
 	}
@@ -647,7 +647,7 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *appsv
 // Deprecated:
 func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
-	clusterDef *appsv1alpha1.ClusterDefinition) error {
+	clusterDef *appsv1alpha1.ClusterDefinition) (*reconcile.Result, error) {
 	if !r.needCheckClusterForReady(cluster) {
 		return nil
 	}

@@ -90,10 +90,8 @@ type ClusterStatus struct {
 	// Reconfiguring: reconfiguration operation is running.
 	// Deleting: deleting Cluster.
 	// if the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
-	// ConditionsError: Cluster and all the components are still healthy, but some update/create API fails due to invalid parameters.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
 	// +optional
-	Phase Phase `json:"phase,omitempty"`
+	Phase ClusterPhase `json:"phase,omitempty"`
 
 	// message describes cluster details message in current phase.
 	// +optional
@@ -200,8 +198,7 @@ type ClusterComponentStatus struct {
 	// Stopped: replicas number of component is 0.
 	// If the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
-	Phase Phase `json:"phase,omitempty"`
+	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.
 	// keys are podName or deployName or statefulSetName, the format is `<ObjectKind>/<Name>`.
@@ -560,11 +557,11 @@ func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.
 	return t
 }
 
-func (r ClusterStatus) GetTerminalPhases() []Phase {
-	return []Phase{
-		RunningPhase,
-		StoppedPhase,
-		FailedPhase,
-		AbnormalPhase,
+func (r ClusterStatus) GetTerminalPhases() []ClusterPhase {
+	return []ClusterPhase{
+		RunningClusterPhase,
+		StoppedClusterPhase,
+		FailedClusterPhase,
+		AbnormalClusterPhase,
 	}
 }

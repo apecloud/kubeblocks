@@ -30,30 +30,56 @@ const (
 	OpsRequestKind        = "OpsRequestKind"
 )
 
-// Phase defines the CR .Status.Phase
+// ClusterPhase defines the Cluster CR .status.phase
 // +enum
+// +kubebuilder:validation:Enum={Starting,Running,Failed,Abnormal,Updating,Deleting,Deleted,Stopped,Stopping}
+type ClusterPhase string
+
+const (
+	// REVIEW/TODO: AbnormalClusterPhase provides hybrid, consider remove it if possible
+	RunningClusterPhase         ClusterPhase = "Running"
+	StoppedClusterPhase         ClusterPhase = "Stopped"
+	FailedClusterPhase          ClusterPhase = "Failed"
+	AbnormalClusterPhase        ClusterPhase = "Abnormal" // Abnormal is a sub-state of failed, where one of the cluster components has "Failed" or "Abnormal" status phase.
+	StartingClusterPhase        ClusterPhase = "Starting"
+	SpecReconcilingClusterPhase ClusterPhase = "Updating"
+	DeletingClusterPhase        ClusterPhase = "Deleting"
+	StoppingClusterPhase        ClusterPhase = "Stopping"
+)
+
+// ClusterComponentPhase defines the Cluster CR .status.components.phase
+// +enum
+// +kubebuilder:validation:Enum={Starting,Running,Failed,Updating,Deleting,Deleted,Stopped,Stopping}
+type ClusterComponentPhase string
+
+const (
+	StartingClusterCompPhase        ClusterComponentPhase = "Starting"
+	RunningClusterCompPhase         ClusterComponentPhase = "Running"
+	FailedClusterCompPhase          ClusterComponentPhase = "Failed"
+	AbnormalClusterCompPhase        ClusterComponentPhase = "Abnormal" // Abnormal is a sub-state of failed, where one or more workload pods is not in "Running" phase.
+	SpecReconcilingClusterCompPhase ClusterComponentPhase = "Updating"
+	DeletingClusterCompPhase        ClusterComponentPhase = "Deleting"
+	StoppedClusterCompPhase         ClusterComponentPhase = "Stopped"
+	StoppingClusterCompPhase        ClusterComponentPhase = "Stopping"
+
+	// REVIEW: following are variant of "Updating", why not have "Updating" phase with detail Status.Conditions
+	// VolumeExpandingClusterCompPhase   ClusterComponentPhase = "VolumeExpanding"
+	// HorizontalScalingClusterCompPhase ClusterComponentPhase = "HorizontalScaling"
+	// VerticalScalingClusterCompPhase   ClusterComponentPhase = "VerticalScaling"
+	// VersionUpgradingClusterCompPhase  ClusterComponentPhase = "Upgrading"
+	// ReconfiguringClusterCompPhase     ClusterComponentPhase = "Reconfiguring"
+	// ExposingClusterCompPhase          ClusterComponentPhase = "Exposing"
+	// RollingClusterCompPhase           ClusterComponentPhase = "Rolling" // REVIEW: original value is Rebooting, and why not having stopping -> stopped -> starting -> running
+)
+
+// Phase defines the ClusterDefinition and ClusterVersion  CR .status.phase
+// +enum
+// +kubebuilder:validation:Enum={Available,Unavailable}
 type Phase string
 
 const (
-	AvailablePhase         Phase = "Available"
-	UnavailablePhase       Phase = "Unavailable"
-	DeletingPhase          Phase = "Deleting"
-	CreatingPhase          Phase = "Creating"
-	RunningPhase           Phase = "Running"
-	FailedPhase            Phase = "Failed"
-	SpecReconcilingPhase   Phase = "Updating"
-	VolumeExpandingPhase   Phase = "VolumeExpanding"
-	HorizontalScalingPhase Phase = "HorizontalScaling"
-	VerticalScalingPhase   Phase = "VerticalScaling"
-	RebootingPhase         Phase = "Rebooting"
-	VersionUpgradingPhase  Phase = "VersionUpgrading"
-	AbnormalPhase          Phase = "Abnormal"
-	ConditionsErrorPhase   Phase = "ConditionsError"
-	ReconfiguringPhase     Phase = "Reconfiguring"
-	StoppedPhase           Phase = "Stopped"
-	StoppingPhase          Phase = "Stopping"
-	StartingPhase          Phase = "Starting"
-	ExposingPhase          Phase = "Exposing"
+	AvailablePhase   Phase = "Available"
+	UnavailablePhase Phase = "Unavailable"
 )
 
 // OpsPhase defines opsRequest phase.

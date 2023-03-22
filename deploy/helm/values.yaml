@@ -191,23 +191,7 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
-global:
-  tolerations:
-    - key: kb-controller
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
 
-  affinity:
-    nodeAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          preference:
-            matchExpressions:
-              - key: kb-controller
-                operator: In
-                values:
-                  - "true"
 
 ## @param nodeSelector
 ##
@@ -215,11 +199,25 @@ nodeSelector: {}
 
 ## @param tolerations
 ##
-tolerations: {{ .Values.global.tolerations | toYaml | nindent 4 }}
+tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+
 
 ## @param affinity
 ##
-affinity: {{ .Values.global.affinity | toYaml | nindent 4 }}
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"
 
 ## PDB settings
 ##
@@ -300,9 +298,22 @@ prometheus:
     ## Node tolerations for alertmanager scheduling to nodes with taints
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
     ##
-    tolerations: {{ .Values.global.tolerations | toYaml | nindent 4 }}
+    tolerations:
+      - key: kb-controller
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
 
-    affinity: {{ .Values.global.affinity | toYaml | nindent 4 }}
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: kb-controller
+                  operator: In
+                  values:
+                    - "true"
 
     persistentVolume:
       ## If true, alertmanager will create/use a Persistent Volume Claim
@@ -494,9 +505,22 @@ prometheus:
     ## Node tolerations for server scheduling to nodes with taints
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
     ##
-    tolerations: {{ .Values.global.tolerations | toYaml | nindent 4 }}
+    tolerations:
+      - key: kb-controller
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
 
-    affinity: {{ .Values.global.affinity | toYaml | nindent 4 }}
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: kb-controller
+                  operator: In
+                  values:
+                    - "true"
 
     persistentVolume:
       ## If true, Prometheus server will create/use a Persistent Volume Claim
@@ -1378,9 +1402,22 @@ grafana:
   ## Node tolerations for grafana scheduling to nodes with taints
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
   ##
-  tolerations: {{ .Values.global.tolerations | toYaml | nindent 4 }}
+  tolerations:
+    - key: kb-controller
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
 
-  affinity: {{ .Values.global.affinity | toYaml | nindent 4 }}
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kb-controller
+                operator: In
+                values:
+                  - "true"
 
   ## Timezone for the default dashboards
   ## Other options are: browser or a specific timezone, i.e. Europe/Luxembourg
@@ -1505,9 +1542,22 @@ snapshot-controller:
     repository: registry.cn-hangzhou.aliyuncs.com/apecloud/snapshot-controller
     tag: v6.2.1
 
-  tolerations: {{ .Values.global.tolerations | toYaml | nindent 4 }}
+  tolerations:
+    - key: kb-controller
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
 
-  affinity: {{ .Values.global.affinity | toYaml | nindent 4 }}
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kb-controller
+                operator: In
+                values:
+                  - "true"
 
 ## csi-s3 settings
 ## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration
@@ -1549,9 +1599,22 @@ alertmanager-webhook-adaptor:
     pullPolicy: IfNotPresent
     tag: "0.1.4"
 
-  tolerations: {{ .Values.global.tolerations | toYaml | nindent 4 }}
+  tolerations:
+    - key: kb-controller
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
 
-  affinity: {{ .Values.global.affinity | toYaml | nindent 4 }}
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kb-controller
+                operator: In
+                values:
+                  - "true"
 
   ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
   ##

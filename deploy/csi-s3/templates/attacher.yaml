@@ -82,8 +82,6 @@ spec:
       {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
-      - key: node-role.kubernetes.io/master
-        operator: "Exists"
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:

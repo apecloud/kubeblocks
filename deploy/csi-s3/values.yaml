@@ -45,6 +45,8 @@ tolerations:
     operator: Equal
     value: "true"
     effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: "Exists"
 
 affinity:
   nodeAffinity:

@@ -41,9 +41,9 @@ type PodReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=apps,resources=Pods,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=Pods/status,verbs=get
-// +kubebuilder:rbac:groups=apps,resources=Pods/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=pods/status,verbs=get
+// +kubebuilder:rbac:groups=apps,resources=pods/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -67,7 +67,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: ctx,
 		Req: req,
-		Log: log.FromContext(ctx).WithValues("Pod", req.NamespacedName),
+		Log: log.FromContext(ctx).WithValues("pod", req.NamespacedName),
 	}
 
 	if err = r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, pod); err != nil {

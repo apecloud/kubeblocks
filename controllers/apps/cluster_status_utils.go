@@ -40,50 +40,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// postHandler defines the handler after patching cluster status.
-type postHandler func(cluster *appsv1alpha1.Cluster) error
-
-// clusterStatusHandler a cluster status handler which changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
-type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (bool, postHandler)
-
 const (
 	// EventTimeOut timeout of the event
 	EventTimeOut = 30 * time.Second
 )
-
-// doChainClusterStatusHandler chain processing clusterStatusHandler.
-func doChainClusterStatusHandler(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	handlers ...clusterStatusHandler) error {
-	patch := client.MergeFrom(cluster.DeepCopy())
-	var (
-		needPatchStatus bool
-		postHandlers    = make([]func(cluster *appsv1alpha1.Cluster) error, 0, len(handlers))
-	)
-	for _, statusHandler := range handlers {
-		needPatch, postFunc := statusHandler(cluster)
-		if needPatch {
-			needPatchStatus = true
-		}
-		if postFunc != nil {
-			postHandlers = append(postHandlers, postFunc)
-		}
-	}
-	if !needPatchStatus {
-		return nil
-	}
-	if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
-		return err
-	}
-	// perform the handlers after patched the cluster status.
-	for _, postFunc := range postHandlers {
-		if err := postFunc(cluster); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // isTargetKindForEvent checks the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
@@ -441,27 +401,6 @@ func updateComponentStatusPhase(cli client.Client,
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.SetComponentStatus(componentName, c)
 	return cli.Status().Patch(ctx, cluster, patch)
-}
-
-// syncComponentPhaseWhenSpecUpdating when workload of the component changed
-// and component phase is not the phase of operations, sync component phase to 'SpecUpdating'.
-func syncComponentPhaseWhenSpecUpdating(cluster *appsv1alpha1.Cluster,
-	componentName string) {
-	if len(componentName) == 0 {
-		return
-	}
-	if len(cluster.Status.Components) == 0 {
-		cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
-			Phase: appsv1alpha1.SpecUpdatingPhase,
-		})
-		return
-	}
-
-	// if component phase is not the phase of operations, sync component phase to 'SpecUpdating'
-	if compStatus, ok := cluster.Status.Components[componentName]; ok && util.IsCompleted(compStatus.Phase) {
-		compStatus.Phase = appsv1alpha1.SpecUpdatingPhase
-		cluster.Status.SetComponentStatus(componentName, compStatus)
-	}
 }
 
 // existsOperations checks if the cluster is doing operations

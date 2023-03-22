@@ -11,4 +11,4 @@ jobs:
         uses: akwodkiewicz/simple-pr-stats@v0.2
         with:
           token: ${{ secrets.KUBEBLOCKS_TOKEN }}
-          days_back: 360
+          days_back: 40

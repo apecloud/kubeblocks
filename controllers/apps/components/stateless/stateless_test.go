@@ -82,7 +82,7 @@ var _ = Describe("Stateful Component", func() {
 			Expect(err).Should(Succeed())
 			By("test pods number of deploy is 0 ")
 			phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
-			Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
+			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("test pod is ready")
 			rsName := deploy.Name + "-5847cb795c"
@@ -117,7 +117,7 @@ var _ = Describe("Stateful Component", func() {
 			podsReady, _ := statelessComponent.PodsReady(ctx, deploy)
 			Expect(podsReady == false).Should(BeTrue())
 			phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
-			Expect(phase == appsv1alpha1.AbnormalPhase).Should(BeTrue())
+			Expect(phase == appsv1alpha1.AbnormalClusterCompPhase).Should(BeTrue())
 
 			By("test pods of deployment are ready")
 			testk8s.MockDeploymentReady(deploy, NewRSAvailableReason, rsName)

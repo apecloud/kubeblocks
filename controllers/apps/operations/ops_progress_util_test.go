@@ -69,7 +69,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 	initClusterForOps := func(opsRes *OpsResource) {
 		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
-		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningPhase
+		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 	}
 
 	testProgressDetailsWithStatefulPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, consensusPodList []corev1.Pod) {
@@ -119,7 +119,8 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 			By("create restart ops and pods of consensus component")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-"+randomStr)
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.RebootingPhase, consensusComp, statelessComp)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp, statelessComp) // appsv1alpha1.RebootingPhase
+			// TODO: add RebootingPhase status condition
 			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
 
 			By("mock restart OpsRequest is Running")
@@ -131,12 +132,14 @@ var _ = Describe("Ops ProgressDetails", func() {
 			testProgressDetailsWithStatefulPodUpdating(reqCtx, opsRes, podList)
 
 			By("test the progressDetails when stateless pod updates during restart operation")
-			Expect(opsRes.OpsRequest.Status.Components[statelessComp].Phase).Should(Equal(appsv1alpha1.RebootingPhase))
+			Expect(opsRes.OpsRequest.Status.Components[statelessComp].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // appsv1alpha1.RebootingPhase
+			// TODO: check RebootingPhase status condition
 			testProgressDetailsWithStatelessPodUpdating(reqCtx, opsRes)
 
 			By("create horizontalScaling operation to test the progressDetails when scaling down the replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1)
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.HorizontalScalingPhase, consensusComp)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp) // appsv1alpha1.HorizontalScalingPhase
+			// TODO: add HorizontalScalingPhase status condition
 			initClusterForOps(opsRes)
 
 			By("mock HorizontalScaling OpsRequest phase is running")

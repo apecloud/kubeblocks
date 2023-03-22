@@ -34,8 +34,8 @@ var _ OpsHandler = upgradeOpsHandler{}
 
 func init() {
 	upgradeBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase},
-		ToClusterPhase:    appsv1alpha1.VersionUpgradingPhase,
+		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.VersionUpgradingPhase,
 		OpsHandler:        upgradeOpsHandler{},
 	}
 
@@ -103,7 +103,7 @@ func (u upgradeOpsHandler) getUpgradeComponentsStatus(reqCtx intctrlutil.Request
 			continue
 		}
 		compStatusMap[comp.Name] = appsv1alpha1.OpsRequestComponentStatus{
-			Phase: appsv1alpha1.VersionUpgradingPhase,
+			Phase: appsv1alpha1.SpecReconcilingClusterCompPhase,
 		}
 	}
 	return compStatusMap, nil

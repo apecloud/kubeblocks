@@ -84,7 +84,7 @@ func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(ctx context.Context,
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
 func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string) (appsv1alpha1.Phase, error) {
+	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	deployList := &appsv1.DeploymentList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, stateless.Cli, *stateless.Cluster, componentName, deployList)
 	if err != nil || len(deployList.Items) == 0 {

@@ -45,12 +45,8 @@ const (
 func init() {
 	// the volume expansion operation only support online expanding now, so this operation not affect the cluster availability.
 	volumeExpansionBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.Phase{
-			appsv1alpha1.RunningPhase,
-			appsv1alpha1.FailedPhase,
-			appsv1alpha1.AbnormalPhase,
-		},
-		ToClusterPhase: appsv1alpha1.VolumeExpandingPhase,
+		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.VolumeExpandingPhase,
 		// TODO: add cluster reconcile VolumeExpanding phase.
 		MaintainClusterPhaseBySelf: true,
 		OpsHandler:                 volumeExpansionOpsHandler{},
@@ -223,8 +219,8 @@ func (ve volumeExpansionOpsHandler) setComponentPhaseForClusterAndOpsRequest(com
 		return
 	}
 	p := c.Phase
-	if p == appsv1alpha1.VolumeExpandingPhase {
-		p = appsv1alpha1.RunningPhase
+	if p == appsv1alpha1.SpecReconcilingClusterCompPhase {
+		p = appsv1alpha1.RunningClusterCompPhase
 	}
 	c.Phase = p
 	cluster.Status.SetComponentStatus(componentName, c)
@@ -245,8 +241,8 @@ func (ve volumeExpansionOpsHandler) patchClusterStatus(reqCtx intctrlutil.Reques
 	oldClusterStatus *appsv1alpha1.ClusterStatus,
 	clusterPatch client.Patch) error {
 	// when the OpsRequest.status.phase is Succeed or Failed, do it
-	if opsRequestIsCompleted(opsRequestPhase) && opsRes.Cluster.Status.Phase == appsv1alpha1.VolumeExpandingPhase {
-		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningPhase
+	if opsRequestIsCompleted(opsRequestPhase) && opsRes.Cluster.Status.Phase == appsv1alpha1.SpecReconcilingClusterPhase {
+		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 	}
 	// if cluster status changed, patch it
 	if !reflect.DeepEqual(oldClusterStatus, opsRes.Cluster.Status) {
@@ -283,7 +279,7 @@ func (ve volumeExpansionOpsHandler) initComponentStatus(opsRequest *appsv1alpha1
 	opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	for _, v := range opsRequest.Spec.VolumeExpansionList {
 		opsRequest.Status.Components[v.ComponentName] = appsv1alpha1.OpsRequestComponentStatus{
-			Phase: appsv1alpha1.VolumeExpandingPhase,
+			Phase: appsv1alpha1.SpecReconcilingClusterCompPhase,
 		}
 	}
 }

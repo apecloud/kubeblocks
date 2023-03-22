@@ -33,11 +33,11 @@ var _ OpsHandler = horizontalScalingOpsHandler{}
 
 func init() {
 	horizontalScalingBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase},
-		ToClusterPhase:    appsv1alpha1.HorizontalScalingPhase,
+		// REVIEW: can do opsrequest if not running?
+		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.HorizontalScalingPhase,
 		OpsHandler:        horizontalScalingOpsHandler{},
 	}
-
 	opsMgr := GetOpsManager()
 	opsMgr.RegisterOps(appsv1alpha1.HorizontalScalingType, horizontalScalingBehaviour)
 }
@@ -54,7 +54,6 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		horizontalScaling    appsv1alpha1.HorizontalScaling
 		ok                   bool
 	)
-
 	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
 		if horizontalScaling, ok = horizontalScalingMap[component.Name]; !ok {
 			continue

@@ -557,11 +557,35 @@ func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.
 	return t
 }
 
-func (r ClusterStatus) GetTerminalPhases() []ClusterPhase {
+func GetClusterTerminalPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
 		StoppedClusterPhase,
 		FailedClusterPhase,
 		AbnormalClusterPhase,
+	}
+}
+
+func GetClusterUpRunningPhases() []ClusterPhase {
+	return []ClusterPhase{
+		RunningClusterPhase,
+		FailedClusterPhase,
+		AbnormalClusterPhase,
+	}
+}
+
+func GetClusterFailedPhases() []ClusterPhase {
+	return []ClusterPhase{
+		FailedClusterPhase,
+		AbnormalClusterPhase,
+	}
+}
+
+func GetComponentTerminalPhases() []ClusterComponentPhase {
+	return []ClusterComponentPhase{
+		RunningClusterCompPhase,
+		StoppedClusterCompPhase,
+		FailedClusterCompPhase,
+		AbnormalClusterCompPhase,
 	}
 }

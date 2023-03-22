@@ -82,7 +82,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			consensusCompName, "data").SetStorage("2Gi").SetStorageClass(storageClassName).Create(&testCtx)
 	}
 
-	mockDoOperationOnCluster := func(cluster *appsv1alpha1.Cluster, opsRequestName string, toClusterPhase appsv1alpha1.Phase) {
+	mockDoOperationOnCluster := func(cluster *appsv1alpha1.Cluster, opsRequestName string, toClusterPhase appsv1alpha1.ClusterPhase) {
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 			if tmpCluster.Annotations == nil {
 				tmpCluster.Annotations = map[string]string{}
@@ -91,7 +91,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		})()).ShouldNot(HaveOccurred())
 
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, myCluster *appsv1alpha1.Cluster) {
-			g.Expect(getOpsRequestNameFromAnnotation(myCluster, appsv1alpha1.VolumeExpandingPhase) != "").Should(BeTrue())
+			g.Expect(getOpsRequestNameFromAnnotation(myCluster, appsv1alpha1.SpecReconcilingClusterPhase)).ShouldNot(BeEmpty()) // appsv1alpha1.VolumeExpandingPhase
+			// TODO: add status condition expect for appsv1alpha1.VolumeExpandingPhase
 		})).Should(Succeed())
 	}
 
@@ -116,14 +117,16 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		ops = testapps.CreateOpsRequest(ctx, testCtx, ops)
 
 		By("mock do operation on cluster")
-		mockDoOperationOnCluster(clusterObject, ops.Name, appsv1alpha1.VolumeExpandingPhase)
+		mockDoOperationOnCluster(clusterObject, ops.Name, appsv1alpha1.SpecReconcilingClusterPhase) // appsv1alpha1.VolumeExpandingPhase
+		// TODO: add status condition expect for appsv1alpha1.VolumeExpandingPhase
 
 		// create-pvc
 		pvcName := fmt.Sprintf("%s-%s-%s-%d", vctName, clusterObject.Name, consensusCompName, index)
 		createPVC(clusterObject.Name, storageClassName, vctName, pvcName)
 		// waiting pvc controller mark annotation to OpsRequest
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
-			g.Expect(tmpOps.Annotations != nil && tmpOps.Annotations[constant.ReconcileAnnotationKey] != "").Should(BeTrue())
+			g.Expect(tmpOps.Annotations).ShouldNot(BeNil())
+			g.Expect(tmpOps.Annotations[constant.ReconcileAnnotationKey]).ShouldNot(BeEmpty())
 		})).Should(Succeed())
 		return ops, pvcName
 	}
@@ -140,7 +143,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		opsRes.OpsRequest = newOps
 		_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(err == nil).Should(BeTrue())
-		Eventually(testapps.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName)).Should(Equal(appsv1alpha1.VolumeExpandingPhase))
+		Eventually(testapps.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // VolumeExpandingPhase
+		// TODO: add status condition expect for VolumeExpandingPhase
 	}
 
 	testWarningEventOnPVC := func(reqCtx intctrlutil.RequestCtx, clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource) {
@@ -166,7 +170,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		event.InvolvedObject = stsInvolvedObject
 		pvcEventHandler := PersistentVolumeClaimEventHandler{}
 		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-		Eventually(testapps.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName)).Should(Equal(appsv1alpha1.VolumeExpandingPhase))
+		Eventually(testapps.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // VolumeExpandingPhase
+		// TODO: add status condition expect for VolumeExpandingPhase
 
 		// test when the event reach the conditions
 		event.Count = 5
@@ -184,7 +189,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 	testVolumeExpansion := func(reqCtx intctrlutil.RequestCtx, clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource, randomStr string) {
 		// mock cluster is Running to support volume expansion ops
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-			clusterObject.Status.Phase = appsv1alpha1.RunningPhase
+			clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
 		})).ShouldNot(HaveOccurred())
 
 		// init resources for volume expansion
@@ -239,7 +244,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		// init resources for volume expansion
 		newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, 2)
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-			clusterObject.Status.Phase = appsv1alpha1.VolumeExpandingPhase
+			clusterObject.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase // appsv1alpha1.VolumeExpandingPhase
+			// TODO: add status condition for VolumeExpandingPhase
 		})).ShouldNot(HaveOccurred())
 		Expect(k8sClient.Delete(ctx, newOps)).Should(Succeed())
 		Eventually(func() error {
@@ -251,7 +257,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
 		Expect(handleVolumeExpansionWithPVC(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, pvc)).Should(Succeed())
 
-		Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObject))).Should(Equal(appsv1alpha1.RunningPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObject))).Should(Equal(appsv1alpha1.RunningClusterPhase))
 	}
 
 	Context("Test VolumeExpansion", func() {
@@ -272,10 +278,10 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 			By("Test OpsManager.MainEnter function with ClusterOps")
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-				clusterObject.Status.Phase = appsv1alpha1.RunningPhase
+				clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
 				clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 					consensusCompName: {
-						Phase: appsv1alpha1.RunningPhase,
+						Phase: appsv1alpha1.RunningClusterCompPhase,
 					},
 				}
 			})).ShouldNot(HaveOccurred())

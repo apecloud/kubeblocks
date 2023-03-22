@@ -80,12 +80,14 @@ func GetClusterByObject(ctx context.Context,
 // IsCompleted checks whether the component has completed the operation
 //
 // Deprecated: should use appsv1alpha1.ClusterStatus.GetTerminalPhase()
-func IsCompleted(phase appsv1alpha1.Phase) bool {
-	return slices.Index(appsv1alpha1.ClusterStatus{}.GetTerminalPhases(), phase) != -1
+func IsCompleted(phase appsv1alpha1.ClusterComponentPhase) bool {
+	return slices.Index(appsv1alpha1.GetComponentTerminalPhases(), phase) != -1
 }
 
-func IsFailedOrAbnormal(phase appsv1alpha1.Phase) bool {
-	return slices.Index([]appsv1alpha1.Phase{appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase}, phase) != -1
+func IsFailedOrAbnormal(phase appsv1alpha1.ClusterComponentPhase) bool {
+	return slices.Index([]appsv1alpha1.ClusterComponentPhase{
+		appsv1alpha1.FailedClusterCompPhase,
+		appsv1alpha1.AbnormalClusterCompPhase}, phase) != -1
 }
 
 // GetComponentMatchLabels gets the labels for matching the cluster component
@@ -125,12 +127,12 @@ func IsProbeTimeout(componentDef *appsv1alpha1.ClusterComponentDefinition, podsR
 	return time.Now().After(podsReadyTime.Add(roleProbeTimeout))
 }
 
-func GetComponentPhase(isFailed, isAbnormal bool) appsv1alpha1.Phase {
-	var componentPhase appsv1alpha1.Phase
+func GetComponentPhase(isFailed, isAbnormal bool) appsv1alpha1.ClusterComponentPhase {
+	var componentPhase appsv1alpha1.ClusterComponentPhase
 	if isFailed {
-		componentPhase = appsv1alpha1.FailedPhase
+		componentPhase = appsv1alpha1.FailedClusterCompPhase
 	} else if isAbnormal {
-		componentPhase = appsv1alpha1.AbnormalPhase
+		componentPhase = appsv1alpha1.AbnormalClusterCompPhase
 	}
 	return componentPhase
 }
@@ -148,7 +150,6 @@ func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster ap
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err
 	}
-
 	for _, component := range clusterDef.Spec.ComponentDefs {
 		if component.Name == compDefName {
 			return &component, nil
@@ -171,12 +172,17 @@ func GetClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName st
 func InitClusterComponentStatusIfNeed(
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
-	componentDef appsv1alpha1.ClusterComponentDefinition) {
-	if _, ok := cluster.Status.Components[componentName]; !ok {
-		cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
-			Phase: cluster.Status.Phase,
-		})
+	componentDef appsv1alpha1.ClusterComponentDefinition) error {
+	if cluster == nil {
+		return ErrReqClusterObj
 	}
+
+	// REVIEW: should have following removed
+	// if _, ok := cluster.Status.Components[componentName]; !ok {
+	// 	cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
+	// 		Phase: cluster.Status.Phase,
+	// 	})
+	// }
 	componentStatus := cluster.Status.Components[componentName]
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
@@ -201,6 +207,7 @@ func InitClusterComponentStatusIfNeed(
 		}
 	}
 	cluster.Status.SetComponentStatus(componentName, componentStatus)
+	return nil
 }
 
 // GetComponentDeployMinReadySeconds gets the deployment minReadySeconds of the component.
@@ -297,11 +304,11 @@ func AvailableReplicasAreConsistent(componentReplicas, podCount, workloadAvailab
 }
 
 // GetPhaseWithNoAvailableReplicas gets the component phase when the workload of component has no available replicas.
-func GetPhaseWithNoAvailableReplicas(componentReplicas int32) appsv1alpha1.Phase {
+func GetPhaseWithNoAvailableReplicas(componentReplicas int32) appsv1alpha1.ClusterComponentPhase {
 	if componentReplicas == 0 {
 		return ""
 	}
-	return appsv1alpha1.FailedPhase
+	return appsv1alpha1.FailedClusterCompPhase
 }
 
 // GetComponentPhaseWhenPodsNotReady gets the component phase when pods of component are not ready.
@@ -309,7 +316,7 @@ func GetComponentPhaseWhenPodsNotReady(podList *corev1.PodList,
 	workload metav1.Object,
 	componentReplicas,
 	availableReplicas int32,
-	checkFailedPodRevision func(pod *corev1.Pod, workload metav1.Object) bool) appsv1alpha1.Phase {
+	checkFailedPodRevision func(pod *corev1.Pod, workload metav1.Object) bool) appsv1alpha1.ClusterComponentPhase {
 	podCount := len(podList.Items)
 	if podCount == 0 || availableReplicas == 0 {
 		return GetPhaseWithNoAvailableReplicas(componentReplicas)
@@ -337,17 +344,17 @@ func GetCompPhaseByConditions(existLatestRevisionFailedPod bool,
 	primaryReplicasAvailable bool,
 	compReplicas,
 	podCount,
-	availableReplicas int32) appsv1alpha1.Phase {
+	availableReplicas int32) appsv1alpha1.ClusterComponentPhase {
 	// if the failed pod is not controlled by the latest revision, ignore it.
 	if !existLatestRevisionFailedPod {
 		return ""
 	}
 	if !primaryReplicasAvailable {
-		return appsv1alpha1.FailedPhase
+		return appsv1alpha1.FailedClusterCompPhase
 	}
 	// checks if expected replicas number of component is consistent with the number of available workload replicas.
 	if !AvailableReplicasAreConsistent(compReplicas, podCount, availableReplicas) {
-		return appsv1alpha1.AbnormalPhase
+		return appsv1alpha1.AbnormalClusterCompPhase
 	}
 	return ""
 }

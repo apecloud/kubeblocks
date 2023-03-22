@@ -125,9 +125,9 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 		return true, nil
 	}
 	if isFailed {
-		compStatus.Phase = appsv1alpha1.FailedPhase
+		compStatus.Phase = appsv1alpha1.FailedClusterCompPhase
 	} else if isAbnormal {
-		compStatus.Phase = appsv1alpha1.AbnormalPhase
+		compStatus.Phase = appsv1alpha1.AbnormalClusterCompPhase
 	}
 	cluster.Status.SetComponentStatus(componentName, compStatus)
 	if err = r.Cli.Status().Patch(ctx, cluster, patch); err != nil {
@@ -140,7 +140,8 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 	return false, opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Cli, cluster)
 }
 
-func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.Phase, error) {
+func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
+	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
 		componentName, stsList)

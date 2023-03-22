@@ -36,8 +36,9 @@ var _ OpsHandler = restartOpsHandler{}
 
 func init() {
 	restartBehaviour := OpsBehaviour{
-		FromClusterPhases:          []appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase},
-		ToClusterPhase:             appsv1alpha1.RebootingPhase,
+		// REVIEW: can do opsrequest if not running?
+		FromClusterPhases:          appsv1alpha1.GetClusterTerminalPhases(),
+		ToClusterPhase:             appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.RebootingPhase,
 		OpsHandler:                 restartOpsHandler{},
 		MaintainClusterPhaseBySelf: true,
 	}

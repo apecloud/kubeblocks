@@ -181,7 +181,7 @@ var _ = Describe("SystemAccount Controller", func() {
 
 		By("Patching Cluster to running phase")
 		Eventually(testapps.GetAndChangeObjStatus(&testCtx, objectKey, func(cluster *appsv1alpha1.Cluster) {
-			cluster.Status.Phase = appsv1alpha1.RunningPhase
+			cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 		})).Should(Succeed())
 	}
 

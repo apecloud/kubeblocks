@@ -33,8 +33,8 @@ var _ OpsHandler = verticalScalingHandler{}
 
 func init() {
 	verticalScalingBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase},
-		ToClusterPhase:    appsv1alpha1.VerticalScalingPhase,
+		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.VerticalScalingPhase,
 		OpsHandler:        verticalScalingHandler{},
 	}
 

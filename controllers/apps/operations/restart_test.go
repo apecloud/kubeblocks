@@ -66,7 +66,7 @@ var _ = Describe("Restart OpsRequest", func() {
 
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.RebootingPhase, consensusComp, statelessComp)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp, statelessComp)
 
 			By("mock restart OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)

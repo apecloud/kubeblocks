@@ -149,7 +149,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		fmt.Printf("ClusterDefinition:%s ClusterVersion:%s Cluster:%s \n", clusterDefObj.Name, clusterVersionObj.Name, clusterObj.Name)
 
 		By("Waiting the cluster is created")
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking pods' role label")
 		sts := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey).Items[0]
@@ -181,12 +181,13 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 		By("Checking ReconfigureOpsRequest is running")
 		opsKey := types.NamespacedName{Name: reconfigureOpsRequest.Name, Namespace: testCtx.DefaultNamespace}
-		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.RunningPhase))
+		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
 		By("Checking Cluster and changed component phase is Reconfiguring")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.ReconfiguringPhase))
-			g.Expect(cluster.Status.Components[componentName].Phase).To(Equal(appsv1alpha1.ReconfiguringPhase))
+			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterPhase))                               // appsv1alpha1.ReconfiguringPhase
+			g.Expect(cluster.Status.Components[componentName].Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
+			// TODO: add status condition check
 		})).Should(Succeed())
 
 		By("Issue another reconfigure OpsRequest that will fail - innodb_read_io_threads")

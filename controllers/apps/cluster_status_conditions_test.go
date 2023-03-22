@@ -90,7 +90,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				g.Expect(condition.Reason).Should(BeEquivalentTo(constant.ReasonNotFoundCR))
 			})).Should(Succeed())
 
-            // TODO: removed conditionsError phase need to review correct-ness of following commented off block:
+			// TODO: removed conditionsError phase need to review correct-ness of following commented off block:
 			// By("test conditionsError phase")
 			// Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
 			// 	condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeProvisioningStarted)
@@ -146,20 +146,13 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				g.Expect(condition != nil && condition.Reason == ReasonPreCheckFailed).Should(BeTrue())
 			})).Should(Succeed())
 
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
-				condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
-				condition.LastTransitionTime = metav1.Time{Time: time.Now().Add(-(time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)) + time.Second))}
-				tmpCluster.SetStatusCondition(*condition)
-			})()).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.ConditionsErrorPhase))
-
 			By("reset and waiting cluster to Creating")
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
 				tmpCluster.Spec.ComponentSpecs[0].EnabledLogs = []string{"error"}
 			})()).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.CreatingPhase))
+				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.StartingClusterPhase))
 				g.Expect(tmpCluster.Status.ObservedGeneration).ShouldNot(BeZero())
 			})).Should(Succeed())
 

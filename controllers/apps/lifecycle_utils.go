@@ -357,7 +357,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		if !reflect.DeepEqual(&stsObjCopy.Spec, &stsObj.Spec) {
 			// sync component phase
-			syncComponentPhaseByClusterPhase(cluster, componentName)
+			updateComponentPhaseToUpdating(cluster, componentName)
 		}
 
 		// check all pvc bound, requeue if not all ready
@@ -462,7 +462,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
 			// sync component phase
 			componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
-			syncComponentPhaseByClusterPhase(cluster, componentName)
+			updateComponentPhaseToUpdating(cluster, componentName)
 		}
 		return nil
 	}
@@ -569,7 +569,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if _, ok := obj.(*appsv1.StatefulSet); ok {
 			// h-scale operation may create a new Sts if workloadType is Replication,
 			// so we need to sync component phase here.
-			syncComponentPhaseByClusterPhase(cluster, obj.GetLabels()[constant.KBAppComponentLabelKey])
+			updateComponentPhaseToUpdating(cluster, obj.GetLabels()[constant.KBAppComponentLabelKey])
 		}
 	}
 

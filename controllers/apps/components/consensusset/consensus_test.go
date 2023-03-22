@@ -87,7 +87,7 @@ var _ = Describe("Consensus Component", func() {
 
 	validateComponentStatus := func(cluster *appsv1alpha1.Cluster) {
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-			g.Expect(tmpCluster.Status.Components[consensusCompName].Phase == appsv1alpha1.FailedPhase).Should(BeTrue())
+			g.Expect(tmpCluster.Status.Components[consensusCompName].Phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 		})).Should(Succeed())
 	}
 
@@ -146,7 +146,7 @@ var _ = Describe("Consensus Component", func() {
 
 			By("expect component phase is Failed when pod of component is failed")
 			phase, _ := consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
-			Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
+			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision

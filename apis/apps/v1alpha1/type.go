@@ -32,7 +32,7 @@ const (
 
 // ClusterPhase defines the Cluster CR .status.phase
 // +enum
-// +kubebuilder:validation:Enum={Starting,Running,Failed,Abnormal,Updating,Deleting,Deleted,Stopped,Stopping}
+// +kubebuilder:validation:Enum={Running,Stopped,Failed,Abnormal,Starting,Updating,Stopping}
 type ClusterPhase string
 
 const (
@@ -43,24 +43,24 @@ const (
 	AbnormalClusterPhase        ClusterPhase = "Abnormal" // Abnormal is a sub-state of failed, where one of the cluster components has "Failed" or "Abnormal" status phase.
 	StartingClusterPhase        ClusterPhase = "Starting"
 	SpecReconcilingClusterPhase ClusterPhase = "Updating"
-	DeletingClusterPhase        ClusterPhase = "Deleting"
 	StoppingClusterPhase        ClusterPhase = "Stopping"
+	// DeletingClusterPhase        ClusterPhase = "Deleting" // DO REVIEW: may merged with  Stopping
 )
 
 // ClusterComponentPhase defines the Cluster CR .status.components.phase
 // +enum
-// +kubebuilder:validation:Enum={Starting,Running,Failed,Updating,Deleting,Deleted,Stopped,Stopping}
+// +kubebuilder:validation:Enum={Running,Stopped,Failed,Abnormal,Updating,Stopping}
 type ClusterComponentPhase string
 
 const (
-	StartingClusterCompPhase        ClusterComponentPhase = "Starting"
 	RunningClusterCompPhase         ClusterComponentPhase = "Running"
+	StoppedClusterCompPhase         ClusterComponentPhase = "Stopped"
 	FailedClusterCompPhase          ClusterComponentPhase = "Failed"
 	AbnormalClusterCompPhase        ClusterComponentPhase = "Abnormal" // Abnormal is a sub-state of failed, where one or more workload pods is not in "Running" phase.
 	SpecReconcilingClusterCompPhase ClusterComponentPhase = "Updating"
-	DeletingClusterCompPhase        ClusterComponentPhase = "Deleting"
-	StoppedClusterCompPhase         ClusterComponentPhase = "Stopped"
-	StoppingClusterCompPhase        ClusterComponentPhase = "Stopping"
+	// DeletingClusterCompPhase        ClusterComponentPhase = "Deleting"
+	StartingClusterCompPhase ClusterComponentPhase = "Starting"
+	StoppingClusterCompPhase ClusterComponentPhase = "Stopping"
 
 	// REVIEW: following are variant of "Updating", why not have "Updating" phase with detail Status.Conditions
 	// VolumeExpandingClusterCompPhase   ClusterComponentPhase = "VolumeExpanding"
@@ -216,15 +216,15 @@ const (
 )
 
 type OpsRequestBehaviour struct {
-	FromClusterPhases []Phase
-	ToClusterPhase    Phase
+	FromClusterPhases []ClusterPhase
+	ToClusterPhase    ClusterPhase
 }
 
 type OpsRecorder struct {
 	// name OpsRequest name
 	Name string `json:"name"`
 	// clusterPhase the cluster phase when the OpsRequest is running
-	ToClusterPhase Phase `json:"clusterPhase"`
+	ToClusterPhase ClusterPhase `json:"clusterPhase"`
 }
 
 // ProvisionPolicyType defines the policy for creating accounts.

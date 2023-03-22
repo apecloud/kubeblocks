@@ -29,6 +29,8 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+
+	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
 type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
@@ -87,20 +89,6 @@ const (
 	roleEventReportFrequency          = int(1 / roleEventRecordQPS)
 	defaultFailedEventReportFrequency = 1800
 	defaultRoleDetectionThreshold     = 300
-
-	CheckRunningOperation bindings.OperationKind = "checkRunning"
-	CheckStatusOperation  bindings.OperationKind = "checkStatus"
-	CheckRoleOperation    bindings.OperationKind = "checkRole"
-	GetRoleOperation      bindings.OperationKind = "getRole"
-	GetLagOperation       bindings.OperationKind = "getLag"
-	ExecOperation         bindings.OperationKind = "exec"
-	QueryOperation        bindings.OperationKind = "query"
-	CloseOperation        bindings.OperationKind = "close"
-
-	OperationNotImplemented = "NotImplemented"
-	OperationInvalid        = "Invalid"
-	OperationSuccess        = "Success"
-	OperationFailed         = "Failed"
 )
 
 const (

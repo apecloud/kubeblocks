@@ -31,6 +31,7 @@ import (
 	"github.com/spf13/viper"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
 // List of operations.

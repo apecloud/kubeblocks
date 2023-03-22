@@ -4129,7 +4129,7 @@
     "type": "timepicker"
   },
   "timezone": "",
-  "title": "MySQL",
+  "title": "ApeCloud-MySQL",
   "uid": "549c2bf8936f7767ea6ac47c47b00f2a",
   "version": 1,
   "weekStart": ""

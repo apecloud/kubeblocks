@@ -27,7 +27,9 @@ import (
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
@@ -36,13 +38,17 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/pointer"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
 	podRunningTimeoutFlag = "pod-running-timeout"
 	defaultPodExecTimeout = 60 * time.Second
+
+	dashboardGrafana = "kubeblocks-grafana"
 )
 
 type dashboard struct {
@@ -64,17 +70,23 @@ var (
 	`)
 
 	openExample = templates.Examples(`
-		# Open a dashboard, such as kube-grafana
+		# Open a dashboard by dashboard name, such as kubeblocks-grafana
 		kbcli dashboard open kubeblocks-grafana
 
 		# Open a dashboard with a specific local port
 		kbcli dashboard open kubeblocks-grafana --port 8080
+
+        # Open the grafana dashboard by cluster name
+		kbcli dashboard open kubeblocks-grafana --cluster-name <my-cluster>
+
+		# Open the grafana dashboard by cluster definition, such as apecloud-mysql
+		kbcli dashboard open kube-grafana --cluster-definition apecloud-mysql
 	`)
 
 	// we do not use the default port to port-forward to avoid conflict with other services
 	dashboards = [...]*dashboard{
 		{
-			Name:       "kubeblocks-grafana",
+			Name:       dashboardGrafana,
 			AddonName:  "kb-addon-grafana",
 			Label:      "app.kubernetes.io/instance=kb-addon-grafana,app.kubernetes.io/name=grafana",
 			TargetPort: "13000",
@@ -152,7 +164,7 @@ func (o *listOptions) complete() error {
 
 // get all dashboard service and print
 func (o *listOptions) run() error {
-	if err := getDashboardInfo(o.client); err != nil {
+	if err := getDashboardSvcInfo(o.client); err != nil {
 		return err
 	}
 
@@ -174,11 +186,15 @@ func printTable(out io.Writer) error {
 
 type openOptions struct {
 	factory cmdutil.Factory
+	dynamic dynamic.Interface
+	client  *kubernetes.Clientset
 	genericclioptions.IOStreams
 	portForwardOptions *cmdpf.PortForwardOptions
 
-	name      string
-	localPort string
+	name          string
+	localPort     string
+	cluster       string
+	clusterDefRef string
 }
 
 func newOpenOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *openOptions {
@@ -211,6 +227,8 @@ func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 
 	cmd.Flags().StringVar(&o.localPort, "port", "", "dashboard local port")
+	cmd.Flags().StringVar(&o.cluster, "cluster", "", "Open grafana dashboard by cluster name")
+	cmd.Flags().StringVar(&o.clusterDefRef, "cluster-definition", "", "Open grafana dashboard by cluster definition")
 	cmd.Flags().Duration(podRunningTimeoutFlag, defaultPodExecTimeout,
 		"The length of time (like 5s, 2m, or 3h, higher than zero) to wait until at least one pod is running")
 
@@ -223,28 +241,34 @@ func (o *openOptions) complete(cmd *cobra.Command, args []string) error {
 	}
 
 	o.name = args[0]
-	client, err := o.factory.KubernetesClientSet()
+	var err error
+	o.client, err = o.factory.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
 
-	if err = getDashboardInfo(client); err != nil {
+	if err = getDashboardSvcInfo(o.client); err != nil {
 		return err
 	}
 
-	dash := getDashboardByName(o.name)
-	if dash == nil {
+	dashSvc := getDashboardSvcByName(o.name)
+	if dashSvc == nil {
 		return fmt.Errorf("failed to find dashboard \"%s\", run \"kbcli dashboard list\" to list all dashboards", o.name)
 	}
 
 	if o.localPort == "" {
-		o.localPort = dash.TargetPort
+		o.localPort = dashSvc.TargetPort
 	}
 
-	pfArgs := []string{fmt.Sprintf("svc/%s", dash.AddonName), fmt.Sprintf("%s:%s", o.localPort, dash.Port)}
-	o.portForwardOptions.Namespace = dash.Namespace
+	o.dynamic, err = o.factory.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	pfArgs := []string{fmt.Sprintf("svc/%s", dashSvc.AddonName), fmt.Sprintf("%s:%s", o.localPort, dashSvc.Port)}
+	o.portForwardOptions.Namespace = dashSvc.Namespace
 	o.portForwardOptions.Address = []string{"127.0.0.1"}
-	return o.portForwardOptions.Complete(newFactory(dash.Namespace), cmd, pfArgs)
+	return o.portForwardOptions.Complete(newFactory(dashSvc.Namespace), cmd, pfArgs)
 }
 
 func (o *openOptions) run() error {
@@ -253,6 +277,14 @@ func (o *openOptions) run() error {
 		fmt.Fprintf(o.Out, "Forward successfully! Opening browser ...\n")
 
 		url := "http://127.0.0.1:" + o.localPort
+		if o.name == dashboardGrafana && (o.cluster != "" || o.clusterDefRef != "") {
+			var err error
+			url, err = o.completeGrafanaUrl(url)
+			if err != nil {
+				fmt.Fprintf(o.ErrOut, "Failed to build grafana dashboard url: %v", err)
+			}
+		}
+
 		if err := util.OpenBrowser(url); err != nil {
 			fmt.Fprintf(o.ErrOut, "Failed to open browser: %v", err)
 		}
@@ -261,7 +293,55 @@ func (o *openOptions) run() error {
 	return o.portForwardOptions.RunPortForward()
 }
 
-func getDashboardByName(name string) *dashboard {
+func (o *openOptions) completeGrafanaUrl(url string) (string, error) {
+	getClusterDef := func() (*appsv1alpha1.ClusterDefinition, error) {
+		cd := &appsv1alpha1.ClusterDefinition{}
+		cdObj, err := o.dynamic.Resource(types.ClusterDefGVR()).Get(context.TODO(), o.clusterDefRef, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(cdObj.Object, cd)
+		if err != nil {
+			return nil, err
+		}
+		return cd, nil
+	}
+
+	getUid := func(clusterDef string) (string, error) {
+		// get dashboard configmap by dashboardName
+		dashboardName := fmt.Sprintf("kubeblocks-grafana-%s-overview", clusterDef)
+		cm, err := o.client.CoreV1().ConfigMaps(metav1.NamespaceAll).Get(context.TODO(), dashboardName, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		uid, exist := cm.Data["uid"]
+		if !exist {
+			return "", fmt.Errorf("can not find dashboard uid")
+		}
+		return uid, nil
+	}
+
+	if o.cluster != "" {
+		cd, err := getClusterDef()
+		if err != nil {
+			return "", err
+		}
+		uid, err := getUid(cd.Name)
+		if err != nil {
+			return "", err
+		}
+		url += fmt.Sprintf("/d/%s/%s?var-cluster=%s", uid, cd.Name, o.cluster)
+	} else if o.clusterDefRef != "" {
+		uid, err := getUid(o.clusterDefRef)
+		if err != nil {
+			return "", err
+		}
+		url += fmt.Sprintf("/d/%s/%s", uid, o.clusterDefRef)
+	}
+	return url, nil
+}
+
+func getDashboardSvcByName(name string) *dashboard {
 	for i, d := range dashboards {
 		if d.Name == name {
 			return dashboards[i]
@@ -270,7 +350,7 @@ func getDashboardByName(name string) *dashboard {
 	return nil
 }
 
-func getDashboardInfo(client *kubernetes.Clientset) error {
+func getDashboardSvcInfo(client *kubernetes.Clientset) error {
 	getSvcs := func(client *kubernetes.Clientset, label string) (*corev1.ServiceList, error) {
 		return client.CoreV1().Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: label,

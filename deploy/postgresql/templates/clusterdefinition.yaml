@@ -139,7 +139,7 @@ spec:
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: assword
+                    key: password
               - name: POSTGRES_DB
                 value: {{ (include "postgresql.database" .) | quote }}
               # Audit

@@ -14,7 +14,7 @@ spec:
   componentDefs:
     - name: postgresql-ha
       workloadType: Replication
-      characterType: postgres
+      characterType: postgresql
       probes:
         roleChangedProbe:
           failureThreshold: 2

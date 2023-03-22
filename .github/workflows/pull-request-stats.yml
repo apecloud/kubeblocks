@@ -1,7 +1,7 @@
 name: PR-TIMER
 on:
   schedule:
-    - cron: '6 6 * * 1' #Runs at 06:06 UTC on Mon
+    - cron: '46 1 * * 3' #Runs at 06:06 UTC on Mon
 
 jobs:
   calculate-stats:
@@ -12,3 +12,8 @@ jobs:
         with:
           token: ${{ secrets.KUBEBLOCKS_TOKEN }}
           days_back: 40
+      - name: Run all-pr-stats
+        uses: akwodkiewicz/simple-pr-stats@v0.2
+        with:
+          token: ${{ secrets.KUBEBLOCKS_TOKEN }}
+          days_back: 360    

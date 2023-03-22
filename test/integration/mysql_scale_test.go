@@ -101,7 +101,7 @@ var _ = Describe("MySQL Scaling function", func() {
 
 		By("check cluster running")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.RunningPhase))
+			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.RunningClusterPhase))
 		})).Should(Succeed())
 
 		By("send VerticalScalingOpsRequest successfully")

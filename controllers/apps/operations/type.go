@@ -55,10 +55,10 @@ type OpsHandler interface {
 type realAffectedComponentMap map[string]struct{}
 
 type OpsBehaviour struct {
-	FromClusterPhases []appsv1alpha1.Phase
+	FromClusterPhases []appsv1alpha1.ClusterPhase
 
 	// ToClusterPhase indicates that the cluster will enter this phase during the operation.
-	ToClusterPhase appsv1alpha1.Phase
+	ToClusterPhase appsv1alpha1.ClusterPhase
 
 	// MaintainClusterPhaseBySelf indicates whether the operation will maintain cluster/component phase by itself.
 	// Generally, the cluster/component phase will be maintained by cluster controller, but if your operation will not update
@@ -72,7 +72,7 @@ type OpsResource struct {
 	OpsRequest     *appsv1alpha1.OpsRequest
 	Cluster        *appsv1alpha1.Cluster
 	Recorder       record.EventRecorder
-	ToClusterPhase appsv1alpha1.Phase
+	ToClusterPhase appsv1alpha1.ClusterPhase
 }
 
 type OpsManager struct {

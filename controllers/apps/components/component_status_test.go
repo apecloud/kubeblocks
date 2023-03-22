@@ -158,7 +158,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(isRunning).Should(BeFalse())
 
 				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
-				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedPhase))
+				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			})
 
 			It("should set component status to running if container is ready", func() {
@@ -183,7 +183,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(isRunning).Should(BeTrue())
 
 				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
-				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningPhase))
+				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 			})
 		})
 	})
@@ -284,7 +284,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(isRunning).Should(BeFalse())
 
 				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
-				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedPhase))
+				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			})
 
 			It("should set component status to running if container is ready", func() {
@@ -309,7 +309,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(isRunning).Should(BeTrue())
 
 				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
-				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningPhase))
+				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 			})
 		})
 	})
@@ -406,7 +406,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(isRunning).Should(BeFalse())
 
 				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
-				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedPhase))
+				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterPhase))
 			})
 
 			It("should set component status to running if container is ready", func() {
@@ -435,7 +435,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(isRunning).Should(BeTrue())
 
 				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
-				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningPhase))
+				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 			})
 		})
 	})
@@ -535,7 +535,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(isRunning).Should(BeFalse())
 
 				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
-				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedPhase))
+				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			})
 
 			It("should set component status to running if container is ready", func() {
@@ -560,7 +560,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(isRunning).Should(BeTrue())
 
 				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
-				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningPhase))
+				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 			})
 		})
 	})

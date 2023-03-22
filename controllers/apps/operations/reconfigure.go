@@ -34,13 +34,10 @@ func init() {
 	reAction := reconfigureAction{}
 	opsManager := GetOpsManager()
 	reconfigureBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.Phase{
-			appsv1alpha1.RunningPhase,
-			appsv1alpha1.FailedPhase,
-			appsv1alpha1.AbnormalPhase,
-		},
+		// REVIEW: can do opsrequest if not running?
+		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
 		// TODO: add cluster reconcile Reconfiguring phase.
-		ToClusterPhase:             appsv1alpha1.ReconfiguringPhase,
+		ToClusterPhase:             appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.ReconfiguringPhase,
 		MaintainClusterPhaseBySelf: true,
 		OpsHandler:                 &reAction,
 	}
@@ -192,12 +189,12 @@ func (r *reconfigureAction) syncReconfigureComponentStatus(reqCtx intctrlutil.Re
 
 	componentName := opsRequest.Spec.Reconfigure.ComponentName
 	c, ok := cluster.Status.Components[componentName]
-	if !ok || c.Phase != appsv1alpha1.ReconfiguringPhase {
+	if !ok || c.Phase != appsv1alpha1.SpecReconcilingClusterCompPhase {
 		return nil
 	}
 
 	clusterPatch := client.MergeFrom(cluster.DeepCopy())
-	c.Phase = appsv1alpha1.RunningPhase
+	c.Phase = appsv1alpha1.RunningClusterCompPhase
 	cluster.Status.SetComponentStatus(componentName, c)
 	return cli.Status().Patch(reqCtx.Ctx, cluster, clusterPatch)
 }

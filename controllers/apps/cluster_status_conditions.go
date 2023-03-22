@@ -101,6 +101,7 @@ func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Co
 			eventType = corev1.EventTypeNormal
 		}
 		conMgr.Recorder.Event(conMgr.cluster, eventType, condition.Reason, condition.Message)
+		return nil
 	}
 	// REVIEW/TODO: tmp remove following for interaction with OpsRequest
 	// if phaseChanged {
@@ -127,10 +128,6 @@ func (conMgr clusterConditionManager) setProvisioningStartedCondition() error {
 // @return could return ErrNoOps
 // Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager) setPreCheckErrorCondition(err error) error {
-	var message string
-	if err != nil {
-		message = err.Error()
-	}
 	reason := ReasonPreCheckFailed
 	if apierrors.IsNotFound(err) {
 		reason = constant.ReasonNotFoundCR

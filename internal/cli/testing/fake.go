@@ -69,7 +69,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 			Namespace: namespace,
 		},
 		Status: appsv1alpha1.ClusterStatus{
-			Phase: appsv1alpha1.RunningPhase,
+			Phase: appsv1alpha1.RunningClusterPhase,
 			Components: map[string]appsv1alpha1.ClusterComponentStatus{
 				ComponentName: {
 					ConsensusSetStatus: &appsv1alpha1.ConsensusSetStatus{

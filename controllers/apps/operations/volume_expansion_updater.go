@@ -60,7 +60,7 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 	// check whether the cluster is expanding volume
-	opsRequestName := getOpsRequestNameFromAnnotation(cluster, appsv1alpha1.VolumeExpandingPhase)
+	opsRequestName := getOpsRequestNameFromAnnotation(cluster, appsv1alpha1.SpecReconcilingClusterPhase)
 	if opsRequestName == "" {
 		return nil
 	}
@@ -86,17 +86,18 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 func handleClusterVolumeExpandingPhase(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster) error {
-	if cluster.Status.Phase != appsv1alpha1.VolumeExpandingPhase {
+	if cluster.Status.Phase != appsv1alpha1.SpecReconcilingClusterPhase {
 		return nil
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for k, v := range cluster.Status.Components {
-		if v.Phase == appsv1alpha1.VolumeExpandingPhase {
-			v.Phase = appsv1alpha1.RunningPhase
+		if v.Phase == appsv1alpha1.SpecReconcilingClusterCompPhase {
+			v.Phase = appsv1alpha1.RunningClusterCompPhase
 			cluster.Status.SetComponentStatus(k, v)
 		}
 	}
-	cluster.Status.Phase = appsv1alpha1.RunningPhase
+	// REVIEW: a single component status affect cluser level status?
+	cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 	return cli.Status().Patch(ctx, cluster, patch)
 }
 
@@ -157,7 +158,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 		return err
 	}
 	// get the volume expansion ops which is running on cluster.
-	opsRequestName := getOpsRequestNameFromAnnotation(cluster, appsv1alpha1.VolumeExpandingPhase)
+	opsRequestName := getOpsRequestNameFromAnnotation(cluster, appsv1alpha1.SpecReconcilingClusterPhase)
 	if opsRequestName == "" {
 		return nil
 	}

@@ -138,7 +138,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		clusterObj.Spec.ComponentSpecs[0].Replicas = 0
 		Expect(HandleReplicationSet(ctx, k8sClient, clusterObj, stsList[:1])).Should(Succeed())
 		Eventually(testapps.GetListLen(&testCtx, generics.StatefulSetSignature, client.InNamespace(testCtx.DefaultNamespace))).Should(Equal(0))
-		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.StoppedPhase))
+		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
 	}
 
 	testNeedUpdateReplicationSetStatus := func() {
@@ -149,10 +149,10 @@ var _ = Describe("ReplicationSet Util", func() {
 
 		By("init replicationSet cluster status")
 		patch := client.MergeFrom(clusterObj.DeepCopy())
-		clusterObj.Status.Phase = appsv1alpha1.RunningPhase
+		clusterObj.Status.Phase = appsv1alpha1.RunningClusterPhase
 		clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 			testapps.DefaultRedisCompName: {
-				Phase: appsv1alpha1.RunningPhase,
+				Phase: appsv1alpha1.RunningClusterCompPhase,
 				ReplicationSetStatus: &appsv1alpha1.ReplicationSetStatus{
 					Primary: appsv1alpha1.ReplicationMemberStatus{
 						Pod: clusterObj.Name + testapps.DefaultRedisCompName + "-0-0",

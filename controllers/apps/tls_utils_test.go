@@ -127,7 +127,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 				By("Waiting for the cluster enter creating phase")
 				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
+				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
 
 				By("By inspect that TLS cert. secret")
 				ns := clusterObj.Namespace

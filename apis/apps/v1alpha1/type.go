@@ -58,9 +58,9 @@ const (
 	FailedClusterCompPhase          ClusterComponentPhase = "Failed"
 	AbnormalClusterCompPhase        ClusterComponentPhase = "Abnormal" // Abnormal is a sub-state of failed, where one or more workload pods is not in "Running" phase.
 	SpecReconcilingClusterCompPhase ClusterComponentPhase = "Updating"
-	// DeletingClusterCompPhase        ClusterComponentPhase = "Deleting"
-	StartingClusterCompPhase ClusterComponentPhase = "Starting"
-	StoppingClusterCompPhase ClusterComponentPhase = "Stopping"
+	StartingClusterCompPhase        ClusterComponentPhase = "Starting"
+	StoppingClusterCompPhase        ClusterComponentPhase = "Stopping"
+	// DeletingClusterCompPhase        ClusterComponentPhase = "Deleting" // DO REVIEW: may merged with  Stopping
 
 	// REVIEW: following are variant of "Updating", why not have "Updating" phase with detail Status.Conditions
 	// VolumeExpandingClusterCompPhase   ClusterComponentPhase = "VolumeExpanding"

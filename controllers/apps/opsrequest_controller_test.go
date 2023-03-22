@@ -84,6 +84,8 @@ var _ = Describe("OpsRequest Controller", func() {
 	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) {
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, namespacedName,
 			func(fetched *appsv1alpha1.Cluster) {
+				// TODO: whould be better to have hint for cluster.status.phase is mocked,
+				// i.e., add annotation info for the mocked context
 				fetched.Status.Phase = appsv1alpha1.RunningClusterPhase
 				if len(fetched.Status.Components) == 0 {
 					fetched.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
@@ -321,7 +323,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.GetListLen(&testCtx, intctrlutil.StatefulSetSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterObj.Name,
-				}, client.InNamespace(clusterObj.Namespace))).Should(Equal(2))
+				}, client.InNamespace(clusterObj.Namespace))).Should(BeEquivalentTo(2))
 			stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), testapps.DefaultRedisCompName)
 			for _, v := range stsList.Items {
 				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {

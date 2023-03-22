@@ -118,8 +118,7 @@ func HandleCRDeletion(reqCtx RequestCtx,
 		if !controllerutil.ContainsFinalizer(cr, finalizer) {
 			controllerutil.AddFinalizer(cr, finalizer)
 			if err := r.Update(reqCtx.Ctx, cr); err != nil {
-				res, err := CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
+				return ResultToP(CheckedRequeueWithError(err, reqCtx.Log, ""))
 			}
 		}
 	} else {
@@ -147,8 +146,7 @@ func HandleCRDeletion(reqCtx RequestCtx,
 					// if fail to delete the external dependency here, return with error
 					// so that it can be retried
 					if res == nil {
-						res, err := CheckedRequeueWithError(err, reqCtx.Log, "")
-						return &res, err
+						return ResultToP(CheckedRequeueWithError(err, reqCtx.Log, ""))
 					}
 					return res, err
 				} else if res != nil {
@@ -158,8 +156,7 @@ func HandleCRDeletion(reqCtx RequestCtx,
 			// remove our finalizer from the list and update it.
 			if controllerutil.RemoveFinalizer(cr, finalizer) {
 				if err := r.Update(reqCtx.Ctx, cr); err != nil {
-					res, err := CheckedRequeueWithError(err, reqCtx.Log, "")
-					return &res, err
+					return ResultToP(CheckedRequeueWithError(err, reqCtx.Log, ""))
 				}
 				// record resources deleted event
 				if reqCtx.Recorder != nil {
@@ -197,8 +194,7 @@ func ValidateReferenceCR(reqCtx RequestCtx, cli client.Client, obj client.Object
 			if recordEvent != nil {
 				recordEvent()
 			}
-			res, err := RequeueAfter(30*time.Second, reqCtx.Log, "")
-			return &res, err
+			return ResultToP(RequeueAfter(time.Second, reqCtx.Log, ""))
 		}
 	}
 	return nil, nil

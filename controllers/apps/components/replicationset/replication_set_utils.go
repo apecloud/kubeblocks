@@ -201,7 +201,9 @@ func syncReplicationSetClusterStatus(
 	}
 	oldReplicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
 	if oldReplicationSetStatus == nil {
-		util.InitClusterComponentStatusIfNeed(cluster, componentName, *componentDef)
+		if err = util.InitClusterComponentStatusIfNeed(cluster, componentName, *componentDef); err != nil {
+			return err
+		}
 		oldReplicationSetStatus = cluster.Status.Components[componentName].ReplicationSetStatus
 	}
 	if err := syncReplicationSetStatus(oldReplicationSetStatus, podList); err != nil {

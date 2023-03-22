@@ -554,13 +554,13 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	// why create tls certs here? or why not use prepare-checkedCreate pattern?
 	// tls certs generation is very time-consuming, if using prepare-checkedCreate pattern,
 	// we shall generate certs in every component Update which will slow down the cluster reconcile loop
-	if secret, err := plan.CreateOrCheckTLSCerts(reqCtx, cli, cluster, scheme, dbClusterFinalizerName); err != nil {
+	if secret, err := plan.CreateOrCheckTLSCerts(reqCtx, cli, cluster); err != nil {
 		return false, err
 	} else if secret != nil {
 		// TODO: need to check if `objs` slice is being after calling this function
 		tmp := make([]client.Object, 0, len(objs)+1)
-		tmp = append(tmp, objs...)
 		tmp = append(tmp, secret)
+		tmp = append(tmp, objs...)
 		objs = tmp
 	}
 
@@ -594,6 +594,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	}
 
 	objsByKind := make(map[string][]client.Object)
+	// TODO: sort objs, have data objects placed 1st or workload objects placed last``
 	for _, obj := range objs {
 		logger.V(1).Info("create or update", "objs", obj)
 		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {

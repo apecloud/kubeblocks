@@ -118,7 +118,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.DeploymentSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey: clusterKey.Name,
-			}, client.InNamespace(clusterKey.Namespace))).ShouldNot(Equal(0))
+			}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEquivalentTo(0))
 
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 

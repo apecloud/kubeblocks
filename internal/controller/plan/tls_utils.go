@@ -24,12 +24,12 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -38,10 +38,9 @@ import (
 func CreateOrCheckTLSCerts(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
-	scheme *runtime.Scheme,
-	finalizer string) (*v1.Secret, error) {
+) (*v1.Secret, error) {
 	if cluster == nil {
-		return nil, nil
+		return nil, componentutil.ErrReqClusterObj
 	}
 
 	for _, comp := range cluster.Spec.ComponentSpecs {
@@ -58,7 +57,7 @@ func CreateOrCheckTLSCerts(reqCtx controllerutil.RequestCtx,
 				return nil, err
 			}
 		case dbaasv1alpha1.IssuerKubeBlocks:
-			return createTLSSecret(reqCtx, cli, cluster, comp.Name, scheme, finalizer)
+			return createTLSSecret(reqCtx, cli, cluster, comp.Name)
 		}
 	}
 	return nil, nil
@@ -76,14 +75,9 @@ func CreateOrCheckTLSCerts(reqCtx controllerutil.RequestCtx,
 func createTLSSecret(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
-	componentName string,
-	scheme *runtime.Scheme,
-	finalizer string) (*v1.Secret, error) {
+	componentName string) (*v1.Secret, error) {
 	secret, err := ComposeTLSSecret(cluster.Namespace, cluster.Name, componentName)
 	if err != nil {
-		return nil, err
-	}
-	if err := controllerutil.SetOwnership(cluster, secret, scheme, finalizer); err != nil {
 		return nil, err
 	}
 	return secret, nil

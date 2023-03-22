@@ -157,6 +157,7 @@ func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.Namespaced
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
 			constant.AppInstanceLabelKey: key.Name,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
+		g.Expect(stsList.Items).ShouldNot(gomega.BeNil())
 		g.Expect(stsList.Items).ShouldNot(gomega.BeEmpty())
 	}).Should(gomega.Succeed())
 	return stsList
@@ -180,6 +181,7 @@ func ListAndCheckStatefulSetWithComponent(testCtx *testutil.TestContext, key typ
 			constant.AppInstanceLabelKey:    key.Name,
 			constant.KBAppComponentLabelKey: componentName,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
+		g.Expect(stsList.Items).ShouldNot(gomega.BeNil())
 		g.Expect(stsList.Items).ShouldNot(gomega.BeEmpty())
 	}).Should(gomega.Succeed())
 	return stsList

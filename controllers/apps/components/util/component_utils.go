@@ -44,6 +44,13 @@ var (
 	ErrNoOps                      = errors.New("no operation required")
 )
 
+func IgnoreNoOps(err error) error {
+	if err != nil && err != ErrNoOps {
+		return err
+	}
+	return nil
+}
+
 func ComponentRuntimeReqArgsCheck(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec) error {

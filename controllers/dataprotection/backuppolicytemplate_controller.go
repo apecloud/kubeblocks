@@ -32,6 +32,7 @@ import (
 )
 
 // BackupPolicyTemplateReconciler reconciles a BackupPolicyTemplate object
+// TODO: remove this controller, since it's BackupPolicyTemplate is manifest only API
 type BackupPolicyTemplateReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
@@ -44,10 +45,6 @@ type BackupPolicyTemplateReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the BackupPolicyTemplate object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.1/pkg/reconcile
@@ -69,15 +66,13 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req ctrl
 	}
 
 	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, BackupPolicyTemplate, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
+	if res, err := intctrlutil.HandleCRDeletion(reqCtx, r, BackupPolicyTemplate, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, BackupPolicyTemplate)
-	})
-	if res != nil {
+	}); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	} else if res != nil {
 		return *res, err
 	}
-
-	// TODO(user): your logic here
-
 	return ctrl.Result{}, nil
 }
 

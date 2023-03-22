@@ -75,7 +75,7 @@ func doChainClusterStatusHandler(ctx context.Context,
 		}
 	}
 	if !needPatchStatus {
-		return nil
+		return util.ErrNoOps
 	}
 	if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
 		return err

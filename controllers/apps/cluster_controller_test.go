@@ -210,7 +210,7 @@ var _ = Describe("Cluster Controller", func() {
 		}).Should(BeTrue())
 
 		By("Delete a LoadBalancer service")
-		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			for idx, comp := range cluster.Spec.ComponentSpecs {
 				if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
 					continue
@@ -226,7 +226,7 @@ var _ = Describe("Cluster Controller", func() {
 				return
 			}
 
-		})).Should(Succeed())
+		})()).ShouldNot(HaveOccurred())
 		// REVIEW: not so BDD as need to implement condition logics.
 		Eventually(func(g Gomega) bool {
 			return validateSvc(g, 3, testapps.ServiceVPCName,
@@ -236,7 +236,7 @@ var _ = Describe("Cluster Controller", func() {
 		}).Should(BeFalse())
 
 		By("Add the deleted LoadBalancer service back")
-		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			for idx, comp := range cluster.Spec.ComponentSpecs {
 				if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
 					continue
@@ -248,7 +248,7 @@ var _ = Describe("Cluster Controller", func() {
 				cluster.Spec.ComponentSpecs[idx] = comp
 				return
 			}
-		})).Should(Succeed())
+		})()).ShouldNot(HaveOccurred())
 		Eventually(func(g Gomega) bool {
 			return validateSvc(g, 4, testapps.ServiceVPCName, nil)
 		}).Should(BeTrue())
@@ -353,9 +353,9 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("Update the cluster's termination policy to DoNotTerminate")
-		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			cluster.Spec.TerminationPolicy = appsv1alpha1.DoNotTerminate
-		})).Should(Succeed())
+		})()).ShouldNot(HaveOccurred())
 
 		By("Delete the cluster")
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
@@ -371,26 +371,26 @@ var _ = Describe("Cluster Controller", func() {
 		Consistently(checkClusterDoNotTerminate).Should(Succeed())
 
 		By("Update the cluster's termination policy to WipeOut")
-		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			cluster.Spec.TerminationPolicy = appsv1alpha1.WipeOut
-		})).Should(Succeed())
+		})()).ShouldNot(HaveOccurred())
 
 		By("Wait for the cluster to terminate")
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 	}
 
 	changeCompReplicas := func(clusterName types.NamespacedName, replicas int32, comp *appsv1alpha1.ClusterComponentSpec) {
-		Eventually(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *appsv1alpha1.Cluster) {
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *appsv1alpha1.Cluster) {
 			for i, clusterComp := range cluster.Spec.ComponentSpecs {
 				if clusterComp.Name == comp.Name {
 					cluster.Spec.ComponentSpecs[i].Replicas = replicas
 				}
 			}
-		})).Should(Succeed())
+		})()).ShouldNot(HaveOccurred())
 	}
 
 	changeStatefulSetReplicas := func(clusterName types.NamespacedName, replicas int32) {
-		Eventually(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *appsv1alpha1.Cluster) {
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *appsv1alpha1.Cluster) {
 			if len(cluster.Spec.ComponentSpecs) == 0 {
 				cluster.Spec.ComponentSpecs = []appsv1alpha1.ClusterComponentSpec{
 					{
@@ -401,7 +401,7 @@ var _ = Describe("Cluster Controller", func() {
 			} else {
 				cluster.Spec.ComponentSpecs[0].Replicas = replicas
 			}
-		})).Should(Succeed())
+		})()).ShouldNot(HaveOccurred())
 	}
 
 	testChangeReplicas := func() {
@@ -475,9 +475,9 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			createPVC(clusterKey.Name, pvcKey.Name, comp.Name)
 			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 				pvc.Status.Phase = corev1.ClaimBound
-			})).Should(Succeed())
+			})()).ShouldNot(HaveOccurred())
 		}
 
 		By("Checking sts replicas right")
@@ -539,9 +539,9 @@ var _ = Describe("Cluster Controller", func() {
 				Name:      getPVCName(comp.Name, i),
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 				pvc.Status.Phase = corev1.ClaimBound
-			})).Should(Succeed())
+			})()).ShouldNot(HaveOccurred())
 		}
 
 		By("Check backup job cleanup")
@@ -566,11 +566,11 @@ var _ = Describe("Cluster Controller", func() {
 		initialGeneration := int(cluster.Status.ObservedGeneration)
 
 		By("Set HorizontalScalePolicy")
-		Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 			func(clusterDef *appsv1alpha1.ClusterDefinition) {
 				clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
 					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot}
-			})).Should(Succeed())
+			})()).ShouldNot(HaveOccurred())
 
 		By("Creating a BackupPolicyTemplate")
 		createBackupPolicyTpl(clusterDefObj)
@@ -676,10 +676,10 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Updating the PVC storage size")
 		newStorageValue := resource.MustParse("2Gi")
-		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			comp := &cluster.Spec.ComponentSpecs[0]
 			comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
-		})).Should(Succeed())
+		})()).ShouldNot(HaveOccurred())
 
 		By("Checking the resize operation finished")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
@@ -1047,13 +1047,13 @@ var _ = Describe("Cluster Controller", func() {
 		createBackupPolicyTpl(clusterDefObj)
 
 		By("Set HorizontalScalePolicy")
-		Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 			func(clusterDef *appsv1alpha1.ClusterDefinition) {
 				clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
 					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot, BackupTemplateSelector: map[string]string{
 						clusterDefLabelKey: clusterDefObj.Name,
 					}}
-			})).Should(Succeed())
+			})()).ShouldNot(HaveOccurred())
 
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
 		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
@@ -1257,7 +1257,7 @@ var _ = Describe("Cluster Controller", func() {
 					Name: "backup-pvc",
 				}
 				backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 			By("checking backup status completed")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
 				func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
@@ -1279,7 +1279,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 					mysqlCompName: {Phase: appsv1alpha1.RunningPhase},
 				}
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
 				g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 			})).Should(Succeed())
@@ -1287,7 +1287,7 @@ var _ = Describe("Cluster Controller", func() {
 			By("clean up annotations after cluster running")
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
 				clusterObj.Status.Phase = appsv1alpha1.RunningPhase
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())

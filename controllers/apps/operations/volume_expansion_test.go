@@ -88,7 +88,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 				tmpCluster.Annotations = map[string]string{}
 			}
 			tmpCluster.Annotations[constant.OpsRequestAnnotationKey] = fmt.Sprintf(`[{"clusterPhase": "%s", "name":"%s"}]`, toClusterPhase, opsRequestName)
-		})()).Should(Succeed())
+		})()).ShouldNot(HaveOccurred())
 
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, myCluster *appsv1alpha1.Cluster) {
 			g.Expect(getOpsRequestNameFromAnnotation(myCluster, appsv1alpha1.VolumeExpandingPhase) != "").Should(BeTrue())
@@ -133,7 +133,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			newOps.Status.Phase = appsv1alpha1.OpsRunningPhase
 			newOps.Status.StartTimestamp = metav1.Time{Time: time.Now()}
-		})).Should(Succeed())
+		})).ShouldNot(HaveOccurred())
 
 		// do volume-expand action
 		_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -185,7 +185,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		// mock cluster is Running to support volume expansion ops
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
 			clusterObject.Status.Phase = appsv1alpha1.RunningPhase
-		})).Should(Succeed())
+		})).ShouldNot(HaveOccurred())
 
 		// init resources for volume expansion
 		newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, 0)
@@ -202,7 +202,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 				LastTransitionTime: metav1.Now(),
 			},
 			}
-		})()).Should(Succeed())
+		})()).ShouldNot(HaveOccurred())
 
 		Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
 			conditions := tmpPVC.Status.Conditions
@@ -221,7 +221,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		// mock pvc volumeExpansion succeed
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 			pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("3Gi")}
-		})()).Should(Succeed())
+		})()).ShouldNot(HaveOccurred())
 
 		Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
 			g.Expect(tmpPVC.Status.Capacity[corev1.ResourceStorage] == resource.MustParse("3Gi")).Should(BeTrue())
@@ -240,7 +240,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, 2)
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
 			clusterObject.Status.Phase = appsv1alpha1.VolumeExpandingPhase
-		})).Should(Succeed())
+		})).ShouldNot(HaveOccurred())
 		Expect(k8sClient.Delete(ctx, newOps)).Should(Succeed())
 		Eventually(func() error {
 			return k8sClient.Get(ctx, client.ObjectKey{Name: newOps.Name, Namespace: testCtx.DefaultNamespace}, &appsv1alpha1.OpsRequest{})
@@ -263,7 +263,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			sc := testapps.CreateStorageClass(testCtx, storageClassName, true)
 			Expect(testapps.ChangeObj(&testCtx, sc, func() {
 				sc.Annotations = map[string]string{storage.IsDefaultStorageClassAnnotation: "true"}
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 
 			opsRes := &OpsResource{
 				Cluster:  clusterObject,
@@ -278,7 +278,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 						Phase: appsv1alpha1.RunningPhase,
 					},
 				}
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 
 			By("Test VolumeExpansion")
 			testVolumeExpansion(reqCtx, clusterObject, opsRes, randomStr)

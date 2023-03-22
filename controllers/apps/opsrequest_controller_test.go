@@ -82,7 +82,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	// Testcases
 
 	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) {
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, namespacedName,
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, namespacedName,
 			func(fetched *appsv1alpha1.Cluster) {
 				fetched.Status.Phase = appsv1alpha1.RunningPhase
 				if len(fetched.Status.Components) == 0 {
@@ -98,7 +98,7 @@ var _ = Describe("OpsRequest Controller", func() {
 					componentStatus.Phase = appsv1alpha1.RunningPhase
 					fetched.Status.SetComponentStatus(componentKey, componentStatus)
 				}
-			})).Should(Succeed())
+			})()).ShouldNot(HaveOccurred())
 	}
 
 	testVerticalScaleCPUAndMemory := func(workloadType testapps.ComponentTplType) {
@@ -240,11 +240,11 @@ var _ = Describe("OpsRequest Controller", func() {
 			replicas := int32(3)
 
 			By("set component to horizontal with snapshot policy and create a cluster")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 				func(clusterDef *appsv1alpha1.ClusterDefinition) {
 					clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
 						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot}
-				})).Should(Succeed())
+				})()).ShouldNot(HaveOccurred())
 			pvcSpec := testapps.NewPVC("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
@@ -270,9 +270,9 @@ var _ = Describe("OpsRequest Controller", func() {
 				pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterKey.Name,
 					mysqlCompName, "data").SetStorage("1Gi").Create(&testCtx).GetObject()
 				// mock pvc bound
-				Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
 					pvc.Status.Phase = corev1.ClaimBound
-				})).Should(Succeed())
+				})()).ShouldNot(HaveOccurred())
 			}
 			// wait for cluster observed generation
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -304,9 +304,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 
 			By("reset replicas to 1 and cluster should reconcile to Running")
-			Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 				cluster.Spec.ComponentSpecs[0].Replicas = int32(3)
-			})).Should(Succeed())
+			})()).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
 		})
 	})

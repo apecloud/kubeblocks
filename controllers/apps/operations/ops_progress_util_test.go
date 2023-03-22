@@ -103,7 +103,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 		Expect(testapps.ChangeObjStatus(&testCtx, newPod, func() {
 			lastTransTime := metav1.NewTime(time.Now().Add(-11 * time.Second))
 			testk8s.MockPodAvailable(newPod, lastTransTime)
-		})).Should(Succeed())
+		})).ShouldNot(HaveOccurred())
 
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, statelessComp, newPod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
@@ -165,7 +165,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			expectClusterComponentReplicas := int32(2)
 			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func() {
 				opsRes.Cluster.Spec.ComponentSpecs[1].Replicas = expectClusterComponentReplicas
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 3)
 			// update ops phase to Running first
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)

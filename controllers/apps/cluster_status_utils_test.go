@@ -220,12 +220,12 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			// mock leader pod ready and sts.status.availableReplicas is 1
 			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
 				testk8s.MockPodAvailable(pod, metav1.NewTime(time.Now()))
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, types.NamespacedName{Name: stsName,
 				Namespace: testCtx.DefaultNamespace}, func(tmpSts *appsv1.StatefulSet) {
 				testk8s.MockStatefulSetReady(tmpSts)
 				tmpSts.Status.AvailableReplicas = *tmpSts.Spec.Replicas - 1
-			})()).Should(Succeed())
+			})()).ShouldNot(HaveOccurred())
 			handleAndCheckComponentStatus(consensusMySQLCompName, event, appsv1alpha1.AbnormalPhase, false)
 
 			By("watch warning event from Deployment and component workload type is Stateless")
@@ -240,7 +240,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 					compStatus.Phase = appsv1alpha1.RunningPhase
 					tmpCluster.Status.SetComponentStatus(name, compStatus)
 				}
-			})()).Should(Succeed())
+			})()).ShouldNot(HaveOccurred())
 
 			By("test the cluster phase when stateless component is Failed and other components are Running")
 			// set nginx component phase to Failed
@@ -248,7 +248,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				compStatus := tmpCluster.Status.Components[nginxCompName]
 				compStatus.Phase = appsv1alpha1.FailedPhase
 				tmpCluster.Status.SetComponentStatus(nginxCompName, compStatus)
-			})()).Should(Succeed())
+			})()).ShouldNot(HaveOccurred())
 
 			// expect cluster phase is Abnormal by cluster controller.
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
@@ -279,7 +279,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			changeAndCheckComponents := func(changeFunc func(), expectObservedGeneration int64, checkFun func(Gomega, *appsv1alpha1.Cluster)) {
 				Expect(testapps.ChangeObj(&testCtx, cluster, func() {
 					changeFunc()
-				})).Should(Succeed())
+				})).ShouldNot(HaveOccurred())
 				// wait for cluster controller reconciles to complete.
 				Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(cluster))).Should(Equal(expectObservedGeneration))
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), checkFun)).Should(Succeed())

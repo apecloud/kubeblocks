@@ -90,7 +90,7 @@ var _ = Describe("Start OpsRequest", func() {
 			// mock cluster phase to stopped
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 				opsRes.Cluster.Status.Phase = appsv1alpha1.StoppedPhase
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())

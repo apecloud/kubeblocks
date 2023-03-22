@@ -86,13 +86,13 @@ Return the name for a custom database to create
 {{- end -}}
 
 {{/*
-Get the postgres-password key.
+Get the password key.
 */}}
 {{/* TODO: use $(RANDOM_PASSWD) instead */}}
 {{- define "postgresql.postgresPassword" -}}
 {{- if or (.Release.IsInstall) (not (lookup "apps.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "postgresql")) -}}
 {{ .Values.auth.postgresPassword | default (randAlphaNum 10) }}
 {{- else -}}
-{{ index (lookup "apps.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "postgresql").spec.connectionCredential "postgres-password"}}
+{{ index (lookup "apps.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "postgresql").spec.connectionCredential "password"}}
 {{- end }}
 {{- end }}

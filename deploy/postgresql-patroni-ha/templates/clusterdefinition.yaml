@@ -14,7 +14,7 @@ spec:
   componentDefs:
     - name: postgresql-ha
       workloadType: Replication
-      characterType: postgres
+      characterType: postgresql
       probes:
         roleChangedProbe:
           failureThreshold: 2
@@ -236,11 +236,11 @@ spec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
           command:
-            - /bin/sh
-            - -c
+            - psql
           args:
-          - psql -h$(KB_ACCOUNT_ENDPOINT)
-          - -c "$(KB_ACCOUNT_STATEMENT)"
+            - -h$(KB_ACCOUNT_ENDPOINT)
+            - -c
+            - $(KB_ACCOUNT_STATEMENT)
           env:
           - name: PGUSER
             valueFrom:

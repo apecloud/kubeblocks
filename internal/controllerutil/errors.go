@@ -17,6 +17,7 @@ limitations under the License.
 package controllerutil
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -38,6 +39,8 @@ type ErrorType string
 const (
 	// ErrorTypeBackupNotCompleted is used to report backup not completed.
 	ErrorTypeBackupNotCompleted ErrorType = "BackupNotCompleted"
+	// ErrorWaitCacheRefresh waits for synchronization of the corresponding object cache in client-go from ApiServer.
+	ErrorWaitCacheRefresh = "WaitCacheRefresh"
 )
 
 func NewError(errorType ErrorType, message string) *Error {
@@ -52,4 +55,12 @@ func NewErrorf(errorType ErrorType, format string, a ...any) *Error {
 		Type:    errorType,
 		Message: fmt.Sprintf(format, a...),
 	}
+}
+
+// IsTargetError checks if the error is the target error.
+func IsTargetError(err error, errorType ErrorType) bool {
+	if tmpErr, ok := err.(*Error); ok || errors.As(err, &tmpErr) {
+		return tmpErr.Type == errorType
+	}
+	return false
 }

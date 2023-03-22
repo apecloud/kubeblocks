@@ -197,7 +197,7 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
 	if compStatus.Phase == appsv1alpha1.RunningPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
-		return 0, fmt.Errorf("wait for the pods of deployment to be synchronized to client-go cache")
+		return 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of deployment to be synchronized")
 	}
 
 	currComponent, err := stateless.NewStateless(cli, opsRes.Cluster,
@@ -417,7 +417,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 		return
 	}
 	if compStatus.Phase == appsv1alpha1.RunningPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
-		err = fmt.Errorf("wait for the pods of component to be synchronized")
+		err = intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of component to be synchronized")
 		return
 	}
 	dValue := *expectReplicas - *lastComponentReplicas

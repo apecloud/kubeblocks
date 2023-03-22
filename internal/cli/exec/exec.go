@@ -19,6 +19,7 @@ package exec
 import (
 	"context"
 	"fmt"
+	"io"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -121,6 +122,10 @@ func (o *ExecOptions) validate() error {
 }
 
 func (o *ExecOptions) Run() error {
+	return o.RunWithRedirect(o.Out, o.ErrOut)
+}
+
+func (o *ExecOptions) RunWithRedirect(outWriter io.Writer, errWriter io.Writer) error {
 	if err := o.validate(); err != nil {
 		return err
 	}
@@ -153,12 +158,12 @@ func (o *ExecOptions) Run() error {
 			Container: o.ContainerName,
 			Command:   o.Command,
 			Stdin:     o.Stdin,
-			Stdout:    o.Out != nil,
-			Stderr:    o.ErrOut != nil,
+			Stdout:    outWriter != nil,
+			Stderr:    errWriter != nil,
 			TTY:       t.Raw,
 		}, scheme.ParameterCodec)
 
-		return o.Executor.Execute("POST", req.URL(), o.Config, o.In, o.Out, o.ErrOut, t.Raw, sizeQueue)
+		return o.Executor.Execute("POST", req.URL(), o.Config, o.In, outWriter, errWriter, t.Raw, sizeQueue)
 	}
 
 	if err := t.Safe(fn); err != nil {

@@ -1,29 +1,28 @@
 ---
-title: kbcli cluster list-accounts
+title: kbcli cluster grant-role
 ---
 
-List accounts for a cluster
+Grant role to account
 
 ```
-kbcli cluster list-accounts [flags]
+kbcli cluster grant-role [flags]
 ```
 
 ### Examples
 
 ```
-  # list all users from specified component of a cluster
-  kbcli cluster list-accounts NAME --component-name COMPNAME --show-connected-users
-  
-  # list all users from cluster's one particular instance
-  kbcli cluster list-accounts NAME -i INSTANCE
+  # grant role to user
+  kbcli cluster grant-role NAME --component-name COMPNAME --username NAME --role ROLENAME
 ```
 
 ### Options
 
 ```
       --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
-  -h, --help                    help for list-accounts
+  -h, --help                    help for grant-role
   -i, --instance string         Specify the name of instance to be connected.
+  -r, --role string             Role name should be one of {SUPERUSER, READWRITE, READONLY}
+  -u, --username string         Required. Specify the name of user.
 ```
 
 ### Options inherited from parent commands

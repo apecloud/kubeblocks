@@ -46,8 +46,9 @@ func init() {
 	// the volume expansion operation only support online expanding now, so this operation not affect the cluster availability.
 	volumeExpansionBehaviour := OpsBehaviour{
 		FromClusterPhases: []appsv1alpha1.Phase{
-			appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase,
-			appsv1alpha1.AbnormalPhase, appsv1alpha1.ConditionsErrorPhase,
+			appsv1alpha1.RunningPhase,
+			appsv1alpha1.FailedPhase,
+			appsv1alpha1.AbnormalPhase,
 		},
 		ToClusterPhase: appsv1alpha1.VolumeExpandingPhase,
 		// TODO: add cluster reconcile VolumeExpanding phase.

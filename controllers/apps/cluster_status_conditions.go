@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -33,7 +32,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -90,9 +88,8 @@ const (
 func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Condition) error {
 	patch := client.MergeFrom(conMgr.cluster.DeepCopy())
 	oldCondition := meta.FindStatusCondition(conMgr.cluster.Status.Conditions, condition.Type)
-	phaseChanged := conMgr.handleConditionForClusterPhase(oldCondition, condition)
 	conditionChanged := !reflect.DeepEqual(oldCondition, condition)
-	if conditionChanged || phaseChanged {
+	if conditionChanged {
 		meta.SetStatusCondition(&conMgr.cluster.Status.Conditions, condition)
 		if err := conMgr.Client.Status().Patch(conMgr.ctx, conMgr.cluster, patch); err != nil {
 			return err
@@ -105,34 +102,12 @@ func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Co
 		}
 		conMgr.Recorder.Event(conMgr.cluster, eventType, condition.Reason, condition.Message)
 	}
-	if phaseChanged {
-		// if cluster status changed, do it
-		return opsutil.MarkRunningOpsRequestAnnotation(conMgr.ctx, conMgr.Client, conMgr.cluster)
-	}
+	// REVIEW/TODO: tmp remove following for interaction with OpsRequest
+	// if phaseChanged {
+	// 	// if cluster status changed, do it
+	// 	return opsutil.MarkRunningOpsRequestAnnotation(conMgr.ctx, conMgr.Client, conMgr.cluster)
+	// }
 	return componentutil.ErrNoOps
-}
-
-// handleConditionForClusterPhase checks whether the condition can be repaired by cluster.
-// if it cannot be repaired after 30 seconds, set the cluster status to ConditionsError
-func (conMgr clusterConditionManager) handleConditionForClusterPhase(
-	oldCondition *metav1.Condition, condition metav1.Condition) bool {
-	if condition.Status == metav1.ConditionTrue {
-		return false
-	}
-	if oldCondition == nil || oldCondition.Reason != condition.Reason {
-		return false
-	}
-	if time.Now().Before(oldCondition.LastTransitionTime.Add(
-		time.Millisecond * requeueDuration)) {
-		return false
-	}
-	if !componentutil.IsFailedOrAbnormal(conMgr.cluster.Status.Phase) &&
-		conMgr.cluster.Status.Phase != appsv1alpha1.ConditionsErrorPhase {
-		// the condition has occurred for more than 30 seconds and cluster status is not Failed/Abnormal, do it
-		conMgr.cluster.Status.Phase = appsv1alpha1.ConditionsErrorPhase
-		return true
-	}
-	return false
 }
 
 // setProvisioningStartedCondition sets the provisioning started condition in cluster conditions.

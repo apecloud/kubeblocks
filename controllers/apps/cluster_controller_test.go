@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -1095,7 +1094,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking cluster status failed with backup error")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.ConditionsErrorPhase))
+			g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.AbnormalPhase))
 			hasBackupError := false
 			for _, cond := range cluster.Status.Conditions {
 				if strings.Contains(cond.Message, "backup error") {
@@ -1104,7 +1103,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 			g.Expect(hasBackupError).Should(BeTrue())
-		}), 20*time.Second, time.Second).Should(Succeed())
+		})).Should(Succeed())
 	}
 
 	// Scenarios

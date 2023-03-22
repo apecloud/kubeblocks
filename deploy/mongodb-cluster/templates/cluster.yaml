@@ -21,7 +21,6 @@ spec:
     - name: shard-{{ $i }}
       componentDefRef: shard
       monitor: {{ $.Values.monitor.enabled }}
-      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       replicas: {{ .replicas | default "3" }}
       {{- with .tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
@@ -81,7 +80,6 @@ spec:
     - name: mongos-{{ $i }}
       componentDefRef: mongos
       monitor: {{ $.Values.monitor.enabled }}
-      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       replicas: {{ .replicas | default 1 }}
       {{- with .tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}

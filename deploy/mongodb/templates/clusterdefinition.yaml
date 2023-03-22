@@ -6,6 +6,53 @@ metadata:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
   componentDefs:
+    - name: replicaset
+      scriptSpecs:
+        - name: mongodb-scripts
+          templateRef: mongodb-scripts
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 493
+      characterType: mongodb
+      workloadType: Consensus
+      consensusSpec:
+        leader:
+          name: "primary"
+          accessMode: ReadWrite
+        followers:
+          - name: "secondary"
+            accessMode: Readonly
+        updateStrategy: Serial
+      probes:
+        roleChangedProbe:
+          periodSeconds: 2
+          failureThreshold: 3
+      service:
+        ports:
+          - protocol: TCP
+            port: 27018
+      podSpec:
+        containers:
+          - name: replica
+            ports:
+              - name: replica
+                protocol: TCP
+                containerPort: 27018
+            command:
+              - /scripts/replicaset-setup.sh
+            lifecycle:
+              postStart:
+                exec:
+                  command:
+                    - /scripts/replicaset-post-start.sh
+                    - REPLICASET
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts/replicaset-setup.sh
+                subPath: replicaset-setup.sh
+              - name: scripts
+                mountPath: /scripts/replicaset-post-start.sh
+                subPath: replicaset-post-start.sh
     - name: mongos
       scriptSpecs:
         - name: mongodb-scripts

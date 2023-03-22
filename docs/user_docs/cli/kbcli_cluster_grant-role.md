@@ -2,7 +2,7 @@
 title: kbcli cluster grant-role
 ---
 
-Grant role to user
+Grant role to account
 
 ```
 kbcli cluster grant-role [flags]
@@ -23,7 +23,6 @@ kbcli cluster grant-role [flags]
   -i, --instance string         Specify the name of instance to be connected.
   -r, --role string             Role name should be one of {SUPERUSER, READWRITE, READONLY}
   -u, --username string         Required. Specify the name of user.
-      --verbose                 Print verbose information.
 ```
 
 ### Options inherited from parent commands

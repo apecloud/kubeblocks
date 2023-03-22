@@ -2,26 +2,28 @@
 title: kbcli cluster list-accounts
 ---
 
-List cluster accounts.
+List accounts for a cluster
 
 ```
-kbcli cluster list-accounts NAME [flags]
+kbcli cluster list-accounts [flags]
 ```
 
 ### Examples
 
 ```
-  # list all accounts of a specified cluster
-  kbcli cluster list-accounts mycluster
+  # list all users from specified component of a cluster
+  kbcli cluster list-accounts NAME --component-name COMPNAME --show-connected-users
+  
+  # list all users from cluster's one particular instance
+  kbcli cluster list-accounts NAME -i INSTANCE
 ```
 
 ### Options
 
 ```
-  -A, --all-namespace     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
-  -h, --help              help for list-accounts
-  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
-  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
+      --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
+  -h, --help                    help for list-accounts
+  -i, --instance string         Specify the name of instance to be connected.
 ```
 
 ### Options inherited from parent commands

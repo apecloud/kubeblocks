@@ -1,28 +1,32 @@
 ---
-title: kbcli cluster revoke-role
+title: kbcli cluster create-account
 ---
 
-Revoke role from account
+Create account for a cluster
 
 ```
-kbcli cluster revoke-role [flags]
+kbcli cluster create-account [flags]
 ```
 
 ### Examples
 
 ```
-  # revoke role from user
-  kbcli cluster revoke-role NAME --component-name COMPNAME --role ROLENAME
+  # create account
+  kbcli cluster create-account NAME --component-name COMPNAME --username NAME --password PASSWD
+  # create account without password
+  kbcli cluster create-account NAME --component-name COMPNAME --username NAME
+  # create account with expired interval
+  kbcli cluster create-account NAME --component-name COMPNAME --username NAME --password PASSWD --expiredAt 2046-01-02T15:04:05Z
 ```
 
 ### Options
 
 ```
       --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
-  -h, --help                    help for revoke-role
+  -h, --help                    help for create-account
   -i, --instance string         Specify the name of instance to be connected.
-  -r, --role string             Role name should be one of {SUPERUSER, READWRITE, READONLY}
-  -u, --username string         Required. Specify the name of user.
+  -p, --password string         Optional. Specify the password of user. The default value is empty, which means a random password will be generated.
+  -u, --username string         Required. Specify the name of user, which must be unique.
 ```
 
 ### Options inherited from parent commands

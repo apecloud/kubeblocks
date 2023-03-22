@@ -1,28 +1,27 @@
 ---
-title: kbcli cluster revoke-role
+title: kbcli cluster describe-account
 ---
 
-Revoke role from account
+Describe account roles and related information
 
 ```
-kbcli cluster revoke-role [flags]
+kbcli cluster describe-account [flags]
 ```
 
 ### Examples
 
 ```
-  # revoke role from user
-  kbcli cluster revoke-role NAME --component-name COMPNAME --role ROLENAME
+  # describe account and show role information
+  kbcli cluster describe-account NAME --component-name COMPNAME--username NAME
 ```
 
 ### Options
 
 ```
       --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
-  -h, --help                    help for revoke-role
+  -h, --help                    help for describe-account
   -i, --instance string         Specify the name of instance to be connected.
-  -r, --role string             Role name should be one of {SUPERUSER, READWRITE, READONLY}
-  -u, --username string         Required. Specify the name of user.
+  -u, --username string         Required. Specify the name of user
 ```
 
 ### Options inherited from parent commands

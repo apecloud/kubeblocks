@@ -41,23 +41,23 @@ Cluster command.
 * [kbcli cluster configure](kbcli_cluster_configure.md)	 - Reconfigure parameters with the specified components in the cluster.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
-* [kbcli cluster create-user](kbcli_cluster_create-user.md)	 - Create user for a cluster
+* [kbcli cluster create-account](kbcli_cluster_create-account.md)	 - Create account for a cluster
 * [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters.
+* [kbcli cluster delete-account](kbcli_cluster_delete-account.md)	 - Delete account for a cluster
 * [kbcli cluster delete-backup](kbcli_cluster_delete-backup.md)	 - Delete a backup.
 * [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete an OpsRequest.
 * [kbcli cluster delete-restore](kbcli_cluster_delete-restore.md)	 - Delete a restore job.
-* [kbcli cluster delete-user](kbcli_cluster_delete-user.md)	 - Delete user for a cluster
-* [kbcli cluster desc-user](kbcli_cluster_desc-user.md)	 - Describe user roles and related information
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster.
+* [kbcli cluster describe-account](kbcli_cluster_describe-account.md)	 - Describe account roles and related information
 * [kbcli cluster describe-config](kbcli_cluster_describe-config.md)	 - Show details of a specific reconfiguring.
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest.
 * [kbcli cluster diff-config](kbcli_cluster_diff-config.md)	 - Show the difference in parameters between the two submitted OpsRequest.
 * [kbcli cluster explain-config](kbcli_cluster_explain-config.md)	 - List the constraint for supported configuration params.
 * [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster.
-* [kbcli cluster grant-role](kbcli_cluster_grant-role.md)	 - Grant role to user
+* [kbcli cluster grant-role](kbcli_cluster_grant-role.md)	 - Grant role to account
 * [kbcli cluster hscale](kbcli_cluster_hscale.md)	 - Horizontally scale the specified components in the cluster.
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters.
-* [kbcli cluster list-accounts](kbcli_cluster_list-accounts.md)	 - List cluster accounts.
+* [kbcli cluster list-accounts](kbcli_cluster_list-accounts.md)	 - List accounts for a cluster
 * [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backups.
 * [kbcli cluster list-components](kbcli_cluster_list-components.md)	 - List cluster components.
 * [kbcli cluster list-events](kbcli_cluster_list-events.md)	 - List cluster events.
@@ -65,11 +65,10 @@ Cluster command.
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster.
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests.
 * [kbcli cluster list-restores](kbcli_cluster_list-restores.md)	 - List all restore jobs.
-* [kbcli cluster list-users](kbcli_cluster_list-users.md)	 - List users for a cluster
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file.
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster.
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup.
-* [kbcli cluster revoke-role](kbcli_cluster_revoke-role.md)	 - Revoke role from user
+* [kbcli cluster revoke-role](kbcli_cluster_revoke-role.md)	 - Revoke role from account
 * [kbcli cluster start](kbcli_cluster_start.md)	 - Start the cluster if cluster is stopped.
 * [kbcli cluster stop](kbcli_cluster_stop.md)	 - Stop the cluster and release all the pods of the cluster.
 * [kbcli cluster update](kbcli_cluster_update.md)	 - Update the cluster settings, such as enable or disable monitor or log.

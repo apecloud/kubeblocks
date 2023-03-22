@@ -29,7 +29,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -94,7 +93,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if componentStatus.ConsensusSetStatus == nil {
 		return intctrlutil.Reconciled()
 	}
-	if componentStatus.ConsensusSetStatus.Leader.Pod == componentutil.ComponentStatusDefaultPodName {
+	if componentStatus.ConsensusSetStatus.Leader.Pod == util.ComponentStatusDefaultPodName {
 		return intctrlutil.Reconciled()
 	}
 

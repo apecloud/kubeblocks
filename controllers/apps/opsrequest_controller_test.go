@@ -157,7 +157,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
 			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
 				testk8s.MockPodAvailable(pod, lastTransTime)
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 		}
 
 		By("check Cluster and changed component phase is VerticalScaling")
@@ -175,7 +175,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				verticalScalingOpsRequest.Annotations = map[string]string{}
 			}
 			verticalScalingOpsRequest.Annotations[constant.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-		})).Should(Succeed())
+		})).ShouldNot(HaveOccurred())
 
 		By("check VerticalScalingOpsRequest succeed")
 		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
@@ -189,7 +189,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("check OpsRequest reclaimed after ttl")
 		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
 			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
-		})).Should(Succeed())
+		})).ShouldNot(HaveOccurred())
 
 		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest), verticalScalingOpsRequest, false)).Should(Succeed())
 	}
@@ -260,7 +260,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(int(*sts.Spec.Replicas)).To(BeEquivalentTo(replicas))
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				testk8s.MockStatefulSetReady(sts)
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 			testapps.MockConsensusComponentPods(testCtx, sts, clusterKey.Name, mysqlCompName)
 			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningPhase))
 
@@ -301,7 +301,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			testapps.DeleteObject(&testCtx, opsKey, ops)
 			Expect(testapps.ChangeObj(&testCtx, ops, func() {
 				ops.Finalizers = []string{}
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 
 			By("reset replicas to 1 and cluster should reconcile to Running")
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
@@ -324,7 +324,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			for _, v := range stsList.Items {
 				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
 					testk8s.MockStatefulSetReady(&v)
-				})).Should(Succeed())
+				})).ShouldNot(HaveOccurred())
 				podName := v.Name + "-0"
 				pod := testapps.MockReplicationComponentStsPod(testCtx, &v, clusterObj.Name, testapps.DefaultRedisCompName, podName, v.Labels[constant.RoleLabelKey])
 				podList = append(podList, pod)
@@ -378,7 +378,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				stopOps.Annotations = map[string]string{
 					constant.ReconcileAnnotationKey: time.Now().Format(time.RFC3339Nano),
 				}
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StoppedPhase))
 
 			By("should be Running before pods are not deleted successfully")
@@ -388,7 +388,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			for _, pod := range podList {
 				Expect(testapps.ChangeObj(&testCtx, pod, func() {
 					pod.Finalizers = make([]string, 0)
-				})).Should(Succeed())
+				})).ShouldNot(HaveOccurred())
 			}
 			By("ops phase should be Succeed")
 			// reconcile opsRequest
@@ -396,7 +396,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				stopOps.Annotations = map[string]string{
 					constant.ReconcileAnnotationKey: time.Now().Format(time.RFC3339Nano),
 				}
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 
 			By("test start ops")
@@ -442,7 +442,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			testapps.DeleteObject(&testCtx, opsKey, volumeExpandOps)
 			Expect(testapps.ChangeObj(&testCtx, volumeExpandOps, func() {
 				volumeExpandOps.Finalizers = []string{}
-			})).Should(Succeed())
+			})).ShouldNot(HaveOccurred())
 
 			By("check the cluster annotation")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmlCluster *appsv1alpha1.Cluster) {

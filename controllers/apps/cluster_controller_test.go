@@ -1409,8 +1409,8 @@ var _ = Describe("Cluster Controller", func() {
 			}
 
 			By("Checking reconcile succeeded")
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.RunningPhase))
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 			By("Creating storageclass")
 			_ = testapps.CreateStorageClass(testCtx, storageClassName, true)
@@ -1447,8 +1447,8 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(testCtx.Cli.Patch(ctx, clusterObj, patch)).Should(Succeed())
 
 			By("Waiting cluster update reconcile succeed")
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.SpecReconcilingPhase))
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
 			By("Checking pvc volume size")
 			Eventually(func(g Gomega) {

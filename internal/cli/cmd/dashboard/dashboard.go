@@ -80,7 +80,7 @@ var (
 		kbcli dashboard open kubeblocks-grafana --cluster-name <my-cluster>
 
 		# Open the grafana dashboard by cluster definition, such as apecloud-mysql
-		kbcli dashboard open kube-grafana --cluster-definition apecloud-mysql
+		kbcli dashboard open kubeblocks-grafana --cluster-definition apecloud-mysql
 	`)
 
 	// we do not use the default port to port-forward to avoid conflict with other services

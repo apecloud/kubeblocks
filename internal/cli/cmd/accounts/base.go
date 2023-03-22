@@ -1,10 +1,25 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package accounts
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/spf13/cobra"
@@ -16,6 +31,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel"
 )
 
@@ -51,7 +67,6 @@ func NewAccountBaseOptions(f cmdutil.Factory, streams genericclioptions.IOStream
 func (o *AccountBaseOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.ComponentName, "component-name", "", "Specify the name of component to be connected. If not specified, the first component will be used.")
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "Specify the name of instance to be connected.")
-	cmd.Flags().BoolVar(&o.Verbose, "verbose", false, "Print verbose information.")
 }
 
 func (o *AccountBaseOptions) Validate(args []string) error {
@@ -109,6 +124,8 @@ func (o *AccountBaseOptions) Complete(f cmdutil.Factory) error {
 	o.ExecOptions.Quiet = true
 	o.ExecOptions.TTY = true
 	o.ExecOptions.Stdin = true
+
+	o.Verbose = klog.V(1).Enabled()
 
 	return nil
 }
@@ -182,7 +199,7 @@ func (o *AccountBaseOptions) printMeta(response sqlchannel.SQLChannelResponse) {
 	meta := response.Metadata
 	tblPrinter := o.newTblPrinterWithStyle("QUERY META", []interface{}{"START TIME", "END TIME", "OPERATION", "DATA"})
 	tblPrinter.SetStyle(printer.KubeCtlStyle)
-	tblPrinter.AddRow(formatTime(meta.StartTime), formatTime(meta.EndTime), meta.Operation, meta.Extra)
+	tblPrinter.AddRow(util.TimeTimeFormat(meta.StartTime), util.TimeTimeFormat(meta.EndTime), meta.Operation, meta.Extra)
 	tblPrinter.Print()
 }
 
@@ -227,8 +244,4 @@ func (o *AccountBaseOptions) printRoleInfo(response sqlchannel.SQLChannelRespons
 	}
 	tblPrinter.Print()
 	return nil
-}
-
-func formatTime(t time.Time) string {
-	return t.Format(time.RFC3339)
 }

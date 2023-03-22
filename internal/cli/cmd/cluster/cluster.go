@@ -50,7 +50,6 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewListInstancesCmd(f, streams),
 				NewListComponentsCmd(f, streams),
 				NewListEventsCmd(f, streams),
-				NewListAccountsCmd(f, streams),
 				NewDeleteCmd(f, streams),
 			},
 		},
@@ -97,10 +96,10 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		{
 			Message: "User Accounts Commands:",
 			Commands: []*cobra.Command{
-				NewCreateUserCmd(f, streams),
-				NewDeleteUserCmd(f, streams),
-				NewDescUserCmd(f, streams),
-				NewListUsersCmd(f, streams),
+				NewCreateAccountCmd(f, streams),
+				NewDeleteAccountCmd(f, streams),
+				NewDescAccountCmd(f, streams),
+				NewListAccountsCmd(f, streams),
 				NewGrantOptions(f, streams),
 				NewRevokeOptions(f, streams),
 			},

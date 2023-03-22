@@ -1,3 +1,19 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package cluster
 
 import (
@@ -14,33 +30,30 @@ import (
 
 var (
 	createUserExamples = templates.Examples(`
-		# create user
-		kbcli cluster create-user NAME --component-name COMPNAME --username NAME --password PASSWD
-		# create user without password
-		kbcli cluster create-user NAME --component-name COMPNAME --username NAME
-		# create user with expired interval
-		kbcli cluster create-user NAME --component-name COMPNAME --username NAME --password PASSWD --expiredAt 2046-01-02T15:04:05Z
+		# create account
+		kbcli cluster create-account NAME --component-name COMPNAME --username NAME --password PASSWD
+		# create account without password
+		kbcli cluster create-account NAME --component-name COMPNAME --username NAME
+		# create account with expired interval
+		kbcli cluster create-account NAME --component-name COMPNAME --username NAME --password PASSWD --expiredAt 2046-01-02T15:04:05Z
  `)
 
 	deleteUserExamples = templates.Examples(`
-		# delete user by name
-		kbcli cluster delete-user NAME --component-name COMPNAME --username NAME
+		# delete account by name
+		kbcli cluster delete-account NAME --component-name COMPNAME --username NAME
  `)
 
 	descUserExamples = templates.Examples(`
-		# describe user and show role information
-		kbcli cluster desc-user NAME --component-name COMPNAME--username NAME
+		# describe account and show role information
+		kbcli cluster describe-account NAME --component-name COMPNAME--username NAME
  `)
 
 	listUsersExample = templates.Examples(`
 		# list all users from specified component of a cluster
-		kbcli cluster list-users NAME --component-name COMPNAME --show-connected-users
-
-		# list all users of a cluster, by default the first component will be used
-		kbcli cluster list-users NAME --show-connected-users
+		kbcli cluster list-accounts NAME --component-name COMPNAME --show-connected-users
 
 		# list all users from cluster's one particular instance
-		kbcli cluster list-users NAME -i INSTANCE
+		kbcli cluster list-accounts NAME -i INSTANCE
 	`)
 	grantRoleExamples = templates.Examples(`
 		# grant role to user
@@ -52,11 +65,11 @@ var (
 	`)
 )
 
-func NewCreateUserCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCreateAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := accounts.NewCreateUserOptions(f, streams)
 	cmd := &cobra.Command{
-		Use:               "create-user",
-		Short:             "Create user for a cluster",
+		Use:               "create-account",
+		Short:             "Create account for a cluster",
 		Example:           createUserExamples,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -69,11 +82,11 @@ func NewCreateUserCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	return cmd
 }
 
-func NewDeleteUserCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDeleteAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := accounts.NewDeleteUserOptions(f, streams)
 	cmd := &cobra.Command{
-		Use:               "delete-user",
-		Short:             "Delete user for a cluster",
+		Use:               "delete-account",
+		Short:             "Delete account for a cluster",
 		Example:           deleteUserExamples,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -86,11 +99,11 @@ func NewDeleteUserCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	return cmd
 }
 
-func NewDescUserCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDescAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := accounts.NewDescribeUserOptions(f, streams)
 	cmd := &cobra.Command{
-		Use:               "desc-user",
-		Short:             "Describe user roles and related information",
+		Use:               "describe-account",
+		Short:             "Describe account roles and related information",
 		Example:           descUserExamples,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -103,13 +116,13 @@ func NewDescUserCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	return cmd
 }
 
-func NewListUsersCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListAccountsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := accounts.NewListUserOptions(f, streams)
 
 	cmd := &cobra.Command{
-		Use:               "list-users",
-		Short:             "List users for a cluster",
-		Aliases:           []string{"ls-users"},
+		Use:               "list-accounts",
+		Short:             "List accounts for a cluster",
+		Aliases:           []string{"ls-accounts"},
 		Example:           listUsersExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -127,7 +140,7 @@ func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 
 	cmd := &cobra.Command{
 		Use:               "grant-role",
-		Short:             "Grant role to user",
+		Short:             "Grant role to account",
 		Aliases:           []string{"grant", "gr"},
 		Example:           grantRoleExamples,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
@@ -146,7 +159,7 @@ func NewRevokeOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 
 	cmd := &cobra.Command{
 		Use:               "revoke-role",
-		Short:             "Revoke role from user",
+		Short:             "Revoke role from account",
 		Aliases:           []string{"revoke", "rv"},
 		Example:           revokeRoleExamples,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),

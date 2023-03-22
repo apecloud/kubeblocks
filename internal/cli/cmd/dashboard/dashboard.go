@@ -279,7 +279,7 @@ func (o *openOptions) run() error {
 		url := "http://127.0.0.1:" + o.localPort
 		if o.name == dashboardGrafana && (o.cluster != "" || o.clusterDefRef != "") {
 			var err error
-			url, err = o.completeGrafanaUrl(url)
+			url, err = o.completeGrafanaURL(url)
 			if err != nil {
 				fmt.Fprintf(o.ErrOut, "Failed to build grafana dashboard url: %v", err)
 			}
@@ -293,7 +293,7 @@ func (o *openOptions) run() error {
 	return o.portForwardOptions.RunPortForward()
 }
 
-func (o *openOptions) completeGrafanaUrl(url string) (string, error) {
+func (o *openOptions) completeGrafanaURL(url string) (string, error) {
 	getClusterDef := func() (*appsv1alpha1.ClusterDefinition, error) {
 		cd := &appsv1alpha1.ClusterDefinition{}
 		cdObj, err := o.dynamic.Resource(types.ClusterDefGVR()).Get(context.TODO(), o.clusterDefRef, metav1.GetOptions{})
@@ -307,7 +307,7 @@ func (o *openOptions) completeGrafanaUrl(url string) (string, error) {
 		return cd, nil
 	}
 
-	getUid := func(clusterDef string) (string, error) {
+	getUIU := func(clusterDef string) (string, error) {
 		// get dashboard configmap by dashboardName
 		dashboardName := fmt.Sprintf("kubeblocks-grafana-%s-overview", clusterDef)
 		cm, err := o.client.CoreV1().ConfigMaps(metav1.NamespaceAll).Get(context.TODO(), dashboardName, metav1.GetOptions{})
@@ -326,13 +326,13 @@ func (o *openOptions) completeGrafanaUrl(url string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		uid, err := getUid(cd.Name)
+		uid, err := getUIU(cd.Name)
 		if err != nil {
 			return "", err
 		}
 		url += fmt.Sprintf("/d/%s/%s?var-cluster=%s", uid, cd.Name, o.cluster)
 	} else if o.clusterDefRef != "" {
-		uid, err := getUid(o.clusterDefRef)
+		uid, err := getUIU(o.clusterDefRef)
 		if err != nil {
 			return "", err
 		}

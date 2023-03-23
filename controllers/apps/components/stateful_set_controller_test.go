@@ -125,6 +125,7 @@ var _ = Describe("StatefulSet Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			compStatus := cluster.Status.Components[consensusCompName]
 			g.Expect(compStatus.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // original expecting value RebootingPhase
+			g.Expect(compStatus.PodsReady).ShouldNot(BeNil())
 			g.Expect(*compStatus.PodsReady).Should(BeTrue())
 			// REVIEW/TODO: ought add extra condtion check for RebootingPhase
 		})).Should(Succeed())
@@ -147,19 +148,22 @@ var _ = Describe("StatefulSet Controller", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 				cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
 				cluster.Status.ObservedGeneration = 1
+				cluster.Status.ObservedGeneration = 1
+				cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+					consensusCompName: {
+						Phase: appsv1alpha1.SpecReconcilingClusterCompPhase,
+					},
+				}
 			})).Should(Succeed())
 			_ = testapps.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{consensusCompName})
 			Expect(testapps.ChangeObj(&testCtx, cluster, func() {
 				cluster.Annotations = map[string]string{
-					constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Rebooting"}]`, opsRequestName),
+					constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"}]`, opsRequestName),
 				}
 			})).Should(Succeed())
 
 			// trigger statefulset controller Reconcile
 			sts := testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
-
-			By("wait for component phase to Rebooting by StatefulSet controller when cluster.status.components is nil")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
 
 			By("mock the StatefulSet and pods are ready")
 			// mock statefulSet available and consensusSet component is running

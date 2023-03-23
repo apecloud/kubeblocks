@@ -188,7 +188,7 @@ var _ = Describe("Replication Component", func() {
 			})).Should(Succeed())
 			testk8s.UpdatePodStatusNotReady(ctx, testCtx, podList[1].Name)
 			phase, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
-			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			// mock primary pod is not ready
 			testk8s.UpdatePodStatusNotReady(ctx, testCtx, primaryPod.Name)

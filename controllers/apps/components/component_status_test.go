@@ -406,7 +406,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(isRunning).Should(BeFalse())
 
 				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
-				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterPhase))
+				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			})
 
 			It("should set component status to running if container is ready", func() {

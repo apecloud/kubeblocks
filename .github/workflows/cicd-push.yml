@@ -189,6 +189,19 @@ jobs:
       GO_VERSION: 1.19
     secrets: inherit
 
+  check-debug-image:
+    name: check image
+    needs: trigger-mode
+    if: needs.trigger-mode.outputs.trigger-mode == '[docker]'
+    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    with:
+      MAKE_OPS_PRE: "generate"
+      MAKE_OPS: "build-manager-debug-image"
+      IMG: "apecloud/kubeblocks-debug"
+      VERSION: "check"
+      GO_VERSION: 1.19
+    secrets: inherit
+
   check-helm:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') && github.ref_name != 'main' }}

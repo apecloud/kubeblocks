@@ -241,7 +241,7 @@ var _ = Describe("Consensus Component", func() {
 			})).Should(Succeed())
 			phase = GetComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
 				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
-			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 		})
 	})

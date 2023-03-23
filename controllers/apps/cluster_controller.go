@@ -213,13 +213,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// observedGeneration and terminal phase check state
 	if cluster.Status.ObservedGeneration == cluster.Generation &&
 		slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase) {
-		// checks if the controller is handling the garbage of restore.
-		if err := r.handleGarbageOfRestoreBeforeRunning(ctx, cluster); err == nil {
-			return intctrlutil.Reconciled()
-		} else if componentutil.IgnoreNoOps(err) != nil {
-			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
-		}
-
 		// reconcile the phase and conditions of the Cluster.status
 		if res, err := r.reconcileClusterStatus(reqCtx, cluster, clusterDefinition); componentutil.IgnoreNoOps(err) != nil {
 			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
@@ -241,6 +234,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if cluster.Status.Phase == "" {
 			// REVIEW: may need to start with "validating" phase
 			cluster.Status.Phase = appsv1alpha1.StartingClusterPhase
+			return nil
+		}
+		if cluster.Status.Phase != appsv1alpha1.StartingClusterPhase {
+			cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
 		}
 		return nil
 	}, nil); err != nil {
@@ -330,10 +327,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueAfter(
 			time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
-	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster); componentutil.IgnoreNoOps(err) != nil {
+	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDeepCopy); componentutil.IgnoreNoOps(err) != nil {
 		// REVIEW:
 		// caught err being - "clusters.apps.kubeblocks.io \"test-clusterucasrw\" not found",
 		// how could this possible
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+
+	// checks if the controller is handling the garbage of restore.
+	if err := r.handleGarbageOfRestoreBeforeRunning(ctx, cluster); err == nil {
+		return intctrlutil.Reconciled()
+	} else if componentutil.IgnoreNoOps(err) != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -377,15 +381,17 @@ func (r *ClusterReconciler) patchClusterStatus(ctx context.Context,
 // handleClusterStatusAfterApplySucceed when cluster apply resources successful, handle the status
 func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 	ctx context.Context,
-	cluster *appsv1alpha1.Cluster) error {
-	patch := client.MergeFrom(cluster)
-	// apply resources succeed, record the condition and event
+	cluster *appsv1alpha1.Cluster,
+	clusterDeepCopy *appsv1alpha1.Cluster) error {
 	applyResourcesCondition := newApplyResourcesCondition()
+	oldApplyCondition := meta.FindStatusCondition(cluster.Status.Conditions, applyResourcesCondition.Type)
 	meta.SetStatusCondition(&cluster.Status.Conditions, applyResourcesCondition)
-	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
+	if err := r.patchClusterStatus(ctx, cluster, clusterDeepCopy); err != nil {
 		return err
 	}
-	r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
+	if oldApplyCondition == nil || oldApplyCondition.Status != applyResourcesCondition.Status {
+		r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
+	}
 	return nil
 }
 
@@ -748,7 +754,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(reqCtx intctrlutil.RequestCtx
 		handleClusterIsRunning); err != nil {
 		return nil, err
 	}
-	return intctrlutil.ResultToP(intctrlutil.Requeue(reqCtx.Log, ""))
+	return nil, nil
 }
 
 // cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.

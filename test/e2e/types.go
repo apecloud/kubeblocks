@@ -27,3 +27,4 @@ var K8sClient client.Client
 var Ctx context.Context
 var Cancel context.CancelFunc
 var Logger logr.Logger
+var Version string

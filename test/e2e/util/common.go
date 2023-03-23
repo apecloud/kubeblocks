@@ -46,6 +46,9 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 func EnsureClusterExists(ctx context.Context) error {
@@ -292,4 +295,10 @@ func WaitForCRDEstablished(crdName string) error {
 		return err
 	}
 	return nil
+}
+
+func BuildAddonLabelSelector() string {
+	return fmt.Sprintf("%s=%s,%s=%s",
+		constant.AppInstanceLabelKey, types.KubeBlocksReleaseName,
+		constant.AppNameLabelKey, types.KubeBlocksChartName)
 }

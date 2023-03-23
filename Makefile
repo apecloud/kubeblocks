@@ -871,9 +871,12 @@ smoke-testdata-manifests: ## Update E2E test dataset
 
 ##@ Test E2E
 GINKGO=$(shell which ginkgo)
+ifeq ($(origin VERSION), command line)
+    VERSION ?= $(VERSION)
+endif
 .PHONY: test-e2e
-test-e2e: smoke-testdata-manifests ## Test End-to-end.
-	$(GINKGO) test -process -ginkgo.v test/e2e
+test-e2e: helm-package smoke-testdata-manifests ## Test End-to-end.
+	$(GINKGO) test -process -ginkgo.v test/e2e --junit-report=report.xml -- --VERSION=$(VERSION)
 
 # NOTE: include must be at the end
 ##@ Docker containers

@@ -1,29 +1,33 @@
 ---
-title: kbcli cluster list-accounts
+title: kbcli cluster list-users
 ---
 
-List accounts for a cluster
+List users for a cluster
 
 ```
-kbcli cluster list-accounts [flags]
+kbcli cluster list-users [flags]
 ```
 
 ### Examples
 
 ```
   # list all users from specified component of a cluster
-  kbcli cluster list-accounts NAME --component-name COMPNAME --show-connected-users
+  kbcli cluster list-users NAME --component-name COMPNAME --show-connected-users
+  
+  # list all users of a cluster, by default the first component will be used
+  kbcli cluster list-users NAME --show-connected-users
   
   # list all users from cluster's one particular instance
-  kbcli cluster list-accounts NAME -i INSTANCE
+  kbcli cluster list-users NAME -i INSTANCE
 ```
 
 ### Options
 
 ```
       --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
-  -h, --help                    help for list-accounts
+  -h, --help                    help for list-users
   -i, --instance string         Specify the name of instance to be connected.
+      --verbose                 Print verbose information.
 ```
 
 ### Options inherited from parent commands

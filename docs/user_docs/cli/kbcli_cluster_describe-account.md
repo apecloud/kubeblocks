@@ -1,29 +1,27 @@
 ---
-title: kbcli cluster list-accounts
+title: kbcli cluster describe-account
 ---
 
-List accounts for a cluster
+Describe account roles and related information
 
 ```
-kbcli cluster list-accounts [flags]
+kbcli cluster describe-account [flags]
 ```
 
 ### Examples
 
 ```
-  # list all users from specified component of a cluster
-  kbcli cluster list-accounts NAME --component-name COMPNAME --show-connected-users
-  
-  # list all users from cluster's one particular instance
-  kbcli cluster list-accounts NAME -i INSTANCE
+  # describe account and show role information
+  kbcli cluster describe-account NAME --component-name COMPNAME--username NAME
 ```
 
 ### Options
 
 ```
       --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
-  -h, --help                    help for list-accounts
+  -h, --help                    help for describe-account
   -i, --instance string         Specify the name of instance to be connected.
+  -u, --username string         Required. Specify the name of user
 ```
 
 ### Options inherited from parent commands

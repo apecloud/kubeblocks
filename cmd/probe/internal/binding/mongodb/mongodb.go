@@ -31,6 +31,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
 // MongoDBOperations is a binding implementation for MongoDB.

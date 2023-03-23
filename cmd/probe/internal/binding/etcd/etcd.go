@@ -28,6 +28,7 @@ import (
 	v3 "go.etcd.io/etcd/client/v3"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
 type Etcd struct {

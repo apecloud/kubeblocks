@@ -381,6 +381,7 @@ spec:
                       - Failed
                       - Abnormal
                       - Updating
+                      - Starting
                       - Stopping
                       type: string
                     progressDetails:

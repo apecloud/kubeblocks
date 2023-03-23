@@ -49,7 +49,7 @@ const (
 
 // ClusterComponentPhase defines the Cluster CR .status.components.phase
 // +enum
-// +kubebuilder:validation:Enum={Running,Stopped,Failed,Abnormal,Updating,Stopping}
+// +kubebuilder:validation:Enum={Running,Stopped,Failed,Abnormal,Updating,Starting,Stopping}
 type ClusterComponentPhase string
 
 const (

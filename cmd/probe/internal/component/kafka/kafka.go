@@ -23,7 +23,6 @@ import (
 
 	"github.com/Shopify/sarama"
 
-	//"github.com/dapr/components-contrib/pubsub"
 	"github.com/dapr/kit/logger"
 	"github.com/dapr/kit/retry"
 )
@@ -155,9 +154,7 @@ type EventHandler func(ctx context.Context, msg *NewEvent) error
 // SubscriptionHandlerConfig is the handler and configuration for subscription.
 type SubscriptionHandlerConfig struct {
 	IsBulkSubscribe bool
-	//SubscribeConfig pubsub.BulkSubscribeConfig
-	//BulkHandler     BulkEventHandler
-	Handler EventHandler
+	Handler         EventHandler
 }
 
 // NewEvent is an event arriving from a message bus instance.
@@ -177,7 +174,7 @@ type KafkaBulkMessage struct {
 
 // KafkaBulkMessageEntry is an item contained inside bulk event arriving from a message bus instance.
 type KafkaBulkMessageEntry struct {
-	EntryId     string            `json:"entryId"` //nolint:stylecheck
+	EntryID     string            `json:"entryId"` //nolint:stylecheck
 	Event       []byte            `json:"event"`
 	ContentType string            `json:"contentType,omitempty"`
 	Metadata    map[string]string `json:"metadata"`

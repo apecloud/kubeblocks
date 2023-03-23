@@ -45,15 +45,14 @@ func (s asBase64String) String() string {
 }
 
 func parseInitialOffset(value string) (initialOffset int64, err error) {
-	initialOffset = sarama.OffsetNewest // Default
-	if strings.EqualFold(value, "oldest") {
+	switch strings.ToLower(value) {
+	case "oldest":
 		initialOffset = sarama.OffsetOldest
-	} else if strings.EqualFold(value, "newest") {
+	case "newest":
 		initialOffset = sarama.OffsetNewest
-	} else if value != "" {
+	default:
 		return 0, fmt.Errorf("kafka error: invalid initialOffset: %s", value)
 	}
-
 	return initialOffset, err
 }
 
@@ -67,7 +66,7 @@ func isValidPEM(val string) bool {
 // TopicHandlerConfig is the map of topics and sruct containing handler and their config.
 type TopicHandlerConfig map[string]SubscriptionHandlerConfig
 
-// // TopicList returns the list of topics
+// TopicList returns the list of topics
 func (tbh TopicHandlerConfig) TopicList() []string {
 	topics := make([]string, len(tbh))
 	i := 0

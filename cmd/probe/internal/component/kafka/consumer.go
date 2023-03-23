@@ -36,7 +36,6 @@ type consumer struct {
 	running chan struct{}
 	stopped atomic.Bool
 	once    sync.Once
-	mutex   sync.Mutex
 }
 
 func (consumer *consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
@@ -127,12 +126,7 @@ func (k *Kafka) RemoveTopicHandler(topic string) {
 	k.subscribeLock.Unlock()
 }
 
-// checkBulkSubscribe checks if a bulk handler and config are correctly registered for provided topic
-func (k *Kafka) checkBulkSubscribe(topic string) bool {
-	return false
-}
-
-// GetTopicBulkHandler returns the handlerConfig for a topic
+// GetTopicHandlerConfig returns the handlerConfig for a topic
 func (k *Kafka) GetTopicHandlerConfig(topic string) (SubscriptionHandlerConfig, error) {
 	handlerConfig, ok := k.subscribeTopics[topic]
 	if ok && (!handlerConfig.IsBulkSubscribe && handlerConfig.Handler != nil) {

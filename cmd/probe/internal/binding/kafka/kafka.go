@@ -25,7 +25,6 @@ import (
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
-	"github.com/spf13/viper"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/kafka"
@@ -47,12 +46,6 @@ type KafkaOperations struct {
 	BaseOperations
 }
 
-var (
-	defaultDBPort = 3306
-	dbUser        = "root"
-	dbPasswd      = ""
-)
-
 // NewKafka returns a new kafka binding instance.
 func NewKafka(logger logger.Logger) bindings.InputOutputBinding {
 	k := kafka.NewKafka(logger)
@@ -67,20 +60,12 @@ func NewKafka(logger logger.Logger) bindings.InputOutputBinding {
 
 func (kafkaOps *KafkaOperations) Init(metadata bindings.Metadata) error {
 	kafkaOps.BaseOperations.Init(metadata)
-	if viper.IsSet("KB_SERVICE_USER") {
-		dbUser = viper.GetString("KB_SERVICE_USER")
-	}
-
-	if viper.IsSet("KB_SERVICE_PASSWORD") {
-		dbPasswd = viper.GetString("KB_SERVICE_PASSWORD")
-	}
-
 	kafkaOps.Logger.Debug("Initializing kafka binding")
 	kafkaOps.DBType = "kafka"
 	kafkaOps.InitIfNeed = kafkaOps.initIfNeed
-	//kafkaOps.BaseOperations.GetRole = kafkaOps.GetRole
-	//kafkaOps.DBPort = kafkaOps.GetRunningPort()
-	//kafkaOps.RegisterOperation(GetRoleOperation, kafkaOps.GetRoleOps)
+	// kafkaOps.BaseOperations.GetRole = kafkaOps.GetRole
+	// kafkaOps.DBPort = kafkaOps.GetRunningPort()
+	// kafkaOps.RegisterOperation(GetRoleOperation, kafkaOps.GetRoleOps)
 	// kafkaOps.RegisterOperation(GetLagOperation, kafkaOps.GetLagOps)
 	// kafkaOps.RegisterOperation(CheckStatusOperation, kafkaOps.CheckStatusOps)
 	// kafkaOps.RegisterOperation(ExecOperation, kafkaOps.ExecOps)

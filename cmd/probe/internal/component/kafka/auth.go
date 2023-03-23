@@ -29,13 +29,14 @@ func updatePasswordAuthInfo(config *sarama.Config, metadata *kafkaMetadata, sasl
 	config.Net.SASL.Enable = true
 	config.Net.SASL.User = saslUsername
 	config.Net.SASL.Password = saslPassword
-	if metadata.SaslMechanism == "SHA-256" {
+	switch metadata.SaslMechanism {
+	case "SHA-256":
 		config.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &XDGSCRAMClient{HashGeneratorFcn: SHA256} }
 		config.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA256
-	} else if metadata.SaslMechanism == "SHA-512" {
+	case "SHA-512":
 		config.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &XDGSCRAMClient{HashGeneratorFcn: SHA512} }
 		config.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA512
-	} else {
+	default:
 		config.Net.SASL.Mechanism = sarama.SASLTypePlaintext
 	}
 }

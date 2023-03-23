@@ -17,8 +17,11 @@ limitations under the License.
 package playground
 
 import (
-	"fmt"
+	"encoding/json"
+	"os"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -41,17 +44,69 @@ func cloudProviderRepoDir() (string, error) {
 	return filepath.Join(dir, cp.GitRepoName), err
 }
 
-// getExistedCluster get existed playground kubernetes cluster, we should only have one cluster
-func getExistedCluster(provider cp.Interface) (string, error) {
-	clusterNames, err := provider.GetExistedClusters()
+func initPlaygroundDir() error {
+	dir, err := playgroundDir()
+	if err != nil {
+		return err
+	}
+
+	if _, err = os.Stat(dir); err != nil && os.IsNotExist(err) {
+		return os.MkdirAll(dir, 0750)
+	}
+	return nil
+}
+
+// writeClusterInfoToFile writes the cluster info to a state file
+func writeClusterInfoToFile(path string, info *cp.K8sClusterInfo) error {
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if err = json.NewEncoder(f).Encode(info); err != nil {
+		// if we fail to write the state file, we should remove it
+		if e := os.Remove(path); e != nil {
+			return errors.Wrap(err, e.Error())
+		}
+		return err
+	}
+	return nil
+}
+
+func removeStateFile(path string) error {
+	_, err := os.Stat(path)
+	if err == nil {
+		return os.Remove(path)
+	}
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return err
+}
+
+// readClusterInfoFromFile reads the kubernetes cluster info from a state file
+func readClusterInfoFromFile(path string) (*cp.K8sClusterInfo, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer f.Close()
+
+	var info cp.K8sClusterInfo
+	if err := json.NewDecoder(f).Decode(&info); err != nil {
+		return nil, err
+	}
+	return &info, nil
+}
+
+func stateFilePath() (string, error) {
+	dir, err := playgroundDir()
 	if err != nil {
 		return "", err
 	}
-	if len(clusterNames) > 1 {
-		return "", fmt.Errorf("found more than one cluster have been created, check it again, %v", clusterNames)
-	}
-	if len(clusterNames) == 0 {
-		return "", nil
-	}
-	return clusterNames[0], nil
+	return filepath.Join(dir, stateFileName), nil
 }

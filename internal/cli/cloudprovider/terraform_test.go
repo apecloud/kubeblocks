@@ -28,8 +28,7 @@ var _ = Describe("aws cloud provider", func() {
 		expectedContextName = "arn-kb-playground-test"
 	)
 
-	It("new aws cloud provider", func() {
-
+	It("get cluster name from state file", func() {
 		name, err := getOutputValue(clusterNameKey, tfPath)
 		Expect(err).Should(Succeed())
 		Expect(name).Should(Equal(expectedClusterName))

@@ -59,13 +59,3 @@ func (r *ReconcileTask) AppendResource(objs ...client.Object) {
 	}
 	*r.Resources = append(*r.Resources, objs...)
 }
-
-func (r *ReconcileTask) InsertResource(objs ...client.Object) {
-	if r == nil {
-		return
-	}
-	resources := make([]client.Object, 0, len(*r.Resources)+len(objs))
-	resources = append(resources, objs...)
-	resources = append(resources, *r.Resources...)
-	*r.Resources = resources
-}

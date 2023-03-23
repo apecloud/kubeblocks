@@ -325,7 +325,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		{
 			// handle cronjob complete or fail event
 			pred: func() bool {
-				return event.InvolvedObject.Kind == constant.CronJob &&
+				return event.InvolvedObject.Kind == constant.CronJobKind &&
 					event.Reason == "SawCompletedJob"
 			},
 			processor: func() error {

@@ -44,7 +44,7 @@ func MockStatelessPod(testCtx testutil.TestContext, deploy *appsv1.Deployment, c
 		}
 	}
 	return NewPodFactory(testCtx.DefaultNamespace, podName).
-		SetOwnerReferences("apps/v1", constant.ReplicaSet, newRs).
+		SetOwnerReferences("apps/v1", constant.ReplicaSetKind, newRs).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(componentName).
 		AddAppManangedByLabel().

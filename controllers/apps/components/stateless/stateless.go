@@ -90,7 +90,7 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 	if err != nil || len(deployList.Items) == 0 {
 		return "", err
 	}
-	// if the failed pod is not controlled by the new ReplicaSet
+	// if the failed pod is not controlled by the new ReplicaSetKind
 	checkExistFailedPodOfNewRS := func(pod *corev1.Pod, workload metav1.Object) bool {
 		d := workload.(*appsv1.Deployment)
 		return !intctrlutil.PodIsReady(pod) && belongToNewReplicaSet(d, pod)
@@ -168,7 +168,7 @@ func belongToNewReplicaSet(d *appsv1.Deployment, pod *corev1.Pod) bool {
 		return false
 	}
 	for _, v := range pod.OwnerReferences {
-		if v.Kind == constant.ReplicaSet && strings.Contains(condition.Message, v.Name) {
+		if v.Kind == constant.ReplicaSetKind && strings.Contains(condition.Message, v.Name) {
 			return d.Status.ObservedGeneration == d.Generation
 		}
 	}

@@ -842,6 +842,26 @@ endif
 minikube-delete: minikube ## Delete minikube cluster.
 	$(MINIKUBE) delete
 
+.PHONY: minikube-run
+minikube-run: manifests generate fmt vet minikube helmtool ## Start minikube cluster and helm install kubeblocks.
+ifneq (, $(shell which minikube))
+ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
+	$(MINIKUBE) start --wait=all --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS)
+endif
+endif
+	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+	$(HELM) upgrade --install kubeblocks deploy/helm --set versionOverride=$(VERSION),csi-hostpath-driver.enabled=true --reuse-values --wait --wait-for-jobs --atomic
+
+.PHONY: minikube-run-fast
+minikube-run-fast: minikube helmtool ## Fast start minikube cluster and helm install kubeblocks.
+ifneq (, $(shell which minikube))
+ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
+	$(MINIKUBE) start --wait=all --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS)
+endif
+endif
+	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+	$(HELM) upgrade --install kubeblocks deploy/helm --set versionOverride=$(VERSION),csi-hostpath-driver.enabled=true --reuse-values --wait --wait-for-jobs --atomic
+
 .PHONY: smoke-testdata-manifests
 smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml

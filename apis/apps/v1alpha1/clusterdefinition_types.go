@@ -390,6 +390,11 @@ type ClusterComponentDefinition struct {
 	// even if a persistent volume has been specified.
 	// +optional
 	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
+
+	// CustomLabelSpecs is used for custom label tags which you want to add to the component resources.
+	// +listType=map
+	// +optional
+	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
 }
 
 type HorizontalScalePolicy struct {
@@ -599,6 +604,31 @@ type CommandExecutorItem struct {
 	// args is used to perform statements.
 	// +optional
 	Args []string `json:"args,omitempty"`
+}
+
+type CustomLabelSpec struct {
+	// key name of label
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+
+	// value of label
+	// +kubebuilder:validation:Required
+	Value string `json:"value"`
+
+	// Resources defines the resources to be labeled.
+	// +kubebuilder:validation:Required
+	Resources []GVKResource `json:"resources,omitempty"`
+}
+
+type GVKResource struct {
+	// The GVK of the GVKResource is Group/Version/Kind, for example "v1/Pod", "apps/v1/StatefulSet", etc.
+	// When the gvk resource filtered by the selector already exists, if there is no corresponding custom label, it will be added, and if label already exists, it will be updated.
+	// +kubebuilder:validation:Required
+	GVK string `json:"gvk"`
+
+	// Selector is a label query over a set of resources.
+	// +optional
+	Selector map[string]string `json:"selector,omitempty"`
 }
 
 // +kubebuilder:object:root=true

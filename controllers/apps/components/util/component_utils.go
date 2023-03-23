@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -87,7 +88,7 @@ func IsFailedOrAbnormal(phase appsv1alpha1.Phase) bool {
 }
 
 // GetComponentMatchLabels gets the labels for matching the cluster component
-func GetComponentMatchLabels(clusterName, componentName string) client.ListOption {
+func GetComponentMatchLabels(clusterName, componentName string) map[string]string {
 	return client.MatchingLabels{
 		constant.AppInstanceLabelKey:    clusterName,
 		constant.KBAppComponentLabelKey: componentName,
@@ -99,7 +100,7 @@ func GetComponentMatchLabels(clusterName, componentName string) client.ListOptio
 func GetComponentPodList(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, componentName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
-		GetComponentMatchLabels(cluster.Name, componentName))
+		client.MatchingLabels(GetComponentMatchLabels(cluster.Name, componentName)))
 	return podList, err
 }
 
@@ -136,6 +137,12 @@ func GetComponentPhase(isFailed, isAbnormal bool) appsv1alpha1.Phase {
 // GetObjectListByComponentName gets k8s workload list with component
 func GetObjectListByComponentName(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
 	matchLabels := GetComponentMatchLabels(cluster.Name, componentName)
+	inNamespace := client.InNamespace(cluster.Namespace)
+	return cli.List(ctx, objectList, client.MatchingLabels(matchLabels), inNamespace)
+}
+
+// GetObjectListByCustomLabels gets k8s workload list with custom labels
+func GetObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, objectList client.ObjectList, matchLabels client.ListOption) error {
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
@@ -348,4 +355,19 @@ func GetCompPhaseByConditions(existLatestRevisionFailedPod bool,
 		return appsv1alpha1.AbnormalPhase
 	}
 	return ""
+}
+
+// UpdateObjLabel updates the value of the role label of the object.
+func UpdateObjLabel[T generics.Object, PT generics.PObject[T]](
+	ctx context.Context, cli client.Client, obj T, labelKey, labelValue string) error {
+	pObj := PT(&obj)
+	patch := client.MergeFrom(PT(pObj.DeepCopy()))
+	if v, ok := pObj.GetLabels()[labelKey]; ok && v == labelValue {
+		return nil
+	}
+	pObj.GetLabels()[labelKey] = labelValue
+	if err := cli.Patch(ctx, pObj, patch); err != nil {
+		return err
+	}
+	return nil
 }

@@ -135,6 +135,7 @@ const (
 	ReplicaSet                = "ReplicaSet"
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
+	ConfigMapKind             = "ConfigMap"
 )
 
 const (

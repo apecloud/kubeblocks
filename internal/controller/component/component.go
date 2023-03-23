@@ -58,6 +58,7 @@ func BuildComponent(
 		TLS:                   clusterCompSpec.TLS,
 		Issuer:                clusterCompSpec.Issuer,
 		VolumeTypes:           clusterCompDefObj.VolumeTypes,
+		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
 	}
 
 	// resolve component.ConfigTemplates

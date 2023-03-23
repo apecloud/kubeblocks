@@ -162,6 +162,7 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 	}
 
 	toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
+		{Name: "KB_RANDOM_STR", Value: randomString(8)},
 		{Name: "KB_CLUSTER_NAME", Value: params.Cluster.Name},
 		{Name: "KB_COMP_NAME", Value: params.Component.Name},
 		{Name: "KB_CLUSTER_COMP_NAME", Value: params.Cluster.Name + "-" + params.Component.Name},

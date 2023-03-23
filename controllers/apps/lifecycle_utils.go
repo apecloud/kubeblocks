@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"reflect"
 	"strings"
 	"time"
@@ -595,7 +596,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		kind := obj.GetObjectKind().GroupVersionKind().Kind
 		objsByKind[kind] = append(objsByKind[kind], obj)
-
 		if err = cli.Create(ctx, obj); err == nil {
 			postCreateFunc(obj)
 			continue
@@ -1144,4 +1144,63 @@ func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string
 	compBackupMap := map[string]string{}
 	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
 	return compBackupMap, err
+}
+
+// addCustomLabelsOnObjectCreation adds custom labels on object creation.
+func addCustomLabelsOnObjectCreation(clusterDef *appsv1alpha1.ClusterDefinition, obj *client.Object) error {
+	var (
+		err       error
+		objLabels map[string]string
+	)
+	if clusterDef == nil {
+		return nil
+	}
+	patchObjLabel := func(resources []appsv1alpha1.GVKResource, labelKey, labelValue string) error {
+		objLabels = (*obj).GetLabels()
+		// if no resource specified, we do not add label to any resource.
+		if len(resources) <= 0 {
+			return nil
+		}
+		for _, resource := range resources {
+			gvk, err := parseCustomLabelPattern(resource.GVK)
+			if err != nil {
+				return err
+			}
+			if !slices.Contains(getCustomLabelSupportKind(), gvk.Kind) {
+				return errors.New(fmt.Sprintf("kind %s is not supported for custom labels", gvk.Kind))
+			}
+			objGVK := (*obj).GetObjectKind().GroupVersionKind()
+			if gvk.Group == objGVK.Group && gvk.Version == objGVK.Version && gvk.Kind == objGVK.Kind {
+				objLabels[labelKey] = labelValue
+				// if the object is a statefulSet, add label to its pod template too.
+				if gvk.Kind == constant.StatefulSetKind {
+					sts, ok := (*obj).(*appsv1.StatefulSet)
+					if !ok {
+						return errors.New("failed to convert object to StatefulSet")
+					}
+					sts.Spec.Template.Labels[labelKey] = labelValue
+				}
+				break
+			}
+		}
+		(*obj).SetLabels(objLabels)
+		return nil
+	}
+
+	for _, compDef := range clusterDef.Spec.ComponentDefs {
+		if len(compDef.CustomLabelSpecs) == 0 {
+			continue
+		}
+		objLabels = (*obj).GetLabels()
+		if v, ok := objLabels[constant.AppNameLabelKey]; !ok || v != compDef.Name {
+			return nil
+		}
+
+		for _, customLabelSpec := range compDef.CustomLabelSpecs {
+			if err = patchObjLabel(customLabelSpec.Resources, customLabelSpec.Key, customLabelSpec.Value); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

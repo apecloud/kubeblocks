@@ -238,6 +238,44 @@ spec:
                       required:
                       - leader
                       type: object
+                    customLabelSpecs:
+                      description: CustomLabelSpecs is used for custom label tags
+                        which you want to add to the component resources.
+                      items:
+                        properties:
+                          key:
+                            description: key name of label
+                            type: string
+                          resources:
+                            description: Resources defines the resources to be labeled.
+                            items:
+                              properties:
+                                gvk:
+                                  description: The GVK of the GVKResource is Group/Version/Kind,
+                                    for example "v1/Pod", "apps/v1/StatefulSet", etc.
+                                    When the gvk resource filtered by the selector
+                                    already exists, if there is no corresponding custom
+                                    label, it will be added, and if label already
+                                    exists, it will be updated.
+                                  type: string
+                                selector:
+                                  additionalProperties:
+                                    type: string
+                                  description: Selector is a label query over a set
+                                    of resources.
+                                  type: object
+                              required:
+                              - gvk
+                              type: object
+                            type: array
+                          value:
+                            description: value of label
+                            type: string
+                        required:
+                        - key
+                        - value
+                        type: object
+                      type: array
                     description:
                       description: The description of component definition.
                       type: string

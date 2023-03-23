@@ -148,7 +148,6 @@ var _ = Describe("StatefulSet Controller", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 				cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
 				cluster.Status.ObservedGeneration = 1
-				cluster.Status.ObservedGeneration = 1
 				cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 					consensusCompName: {
 						Phase: appsv1alpha1.SpecReconcilingClusterCompPhase,

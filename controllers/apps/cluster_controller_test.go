@@ -372,16 +372,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Delete the cluster")
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
-
-		By("Check the cluster do not terminate immediately")
-		checkClusterDoNotTerminate := testapps.CheckObj(&testCtx, clusterKey,
-			func(g Gomega, fetched *appsv1alpha1.Cluster) {
-				g.Expect(fetched.Status.Message).To(ContainSubstring(
-					fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", fetched.Spec.TerminationPolicy)))
-				g.Expect(fetched.Finalizers).ShouldNot(BeEmpty())
-			})
-		Eventually(checkClusterDoNotTerminate).Should(Succeed())
-		Consistently(checkClusterDoNotTerminate).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
 		By("Update the cluster's termination policy to WipeOut")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {

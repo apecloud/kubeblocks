@@ -754,7 +754,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(reqCtx intctrlutil.RequestCtx
 		handleClusterIsRunning); err != nil {
 		return nil, err
 	}
-	return intctrlutil.ResultToP(intctrlutil.Requeue(reqCtx.Log, ""))
+	return nil, nil
 }
 
 // cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.

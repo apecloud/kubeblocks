@@ -175,7 +175,7 @@ cue-fmt: cuetool ## Run cue fmt against code.
 	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fix
 
 .PHONY: fast-lint
-fast-lint: golangci staticcheck  # [INTERNAL] fast lint
+fast-lint: golangci staticcheck vet  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint

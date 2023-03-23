@@ -30,6 +30,8 @@ const (
 	ConfVolumeName      = "conf"
 	DataVolumeName      = "data"
 	ScriptsVolumeName   = "scripts"
+	ServiceDefaultName  = ""
+	ServiceHeadlessName = "headless"
 	ServiceVPCName      = "a-vpc-lb-service-for-app"
 	ServiceInternetName = "a-internet-lb-service-for-app"
 

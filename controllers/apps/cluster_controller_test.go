@@ -171,6 +171,58 @@ var _ = Describe("Cluster Controller", func() {
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
 	}
 
+	type ExpectService struct {
+		headless bool
+		svcType  corev1.ServiceType
+	}
+
+	getHeadlessSvcPorts := func(g Gomega, compDefName string) []corev1.ServicePort {
+		comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *clusterObj, compDefName)
+		g.Expect(err).ShouldNot(HaveOccurred())
+		var headlessSvcPorts []corev1.ServicePort
+		for _, container := range comp.PodSpec.Containers {
+			for _, port := range container.Ports {
+				// be consistent with headless_service_template.cue
+				headlessSvcPorts = append(headlessSvcPorts, corev1.ServicePort{
+					Name:       port.Name,
+					Protocol:   port.Protocol,
+					Port:       port.ContainerPort,
+					TargetPort: intstr.FromString(port.Name),
+				})
+			}
+		}
+		return headlessSvcPorts
+	}
+
+	validateCompSvcList := func(g Gomega, compName string, compType string, expectServices map[string]ExpectService) {
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		svcList := &corev1.ServiceList{}
+		g.Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
+			constant.AppInstanceLabelKey:    clusterKey.Name,
+			constant.KBAppComponentLabelKey: compName,
+		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+
+		for svcName, svcSpec := range expectServices {
+			idx := slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
+				return strings.HasSuffix(e.Name, svcName)
+			})
+			g.Expect(idx >= 0).To(BeTrue())
+			svc := svcList.Items[idx]
+			g.Expect(svc.Spec.Type).Should(Equal(svcSpec.svcType))
+			switch {
+			case svc.Spec.Type == corev1.ServiceTypeLoadBalancer:
+				g.Expect(svc.Spec.ExternalTrafficPolicy).Should(Equal(corev1.ServiceExternalTrafficPolicyTypeLocal))
+			case svc.Spec.Type == corev1.ServiceTypeClusterIP && !svcSpec.headless:
+				g.Expect(svc.Spec.ClusterIP).ShouldNot(Equal(corev1.ClusterIPNone))
+			case svc.Spec.Type == corev1.ServiceTypeClusterIP && svcSpec.headless:
+				g.Expect(svc.Spec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
+				g.Expect(reflect.DeepEqual(svc.Spec.Ports, getHeadlessSvcPorts(g, compType))).Should(BeTrue())
+			}
+		}
+		g.Expect(len(expectServices)).Should(Equal(len(svcList.Items)))
+	}
+
 	testServiceAddAndDelete := func() {
 		By("Creating a cluster with two LoadBalancer services")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -184,32 +236,17 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster initialized")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
-		validateSvc := func(g Gomega, total int, svcName string, predicate func(Gomega, int) bool) bool {
-			svcList := &corev1.ServiceList{}
-			g.Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
-				constant.AppInstanceLabelKey:    clusterKey.Name,
-				constant.KBAppComponentLabelKey: mysqlCompName,
-			}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-			g.Expect(svcList.Items).Should(HaveLen(total))
-			idx := slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
-				return strings.HasSuffix(e.Name, svcName)
-			})
-			if predicate != nil {
-				return predicate(g, idx)
-			}
-			g.Expect(idx >= 0).Should(BeTrue())
-			svc := svcList.Items[idx]
-			return svc.Spec.Type != corev1.ServiceTypeLoadBalancer ||
-				svc.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal
+		expectServices := map[string]ExpectService{
+			testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+			testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+			testapps.ServiceVPCName:      {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
+			testapps.ServiceInternetName: {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
 		}
-		Consistently(func(g Gomega) bool {
-			return validateSvc(g, 4, testapps.ServiceVPCName, nil)
-		}).Should(BeTrue())
-		Consistently(func(g Gomega) bool {
-			return validateSvc(g, 4, testapps.ServiceInternetName, nil)
-		}).Should(BeTrue())
+		Eventually(func(g Gomega) { validateCompSvcList(g, mysqlCompName, mysqlCompType, expectServices) }).Should(Succeed())
 
 		By("Delete a LoadBalancer service")
+		deleteService := testapps.ServiceVPCName
+		delete(expectServices, deleteService)
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			for idx, comp := range cluster.Spec.ComponentSpecs {
 				if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
@@ -217,7 +254,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 				var services []appsv1alpha1.ClusterComponentService
 				for _, item := range comp.Services {
-					if item.Name == testapps.ServiceVPCName {
+					if item.Name == deleteService {
 						continue
 					}
 					services = append(services, item)
@@ -225,33 +262,25 @@ var _ = Describe("Cluster Controller", func() {
 				cluster.Spec.ComponentSpecs[idx].Services = services
 				return
 			}
-
 		})()).ShouldNot(HaveOccurred())
-		// REVIEW: not so BDD as need to implement condition logics.
-		Eventually(func(g Gomega) bool {
-			return validateSvc(g, 3, testapps.ServiceVPCName,
-				func(g Gomega, i int) bool {
-					return i >= 0
-				})
-		}).Should(BeFalse())
+		Eventually(func(g Gomega) { validateCompSvcList(g, mysqlCompName, mysqlCompType, expectServices) }).Should(Succeed())
 
 		By("Add the deleted LoadBalancer service back")
+		expectServices[deleteService] = ExpectService{svcType: corev1.ServiceTypeLoadBalancer, headless: false}
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			for idx, comp := range cluster.Spec.ComponentSpecs {
 				if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
 					continue
 				}
 				comp.Services = append(comp.Services, appsv1alpha1.ClusterComponentService{
-					Name:        testapps.ServiceVPCName,
+					Name:        deleteService,
 					ServiceType: corev1.ServiceTypeLoadBalancer,
 				})
 				cluster.Spec.ComponentSpecs[idx] = comp
 				return
 			}
 		})()).ShouldNot(HaveOccurred())
-		Eventually(func(g Gomega) bool {
-			return validateSvc(g, 4, testapps.ServiceVPCName, nil)
-		}).Should(BeTrue())
+		Eventually(func(g Gomega) { validateCompSvcList(g, mysqlCompName, mysqlCompType, expectServices) }).Should(Succeed())
 	}
 
 	checkAllServicesCreate := func() {
@@ -266,65 +295,20 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster initialized")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
-		By("Checking proxy should have external ClusterIP service")
-		svcList1 := &corev1.ServiceList{}
-		Expect(k8sClient.List(testCtx.Ctx, svcList1, client.MatchingLabels{
-			constant.AppInstanceLabelKey:    clusterKey.Name,
-			constant.KBAppComponentLabelKey: nginxCompName,
-		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-		// TODO: fix me later, proxy should not have internal headless service
-		// Expect(svcList1.Items).Should(HaveLen(1))
-		Expect(svcList1.Items).ShouldNot(BeEmpty())
-		var existsExternalClusterIP bool
-		for _, svc := range svcList1.Items {
-			Expect(svc.Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
-			if svc.Spec.ClusterIP == corev1.ClusterIPNone {
-				continue
-			}
-			existsExternalClusterIP = true
+		By("Checking proxy services")
+		nginxExpectServices := map[string]ExpectService{
+			// TODO: fix me later, proxy should not have internal headless service
+			testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+			testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
 		}
-		Expect(existsExternalClusterIP).To(BeTrue())
+		Eventually(func(g Gomega) { validateCompSvcList(g, nginxCompName, nginxCompType, nginxExpectServices) }).Should(Succeed())
 
-		By("Checking mysql should have internal headless service")
-		getHeadlessSvcPorts := func(compDefName string) []corev1.ServicePort {
-			cluster := &appsv1alpha1.Cluster{}
-			Expect(k8sClient.Get(testCtx.Ctx, clusterKey, cluster)).To(Succeed())
-			comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *cluster, compDefName)
-			Expect(err).ShouldNot(HaveOccurred())
-			var headlessSvcPorts []corev1.ServicePort
-			for _, container := range comp.PodSpec.Containers {
-				for _, port := range container.Ports {
-					// be consistent with headless_service_template.cue
-					headlessSvcPorts = append(headlessSvcPorts, corev1.ServicePort{
-						Name:       port.Name,
-						Protocol:   port.Protocol,
-						Port:       port.ContainerPort,
-						TargetPort: intstr.FromString(port.Name),
-					})
-				}
-			}
-			return headlessSvcPorts
+		By("Checking mysql services")
+		mysqlExpectServices := map[string]ExpectService{
+			testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+			testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
 		}
-
-		svcList2 := &corev1.ServiceList{}
-		Expect(k8sClient.List(testCtx.Ctx, svcList2, client.MatchingLabels{
-			constant.AppInstanceLabelKey:    clusterKey.Name,
-			constant.KBAppComponentLabelKey: mysqlCompName,
-		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-		Expect(svcList2.Items).Should(HaveLen(2))
-
-		idx := slices.IndexFunc(svcList2.Items, func(e corev1.Service) bool {
-			if e.Spec.Type != corev1.ServiceTypeClusterIP {
-				return false
-			}
-			if e.Spec.ClusterIP != corev1.ClusterIPNone {
-				return false
-			}
-			return true
-		})
-		Expect(idx).Should(BeNumerically(">=", 0))
-		Expect(reflect.DeepEqual(svcList2.Items[idx].Spec.Ports,
-			getHeadlessSvcPorts(mysqlCompType))).Should(BeTrue())
+		Eventually(func(g Gomega) { validateCompSvcList(g, mysqlCompName, mysqlCompType, mysqlExpectServices) }).Should(Succeed())
 	}
 
 	testWipeOut := func() {

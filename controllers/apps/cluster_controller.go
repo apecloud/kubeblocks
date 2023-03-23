@@ -787,7 +787,7 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 
 // patchClusterResourceCustomLabels patches the custom labels to GVR(Group/Version/Resource) defined in the cluster spec.
 func (r *ClusterReconciler) patchClusterResourceCustomLabels(ctx context.Context, cluster *appsv1alpha1.Cluster) error {
-	if cluster == nil || cluster.Spec.CustomLabelSpecs == nil {
+	if cluster == nil || len(cluster.Spec.CustomLabelSpecs) == 0 {
 		return nil
 	}
 	patchGVRCustomLabels := func(resource appsv1alpha1.GVKResource, componentName, labelKey, labelValue string) error {

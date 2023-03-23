@@ -7,20 +7,6 @@ spec:
   clusterDefinitionRef: postgresql-ha # ref clusterdefinition.name
   clusterVersionRef: postgresql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ .Values.terminationPolicy }}
-  customLabelSpecs:
-    - key: apps.kubeblocks.postgresql.patroni/scope
-      value: {{ .Release.Name }}-postgresql
-      scope:
-        type: component
-        componentScopeSpecs:
-          - name: postgresql
-            resources:
-              - pattern: "/v1/Pod"
-                selector:
-                  app.kubernetes.io/managed-by: kubeblocks
-              - pattern: "apps/v1/StatefulSet"
-                selector:
-                  app.kubernetes.io/managed-by: kubeblocks
   affinity:
     {{- with .Values.topologyKeys }}
     topologyKeys: {{ . | toYaml | nindent 6 }}
@@ -31,6 +17,16 @@ spec:
   componentSpecs:
     - name: postgresql # user-defined
       componentDefRef: postgresql-ha # ref clusterdefinition components.name
+      customLabelSpecs:
+        - key: apps.kubeblocks.postgresql.patroni/scope
+          value: {{ .Release.Name }}-postgresql
+          resources:
+            - pattern: "v1/Pod"
+              selector:
+                app.kubernetes.io/managed-by: kubeblocks
+            - pattern: "apps/v1/StatefulSet"
+              selector:
+                app.kubernetes.io/managed-by: kubeblocks
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 2 }}
       primaryIndex: {{ .Values.primaryIndex | default 0 }}

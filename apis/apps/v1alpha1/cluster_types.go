@@ -542,16 +542,7 @@ func (r *ClusterComponentSpec) GetPrimaryIndex() int32 {
 	return *r.PrimaryIndex
 }
 
-// following are helper functions
-func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
-	t := corev1.PersistentVolumeClaimTemplate{}
-	t.ObjectMeta.Name = template.Name
-	if template.Spec != nil {
-		t.Spec = *template.Spec
-	}
-	return t
-}
-
+// GetClusterTerminalPhases return Cluster terminal phases.
 func GetClusterTerminalPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
@@ -561,14 +552,16 @@ func GetClusterTerminalPhases() []ClusterPhase {
 	}
 }
 
+// GetClusterUpRunningPhases return Cluster running or partially running phases.
 func GetClusterUpRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
-		FailedClusterPhase,
 		AbnormalClusterPhase,
+		FailedClusterPhase, // REVIEW/TODO: single component with single pod component are handled as FailedClusterPhase, ought to remove this.
 	}
 }
 
+// GetClusterFailedPhases return Cluster failed or partially failed phases.
 func GetClusterFailedPhases() []ClusterPhase {
 	return []ClusterPhase{
 		FailedClusterPhase,
@@ -576,6 +569,7 @@ func GetClusterFailedPhases() []ClusterPhase {
 	}
 }
 
+// GetComponentTerminalPhases return Cluster's component terminal phases.
 func GetComponentTerminalPhases() []ClusterComponentPhase {
 	return []ClusterComponentPhase{
 		RunningClusterCompPhase,
@@ -583,4 +577,13 @@ func GetComponentTerminalPhases() []ClusterComponentPhase {
 		FailedClusterCompPhase,
 		AbnormalClusterCompPhase,
 	}
+}
+
+func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
+	t := corev1.PersistentVolumeClaimTemplate{}
+	t.ObjectMeta.Name = template.Name
+	if template.Spec != nil {
+		t.Spec = *template.Spec
+	}
+	return t
 }

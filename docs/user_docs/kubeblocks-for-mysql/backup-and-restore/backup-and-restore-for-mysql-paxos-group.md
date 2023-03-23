@@ -124,29 +124,3 @@ This section shows how to use `kbcli` to back up and restore a MySQL Paxos Group
    
    select * from demo.msg;
    ```
-9. Delete the ApeCloud MySQL cluster and clean up the backup.
-    
-   :::note
-
-   Expenses incurred when you have snapshots on the cloud. So it is recommended to delete the test cluster.
-
-   :::
-  
-   Delete a MySQL cluster with the following command.
-
-   ```bash
-   kbcli cluster delete mysql-cluster
-   kbcli cluster delete mysql-new-from-snapshot
-   ```
-
-   Delete the backup specified.
-
-   ```bash
-   kbcli cluster delete-backup mysql-cluster --name backup-default-mysql-cluster-20221124113440 
-   ```
-
-   Delete all backups with `mysql-cluster`.
-
-   ```bash
-   kbcli cluster delete-backup pg-cluster --force
-   ```

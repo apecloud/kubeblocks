@@ -337,6 +337,24 @@ spec:
 			Expect(k8sClient.Create(ctx, sts)).Should(Succeed())
 			Expect(deleteObjectOrphan(k8sClient, ctx, sts)).Should(Succeed())
 		})
+
+		It("should merge annotations from original that not exist in target to final result", func() {
+			originalKey := "only-existing-in-original"
+			targetKey := "only-existing-in-target"
+			updatedKey := "updated-in-target"
+			originalAnnotations := map[string]string{
+				originalKey: "true",
+				updatedKey:  "false",
+			}
+			targetAnnotations := map[string]string{
+				targetKey:  "true",
+				updatedKey: "true",
+			}
+			resultAnnotations := mergeAnnotations(originalAnnotations, targetAnnotations)
+			Expect(resultAnnotations[targetKey]).ShouldNot(BeEmpty())
+			Expect(resultAnnotations[originalKey]).ShouldNot(BeEmpty())
+			Expect(resultAnnotations[updatedKey]).Should(Equal("true"))
+		})
 	})
 
 	Context("test mergeServiceAnnotations", func() {

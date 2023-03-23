@@ -39,6 +39,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
 // MysqlOperations represents MySQL output bindings.

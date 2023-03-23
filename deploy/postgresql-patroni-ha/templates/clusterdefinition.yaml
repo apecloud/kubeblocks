@@ -85,7 +85,7 @@ spec:
             securityContext:
               runAsUser: 0
             command:
-              - /bin/sh
+              - /bin/bash
               - -c
               - |
                 set -ex
@@ -93,6 +93,12 @@ spec:
                 if [ "$KB_PRIMARY_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
                     sleep 3
                 fi
+                kb_restore_conf=""
+                if [ -f ${RESTORE_DATA_DIR}/kb_restore.signal ]; then
+                  kb_restore_conf=$(cat /home/postgres/conf/kb_restore.conf)
+                  chown -R postgres ${RESTORE_DATA_DIR}
+                fi
+                export SPILO_CONFIGURATION=${SPILO_CONFIGURATION/\[\[KB_RESTORE_CONF\]\]/$kb_restore_conf}
                 exec /launch.sh init
             volumeMounts:
               - name: dshm
@@ -129,12 +135,15 @@ spec:
                 value: "apps.kubeblocks.pg.patroni/role"
               - name: KUBERNETES_LABELS
                 value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
+              - name: RESTORE_DATA_DIR
+                value: /home/postgres/pgdata/kb_restore
               - name: SPILO_CONFIGURATION
                 value: | ## https://github.com/zalando/patroni#yaml-configuration
                   bootstrap:
                     initdb:
                       - auth-host: md5
                       - auth-local: trust
+                    [[KB_RESTORE_CONF]]
                   postgresql:
                     config_dir: /home/postgres/pgdata/conf
               - name: ALLOW_NOSSL

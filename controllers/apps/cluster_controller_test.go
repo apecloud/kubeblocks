@@ -1417,7 +1417,16 @@ var _ = Describe("Cluster Controller", func() {
 
 			pvcList := &corev1.PersistentVolumeClaimList{}
 
-			By("Mocking PVCs status to bound")
+			By("Updating PVC volume size")
+			patch := client.MergeFrom(clusterObj.DeepCopy())
+			componentSpec := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
+			componentSpec.VolumeClaimTemplates[0].Spec = &updatedPVCSpec
+			Expect(testCtx.Cli.Patch(ctx, clusterObj, patch)).Should(Succeed())
+
+			By("Checking cluster phase to Updating")
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.SpecReconcilingPhase))
+
+			By("Mocking PVCs status to bound, only bound pvc can expand")
 			Expect(testCtx.Cli.List(testCtx.Ctx, pvcList, client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: testapps.DefaultRedisCompName,
@@ -1440,15 +1449,11 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}).Should(Succeed())
 
-			By("Updating PVC volume size")
-			patch := client.MergeFrom(clusterObj.DeepCopy())
-			componentSpec := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
-			componentSpec.VolumeClaimTemplates[0].Spec = &updatedPVCSpec
-			Expect(testCtx.Cli.Patch(ctx, clusterObj, patch)).Should(Succeed())
-
 			By("Waiting cluster update reconcile succeed")
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.SpecReconcilingPhase))
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+
+			By("Checking status to Running")
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.RunningPhase))
 
 			By("Checking pvc volume size")
 			Eventually(func(g Gomega) {

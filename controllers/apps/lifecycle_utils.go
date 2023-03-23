@@ -593,17 +593,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	workloadsKinds := make(map[string][]client.Object)
 	for _, obj := range objs {
 		switch kind := obj.GetObjectKind().GroupVersionKind().Kind; kind {
-		case constant.PodKind:
-			fallthrough
-		case constant.ReplicaSetKind:
-			fallthrough
-		case constant.CronJobKind:
-			fallthrough
-		case constant.JobKind:
-			fallthrough
-		case constant.DeploymentKind:
-			fallthrough
-		case constant.StatefulSetKind:
+		case constant.PodKind, constant.ReplicaSetKind, constant.CronJobKind, constant.JobKind, constant.DeploymentKind, constant.StatefulSetKind:
 			workloadsKinds[kind] = append(workloadsKinds[kind], obj)
 		}
 	}
@@ -648,6 +638,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
+	// REVIEW/TODO: having following handling is rather hackish, as function expansion
+	// is not trying to fit into lifecycle process flow.
 	if err = garbageCollectServices(); err != nil {
 		return false, err
 	}

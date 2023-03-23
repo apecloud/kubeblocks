@@ -51,7 +51,7 @@ func (info *compInfo) inferPodName() (string, error) {
 	if info.compStatus == nil {
 		return "", fmt.Errorf("component status is missing")
 	}
-	if info.compStatus.Phase != appsv1alpha1.RunningPhase || !*info.compStatus.PodsReady {
+	if info.compStatus.Phase != appsv1alpha1.RunningClusterCompPhase || !*info.compStatus.PodsReady {
 		return "", fmt.Errorf("component is not ready, please try later")
 	}
 	if info.compStatus.ConsensusSetStatus != nil {
@@ -73,7 +73,7 @@ func fillCompInfoByName(ctx context.Context, dynamic dynamic.Interface, namespac
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
 		return nil, err
 	}
-	if cluster.Status.Phase != appsv1alpha1.RunningPhase {
+	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 		return nil, fmt.Errorf("cluster %s is not running, please try later", clusterName)
 	}
 

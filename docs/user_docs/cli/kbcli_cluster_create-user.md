@@ -1,29 +1,33 @@
 ---
-title: kbcli cluster list-accounts
+title: kbcli cluster create-user
 ---
 
-List accounts for a cluster
+Create user for a cluster
 
 ```
-kbcli cluster list-accounts [flags]
+kbcli cluster create-user [flags]
 ```
 
 ### Examples
 
 ```
-  # list all users from specified component of a cluster
-  kbcli cluster list-accounts NAME --component-name COMPNAME --show-connected-users
-  
-  # list all users from cluster's one particular instance
-  kbcli cluster list-accounts NAME -i INSTANCE
+  # create user
+  kbcli cluster create-user NAME --component-name COMPNAME --username NAME --password PASSWD
+  # create user without password
+  kbcli cluster create-user NAME --component-name COMPNAME --username NAME
+  # create user with expired interval
+  kbcli cluster create-user NAME --component-name COMPNAME --username NAME --password PASSWD --expiredAt 2046-01-02T15:04:05Z
 ```
 
 ### Options
 
 ```
       --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
-  -h, --help                    help for list-accounts
+  -h, --help                    help for create-user
   -i, --instance string         Specify the name of instance to be connected.
+  -p, --password string         Optional. Specify the password of user. The default value is empty, which means a random password will be generated.
+  -u, --username string         Required. Specify the name of user, which must be unique.
+      --verbose                 Print verbose information.
 ```
 
 ### Options inherited from parent commands

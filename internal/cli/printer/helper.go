@@ -41,3 +41,7 @@ func BoldGreen(msg interface{}) string {
 func Warning(out io.Writer, format string, i ...interface{}) {
 	fmt.Fprintf(out, "%s %s", BoldYellow("Warning:"), fmt.Sprintf(format, i...))
 }
+
+func Alert(out io.Writer, format string, i ...interface{}) {
+	fmt.Fprintf(out, "%s %s", BoldRed("Alert:"), fmt.Sprintf(format, i...))
+}

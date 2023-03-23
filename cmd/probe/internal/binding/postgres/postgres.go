@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	. "github.com/apecloud/kubeblocks/cmd/probe/util"
@@ -81,6 +83,14 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.RegisterOperation(CheckStatusOperation, pgOps.CheckStatusOps)
 	pgOps.RegisterOperation(ExecOperation, pgOps.ExecOps)
 	pgOps.RegisterOperation(QueryOperation, pgOps.QueryOps)
+
+	// following are ops for account management
+	pgOps.RegisterOperation(ListUsersOp, pgOps.ListUsersOps)
+	pgOps.RegisterOperation(CreateUserOp, pgOps.CreateUserOps)
+	pgOps.RegisterOperation(DeleteUserOp, pgOps.DeleteUserOps)
+	pgOps.RegisterOperation(DescribeUserOp, pgOps.DescribeUserOps)
+	pgOps.RegisterOperation(GrantUserRoleOp, pgOps.GrantUserRoleOps)
+	pgOps.RegisterOperation(RevokeUserRoleOp, pgOps.RevokeUserRoleOps)
 	return nil
 }
 
@@ -199,7 +209,7 @@ func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.Invo
 // CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (pgOps *PostgresOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	rwSQL := fmt.Sprintf(`begin;
-create table if not exists kb_health_check(type int, check_ts timestamp, primary key(type));	
+create table if not exists kb_health_check(type int, check_ts timestamp, primary key(type));
 insert into kb_health_check values(%d, CURRENT_TIMESTAMP) on conflict(type) do update set check_ts = CURRENT_TIMESTAMP;
 	commit;
 	select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType, CheckStatusType)
@@ -305,4 +315,327 @@ func (pgOps *PostgresOperations) exec(ctx context.Context, sql string) (result i
 	result = res.RowsAffected()
 
 	return
+}
+
+func (pgOps *PostgresOperations) CreateUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind       = CreateUserOp
+		createUserTpl = "CREATE USER %s WITH PASSWORD '%s';"
+	)
+
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		if len(user.Password) == 0 {
+			return ErrNoPassword
+		}
+		return nil
+	}
+	sqlTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(createUserTpl, user.UserName, user.Password)
+	}
+	msgTplRend := func(user UserInfo) string {
+		return fmt.Sprintf("created user: %s, with password: %s", user.UserName, user.Password)
+	}
+	return pgOps.execUser(ctx, req, opsKind, validFn, sqlTplRend, msgTplRend, nil)
+}
+
+func (pgOps *PostgresOperations) DeleteUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind     = CreateUserOp
+		dropUserTpl = "DROP USER IF EXISTS %s;"
+	)
+
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		return nil
+	}
+	sqlTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(dropUserTpl, user.UserName)
+	}
+	msgTplRend := func(user UserInfo) string {
+		return fmt.Sprintf("deleted user: %s", user.UserName)
+	}
+	return pgOps.execUser(ctx, req, opsKind, validFn, sqlTplRend, msgTplRend, nil)
+}
+
+func (pgOps *PostgresOperations) GrantUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		grantTpl   = "GRANT %s TO %s;"
+		succMsgTpl = "role %s granted to user: %s"
+	)
+	return pgOps.managePrivillege(ctx, req, GrantUserRoleOp, grantTpl, succMsgTpl)
+}
+
+func (pgOps *PostgresOperations) RevokeUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		revokeTpl  = "REVOKE %s FROM %s;"
+		succMsgTpl = "role %s revoked from user: %s"
+	)
+	return pgOps.managePrivillege(ctx, req, RevokeUserRoleOp, revokeTpl, succMsgTpl)
+}
+
+func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *bindings.InvokeRequest, op bindings.OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		if len(user.RoleName) == 0 {
+			return ErrNoRoleName
+		}
+		roles := []string{ReadOnlyRole, ReadWriteRole, SuperUserRole}
+		if !slices.Contains(roles, strings.ToLower(user.RoleName)) {
+			return ErrInvalidRoleName
+		}
+		return nil
+	}
+
+	sqlTplRend := func(user UserInfo) string {
+		if user.RoleName == SuperUserRole {
+			if op == GrantUserRoleOp {
+				return "ALTER USER " + user.UserName + " WITH SUPERUSER;"
+			} else {
+				return "ALTER USER " + user.UserName + " WITH NOSUPERUSER;"
+			}
+		}
+		roleDesc, _ := pgOps.renderRoleByName(user.RoleName)
+		return fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
+	}
+
+	msgTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(succMsgTpl, user.RoleName, user.UserName)
+	}
+
+	return pgOps.execUser(ctx, req, op, validFn, sqlTplRend, msgTplRend, nil)
+}
+
+func (pgOps *PostgresOperations) ListUsersOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind     = ListUsersOp
+		listUserTpl = `
+SELECT usename AS userName, usesuper,
+ARRAY(SELECT 
+	case 
+		when b.rolname = 'pg_read_all_data' THEN 'readonly'
+		when b.rolname = 'pg_write_all_data' THEN 'readwrite'
+  else b.rolname
+	end 
+FROM pg_catalog.pg_auth_members m
+JOIN pg_catalog.pg_roles b ON (m.roleid = b.oid)
+WHERE m.member = usesysid ) as roles
+FROM pg_catalog.pg_user
+ORDER BY usename;
+`
+	)
+	sqlTplRend := func(user UserInfo) string {
+		return listUserTpl
+	}
+
+	// post-processing
+	dataProcessor := func(data []byte) (interface{}, error) {
+		type pgUserInfo struct {
+			UserName string   `json:"username"`
+			Super    bool     `json:"usesuper"`
+			Roles    []string `json:"roles"`
+		}
+		// parse data to struct
+		var pgUsers []pgUserInfo
+		err := json.Unmarshal(data, &pgUsers)
+		if err != nil {
+			return nil, err
+		}
+		// parse roles
+		users := make([]UserInfo, len(pgUsers))
+		for i := range pgUsers {
+			if pgUsers[i].Super {
+				pgUsers[i].Roles = append(pgUsers[i].Roles, "superuser")
+			}
+			users[i] = UserInfo{
+				UserName: pgUsers[i].UserName,
+				RoleName: strings.Join(pgUsers[i].Roles, ","),
+			}
+		}
+
+		if jsonData, err := json.Marshal(users); err != nil {
+			return nil, err
+		} else {
+			return string(jsonData), nil
+		}
+	}
+
+	return pgOps.queryUser(ctx, req, opsKind, nil, sqlTplRend, dataProcessor)
+}
+
+func (pgOps *PostgresOperations) DescribeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind     = DescribeUserOp
+		descUserTpl = `
+		SELECT usename AS userName,  valuntil <now() AS expired, usesuper,
+		ARRAY(SELECT 
+		 case 
+			 when b.rolname = 'pg_read_all_data' THEN 'readonly'
+			 when b.rolname = 'pg_write_all_data' THEN 'readwrite'
+		 else b.rolname
+		 end 
+		FROM pg_catalog.pg_auth_members m
+		JOIN pg_catalog.pg_roles b ON (m.roleid = b.oid)
+		WHERE m.member = usesysid ) as roles
+		FROM pg_user
+		WHERE usename = '%s';
+`
+	)
+
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		return nil
+	}
+
+	sqlTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(descUserTpl, user.UserName)
+	}
+
+	// post-processing
+	dataProcessor := func(data []byte) (interface{}, error) {
+		type pgUserInfo struct {
+			UserName string   `json:"username"`
+			Expired  bool     `json:"expired"`
+			Super    bool     `json:"usesuper"`
+			Roles    []string `json:"roles"`
+		}
+		// parse data to struct
+		var pgUsers []pgUserInfo
+		err := json.Unmarshal(data, &pgUsers)
+		if err != nil {
+			return nil, err
+		}
+		if len(pgUsers) == 0 {
+			return nil, ErrNoUserFound
+		}
+		// parse roles
+		users := make([]UserInfo, len(pgUsers))
+		for i := range pgUsers {
+			if pgUsers[i].Super {
+				pgUsers[i].Roles = append(pgUsers[i].Roles, "superuser")
+			}
+			users[i] = UserInfo{
+				UserName: pgUsers[i].UserName,
+				RoleName: strings.Join(pgUsers[i].Roles, ","),
+			}
+			if pgUsers[i].Expired {
+				users[i].Expired = "T"
+			} else {
+				users[i].Expired = "F"
+			}
+		}
+		if jsonData, err := json.Marshal(users); err != nil {
+			return nil, err
+		} else {
+			return string(jsonData), nil
+		}
+	}
+
+	return pgOps.queryUser(ctx, req, opsKind, validFn, sqlTplRend, dataProcessor)
+}
+
+func (pgOps *PostgresOperations) execUser(ctx context.Context, req *bindings.InvokeRequest, opsKind bindings.OperationKind,
+	validFn UserDefinedObjectValidator[UserInfo], sqlTplRend SQLRender[UserInfo], msgTplRend SQLRender[UserInfo], postProcessor SQLPostProcessor[UserInfo]) (OpsResult, error) {
+	var (
+		result   = OpsResult{}
+		userInfo = UserInfo{}
+		metadata = OpsMetadata{StartTime: time.Now(), Operation: opsKind}
+	)
+
+	result[RespTypMeta] = &metadata
+	// parser userinfo from metadata
+	if err := ParseObjectFromMetadata(req.Metadata, &userInfo, validFn); err != nil {
+		metadata.EndTime = time.Now()
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
+	}
+
+	sql := sqlTplRend(userInfo)
+	pgOps.Logger.Debugf("PostgresOperations.execUser() with sql: %s", sql)
+	_, err := pgOps.exec(ctx, sql)
+	metadata.EndTime = time.Now()
+	metadata.Extra = sql
+
+	if err != nil {
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
+	}
+
+	if postProcessor != nil {
+		err = postProcessor(userInfo)
+		if err != nil {
+			result[RespTypEve] = RespEveFail
+			result[RespTypMsg] = err.Error()
+			return result, nil
+		}
+	}
+
+	result[RespTypEve] = RespEveSucc
+	result[RespTypMsg] = msgTplRend(userInfo)
+	return result, nil
+}
+
+func (pgOps *PostgresOperations) queryUser(ctx context.Context, req *bindings.InvokeRequest, opsKind bindings.OperationKind,
+	validFn UserDefinedObjectValidator[UserInfo], sqlTplRend SQLRender[UserInfo], dataProcessor DataRender) (OpsResult, error) {
+	var (
+		result   = OpsResult{}
+		userInfo = UserInfo{}
+		metadata = OpsMetadata{StartTime: time.Now(), Operation: opsKind}
+	)
+
+	result[RespTypMeta] = &metadata
+	// parser userinfo from metadata
+	if err := ParseObjectFromMetadata(req.Metadata, &userInfo, validFn); err != nil {
+		metadata.EndTime = time.Now()
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
+	}
+
+	sql := sqlTplRend(userInfo)
+	pgOps.Logger.Debugf("PostgresOperations.queryUser() with sql: %s", sql)
+	jsonData, err := pgOps.query(ctx, sql)
+	metadata.EndTime = time.Now()
+	metadata.Extra = sql
+
+	if err != nil {
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
+	}
+	var ret interface{}
+	if dataProcessor == nil {
+		ret = string(jsonData)
+	} else {
+		if ret, err = dataProcessor(jsonData); err != nil {
+			result[RespTypEve] = RespEveFail
+			result[RespTypMsg] = err.Error()
+			return result, nil
+		}
+	}
+
+	result[RespTypEve] = RespEveSucc
+	result[RespTypData] = ret
+	return result, nil
+}
+
+func (pgOps *PostgresOperations) renderRoleByName(roleName string) (string, error) {
+	switch strings.ToLower(roleName) {
+	case ReadWriteRole:
+		return "pg_write_all_data", nil
+	case ReadOnlyRole:
+		return "pg_read_all_data", nil
+	default:
+		return "", fmt.Errorf("role name: %s is not supported", roleName)
+	}
 }

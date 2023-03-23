@@ -62,6 +62,14 @@ func TestOperations(t *testing.T) {
 	assert.NotNil(t, pgOps.OperationMap[ExecOperation])
 	assert.NotNil(t, pgOps.OperationMap[QueryOperation])
 	assert.NotNil(t, pgOps.OperationMap[CheckStatusOperation])
+
+	assert.NotNil(t, pgOps.OperationMap[ListUsersOp])
+	assert.NotNil(t, pgOps.OperationMap[CreateUserOp])
+	assert.NotNil(t, pgOps.OperationMap[DeleteUserOp])
+	assert.NotNil(t, pgOps.OperationMap[DescribeUserOp])
+	assert.NotNil(t, pgOps.OperationMap[GrantUserRoleOp])
+	assert.NotNil(t, pgOps.OperationMap[RevokeUserRoleOp])
+
 }
 
 // SETUP TESTS
@@ -182,6 +190,130 @@ func TestPostgresIntegration(t *testing.T) {
 		req.Data = nil
 		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
+	})
+}
+
+// SETUP TESTS, run as `postgre` to manage accounts
+// 1. exprot PGUSER=potgres
+// 2. exprot PGPASSWORD=<your-pg-password>
+// 4. export POSTGRES_TEST_CONN_URL="postgres://${PGUSER}:${PGPASSWORD}@localhost:5432/postgres"
+// 5. `go test -v -count=1 ./bindings/postgres -run ^TestPostgresIntegrationAccounts`
+func TestPostgresIntegrationAccounts(t *testing.T) {
+	url := os.Getenv("POSTGRES_TEST_CONN_URL")
+	if url == "" {
+		t.SkipNow()
+	}
+
+	// live DB test
+	b := NewPostgres(logger.NewLogger("test")).(*PostgresOperations)
+	m := bindings.Metadata{Base: metadata.Base{Properties: map[string]string{connectionURLKey: url}}}
+	if err := b.Init(m); err != nil {
+		t.Fatal(err)
+	}
+	assert.True(t, b.InitIfNeed())
+	_ = b.InitDelay()
+	assert.False(t, b.InitIfNeed())
+
+	ctx := context.TODO()
+
+	t.Run("Account management", func(t *testing.T) {
+		const (
+			userName = "fakeuser"
+			password = "fakePassword"
+			roleName = "readonly"
+		)
+		// delete user to clean up
+		req := &bindings.InvokeRequest{
+			Operation: DeleteUserOp,
+			Metadata:  map[string]string{},
+		}
+		res, err := b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveFail)
+		req.Metadata["userName"] = userName
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveSucc)
+
+		// create user
+		req = &bindings.InvokeRequest{
+			Operation: CreateUserOp,
+			Metadata:  map[string]string{},
+		}
+		req.Metadata["userName"] = userName
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveFail)
+		req.Metadata["password"] = password
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveSucc)
+
+		// describe user
+		req = &bindings.InvokeRequest{
+			Operation: DescribeUserOp,
+			Metadata:  map[string]string{},
+		}
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveFail)
+		req.Metadata["userName"] = userName
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveSucc)
+
+		// list users
+		req = &bindings.InvokeRequest{
+			Operation: ListUsersOp,
+			Metadata:  map[string]string{},
+		}
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveSucc)
+
+		// grant role
+		req = &bindings.InvokeRequest{
+			Operation: GrantUserRoleOp,
+			Metadata:  map[string]string{},
+		}
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveFail)
+
+		req.Metadata["userName"] = userName
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveFail)
+
+		req.Metadata["roleName"] = "fakerole"
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveFail)
+
+		req.Metadata["roleName"] = roleName
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveSucc)
+
+		// revoke role
+		req = &bindings.InvokeRequest{
+			Operation: RevokeUserRoleOp,
+			Metadata:  map[string]string{},
+		}
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveFail)
+
+		req.Metadata["userName"] = userName
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveFail)
+
+		req.Metadata["roleName"] = "fakerole"
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveFail)
+
+		req.Metadata["roleName"] = roleName
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveSucc)
+
+		// delete user
+		req = &bindings.InvokeRequest{
+			Operation: DeleteUserOp,
+			Metadata:  map[string]string{},
+		}
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveFail)
+		req.Metadata["userName"] = userName
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveSucc)
 	})
 }
 

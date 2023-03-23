@@ -65,39 +65,6 @@ type BaseOperations struct {
 	OperationMap           map[bindings.OperationKind]Operation
 }
 
-const (
-	ReadWrite AccessMode = "ReadWrite"
-	Readonly  AccessMode = "Readonly"
-	None      AccessMode = "None"
-
-	// keys from response's metadata.
-	RespOpKey           = "operation"
-	RespStartTimeKey    = "start-time"
-	RespRowsAffectedKey = "rows-affected"
-	RespEndTimeKey      = "end-time"
-	RespDurationKey     = "duration"
-	StatusCode          = "status-code"
-	// 451 Unavailable For Legal Reasons, used to indicate operation failed.
-	OperationFailedHTTPCode = "451"
-	// 404 Not Found, used to indicate operation not found.
-	OperationNotFoundHTTPCode = "404"
-
-	// CommandSQLKey keys from request's metadata.
-	CommandSQLKey = "sql"
-
-	roleEventRecordQPS                = 1. / 100.
-	roleEventReportFrequency          = int(1 / roleEventRecordQPS)
-	defaultFailedEventReportFrequency = 1800
-	defaultRoleDetectionThreshold     = 300
-)
-
-const (
-	// types for probe
-	CheckRunningType int = iota
-	CheckStatusType
-	CheckRoleChangedType
-)
-
 func init() {
 	viper.SetDefault("KB_FAILED_EVENT_REPORT_FREQUENCY", defaultFailedEventReportFrequency)
 	viper.SetDefault("KB_ROLE_DETECTION_THRESHOLD", defaultRoleDetectionThreshold)

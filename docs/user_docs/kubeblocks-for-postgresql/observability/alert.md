@@ -76,8 +76,7 @@ To improve usability, `kbcli` develops the `alert` subcommand to simplify the re
 Add an alert receiver.
    
    ```bash
-   kbcli alert add-receiver 
-   --webhook='xxx' --cluster=xx --severity=xx
+   kbcli alert add-receiver --webhook='xxx' --cluster=xx --severity=xx
    ```
 
 ***Example***
@@ -87,19 +86,19 @@ Add an alert receiver.
 
    ```bash
    # Signature authentication is disabled
-   kbcli alert add-receiver
+   kbcli alert add-receiver \
    --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo'
 
    # Signature authentication is enabled and sign is used as the value of token
-   kbcli alert add-receiver
+   kbcli alert add-receiver \
    --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=sign'
 
    # Only receive the alerts from a cluster named pg
-   kbcli alert add-receiver
+   kbcli alert add-receiver \
    --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=pg
 
    # Only receive the critical alerts from a cluster named pg
-   kbcli alert add-receiver
+   kbcli alert add-receiver \
    --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=pg --severity=critical
    ```
 

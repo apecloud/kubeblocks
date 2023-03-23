@@ -228,7 +228,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			// do Action
 			_, err = opsManager.Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(opsRes.Cluster.Status.Phase).Should(Equal(appsv1alpha1.ReconfiguringType))
+			Expect(opsRes.Cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 
 			By("Reconfigure operation success")
 			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsSucceedPhase, nil)).Should(Succeed())

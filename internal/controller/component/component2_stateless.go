@@ -53,10 +53,6 @@ type statelessComponent struct {
 	componentBase
 }
 
-func (c *statelessComponent) GetName() string {
-	return c.CompSpec.Name
-}
-
 func (c *statelessComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 	return appsv1alpha1.Stateless
 }
@@ -94,7 +90,7 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 }
 
 func (c *statelessComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
-	if stsList, err := listDeployOwnedByComponent(reqCtx, cli, c.Cluster, c.CompSpec); err != nil {
+	if stsList, err := listDeployOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name); err != nil {
 		return false, err
 	} else {
 		return len(stsList) > 0, nil // component.replica can not be zero

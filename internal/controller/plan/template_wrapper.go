@@ -18,6 +18,7 @@ package plan
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -29,7 +30,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 type templateRenderValidator = func(map[string]string) error
@@ -44,15 +44,13 @@ type renderWrapper struct {
 	ctx     context.Context
 	cli     client.Client
 	cluster *appsv1alpha1.Cluster
-	params  builder.BuilderParams
 }
 
-func newTemplateRenderWrapper(cfgTplBuilder *configTemplateBuilder, cluster *appsv1alpha1.Cluster, params builder.BuilderParams, ctx context.Context, cli client.Client) renderWrapper {
+func newTemplateRenderWrapper(cfgTplBuilder *configTemplateBuilder, cluster *appsv1alpha1.Cluster, ctx context.Context, cli client.Client) renderWrapper {
 	return renderWrapper{
 		ctx:     ctx,
 		cli:     cli,
 		cluster: cluster,
-		params:  params,
 
 		templateBuilder:     cfgTplBuilder,
 		templateAnnotations: make(map[string]string),
@@ -60,13 +58,13 @@ func newTemplateRenderWrapper(cfgTplBuilder *configTemplateBuilder, cluster *app
 	}
 }
 
-func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileTask, obj client.Object) error {
+func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	for _, tpl := range task.Component.ConfigTemplates {
-		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, tpl.VolumeName)
+	for _, tpl := range component.ConfigTemplates {
+		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, tpl.VolumeName)
 
 		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, tpl.ConfigConstraintRef, tpl.ComponentTemplateSpec, wrapper.params, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
+		cm, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, tpl.ConfigConstraintRef, tpl.ComponentTemplateSpec, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
 			return validateRenderedData(m, tpl, wrapper.ctx, wrapper.cli)
 		})
 		if err != nil {
@@ -81,13 +79,13 @@ func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileT
 	return nil
 }
 
-func (wrapper *renderWrapper) renderScriptTemplate(task *intctrltypes.ReconcileTask, obj client.Object) error {
+func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	for _, tpl := range task.Component.ScriptTemplates {
-		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, tpl.VolumeName)
+	for _, tpl := range component.ScriptTemplates {
+		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, tpl.VolumeName)
 
 		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, "", tpl, wrapper.params, wrapper.ctx, wrapper.cli, nil)
+		cm, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, "", tpl, wrapper.ctx, wrapper.cli, nil)
 		if err != nil {
 			return err
 		}
@@ -129,11 +127,12 @@ func updateCMConfigSpecLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ComponentCo
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.
-func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
+func generateConfigMapFromTpl(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	tplBuilder *configTemplateBuilder,
 	cmName string,
 	configConstraintName string,
 	tplCfg appsv1alpha1.ComponentTemplateSpec,
-	params builder.BuilderParams,
 	ctx context.Context,
 	cli client.Client, dataValidator templateRenderValidator) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
@@ -150,7 +149,7 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 	}
 
 	// Using ConfigMap cue template render to configmap of config
-	return builder.BuildConfigMapWithTemplate(configs, params, cmName, configConstraintName, tplCfg)
+	return builder.BuildConfigMapWithTemplateLow(cluster, component, configs, cmName, configConstraintName, tplCfg)
 }
 
 // renderConfigMapTemplate render config file using template engine

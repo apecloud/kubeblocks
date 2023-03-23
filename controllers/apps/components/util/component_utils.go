@@ -170,14 +170,14 @@ func GetClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName st
 func InitClusterComponentStatusIfNeed(
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
-	componentDef appsv1alpha1.ClusterComponentDefinition) {
+	workloadType appsv1alpha1.WorkloadType) {
 	if _, ok := cluster.Status.Components[componentName]; !ok {
 		cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
 			Phase: cluster.Status.Phase,
 		})
 	}
 	componentStatus := cluster.Status.Components[componentName]
-	switch componentDef.WorkloadType {
+	switch workloadType {
 	case appsv1alpha1.Consensus:
 		if componentStatus.ConsensusSetStatus != nil {
 			break

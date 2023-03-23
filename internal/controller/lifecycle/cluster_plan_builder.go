@@ -149,8 +149,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		//&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 		// add our finalizer to all objects
 		&ownershipTransformer{finalizer: dbClusterFinalizerName},
-		// make all non-secret workload objects depending on all secrets
-		&secretDependencyTransformer{},
+		// make all non-secret objects depending on all secrets
+		&secretTransformer{},
 		// make config configmap immutable
 		&configTransformer{},
 		// read old snapshot from cache, and generate diff plan

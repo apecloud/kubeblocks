@@ -19,6 +19,7 @@ package plan
 import (
 	"context"
 	"fmt"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"math"
 	"strings"
 
@@ -287,7 +288,7 @@ func prepareComponentWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	}()
 
 	// render config template
-	configs, err := buildCfg(task, workload, podSpec, reqCtx.Ctx, cli)
+	configs, err := BuildCfg(task, workload, podSpec, reqCtx.Ctx, cli)
 	if err != nil {
 		return err
 	}
@@ -377,32 +378,42 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	return nil
 }
 
-// buildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files
-func buildCfg(task *intctrltypes.ReconcileTask,
+func BuildCfg(task *intctrltypes.ReconcileTask,
+	obj client.Object,
+	podSpec *corev1.PodSpec,
+	ctx context.Context,
+	cli client.Client) ([]client.Object, error) {
+	return BuildCfgLow(task.ClusterVersion, task.Cluster, task.Component, obj, podSpec, ctx, cli)
+}
+
+// BuildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files
+func BuildCfgLow(clusterVersion *appsv1alpha1.ClusterVersion,
+	cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
 	obj client.Object,
 	podSpec *corev1.PodSpec,
 	ctx context.Context,
 	cli client.Client) ([]client.Object, error) {
 	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
-	if len(task.Component.ConfigTemplates) == 0 && len(task.Component.ScriptTemplates) == 0 {
+	if len(component.ConfigTemplates) == 0 && len(component.ScriptTemplates) == 0 {
 		return nil, nil
 	}
 
-	clusterName := task.Cluster.Name
-	namespaceName := task.Cluster.Namespace
+	clusterName := cluster.Name
+	namespaceName := cluster.Namespace
 	// New ConfigTemplateBuilder
-	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, task.Cluster, task.ClusterVersion, ctx, cli)
+	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, cluster, clusterVersion, ctx, cli)
 	// Prepare built-in objects and built-in functions
-	if err := cfgTemplateBuilder.injectBuiltInObjectsAndFunctions(podSpec, task.Component.ConfigTemplates, task.Component); err != nil {
+	if err := cfgTemplateBuilder.injectBuiltInObjectsAndFunctions(podSpec, component.ConfigTemplates, component); err != nil {
 		return nil, err
 	}
 
-	renderWrapper := newTemplateRenderWrapper(cfgTemplateBuilder, task.Cluster, task.GetBuilderParams(), ctx, cli)
-	if err := renderWrapper.renderConfigTemplate(task, obj); err != nil {
+	renderWrapper := newTemplateRenderWrapper(cfgTemplateBuilder, cluster, ctx, cli)
+	if err := renderWrapper.renderConfigTemplate(cluster, component); err != nil {
 		return nil, err
 	}
-	if err := renderWrapper.renderScriptTemplate(task, obj); err != nil {
+	if err := renderWrapper.renderScriptTemplate(cluster, component); err != nil {
 		return nil, err
 	}
 
@@ -415,7 +426,7 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
 	}
 
-	if err := updateConfigManagerWithComponent(podSpec, task.Component.ConfigTemplates, ctx, cli, task.GetBuilderParams()); err != nil {
+	if err := updateConfigManagerWithComponent(podSpec, component.ConfigTemplates, ctx, cli, cluster, component); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
 
@@ -449,7 +460,8 @@ func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotat
 
 // updateConfigManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec, ctx context.Context, cli client.Client, params builder.BuilderParams) error {
+func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec,
+	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
 	var (
 		err error
 
@@ -460,7 +472,7 @@ func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []ap
 	if volumeDirs = getUsingVolumesByCfgTemplates(podSpec, cfgTemplates); len(volumeDirs) == 0 {
 		return nil
 	}
-	if configManagerParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, params); err != nil {
+	if configManagerParams, err = buildConfigManagerParams(cli, ctx, cluster, component, cfgTemplates, volumeDirs); err != nil {
 		return err
 	}
 	if configManagerParams == nil {
@@ -532,14 +544,15 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	return volumeDirs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster,
+	comp *component.SynthesizedComponent, cfgTemplates []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount) (*cfgcm.ConfigManagerParams, error) {
 	configManagerParams := &cfgcm.ConfigManagerParams{
 		ManagerName:   constant.ConfigSidecarName,
-		CharacterType: params.Component.CharacterType,
-		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
+		CharacterType: comp.CharacterType,
+		SecreteName:   component.GenerateConnCredential(cluster.Name),
 		Image:         viper.GetString(constant.ConfigSidecarIMAGE),
 		Volumes:       volumeDirs,
-		Cluster:       params.Cluster,
+		Cluster:       cluster,
 	}
 
 	var err error

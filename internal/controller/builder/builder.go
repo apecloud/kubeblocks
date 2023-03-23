@@ -291,7 +291,7 @@ func BuildStsLow(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, c
 		}
 	}
 
-	if err := processContainersInjection(reqCtx, cluster, component., envConfigName, &sts.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &sts.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return &sts, nil
@@ -302,12 +302,17 @@ func randomString(length int) string {
 }
 
 func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
+	return BuildConnCredentialLow(params.ClusterDefinition, params.Cluster, params.Component)
+}
+
+func BuildConnCredentialLow(clusterDefiniiton *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent) (*corev1.Secret, error) {
 	const tplFile = "conn_credential_template.cue"
 
 	connCredential := corev1.Secret{}
 	if err := buildFromCUE(tplFile, map[string]any{
-		"clusterdefinition": params.ClusterDefinition,
-		"cluster":           params.Cluster,
+		"clusterdefinition": clusterDefiniiton,
+		"cluster":           cluster,
 	}, "secret", &connCredential); err != nil {
 		return nil, err
 	}
@@ -362,10 +367,10 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 		"$(UUID_B64)":      uuidB64,
 		"$(UUID_STR_B64)":  uuidStrB64,
 		"$(UUID_HEX)":      uuidHex,
-		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", cluster.Name, component.Name, cluster.Namespace),
 	}
-	if len(params.Component.Services) > 0 {
-		for _, p := range params.Component.Services[0].Spec.Ports {
+	if len(component.Services) > 0 {
+		for _, p := range component.Services[0].Spec.Ports {
 			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
 		}
 	}
@@ -627,9 +632,17 @@ func BuildCronJob(pvcKey types.NamespacedName,
 	return &cronJob, nil
 }
 
-func BuildConfigMapWithTemplate(
-	configs map[string]string,
+func BuildConfigMapWithTemplate(configs map[string]string,
 	params BuilderParams,
+	cmName string,
+	configConstraintName string,
+	tplCfg appsv1alpha1.ComponentTemplateSpec) (*corev1.ConfigMap, error) {
+	return BuildConfigMapWithTemplateLow(params.Cluster, params.Component, configs, cmName, configConstraintName, tplCfg)
+}
+
+func BuildConfigMapWithTemplateLow(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	configs map[string]string,
 	cmName string,
 	configConstraintName string,
 	tplCfg appsv1alpha1.ComponentTemplateSpec) (*corev1.ConfigMap, error) {
@@ -646,16 +659,16 @@ func BuildConfigMapWithTemplate(
 	// prepare cue data
 	configMeta := map[string]map[string]string{
 		"clusterDefinition": {
-			"name": params.ClusterDefinition.GetName(),
+			"name": cluster.Spec.ClusterDefRef,
 		},
 		"cluster": {
-			"name":      params.Cluster.GetName(),
-			"namespace": params.Cluster.GetNamespace(),
+			"name":      cluster.GetName(),
+			"namespace": cluster.GetNamespace(),
 		},
 		"component": {
-			"name":                  params.Component.Name,
-			"type":                  params.Component.Type,
-			"characterType":         params.Component.CharacterType,
+			"name":                  component.Name,
+			"type":                  component.Type,
+			"characterType":         component.CharacterType,
 			"configName":            cmName,
 			"templateName":          tplCfg.TemplateRef,
 			"configConstraintsName": configConstraintName,

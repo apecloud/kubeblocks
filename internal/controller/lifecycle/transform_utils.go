@@ -37,6 +37,18 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+func FindMatchedVertex[T interface{}](dag *graph.DAG, objectKey client.ObjectKey) graph.Vertex {
+	for _, vertex := range dag.Vertices() {
+		v, _ := vertex.(*lifecycleVertex)
+		if _, ok := v.obj.(T); ok {
+			if client.ObjectKeyFromObject(v.obj) == objectKey {
+				return vertex
+			}
+		}
+	}
+	return nil
+}
+
 func findAll[T interface{}](dag *graph.DAG) []graph.Vertex {
 	vertices := make([]graph.Vertex, 0)
 	for _, vertex := range dag.Vertices() {

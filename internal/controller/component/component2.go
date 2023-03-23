@@ -26,7 +26,14 @@ import (
 
 type Component interface {
 	GetName() string
+	GetNamespace() string
+	GetClusterName() string
 	GetWorkloadType() appsv1alpha1.WorkloadType
+
+	GetDefinition() *appsv1alpha1.ClusterDefinition
+	GetVersion() *appsv1alpha1.ClusterVersion
+	GetCluster() *appsv1alpha1.Cluster
+	GetSynthesizedComponent() *SynthesizedComponent
 
 	Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error)
 
@@ -66,6 +73,7 @@ func NewComponent(definition appsv1alpha1.ClusterDefinition,
 
 type componentBase struct {
 	Definition appsv1alpha1.ClusterDefinition
+	Version    appsv1alpha1.ClusterVersion
 	Cluster    appsv1alpha1.Cluster
 
 	CompDef  appsv1alpha1.ClusterComponentDefinition
@@ -76,7 +84,8 @@ type componentBase struct {
 	Component *SynthesizedComponent
 
 	// DAG vertex of main workload object
-	WorkloadVertex *lifecycleVertex
+	WorkloadVertex  *lifecycleVertex
+	WorkloadVertexs []*lifecycleVertex // TODO
 
 	Dag *graph.DAG
 }
@@ -99,7 +108,6 @@ func (c *componentBase) addResource(obj client.Object, action lifecycle.Action, 
 	if parent != nil {
 		c.Dag.Connect(parent, vertex)
 	}
-
 	return vertex
 }
 
@@ -113,4 +121,32 @@ func (c *componentBase) deleteResource(obj client.Object, parent *lifecycleVerte
 
 func (c *componentBase) updateResource(obj client.Object, parent *lifecycleVertex) *lifecycleVertex {
 	return c.addResource(obj, lifecycle.UPDATE, parent)
+}
+
+func (c *componentBase) GetName() string {
+	return c.CompSpec.Name
+}
+
+func (c *componentBase) GetNamespace() string {
+	return c.Cluster.Namespace
+}
+
+func (c *componentBase) GetClusterName() string {
+	return c.Cluster.Name
+}
+
+func (c *componentBase) GetDefinition() *appsv1alpha1.ClusterDefinition {
+	return &c.Definition
+}
+
+func (c *componentBase) GetVersion() *appsv1alpha1.ClusterVersion {
+	return &c.Version
+}
+
+func (c *componentBase) GetCluster() *appsv1alpha1.Cluster {
+	return &c.Cluster
+}
+
+func (c *componentBase) GetSynthesizedComponent() *SynthesizedComponent {
+	return c.Component
 }

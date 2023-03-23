@@ -201,7 +201,7 @@ func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) er
 	}
 	// sync cluster.status.components.replicationSet.status
 	clusterDeepCopy := r.Cluster.DeepCopy()
-	if err := syncReplicationSetClusterStatus(r.Cli, ctx, r.Cluster, podList); err != nil {
+	if err := syncReplicationSetClusterStatus(ctx, r.Cli, r.Cluster, podList); err != nil {
 		return err
 	}
 	if reflect.DeepEqual(clusterDeepCopy.Status.Components, r.Cluster.Status.Components) {

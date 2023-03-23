@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	"reflect"
 	"strings"
 	"time"
@@ -31,7 +32,6 @@ import (
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -42,6 +42,50 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
+	reqCtx intctrlutil.RequestCtx, cli client.Client, _ func(T, L), namespace string, labels map[string]string) ([]PT, error) {
+	var objList L
+	if err := cli.List(reqCtx.Ctx, PL(&objList), client.MatchingLabels(labels), client.InNamespace(namespace)); err != nil {
+		return nil, err
+	}
+
+	objs := make([]PT, 0)
+	for _, obj := range reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T) {
+		objs = append(objs, &obj)
+	}
+	return objs, nil
+}
+
+func listPodOwnedByComponent(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	namespace, clusterName, compName string) ([]*corev1.Pod, error) {
+	labels := map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: compName,
+	}
+	return listObjWithLabelsInNamespace(reqCtx, cli, generics.PodSignature, namespace, labels)
+}
+
+func listStsOwnedByComponent(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	namespace, clusterName, compName string) ([]*appsv1.StatefulSet, error) {
+	labels := map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: compName,
+	}
+	return listObjWithLabelsInNamespace(reqCtx, cli, generics.StatefulSetSignature, namespace, labels)
+}
+
+func listDeployOwnedByComponent(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	namespace, clusterName, compName string) ([]*appsv1.Deployment, error) {
+	labels := map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: compName,
+	}
+	return listObjWithLabelsInNamespace(reqCtx, cli, generics.DeploymentSignature, namespace, labels)
+}
 
 func getClusterBackupSourceMap(cluster appsv1alpha1.Cluster) (map[string]string, error) {
 	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
@@ -80,44 +124,6 @@ func buildRestoreInfoFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client
 		return err
 	}
 	return BuildRestoredInfo2(component, backup, backupTool)
-}
-
-func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
-	reqCtx intctrlutil.RequestCtx, cli client.Client, _ func(T, L), namespace string, labels map[string]string) ([]T, error) {
-	var objList L
-	if err := cli.List(reqCtx.Ctx, PL(&objList), client.MatchingLabels(labels), client.InNamespace(namespace)); err != nil {
-		return nil, err
-	}
-	return reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T), nil
-}
-
-func listStsOwnedByCluster(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	cluster appsv1alpha1.Cluster) ([]appsv1.StatefulSet, error) {
-	labels := map[string]string{
-		constant.AppManagedByLabelKey: constant.AppName,
-		constant.AppInstanceLabelKey:  cluster.Name,
-	}
-	return listObjWithLabelsInNamespace(reqCtx, cli, generics.StatefulSetSignature, cluster.Namespace, labels)
-}
-
-func listStsOwnedByComponent(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	cluster appsv1alpha1.Cluster, compSpec appsv1alpha1.ClusterComponentSpec) ([]appsv1.StatefulSet, error) {
-	labels := map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: compSpec.Name,
-	}
-	return listObjWithLabelsInNamespace(reqCtx, cli, generics.StatefulSetSignature, cluster.Namespace, labels)
-}
-
-func listDeployOwnedByComponent(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	cluster appsv1alpha1.Cluster, compSpec appsv1alpha1.ClusterComponentSpec) ([]appsv1.Deployment, error) {
-	labels := map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: compSpec.Name,
-	}
-	return listObjWithLabelsInNamespace(reqCtx, cli, generics.DeploymentSignature, cluster.Namespace, labels)
 }
 
 func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, component SynthesizedComponent) error {

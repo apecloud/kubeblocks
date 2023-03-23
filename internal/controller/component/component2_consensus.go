@@ -65,22 +65,26 @@ func (c *consensusComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		Comp:      c,
 		Error:     nil,
 		EnvConfig: nil,
-		Workload:  nil,
+		Workloads: make([]*appsv1.StatefulSet, 1),
+	}
+
+	patchService := func(svc *corev1.Service) {
+		leader := c.Component.ConsensusSpec.Leader
+		if len(leader.Name) > 0 {
+			svc.Spec.Selector[constant.RoleLabelKey] = leader.Name
+		}
 	}
 	// runtime, config, script, env, volume, service, monitor, probe
 	return builder.buildEnv(). // TODO: workload related, scaling related
-					buildWorkload(). // build workload here since other objects depend on it.
+					buildConsensusWorkload(). // build workload here since other objects depend on it.
 					buildHeadlessService().
-					buildConfig().
-					buildTlsVolume().
+					buildConfig(0).
+					buildTLSVolume(0).
+					buildVolumeMount(0).
 					buildPDB().
-					buildService().
-					buildVolumeMount().
+					buildService(patchService).
+					buildTLSCert().
 					complete()
-}
-
-func (c *consensusComponent) GetName() string {
-	return c.CompSpec.Name
 }
 
 func (c *consensusComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -88,7 +92,7 @@ func (c *consensusComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *consensusComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
-	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster, c.CompSpec); err != nil {
+	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name); err != nil {
 		return false, err
 	} else {
 		return len(stsList) > 0, nil // component.replica can not be zero
@@ -103,12 +107,11 @@ func (c *consensusComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return fmt.Errorf("component to be created is aready exist, cluster: %s, component: %s",
 			c.Cluster.Name, c.CompSpec.Name)
 	}
-
 	return c.init(reqCtx, cli)
 }
 
 func (c *consensusComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	// TODO: delete component managed resources
+	// TODO: delete component owned resources
 	return nil
 }
 
@@ -138,9 +141,9 @@ func (c *consensusComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli cli
 
 	for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 		var vctProto *corev1.PersistentVolumeClaimSpec
-		for _, v := range c.CompSpec.VolumeClaimTemplates {
+		for _, v := range c.Component.VolumeClaimTemplates {
 			if v.Name == vct.Name {
-				vctProto = v.Spec
+				vctProto = &v.Spec
 				break
 			}
 		}
@@ -195,13 +198,13 @@ func (c *consensusComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli 
 		corev1.EventTypeNormal,
 		"HorizontalScale",
 		"start horizontal scale component %s of cluster %s from %d to %d",
-		c.CompSpec.Name, c.Cluster.Name, int(c.CompSpec.Replicas)-ret, c.CompSpec.Replicas)
+		c.GetName(), c.GetClusterName(), int(c.Component.Replicas)-ret, c.Component.Replicas)
 
 	return nil
 }
 
 func (c *consensusComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.StatefulSet, error) {
-	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster, c.CompSpec)
+	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +218,7 @@ func (c *consensusComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli 
 			c.Cluster.Name, c.CompSpec.Name, cnt)
 	}
 
-	sts := &stsList[0]
+	sts := stsList[0]
 	if sts.Spec.Replicas == nil {
 		return nil, fmt.Errorf("running workload for the consensus component has no replica, cluster: %s, component: %s",
 			c.Cluster.Name, c.CompSpec.Name)
@@ -230,7 +233,7 @@ func (c *consensusComponent) horizontalScaling(reqCtx intctrlutil.RequestCtx, cl
 	if err != nil {
 		return 0, err
 	}
-	return int(c.CompSpec.Replicas - *sts.Spec.Replicas), nil
+	return int(c.Component.Replicas - *sts.Spec.Replicas), nil
 }
 
 func (c *consensusComponent) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -386,12 +389,4 @@ func (c *consensusComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.
 	c.WorkloadVertex.immutable = false
 
 	return nil
-}
-
-// TODO multi roles with same accessMode support
-func addLeaderSelectorLabels(service *corev1.Service, component *SynthesizedComponent) {
-	leader := component.ConsensusSpec.Leader
-	if len(leader.Name) > 0 {
-		service.Spec.Selector[constant.RoleLabelKey] = leader.Name
-	}
 }

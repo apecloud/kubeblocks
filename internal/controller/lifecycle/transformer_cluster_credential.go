@@ -19,7 +19,6 @@ package lifecycle
 import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -48,16 +47,12 @@ func (c *clusterCredentialTransformer) Transform(dag *graph.DAG) error {
 			continue
 		}
 
-		task := intctrltypes.ReconcileTask{
-			Cluster:           cluster,
-			ClusterDefinition: &c.cc.cd,
-			Component: &component.SynthesizedComponent{
-				Services: []corev1.Service{
-					{Spec: *compDef.Service},
-				},
+		component := &component.SynthesizedComponent{
+			Services: []corev1.Service{
+				{Spec: *compDef.Service},
 			},
 		}
-		if secret, err = builder.BuildConnCredential(task.GetBuilderParams()); err != nil {
+		if secret, err = builder.BuildConnCredentialLow(&c.cc.cd, cluster, component); err != nil {
 			return err
 		}
 		break

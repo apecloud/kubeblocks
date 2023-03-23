@@ -187,7 +187,7 @@ var (
 		CharacterType: "mysql",
 		ConsensusSpec: &defaultConsensusSpec,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleChangedProbe: &appsv1alpha1.ClusterDefinitionProbe{
+			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 				FailureThreshold: 3,
 				PeriodSeconds:    1,
 				TimeoutSeconds:   5,

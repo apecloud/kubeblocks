@@ -41,7 +41,6 @@ type MongoDBOperations struct {
 	client           *mongo.Client
 	database         *mongo.Database
 	operationTimeout time.Duration
-	logger           logger.Logger
 	BaseOperations
 }
 

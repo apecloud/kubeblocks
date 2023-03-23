@@ -66,9 +66,9 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		return err
 	}
 
-	if componentProbes.RoleChangedProbe != nil {
+	if componentProbes.RoleProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleChangedProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleChangedProbe, int(probeSvcHTTPPort))
+		buildRoleProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
@@ -182,7 +182,7 @@ func getComponentRoles(component *SynthesizedComponent) map[string]string {
 	return roles
 }
 
-func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *corev1.Container,
+func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe

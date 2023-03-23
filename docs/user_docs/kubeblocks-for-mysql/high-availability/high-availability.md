@@ -20,7 +20,7 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
 * Install a Kubernetes cluster and KubeBlocks, refer to [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md).
 * Create an ApeCloud MySQL Paxos Group, refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
-* Run `kubectl get cd apecloud-mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the ApeCloud MySQL Paxos Group (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
+* Run `kubectl get cd apecloud-mysql -o yaml` to check whether _roleprobe_ is enabled in the ApeCloud MySQL Paxos Group (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
   ```
   probes:
   roleChangedProbe:

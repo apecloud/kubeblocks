@@ -24,7 +24,7 @@ spec:
             accessMode: Readonly
         updateStrategy: Serial
       probes:
-        roleChangedProbe:
+        roleProbe:
           periodSeconds: 2
           failureThreshold: 3
       service:
@@ -96,7 +96,7 @@ spec:
             accessMode: Readonly
         updateStrategy: Serial
       probes:
-        roleChangedProbe:
+        roleProbe:
           periodSeconds: 2
           failureThreshold: 3
       service:
@@ -145,7 +145,7 @@ spec:
             accessMode: Readonly
         updateStrategy: BestEffortParallel
       probes:
-        roleChangedProbe:
+        roleProbe:
           periodSeconds: 2
           failureThreshold: 3
       service:

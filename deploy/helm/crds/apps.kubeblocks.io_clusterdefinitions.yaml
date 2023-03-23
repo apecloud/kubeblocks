@@ -7875,7 +7875,7 @@ spec:
                     probes:
                       description: probes setting for healthy checks.
                       properties:
-                        roleChangedProbe:
+                        roleProbe:
                           description: Probe for DB role changed check.
                           properties:
                             commands:
@@ -7922,9 +7922,8 @@ spec:
                             exceed the InitializationTimeoutSeconds time without a
                             role label, this component will enter the Failed/Abnormal
                             phase. Note that this configuration will only take effect
-                            if the component supports RoleChangedProbe and will not
-                            affect the life cycle of the pod. default values are 60
-                            seconds.
+                            if the component supports RoleProbe and will not affect
+                            the life cycle of the pod. default values are 60 seconds.
                           format: int32
                           minimum: 30
                           type: integer

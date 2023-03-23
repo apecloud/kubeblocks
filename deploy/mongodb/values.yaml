@@ -13,7 +13,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 replicaset:
-  roleChangedProbe:
+  roleProbe:
     failureThreshold: 2
     periodSeconds: 1
     timeoutSeconds: 1

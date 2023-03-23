@@ -131,7 +131,7 @@ zookeeper:
     tag: 3.8.0-debian-11-r47   
 
   logConfigs: {}
-  roleChangedProbe:
+  roleProbe:
     failureThreshold: 2
     periodSeconds: 1
     successThreshold: 1

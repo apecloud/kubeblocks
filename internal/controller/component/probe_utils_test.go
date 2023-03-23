@@ -72,9 +72,9 @@ var _ = Describe("probe_utils", func() {
 				},
 			}
 			component.Probes = &appsv1alpha1.ClusterDefinitionProbes{
-				RunningProbe:     &appsv1alpha1.ClusterDefinitionProbe{},
-				StatusProbe:      &appsv1alpha1.ClusterDefinitionProbe{},
-				RoleChangedProbe: &appsv1alpha1.ClusterDefinitionProbe{},
+				RunningProbe: &appsv1alpha1.ClusterDefinitionProbe{},
+				StatusProbe:  &appsv1alpha1.ClusterDefinitionProbe{},
+				RoleProbe:    &appsv1alpha1.ClusterDefinitionProbe{},
 			}
 			component.PodSpec = &corev1.PodSpec{
 				Containers: []corev1.Container{},
@@ -92,7 +92,7 @@ var _ = Describe("probe_utils", func() {
 		})
 
 		It("should build role changed probe container", func() {
-			buildRoleChangedProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort)
+			buildRoleProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort)
 			Expect(container.ReadinessProbe.Exec.Command).ShouldNot(BeEmpty())
 		})
 

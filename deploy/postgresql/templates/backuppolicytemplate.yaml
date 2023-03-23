@@ -13,3 +13,13 @@ spec:
   credentialKeyword:
     userKeyword: username
     passwordKeyword: password
+
+  hooks:
+    containerName: postgresql
+    preCommands:
+      - psql -c "CHECKPOINT"
+  backupStatusUpdates:
+    - path: manifests.backupLog
+      containerName: postgresql
+      script: /scripts/backup-log-collector.sh
+      updateStage: pre

@@ -1202,6 +1202,55 @@ var _ = Describe("Cluster Controller", func() {
 				Create(&testCtx).GetObject()
 		})
 
+		It("Should requeue reconcile if there are deleting pvcs when creating", func() {
+			mockFinalizer := "test-finalizer/test"
+			clusterName := "test-cluster-for-dirty-resources"
+
+			By("Mocking a pvc")
+			deletingPVC := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace,
+				"test-pvc",
+				clusterName,
+				mysqlCompName,
+				testapps.DataVolumeName).
+				SetStorage("1Gi").
+				Create(&testCtx).GetObject()
+
+			By("Setting finalizer to prevent it from deleted")
+			Expect(testapps.ChangeObj(&testCtx, deletingPVC, func() {
+				deletingPVC.Finalizers = append(deletingPVC.Finalizers, mockFinalizer)
+			})).Should(Succeed())
+
+			By("Deleting pvc")
+			Expect(k8sClient.Delete(ctx, deletingPVC)).Should(Succeed())
+
+			By("Creating cluster")
+			pvcSpec := testapps.NewPVC("1Gi")
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				clusterDefObj.Name, clusterVersionObj.Name).
+				AddComponent(mysqlCompName, mysqlCompType).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				SetReplicas(1).
+				Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingPhase))
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
+
+			By("Removing pvc's finalizers to make it deleted")
+			Expect(testapps.ChangeObj(&testCtx, deletingPVC, func() {
+				deletingPVC.SetFinalizers([]string{})
+			})).Should(Succeed())
+
+			By("Checking pvc deleted")
+			Eventually(testapps.GetListLen(&testCtx, intctrlutil.PersistentVolumeClaimSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
+
+			By("Checking reconcile succeeded")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		})
+
 		It("Should success with one leader pod and two follower pods", func() {
 			testThreeReplicas()
 		})

@@ -218,6 +218,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
 
+	// check no dirty resources left by last cluster with same name
+	hasDirtyResources := false
+	if hasDirtyResources, err = r.hasDirtyResources(ctx, cluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	// if there's any dirty resource, wait for next reconcile loop
+	if hasDirtyResources {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+	}
+
 	// preCheck succeed, starting the cluster provisioning
 	if err = clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -776,6 +786,23 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 		cluster.Status.SetComponentStatus(componentName, compStatus)
 	}
 	return doRemoveInitContainers, nil
+}
+
+func (r *ClusterReconciler) hasDirtyResources(ctx context.Context, cluster *appsv1alpha1.Cluster) (bool, error) {
+	// check if there's any deleting pvcs
+	pvcList := corev1.PersistentVolumeClaimList{}
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name,
+	}
+	if err := r.Client.List(ctx, &pvcList, ml); err != nil {
+		return false, err
+	}
+	for _, pvc := range pvcList.Items {
+		if !pvc.DeletionTimestamp.IsZero() {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Handle is the event handler for the cluster status event.

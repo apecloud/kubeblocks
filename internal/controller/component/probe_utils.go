@@ -35,7 +35,9 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	roleObserveURIFormat = "http://localhost:%s/v1.0/bindings/%s"
+	checkRoleURIFormat    = "http://localhost:%s/v1.0/bindings/%s"
+	checkRunningURIFormat = "/v1.0/bindings/%s?operation=checkRunning"
+	checkStatusURIFormat  = "/v1.0/bindings/%s?operation=checkStatus"
 )
 
 var (
@@ -74,13 +76,13 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	if componentProbes.StatusProbe != nil {
 		statusProbeContainer := container.DeepCopy()
-		buildStatusProbeContainer(statusProbeContainer, componentProbes.StatusProbe, int(probeSvcHTTPPort))
+		buildStatusProbeContainer(component.CharacterType, statusProbeContainer, componentProbes.StatusProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *statusProbeContainer)
 	}
 
 	if componentProbes.RunningProbe != nil {
 		runningProbeContainer := container.DeepCopy()
-		buildRunningProbeContainer(runningProbeContainer, componentProbes.RunningProbe, int(probeSvcHTTPPort))
+		buildRunningProbeContainer(component.CharacterType, runningProbeContainer, componentProbes.RunningProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *runningProbeContainer)
 	}
 
@@ -188,7 +190,7 @@ func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(characterType)
 	svcPort := strconv.Itoa(probeSvcHTTPPort)
-	roleObserveURI := fmt.Sprintf(roleObserveURIFormat, svcPort, bindingType)
+	roleObserveURI := fmt.Sprintf(checkRoleURIFormat, svcPort, bindingType)
 	probe.Exec.Command = []string{
 		"curl", "-X", "POST",
 		"--max-time", strconv.Itoa(int(probeSetting.TimeoutSeconds)),
@@ -203,12 +205,12 @@ func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
-func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
+func buildStatusProbeContainer(characterType string, statusProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	statusProbeContainer.Name = constant.StatusProbeContainerName
 	probe := statusProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = "/v1.0/bindings/probe?operation=checkStatus"
+	httpGet.Path = fmt.Sprintf(checkStatusURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet
@@ -218,12 +220,12 @@ func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 	statusProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
-func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
+func buildRunningProbeContainer(characterType string, runningProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	runningProbeContainer.Name = constant.RunningProbeContainerName
 	probe := runningProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = "/v1.0/bindings/probe?operation=checkRunning"
+	httpGet.Path = fmt.Sprintf(checkRunningURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet

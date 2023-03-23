@@ -154,7 +154,7 @@ const (
 	ProbeGRPCPortName         = "probe-grpc-port"
 	RoleProbeContainerName    = "kb-checkrole"
 	StatusProbeContainerName  = "kb-checkstatus"
-	RunningProbeContainerName = "kb-runningcheck"
+	RunningProbeContainerName = "kb-checkrunning"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"

@@ -102,12 +102,12 @@ var _ = Describe("probe_utils", func() {
 		})
 
 		It("should build status probe container", func() {
-			buildStatusProbeContainer(container, clusterDefProbe, probeServiceHTTPPort)
+			buildStatusProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort)
 			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
 		})
 
 		It("should build running probe container", func() {
-			buildRunningProbeContainer(container, clusterDefProbe, probeServiceHTTPPort)
+			buildRunningProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort)
 			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
 		})
 	})

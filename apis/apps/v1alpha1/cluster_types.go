@@ -72,23 +72,14 @@ type ClusterStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// phase describes the phase of the Cluster. the detail information of phase is as follows:
-	// Running: cluster is running, all components are available. [terminal state]
-	// Stopped: all components are stopped, or some components are stopped and other components are running. [terminal state]
+	// phase describes the phase of the Cluster, the detail information of the phases are as following:
+	// Running: cluster is running, all its components are available. [terminal state]
+	// Stopped: cluster has stopped, all its components are stopped. [terminal state]
 	// Failed: cluster is unavailable. [terminal state]
-	// Abnormal: Cluster is still available, but part of its components are Abnormal. [terminal state]
-	// Creating: creating Cluster.
-	// Running: Cluster is running, all components are available.
-	// Updating: the Cluster phase will be 'Updating' when directly updating Cluster.spec.
-	// VolumeExpanding: volume expansion operation is running.
-	// HorizontalScaling: horizontal scaling operation is running.
-	// VerticalScaling: vertical scaling operation is running.
-	// VersionUpgrading: upgrade operation is running.
-	// Rebooting: restart operation is running.
-	// Stopping: stop operation is running.
-	// Starting: start operation is running.
-	// Reconfiguring: reconfiguration operation is running.
-	// Deleting: deleting Cluster.
+	// Abnormal: Cluster is still running, but part of its components are Abnormal/Failed. [terminal state]
+	// Starting: Cluster has entered starting process.
+	// Updating: Cluster has entered updating process, triggered by Spec. updated.
+	// Stopping: Cluster has entered a stopping process.
 	// if the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// +optional
 	Phase ClusterPhase `json:"phase,omitempty"`
@@ -191,13 +182,17 @@ type ComponentMessageMap map[string]string
 
 // ClusterComponentStatus record components status information
 type ClusterComponentStatus struct {
-	// phase describes the phase of the Cluster. the detail information of phase is as follows:
+	// phase describes the phase of the component, the detail information of the phases are as following:
 	// Failed: component is unavailable, i.e, all pods are not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
-	// Abnormal: component available but part of its pods are not ready.
-	// Stopped: replicas number of component is 0.
+	// Running: component is running. [terminal state]
+	// Stopped: component is stopped, as no running pod. [terminal state]
+	// Failed: component has failed to start running. [terminal state]
+	// Abnormal: component is running but part of its pods are not ready. [terminal state]
+	// Starting: component has entered starting process.
+	// Updating: component has entered updating process, triggered by Spec. updated.
+	// Stopping: component has entered a stopping process.
 	// If the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
-	// Other phases behave the same as the cluster phase.
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.

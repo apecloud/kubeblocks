@@ -196,6 +196,17 @@ var _ = Describe("Consensus Component", func() {
 			_ = GetObjectListByComponentName(ctx, k8sClient, *cluster, stsList, consensusCompName)
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 
+			By("test GetObjectListByCustomLabels function")
+			stsList = &appsv1.StatefulSetList{}
+			matchLabel := GetComponentMatchLabels(cluster.Name, consensusCompName)
+			_ = GetObjectListByCustomLabels(ctx, k8sClient, *cluster, stsList, client.MatchingLabels(matchLabel))
+			Expect(len(stsList.Items) > 0).Should(BeTrue())
+
+			By("test UpdateObjLabel function")
+			stsObj := stsList.Items[0]
+			err := UpdateObjLabel(ctx, k8sClient, stsObj, "test", "test")
+			Expect(err).Should(Succeed())
+
 			By("test GetComponentStatusMessageKey function")
 			Expect(GetComponentStatusMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
 

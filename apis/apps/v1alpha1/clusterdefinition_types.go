@@ -264,13 +264,13 @@ type LogConfig struct {
 }
 
 type VolumeTypeSpec struct {
-	// Name definition is the same as the name of the VolumeMounts field in PodSpec.Container,
+	// name definition is the same as the name of the VolumeMounts field in PodSpec.Container,
 	// similar to the relations of Volumes[*].name and VolumesMounts[*].name in Pod.Spec.
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name string `json:"name,omitempty"`
 
-	// Type is in enum of {data, log}.
+	// type is in enum of {data, log}.
 	// VolumeTypeData: the volume is for the persistent data storage.
 	// VolumeTypeLog: the volume is for the persistent log storage.
 	// +optional
@@ -281,7 +281,7 @@ type VolumeTypeSpec struct {
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
 type ClusterComponentDefinition struct {
-	// Name of the component, it can be any valid string.
+	// name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=18
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
@@ -375,7 +375,7 @@ type ClusterComponentDefinition struct {
 	// +optional
 	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`
 
-	// VolumeTypes is used to describe the purpose of the volumes
+	// volumeTypes is used to describe the purpose of the volumes
 	// mapping the name of the VolumeMounts in the PodSpec.Container field,
 	// such as data volume, log volume, etc.
 	// When backing up the volume, the volume can be correctly backed up
@@ -390,10 +390,16 @@ type ClusterComponentDefinition struct {
 	// even if a persistent volume has been specified.
 	// +optional
 	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
+
+	// customLabelSpecs is used for custom label tags which you want to add to the component resources.
+	// +listType=map
+	// +listMapKey=key
+	// +optional
+	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
 }
 
 type HorizontalScalePolicy struct {
-	// Type controls what kind of data synchronization do when component scale out.
+	// type controls what kind of data synchronization do when component scale out.
 	// Policy is in enum of {None, Snapshot}. The default policy is `None`.
 	// None: Default policy, do nothing.
 	// Snapshot: Do native volume snapshot before scaling and restore to newly scaled pods.
@@ -405,11 +411,11 @@ type HorizontalScalePolicy struct {
 	// +optional
 	Type HScaleDataClonePolicyType `json:"type,omitempty"`
 
-	// BackupTemplateSelector defines the label selector for finding associated BackupTemplate API object.
+	// backupTemplateSelector defines the label selector for finding associated BackupTemplate API object.
 	// +optional
 	BackupTemplateSelector map[string]string `json:"backupTemplateSelector,omitempty"`
 
-	// VolumeMountsName defines which volumeMount of the container to do backup,
+	// volumeMountsName defines which volumeMount of the container to do backup,
 	// only work if Type is not None
 	// if not specified, the 1st volumeMount will be chosen
 	// +optional
@@ -473,19 +479,19 @@ type ClusterDefinitionProbes struct {
 }
 
 type ConsensusSetSpec struct {
-	// Leader, one single leader.
+	// leader, one single leader.
 	// +kubebuilder:validation:Required
 	Leader ConsensusMember `json:"leader"`
 
-	// Followers, has voting right but not Leader.
+	// followers, has voting right but not Leader.
 	// +optional
 	Followers []ConsensusMember `json:"followers,omitempty"`
 
-	// Learner, no voting right.
+	// learner, no voting right.
 	// +optional
 	Learner *ConsensusMember `json:"learner,omitempty"`
 
-	// UpdateStrategy, Pods update strategy.
+	// updateStrategy, Pods update strategy.
 	// serial: update Pods one by one that guarantee minimum component unavailable time.
 	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
 	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time.
@@ -497,17 +503,17 @@ type ConsensusSetSpec struct {
 }
 
 type ConsensusMember struct {
-	// Name, role name.
+	// name, role name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=leader
 	Name string `json:"name"`
 
-	// AccessMode, what service this member capable.
+	// accessMode, what service this member capable.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=ReadWrite
 	AccessMode AccessMode `json:"accessMode"`
 
-	// Replicas, number of Pods of this role.
+	// replicas, number of Pods of this role.
 	// default 1 for Leader
 	// default 0 for Learner
 	// default Cluster.spec.componentSpec[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
@@ -599,6 +605,31 @@ type CommandExecutorItem struct {
 	// args is used to perform statements.
 	// +optional
 	Args []string `json:"args,omitempty"`
+}
+
+type CustomLabelSpec struct {
+	// key name of label
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+
+	// value of label
+	// +kubebuilder:validation:Required
+	Value string `json:"value"`
+
+	// resources defines the resources to be labeled.
+	// +kubebuilder:validation:Required
+	Resources []GVKResource `json:"resources,omitempty"`
+}
+
+type GVKResource struct {
+	// gvk is Group/Version/Kind, for example "v1/Pod", "apps/v1/StatefulSet", etc.
+	// when the gvk resource filtered by the selector already exists, if there is no corresponding custom label, it will be added, and if label already exists, it will be updated.
+	// +kubebuilder:validation:Required
+	GVK string `json:"gvk"`
+
+	// selector is a label query over a set of resources.
+	// +optional
+	Selector map[string]string `json:"selector,omitempty"`
 }
 
 // +kubebuilder:object:root=true

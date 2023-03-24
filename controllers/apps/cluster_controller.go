@@ -322,6 +322,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		return intctrlutil.RequeueAfter(requeueDuration, reqCtx.Log, "")
 	}
+
+	// patchClusterCustomLabels if cluster has custom labels.
+	if err = r.patchClusterResourceCustomLabels(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDeepCopy); componentutil.IgnoreNoOps(err) != nil {
 		// REVIEW:
 		// caught err being - "clusters.apps.kubeblocks.io \"test-clusterucasrw\" not found",
@@ -841,6 +847,26 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 		cluster.Status.SetComponentStatus(componentName, compStatus)
 	}
 	return doRemoveInitContainers, nil
+}
+
+// patchClusterResourceCustomLabels patches the custom labels to GVR(Group/Version/Resource) defined in the cluster spec.
+func (r *ClusterReconciler) patchClusterResourceCustomLabels(ctx context.Context, cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition) error {
+	if cluster == nil || clusterDef == nil {
+		return nil
+	}
+	// patch the custom label defined in clusterDefinition.spec.componentDefs[x].customLabelSpecs to the component resource.
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		compDef := clusterDef.GetComponentDefByName(compSpec.ComponentDefRef)
+		for _, customLabelSpec := range compDef.CustomLabelSpecs {
+			// TODO if the customLabelSpec.Resources is empty, we should add the label to all the resources under the component.
+			for _, resource := range customLabelSpec.Resources {
+				if err := componentutil.PatchGVRCustomLabels(ctx, r.Client, cluster, resource, compSpec.Name, customLabelSpec.Key, customLabelSpec.Value); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // Handle is the event handler for the cluster status event.

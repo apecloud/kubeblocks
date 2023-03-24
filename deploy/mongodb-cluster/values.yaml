@@ -111,7 +111,7 @@ replicaset:
   persistence:
     ## @param replicaset.persistence.enabled Enable persistence using Persistent Volume Claims
     ##
-    enabled: false
+    enabled: true
     ## `data` volume settings
     ##
     data:
@@ -122,10 +122,10 @@ replicaset:
       ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
       ##   GKE, AWS & OpenStack)
       ##
-      storageClassName:
+      storageClassName: 
       ## @param replicaset.persistence.size Size of data volume
       ##
-      size: 10Gi
+      size: 20Gi
   ## @param replicaset.tolerations Tolerations for MongoDB pods assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
   ##

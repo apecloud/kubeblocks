@@ -37,6 +37,9 @@ spec:
         ports:
           - protocol: TCP
             port: 27018
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         containers:
           - name: replica
@@ -64,6 +67,8 @@ spec:
                     - /scripts/replicaset-post-start.sh
                     - REPLICASET
             volumeMounts:
+              - mountPath: /data/db
+                name: data
               - name: scripts
                 mountPath: /scripts/replicaset-setup.sh
                 subPath: replicaset-setup.sh

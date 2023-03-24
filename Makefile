@@ -531,7 +531,7 @@ install-docker-buildx: ## Create `docker buildx` builder.
 golangci: GOLANGCILINT_VERSION = v1.51.2
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
-	echo golangci-lint is already installed
+	@echo golangci-lint is already installed
 GOLANGCILINT=$(shell which golangci-lint)
 else ifeq (, $(shell which $(GOBIN)/golangci-lint))
 	@{ \
@@ -542,7 +542,7 @@ else ifeq (, $(shell which $(GOBIN)/golangci-lint))
 	}
 GOLANGCILINT=$(GOBIN)/golangci-lint
 else
-	echo golangci-lint is already installed
+	@echo golangci-lint is already installed
 GOLANGCILINT=$(GOBIN)/golangci-lint
 endif
 

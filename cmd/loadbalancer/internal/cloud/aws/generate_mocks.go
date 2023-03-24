@@ -16,4 +16,4 @@ limitations under the License.
 
 package aws
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -destination mocks/ec2_mocks.go . EC2
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../../hack/boilerplate.go.txt -destination mocks/ec2_mocks.go . EC2

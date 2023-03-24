@@ -6,8 +6,8 @@ metadata:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
   connectionCredential:
-    username: admin
-    password: {{ (include "monogdb.password" .) | quote  }}
+    username: root
+    password: {{ (include "mongodb.password" .) | quote  }}
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-monogdb)"
@@ -46,6 +46,17 @@ spec:
                 containerPort: 27018
             command:
               - /scripts/replicaset-setup.sh
+            env:
+              - name: MONGODB_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MONGODB_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
             lifecycle:
               postStart:
                 exec:
@@ -189,6 +200,3 @@ spec:
               - name: scripts
                 mountPath: /scripts/shard-agent.sh
                 subPath: shard-agent.sh
-  connectionCredential:
-    username: admin
-    password: ""

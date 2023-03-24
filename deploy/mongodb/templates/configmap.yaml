@@ -30,7 +30,7 @@ data:
     if [ $INDEX -ne 0 ]; then exit 0; fi
     
     PORT=27018
-    until mongosh --port $PORT --eval "print('ready')"; do sleep 1; done
+    until mongosh --quiet --port $PORT --eval "print('ready')"; do sleep 1; done
     
     RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
     RPL_SET_NAME=${RPL_SET_NAME%-};
@@ -40,16 +40,23 @@ data:
     MEMBERS=""
     i=0
     while [ $i -lt $(eval echo \$KB_"$TYPE_NAME"_N) ]; do
-      if [ $i -ne 0 ]; then MEMBERS="$MEMBERS,"; fi
       host=$(eval echo \$KB_"$TYPE_NAME"_"$i"_HOSTNAME)
       host=$host"."$KB_NAMESPACE".svc.cluster.local"
-      until mongosh --port $PORT --host $host --eval "print('peer is ready')"; do sleep 1; done
-      MEMBERS="$MEMBERS{_id: $i, host: \"$host:$PORT\"}"
+      until mongosh --quiet --port $PORT --host $host --eval "print('peer is ready')"; do sleep 1; done
+      if [ $i -eq 0 ]; then 
+        MEMBERS="{_id: $i, host: \"$host:$PORT\", priority:2}"
+      else 
+        MEMBERS="$MEMBERS,{_id: $i, host: \"$host:$PORT\"}"
+      fi
       i=$(( i + 1))
     done
     CONFIGSVR=""
-    if [ $IS_CONFIGSVR = "true" ]; then CONFIGSVR="configsvr: true,"; fi
-    mongosh --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", $CONFIGSVR members: [$MEMBERS]})"
+    if [ ""$IS_CONFIGSVR = "true" ]; then CONFIGSVR="configsvr: true,"; fi
+    until mongosh --quiet --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", $CONFIGSVR members: [$MEMBERS]})"; do sleep 1; done
+
+    $(until mongosh --quiet --port 27018 --eval "rs.isMaster().isWritablePrimary"|grep true; do sleep 1; done;
+    echo "create user";
+    mongosh --quiet --port $PORT --eval "db.getSiblingDB('admin').createUser({ user: \"$MONGODB_ROOT_USER\", pwd: \"$MONGODB_ROOT_PASSWORD\", roles: [{role: 'root', db: 'admin'}] })")&
   shard-agent.sh: |-
     #!/bin/sh
     

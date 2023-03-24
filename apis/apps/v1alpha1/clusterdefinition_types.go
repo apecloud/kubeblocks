@@ -190,7 +190,7 @@ type ComponentTemplateSpec struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
-	// VolumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
+	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
@@ -223,13 +223,13 @@ type ComponentConfigSpec struct {
 }
 
 type ExporterConfig struct {
-	// ScrapePort is exporter port for Time Series Database to scrape metrics.
+	// scrapePort is exporter port for Time Series Database to scrape metrics.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Maximum=65535
 	// +kubebuilder:validation:Minimum=0
 	ScrapePort int32 `json:"scrapePort"`
 
-	// ScrapePath is exporter url path for Time Series Database to scrape metrics.
+	// scrapePath is exporter url path for Time Series Database to scrape metrics.
 	// +kubebuilder:validation:MaxLength=128
 	// +kubebuilder:default="/metrics"
 	// +optional

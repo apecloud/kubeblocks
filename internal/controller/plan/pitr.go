@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package operations
+package plan
 
 import (
 	"context"
@@ -37,7 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	ctlcomponent "github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -169,8 +169,9 @@ func (p *PointInTimeRecoveryManager) getNextBackup() (*dpv1alpha1.Backup, error)
 }
 
 // checkAndInit check if cluster need to be restored, return value: true: need, false: no need
-func (p *PointInTimeRecoveryManager) checkAndInit(cluster *appsv1alpha1.Cluster) (bool, error) {
+func (p *PointInTimeRecoveryManager) checkAndInit() (bool, error) {
 	// check args if pitr supported
+	cluster := p.Cluster
 	if cluster.Annotations == nil {
 		return false, nil
 	}
@@ -191,7 +192,7 @@ func (p *PointInTimeRecoveryManager) checkAndInit(cluster *appsv1alpha1.Cluster)
 	}
 
 	vctCount := 0
-	for _, item := range p.Cluster.Spec.ComponentSpecs {
+	for _, item := range cluster.Spec.ComponentSpecs {
 		vctCount += len(item.VolumeClaimTemplates)
 	}
 	if vctCount == 0 {
@@ -266,7 +267,7 @@ func (p *PointInTimeRecoveryManager) runScriptsJob() error {
 			Namespace: p.namespace,
 			Name:      pitrPVCName,
 		}
-		pitrPVC, err := builder.BuildPVCFromSnapshot(sts, vct, pitrPVCKey, nextBackup.Name)
+		pitrPVC, err := builder.BuildPVCFromSnapshot(sts, vct, pitrPVCKey, nextBackup.Name, nil)
 		if err != nil {
 			return err
 		}
@@ -363,9 +364,9 @@ func (p *PointInTimeRecoveryManager) cleanupScriptsJob() error {
 }
 
 // DoRecoveryJob prepare data before point in time recovery
-func (p *PointInTimeRecoveryManager) DoRecoveryJob(cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
+func (p *PointInTimeRecoveryManager) DoRecoveryJob() (shouldRequeue bool, err error) {
 	shouldRequeue = false
-	if required, err := p.checkAndInit(cluster); err != nil {
+	if required, err := p.checkAndInit(); err != nil {
 		return shouldRequeue, err
 	} else if !required {
 		return shouldRequeue, nil
@@ -463,8 +464,8 @@ func (p *PointInTimeRecoveryManager) rollbackClusterConfigMaps() error {
 }
 
 // DoPrepare prepare init container and pvc before point in time recovery
-func (p *PointInTimeRecoveryManager) DoPrepare(cluster *appsv1alpha1.Cluster, component *ctlcomponent.SynthesizedComponent) error {
-	if required, err := p.checkAndInit(cluster); err != nil {
+func (p *PointInTimeRecoveryManager) DoPrepare(component *component.SynthesizedComponent) error {
+	if required, err := p.checkAndInit(); err != nil {
 		return err
 	} else if !required {
 		return nil
@@ -501,7 +502,7 @@ func (p *PointInTimeRecoveryManager) removeStsInitContainer(
 	componentName string) error {
 	// get the sts list of component
 	stsList := &appsv1.StatefulSetList{}
-	if err := util.GetObjectListByComponentName(p.Ctx, p.Client, cluster, stsList, componentName); err != nil {
+	if err := util.GetObjectListByComponentName(p.Ctx, p.Client, *cluster, stsList, componentName); err != nil {
 		return err
 	}
 	for _, sts := range stsList.Items {
@@ -522,7 +523,7 @@ func (p *PointInTimeRecoveryManager) removeStsInitContainer(
 
 // MergeConfigMap to merge from config when recovery to point time from cluster.
 func (p *PointInTimeRecoveryManager) MergeConfigMap(configMap *corev1.ConfigMap) error {
-	if required, err := p.checkAndInit(p.Cluster); err != nil {
+	if required, err := p.checkAndInit(); err != nil {
 		return err
 	} else if !required {
 		return nil

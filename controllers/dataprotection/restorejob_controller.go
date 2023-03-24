@@ -18,7 +18,6 @@ package dataprotection
 
 import (
 	"context"
-	"time"
 
 	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
@@ -152,7 +151,7 @@ func (r *RestoreJobReconciler) doRestoreNewPhaseAction(
 	if err := r.Client.Status().Update(reqCtx.Ctx, restoreJob); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+	return intctrlutil.Reconciled()
 }
 
 func (r *RestoreJobReconciler) doRestoreInProgressPhyAction(
@@ -162,11 +161,11 @@ func (r *RestoreJobReconciler) doRestoreInProgressPhyAction(
 	if err != nil {
 		// not found backup job, retry create job
 		reqCtx.Log.Info(err.Error())
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	jobStatusConditions := job.Status.Conditions
 	if len(jobStatusConditions) == 0 {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 	}
 
 	switch jobStatusConditions[0].Type {

@@ -22,6 +22,7 @@ import (
 	"go/build"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -68,6 +69,7 @@ var _ = BeforeSuite(func() {
 			o.TimeEncoder = zapcore.ISO8601TimeEncoder
 		}))
 	}
+	reconcileInterval = time.Millisecond
 
 	ctx, cancel = context.WithCancel(context.TODO())
 

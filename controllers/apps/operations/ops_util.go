@@ -101,6 +101,9 @@ func ReconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 			opsIsCompleted:      opsIsCompleted,
 		}, &compStatus)
 		if err != nil {
+			if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
+				return opsRequestPhase, time.Second, nil
+			}
 			return opsRequestPhase, 0, err
 		}
 		expectProgressCount += expectCount

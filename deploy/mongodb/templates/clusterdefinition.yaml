@@ -5,6 +5,12 @@ metadata:
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
+  connectionCredential:
+    username: admin
+    password: {{ (include "monogdb.password" .) | quote  }}
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-monogdb)"
   componentDefs:
     - name: replicaset
       scriptSpecs:

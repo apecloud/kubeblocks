@@ -17,3 +17,14 @@ replicaset:
     failureThreshold: 2
     periodSeconds: 1
     timeoutSeconds: 1
+
+## Authentication parameters
+##
+auth:
+  ## @param auth.password Password for the "mongodb" admin user, leave empty 
+  ## for random generated password.
+  ##
+  password:
+  ## @param auth.database Name for a custom database to create
+  ##
+  database: "admin"

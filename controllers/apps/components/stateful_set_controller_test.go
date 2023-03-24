@@ -124,8 +124,10 @@ var _ = Describe("StatefulSet Controller", func() {
 		clusterKey := client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			compStatus := cluster.Status.Components[consensusCompName]
-			g.Expect(compStatus.Phase).Should(Equal(appsv1alpha1.RebootingPhase))
+			g.Expect(compStatus.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // original expecting value RebootingPhase
+			g.Expect(compStatus.PodsReady).ShouldNot(BeNil())
 			g.Expect(*compStatus.PodsReady).Should(BeTrue())
+			// REVIEW/TODO: ought add extra condtion check for RebootingPhase
 		})).Should(Succeed())
 
 		By("add leader role label for leaderPod to mock consensus component to be Running")
@@ -141,36 +143,39 @@ var _ = Describe("StatefulSet Controller", func() {
 			_, _, cluster := testapps.InitConsensusMysql(testCtx, clusterDefName,
 				clusterVersionName, clusterName, consensusCompType, consensusCompName)
 
+			// REVIEW/TODO: "Rebooting" got refactored
 			By("mock cluster phase is 'Rebooting' and restart operation is running on cluster")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
-				cluster.Status.Phase = appsv1alpha1.RebootingPhase
+				cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
 				cluster.Status.ObservedGeneration = 1
+				cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+					consensusCompName: {
+						Phase: appsv1alpha1.SpecReconcilingClusterCompPhase,
+					},
+				}
 			})).Should(Succeed())
 			_ = testapps.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{consensusCompName})
 			Expect(testapps.ChangeObj(&testCtx, cluster, func() {
 				cluster.Annotations = map[string]string{
-					constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Rebooting"}]`, opsRequestName),
+					constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"}]`, opsRequestName),
 				}
 			})).Should(Succeed())
 
 			// trigger statefulset controller Reconcile
 			sts := testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
 
-			By("wait for component phase to Rebooting by StatefulSet controller when cluster.status.components is nil")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.RebootingPhase))
-
 			By("mock the StatefulSet and pods are ready")
 			// mock statefulSet available and consensusSet component is running
 			pods := testUsingEnvTest(sts)
 
 			By("check the component phase becomes Running")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.RunningPhase))
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 			By("mock component of cluster is stopping")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
-				tmpCluster.Status.Phase = appsv1alpha1.StoppingPhase
+				tmpCluster.Status.Phase = appsv1alpha1.StoppingClusterPhase
 				tmpCluster.Status.SetComponentStatus(consensusCompName, appsv1alpha1.ClusterComponentStatus{
-					Phase: appsv1alpha1.StoppingPhase,
+					Phase: appsv1alpha1.StoppingClusterCompPhase,
 				})
 			})()).Should(Succeed())
 
@@ -191,7 +196,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			}
 
 			By("check the component phase becomes Stopped")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.StoppedPhase))
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
 
 			By("test updateStrategy with Serial")
 			testUpdateStrategy(appsv1alpha1.SerialStrategy, consensusCompName, 1)

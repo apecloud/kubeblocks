@@ -216,7 +216,7 @@ func PatchValidateErrorCondition(ctx context.Context, cli client.Client, opsRes 
 }
 
 // getOpsRequestNameFromAnnotation gets OpsRequest.name from cluster.annotations
-func getOpsRequestNameFromAnnotation(cluster *appsv1alpha1.Cluster, toClusterPhase appsv1alpha1.Phase) string {
+func getOpsRequestNameFromAnnotation(cluster *appsv1alpha1.Cluster, toClusterPhase appsv1alpha1.ClusterPhase) string {
 	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 	opsRecorder := getOpsRecorderWithClusterPhase(opsRequestSlice, toClusterPhase)
 	return opsRecorder.Name
@@ -224,7 +224,7 @@ func getOpsRequestNameFromAnnotation(cluster *appsv1alpha1.Cluster, toClusterPha
 
 // getOpsRecorderWithClusterPhase gets OpsRequest recorder from slice by target cluster phase
 func getOpsRecorderWithClusterPhase(opsRequestSlice []appsv1alpha1.OpsRecorder,
-	toClusterPhase appsv1alpha1.Phase) appsv1alpha1.OpsRecorder {
+	toClusterPhase appsv1alpha1.ClusterPhase) appsv1alpha1.OpsRecorder {
 	for _, v := range opsRequestSlice {
 		if v.ToClusterPhase == toClusterPhase {
 			return v
@@ -273,7 +273,7 @@ func patchClusterStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 	realChangeCompMap := opsBehaviour.OpsHandler.GetRealAffectedComponentMap(opsRes.OpsRequest)
 	for k := range realChangeCompMap {
 		if compStatus, ok := opsRes.Cluster.Status.Components[k]; ok {
-			compStatus.Phase = toClusterPhase
+			compStatus.Phase = appsv1alpha1.SpecReconcilingClusterCompPhase
 			opsRes.Cluster.Status.SetComponentStatus(k, compStatus)
 		}
 	}

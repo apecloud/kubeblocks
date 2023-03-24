@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -100,6 +101,7 @@ func GetOpsRequestSliceFromCluster(cluster *appsv1alpha1.Cluster) ([]appsv1alpha
 // then the related OpsRequest can reconcile.
 // Note: if the client-go fetches the Cluster resources from cache,
 // it should record the Cluster.ResourceVersion to check if the Cluster object from client-go is the latest in OpsRequest controller.
+// @return could return ErrNoOps
 func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
 	var (
 		opsRequestSlice []appsv1alpha1.OpsRecorder
@@ -121,7 +123,7 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 	if len(notExistOps) != 0 {
 		return RemoveClusterInvalidOpsRequestAnnotation(ctx, cli, cluster, opsRequestSlice, notExistOps)
 	}
-	return nil
+	return componentutil.ErrNoOps
 }
 
 // RemoveClusterInvalidOpsRequestAnnotation deletes the OpsRequest annotation in cluster when the OpsRequest not existing.

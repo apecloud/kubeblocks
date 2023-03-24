@@ -67,7 +67,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 	initClusterForOps := func(opsRes *OpsResource) {
 		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
 		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-			opsRes.Cluster.Status.Phase = appsv1alpha1.RunningPhase
+			opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 		})).ShouldNot(HaveOccurred())
 	}
 
@@ -79,7 +79,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 			By("Test HorizontalScaling with scale down replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1)
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.VerticalScalingPhase, consensusComp)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp) // appsv1alpha1.VerticalScalingPhase
 			initClusterForOps(opsRes)
 
 			By("mock HorizontalScaling OpsRequest phase is Creating and do action")
@@ -88,13 +88,13 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			By("Test OpsManager.Reconcile function when horizontal scaling OpsRequest is Running")
-			opsRes.Cluster.Status.Phase = appsv1alpha1.RunningPhase
+			opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("test GetOpsRequestAnnotation function")
 			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func() {
-				opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"HorizontalScaling"},{"name":"test-not-exists-ops","clusterPhase":"VolumeExpanding"}]`,
+				opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"},{"name":"test-not-exists-ops","clusterPhase":"Updating"}]`,
 					opsRes.OpsRequest.Name)
 				opsRes.Cluster.Annotations = map[string]string{
 					constant.OpsRequestAnnotationKey: opsAnnotationString,

@@ -43,6 +43,8 @@ const (
 	ErrorWaitCacheRefresh = "WaitCacheRefresh"
 )
 
+var ErrFailedToAddFinalizer = errors.New("failed to add finalizer")
+
 func NewError(errorType ErrorType, message string) *Error {
 	return &Error{
 		Type:    errorType,

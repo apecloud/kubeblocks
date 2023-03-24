@@ -139,8 +139,8 @@ func prepareConnCredential(reqCtx intctrlutil.RequestCtx, cli client.Client, tas
 	if err != nil {
 		return err
 	}
-	// must make sure secret resources are created before others
-	task.InsertResource(secret)
+	// must make sure secret resources are created before workloads resources
+	task.AppendResource(secret)
 	return nil
 }
 
@@ -357,7 +357,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		if !reflect.DeepEqual(&stsObjCopy.Spec, &stsObj.Spec) {
 			// sync component phase
-			syncComponentPhaseByClusterPhase(cluster, componentName)
+			updateComponentPhaseWithOperation(cluster, componentName)
 		}
 
 		// check all pvc bound, requeue if not all ready
@@ -462,7 +462,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
 			// sync component phase
 			componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
-			syncComponentPhaseByClusterPhase(cluster, componentName)
+			updateComponentPhaseWithOperation(cluster, componentName)
 		}
 		return nil
 	}
@@ -504,7 +504,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 
-	cleanUselessServices := func() error {
+	garbageCollectServices := func() error {
 		var (
 			allSvcList = corev1.ServiceList{}
 			ml         = getServiceMatchingLabels(cluster.Name, "")
@@ -548,22 +548,24 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				return client.IgnoreNotFound(err)
 			}
 		}
+		// TODO: need to have event records
 		return nil
 	}
 
 	// why create tls certs here? or why not use prepare-checkedCreate pattern?
 	// tls certs generation is very time-consuming, if using prepare-checkedCreate pattern,
 	// we shall generate certs in every component Update which will slow down the cluster reconcile loop
-	if err := plan.CreateOrCheckTLSCerts(reqCtx, cli, cluster, scheme, dbClusterFinalizerName); err != nil {
+	if secret, err := plan.CreateOrCheckTLSCerts(reqCtx, cli, cluster); err != nil {
 		return false, err
+	} else if secret != nil {
+		objs = append(objs, secret)
 	}
 
 	// processing function after k8s object creation
 	postCreateFunc := func(obj client.Object) {
-		if _, ok := obj.(*appsv1.StatefulSet); ok {
-			// h-scale operation may create a new Sts if workloadType is Replication,
-			// so we need to sync component phase here.
-			syncComponentPhaseByClusterPhase(cluster, obj.GetLabels()[constant.KBAppComponentLabelKey])
+		switch obj.(type) {
+		case *appsv1.StatefulSet, *appsv1.Deployment:
+			updateComponentPhaseWithOperation(cluster, obj.GetLabels()[constant.KBAppComponentLabelKey])
 		}
 	}
 
@@ -587,45 +589,70 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return false, nil
 	}
 
-	objsByKind := make(map[string][]client.Object)
+	// sort objs, have workload objects placed last
+	workloadsKinds := make(map[string][]client.Object)
 	for _, obj := range objs {
-		logger.V(1).Info("create or update", "objs", obj)
-		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
-			return false, err
+		switch kind := obj.GetObjectKind().GroupVersionKind().Kind; kind {
+		case constant.PodKind, constant.ReplicaSetKind, constant.CronJobKind, constant.JobKind, constant.DeploymentKind, constant.StatefulSetKind:
+			workloadsKinds[kind] = append(workloadsKinds[kind], obj)
 		}
-		kind := obj.GetObjectKind().GroupVersionKind().Kind
-		objsByKind[kind] = append(objsByKind[kind], obj)
+	}
 
+	createObj := func(obj client.Object) error {
+		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
+			return err
+		}
 		if err = cli.Create(ctx, obj); err == nil {
 			postCreateFunc(obj)
-			continue
+			return nil
 		} else if !apierrors.IsAlreadyExists(err) {
-			return false, err
+			return err
 		}
-
-		// handle object changes
+		// handle object changes for already created objects
 		requeue, err := handleObjectUpdate(obj)
 		if err != nil {
-			return false, err
+			return err
 		}
 		if requeue {
 			shouldRequeue = true
 		}
+		return nil
 	}
 
-	if err = cleanUselessServices(); err != nil {
+	// two stages create, 1st stage create non-workloads objects
+	for _, obj := range objs {
+		logger.V(1).Info("create or update", "objs", obj)
+		if _, ok := workloadsKinds[obj.GetObjectKind().GroupVersionKind().Kind]; ok {
+			continue
+		}
+		if err = createObj(obj); err != nil {
+			return false, err
+		}
+	}
+	// 2nd stage create workloads
+	for _, v := range workloadsKinds {
+		for _, obj := range v {
+			if err = createObj(obj); err != nil {
+				return false, err
+			}
+		}
+	}
+
+	// REVIEW/TODO: having following handling is rather hackish, as function expansion
+	// is not trying to fit into lifecycle process flow.
+	if err = garbageCollectServices(); err != nil {
 		return false, err
 	}
-
 	// stsList is used to handle statefulSets horizontal scaling when workloadType is replication
-	var stsList []*appsv1.StatefulSet
-	for _, obj := range objsByKind[constant.StatefulSetKind] {
-		stsList = append(stsList, obj.(*appsv1.StatefulSet))
+	if stsListObjs, ok := workloadsKinds[constant.StatefulSetKind]; ok {
+		var stsList = make([]*appsv1.StatefulSet, 0, len(stsListObjs))
+		for _, obj := range stsListObjs {
+			stsList = append(stsList, obj.(*appsv1.StatefulSet))
+		}
+		if err := replicationset.HandleReplicationSet(reqCtx.Ctx, cli, cluster, stsList); err != nil {
+			return false, err
+		}
 	}
-	if err := replicationset.HandleReplicationSet(reqCtx.Ctx, cli, cluster, stsList); err != nil {
-		return false, err
-	}
-
 	return shouldRequeue, nil
 }
 

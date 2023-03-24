@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -39,9 +40,8 @@ import (
 type ReplicationRole string
 
 const (
-	Primary                ReplicationRole = "primary"
-	Secondary              ReplicationRole = "secondary"
-	DBClusterFinalizerName                 = "cluster.kubeblocks.io/finalizer"
+	Primary   ReplicationRole = "primary"
+	Secondary ReplicationRole = "secondary"
 )
 
 // HandleReplicationSet handles the replication workload life cycle process, including horizontal scaling, etc.
@@ -157,7 +157,7 @@ func doHorizontalScaleDown(ctx context.Context,
 			err = cli.Delete(ctx, dos[i])
 			if err == nil {
 				patch := client.MergeFrom(dos[i].DeepCopy())
-				controllerutil.RemoveFinalizer(dos[i], DBClusterFinalizerName)
+				controllerutil.RemoveFinalizer(dos[i], apps.DBClusterFinalizerName)
 				if err = cli.Patch(ctx, dos[i], patch); err != nil {
 					return err
 				}

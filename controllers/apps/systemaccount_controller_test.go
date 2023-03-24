@@ -464,7 +464,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		// 			g.Expect(k8sClient.List(ctx, secretsForAcct, ml)).To(Succeed())
 		// 			for _, secret := range secretsForAcct.Items {
 		// 				// each secret has finalizer
-		// 				g.Expect(controllerutil.ContainsFinalizer(&secret, dbClusterFinalizerName)).To(BeTrue())
+		// 				g.Expect(controllerutil.ContainsFinalizer(&secret, DBClusterFinalizerName)).To(BeTrue())
 		// 				g.Expect(len(secret.ObjectMeta.OwnerReferences)).To(BeEquivalentTo(1))
 		// 				g.Expect(checkOwnerReferenceToObj(secret.OwnerReferences[0], cluster)).To(BeTrue())
 		// 			}

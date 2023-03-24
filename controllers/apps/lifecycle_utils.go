@@ -540,7 +540,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				continue
 			}
 			patch := client.MergeFrom(svc.DeepCopy())
-			controllerutil.RemoveFinalizer(&svc, dbClusterFinalizerName)
+			controllerutil.RemoveFinalizer(&svc, DBClusterFinalizerName)
 			if err = cli.Patch(reqCtx.Ctx, &svc, patch); err != nil {
 				return client.IgnoreNotFound(err)
 			}
@@ -554,7 +554,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	// why create tls certs here? or why not use prepare-checkedCreate pattern?
 	// tls certs generation is very time-consuming, if using prepare-checkedCreate pattern,
 	// we shall generate certs in every component Update which will slow down the cluster reconcile loop
-	if err := plan.CreateOrCheckTLSCerts(reqCtx, cli, cluster, scheme, dbClusterFinalizerName); err != nil {
+	if err := plan.CreateOrCheckTLSCerts(reqCtx, cli, cluster, scheme, DBClusterFinalizerName); err != nil {
 		return false, err
 	}
 
@@ -590,7 +590,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	objsByKind := make(map[string][]client.Object)
 	for _, obj := range objs {
 		logger.V(1).Info("create or update", "objs", obj)
-		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
+		if err := intctrlutil.SetOwnership(cluster, obj, scheme, DBClusterFinalizerName); err != nil {
 			return false, err
 		}
 		kind := obj.GetObjectKind().GroupVersionKind().Kind

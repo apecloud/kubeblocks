@@ -19,8 +19,10 @@ package components
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -29,7 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	uitl "github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	componentutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -69,6 +75,13 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, sts, apps.DBClusterFinalizerName, func() (*ctrl.Result, error) {
+		return r.deleteExternalResources(reqCtx, sts)
+	})
+	if res != nil {
+		return *res, err
+	}
+
 	return workloadCompClusterReconcile(reqCtx, r.Client, sts,
 		func(cluster *appsv1alpha1.Cluster, componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
 			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
@@ -92,4 +105,67 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Pod{}).
 		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate)).
 		Complete(r)
+}
+
+func (r *StatefulSetReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, sts *appsv1.StatefulSet) (*ctrl.Result, error) {
+	// TODO: hack delete postgres patroni configmap here, should be refactored
+	return deletePostgresPatroniConfigMap(reqCtx, r.Client, sts)
+}
+
+func deletePostgresPatroniConfigMap(reqCtx intctrlutil.RequestCtx, cli client.Client, sts *appsv1.StatefulSet) (*ctrl.Result, error) {
+	stsLabels := sts.GetLabels()
+	clusterName := stsLabels[constant.AppInstanceLabelKey]
+	componentName := stsLabels[constant.KBAppComponentLabelKey]
+
+	var cluster *appsv1alpha1.Cluster
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: sts.Namespace, Name: clusterName}, cluster); err != nil {
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
+	}
+	// if the cluster is not being deleted, skip deleting postgres patroni configmap
+	if cluster != nil {
+		if cluster.DeletionTimestamp != nil {
+			res, err := intctrlutil.CheckedRequeueWithError(errors.New("cluster is not being deleted, skip deleting postgres patroni configmap"), reqCtx.Log, "")
+			return &res, err
+		}
+	}
+
+	// we should check there is no pod under the component before deleting the configmap, otherwise the patroni configMap will be recreated by postgres Pod.
+	podList := &corev1.PodList{}
+	if err := cli.List(reqCtx.Ctx, podList, client.InNamespace(sts.Namespace), uitl.GetComponentMatchLabels(clusterName, componentName)); err != nil {
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
+	}
+	if len(podList.Items) > 0 {
+		res, err := intctrlutil.CheckedRequeueWithError(errors.New("the component has pods, skip deleting postgres patroni configmap"), reqCtx.Log, "")
+		return &res, err
+	}
+
+	var patroniConfigMapNameList []string
+	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(clusterName, componentName)
+	for _, patroniConfigMap := range []string{
+		PgPatroniConfigMapLeaderPlaceHolder,
+		PgPatroniConfigMapConfigPlaceHolder,
+		PgPatroniConfigMapFailoverPlaceHolder,
+	} {
+		patroniConfigMap = componentutil.ReplaceNamedVars(builtInEnvMap, patroniConfigMap, -1, true)
+		patroniConfigMapNameList = append(patroniConfigMapNameList, patroniConfigMap)
+	}
+
+	for _, patroniConfigMapName := range patroniConfigMapNameList {
+		patroniConfigMap := &corev1.ConfigMap{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: sts.Namespace, Name: patroniConfigMapName}, patroniConfigMap); err != nil {
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
+		}
+		if patroniConfigMap == nil {
+			continue
+		}
+		reqCtx.Recorder.Eventf(sts, corev1.EventTypeNormal, "Deleting", "Deleting Patroni ConfigMap %s", patroniConfigMap.Name)
+		if err := cli.Delete(reqCtx.Ctx, patroniConfigMap); err != nil || !apierrors.IsNotFound(err) {
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
+		}
+	}
+	return nil, nil
 }

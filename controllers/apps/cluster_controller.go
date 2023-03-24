@@ -139,7 +139,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		cluster:  cluster,
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, DBClusterFinalizerName, func() (*ctrl.Result, error) {
 		return r.deleteExternalResources(reqCtx, cluster)
 	})
 	if res != nil {
@@ -362,12 +362,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 
-	// all resources created in reconcileClusterWorkloads should be handled properly
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.StatefulSetSignature, inNS, ml); err != nil {
-		return ret, err
-	}
-
+	// all resources created in reconcileClusterWorkloads should be handled properly except for StatefulSet, StatefulSet is handled in statefulSet Reconcile controller.
 	if ret, err := removeFinalizer(r, reqCtx, generics.DeploymentSignature, inNS, ml); err != nil {
 		return ret, err
 	}
@@ -403,11 +398,11 @@ func removeFinalizer[T generics.Object, PT generics.PObject[T],
 	}
 	for _, obj := range reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T) {
 		pobj := PT(&obj)
-		if !controllerutil.ContainsFinalizer(pobj, dbClusterFinalizerName) {
+		if !controllerutil.ContainsFinalizer(pobj, DBClusterFinalizerName) {
 			continue
 		}
 		patch := client.MergeFrom(PT(pobj.DeepCopy()))
-		controllerutil.RemoveFinalizer(pobj, dbClusterFinalizerName)
+		controllerutil.RemoveFinalizer(pobj, DBClusterFinalizerName)
 		if err := r.Patch(reqCtx.Ctx, pobj, patch); err != nil {
 			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			return &res, err

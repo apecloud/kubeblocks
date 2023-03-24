@@ -384,7 +384,7 @@ func PatchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv
 		return err
 	}
 	if !slices.Contains(getCustomLabelSupportKind(), gvk.Kind) {
-		return errors.New(fmt.Sprintf("kind %s is not supported for custom labels", gvk.Kind))
+		return errors.New("kind is not supported for custom labels")
 	}
 
 	objectList := getObjectListMapOfResourceKind()[gvk.Kind]

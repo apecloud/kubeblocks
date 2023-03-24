@@ -77,8 +77,8 @@ type ConfigConstraintStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-func (c ConfigConstraintStatus) GetTerminalPhases() []Phase {
-	return []Phase{AvailablePhase}
+func (cs ConfigConstraintStatus) IsTerminalPhases() bool {
+	return cs.Phase == AvailablePhase
 }
 
 type CustomParametersValidation struct {

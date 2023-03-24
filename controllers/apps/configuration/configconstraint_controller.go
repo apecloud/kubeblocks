@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -84,8 +83,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return *res, err
 	}
 
-	if configConstraint.Status.ObservedGeneration == configConstraint.Generation &&
-		slices.Contains(configConstraint.Status.GetTerminalPhases(), configConstraint.Status.Phase) {
+	if configConstraint.Status.ObservedGeneration == configConstraint.Generation && configConstraint.Status.IsTerminalPhases() {
 		return intctrlutil.Reconciled()
 	}
 

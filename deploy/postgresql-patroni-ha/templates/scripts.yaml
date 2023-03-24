@@ -13,7 +13,7 @@ data:
     chmod +777 -R /home/postgres/pgdata/conf
     cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf
     chmod +777 /home/postgres/pgdata/conf/postgresql.conf
-  generage_patroni_yaml.py: |
+  generate_patroni_yaml.py: |
     #!/usr/bin/env python3
     # -*- coding: utf-8 -*-
     import os
@@ -47,11 +47,10 @@ data:
             lines = read_file_lines(f)
             if lines:
                 postgresql['pg_hba'] = lines
-        restore_config = os.path.join(restore_dir, 'kb_restore.signal')
-        if restore_dir and os.path.isfile(restore_config):
+        if restore_dir and os.path.isfile(os.path.join(restore_dir, 'kb_restore.signal')):
             if not 'bootstrap' in local_config:
                 local_config['bootstrap'] = {}
-            with open(restore_config, 'r') as f:
+            with open('/home/postgres/conf/kb_restore.conf', 'r') as f:
                 local_config['bootstrap'].update(yaml.safe_load(f))
         write_file(yaml.dump(local_config, default_flow_style=False), filename, True)
     if __name__ == '__main__':
@@ -64,7 +63,7 @@ data:
     if [ "$KB_PRIMARY_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
         sleep 3
     fi
-    python3 /kb-scripts/generage_patroni_yaml.py tmp_patroni.yaml
+    python3 /kb-scripts/generate_patroni_yaml.py tmp_patroni.yaml
     export SPILO_CONFIGURATION=$(cat tmp_patroni.yaml)
     # export SCOPE="$KB_CLUSTER_NAME-$KB_CLUSTER_NAME"
     exec /launch.sh init

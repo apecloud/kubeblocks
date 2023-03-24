@@ -16,7 +16,6 @@ limitations under the License.
 
 package smoketest
 
-import "C"
 import (
 	"context"
 	"log"

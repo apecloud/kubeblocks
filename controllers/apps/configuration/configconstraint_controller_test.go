@@ -108,6 +108,12 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			log.Log.Info("expect that ConfigConstraint is not deleted.")
 			Consistently(testapps.CheckObjExists(&testCtx, constraintKey, &appsv1alpha1.ConfigConstraint{}, true)).Should(Succeed())
 
+			By("check ConfigConstraint status should be deleting")
+			Eventually(testapps.CheckObj(&testCtx, constraintKey,
+				func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {
+					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(appsv1alpha1.CCDeletingPhase))
+				})).Should(Succeed())
+
 			By("By delete referencing clusterdefinition and clusterversion")
 			Expect(k8sClient.Delete(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
 			Expect(k8sClient.Delete(testCtx.Ctx, clusterDefObj)).Should(Succeed())

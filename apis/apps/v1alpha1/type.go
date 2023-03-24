@@ -82,6 +82,17 @@ const (
 	UnavailablePhase Phase = "Unavailable"
 )
 
+// ConfigConstraintPhase defines the ConfigConstraint  CR .status.phase
+// +enum
+// +kubebuilder:validation:Enum={Available,Unavailable, Deleting}
+type ConfigConstraintPhase string
+
+const (
+	CCAvailablePhase   ConfigConstraintPhase = "Available"
+	CCUnavailablePhase ConfigConstraintPhase = "Unavailable"
+	CCDeletingPhase    ConfigConstraintPhase = "Deleting"
+)
+
 // OpsPhase defines opsRequest phase.
 // +enum
 // +kubebuilder:validation:Enum={Pending,Creating,Running,Failed,Succeed}

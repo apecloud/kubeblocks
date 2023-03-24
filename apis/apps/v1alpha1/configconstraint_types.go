@@ -62,9 +62,9 @@ type ConfigConstraintSpec struct {
 
 // ConfigConstraintStatus defines the observed state of ConfigConstraint.
 type ConfigConstraintStatus struct {
-	// phase is status of configuration template, when set to AvailablePhase, it can be referenced by ClusterDefinition or ClusterVersion.
+	// phase is status of configuration template, when set to CCAvailablePhase, it can be referenced by ClusterDefinition or ClusterVersion.
 	// +optional
-	Phase Phase `json:"phase,omitempty"`
+	Phase ConfigConstraintPhase `json:"phase,omitempty"`
 
 	// message field describes the reasons of abnormal status.
 	// +optional
@@ -77,8 +77,8 @@ type ConfigConstraintStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-func (cs ConfigConstraintStatus) IsTerminalPhases() bool {
-	return cs.Phase == AvailablePhase
+func (cs ConfigConstraintStatus) IsConfigConstraintTerminalPhases() bool {
+	return cs.Phase == CCAvailablePhase
 }
 
 type CustomParametersValidation struct {

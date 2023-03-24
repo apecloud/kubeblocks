@@ -77,6 +77,10 @@ type ConfigConstraintStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
+func (c ConfigConstraintStatus) GetTerminalPhases() []Phase {
+	return []Phase{AvailablePhase}
+}
+
 type CustomParametersValidation struct {
 	// schema provides a way for providers to validate the changed parameters through json.
 	// +kubebuilder:validation:Schemaless

@@ -16,6 +16,24 @@ limitations under the License.
 
 package cloudprovider
 
+import (
+	"strings"
+)
+
+type outputKey string
+
+// terraform output keys
+const (
+	clusterNameKey outputKey = "cluster_name"
+	contextNameKey outputKey = "context_name"
+	regionKey      outputKey = "region"
+)
+
+const (
+	GitRepoName = "cloud-provider"
+	GitRepoURL  = "https://github.com/apecloud/cloud-provider"
+)
+
 const (
 	Local        = "local"
 	AWS          = "aws"
@@ -34,15 +52,40 @@ var (
 	}
 )
 
-const (
-	GitRepoName = "cloud-provider"
-	GitRepoURL  = "https://github.com/apecloud/cloud-provider"
-)
-
 func CloudProviders() []string {
 	return []string{Local, AWS, Azure, GCP, AlibabaCloud}
 }
 
 func K8sService(provider string) string {
 	return cloudProviderK8sServiceMap[provider]
+}
+
+// K8sClusterInfo is the kubernetes cluster information for playground that will
+// be serialized to a state file
+type K8sClusterInfo struct {
+	ClusterName   string `json:"cluster_name"`
+	ContextName   string `json:"context_name"`
+	KubeConfig    string `json:"kubeconfig"`
+	CloudProvider string `json:"cloud_provider"`
+	Region        string `json:"region,omitempty"`
+}
+
+// IsValid check if kubernetes cluster info is valid
+func (c *K8sClusterInfo) IsValid() bool {
+	if c.ClusterName == "" || c.CloudProvider == "" || (c.CloudProvider != Local && c.Region == "") {
+		return false
+	}
+	return true
+}
+
+func (c *K8sClusterInfo) String() string {
+	fields := []string{"  cloud provider: " + c.CloudProvider,
+		"cluster name: " + c.ClusterName,
+		"context name: " + c.ContextName,
+		"kubeconfig: " + c.KubeConfig,
+	}
+	if c.CloudProvider != Local {
+		fields = append(fields, "region: "+c.Region)
+	}
+	return strings.Join(fields, "\n  ")
 }

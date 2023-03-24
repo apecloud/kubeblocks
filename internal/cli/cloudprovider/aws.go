@@ -17,14 +17,14 @@ limitations under the License.
 package cloudprovider
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
-	"github.com/pkg/errors"
+
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 type awsCloudProvider struct {
@@ -110,23 +110,27 @@ func (p *awsCloudProvider) DeleteK8sCluster(name string) error {
 	return tfDestroy(subPaths[0], p.stdout, p.stderr, p.buildDestroyOpts()...)
 }
 
-// GetExistedClusters get existed clusters
-func (p *awsCloudProvider) GetExistedClusters() ([]string, error) {
-	subPaths, err := getSubPaths(p.awsPath, []string{"eks", "lb"})
+func (p *awsCloudProvider) GetClusterInfo() (*K8sClusterInfo, error) {
+	eksTfPath := p.eksTfPath()
+	clusterName, err := getOutputValue(clusterNameKey, eksTfPath)
 	if err != nil {
 		return nil, err
 	}
-
-	clusterName, err := getClusterNameFromStateFile(subPaths[0])
+	contextName, err := getOutputValue(contextNameKey, eksTfPath)
 	if err != nil {
 		return nil, err
 	}
-
-	// previous cluster exists, try to destroy it
-	if clusterName == "" {
-		return nil, nil
+	region, err := getOutputValue(regionKey, eksTfPath)
+	if err != nil {
+		return nil, err
 	}
-	return []string{clusterName}, nil
+	return &K8sClusterInfo{
+		CloudProvider: p.Name(),
+		ClusterName:   clusterName,
+		ContextName:   contextName,
+		Region:        region,
+		KubeConfig:    util.ConfigPath("config"),
+	}, nil
 }
 
 func (p *awsCloudProvider) buildApplyOpts() []tfexec.ApplyOption {
@@ -135,6 +139,10 @@ func (p *awsCloudProvider) buildApplyOpts() []tfexec.ApplyOption {
 
 func (p *awsCloudProvider) buildDestroyOpts() []tfexec.DestroyOption {
 	return []tfexec.DestroyOption{tfexec.Var("cluster_name=" + p.clusterName), tfexec.Var("region=" + p.region)}
+}
+
+func (p *awsCloudProvider) eksTfPath() string {
+	return filepath.Join(p.awsPath, "eks")
 }
 
 func getSubPaths(parent string, names []string) ([]string, error) {
@@ -147,31 +155,4 @@ func getSubPaths(parent string, names []string) ([]string, error) {
 		subPaths[i] = subPath
 	}
 	return subPaths, nil
-}
-
-func getClusterNameFromStateFile(tfPath string) (string, error) {
-	return getOutputValue("cluster_name", tfPath)
-}
-
-func getOutputValue(key string, tfPath string) (string, error) {
-	stateFile := filepath.Join(tfPath, tfStateFileName)
-	content, err := os.ReadFile(stateFile)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return "", err
-	}
-
-	var state map[string]interface{}
-	if err = json.Unmarshal(content, &state); err != nil {
-		return "", err
-	}
-	outputs, ok := state["outputs"].(map[string]interface{})
-	if !ok {
-		return "", nil
-	}
-
-	value, ok := outputs[key].(map[string]interface{})
-	if !ok {
-		return "", nil
-	}
-	return value["value"].(string), nil
 }

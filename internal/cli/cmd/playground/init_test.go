@@ -43,10 +43,8 @@ var _ = Describe("playground", func() {
 			clusterDef:     clitesting.ClusterDefName,
 			clusterVersion: clitesting.ClusterVersionName,
 			IOStreams:      streams,
-			baseOptions: baseOptions{
-				cloudProvider: defaultCloudProvider,
-			},
-			helmCfg: helm.NewConfig("", util.ConfigPath("config"), "", false),
+			cloudProvider:  defaultCloudProvider,
+			helmCfg:        helm.NewConfig("", util.ConfigPath("config"), "", false),
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).Should(HaveOccurred())
@@ -59,9 +57,7 @@ var _ = Describe("playground", func() {
 			IOStreams:      streams,
 			clusterDef:     clitesting.ClusterDefName,
 			clusterVersion: clitesting.ClusterVersionName,
-			baseOptions: baseOptions{
-				cloudProvider: cp.AWS,
-			},
+			cloudProvider:  cp.AWS,
 		}
 		Expect(o.validate()).Should(HaveOccurred())
 	})

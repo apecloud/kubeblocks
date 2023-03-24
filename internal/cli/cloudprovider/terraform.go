@@ -18,7 +18,9 @@ package cloudprovider
 
 import (
 	"context"
+	"encoding/json"
 	"io"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/releases"
 	"github.com/hashicorp/terraform-exec/tfexec"
+	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -111,4 +114,27 @@ func newTerraform(workingDir string, stdout, stderr io.Writer) (*tfexec.Terrafor
 	tf.SetStdout(stdout)
 	tf.SetStderr(stderr)
 	return tf, nil
+}
+
+func getOutputValue(key outputKey, tfPath string) (string, error) {
+	stateFile := filepath.Join(tfPath, tfStateFileName)
+	content, err := os.ReadFile(stateFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+
+	var state map[string]interface{}
+	if err = json.Unmarshal(content, &state); err != nil {
+		return "", err
+	}
+	outputs, ok := state["outputs"].(map[string]interface{})
+	if !ok {
+		return "", nil
+	}
+
+	value, ok := outputs[string(key)].(map[string]interface{})
+	if !ok {
+		return "", nil
+	}
+	return value["value"].(string), nil
 }

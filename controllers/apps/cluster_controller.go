@@ -19,8 +19,6 @@ package apps
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	batchv1 "k8s.io/api/batch/v1"
 	"reflect"
 	"time"
 
@@ -791,78 +789,13 @@ func (r *ClusterReconciler) patchClusterResourceCustomLabels(ctx context.Context
 	if cluster == nil || clusterDef == nil {
 		return nil
 	}
-	patchGVRCustomLabels := func(resource appsv1alpha1.GVKResource, componentName, labelKey, labelValue string) error {
-		gvk, err := parseCustomLabelPattern(resource.GVK)
-		if err != nil {
-			return err
-		}
-		if !slices.Contains(getCustomLabelSupportKind(), gvk.Kind) {
-			return errors.New(fmt.Sprintf("kind %s is not supported for custom labels", gvk.Kind))
-		}
-
-		objectList := getObjectListMapOfResourceKind()[gvk.Kind]
-		matchLabels := componentutil.GetComponentMatchLabels(cluster.Name, componentName)
-		for k, v := range resource.Selector {
-			matchLabels[k] = v
-		}
-		if err := componentutil.GetObjectListByCustomLabels(ctx, r.Client, *cluster, objectList, client.MatchingLabels(matchLabels)); err != nil {
-			return err
-		}
-
-		switch gvk.Kind {
-		case constant.StatefulSetKind:
-			stsList := objectList.(*appsv1.StatefulSetList)
-			for _, sts := range stsList.Items {
-				if err := componentutil.UpdateObjLabel(ctx, r.Client, sts, labelKey, labelValue); err != nil {
-					return err
-				}
-			}
-		case constant.DeploymentKind:
-			deployList := objectList.(*appsv1.DeploymentList)
-			for _, deploy := range deployList.Items {
-				if err := componentutil.UpdateObjLabel(ctx, r.Client, deploy, labelKey, labelValue); err != nil {
-					return err
-				}
-			}
-		case constant.PodKind:
-			podList := objectList.(*corev1.PodList)
-			for _, pod := range podList.Items {
-				if err := componentutil.UpdateObjLabel(ctx, r.Client, pod, labelKey, labelValue); err != nil {
-					return err
-				}
-			}
-		case constant.ServiceKind:
-			svcList := objectList.(*corev1.ServiceList)
-			for _, svc := range svcList.Items {
-				if err := componentutil.UpdateObjLabel(ctx, r.Client, svc, labelKey, labelValue); err != nil {
-					return err
-				}
-			}
-		case constant.ConfigMapKind:
-			cmList := objectList.(*corev1.ConfigMapList)
-			for _, cm := range cmList.Items {
-				if err := componentutil.UpdateObjLabel(ctx, r.Client, cm, labelKey, labelValue); err != nil {
-					return err
-				}
-			}
-		case constant.CronJob:
-			cjList := objectList.(*batchv1.CronJobList)
-			for _, cj := range cjList.Items {
-				if err := componentutil.UpdateObjLabel(ctx, r.Client, cj, labelKey, labelValue); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-
 	// patch the custom label defined in clusterDefinition.spec.componentDefs[x].customLabelSpecs to the component resource.
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compDef := clusterDef.GetComponentDefByName(compSpec.ComponentDefRef)
 		for _, customLabelSpec := range compDef.CustomLabelSpecs {
 			// TODO if the customLabelSpec.Resources is empty, we should add the label to all the resources under the component.
 			for _, resource := range customLabelSpec.Resources {
-				if err := patchGVRCustomLabels(resource, compSpec.Name, customLabelSpec.Key, customLabelSpec.Value); err != nil {
+				if err := componentutil.PatchGVRCustomLabels(ctx, r.Client, cluster, resource, compSpec.Name, customLabelSpec.Key, customLabelSpec.Value); err != nil {
 					return err
 				}
 			}

@@ -71,6 +71,11 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return workloadCompClusterReconcile(reqCtx, r.Client, deploy,
 		func(cluster *appsv1alpha1.Cluster, componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
 			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, deploy, componentSpec)
+			// patch the current componentSpec workload's custom labels
+			if err := patchWorkloadCustomLabel(reqCtx.Ctx, r.Client, cluster, componentSpec); err != nil {
+				reqCtx.Log.V(1).Info("Deployment Controller patchWorkloadCustomLabel failed", "componentSpec", componentSpec, "err", err)
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			}
 			if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			} else if requeueAfter != 0 {

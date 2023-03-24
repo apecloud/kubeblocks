@@ -276,6 +276,7 @@ spec:
                         - value
                         type: object
                       type: array
+                      x-kubernetes-list-type: map
                     description:
                       description: The description of component definition.
                       type: string

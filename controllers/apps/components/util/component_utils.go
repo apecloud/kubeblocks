@@ -20,17 +20,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/generics"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 const (
@@ -370,4 +374,135 @@ func UpdateObjLabel[T generics.Object, PT generics.PObject[T]](
 		return err
 	}
 	return nil
+}
+
+// PatchGVRCustomLabels patches the custom labels to the object list of the specified GVK.
+func PatchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster,
+	resource appsv1alpha1.GVKResource, componentName, labelKey, labelValue string) error {
+	gvk, err := ParseCustomLabelPattern(resource.GVK)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(getCustomLabelSupportKind(), gvk.Kind) {
+		return errors.New(fmt.Sprintf("kind %s is not supported for custom labels", gvk.Kind))
+	}
+
+	objectList := getObjectListMapOfResourceKind()[gvk.Kind]
+	matchLabels := GetComponentMatchLabels(cluster.Name, componentName)
+	for k, v := range resource.Selector {
+		matchLabels[k] = v
+	}
+	if err := GetObjectListByCustomLabels(ctx, cli, *cluster, objectList, client.MatchingLabels(matchLabels)); err != nil {
+		return err
+	}
+	labelKey = replaceKBEnvPlaceholderTokens(cluster.Name, componentName, labelKey)
+	labelValue = replaceKBEnvPlaceholderTokens(cluster.Name, componentName, labelValue)
+	switch gvk.Kind {
+	case constant.StatefulSetKind:
+		stsList := objectList.(*appsv1.StatefulSetList)
+		for _, sts := range stsList.Items {
+			if err := UpdateObjLabel(ctx, cli, sts, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	case constant.DeploymentKind:
+		deployList := objectList.(*appsv1.DeploymentList)
+		for _, deploy := range deployList.Items {
+			if err := UpdateObjLabel(ctx, cli, deploy, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	case constant.PodKind:
+		podList := objectList.(*corev1.PodList)
+		for _, pod := range podList.Items {
+			if err := UpdateObjLabel(ctx, cli, pod, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	case constant.ServiceKind:
+		svcList := objectList.(*corev1.ServiceList)
+		for _, svc := range svcList.Items {
+			if err := UpdateObjLabel(ctx, cli, svc, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	case constant.ConfigMapKind:
+		cmList := objectList.(*corev1.ConfigMapList)
+		for _, cm := range cmList.Items {
+			if err := UpdateObjLabel(ctx, cli, cm, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	case constant.CronJob:
+		cjList := objectList.(*batchv1.CronJobList)
+		for _, cj := range cjList.Items {
+			if err := UpdateObjLabel(ctx, cli, cj, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// ParseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
+func ParseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
+	patterns := strings.Split(pattern, "/")
+	switch len(patterns) {
+	case 2:
+		return schema.GroupVersionKind{
+			Group:   "",
+			Version: patterns[0],
+			Kind:    patterns[1],
+		}, nil
+	case 3:
+		return schema.GroupVersionKind{
+			Group:   patterns[0],
+			Version: patterns[1],
+			Kind:    patterns[2],
+		}, nil
+	}
+	return schema.GroupVersionKind{}, fmt.Errorf("invalid pattern %s", pattern)
+}
+
+// getCustomLabelSupportKind returns the kinds that support custom label.
+func getCustomLabelSupportKind() []string {
+	return []string{
+		constant.CronJob,
+		constant.StatefulSetKind,
+		constant.DeploymentKind,
+		constant.ReplicaSet,
+		constant.ServiceKind,
+		constant.ConfigMapKind,
+		constant.PodKind,
+	}
+}
+
+// GetCustomLabelWorkloadKind returns the kinds that support custom label.
+func GetCustomLabelWorkloadKind() []string {
+	return []string{
+		constant.CronJob,
+		constant.StatefulSetKind,
+		constant.DeploymentKind,
+		constant.ReplicaSet,
+		constant.PodKind,
+	}
+}
+
+// getObjectListMapOfResourceKind returns the mapping of resource kind and its object list.
+func getObjectListMapOfResourceKind() map[string]client.ObjectList {
+	return map[string]client.ObjectList{
+		constant.CronJob:         &batchv1.CronJobList{},
+		constant.StatefulSetKind: &appsv1.StatefulSetList{},
+		constant.DeploymentKind:  &appsv1.DeploymentList{},
+		constant.ReplicaSet:      &appsv1.ReplicaSetList{},
+		constant.ServiceKind:     &corev1.ServiceList{},
+		constant.ConfigMapKind:   &corev1.ConfigMapList{},
+		constant.PodKind:         &corev1.PodList{},
+	}
+}
+
+// replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.
+func replaceKBEnvPlaceholderTokens(clusterName, componentName, strToReplace string) string {
+	builtInEnvMap := componetutil.GetReplacementMapForBuiltInEnv(clusterName, componentName)
+	return componetutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }

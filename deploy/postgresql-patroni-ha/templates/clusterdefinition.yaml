@@ -16,8 +16,8 @@ spec:
       workloadType: Replication
       characterType: postgresql
       customLabelSpecs:
-        - key: apps.kubeblocks.postgresql.patroni/scope
-          value: postgres-postgresql
+        - key: apps.kubeblocks.postgres.patroni/scope
+          value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)"
           resources:
             - gvk: "v1/Pod"
               selector:
@@ -110,6 +110,20 @@ spec:
                 fi
                 export SPILO_CONFIGURATION=${SPILO_CONFIGURATION/\[\[KB_RESTORE_CONF\]\]/$kb_restore_conf}
                 exec /launch.sh init
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - -ee
+                  - |
+                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm

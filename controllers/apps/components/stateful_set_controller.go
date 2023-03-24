@@ -72,6 +72,11 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return workloadCompClusterReconcile(reqCtx, r.Client, sts,
 		func(cluster *appsv1alpha1.Cluster, componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
 			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
+			// patch the current componentSpec workload's custom labels
+			if err := patchWorkloadCustomLabel(reqCtx.Ctx, r.Client, cluster, componentSpec); err != nil {
+				reqCtx.Log.V(1).Info("StatefulSet Controller patchWorkloadCustomLabel failed", "componentSpec", componentSpec, "err", err)
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			}
 			reqCtx.Log.V(1).Info("before updateComponentStatusInClusterStatus",
 				"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,
 				"replicas", sts.Status.Replicas)

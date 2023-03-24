@@ -94,7 +94,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 			By("test GetOpsRequestAnnotation function")
 			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func() {
-				opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"HorizontalScaling"},{"name":"test-not-exists-ops","clusterPhase":"VolumeExpanding"}]`,
+				opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"},{"name":"test-not-exists-ops","clusterPhase":"Updating"}]`,
 					opsRes.OpsRequest.Name)
 				opsRes.Cluster.Annotations = map[string]string{
 					constant.OpsRequestAnnotationKey: opsAnnotationString,

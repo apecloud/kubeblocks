@@ -444,12 +444,12 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	return &pvc, nil
 }
 
+// BuildEnvConfig build cluster component context ConfigMap object, which is to be used in workload container's
+// envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
 func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli client.Client) (*corev1.ConfigMap, error) {
 	return BuildEnvConfigLow(reqCtx, cli, params.Cluster, params.Component)
 }
 
-// BuildEnvConfig build cluster component context ConfigMap object, which is to be used in workload container's
-// envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
 func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) (*corev1.ConfigMap, error) {
 

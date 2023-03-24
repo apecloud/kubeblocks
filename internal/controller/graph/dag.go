@@ -166,6 +166,16 @@ func (d *DAG) Root() Vertex {
 	return roots[0]
 }
 
+func (d *DAG) Merge(subDag *DAG) {
+	root := d.Root()
+	for v := range subDag.vertices {
+		if len(d.inAdj(v)) == 0 {
+			d.AddVertex(v)
+			d.Connect(root, v)
+		}
+	}
+}
+
 // String return a string representation of the DAG in topology order
 func (d *DAG) String() string {
 	str := "|"

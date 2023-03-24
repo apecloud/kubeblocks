@@ -19,7 +19,6 @@ package plan
 import (
 	"context"
 	"fmt"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"math"
 	"strings"
 
@@ -33,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
@@ -40,88 +40,6 @@ import (
 	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-func PrepareStatelessComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
-	if err := prepareComponentWorkloads(reqCtx, cli, task,
-		func(envConfig *corev1.ConfigMap) (client.Object, error) {
-			return builder.BuildDeploy(reqCtx, task.GetBuilderParams())
-		}); err != nil {
-		return err
-	}
-	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
-	if err != nil {
-		return err
-	}
-	for _, svc := range svcList {
-		task.AppendResource(svc)
-	}
-	return nil
-}
-
-func PrepareStatefulComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
-	if err := prepareComponentWorkloads(reqCtx, cli, task,
-		func(envConfig *corev1.ConfigMap) (client.Object, error) {
-			return builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfig.Name)
-		}); err != nil {
-		return err
-	}
-	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
-	if err != nil {
-		return err
-	}
-	for _, svc := range svcList {
-		task.AppendResource(svc)
-	}
-	return nil
-}
-
-//
-//func PrepareReplicationComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
-//	// get the number of existing statefulsets under the current component
-//	var existStsList = &appsv1.StatefulSetList{}
-//	if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, *task.Cluster, existStsList, task.Component.Name); err != nil {
-//		return err
-//	}
-//
-//	// If the statefulSets already exists, check whether there is an HA switching and the HA process is prioritized to handle.
-//	// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
-//	if len(existStsList.Items) > 0 {
-//		primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster,
-//			task.Component.Name, task.Component.GetPrimaryIndex())
-//		if err != nil {
-//			return err
-//		}
-//		if primaryIndexChanged {
-//			if err := replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster,
-//				componentutil.GetClusterComponentSpecByName(*task.Cluster, task.Component.Name)); err != nil {
-//				return err
-//			}
-//		}
-//	}
-//
-//	// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
-//	//  then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
-//	replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
-//	for index := int32(0); index < int32(replicaCount); index++ {
-//		if err := prepareComponentWorkloads(reqCtx, cli, task,
-//			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-//				return buildReplicationSet(reqCtx, task, envConfig.Name, index)
-//			}); err != nil {
-//			return err
-//		}
-//	}
-//
-//	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
-//	if err != nil {
-//		return err
-//	}
-//	for _, svc := range svcList {
-//		svc.Spec.Selector[constant.RoleLabelKey] = string(replicationset.Primary)
-//		task.AppendResource(svc)
-//	}
-//
-//	return nil
-//}
 
 // PrepareComponentResources generate all necessary sub-resources objects used in component,
 // like Secret, ConfigMap, Service, StatefulSet, Deployment, Volume, PodDisruptionBudget etc.
@@ -378,6 +296,7 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	return nil
 }
 
+// BuildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files
 func BuildCfg(task *intctrltypes.ReconcileTask,
 	obj client.Object,
 	podSpec *corev1.PodSpec,
@@ -386,7 +305,6 @@ func BuildCfg(task *intctrltypes.ReconcileTask,
 	return BuildCfgLow(task.ClusterVersion, task.Cluster, task.Component, obj, podSpec, ctx, cli)
 }
 
-// BuildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files
 func BuildCfgLow(clusterVersion *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,

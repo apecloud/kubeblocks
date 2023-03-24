@@ -14,25 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package lifecycle
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/generics"
 	"reflect"
 	"strings"
 	"time"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -41,6 +31,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
@@ -87,46 +89,7 @@ func listDeployOwnedByComponent(reqCtx intctrlutil.RequestCtx, cli client.Client
 	return listObjWithLabelsInNamespace(reqCtx, cli, generics.DeploymentSignature, namespace, labels)
 }
 
-func getClusterBackupSourceMap(cluster appsv1alpha1.Cluster) (map[string]string, error) {
-	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
-	if len(compBackupMapString) == 0 {
-		return nil, nil
-	}
-	compBackupMap := map[string]string{}
-	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
-	return compBackupMap, err
-}
-
-func getComponentBackupSource(cluster appsv1alpha1.Cluster, compName string) (string, error) {
-	backupSources, err := getClusterBackupSourceMap(cluster)
-	if err != nil {
-		return "", err
-	}
-	if source, ok := backupSources[compName]; ok {
-		return source, nil
-	}
-	return "", nil
-}
-
-func buildRestoreInfoFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster appsv1alpha1.Cluster,
-	component *SynthesizedComponent) error {
-	// build info that needs to be restored from backup
-	backupSourceName, err := getComponentBackupSource(cluster, component.Name)
-	if err != nil {
-		return err
-	}
-	if len(backupSourceName) == 0 {
-		return nil
-	}
-
-	backup, backupTool, err := getBackupObjects(reqCtx, cli, cluster.Namespace, backupSourceName)
-	if err != nil {
-		return err
-	}
-	return BuildRestoredInfo2(component, backup, backupTool)
-}
-
-func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, component SynthesizedComponent) error {
+func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, component component.SynthesizedComponent) error {
 	if !component.TLS {
 		return nil
 	}
@@ -151,7 +114,7 @@ func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, 
 	return nil
 }
 
-func composeTLSVolume(clusterName string, component SynthesizedComponent) (*corev1.Volume, error) {
+func composeTLSVolume(clusterName string, component component.SynthesizedComponent) (*corev1.Volume, error) {
 	if !component.TLS {
 		return nil, errors.New("can't compose TLS volume when TLS not enabled")
 	}
@@ -338,7 +301,7 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 func doBackup(reqCtx intctrlutil.RequestCtx,
 	cli types2.ReadonlyClient,
 	cluster *appsv1alpha1.Cluster,
-	component *SynthesizedComponent,
+	component *component.SynthesizedComponent,
 	snapshotKey types.NamespacedName,
 	stsProto *appsv1.StatefulSet,
 	stsObj *appsv1.StatefulSet) ([]client.Object, error) {
@@ -451,7 +414,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 func isVolumeSnapshotExists(cli types2.ReadonlyClient,
 	ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
-	component *SynthesizedComponent) (bool, error) {
+	component *component.SynthesizedComponent) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
 	if err := cli.List(ctx, &vsList, ml); err != nil {
@@ -517,7 +480,7 @@ func doSnapshot(cli types2.ReadonlyClient,
 func isVolumeSnapshotReadyToUse(cli types2.ReadonlyClient,
 	ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
-	component *SynthesizedComponent) (bool, error) {
+	component *component.SynthesizedComponent) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
 	if err := cli.List(ctx, &vsList, ml); err != nil {
@@ -649,6 +612,8 @@ func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
 	if err != nil {
 		return nil, err
 	}
-	intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName)
+	if err = intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName); err != nil {
+		return nil, err
+	}
 	return pvc, nil
 }

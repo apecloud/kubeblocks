@@ -17,13 +17,11 @@ limitations under the License.
 package lifecycle
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"reflect"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -50,63 +48,54 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 		return nil
 	}
 
-	compSpecMap := make(map[string]appsv1alpha1.ClusterComponentSpec)
+	compSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
 	for _, spec := range cluster.Spec.ComponentSpecs {
-		compSpecMap[spec.Name] = spec
+		compSpecMap[spec.Name] = &spec
 	}
 	compProto := sets.KeySet(compSpecMap)
-	// TODO: should review that whether it is reasonable and correct to use component status
+	// TODO: should review that whether it is reasonable to use component status
 	compStatus := sets.KeySet(cluster.Status.Components)
 
 	createSet := compProto.Difference(compStatus)
 	updateSet := compProto.Intersection(compStatus)
 	deleteSet := compStatus.Difference(compProto)
 
-	resources := make([]client.Object, 0)
+	dag4Component := graph.NewDAG()
 	for compName := range createSet {
-		comp := component.NewComponent(c.cc.cd, c.cc.cv, *cluster, compSpecMap[compName], dag)
+		comp, err := NewComponent(&c.cc.cd, &c.cc.cv, cluster, compName, dag4Component)
+		if err != nil {
+			return err
+		}
 		if err := comp.Create(c.ctx, c.cli); err != nil {
 			return err
 		}
 	}
 
 	for compName := range deleteSet {
-		comp := component.NewComponent(c.cc.cd, c.cc.cv, *cluster, compSpecMap[compName], dag)
+		// TODO: compSpecMap[compName] is not exist, should fix it
+		comp, err := NewComponent(&c.cc.cd, &c.cc.cv, cluster, compName, dag4Component)
+		if err != nil {
+			return err
+		}
 		if err := comp.Delete(c.ctx, c.cli); err != nil {
 			return err
 		}
 	}
 
 	for compName := range updateSet {
-		comp := component.NewComponent(c.cc.cd, c.cc.cv, *cluster, compSpecMap[compName], dag)
+		comp, err := NewComponent(&c.cc.cd, &c.cc.cv, cluster, compName, dag4Component)
+		if err != nil {
+			return err
+		}
+		// TODO: will replace Update with specified operations(restart, reconfigure, h/v-scaling...) after ops-request forwards to cluster controller
 		if err := comp.Update(c.ctx, c.cli); err != nil {
 			return err
 		}
 	}
 
-	// replication set will create duplicate env configmap and headless service
-	// TODO: fix it within replication set
-	for _, object := range dedupResources(resources) {
-		vertex := &lifecycleVertex{obj: object}
-		dag.AddVertex(vertex)
-		dag.Connect(rootVertex, vertex)
-	}
-	return nil
-}
+	dag.Merge(dag4Component)
 
-func dedupResources(resources []client.Object) []client.Object {
-	objects := make([]client.Object, 0)
-	for _, resource := range resources {
-		contains := false
-		for _, object := range objects {
-			if reflect.DeepEqual(resource, object) {
-				contains = true
-				break
-			}
-		}
-		if !contains {
-			objects = append(objects, resource)
-		}
-	}
-	return objects
+	fmt.Printf("DAG: %s\n", dag)
+
+	return nil
 }

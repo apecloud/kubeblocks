@@ -24,7 +24,6 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"golang.org/x/exp/maps"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -146,7 +145,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// components to K8s objects and put them into dag
 		&componentTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
 		//// tls certs secret
-		//&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
+		// &tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 		// add our finalizer to all objects
 		&ownershipTransformer{finalizer: dbClusterFinalizerName},
 		// make all non-secret objects depending on all secrets
@@ -158,11 +157,11 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// handle TerminationPolicyType=DoNotTerminate
 		&doNotTerminateTransformer{},
 		//// horizontal scaling
-		//&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
+		// &stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 		//// stateful set pvc Update
-		//&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
+		// &stsPVCTransformer{cli: c.cli, ctx: c.ctx},
 		//// replication set horizontal scaling
-		//&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
+		// &rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
 		&clusterStatusTransformer{cc: *cr, cli: c.cli, ctx: c.ctx, recorder: c.recorder},
 	}
@@ -284,13 +283,13 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		if node.immutable {
 			return nil
 		}
-		o, err := c.buildUpdateObj(node)
-		if err != nil {
-			return err
-		}
-		err = c.cli.Update(c.ctx.Ctx, o)
+		//o, err := c.buildUpdateObj(node)
+		//if err != nil {
+		//	return err
+		//}
+		err := c.cli.Update(c.ctx.Ctx, node.obj)
 		if err != nil && !apierrors.IsNotFound(err) {
-			c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", o, node.oriObj, o))
+			c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", node.obj, node.oriObj, node.obj))
 			return err
 		}
 	case DELETE:
@@ -322,78 +321,78 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	return nil
 }
 
-func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Object, error) {
-	handleSts := func(origObj, stsProto *appsv1.StatefulSet) (client.Object, error) {
-		stsObj := origObj.DeepCopy()
-		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
-		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-			c.recorder.Eventf(c.cluster,
-				corev1.EventTypeNormal,
-				"HorizontalScale",
-				"Start horizontal scale component %s from %d to %d",
-				componentName,
-				*stsObj.Spec.Replicas,
-				*stsProto.Spec.Replicas)
-		}
-		// keep the original template annotations.
-		// if annotations exist and are replaced, the statefulSet will be updated.
-		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
-			stsProto.Spec.Template.Annotations)
-		stsObj.Spec.Template = stsProto.Spec.Template
-		stsObj.Spec.Replicas = stsProto.Spec.Replicas
-		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
-		if !reflect.DeepEqual(&origObj.Spec, &stsObj.Spec) {
-			// sync component phase
-			syncComponentPhaseWhenSpecUpdating(c.cluster, componentName)
-		}
-
-		return stsObj, nil
-	}
-
-	handleDeploy := func(origObj, deployProto *appsv1.Deployment) (client.Object, error) {
-		deployObj := origObj.DeepCopy()
-		deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations,
-			deployProto.Spec.Template.Annotations)
-		deployObj.Spec = deployProto.Spec
-		if !reflect.DeepEqual(&origObj.Spec, &deployObj.Spec) {
-			// sync component phase
-			componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
-			syncComponentPhaseWhenSpecUpdating(c.cluster, componentName)
-		}
-		return deployObj, nil
-	}
-
-	handleSvc := func(origObj, svcProto *corev1.Service) (client.Object, error) {
-		svcObj := origObj.DeepCopy()
-		svcObj.Spec = svcProto.Spec
-		svcObj.Annotations = mergeServiceAnnotations(svcObj.Annotations, svcProto.Annotations)
-		return svcObj, nil
-	}
-
-	handlePVC := func(origObj, pvcProto *corev1.PersistentVolumeClaim) (client.Object, error) {
-		pvcObj := origObj.DeepCopy()
-		if pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] == pvcProto.Spec.Resources.Requests[corev1.ResourceStorage] {
-			return pvcObj, nil
-		}
-		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
-		return pvcObj, nil
-	}
-
-	switch obj := node.obj.(type) {
-	case *appsv1.StatefulSet:
-		return handleSts(node.oriObj.(*appsv1.StatefulSet), obj)
-	case *appsv1.Deployment:
-		return handleDeploy(node.oriObj.(*appsv1.Deployment), obj)
-	case *corev1.Service:
-		return handleSvc(node.oriObj.(*corev1.Service), obj)
-	case *corev1.PersistentVolumeClaim:
-		return handlePVC(node.oriObj.(*corev1.PersistentVolumeClaim), obj)
-	case *corev1.Secret, *corev1.ConfigMap:
-		return obj, nil
-	}
-
-	return node.obj, nil
-}
+//func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Object, error) {
+//	handleSts := func(origObj, stsProto *appsv1.StatefulSet) (client.Object, error) {
+//		stsObj := origObj.DeepCopy()
+//		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
+//		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
+//			c.recorder.Eventf(c.cluster,
+//				corev1.EventTypeNormal,
+//				"HorizontalScale",
+//				"Start horizontal scale component %s from %d to %d",
+//				componentName,
+//				*stsObj.Spec.Replicas,
+//				*stsProto.Spec.Replicas)
+//		}
+//		// keep the original template annotations.
+//		// if annotations exist and are replaced, the statefulSet will be updated.
+//		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
+//			stsProto.Spec.Template.Annotations)
+//		stsObj.Spec.Template = stsProto.Spec.Template
+//		stsObj.Spec.Replicas = stsProto.Spec.Replicas
+//		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
+//		if !reflect.DeepEqual(&origObj.Spec, &stsObj.Spec) {
+//			// sync component phase
+//			syncComponentPhaseWhenSpecUpdating(c.cluster, componentName)
+//		}
+//
+//		return stsObj, nil
+//	}
+//
+//	handleDeploy := func(origObj, deployProto *appsv1.Deployment) (client.Object, error) {
+//		deployObj := origObj.DeepCopy()
+//		deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations,
+//			deployProto.Spec.Template.Annotations)
+//		deployObj.Spec = deployProto.Spec
+//		if !reflect.DeepEqual(&origObj.Spec, &deployObj.Spec) {
+//			// sync component phase
+//			componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
+//			syncComponentPhaseWhenSpecUpdating(c.cluster, componentName)
+//		}
+//		return deployObj, nil
+//	}
+//
+//	handleSvc := func(origObj, svcProto *corev1.Service) (client.Object, error) {
+//		svcObj := origObj.DeepCopy()
+//		svcObj.Spec = svcProto.Spec
+//		svcObj.Annotations = mergeServiceAnnotations(svcObj.Annotations, svcProto.Annotations)
+//		return svcObj, nil
+//	}
+//
+//	handlePVC := func(origObj, pvcProto *corev1.PersistentVolumeClaim) (client.Object, error) {
+//		pvcObj := origObj.DeepCopy()
+//		if pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] == pvcProto.Spec.Resources.Requests[corev1.ResourceStorage] {
+//			return pvcObj, nil
+//		}
+//		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
+//		return pvcObj, nil
+//	}
+//
+//	switch obj := node.obj.(type) {
+//	case *appsv1.StatefulSet:
+//		return handleSts(node.oriObj.(*appsv1.StatefulSet), obj)
+//	case *appsv1.Deployment:
+//		return handleDeploy(node.oriObj.(*appsv1.Deployment), obj)
+//	case *corev1.Service:
+//		return handleSvc(node.oriObj.(*corev1.Service), obj)
+//	case *corev1.PersistentVolumeClaim:
+//		return handlePVC(node.oriObj.(*corev1.PersistentVolumeClaim), obj)
+//	case *corev1.Secret, *corev1.ConfigMap:
+//		return obj, nil
+//	}
+//
+//	return node.obj, nil
+//}
 
 func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster) error {
 	switch cluster.Spec.TerminationPolicy {

@@ -18,7 +18,6 @@ package plan
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +29,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 )
 
 type templateRenderValidator = func(map[string]string) error

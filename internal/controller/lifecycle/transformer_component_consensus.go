@@ -14,75 +14,117 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package lifecycle
 
 import (
 	"fmt"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
 
-func NewConsensusComponent(definition appsv1alpha1.ClusterDefinition,
-	version appsv1alpha1.ClusterVersion,
-	cluster appsv1alpha1.Cluster,
-	compSpec appsv1alpha1.ClusterComponentSpec,
-	dag *graph.DAG) *consensusComponent {
-	return &consensusComponent{
-		componentBase: componentBase{
-			Definition:     definition,
-			Cluster:        cluster,
-			CompDef:        *(&definition).GetComponentDefByName(compSpec.ComponentDefRef),
-			CompVer:        version.GetDefNameMappingComponents()[compSpec.ComponentDefRef],
-			CompSpec:       compSpec,
-			Component:      nil,
-			WorkloadVertex: nil,
-			Dag:            dag,
-		},
-	}
-}
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
 
 type consensusComponent struct {
 	componentBase
 }
 
-func (c *consensusComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	synthesizedComp, err := BuildSynthesizedComponent(reqCtx, cli, c.Cluster, c.Definition, c.CompDef, c.CompSpec, c.CompVer)
+type consensusComponentBuilder struct {
+	componentBuilderBase
+	workload *appsv1.StatefulSet
+}
+
+func (b *consensusComponentBuilder) mutableWorkload(_ int32) client.Object {
+	return b.workload
+}
+
+func (b *consensusComponentBuilder) mutablePodSpec(_ int32) *corev1.PodSpec {
+	return &b.workload.Spec.Template.Spec
+}
+
+func (b *consensusComponentBuilder) buildService() componentBuilder {
+	buildfn := func() ([]client.Object, error) {
+		svcList, err := builder.BuildSvcListLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		if err != nil {
+			return nil, err
+		}
+		objs := make([]client.Object, 0, len(svcList))
+		leader := b.Comp.GetSynthesizedComponent().ConsensusSpec.Leader
+		for _, svc := range svcList {
+			if len(leader.Name) > 0 {
+				svc.Spec.Selector[constant.RoleLabelKey] = leader.Name
+			}
+			objs = append(objs, svc)
+		}
+		return objs, err
+	}
+	return b.buildWrapper(buildfn)
+}
+
+func (b *consensusComponentBuilder) buildWorkload(_ int32) componentBuilder {
+	buildfn := func() ([]client.Object, error) {
+		if b.EnvConfig == nil {
+			return nil, fmt.Errorf("build consensus workload but env config is nil, cluster: %s, component: %s",
+				b.Comp.GetClusterName(), b.Comp.GetName())
+		}
+
+		component := b.Comp.GetSynthesizedComponent()
+		sts, err := builder.BuildStsLow(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		if err != nil {
+			return nil, err
+		}
+		sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+
+		b.workload = sts
+
+		// build PDB object
+		if component.MaxUnavailable != nil {
+			pdb, err := builder.BuildPDBLow(b.Comp.GetCluster(), component)
+			if err != nil {
+				return nil, err
+			}
+			return []client.Object{pdb}, err // don't return sts here, and it will not add to resource queue now
+		}
+		return nil, nil
+	}
+	return b.buildWrapper(buildfn)
+}
+
+func (c *consensusComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, action *Action) error {
+	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, *c.Cluster, *c.Definition, *c.CompDef, *c.CompSpec, c.CompVer)
 	if err != nil {
 		return err
 	}
 	c.Component = synthesizedComp
 
-	builder := &componentBuilder{
-		ReqCtx:    reqCtx,
-		Client:    cli,
-		Comp:      c,
-		Error:     nil,
-		EnvConfig: nil,
-		Workloads: make([]*appsv1.StatefulSet, 1),
+	builder := &consensusComponentBuilder{
+		componentBuilderBase: componentBuilderBase{
+			ReqCtx:        reqCtx,
+			Client:        cli,
+			Comp:          c,
+			defaultAction: action,
+			Error:         nil,
+			EnvConfig:     nil,
+		},
+		workload: nil,
 	}
+	builder.concreteBuilder = builder
 
-	patchService := func(svc *corev1.Service) {
-		leader := c.Component.ConsensusSpec.Leader
-		if len(leader.Name) > 0 {
-			svc.Spec.Selector[constant.RoleLabelKey] = leader.Name
-		}
-	}
 	// runtime, config, script, env, volume, service, monitor, probe
 	return builder.buildEnv(). // TODO: workload related, scaling related
-					buildConsensusWorkload(). // build workload here since other objects depend on it.
+					buildWorkload(0). // build workload here since other objects depend on it.
 					buildHeadlessService().
 					buildConfig(0).
 					buildTLSVolume(0).
 					buildVolumeMount(0).
-					buildPDB().
-					buildService(patchService).
+					buildService().
 					buildTLSCert().
 					complete()
 }
@@ -100,14 +142,17 @@ func (c *consensusComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Cli
 }
 
 func (c *consensusComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	if err := c.init(reqCtx, cli, actionPtr(CREATE)); err != nil {
+		return err
+	}
 	if exist, err := c.Exist(reqCtx, cli); err != nil || exist {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("component to be created is aready exist, cluster: %s, component: %s",
+		return fmt.Errorf("component to be created is already exist, cluster: %s, component: %s",
 			c.Cluster.Name, c.CompSpec.Name)
 	}
-	return c.init(reqCtx, cli)
+	return nil
 }
 
 func (c *consensusComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -116,7 +161,7 @@ func (c *consensusComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Cl
 }
 
 func (c *consensusComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli); err != nil {
+	if err := c.init(reqCtx, cli, nil); err != nil {
 		return err
 	}
 
@@ -130,7 +175,7 @@ func (c *consensusComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
-	return nil
+	return c.updateUnderlayResources(reqCtx, cli)
 }
 
 func (c *consensusComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -170,7 +215,7 @@ func (c *consensusComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli cli
 				return err
 			}
 			pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Resources.Requests[corev1.ResourceStorage]
-			c.updateResource(pvc, c.WorkloadVertex)
+			c.updateResource(pvc, c.workloadVertexs[0])
 		}
 	}
 	return nil
@@ -194,7 +239,7 @@ func (c *consensusComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli 
 		}
 	}
 
-	reqCtx.Recorder.Eventf(&c.Cluster,
+	reqCtx.Recorder.Eventf(c.Cluster,
 		corev1.EventTypeNormal,
 		"HorizontalScale",
 		"start horizontal scale component %s of cluster %s from %d to %d",
@@ -255,7 +300,7 @@ func (c *consensusComponent) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.C
 				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 			}
 			// create cronjob to delete pvc after 30 minutes
-			if obj, err := checkedCreateDeletePVCCronJob(reqCtx, cli, pvcKey, stsObj, &c.Cluster); err != nil {
+			if obj, err := checkedCreateDeletePVCCronJob(reqCtx, cli, pvcKey, stsObj, c.Cluster); err != nil {
 				return err
 			} else if obj != nil {
 				c.createResource(obj, nil)
@@ -296,7 +341,7 @@ func (c *consensusComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.
 				if err := cli.Get(reqCtx.Ctx, cronJobKey, cronJob); err != nil {
 					return client.IgnoreNotFound(err)
 				}
-				c.deleteResource(cronJob, c.WorkloadVertex)
+				c.deleteResource(cronJob, c.workloadVertexs[0])
 			}
 		}
 		return nil
@@ -338,7 +383,7 @@ func (c *consensusComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.
 			return nil
 		}
 		// if all pvc bounded, clean backup resources
-		objs, err := deleteSnapshot(cli, reqCtx, snapshotKey, &c.Cluster, c.CompSpec.Name)
+		objs, err := deleteSnapshot(cli, reqCtx, snapshotKey, c.Cluster, c.CompSpec.Name)
 		if err != nil {
 			return err
 		}
@@ -358,15 +403,15 @@ func (c *consensusComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.
 	}
 	if !allPVCsExist {
 		// do backup according to component's horizontal scale policy
-		stsProto := c.WorkloadVertex.obj.(*appsv1.StatefulSet)
-		objs, err := doBackup(reqCtx, cli, &c.Cluster, c.Component, snapshotKey, stsProto, stsObj)
+		stsProto := c.workloadVertexs[0].obj.(*appsv1.StatefulSet)
+		objs, err := doBackup(reqCtx, cli, c.Cluster, c.Component, snapshotKey, stsProto, stsObj)
 		if err != nil {
 			return err
 		}
 		for _, obj := range objs {
 			c.createResource(obj, nil)
 		}
-		c.WorkloadVertex.immutable = true
+		c.workloadVertexs[0].immutable = true
 		return nil
 	}
 
@@ -376,7 +421,7 @@ func (c *consensusComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.
 		return err
 	}
 	if !allPVCBounded {
-		c.WorkloadVertex.immutable = true
+		c.workloadVertexs[0].immutable = true
 		return nil
 	}
 	// clean backup resources.
@@ -386,7 +431,25 @@ func (c *consensusComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.
 	}
 
 	// pvcs are ready, stateful_set.replicas should be updated
-	c.WorkloadVertex.immutable = false
+	c.workloadVertexs[0].immutable = false
 
 	return nil
+}
+
+func (c *consensusComponent) updateUnderlayResources(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	if err := c.updateWorkload(reqCtx, cli); err != nil {
+		return err
+	}
+	if err := c.updateService(reqCtx, cli); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *consensusComponent) updateWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	stsObj, err := c.runningWorkload(reqCtx, cli)
+	if err != nil {
+		return err
+	}
+	return c.updateStatefulSetWorkload(stsObj, 0)
 }

@@ -24,17 +24,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func FindMatchedVertex[T interface{}](dag *graph.DAG, objectKey client.ObjectKey) graph.Vertex {
@@ -183,23 +179,23 @@ func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string
 	return compBackupMap, err
 }
 
-func getBackupObjects(reqCtx intctrlutil.RequestCtx,
-	cli types2.ReadonlyClient,
-	namespace string,
-	backupName string) (*dataprotectionv1alpha1.Backup, *dataprotectionv1alpha1.BackupTool, error) {
-	// get backup
-	backup := &dataprotectionv1alpha1.Backup{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, backup); err != nil {
-		return nil, nil, err
-	}
-
-	// get backup tool
-	backupTool := &dataprotectionv1alpha1.BackupTool{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
-		return nil, nil, err
-	}
-	return backup, backupTool, nil
-}
+// func getBackupObjects(reqCtx intctrlutil.RequestCtx,
+//	cli types2.ReadonlyClient,
+//	namespace string,
+//	backupName string) (*dataprotectionv1alpha1.Backup, *dataprotectionv1alpha1.BackupTool, error) {
+//	// get backup
+//	backup := &dataprotectionv1alpha1.Backup{}
+//	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, backup); err != nil {
+//		return nil, nil, err
+//	}
+//
+//	// get backup tool
+//	backupTool := &dataprotectionv1alpha1.BackupTool{}
+//	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
+//		return nil, nil, err
+//	}
+//	return backup, backupTool, nil
+//}
 
 func isTypeOf[T interface{}](obj client.Object) bool {
 	_, ok := obj.(T)

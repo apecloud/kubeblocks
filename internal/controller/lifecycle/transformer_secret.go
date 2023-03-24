@@ -24,9 +24,7 @@ import (
 )
 
 // secretTransformer puts the all secrets at the beginning of the DAG
-type secretTransformer struct {
-	cc clusterRefResources
-}
+type secretTransformer struct{}
 
 func (c *secretTransformer) Transform(dag *graph.DAG) error {
 	var secretVertices, noneRootVertices []graph.Vertex

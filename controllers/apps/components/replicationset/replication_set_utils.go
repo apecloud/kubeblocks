@@ -19,7 +19,6 @@ package replicationset
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"reflect"
 	"sort"
 
@@ -33,6 +32,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )

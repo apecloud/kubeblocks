@@ -1,5 +1,5 @@
 ---
-title: Try out basic function of KubeBlocks on Cloud
+title: Try out basic functions of KubeBlocks on Cloud
 description: How to run KubeBlocks on Playground
 sidebar_position: 1
 sidebar_label: Try out basic functions on Playground
@@ -14,6 +14,7 @@ With Playground, you can try out KubeBlocks both on your local host (macOS) and 
 
 <Tabs>
 <TabItem value="AWS" label="AWS" default>
+
 ## Before you start to try KubeBlocks on Cloud (AWS)
   
 When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find the script at [Github repository](https://github.com/apecloud/cloud-provider).
@@ -59,7 +60,7 @@ export AWS_SECRET_ACCESS_KEY="asecretkey"
 Initialize Playground.
 
 ```bash
-kbbcli playground init --cloud-provider aws --region cn-northwest-1
+kbcli playground init --cloud-provider aws --region cn-northwest-1
 ```
 
 * `cloud-provider` specifies the cloud provider. 
@@ -103,7 +104,7 @@ The initialization lasts about 20 minutes. If the installation fails after a lon
 
 ## Try KubeBlocks with Playground
 
-You can explore three parts of KubeBlocks, the [Basic functions](#basic-functions-1), [Observability](#observability-1), and [High availability](#high-availability-of-apecloud-mysql-1). Refer to [Feature list](./../introduction/introduction.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
+You can explore KubeBlocks by [Viewing an ApeCloud MySQL cluster](#view-an-apecloud-mysql-cluster), [Accessing an ApeCloud MySQL Cluster](#access-an-apecloud-mysql-cluster), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Overview](./../introduction/introduction.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
 
 KubeBlocks supports the complete life cycle management of a database cluster. Go through the following instruction to try basic features of KubeBlocks. 
 For the full feature set, refer to [KubeBlocks Documentation](./../introduction/introduction.md) for details.
@@ -323,7 +324,7 @@ kbcli kubeblocks uninstall --remove-pvcs --remove-pvs
 Run the command below to destroy Playground.
 
 ```bash
-kbbcli playground destroy --cloud-provider aws --region cn-northwest-1
+kbcli playground destroy --cloud-provider aws --region cn-northwest-1
 ```
 
 Like the parameters in `kbcli playground init`, use `--cloud-provider` and `--region` to specify the cloud provider and the region.

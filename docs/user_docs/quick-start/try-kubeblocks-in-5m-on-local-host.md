@@ -63,7 +63,7 @@ Meet the following requirements for smooth operation of Playground and other fun
 
 ## Try KubeBlocks with Playground
 
-You can explore three parts of KubeBlocks, the [Basic functions](#basic-functions), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Feature list](./../introduction/introduction.md) to explore detailed KubeBlocks features and you can try all the features of KubeBlocks in a standard Kubernetes cluster.
+You can explore KubeBlocks, by [Viewing an ApeCloud MySQL cluster](#view-an-apecloud-mysql-cluster), [Accessing an ApeCloud MySQL cluster](#access-an-apecloud-mysql-cluster), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Overview](./../introduction/introduction.md) to explore detailed KubeBlocks features and you can try all the features of KubeBlocks in a standard Kubernetes cluster.
 
 KubeBlocks supports the complete life cycle management of a database cluster. Go through the following instructions to try basic features of KubeBlocks. 
 
@@ -272,7 +272,7 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
 
 Destroying Playground cleans up relevant component services and data:
 
-* Delete all KubeBlocks database clusters, such as ApeCloud MySQL Paxos Group.
+* Delete all KubeBlocks database clusters.
 * Uninstall KubeBlocks.
 * Delete the local Kubernetes clusters created by K3d.
   

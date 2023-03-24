@@ -63,19 +63,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL Standalone 
   
        kubectl patch sc/gp2 -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
        ```
-    - Configure default snapshot volumesnapshot class
-       ```bash
-       kubectl create -f - <<EOF
-       apiVersion: snapshot.storage.k8s.io/v1
-       kind: VolumeSnapshotClass
-       metadata:
-         name: csi-aws-vsc
-         annotations:
-           snapshot.storage.kubernetes.io/is-default-class: "true"
-       driver: ebs.csi.aws.com
-       deletionPolicy: Delete
-       EOF
-       ```
+
 3. Create a MySQL standalone. 
      ```bash
      kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'

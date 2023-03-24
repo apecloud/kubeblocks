@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package operations
+package plan
 
 import (
 	"time"
@@ -62,19 +62,37 @@ var _ = Describe("PITR Functions", func() {
 	AfterEach(cleanEnv)
 
 	Context("Test PITR", func() {
-		var pitrClient PointInTimeRecoveryManager
-		var cluster *appsv1alpha1.Cluster
-		var clusterDef *appsv1alpha1.ClusterDefinition
+		const (
+			clusterDefName = "test-clusterdef"
+			mysqlCompType  = "replicasets"
+			mysqlCompName  = "mysql"
+			nginxCompType  = "proxy"
+		)
+
+		var (
+			clusterDef     *appsv1alpha1.ClusterDefinition
+			clusterVersion *appsv1alpha1.ClusterVersion
+			cluster        *appsv1alpha1.Cluster
+		)
 
 		BeforeEach(func() {
-			By("init operations resources ")
-			_, clusterDef, cluster = initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-
-			pitrClient = PointInTimeRecoveryManager{
-				Client:  k8sClient,
-				Cluster: cluster,
-				Ctx:     ctx,
-			}
+			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
+				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+				Create(&testCtx).GetObject()
+			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+				AddComponent(mysqlCompType).
+				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(nginxCompType).
+				AddInitContainerShort("nginx-init", testapps.NginxImage).
+				AddContainerShort("nginx", testapps.NginxImage).
+				Create(&testCtx).GetObject()
+			pvcSpec := testapps.NewPVC("1Gi")
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				clusterDef.Name, clusterVersion.Name).
+				AddComponent(mysqlCompName, mysqlCompType).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				Create(&testCtx).GetObject()
 
 			By("By creating backup policyTemplate: ")
 			backupTplLabels := map[string]string{
@@ -126,15 +144,19 @@ var _ = Describe("PITR Functions", func() {
 				"restore-from-time":    metav1.Now().Format(time.RFC3339),
 				"restore-from-cluster": sourceCluster,
 			})
+			pitrMgr := PointInTimeRecoveryManager{
+				Cluster: cluster,
+				Client:  testCtx.Cli,
+				Ctx:     ctx,
+			}
 			clusterCompDefObj := clusterDef.Spec.ComponentDefs[0]
 			synthesizedComponent := &component.SynthesizedComponent{
 				PodSpec:               clusterCompDefObj.PodSpec,
-				Service:               clusterCompDefObj.Service,
 				Probes:                clusterCompDefObj.Probes,
 				LogConfigs:            clusterCompDefObj.LogConfigs,
 				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
 			}
-			Expect(pitrClient.DoPrepare(cluster, synthesizedComponent)).Should(HaveOccurred())
+			Expect(pitrMgr.DoPrepare(synthesizedComponent)).Should(HaveOccurred())
 		})
 
 	})

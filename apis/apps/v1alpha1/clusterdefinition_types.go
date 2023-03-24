@@ -393,6 +393,7 @@ type ClusterComponentDefinition struct {
 
 	// CustomLabelSpecs is used for custom label tags which you want to add to the component resources.
 	// +listType=map
+	// +listMapKey=key
 	// +optional
 	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
 }

@@ -24,7 +24,6 @@ import (
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,7 +33,7 @@ import (
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
-var _ = Describe("Backup for a StatefulSet", func() {
+var _ = Describe("Backup Controller test", func() {
 	const clusterName = "wesql-cluster"
 	const componentName = "replicasets-primary"
 	const containerName = "mysql"
@@ -60,7 +59,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		//testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
@@ -80,33 +79,34 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		By("mock a cluster")
 		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			"test-cd", "test-cv").Create(&testCtx)
-
-		By("By mocking a statefulset")
-		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
-			AddAppInstanceLabel(clusterName).
-			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
-			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
-				Spec:       testapps.NewPVC(defaultPVCSize),
-			}).Create(&testCtx).GetObject()
-
+		/*
+			By("By mocking a statefulset")
+			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
+				AddAppInstanceLabel(clusterName).
+				AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
+				AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
+					Spec:       testapps.NewPVC(defaultPVCSize),
+				}).Create(&testCtx).GetObject()
+		*/
+		podGenerateName := clusterName + "-" + componentName
 		By("By mocking a pvc belonging to the pod")
 		pvc := testapps.NewPersistentVolumeClaimFactory(
-			testCtx.DefaultNamespace, "data-"+sts.Name+"-0", clusterName, componentName, "data").
+			testCtx.DefaultNamespace, "data-"+podGenerateName+"-0", clusterName, componentName, "data").
 			SetStorage("1Gi").
 			Create(&testCtx).GetObject()
 		pvcName = pvc.Name
 
 		By("By mocking a pvc belonging to the pod2")
 		pvc2 := testapps.NewPersistentVolumeClaimFactory(
-			testCtx.DefaultNamespace, "data-"+sts.Name+"-1", clusterName, componentName, "data").
+			testCtx.DefaultNamespace, "data-"+podGenerateName+"-1", clusterName, componentName, "data").
 			SetStorage("1Gi").
 			Create(&testCtx).GetObject()
 
 		By("By mocking a pod belonging to the statefulset")
 		volume := corev1.Volume{Name: pvc.Name, VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}}}
-		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podGenerateName+"-0").
 			AddAppInstanceLabel(clusterName).
 			AddRoleLabel("leader").
 			AddAppComponentLabel(componentName).
@@ -118,7 +118,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		By("By mocking a pod 2 belonging to the statefulset")
 		volume2 := corev1.Volume{Name: pvc2.Name, VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc2.Name}}}
-		_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-1").
+		_ = testapps.NewPodFactory(testCtx.DefaultNamespace, podGenerateName+"-1").
 			AddAppInstanceLabel(clusterName).
 			AddAppComponentLabel(componentName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
@@ -223,6 +223,9 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			})
 
 			It("should success after all jobs complete", func() {
+				backupPolicyKey := types.NamespacedName{Name: backupPolicyName, Namespace: backupKey.Namespace}
+				patchBackupPolicySpecHooksManifests(backupPolicyKey, []string{"true"})
+
 				preJobKey := types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}
 				postJobKey := types.NamespacedName{Name: backupKey.Name + "-post", Namespace: backupKey.Namespace}
 				patchK8sJobStatus(preJobKey, batchv1.JobComplete)
@@ -236,6 +239,9 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 				patchVolumeSnapshotStatus(backupKey, true)
 				patchK8sJobStatus(postJobKey, batchv1.JobComplete)
+
+				manifestsJobKey := types.NamespacedName{Name: backupKey.Name + "-manifests", Namespace: backupKey.Namespace}
+				patchK8sJobStatus(manifestsJobKey, batchv1.JobComplete)
 
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
@@ -409,5 +415,11 @@ func patchVolumeSnapshotStatus(key types.NamespacedName, readyToUse bool) {
 	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *snapshotv1.VolumeSnapshot) {
 		snapStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
 		fetched.Status = &snapStatus
+	})).Should(Succeed())
+}
+
+func patchBackupPolicySpecHooksManifests(key types.NamespacedName, mainitest []string) {
+	Eventually(testapps.GetAndChangeObj(&testCtx, key, func(fetched *dataprotectionv1alpha1.BackupPolicy) {
+		fetched.Spec.Hooks.ManifestsCommands = mainitest
 	})).Should(Succeed())
 }

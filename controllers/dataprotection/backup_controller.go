@@ -492,7 +492,7 @@ func (r *BackupReconciler) ensureVolumeSnapshotReady(reqCtx intctrlutil.RequestC
 func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup) error {
 	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-metadata"}
+	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-manifests"}
 	job := &batchv1.Job{}
 	// check if job is created
 	if exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, job); err != nil {
@@ -1006,8 +1006,8 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 		logger.Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
 		return podSpec, err
 	}
-	if backupPolicy.Spec.Hooks == nil {
-		return podSpec, errors.New("not support metadata collection because of empty backup policy hooks")
+	if backupPolicy.Spec.Hooks == nil || len(backupPolicy.Spec.Hooks.ManifestsCommands) == 0 {
+		return podSpec, errors.New("not support metadata collection because of empty backup policy manifestsCommands")
 	}
 	targetPod, err := r.getTargetPod(reqCtx, backup, backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
 	if err != nil {

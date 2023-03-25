@@ -758,9 +758,7 @@ func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
 	}
 	rootVertex, _ := root.(*lifecycleVertex)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-	if err := intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName); err != nil {
-		return err
-	}
+	intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName)
 	vertex := &lifecycleVertex{obj: pvc, action: actionPtr(CREATE)}
 	dag.AddVertex(vertex)
 	dag.Connect(root, vertex)

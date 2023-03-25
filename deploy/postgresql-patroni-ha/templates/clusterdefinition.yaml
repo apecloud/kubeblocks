@@ -44,6 +44,12 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-custom-metrics
           defaultMode: 0777
+      scriptSpecs:
+        - name: pg-patroni-scripts
+          templateRef: pg-patroni-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
       service:
         ports:
           - name: tcp-postgresql
@@ -63,15 +69,7 @@ spec:
           - name: pg-init-container
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
             command:
-              - /bin/sh
-              - -c
-              - |
-                mkdir -p /home/postgres/pgdata/conf
-                chmod +777 -R /home/postgres/pgdata/conf
-                cp /home/postgres/conf/pg_hba.conf /home/postgres/pgdata/conf
-                cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf
-                chmod +777 /home/postgres/pgdata/conf/pg_hba.conf
-                chmod +777 /home/postgres/pgdata/conf/postgresql.conf
+              - /kb-scripts/init_container.sh
             volumeMounts:
               - name: data
                 mountPath: /home/postgres/pgdata
@@ -79,27 +77,16 @@ spec:
               - name: postgresql-config
                 mountPath: /home/postgres/conf
                 mode: 0777
+              - name: scripts
+                mountPath: /kb-scripts
+                mode: 0777
         containers:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
             securityContext:
               runAsUser: 0
             command:
-              - /bin/bash
-              - -c
-              - |
-                set -ex
-                KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
-                if [ "$KB_PRIMARY_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
-                    sleep 3
-                fi
-                kb_restore_conf=""
-                if [ -f ${RESTORE_DATA_DIR}/kb_restore.signal ]; then
-                  kb_restore_conf=$(cat /home/postgres/conf/kb_restore.conf)
-                  chown -R postgres ${RESTORE_DATA_DIR}
-                fi
-                export SPILO_CONFIGURATION=${SPILO_CONFIGURATION/\[\[KB_RESTORE_CONF\]\]/$kb_restore_conf}
-                exec /launch.sh init
+              - /kb-scripts/setup.sh
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm
@@ -109,6 +96,8 @@ spec:
               - name: postgresql-config
                 mountPath: /home/postgres/conf
                 mode: 0777
+              - name: scripts
+                mountPath: /kb-scripts
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
@@ -143,9 +132,6 @@ spec:
                     initdb:
                       - auth-host: md5
                       - auth-local: trust
-                    [[KB_RESTORE_CONF]]
-                  postgresql:
-                    config_dir: /home/postgres/pgdata/conf
               - name: ALLOW_NOSSL
                 value: "true"
               - name: PGUSER_SUPERUSER

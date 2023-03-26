@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
@@ -35,6 +36,7 @@ import (
 )
 
 type clusterConditionManager2 struct {
+	client.Client
 	Recorder record.EventRecorder
 	ctx      context.Context
 }
@@ -82,11 +84,17 @@ const (
 //
 // updateClusterConditions updates cluster.status condition and records event.
 // Deprecated: avoid monolithic and cascade processing
-func (conMgr clusterConditionManager2) updateStatusConditions(cluster *appsv1alpha1.Cluster, condition metav1.Condition) error {
+func (conMgr clusterConditionManager2) updateStatusConditions(cluster *appsv1alpha1.Cluster, condition metav1.Condition, isFailCondition bool) error {
+	patch := client.MergeFrom(cluster.DeepCopy())
 	oldCondition := meta.FindStatusCondition(cluster.Status.Conditions, condition.Type)
 	conditionChanged := !reflect.DeepEqual(oldCondition, condition)
 	if conditionChanged {
 		meta.SetStatusCondition(&cluster.Status.Conditions, condition)
+		if isFailCondition {
+			if err := conMgr.Client.Status().Patch(conMgr.ctx, cluster, patch); err != nil {
+				return err
+			}
+		}
 	}
 	if conditionChanged {
 		eventType := corev1.EventTypeWarning
@@ -113,7 +121,7 @@ func (conMgr clusterConditionManager2) setProvisioningStartedCondition(cluster *
 		Message: fmt.Sprintf("The operator has started the provisioning of Cluster: %s", cluster.Name),
 		Reason:  ReasonPreCheckSucceed,
 	}
-	return conMgr.updateStatusConditions(cluster, condition)
+	return conMgr.updateStatusConditions(cluster, condition, false)
 }
 
 // setPreCheckErrorCondition sets the error condition when preCheck failed.
@@ -124,7 +132,7 @@ func (conMgr clusterConditionManager2) setPreCheckErrorCondition(cluster *appsv1
 	if apierrors.IsNotFound(err) {
 		reason = constant.ReasonNotFoundCR
 	}
-	return conMgr.updateStatusConditions(cluster, newFailedProvisioningStartedCondition(err.Error(), reason))
+	return conMgr.updateStatusConditions(cluster, newFailedProvisioningStartedCondition(err.Error(), reason), true)
 }
 
 // setUnavailableCondition sets the condition that reference CRs are unavailable.
@@ -132,14 +140,14 @@ func (conMgr clusterConditionManager2) setPreCheckErrorCondition(cluster *appsv1
 // Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager2) setReferenceCRUnavailableCondition(cluster *appsv1alpha1.Cluster, message string) error {
 	return conMgr.updateStatusConditions(cluster, newFailedProvisioningStartedCondition(
-		message, constant.ReasonRefCRUnavailable))
+		message, constant.ReasonRefCRUnavailable), true)
 }
 
 // setApplyResourcesFailedCondition sets applied resources failed condition in cluster conditions.
 // @return could return ErrNoOps
 // Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager2) setApplyResourcesFailedCondition(cluster *appsv1alpha1.Cluster, err error) error {
-	return conMgr.updateStatusConditions(cluster, newFailedApplyResourcesCondition(err.Error()))
+	return conMgr.updateStatusConditions(cluster, newFailedApplyResourcesCondition(err.Error()), true)
 }
 
 // newApplyResourcesCondition creates a condition when applied resources succeed.

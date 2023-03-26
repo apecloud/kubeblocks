@@ -193,6 +193,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 // TODO: change ctx to context.Context
 func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request, recorder record.EventRecorder) graph.PlanBuilder {
 	conMgr := clusterConditionManager2{
+		Client:   cli,
 		Recorder: recorder,
 		ctx:      ctx.Ctx,
 	}

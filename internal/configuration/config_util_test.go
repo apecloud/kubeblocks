@@ -40,7 +40,7 @@ var _ = Describe("config_util", func() {
 		// Add any teardown steps that needs to be executed after each test
 	})
 
-	Context("MergeAndValidateConfiguration", func() {
+	Context("MergeAndValidateConfigs", func() {
 		It("Should success with no error", func() {
 			type args struct {
 				configConstraint v1alpha1.ConfigConstraintSpec
@@ -49,7 +49,7 @@ var _ = Describe("config_util", func() {
 				cmKeys           []string
 			}
 
-			configConstraintObj := testapps.NewCustomizedObj("resources/mysql_config_template.yaml",
+			configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
 				&v1alpha1.ConfigConstraint{}, func(cc *v1alpha1.ConfigConstraint) {
 					if ccContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.cue"); err == nil {
 						cc.Spec.ConfigurationSchema = &v1alpha1.CustomParametersValidation{
@@ -114,7 +114,7 @@ var _ = Describe("config_util", func() {
 				wantErr: true,
 			}}
 			for _, tt := range tests {
-				got, err := MergeAndValidateConfiguration(tt.args.configConstraint, tt.args.baseCfg, tt.args.cmKeys, tt.args.updatedParams)
+				got, err := MergeAndValidateConfigs(tt.args.configConstraint, tt.args.baseCfg, tt.args.cmKeys, tt.args.updatedParams)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 				if tt.wantErr {
 					continue
@@ -125,10 +125,10 @@ var _ = Describe("config_util", func() {
 					CfgType: tt.args.configConstraint.FormatterConfig.Format,
 				}
 
-				patch, err := CreateMergePatch(&K8sConfig{
-					Configurations: tt.args.baseCfg,
-				}, &K8sConfig{
-					Configurations: got,
+				patch, err := CreateMergePatch(&ConfigResource{
+					ConfigData: tt.args.baseCfg,
+				}, &ConfigResource{
+					ConfigData: got,
 				}, option)
 				Expect(err).Should(Succeed())
 

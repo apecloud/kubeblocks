@@ -62,8 +62,8 @@ func CreateOpsRequest(ctx context.Context, testCtx testutil.TestContext, opsRequ
 }
 
 // GetOpsRequestCompPhase gets the component phase of testing OpsRequest  for verification.
-func GetOpsRequestCompPhase(ctx context.Context, testCtx testutil.TestContext, opsName, componentName string) func(g gomega.Gomega) appsv1alpha1.Phase {
-	return func(g gomega.Gomega) appsv1alpha1.Phase {
+func GetOpsRequestCompPhase(ctx context.Context, testCtx testutil.TestContext, opsName, componentName string) func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
+	return func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
 		tmpOps := &appsv1alpha1.OpsRequest{}
 		g.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: opsName,
 			Namespace: testCtx.DefaultNamespace}, tmpOps)).Should(gomega.Succeed())
@@ -75,8 +75,8 @@ func GetOpsRequestCompPhase(ctx context.Context, testCtx testutil.TestContext, o
 }
 
 // GetOpsRequestPhase gets the testing opsRequest phase for verification.
-func GetOpsRequestPhase(testCtx *testutil.TestContext, opsKey types.NamespacedName) func(gomega.Gomega) appsv1alpha1.Phase {
-	return func(g gomega.Gomega) appsv1alpha1.Phase {
+func GetOpsRequestPhase(testCtx *testutil.TestContext, opsKey types.NamespacedName) func(gomega.Gomega) appsv1alpha1.OpsPhase {
+	return func(g gomega.Gomega) appsv1alpha1.OpsPhase {
 		tmpOps := &appsv1alpha1.OpsRequest{}
 		g.Expect(testCtx.Cli.Get(testCtx.Ctx, opsKey, tmpOps)).To(gomega.Succeed())
 		return tmpOps.Status.Phase

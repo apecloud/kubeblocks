@@ -20,8 +20,11 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type horizontalScalingOpsHandler struct{}
@@ -30,11 +33,11 @@ var _ OpsHandler = horizontalScalingOpsHandler{}
 
 func init() {
 	horizontalScalingBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase},
-		ToClusterPhase:    appsv1alpha1.HorizontalScalingPhase,
+		// REVIEW: can do opsrequest if not running?
+		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.HorizontalScalingPhase,
 		OpsHandler:        horizontalScalingOpsHandler{},
 	}
-
 	opsMgr := GetOpsManager()
 	opsMgr.RegisterOps(appsv1alpha1.HorizontalScalingType, horizontalScalingBehaviour)
 }
@@ -45,13 +48,12 @@ func (hs horizontalScalingOpsHandler) ActionStartedCondition(opsRequest *appsv1a
 }
 
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
-func (hs horizontalScalingOpsHandler) Action(opsRes *OpsResource) error {
+func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
 		horizontalScalingMap = opsRes.OpsRequest.ConvertHorizontalScalingListToMap()
 		horizontalScaling    appsv1alpha1.HorizontalScaling
 		ok                   bool
 	)
-
 	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
 		if horizontalScaling, ok = horizontalScalingMap[component.Name]; !ok {
 			continue
@@ -61,18 +63,21 @@ func (hs horizontalScalingOpsHandler) Action(opsRes *OpsResource) error {
 			opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = r
 		}
 	}
-	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
+	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for horizontal scaling opsRequest.
-func (hs horizontalScalingOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
-	handleComponentProgress := func(opsRes *OpsResource,
+func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
+	handleComponentProgress := func(
+		reqCtx intctrlutil.RequestCtx,
+		cli client.Client,
+		opsRes *OpsResource,
 		pgRes progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		return handleComponentProgressForScalingReplicas(opsRes, pgRes, compStatus, hs.getExpectReplicas)
+		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, hs.getExpectReplicas)
 	}
-	return ReconcileActionWithComponentOps(opsRes, "", handleComponentProgress)
+	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
@@ -92,22 +97,31 @@ func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *ap
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
-func (hs horizontalScalingOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
+func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
-	componentNameMap := opsRequest.GetComponentNameMap()
+	componentNameMap := opsRequest.ConvertHorizontalScalingListToMap()
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-		if _, ok := componentNameMap[v.Name]; !ok {
+		hsInfo, ok := componentNameMap[v.Name]
+		if !ok {
 			continue
 		}
 		copyReplicas := v.Replicas
-		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
+		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{
 			Replicas: &copyReplicas,
 		}
+		if hsInfo.Replicas < copyReplicas {
+			podNames, err := getCompPodNamesBeforeScaleDownReplicas(reqCtx, cli, *opsRes.Cluster, v.Name)
+			if err != nil {
+				return err
+			}
+			lastCompConfiguration.TargetResources = map[appsv1alpha1.ComponentResourceKey][]string{
+				appsv1alpha1.PodsCompResourceKey: podNames,
+			}
+		}
+		lastComponentInfo[v.Name] = lastCompConfiguration
 	}
-	opsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
-		Components: lastComponentInfo,
-	}
+	opsRequest.Status.LastConfiguration.Components = lastComponentInfo
 	return nil
 }
 
@@ -118,4 +132,18 @@ func (hs horizontalScalingOpsHandler) getExpectReplicas(opsRequest *appsv1alpha1
 		}
 	}
 	return nil
+}
+
+// getCompPodNamesBeforeScaleDownReplicas gets the component pod names before scale down replicas.
+func getCompPodNamesBeforeScaleDownReplicas(reqCtx intctrlutil.RequestCtx,
+	cli client.Client, cluster appsv1alpha1.Cluster, compName string) ([]string, error) {
+	podNames := make([]string, 0)
+	podList, err := util.GetComponentPodList(reqCtx.Ctx, cli, cluster, compName)
+	if err != nil {
+		return podNames, err
+	}
+	for _, v := range podList.Items {
+		podNames = append(podNames, v.Name)
+	}
+	return podNames, nil
 }

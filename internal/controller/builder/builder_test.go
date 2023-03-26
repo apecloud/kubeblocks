@@ -203,11 +203,12 @@ var _ = Describe("builder", func() {
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc, err := BuildPVCFromSnapshot(sts, params.Component.VolumeClaimTemplates[0], pvcKey, snapshotName)
+			pvc, err := BuildPVCFromSnapshot(sts, params.Component.VolumeClaimTemplates[0], pvcKey, snapshotName, params.Component)
 			Expect(err).Should(BeNil())
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
 			Expect(pvc.Spec.Resources).Should(Equal(params.Component.VolumeClaimTemplates[0].Spec.Resources))
+			Expect(pvc.Labels[constant.VolumeTypeLabelKey]).ShouldNot(BeEmpty())
 		})
 
 		It("builds Service correctly", func() {

@@ -30,7 +30,7 @@ import (
 type ValidatorOptions = func(key string) bool
 
 type ConfigValidator interface {
-	Validate(cfg map[string]string) error
+	Validate(data map[string]string) error
 }
 
 type cmKeySelector struct {
@@ -62,11 +62,11 @@ func (s *cmKeySelector) filter(key string) bool {
 	return false
 }
 
-func (c *configCueValidator) Validate(cfg map[string]string) error {
+func (c *configCueValidator) Validate(data map[string]string) error {
 	if c.cueScript == "" {
 		return nil
 	}
-	for key, content := range cfg {
+	for key, content := range data {
 		if c.filter(key) {
 			continue
 		}
@@ -85,10 +85,10 @@ type schemaValidator struct {
 	cfgType  appsv1alpha1.CfgFileFormat
 }
 
-func (s *schemaValidator) Validate(cfg map[string]string) error {
+func (s *schemaValidator) Validate(data map[string]string) error {
 	openAPITypes := &kubeopenapispec.Schema{}
 	validator := validate.NewSchemaValidator(openAPITypes, nil, "", strfmt.Default)
-	for key, data := range cfg {
+	for key, data := range data {
 		if s.filter(key) {
 			continue
 		}
@@ -121,10 +121,10 @@ func WithKeySelector(keys []string) ValidatorOptions {
 	}
 }
 
-func NewConfigValidator(configTemplate *appsv1alpha1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
+func NewConfigValidator(configConstraint *appsv1alpha1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
 	var (
 		validator    ConfigValidator
-		configSchema = configTemplate.ConfigurationSchema
+		configSchema = configConstraint.ConfigurationSchema
 	)
 
 	switch {
@@ -135,7 +135,7 @@ func NewConfigValidator(configTemplate *appsv1alpha1.ConfigConstraintSpec, optio
 			cmKeySelector: cmKeySelector{
 				keySelector: options,
 			},
-			cfgType:   configTemplate.FormatterConfig.Format,
+			cfgType:   configConstraint.FormatterConfig.Format,
 			cueScript: configSchema.CUE,
 		}
 	case configSchema.Schema != nil:
@@ -143,8 +143,8 @@ func NewConfigValidator(configTemplate *appsv1alpha1.ConfigConstraintSpec, optio
 			cmKeySelector: cmKeySelector{
 				keySelector: options,
 			},
-			typeName: configTemplate.CfgSchemaTopLevelName,
-			cfgType:  configTemplate.FormatterConfig.Format,
+			typeName: configConstraint.CfgSchemaTopLevelName,
+			cfgType:  configConstraint.FormatterConfig.Format,
 			schema:   configSchema.Schema,
 		}
 	default:

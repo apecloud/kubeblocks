@@ -65,7 +65,7 @@ func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool
 			return false, nil
 		}
 	}
-	if availableReplicas != r.Component.Replicas {
+	if availableReplicas < r.Component.Replicas {
 		componentStatusIsRunning = false
 	}
 	return componentStatusIsRunning, nil
@@ -84,12 +84,8 @@ func (r *ReplicationSet) PodsReady(ctx context.Context, obj client.Object) (bool
 	var availableReplicas int32
 	for _, stsObj := range componentStsList.Items {
 		availableReplicas += stsObj.Status.AvailableReplicas
-		if !util.StatefulSetPodsAreReady(&stsObj, *sts.Spec.Replicas) {
-			podsReady = false
-		}
-
 	}
-	if availableReplicas != r.Component.Replicas {
+	if availableReplicas < r.Component.Replicas {
 		podsReady = false
 	}
 	return podsReady, nil
@@ -113,7 +109,7 @@ func (r *ReplicationSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, re
 // GetPhaseWhenPodsNotReady is the implementation of the type Component interface method,
 // when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
 // if return an empty phase, means the pods of component are ready and skips it.
-func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.Phase, error) {
+func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	componentStsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, componentStsList)
 	if err != nil || len(componentStsList.Items) == 0 {
@@ -147,7 +143,6 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, component
 		}
 		if labelValue == "" {
 			compStatus.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
-			// compStatus.Message.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
 			needPatch = true
 		}
 		controllerRef := metav1.GetControllerOf(&v)

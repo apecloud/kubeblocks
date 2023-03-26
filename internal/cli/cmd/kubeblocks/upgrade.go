@@ -63,7 +63,6 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Version, "version", "", "Set KubeBlocks version")
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before upgrade")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for upgrading KubeBlocks")
-	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Show logs in detail")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -109,7 +108,7 @@ func (o *InstallOptions) Upgrade() error {
 	}
 
 	// add helm repo
-	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
+	spinner := printer.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
 	defer spinner(false)
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
@@ -122,7 +121,7 @@ func (o *InstallOptions) Upgrade() error {
 	if o.Version != "" {
 		msg = "to " + o.Version
 	}
-	spinner = util.Spinner(o.Out, "%-40s", "Upgrading KubeBlocks "+msg)
+	spinner = printer.Spinner(o.Out, "%-40s", "Upgrading KubeBlocks "+msg)
 	defer spinner(false)
 	// upgrade KubeBlocks chart
 	if err = o.upgradeChart(); err != nil {

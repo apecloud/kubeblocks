@@ -119,14 +119,6 @@ var _ = Describe("list", func() {
 		Expect(len(strings.Split(out.String(), "\n")) > 1).Should(BeTrue())
 	})
 
-	It("list users", func() {
-		cmd := NewListAccountsCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-
-		cmd.Run(cmd, []string{"test"})
-		Expect(len(strings.Split(out.String(), "\n")) > 1).Should(BeTrue())
-	})
-
 	It("output wide", func() {
 		cmd := NewListCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())

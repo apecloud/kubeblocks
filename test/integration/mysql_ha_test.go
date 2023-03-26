@@ -126,7 +126,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting the cluster is created")
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking pods' role label")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -194,7 +194,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 	Context("with MySQL defined as Consensus type and three replicas", func() {
 		BeforeEach(func() {
 			By("Create configmap")
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
 				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
 			By("Create a clusterDef obj")

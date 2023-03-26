@@ -18,7 +18,6 @@ package apps
 
 import (
 	"context"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
@@ -158,7 +157,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// wait till the cluster is running
-	if cluster.Status.Phase != appsv1alpha1.RunningPhase && cluster.Status.Phase != appsv1alpha1.CreatingPhase {
+	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase && cluster.Status.Phase != appsv1alpha1.StartingClusterPhase {
 		reqCtx.Log.Info("Cluster is not ready yet", "cluster", req.NamespacedName)
 		return intctrlutil.Reconciled()
 	}
@@ -232,7 +231,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 			isReady, svcEP, headlessEP, err := r.isComponentReady(reqCtx, cluster.Name, compName)
 			if err != nil {
-				return intctrlutil.RequeueAfter(time.Millisecond*requeueDuration, reqCtx.Log, "failed to get service")
+				return intctrlutil.RequeueAfter(requeueDuration, reqCtx.Log, "failed to get service")
 			}
 
 			// either service or endpoint is not ready, increase counter and continue to process next component

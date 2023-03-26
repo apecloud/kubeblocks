@@ -63,7 +63,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 					return reconfigureClient, nil
 				}),
 				withMockStatefulSet(3, nil),
-				withConfigTpl("for_test", map[string]string{
+				withConfigSpec("for_test", map[string]string{
 					"a": "b",
 				}),
 				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
@@ -91,7 +91,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 					return reconfigureClient, nil
 				}),
 				withMockStatefulSet(3, nil),
-				withConfigTpl("for_test", map[string]string{
+				withConfigSpec("for_test", map[string]string{
 					"a": "b",
 				}),
 				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
@@ -130,7 +130,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 					return reconfigureClient, nil
 				}),
 				withMockStatefulSet(3, nil),
-				withConfigTpl("for_test", map[string]string{
+				withConfigSpec("for_test", map[string]string{
 					"a": "b",
 				}),
 				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
@@ -171,7 +171,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 					return reconfigureClient, nil
 				}),
 				withMockStatefulSet(3, nil),
-				withConfigTpl("for_test", map[string]string{
+				withConfigSpec("for_test", map[string]string{
 					"a": "b",
 				}),
 				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
@@ -197,7 +197,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 			// not support type
 			mockParam := newMockReconfigureParams("parallelPolicy", nil,
 				withMockStatefulSet(2, nil),
-				withConfigTpl("for_test", map[string]string{
+				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
 				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ComponentConfigSpec{{

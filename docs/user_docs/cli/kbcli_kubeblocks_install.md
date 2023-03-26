@@ -37,7 +37,6 @@ kbcli kubeblocks install [flags]
       --set-string stringArray   Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
       --timeout duration         Time to wait for installing KubeBlocks (default 30m0s)
   -f, --values strings           Specify values in a YAML file or a URL (can specify multiple)
-      --verbose                  Show logs in detail
       --version string           KubeBlocks version
 ```
 

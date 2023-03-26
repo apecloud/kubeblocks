@@ -23,6 +23,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
@@ -39,12 +40,11 @@ var _ = Describe("playground", func() {
 		Expect(cmd != nil).Should(BeTrue())
 
 		o := &initOptions{
-			clusterDef: "test-cd",
-			IOStreams:  streams,
-			baseOptions: baseOptions{
-				cloudProvider: defaultCloudProvider,
-			},
-			helmCfg: helm.NewConfig("", util.ConfigPath("config"), "", false),
+			clusterDef:     clitesting.ClusterDefName,
+			clusterVersion: clitesting.ClusterVersionName,
+			IOStreams:      streams,
+			cloudProvider:  defaultCloudProvider,
+			helmCfg:        helm.NewConfig("", util.ConfigPath("config"), "", false),
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).Should(HaveOccurred())
@@ -54,11 +54,10 @@ var _ = Describe("playground", func() {
 
 	It("init at remote cloud", func() {
 		o := &initOptions{
-			IOStreams: streams,
-			baseOptions: baseOptions{
-				cloudProvider: cp.AWS,
-			},
-			clusterDef: "test-cd",
+			IOStreams:      streams,
+			clusterDef:     clitesting.ClusterDefName,
+			clusterVersion: clitesting.ClusterVersionName,
+			cloudProvider:  cp.AWS,
 		}
 		Expect(o.validate()).Should(HaveOccurred())
 	})

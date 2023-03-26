@@ -20,7 +20,11 @@ import (
 	"sync"
 	"time"
 
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var (
@@ -38,83 +42,73 @@ func (opsMgr *OpsManager) RegisterOps(opsType appsv1alpha1.OpsType, opsBehaviour
 }
 
 // Do the common entry function for handling OpsRequest
-func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
+func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*ctrl.Result, error) {
 	var (
 		opsBehaviour OpsBehaviour
 		err          error
 		ok           bool
 		opsRequest   = opsRes.OpsRequest
 	)
-
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
-		return patchOpsHandlerNotSupported(opsRes)
+		return nil, patchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
 
 	// validate OpsRequest.spec
-	isCreateOps := opsRequest.Status.ObservedGeneration == 0
-	if err = opsRequest.Validate(opsRes.Ctx, opsRes.Client, opsRes.Cluster, isCreateOps); err != nil {
-		if err = PatchValidateErrorCondition(opsRes, err.Error()); err != nil {
-			return err
+	if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, true); err != nil {
+		if patchErr := PatchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error()); patchErr != nil {
+			return nil, patchErr
 		}
-		return err
+		return nil, err
 	}
+	if opsRequest.Status.Phase != appsv1alpha1.OpsCreatingPhase {
+		// If the operation causes the cluster phase to change, the cluster needs to be locked.
+		// At the same time, only one operation is running if these operations are mutex(exist opsBehaviour.ToClusterPhase).
+		if err = addOpsRequestAnnotationToCluster(reqCtx.Ctx, cli, opsRes, opsBehaviour); err != nil {
+			return nil, err
+		}
 
-	if opsRequest.Status.Phase != appsv1alpha1.RunningPhase {
 		opsDeepCopy := opsRequest.DeepCopy()
 		// save last configuration into status.lastConfiguration
-		if err = opsBehaviour.OpsHandler.SaveLastConfiguration(opsRes); err != nil {
-			return err
+		if err = opsBehaviour.OpsHandler.SaveLastConfiguration(reqCtx, cli, opsRes); err != nil {
+			return nil, err
 		}
 
-		if err = patchOpsRequestToRunning(opsRes, opsDeepCopy, opsBehaviour.OpsHandler); err != nil {
-			return err
-		}
+		return &ctrl.Result{}, patchOpsRequestToCreating(reqCtx.Ctx, cli, opsRes, opsDeepCopy, opsBehaviour.OpsHandler)
 	}
-
-	// If the operation cause the cluster state to change, the cluster needs to be locked.
-	// At the same time, only one operation is running if these operations are mutex(exist opsBehaviour.ToClusterPhase).
-	if err = addOpsRequestAnnotationToCluster(opsRes, opsBehaviour.ToClusterPhase); err != nil {
-		return err
-	}
-
-	if err = opsBehaviour.OpsHandler.Action(opsRes); err != nil {
-		return err
+	if err = opsBehaviour.OpsHandler.Action(reqCtx, cli, opsRes); err != nil {
+		return nil, err
 	}
 
 	// patch cluster.status after updating cluster.spec.
 	// because cluster controller probably reconciles status.phase to Running if cluster is not updated.
-	return patchClusterStatus(opsRes, opsBehaviour)
+	return nil, patchClusterStatus(reqCtx, cli, opsRes, opsBehaviour)
 }
 
 // Reconcile entry function when OpsRequest.status.phase is Running.
 // loops till the operation is completed.
-func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) (time.Duration, error) {
+func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (time.Duration, error) {
 	var (
 		opsBehaviour    OpsBehaviour
 		ok              bool
 		err             error
 		requeueAfter    time.Duration
-		opsRequestPhase appsv1alpha1.Phase
+		opsRequestPhase appsv1alpha1.OpsPhase
 		opsRequest      = opsRes.OpsRequest
 	)
 
-	if opsRes.OpsRequest.Status.Phase != appsv1alpha1.RunningPhase {
-		return requeueAfter, nil
-	}
-
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRes.OpsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
-		return 0, patchOpsHandlerNotSupported(opsRes)
+		return 0, patchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
-
-	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(opsRes); err != nil && !isOpsRequestFailedPhase(opsRequestPhase) {
+	opsRes.ToClusterPhase = opsBehaviour.ToClusterPhase
+	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(reqCtx, cli, opsRes); err != nil && !isOpsRequestFailedPhase(opsRequestPhase) {
 		// if the opsRequest phase is Failed, skipped
 		return requeueAfter, err
 	}
 	switch opsRequestPhase {
-	case appsv1alpha1.SucceedPhase:
-		return requeueAfter, PatchOpsStatus(opsRes, opsRequestPhase, appsv1alpha1.NewSucceedCondition(opsRequest))
-	case appsv1alpha1.FailedPhase:
-		return requeueAfter, PatchOpsStatus(opsRes, opsRequestPhase, appsv1alpha1.NewFailedCondition(opsRequest, err))
+	case appsv1alpha1.OpsSucceedPhase:
+		return requeueAfter, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewSucceedCondition(opsRequest))
+	case appsv1alpha1.OpsFailedPhase:
+		return requeueAfter, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
 		return requeueAfter, nil
 	}

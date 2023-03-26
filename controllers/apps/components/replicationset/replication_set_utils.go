@@ -86,41 +86,19 @@ func handleReplicationSetHorizontalScale(ctx context.Context,
 		compOwnsStsMap[compName] = append(compOwnsStsMap[compName], stsObj)
 	}
 
-	// compOwnsPodToSyncMap is used to record the list of component pods to be synchronized to cluster.status except for horizontal scale-in
-	compOwnsPodsToSyncMap := make(map[string][]*corev1.Pod)
 	// stsToDeleteMap is used to record the count of statefulsets to be deleted when horizontal scale-in
 	stsToDeleteMap := make(map[string]int32)
-	for compName, compStsObjs := range compOwnsStsMap {
+	for compName := range compOwnsStsMap {
 		if int32(len(compOwnsStsMap[compName])) > clusterCompReplicasMap[compName] {
 			stsToDeleteMap[compName] = int32(len(compOwnsStsMap[compName])) - clusterCompReplicasMap[compName]
-		} else {
-			for _, compStsObj := range compStsObjs {
-				pod, err := getAndCheckReplicationPodByStatefulSet(ctx, cli, compStsObj)
-				if err != nil {
-					return err
-				}
-				compOwnsPodsToSyncMap[compName] = append(compOwnsPodsToSyncMap[compName], pod)
-			}
 		}
 	}
-	clusterDeepCopy := cluster.DeepCopy()
 	if len(stsToDeleteMap) > 0 {
 		if err := doHorizontalScaleDown(ctx, cli, cluster, compOwnsStsMap, clusterCompReplicasMap, stsToDeleteMap); err != nil {
 			return err
 		}
 	}
-
-	// sync cluster status
-	for _, compPodList := range compOwnsPodsToSyncMap {
-		if err := syncReplicationSetClusterStatus(cli, ctx, cluster, compPodList); err != nil {
-			return err
-		}
-	}
-
-	if reflect.DeepEqual(clusterDeepCopy.Status.Components, cluster.Status.Components) {
-		return nil
-	}
-	return cli.Status().Patch(ctx, cluster, client.MergeFrom(clusterDeepCopy))
+	return nil
 }
 
 // handleComponentIsStopped checks the component status is stopped and updates it.
@@ -128,7 +106,7 @@ func handleComponentIsStopped(cluster *appsv1alpha1.Cluster) {
 	for _, clusterComp := range cluster.Spec.ComponentSpecs {
 		if clusterComp.Replicas == int32(0) {
 			replicationStatus := cluster.Status.Components[clusterComp.Name]
-			replicationStatus.Phase = appsv1alpha1.StoppedPhase
+			replicationStatus.Phase = appsv1alpha1.StoppedClusterCompPhase
 			cluster.Status.SetComponentStatus(clusterComp.Name, replicationStatus)
 		}
 	}
@@ -154,9 +132,11 @@ func doHorizontalScaleDown(ctx context.Context,
 		dos := make([]*appsv1.StatefulSet, 0)
 		partition := int32(len(componentStsList.Items)) - stsToDelCount
 		componentReplicas := clusterCompReplicasMap[compName]
+		var primarySts *appsv1.StatefulSet
 		for _, sts := range componentStsList.Items {
 			// if current primary statefulSet ordinal is larger than target number replica, return err
 			stsIsPrimary, err := checkObjRoleLabelIsPrimary(&sts)
+			primarySts = &sts
 			if err != nil {
 				return err
 			}
@@ -188,6 +168,12 @@ func doHorizontalScaleDown(ctx context.Context,
 			}
 			return err
 		}
+		// reconcile the primary statefulSet after deleting other sts to make component phase is correct.
+		if componentReplicas != 0 {
+			if err = util.MarkPrimaryStsToReconcile(ctx, cli, primarySts); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+		}
 	}
 
 	// if component replicas is 0, handle replication component status after scaling down the replicas.
@@ -215,7 +201,9 @@ func syncReplicationSetClusterStatus(
 	}
 	oldReplicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
 	if oldReplicationSetStatus == nil {
-		util.InitClusterComponentStatusIfNeed(cluster, componentName, *componentDef)
+		if err = util.InitClusterComponentStatusIfNeed(cluster, componentName, *componentDef); err != nil {
+			return err
+		}
 		oldReplicationSetStatus = cluster.Status.Components[componentName].ReplicationSetStatus
 	}
 	if err := syncReplicationSetStatus(oldReplicationSetStatus, podList); err != nil {
@@ -287,6 +275,9 @@ func RemoveReplicationSetClusterStatus(cli client.Client,
 func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus,
 	targetPodList []corev1.Pod,
 	componentReplicas int32) error {
+	if replicationStatus == nil {
+		return nil
+	}
 	targetPodNameMap := make(map[string]struct{})
 	for _, pod := range targetPodList {
 		targetPodNameMap[pod.Name] = struct{}{}

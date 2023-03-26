@@ -64,8 +64,8 @@ func TestCreateUpdatedParamsPatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f, _ := createFileRegex("")
-			newVer, _ := scanConfigurationFiles([]string{tt.args.newVersion}, f)
-			oldVer, _ := scanConfigurationFiles([]string{tt.args.oldVersion}, f)
+			newVer, _ := scanConfigFiles([]string{tt.args.newVersion}, f)
+			oldVer, _ := scanConfigFiles([]string{tt.args.oldVersion}, f)
 			got, err := createUpdatedParamsPatch(newVer, oldVer, tt.args.formatCfg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("createUpdatedParamsPatch() error = %v, wantErr %v", err, tt.wantErr)

@@ -16,4 +16,4 @@ limitations under the License.
 
 package network
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -destination mocks/network_mocks.go . Client
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -destination mocks/network_mocks.go . Client

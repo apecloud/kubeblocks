@@ -388,7 +388,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				ctx,
 				pvcKey,
 				cluster,
-				component.Name,
+				component,
 				vct,
 				stsObj,
 				dag,
@@ -639,7 +639,7 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 	ctx context.Context,
 	pvcKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
-	componentName string,
+	component *component.SynthesizedComponent,
 	vct corev1.PersistentVolumeClaimTemplate,
 	stsObj *appsv1.StatefulSet,
 	dag *graph.DAG,
@@ -650,13 +650,13 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-		ml := getBackupMatchingLabels(cluster.Name, componentName)
+		ml := getBackupMatchingLabels(cluster.Name, component.Name)
 		vsList := snapshotv1.VolumeSnapshotList{}
 		if err := cli.List(ctx, &vsList, ml); err != nil {
 			return err
 		}
 		if len(vsList.Items) == 0 {
-			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, componentName)
+			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, component.Name)
 		}
 		// exclude volumes that are deleting
 		vsName := ""
@@ -667,7 +667,7 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 			vsName = vs.Name
 			break
 		}
-		return createPVCFromSnapshot(vct, stsObj, pvcKey, vsName, dag, root)
+		return createPVCFromSnapshot(vct, stsObj, pvcKey, vsName, component, dag, root)
 	}
 	return nil
 }
@@ -750,15 +750,18 @@ func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string,
+	component *component.SynthesizedComponent,
 	dag *graph.DAG,
 	root graph.Vertex) error {
-	pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName)
+	pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName, component)
 	if err != nil {
 		return err
 	}
 	rootVertex, _ := root.(*lifecycleVertex)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-	intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName)
+	if err = intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName); err != nil {
+		return err
+	}
 	vertex := &lifecycleVertex{obj: pvc, action: actionPtr(CREATE)}
 	dag.AddVertex(vertex)
 	dag.Connect(root, vertex)

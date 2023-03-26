@@ -19,7 +19,6 @@ package configuration
 import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
-	mxjv2 "github.com/clbanning/mxj/v2"
 
 	"github.com/apecloud/kubeblocks/internal/unstructured"
 
@@ -43,15 +42,6 @@ const (
 	ClassicTimeDurationType CueType = "timeDuration"
 )
 
-func init() {
-	// disable cast to float
-	mxjv2.CastValuesToFloat(false)
-	// enable cast to bool
-	mxjv2.CastValuesToBool(true)
-	// enable cast to int
-	mxjv2.CastValuesToInt(true)
-}
-
 // CueValidate cue validate
 func CueValidate(cueTpl string) error {
 	if len(cueTpl) == 0 {
@@ -69,7 +59,7 @@ func ValidateConfigurationWithCue(cueTpl string, cfgType appsv1alpha1.CfgFileFor
 		return WrapError(err, "failed to load configuration. [%s]", rawData)
 	}
 
-	return cfgDataValidateByCue(cueTpl, cfg, cfgType == appsv1alpha1.Properties)
+	return unstructuredDataValidateByCue(cueTpl, cfg, cfgType == appsv1alpha1.Properties)
 }
 
 func loadConfigObjectFromContent(cfgType appsv1alpha1.CfgFileFormat, rawData string) (map[string]interface{}, error) {
@@ -81,7 +71,7 @@ func loadConfigObjectFromContent(cfgType appsv1alpha1.CfgFileFormat, rawData str
 	return configObject.GetAllParameters(), nil
 }
 
-func cfgDataValidateByCue(cueTpl string, data interface{}, trimString bool) error {
+func unstructuredDataValidateByCue(cueTpl string, data interface{}, trimString bool) error {
 	defaultValidatePath := "configuration"
 	context := cuecontext.New()
 	tpl := context.CompileString(cueTpl)

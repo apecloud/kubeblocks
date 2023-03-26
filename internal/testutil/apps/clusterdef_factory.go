@@ -87,7 +87,7 @@ func (factory *MockClusterDefFactory) AddServicePort(port int32) *MockClusterDef
 }
 
 func (factory *MockClusterDefFactory) AddScriptTemplate(name,
-	configTplRef, namespace, volumeName string, mode *int32) *MockClusterDefFactory {
+	configTemplateRef, namespace, volumeName string, mode *int32) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
 		return nil
@@ -95,7 +95,7 @@ func (factory *MockClusterDefFactory) AddScriptTemplate(name,
 	comp.ScriptSpecs = append(comp.ScriptSpecs,
 		appsv1alpha1.ComponentTemplateSpec{
 			Name:        name,
-			TemplateRef: configTplRef,
+			TemplateRef: configTemplateRef,
 			Namespace:   namespace,
 			VolumeName:  volumeName,
 			DefaultMode: mode,
@@ -104,7 +104,7 @@ func (factory *MockClusterDefFactory) AddScriptTemplate(name,
 }
 
 func (factory *MockClusterDefFactory) AddConfigTemplate(name,
-	configTplRef, configConstraintRef, namespace, volumeName string) *MockClusterDefFactory {
+	configTemplateRef, configConstraintRef, namespace, volumeName string) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
 		return nil
@@ -113,7 +113,7 @@ func (factory *MockClusterDefFactory) AddConfigTemplate(name,
 		appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 				Name:        name,
-				TemplateRef: configTplRef,
+				TemplateRef: configTemplateRef,
 				Namespace:   namespace,
 				VolumeName:  volumeName,
 			},
@@ -147,6 +147,15 @@ func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envV
 			break
 		}
 	}
+	return factory
+}
+
+func (factory *MockClusterDefFactory) AddHorizontalScalePolicy(policy appsv1alpha1.HorizontalScalePolicy) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return nil
+	}
+	comp.HorizontalScalePolicy = &policy
 	return factory
 }
 

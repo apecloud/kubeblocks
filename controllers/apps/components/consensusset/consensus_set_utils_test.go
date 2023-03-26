@@ -63,7 +63,9 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 	component := &appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType: appsv1alpha1.Consensus,
 	}
-	util.InitClusterComponentStatusIfNeed(cluster, componentName, *component)
+	if err := util.InitClusterComponentStatusIfNeed(cluster, componentName, *component); err != nil {
+		t.Errorf("caught error %v", err)
+	}
 
 	if len(cluster.Status.Components) == 0 {
 		t.Errorf("cluster.Status.ComponentDefs[*] not intialized properly")

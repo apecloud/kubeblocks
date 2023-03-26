@@ -1,38 +1,28 @@
 ---
-title: kbcli cluster explain-configure
+title: kbcli cluster revoke-role
 ---
 
-List the constraint for supported configuration params.
+Revoke role from account
 
 ```
-kbcli cluster explain-configure [flags]
+kbcli cluster revoke-role [flags]
 ```
 
 ### Examples
 
 ```
-  # describe a cluster, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster
-  
-  # describe a specified configure template, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl
-  
-  # describe a specified configure template, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --trunc-document=false --trunc-enum=false
-  
-  # describe a specified parameters, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --param=sql_mode
+  # revoke role from user
+  kbcli cluster revoke-role NAME --component-name COMPNAME --role ROLENAME
 ```
 
 ### Options
 
 ```
-      --component-name string    Specify the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter."
-  -h, --help                     help for explain-configure
-      --param string             Specify the name of parameter to be query. It clearly display the details of the parameter.
-      --template-names strings   Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --template-names=mysql-3node-tpl)
-      --trunc-document           If the document length of the parameter is greater than 100, it will be truncated.
-      --trunc-enum               If the value list length of the parameter is greater than 20, it will be truncated. (default true)
+      --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
+  -h, --help                    help for revoke-role
+  -i, --instance string         Specify the name of instance to be connected.
+  -r, --role string             Role name should be one of {SUPERUSER, READWRITE, READONLY}
+  -u, --username string         Required. Specify the name of user.
 ```
 
 ### Options inherited from parent commands

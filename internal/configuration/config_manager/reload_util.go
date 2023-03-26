@@ -90,7 +90,7 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 	if err != nil {
 		return nil, err
 	}
-	patch, err := cfgutil.CreateMergePatch(&cfgutil.K8sConfig{Configurations: oldData}, &cfgutil.K8sConfig{Configurations: newData}, patchOption)
+	patch, err := cfgutil.CreateMergePatch(&cfgutil.ConfigResource{ConfigData: oldData}, &cfgutil.ConfigResource{ConfigData: newData}, patchOption)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func createFileRegex(fileRegex string) (regexFilter, error) {
 	}, nil
 }
 
-func scanConfigurationFiles(dirs []string, filter regexFilter) ([]string, error) {
+func scanConfigFiles(dirs []string, filter regexFilter) ([]string, error) {
 	configs := make([]string, 0)
 	for _, dir := range dirs {
 		files, err := os.ReadDir(dir)
@@ -197,7 +197,7 @@ func scanConfigurationFiles(dirs []string, filter regexFilter) ([]string, error)
 	return configs, nil
 }
 
-func backupConfigurationFiles(dirs []string, filter regexFilter, backupPath string) error {
+func backupConfigFiles(dirs []string, filter regexFilter, backupPath string) error {
 	fileInfo, err := os.Stat(backupPath)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -207,14 +207,14 @@ func backupConfigurationFiles(dirs []string, filter regexFilter, backupPath stri
 			return err
 		}
 	}
-	configs, err := scanConfigurationFiles(dirs, filter)
+	configs, err := scanConfigFiles(dirs, filter)
 	if err != nil {
 		return err
 	}
-	return backupLastConfigurationFiles(configs, backupPath)
+	return backupLastConfigFiles(configs, backupPath)
 }
 
-func backupLastConfigurationFiles(configs []string, backupPath string) error {
+func backupLastConfigFiles(configs []string, backupPath string) error {
 	for _, file := range configs {
 		logger.Info(fmt.Sprintf("backup config file: %s", file))
 		if err := copyFileContents(file, filepath.Join(backupPath, filepath.Base(file))); err != nil {

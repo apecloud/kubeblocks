@@ -71,12 +71,12 @@ const (
 	KBManagedByKey                  = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
 
 	// kubeblocks.io annotations
-	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"   // OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
-	RestartAnnotationKey             = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	SnapShotForStartAnnotationKey    = "kubeblocks.io/snapshot-for-start"
-	RestoreFromBackUpAnnotationKey   = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
-	ClusterSnapshotAnnotationKey     = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	OpsRequestAnnotationKey        = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey         = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey           = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	SnapShotForStartAnnotationKey  = "kubeblocks.io/snapshot-for-start"
+	RestoreFromBackUpAnnotationKey = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
+	ClusterSnapshotAnnotationKey   = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
@@ -131,8 +131,9 @@ const (
 	StatefulSetKind           = "StatefulSet"
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
-	CronJob                   = "CronJob"
-	ReplicaSet                = "ReplicaSet"
+	CronJobKind               = "CronJob"
+	JobKind                   = "Job"
+	ReplicaSetKind            = "ReplicaSetKind"
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
 )

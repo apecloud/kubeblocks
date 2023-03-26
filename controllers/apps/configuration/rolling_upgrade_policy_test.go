@@ -58,7 +58,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 	createReconfigureParam := func(compType appsv1alpha1.WorkloadType, replicas int) reconfigureParams {
 		return newMockReconfigureParams("rollingPolicy", k8sMockClient.Client(),
 			withMockStatefulSet(replicas, nil),
-			withConfigTpl("for_test", map[string]string{
+			withConfigSpec("for_test", map[string]string{
 				"key": "value",
 			}),
 			withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {

@@ -101,7 +101,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("Waiting for the cluster to be running")
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking statefulSet number")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -150,7 +150,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			})).Should(Succeed())
 
 			By("Wait for the cluster to be running")
-			Consistently(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
+			Consistently(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 			By("Checking pods' status and count are updated in cluster status after scale-out")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
@@ -168,13 +168,13 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 	Context("with Redis defined as replication Type and doing Horizontal scale", func() {
 		BeforeEach(func() {
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis_scripts.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis-scripts.yaml", &corev1.ConfigMap{},
 				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis_primary_config_cm.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis-primary-config-template.yaml", &corev1.ConfigMap{},
 				testapps.WithName(primaryConfigName), testCtx.UseDefaultNamespace())
 
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis_secondary_config_cm.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis-secondary-config-template.yaml", &corev1.ConfigMap{},
 				testapps.WithName(secondaryConfigName), testCtx.UseDefaultNamespace())
 
 			replicationRedisConfigVolumeMounts := []corev1.VolumeMount{

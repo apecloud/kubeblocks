@@ -7,7 +7,7 @@ metadata:
 spec:
   connectionCredential:
     username: postgres
-    postgres-password: {{ (include "postgresql.postgresPassword" .) | quote  }}
+    password: {{ (include "postgresql.postgresPassword" .) | quote  }}
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-postgresql)"
@@ -123,7 +123,7 @@ spec:
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: postgres-password
+                    key: password
               # Authentication
               - name: POSTGRES_USER
                 valueFrom:
@@ -134,12 +134,12 @@ spec:
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: postgres-password
+                    key: password
               - name: POSTGRES_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: postgres-password
+                    key: password
               - name: POSTGRES_DB
                 value: {{ (include "postgresql.database" .) | quote }}
               # Audit
@@ -196,7 +196,7 @@ spec:
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: postgres-password
+                    key: password
               - name: DATA_SOURCE_USER
                 valueFrom:
                   secretKeyRef:
@@ -258,7 +258,7 @@ spec:
             valueFrom:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: postgres-password
+                key: password
         passwordConfig:
           length: 10
           numDigits: 5

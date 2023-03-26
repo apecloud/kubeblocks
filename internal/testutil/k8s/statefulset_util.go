@@ -157,7 +157,19 @@ func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.Namespaced
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
 			constant.AppInstanceLabelKey: key.Name,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
+		g.Expect(stsList.Items).ShouldNot(gomega.BeNil())
 		g.Expect(stsList.Items).ShouldNot(gomega.BeEmpty())
+	}).Should(gomega.Succeed())
+	return stsList
+}
+
+func ListAndCheckStatefulSetCount(testCtx *testutil.TestContext, key types.NamespacedName, cnt int) *apps.StatefulSetList {
+	stsList := &apps.StatefulSetList{}
+	gomega.Eventually(func(g gomega.Gomega) {
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
+			constant.AppInstanceLabelKey: key.Name,
+		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
+		g.Expect(len(stsList.Items)).Should(gomega.Equal(cnt))
 	}).Should(gomega.Succeed())
 	return stsList
 }
@@ -169,9 +181,22 @@ func ListAndCheckStatefulSetWithComponent(testCtx *testutil.TestContext, key typ
 			constant.AppInstanceLabelKey:    key.Name,
 			constant.KBAppComponentLabelKey: componentName,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
+		g.Expect(stsList.Items).ShouldNot(gomega.BeNil())
 		g.Expect(stsList.Items).ShouldNot(gomega.BeEmpty())
 	}).Should(gomega.Succeed())
 	return stsList
+}
+
+func ListAndCheckPodCountWithComponent(testCtx *testutil.TestContext, key types.NamespacedName, componentName string, cnt int) *corev1.PodList {
+	podList := &corev1.PodList{}
+	gomega.Eventually(func(g gomega.Gomega) {
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, podList, client.MatchingLabels{
+			constant.AppInstanceLabelKey:    key.Name,
+			constant.KBAppComponentLabelKey: componentName,
+		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
+		g.Expect(len(podList.Items)).Should(gomega.Equal(cnt))
+	}).Should(gomega.Succeed())
+	return podList
 }
 
 func PatchStatefulSetStatus(testCtx *testutil.TestContext, stsName string, status apps.StatefulSetStatus) {

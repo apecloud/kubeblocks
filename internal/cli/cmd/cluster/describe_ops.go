@@ -78,6 +78,7 @@ func NewDescribeOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	cmd := &cobra.Command{
 		Use:               "describe-ops",
 		Short:             "Show details of a specific OpsRequest.",
+		Aliases:           []string{"desc-ops"},
 		Example:           describeOpsExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -383,17 +384,17 @@ func (o *describeOpsOptions) printLastConfiguration(configuration appsv1alpha1.L
 	case appsv1alpha1.UpgradeType:
 		printer.PrintPairStringToLine("Cluster Version", configuration.ClusterVersionRef)
 	case appsv1alpha1.VerticalScalingType:
-		handleVolumeExpansion := func(tbl *printer.TablePrinter, cName string, compConf appsv1alpha1.LastComponentConfiguration) {
+		handleVScale := func(tbl *printer.TablePrinter, cName string, compConf appsv1alpha1.LastComponentConfiguration) {
 			tbl.AddRow(cName, compConf.Requests.Cpu(), compConf.Requests.Memory(), compConf.Limits.Cpu(), compConf.Limits.Memory())
 		}
 		headers := []interface{}{"COMPONENT", "REQUEST-CPU", "REQUEST-MEMORY", "LIMIT-CPU", "LIMIT-MEMORY"}
-		o.printLastConfigurationByOpsType(configuration, headers, handleVolumeExpansion)
+		o.printLastConfigurationByOpsType(configuration, headers, handleVScale)
 	case appsv1alpha1.HorizontalScalingType:
-		handleVolumeExpansion := func(tbl *printer.TablePrinter, cName string, compConf appsv1alpha1.LastComponentConfiguration) {
-			tbl.AddRow(cName, compConf.Replicas)
+		handleHScale := func(tbl *printer.TablePrinter, cName string, compConf appsv1alpha1.LastComponentConfiguration) {
+			tbl.AddRow(cName, *compConf.Replicas)
 		}
 		headers := []interface{}{"COMPONENT", "REPLICAS"}
-		o.printLastConfigurationByOpsType(configuration, headers, handleVolumeExpansion)
+		o.printLastConfigurationByOpsType(configuration, headers, handleHScale)
 	case appsv1alpha1.VolumeExpansionType:
 		handleVolumeExpansion := func(tbl *printer.TablePrinter, cName string, compConf appsv1alpha1.LastComponentConfiguration) {
 			vcts := compConf.VolumeClaimTemplates

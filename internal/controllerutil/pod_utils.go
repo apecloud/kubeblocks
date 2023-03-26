@@ -53,7 +53,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 	return parent, ordinal
 }
 
-// GetContainerByConfigTemplate function description:
+// GetContainerByConfigSpec function description:
 // Search the container using the configmap of config from the pod
 //
 // Return: The first container pointer of using configs
@@ -71,7 +71,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 //		   name: data
 //		 - mountPath: /log
 //		   name: log
-func GetContainerByConfigTemplate(podSpec *corev1.PodSpec, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
+func GetContainerByConfigSpec(podSpec *corev1.PodSpec, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
 	containers := podSpec.Containers
 	initContainers := podSpec.InitContainers
 	if container := getContainerWithTplList(containers, configs); container != nil {
@@ -336,6 +336,17 @@ func GetProbeGRPCPort(pod *corev1.Pod) (int32, error) {
 
 func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
 	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
+}
+
+// GetProbeContainerName find the probe container from pod
+func GetProbeContainerName(pod *corev1.Pod) (string, error) {
+	for _, container := range pod.Spec.Containers {
+		if container.Name == constant.RoleProbeContainerName {
+			return constant.RoleProbeContainerName, nil
+		}
+	}
+	return "", fmt.Errorf("container %s not found", constant.RoleProbeContainerName)
+
 }
 
 // PodIsReadyWithLabel checks whether pod is ready or not if the component is ConsensusSet or ReplicationSet,

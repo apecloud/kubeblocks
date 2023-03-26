@@ -112,11 +112,6 @@ var _ = Describe("ReplicationSet Util", func() {
 			stsList = append(stsList, sts)
 		}
 
-		By("Test handleReplicationSet return err when there is no pod in sts.")
-		err := HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)
-		Expect(err).ShouldNot(Succeed())
-		Expect(err.Error()).Should(ContainSubstring("is not 1"))
-
 		By("Creating Pods of replication workloadType.")
 		for _, sts := range stsList {
 			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
@@ -126,7 +121,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		}
 
 		By("Test ReplicationSet pod number of sts equals 1")
-		_, err = getAndCheckReplicationPodByStatefulSet(ctx, k8sClient, stsList[0])
+		_, err := getAndCheckReplicationPodByStatefulSet(ctx, k8sClient, stsList[0])
 		Expect(err).Should(Succeed())
 
 		By("Test handleReplicationSet success when stsList count equal cluster.replicas.")
@@ -143,7 +138,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		clusterObj.Spec.ComponentSpecs[0].Replicas = 0
 		Expect(HandleReplicationSet(ctx, k8sClient, clusterObj, stsList[:1])).Should(Succeed())
 		Eventually(testapps.GetListLen(&testCtx, generics.StatefulSetSignature, client.InNamespace(testCtx.DefaultNamespace))).Should(Equal(0))
-		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.StoppedPhase))
+		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
 	}
 
 	testNeedUpdateReplicationSetStatus := func() {
@@ -154,10 +149,10 @@ var _ = Describe("ReplicationSet Util", func() {
 
 		By("init replicationSet cluster status")
 		patch := client.MergeFrom(clusterObj.DeepCopy())
-		clusterObj.Status.Phase = appsv1alpha1.RunningPhase
+		clusterObj.Status.Phase = appsv1alpha1.RunningClusterPhase
 		clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 			testapps.DefaultRedisCompName: {
-				Phase: appsv1alpha1.RunningPhase,
+				Phase: appsv1alpha1.RunningClusterCompPhase,
 				ReplicationSetStatus: &appsv1alpha1.ReplicationSetStatus{
 					Primary: appsv1alpha1.ReplicationMemberStatus{
 						Pod: clusterObj.Name + testapps.DefaultRedisCompName + "-0-0",

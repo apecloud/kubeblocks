@@ -294,7 +294,9 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	return nil
 }
 
-// buildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files
+// buildCfg generate volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
+// and generate configManager sidecar for the reconfigure operation.
+// TODO rename this function, this function name is not very reasonable, but there is no suitable name.
 func buildCfg(task *intctrltypes.ReconcileTask,
 	obj client.Object,
 	podSpec *corev1.PodSpec,
@@ -309,17 +311,17 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	clusterName := task.Cluster.Name
 	namespaceName := task.Cluster.Namespace
 	// New ConfigTemplateBuilder
-	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, task.Cluster, task.ClusterVersion, ctx, cli)
+	templateBuilder := newTemplateBuilder(clusterName, namespaceName, task.Cluster, task.ClusterVersion, ctx, cli)
 	// Prepare built-in objects and built-in functions
-	if err := cfgTemplateBuilder.injectBuiltInObjectsAndFunctions(podSpec, task.Component.ConfigTemplates, task.Component); err != nil {
+	if err := templateBuilder.injectBuiltInObjectsAndFunctions(podSpec, task.Component.ConfigTemplates, task.Component); err != nil {
 		return nil, err
 	}
 
-	renderWrapper := newTemplateRenderWrapper(cfgTemplateBuilder, task.Cluster, task.GetBuilderParams(), ctx, cli)
-	if err := renderWrapper.renderConfigTemplate(task, obj); err != nil {
+	renderWrapper := newTemplateRenderWrapper(templateBuilder, task.Cluster, task.GetBuilderParams(), ctx, cli)
+	if err := renderWrapper.renderConfigTemplate(task); err != nil {
 		return nil, err
 	}
-	if err := renderWrapper.renderScriptTemplate(task, obj); err != nil {
+	if err := renderWrapper.renderScriptTemplate(task); err != nil {
 		return nil, err
 	}
 

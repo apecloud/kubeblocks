@@ -26,12 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/internal/generics"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	util "github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	clitypes "github.com/apecloud/kubeblocks/internal/cli/types"
 	cliutil "github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -41,9 +42,9 @@ var _ = Describe("MySQL Reconfigure function", func() {
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 
-	const mysqlConfigTemplatePath = "resources/mysql_consensus_config_template.yaml"
-	const mysqlConfigConstraintPath = "resources/mysql_consensus_config_constraint.yaml"
-	const mysqlScriptsPath = "resources/mysql_consensus_scripts.yaml"
+	const mysqlConfigTemplatePath = "resources/mysql-consensus-config-template.yaml"
+	const mysqlConfigConstraintPath = "resources/mysql-consensus-config-constraint.yaml"
+	const mysqlScriptsPath = "resources/mysql-consensus-scripts.yaml"
 
 	const leader = "leader"
 	const follower = "follower"
@@ -148,7 +149,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		fmt.Printf("ClusterDefinition:%s ClusterVersion:%s Cluster:%s \n", clusterDefObj.Name, clusterVersionObj.Name, clusterObj.Name)
 
 		By("Waiting the cluster is created")
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking pods' role label")
 		sts := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey).Items[0]
@@ -180,12 +181,13 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 		By("Checking ReconfigureOpsRequest is running")
 		opsKey := types.NamespacedName{Name: reconfigureOpsRequest.Name, Namespace: testCtx.DefaultNamespace}
-		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.RunningPhase))
+		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
 		By("Checking Cluster and changed component phase is Reconfiguring")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.ReconfiguringPhase))
-			g.Expect(cluster.Status.Components[componentName].Phase).To(Equal(appsv1alpha1.ReconfiguringPhase))
+			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterPhase))                               // appsv1alpha1.ReconfiguringPhase
+			g.Expect(cluster.Status.Components[componentName].Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
+			// TODO: add status condition check
 		})).Should(Succeed())
 
 		By("Issue another reconfigure OpsRequest that will fail - innodb_read_io_threads")

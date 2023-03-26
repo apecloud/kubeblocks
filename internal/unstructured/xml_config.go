@@ -19,7 +19,7 @@ package unstructured
 import (
 	"strings"
 
-	"github.com/clbanning/mxj/v2"
+	mxjv2 "github.com/clbanning/mxj/v2"
 	"github.com/spf13/cast"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -27,10 +27,17 @@ import (
 
 type xmlConfig struct {
 	name string
-	data mxj.Map
+	data mxjv2.Map
 }
 
 func init() {
+	// disable cast to float
+	mxjv2.CastValuesToFloat(false)
+	// enable cast to bool
+	mxjv2.CastValuesToBool(true)
+	// enable cast to int
+	mxjv2.CastValuesToInt(true)
+
 	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.XML, func(name string) ConfigObject {
 		return &xmlConfig{name: name}
 	})
@@ -106,7 +113,7 @@ func (x *xmlConfig) Marshal() (string, error) {
 }
 
 func (x *xmlConfig) Unmarshal(str string) error {
-	m, err := mxj.NewMapXml([]byte(str), true)
+	m, err := mxjv2.NewMapXml([]byte(str), true)
 	if err != nil {
 		return err
 	}

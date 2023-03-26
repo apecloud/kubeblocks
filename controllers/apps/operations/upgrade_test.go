@@ -23,7 +23,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -50,7 +51,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -60,6 +61,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 	Context("Test OpsRequest", func() {
 		It("Test upgrade OpsRequest", func() {
 			By("init operations resources ")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("create Upgrade Ops")
@@ -73,14 +75,25 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				clusterObject.Name, appsv1alpha1.UpgradeType)
 			ops.Spec.Upgrade = &appsv1alpha1.Upgrade{ClusterVersionRef: newClusterVersionName}
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase,
+				consensusComp, statelessComp, statefulComp) // appsv1alpha1.VerticalScalingPhase
+			// TODO: add status condition for VerticalScalingPhase
 
 			By("mock upgrade OpsRequest phase is Running")
-			Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.RunningPhase))
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			// do upgrade
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
 
 			By("Test OpsManager.MainEnter function ")
-			_, err := GetOpsManager().Reconcile(opsRes)
-			Expect(err).Should(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("test GetRealAffectedComponentMap function")
+			h := upgradeOpsHandler{}
+			Expect(len(h.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(3))
 		})
 	})
 })

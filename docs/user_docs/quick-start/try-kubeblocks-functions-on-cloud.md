@@ -1,22 +1,25 @@
 ---
-title: Try full stack k8s data platform on public cloud
+title: Try out basic functions of KubeBlocks on Cloud
 description: How to run KubeBlocks on Playground
-sidebar_position: 2
-sidebar_label: Try KubeBlocks on public cloud
+sidebar_position: 1
+sidebar_label: Try out basic functions on Playground
 ---
 
-# Try full stack k8s data platform on public cloud
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-You can deploy EKS cluster and deploy KubeBlocks on EKS from v0.4 with `kbcli playground` command. 
+# Try out basic functions of KubeBlocks on Cloud 
+This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command. 
+With Playground, you can try out KubeBlocks both on your local host (macOS) and on a cloud environment (AWS).
 
-## How kbcli works on EKS
+<Tabs>
+<TabItem value="AWS" label="AWS" default>
 
+## Before you start to try KubeBlocks on Cloud (AWS)
+  
 When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find the script at [Github repository](https://github.com/apecloud/cloud-provider).
 
 When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repository to the local host, calls the terraform commands to initialize the cluster, then deploys KubeBlocks on this cluster.
-
-## Before you start
-
 * Install AWS CLI. Refer to [Installing or updating the latest version of the AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) for details.
 * Make sure the following tools are installed on your local host.
   * Docker: v20.10.5 (runc ≥ v1.0.0-rc93) or above. For installation details, refer to [Get Docker](https://docs.docker.com/get-docker/).
@@ -24,7 +27,7 @@ When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repos
   * `kbcli`: It is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. Follow the steps below to install `kbcli`.
     1. Install `kbcli`.
          ```bash
-         curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
+         curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
          ```
     2. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.
 
@@ -52,12 +55,12 @@ export AWS_ACCESS_KEY_ID="anaccesskey"
 export AWS_SECRET_ACCESS_KEY="asecretkey"
 ```
 
-## Step 2. Initialize Playground
+## Initialize Playground
 
 Initialize Playground.
 
 ```bash
-kbbcli playground init --cloud-provider aws --region cn-northwest-1
+kbcli playground init --cloud-provider aws --region cn-northwest-1
 ```
 
 * `cloud-provider` specifies the cloud provider. 
@@ -101,23 +104,18 @@ The initialization lasts about 20 minutes. If the installation fails after a lon
 
 ## Try KubeBlocks with Playground
 
-You can explore three parts of KubeBlocks, the [Basic functions](#basic-functions), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Feature list](./../introduction/introduction.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
-
-### Basic functions
+You can explore KubeBlocks by [Viewing an ApeCloud MySQL cluster](#view-an-apecloud-mysql-cluster), [Accessing an ApeCloud MySQL Cluster](#access-an-apecloud-mysql-cluster), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Overview](./../introduction/introduction.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
 
 KubeBlocks supports the complete life cycle management of a database cluster. Go through the following instruction to try basic features of KubeBlocks. 
- For the full feature set, refer to [KubeBlocks Documentation](./../introduction/introduction.md) for details.
+For the full feature set, refer to [KubeBlocks Documentation](./../introduction/introduction.md) for details.
 
-
-
-#### View an ApeCloud MySQL cluster
+### View an ApeCloud MySQL cluster
 
 ***Steps:***
 
 1. Run the command below to view the database cluster list.
     ```bash
     kbcli cluster list
-   
     ```
 
 2. Run `kbcli cluster describe` to view the details of a specified database cluster, such as `STATUS`, `Endpoints`, `Topology`, `Images`, and `Events`.
@@ -125,35 +123,38 @@ KubeBlocks supports the complete life cycle management of a database cluster. Go
     kbcli cluster describe mycluster
     ```
 
-#### Access an ApeCloud MySQL cluster
+### Access an ApeCloud MySQL cluster
 
-**Option 1.** Use kbcli
+**Option 1.** Connect database inside Kubernetes cluster.
 
 If a database cluster has been created and its status is `Running`, run `kbcli cluster connect` to access a specified database cluster. For example, 
 ```bash
 kbcli cluster connect mycluster
 ```
 
-You can also run the command below to access a cluster by MySQL client.
+**Option 2.** Connect database outside Kubernetes cluster.
+
+Get the MySQL client connection example.
+
 ```bash
 kbcli cluster connect --show-example --client=cli mycluster
-# cluster mycluster does not have public endpoints, you can run following command and connect cluster from local host
+```
+
+**Example**
+
+```bash
 kubectl port-forward service/mycluster-mysql 3306:3306
-
-# mysql client connection example
-mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
-
-
-kubectl port-forward service/mycluster-mysql 3306:3306
+>
 Forwarding from 127.0.0.1:3306 -> 3306
 Forwarding from [::1]:3306 -> 3306
 
 
 mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
+>
 ...
 Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-mysql>> show databases;
+mysql> show databases;
 >
 +--------------------+
 | Database           |
@@ -165,20 +166,6 @@ mysql>> show databases;
 | sys                |
 +--------------------+
 5 rows in set (0.02 sec)
-```
-
-**Option 2.** Access with MySQL client 
-
-If you want to access a cluster via MySQL client, get the access address from `Endpoints` in the cluster details.
-```bash
-kbcli cluster describe mycluster
-```
-
-#### (Optional)Delete an ApeCloud MySQL cluster
-
-Delete a specified database cluster with `kbcli cluster delete`. For example, 
-```bash
-kbcli cluster delete mycluster
 ```
 
 ### Observability
@@ -204,7 +191,14 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
 ### High availability of ApeCloud MySQL
 
 ApeCloud MySQL Paxos Group delivers high availability with RPO=0 and RTO in less than 30 seconds.
-This section use a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
+This section uses a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
+
+#### Delete ApeCloud MySQL Standalone
+
+Delete the ApeCloud MySQL Standalone before trying out high availability.
+```bash
+kbcli cluster delete mycluster
+```
 
 #### Create an ApeCloud MySQL Paxos Group
 
@@ -285,25 +279,30 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
 
 1. Run the command below to install the NYAN CAT demo application.
    ```bash
-   kbcli app install nyancat
+   kbcli addon enable nyancat
    ```
-***Result:***
+
+   **Result:**
+
    ```
-   Installing application nyancat OK
-   Install nyancat SUCCESSFULLY!
-   1. Get the application URL by running these commands:
-   kubectl --namespace default port-forward service/nyancat 8087:8087
-   echo "Visit http://127.0.0.1:8087 to use Nyan Cat demo application."
+   addon.extensions.kubeblocks.io/nyancat patched
    ```
-2. Use `port-forward` according to the hints above to expose an application port as available access for your local host, then visit this application via http://127.0.0.1:8087.
-3. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
-   ![NYAN CAT](./../../img/quick_start_nyan_cat.png)
-4. Uninstall the NYAN CAT demo application after your trial.
+2. Check the NYAN CAT add-on status and when its status is `Enabled`, this application is ready.
    ```bash
-   kbcli app uninstall nyancat
+   kbcli addon list | grep nyancat 
    ```
+3. Open the web page.
+   ```bash
+   kbcli dashboard open kubeblocks-nyancat
+   ```
+4. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
+   
+   ![NYAN CAT](./../../img/quick_start_nyan_cat.png)
 
-
+5. Uninstall the NYAN CAT demo application after your trial.
+   ```bash
+   kbcli addon disable nyancat
+   ```
 
 ## Destroy Playground
 
@@ -325,7 +324,7 @@ kbcli kubeblocks uninstall --remove-pvcs --remove-pvs
 Run the command below to destroy Playground.
 
 ```bash
-kbbcli playground destroy --cloud-provider aws --region cn-northwest-1
+kbcli playground destroy --cloud-provider aws --region cn-northwest-1
 ```
 
 Like the parameters in `kbcli playground init`, use `--cloud-provider` and `--region` to specify the cloud provider and the region.
@@ -335,3 +334,12 @@ Like the parameters in `kbcli playground init`, use `--cloud-provider` and `--re
 `kbcli playground destroy` directly deletes the Kubernetes cluster on the cloud but there might be residual resources in cloud, such as volumes. Please confirm whether there are residual resources after uninstalling and delete them in time to avoid unnecessary fees.
 
 :::
+
+
+</TabItem>
+<TabItem value="GCP" label="GCP">
+
+Coming soon!
+
+</TabItem>
+</Tabs>

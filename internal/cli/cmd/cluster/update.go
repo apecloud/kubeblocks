@@ -17,8 +17,10 @@ limitations under the License.
 package cluster
 
 import (
+	"encoding/csv"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -64,6 +66,13 @@ type updateOptions struct {
 
 func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &updateOptions{Options: patch.NewOptions(f, streams, types.ClusterGVR())}
+	o.Options.OutputOperation = func(didPatch bool) string {
+		if didPatch {
+			return "updated"
+		}
+		return "updated (no change)"
+	}
+
 	cmd := &cobra.Command{
 		Use:               "update NAME",
 		Short:             "Update the cluster settings, such as enable or disable monitor or log.",
@@ -111,17 +120,44 @@ func (o *updateOptions) complete(cmd *cobra.Command, args []string) error {
 
 func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 	var err error
-	type buildFn func(obj map[string]interface{}, v string, field string) error
+	type buildFn func(obj map[string]interface{}, v pflag.Value, field string) error
 
-	buildFlagObj := func(obj map[string]interface{}, v string, field string) error {
-		return unstructured.SetNestedField(obj, v, field)
+	buildFlagObj := func(obj map[string]interface{}, v pflag.Value, field string) error {
+		var val interface{}
+		switch v.Type() {
+		case "string":
+			val = v.String()
+		case "stringArray", "stringSlice":
+			val = v.(pflag.SliceValue).GetSlice()
+		case "stringToString":
+			valMap := make(map[string]interface{}, 0)
+			vStr := strings.Trim(v.String(), "[]")
+			if len(vStr) > 0 {
+				r := csv.NewReader(strings.NewReader(vStr))
+				ss, err := r.Read()
+				if err != nil {
+					return err
+				}
+				for _, pair := range ss {
+					kv := strings.SplitN(pair, "=", 2)
+					if len(kv) != 2 {
+						return fmt.Errorf("%s must be formatted as key=value", pair)
+					}
+					valMap[kv[0]] = kv[1]
+				}
+			}
+			val = valMap
+		}
+		return unstructured.SetNestedField(obj, val, field)
 	}
-	buildTolObj := func(obj map[string]interface{}, v string, field string) error {
+
+	buildTolObj := func(obj map[string]interface{}, v pflag.Value, field string) error {
 		tolerations := buildTolerations(o.TolerationsRaw)
 		return unstructured.SetNestedField(obj, tolerations, field)
 	}
-	buildComps := func(obj map[string]interface{}, v string, field string) error {
-		return o.buildComponents(field, v)
+
+	buildComps := func(obj map[string]interface{}, v pflag.Value, field string) error {
+		return o.buildComponents(field, v.String())
 	}
 
 	spec := map[string]interface{}{}
@@ -137,15 +173,19 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 		"pod-anti-affinity":  {field: "podAntiAffinity", obj: affinity, fn: buildFlagObj},
 		"topology-keys":      {field: "topologyKeys", obj: affinity, fn: buildFlagObj},
 		"node-labels":        {field: "nodeLabels", obj: affinity, fn: buildFlagObj},
-		"tolerations":        {field: "tolerations", obj: spec, fn: buildTolObj},
 		"tenancy":            {field: "tenancy", obj: affinity, fn: buildFlagObj},
-		"monitor":            {field: "monitor", obj: nil, fn: buildComps},
-		"enable-all-logs":    {field: "enable-all-logs", obj: nil, fn: buildComps},
+
+		// tolerations
+		"tolerations": {field: "tolerations", obj: spec, fn: buildTolObj},
+
+		// monitor and logs
+		"monitor":         {field: "monitor", obj: nil, fn: buildComps},
+		"enable-all-logs": {field: "enable-all-logs", obj: nil, fn: buildComps},
 	}
 
 	for _, flag := range flags {
 		if f, ok := flagFieldMapping[flag.Name]; ok {
-			if err = f.fn(f.obj, flag.Value.String(), f.field); err != nil {
+			if err = f.fn(f.obj, flag.Value, f.field); err != nil {
 				return err
 			}
 		}

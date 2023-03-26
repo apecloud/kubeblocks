@@ -191,6 +191,8 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
+
+
 ## @param nodeSelector
 ##
 nodeSelector: {}
@@ -202,6 +204,7 @@ tolerations:
     operator: Equal
     value: "true"
     effect: NoSchedule
+
 
 ## @param affinity
 ##
@@ -1544,7 +1547,7 @@ snapshot-controller:
       operator: Equal
       value: "true"
       effect: NoSchedule
- 
+
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
@@ -1595,6 +1598,23 @@ alertmanager-webhook-adaptor:
     repository: apecloud/alertmanager-webhook-adaptor
     pullPolicy: IfNotPresent
     tag: "0.1.4"
+
+  tolerations:
+    - key: kb-controller
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kb-controller
+                operator: In
+                values:
+                  - "true"
 
   ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
   ##

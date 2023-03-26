@@ -101,7 +101,7 @@ var _ = Describe("MySQL Scaling function", func() {
 
 		By("check cluster running")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.RunningPhase))
+			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.RunningClusterPhase))
 		})).Should(Succeed())
 
 		By("send VerticalScalingOpsRequest successfully")
@@ -125,7 +125,7 @@ var _ = Describe("MySQL Scaling function", func() {
 		By("check VerticalScalingOpsRequest succeed")
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
 			func(g Gomega, ops *appsv1alpha1.OpsRequest) {
-				g.Expect(ops.Status.Phase == appsv1alpha1.SucceedPhase).To(BeTrue())
+				g.Expect(ops.Status.Phase == appsv1alpha1.OpsSucceedPhase).To(BeTrue())
 			})).Should(Succeed())
 
 		By("check cluster resource requirements changed")
@@ -227,7 +227,7 @@ var _ = Describe("MySQL Scaling function", func() {
 
 	Context("with MySQL defined as a stateful component", func() {
 		BeforeEach(func() {
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
 				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
 			By("Create a clusterDef obj")
@@ -255,7 +255,7 @@ var _ = Describe("MySQL Scaling function", func() {
 	Context("with MySQL defined as a consensus component", func() {
 		BeforeEach(func() {
 			By("Create configmap")
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
 				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
 			By("Create a clusterDef obj")

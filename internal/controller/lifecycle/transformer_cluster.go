@@ -144,8 +144,8 @@ func prepareConnCredential(task *intctrltypes.ReconcileTask) error {
 	if err != nil {
 		return err
 	}
-	// must make sure secret resources are created before others
-	task.InsertResource(secret)
+	// must make sure secret resources are created before workloads resources
+	task.AppendResource(secret)
 	return nil
 }
 

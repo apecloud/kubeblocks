@@ -20,7 +20,6 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -38,14 +37,10 @@ func GetParameterFromConfiguration(configMap *corev1.ConfigMap, allFiles bool, f
 
 	// Load configmap
 	wrapCfg, err := NewConfigLoader(CfgOption{
-		Type:    CfgCmType,
-		Log:     log.FromContext(context.Background()),
-		CfgType: appsv1alpha1.Ini,
-		K8sKey: &K8sConfig{
-			ResourceFn: func(key client.ObjectKey) (map[string]string, error) {
-				return configMap.Data, nil
-			},
-		},
+		Type:           CfgCmType,
+		Log:            log.FromContext(context.Background()),
+		CfgType:        appsv1alpha1.Ini,
+		ConfigResource: FromConfigData(configMap.Data, nil),
 	})
 	if err != nil {
 		return nil, WrapError(err, "failed to loader configmap")

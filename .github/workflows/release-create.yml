@@ -27,7 +27,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: ${{ env.WITH_RELEASE_NOTES }}
         with:
-          body_path: ./docs/release_notes/v${{ env.REL_VERSION }}.md
+          body_path: ./docs/release_notes/v${{ env.REL_VERSION }}/v${{ env.REL_VERSION }}.md
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           name: KubeBlocks v${{ env.REL_VERSION }}
           tag_name: v${{ env.REL_VERSION }}

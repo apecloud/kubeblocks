@@ -25,6 +25,12 @@ var _ = Describe("util", func() {
 	It("playground dir", func() {
 		dir, err := playgroundDir()
 		Expect(err).Should(Succeed())
-		Expect(dir).ShouldNot(Equal(""))
+		Expect(dir).ShouldNot(BeEmpty())
+	})
+
+	It("cloud provider repo dir", func() {
+		dir, err := cloudProviderRepoDir()
+		Expect(err).Should(Succeed())
+		Expect(dir).ShouldNot(BeEmpty())
 	})
 })

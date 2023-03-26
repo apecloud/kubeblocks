@@ -7,7 +7,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.KUBEBLOCKS_TOKEN }}
   REPO: kubeblocks
-  milestone: 2
+  milestone: 4
   ORGANIZATION: apecloud
   PROJECT_NUMBER: 2
 

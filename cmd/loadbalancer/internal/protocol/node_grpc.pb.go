@@ -25,7 +25,6 @@ const _ = grpc.SupportPackageIsVersion7
 type NodeClient interface {
 	DescribeNodeInfo(ctx context.Context, in *DescribeNodeInfoRequest, opts ...grpc.CallOption) (*DescribeNodeInfoResponse, error)
 	DescribeAllENIs(ctx context.Context, in *DescribeAllENIsRequest, opts ...grpc.CallOption) (*DescribeAllENIsResponse, error)
-	WaitForENIAttached(ctx context.Context, in *WaitForENIAttachedRequest, opts ...grpc.CallOption) (*WaitForENIAttachedResponse, error)
 	SetupNetworkForENI(ctx context.Context, in *SetupNetworkForENIRequest, opts ...grpc.CallOption) (*SetupNetworkForENIResponse, error)
 	CleanNetworkForENI(ctx context.Context, in *CleanNetworkForENIRequest, opts ...grpc.CallOption) (*CleanNetworkForENIResponse, error)
 	SetupNetworkForService(ctx context.Context, in *SetupNetworkForServiceRequest, opts ...grpc.CallOption) (*SetupNetworkForServiceResponse, error)
@@ -52,15 +51,6 @@ func (c *nodeClient) DescribeNodeInfo(ctx context.Context, in *DescribeNodeInfoR
 func (c *nodeClient) DescribeAllENIs(ctx context.Context, in *DescribeAllENIsRequest, opts ...grpc.CallOption) (*DescribeAllENIsResponse, error) {
 	out := new(DescribeAllENIsResponse)
 	err := c.cc.Invoke(ctx, "/protocol.Node/DescribeAllENIs", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *nodeClient) WaitForENIAttached(ctx context.Context, in *WaitForENIAttachedRequest, opts ...grpc.CallOption) (*WaitForENIAttachedResponse, error) {
-	out := new(WaitForENIAttachedResponse)
-	err := c.cc.Invoke(ctx, "/protocol.Node/WaitForENIAttached", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +99,6 @@ func (c *nodeClient) CleanNetworkForService(ctx context.Context, in *CleanNetwor
 type NodeServer interface {
 	DescribeNodeInfo(context.Context, *DescribeNodeInfoRequest) (*DescribeNodeInfoResponse, error)
 	DescribeAllENIs(context.Context, *DescribeAllENIsRequest) (*DescribeAllENIsResponse, error)
-	WaitForENIAttached(context.Context, *WaitForENIAttachedRequest) (*WaitForENIAttachedResponse, error)
 	SetupNetworkForENI(context.Context, *SetupNetworkForENIRequest) (*SetupNetworkForENIResponse, error)
 	CleanNetworkForENI(context.Context, *CleanNetworkForENIRequest) (*CleanNetworkForENIResponse, error)
 	SetupNetworkForService(context.Context, *SetupNetworkForServiceRequest) (*SetupNetworkForServiceResponse, error)
@@ -126,9 +115,6 @@ func (UnimplementedNodeServer) DescribeNodeInfo(context.Context, *DescribeNodeIn
 }
 func (UnimplementedNodeServer) DescribeAllENIs(context.Context, *DescribeAllENIsRequest) (*DescribeAllENIsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DescribeAllENIs not implemented")
-}
-func (UnimplementedNodeServer) WaitForENIAttached(context.Context, *WaitForENIAttachedRequest) (*WaitForENIAttachedResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method WaitForENIAttached not implemented")
 }
 func (UnimplementedNodeServer) SetupNetworkForENI(context.Context, *SetupNetworkForENIRequest) (*SetupNetworkForENIResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetupNetworkForENI not implemented")
@@ -187,24 +173,6 @@ func _Node_DescribeAllENIs_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(NodeServer).DescribeAllENIs(ctx, req.(*DescribeAllENIsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Node_WaitForENIAttached_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(WaitForENIAttachedRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(NodeServer).WaitForENIAttached(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/protocol.Node/WaitForENIAttached",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).WaitForENIAttached(ctx, req.(*WaitForENIAttachedRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -295,10 +263,6 @@ var Node_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DescribeAllENIs",
 			Handler:    _Node_DescribeAllENIs_Handler,
-		},
-		{
-			MethodName: "WaitForENIAttached",
-			Handler:    _Node_WaitForENIAttached_Handler,
 		},
 		{
 			MethodName: "SetupNetworkForENI",

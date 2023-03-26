@@ -139,8 +139,8 @@ func prepareConnCredential(reqCtx intctrlutil.RequestCtx, cli client.Client, tas
 	if err != nil {
 		return err
 	}
-	// must make sure secret resources are created before others
-	task.InsertResource(secret)
+	// must make sure secret resources are created before workloads resources
+	task.AppendResource(secret)
 	return nil
 }
 
@@ -357,7 +357,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		if !reflect.DeepEqual(&stsObjCopy.Spec, &stsObj.Spec) {
 			// sync component phase
-			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
+			updateComponentPhaseWithOperation(cluster, componentName)
 		}
 
 		// check all pvc bound, requeue if not all ready
@@ -462,7 +462,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
 			// sync component phase
 			componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
-			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
+			updateComponentPhaseWithOperation(cluster, componentName)
 		}
 		return nil
 	}
@@ -504,7 +504,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 
-	cleanUselessServices := func() error {
+	garbageCollectServices := func() error {
 		var (
 			allSvcList = corev1.ServiceList{}
 			ml         = getServiceMatchingLabels(cluster.Name, "")
@@ -548,96 +548,111 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				return client.IgnoreNotFound(err)
 			}
 		}
+		// TODO: need to have event records
 		return nil
 	}
 
 	// why create tls certs here? or why not use prepare-checkedCreate pattern?
 	// tls certs generation is very time-consuming, if using prepare-checkedCreate pattern,
 	// we shall generate certs in every component Update which will slow down the cluster reconcile loop
-	if err := plan.CreateOrCheckTLSCerts(reqCtx, cli, cluster, scheme, dbClusterFinalizerName); err != nil {
+	if secret, err := plan.CreateOrCheckTLSCerts(reqCtx, cli, cluster); err != nil {
 		return false, err
+	} else if secret != nil {
+		objs = append(objs, secret)
 	}
 
-	objsByKind := make(map[string][]client.Object)
+	// processing function after k8s object creation
+	postCreateFunc := func(obj client.Object) {
+		switch obj.(type) {
+		case *appsv1.StatefulSet, *appsv1.Deployment:
+			updateComponentPhaseWithOperation(cluster, obj.GetLabels()[constant.KBAppComponentLabelKey])
+		}
+	}
+
+	handleObjectUpdate := func(obj client.Object) (bool, error) {
+		switch newObj := obj.(type) {
+		case *corev1.ConfigMap:
+			return false, handleConfigMap(newObj)
+		case *appsv1.StatefulSet:
+			return handleSts(newObj)
+		case *appsv1.Deployment:
+			// The Config is not allowed to be modified.
+			// Once ClusterDefinition provider adjusts the TemplateRef field of CusterDefinition,
+			// or provider modifies the wrong config file, it may cause the application cluster may fail.
+			return false, handleDeploy(newObj)
+		case *corev1.Service:
+			return false, handleSvc(newObj)
+		case *corev1.PersistentVolumeClaim:
+			// do volume expansion when workload type is `replication`
+			return false, handlePVC(newObj)
+		}
+		return false, nil
+	}
+
+	// sort objs, have workload objects placed last
+	workloadsKinds := make(map[string][]client.Object)
+	for _, obj := range objs {
+		switch kind := obj.GetObjectKind().GroupVersionKind().Kind; kind {
+		case constant.PodKind, constant.ReplicaSetKind, constant.CronJobKind, constant.JobKind, constant.DeploymentKind, constant.StatefulSetKind:
+			workloadsKinds[kind] = append(workloadsKinds[kind], obj)
+		}
+	}
+
+	createObj := func(obj client.Object) error {
+		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
+			return err
+		}
+		if err = cli.Create(ctx, obj); err == nil {
+			postCreateFunc(obj)
+			return nil
+		} else if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		// handle object changes for already created objects
+		requeue, err := handleObjectUpdate(obj)
+		if err != nil {
+			return err
+		}
+		if requeue {
+			shouldRequeue = true
+		}
+		return nil
+	}
+
+	// two stages create, 1st stage create non-workloads objects
 	for _, obj := range objs {
 		logger.V(1).Info("create or update", "objs", obj)
-		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
+		if _, ok := workloadsKinds[obj.GetObjectKind().GroupVersionKind().Kind]; ok {
+			continue
+		}
+		if err = createObj(obj); err != nil {
 			return false, err
 		}
-		kind := obj.GetObjectKind().GroupVersionKind().Kind
-		objsByKind[kind] = append(objsByKind[kind], obj)
-
-		if err := cli.Create(ctx, obj); err == nil {
-			continue
-		} else if !apierrors.IsAlreadyExists(err) {
-			return false, err
-		}
-
-		// Secret kind objects should only be applied once
-		if _, ok := obj.(*corev1.Secret); ok {
-			continue
-		}
-
-		// ConfigMap kind objects should only be applied once
-		//
-		// The Config is not allowed to be modified.
-		// Once ClusterDefinition provider adjusts the TemplateRef field of CusterDefinition,
-		// or provider modifies the wrong config file, it may cause the application cluster may fail.
-		if cm, ok := obj.(*corev1.ConfigMap); ok {
-			if err := handleConfigMap(cm); err != nil {
+	}
+	// 2nd stage create workloads
+	for _, v := range workloadsKinds {
+		for _, obj := range v {
+			if err = createObj(obj); err != nil {
 				return false, err
 			}
-			continue
-		}
-
-		stsProto, ok := obj.(*appsv1.StatefulSet)
-		if ok {
-			requeue, err := handleSts(stsProto)
-			if err != nil {
-				return false, err
-			}
-			if requeue {
-				shouldRequeue = true
-			}
-			continue
-		}
-		deployProto, ok := obj.(*appsv1.Deployment)
-		if ok {
-			if err := handleDeploy(deployProto); err != nil {
-				return false, err
-			}
-			continue
-		}
-		svcProto, ok := obj.(*corev1.Service)
-		if ok {
-			if err := handleSvc(svcProto); err != nil {
-				return false, err
-			}
-			continue
-		}
-		// do volume expansion when workload type is `replication`
-		pvcProto, ok := obj.(*corev1.PersistentVolumeClaim)
-		if ok {
-			if err := handlePVC(pvcProto); err != nil {
-				return false, err
-			}
-			continue
 		}
 	}
 
-	if err = cleanUselessServices(); err != nil {
+	// REVIEW/TODO: having following handling is rather hackish, as function expansion
+	// is not trying to fit into lifecycle process flow.
+	if err = garbageCollectServices(); err != nil {
 		return false, err
 	}
-
 	// stsList is used to handle statefulSets horizontal scaling when workloadType is replication
-	var stsList []*appsv1.StatefulSet
-	for _, obj := range objsByKind[constant.StatefulSetKind] {
-		stsList = append(stsList, obj.(*appsv1.StatefulSet))
+	if stsListObjs, ok := workloadsKinds[constant.StatefulSetKind]; ok {
+		var stsList = make([]*appsv1.StatefulSet, 0, len(stsListObjs))
+		for _, obj := range stsListObjs {
+			stsList = append(stsList, obj.(*appsv1.StatefulSet))
+		}
+		if err := replicationset.HandleReplicationSet(reqCtx.Ctx, cli, cluster, stsList); err != nil {
+			return false, err
+		}
 	}
-	if err := replicationset.HandleReplicationSet(reqCtx.Ctx, cli, cluster, stsList); err != nil {
-		return false, err
-	}
-
 	return shouldRequeue, nil
 }
 
@@ -767,8 +782,9 @@ func createPVCFromSnapshot(ctx context.Context,
 	vct corev1.PersistentVolumeClaimTemplate,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
-	snapshotName string) error {
-	pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName)
+	snapshotName string,
+	component *component.SynthesizedComponent) error {
+	pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName, component)
 	if err != nil {
 		return err
 	}
@@ -874,7 +890,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 	ctx context.Context,
 	pvcKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
-	componentName string,
+	component *component.SynthesizedComponent,
 	vct corev1.PersistentVolumeClaimTemplate,
 	stsObj *appsv1.StatefulSet) error {
 	pvc := corev1.PersistentVolumeClaim{}
@@ -883,13 +899,13 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-		ml := getBackupMatchingLabels(cluster.Name, componentName)
+		ml := getBackupMatchingLabels(cluster.Name, component.Name)
 		vsList := snapshotv1.VolumeSnapshotList{}
 		if err := cli.List(ctx, &vsList, ml); err != nil {
 			return err
 		}
 		if len(vsList.Items) == 0 {
-			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, componentName)
+			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, component.Name)
 		}
 		// exclude volumes that are deleting
 		vsName := ""
@@ -900,7 +916,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 			vsName = vs.Name
 			break
 		}
-		return createPVCFromSnapshot(ctx, cli, vct, stsObj, pvcKey, vsName)
+		return createPVCFromSnapshot(ctx, cli, vct, stsObj, pvcKey, vsName, component)
 	}
 	return nil
 }
@@ -1090,7 +1106,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				ctx,
 				pvcKey,
 				cluster,
-				component.Name,
+				component,
 				vct,
 				stsObj); err != nil {
 				reqCtx.Log.Error(err, "checkedCreatePVCFromSnapshot failed")

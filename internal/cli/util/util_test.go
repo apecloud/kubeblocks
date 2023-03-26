@@ -23,9 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,14 +95,6 @@ var _ = Describe("util", func() {
 		Expect(PrintGoTemplate(os.Stdout, `key: {{.Value}}`, struct {
 			Value string
 		}{"test"})).Should(Succeed())
-	})
-
-	It("Test Spinner", func() {
-		spinner := Spinner(os.Stdout, "spinner test ... ")
-		spinner(true)
-
-		spinner = Spinner(os.Stdout, "spinner test ... ")
-		spinner(false)
 	})
 
 	It("GetNodeByName", func() {
@@ -191,13 +184,13 @@ var _ = Describe("util", func() {
 		Expect(len(GVRToString(types.ClusterGVR())) > 0).Should(BeTrue())
 	})
 
-	It("IsSupportConfigureParams", func() {
+	It("IsSupportReconfigureParams", func() {
 		const (
 			ccName = "mysql_cc"
 			testNS = "default"
 		)
 
-		configConstraintObj := testapps.NewCustomizedObj("resources/mysql_config_template.yaml",
+		configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{}, testapps.WithNamespacedName(ccName, ""), func(cc *appsv1alpha1.ConfigConstraint) {
 				if ccContext, err := testdata.GetTestDataFileContent("/cue_testdata/mysql_for_cli.cue"); err == nil {
 					cc.Spec.ConfigurationSchema = &appsv1alpha1.CustomParametersValidation{
@@ -211,7 +204,7 @@ var _ = Describe("util", func() {
 
 		Expect(appsv1alpha1.AddToScheme(scheme.Scheme)).Should(Succeed())
 		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, configConstraintObj)
-		tpl := appsv1alpha1.ComponentConfigSpec{
+		configSpec := appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 				Name:        "for_test",
 				TemplateRef: ccName,
@@ -221,7 +214,7 @@ var _ = Describe("util", func() {
 		}
 
 		type args struct {
-			tpl           appsv1alpha1.ComponentConfigSpec
+			configSpec    appsv1alpha1.ComponentConfigSpec
 			updatedParams map[string]string
 		}
 		tests := []struct {
@@ -231,21 +224,21 @@ var _ = Describe("util", func() {
 		}{{
 			name: "normal test",
 			args: args{
-				tpl:           tpl,
+				configSpec:    configSpec,
 				updatedParams: testapps.WithMap("automatic_sp_privileges", "OFF", "innodb_autoinc_lock_mode", "1"),
 			},
 			expected: true,
 		}, {
 			name: "not match test",
 			args: args{
-				tpl:           tpl,
+				configSpec:    configSpec,
 				updatedParams: testapps.WithMap("not_exist_field", "1"),
 			},
 			expected: false,
 		}}
 
 		for _, tt := range tests {
-			Expect(IsSupportConfigureParams(tt.args.tpl, tt.args.updatedParams, mockClient)).Should(BeEquivalentTo(tt.expected))
+			Expect(IsSupportReconfigureParams(tt.args.configSpec, tt.args.updatedParams, mockClient)).Should(BeEquivalentTo(tt.expected))
 		}
 	})
 

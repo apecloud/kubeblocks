@@ -71,11 +71,11 @@ var _ = Describe("OpsRequest Controller", func() {
 			opsRecordSlice := []appsv1alpha1.OpsRecorder{
 				{
 					Name:           testOpsName,
-					ToClusterPhase: appsv1alpha1.SpecUpdatingPhase,
+					ToClusterPhase: appsv1alpha1.SpecReconcilingClusterPhase,
 				},
 				{
 					Name:           "not-exists-ops",
-					ToClusterPhase: appsv1alpha1.SpecUpdatingPhase,
+					ToClusterPhase: appsv1alpha1.SpecReconcilingClusterPhase,
 				},
 			}
 			Expect(PatchClusterOpsAnnotations(ctx, k8sClient, cluster, opsRecordSlice)).Should(Succeed())

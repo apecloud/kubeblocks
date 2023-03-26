@@ -34,10 +34,10 @@ func compareWithConfig(left, right interface{}, option CfgOption) (bool, error) 
 		}
 		return left.(string) == right.(string), nil
 	case CfgCmType, CfgTplType:
-		if !typeMatch(&K8sConfig{}, left, right) {
+		if !typeMatch(&ConfigResource{}, left, right) {
 			return false, MakeError("invalid data type!")
 		}
-		return left.(*K8sConfig) == right.(*K8sConfig), nil
+		return left.(*ConfigResource) == right.(*ConfigResource), nil
 	default:
 		return false, MakeError("not support config type compare!")
 	}
@@ -51,7 +51,7 @@ func withOption(option CfgOption, data interface{}) CfgOption {
 	case CfgLocalType:
 		op.Path = data.(string)
 	case CfgCmType, CfgTplType:
-		op.K8sKey = data.(*K8sConfig)
+		op.ConfigResource = data.(*ConfigResource)
 	}
 	return op
 }

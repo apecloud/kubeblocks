@@ -42,7 +42,7 @@ var _ = Describe("Reconfigure Controller", func() {
 
 	const statefulSetName = "mysql-statefulset"
 
-	const configTplName = "mysql-config-tpl"
+	const configSpecName = "mysql-config-tpl"
 
 	const configVolumeName = "mysql-config"
 
@@ -78,34 +78,34 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			By("creating a cluster")
 			configmap := testapps.CreateCustomizedObj(&testCtx,
-				"resources/mysql_config_cm.yaml", &corev1.ConfigMap{},
+				"resources/mysql-config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace(),
 				testapps.WithLabels(
 					constant.AppNameLabelKey, clusterName,
 					constant.AppInstanceLabelKey, clusterName,
 					constant.KBAppComponentLabelKey, statefulCompName,
-					constant.CMConfigurationTemplateNameLabelKey, configTplName,
+					constant.CMConfigurationTemplateNameLabelKey, configSpecName,
 					constant.CMConfigurationConstraintsNameLabelKey, cmName,
-					constant.CMConfigurationSpecProviderLabelKey, configTplName,
+					constant.CMConfigurationSpecProviderLabelKey, configSpecName,
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 				))
 
 			constraint := testapps.CreateCustomizedObj(&testCtx,
-				"resources/mysql_config_template.yaml",
+				"resources/mysql-config-constraint.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 
 			By("Create a clusterDefinition obj")
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
-				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
-				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
+				AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
+				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).
-				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
+				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()
 
@@ -127,7 +127,7 @@ var _ = Describe("Reconfigure Controller", func() {
 				AddAppNameLabel(clusterName).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(statefulCompName).
-				AddAnnotations(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name).
+				AddAnnotations(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name).
 				Create(&testCtx).GetObject()
 
 			By("check config constraint")
@@ -141,7 +141,7 @@ var _ = Describe("Reconfigure Controller", func() {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
 				g.Expect(cm.Labels[constant.AppInstanceLabelKey]).To(Equal(clusterObj.Name))
-				g.Expect(cm.Labels[constant.CMConfigurationTemplateNameLabelKey]).To(Equal(configTplName))
+				g.Expect(cm.Labels[constant.CMConfigurationTemplateNameLabelKey]).To(Equal(configSpecName))
 				g.Expect(cm.Labels[constant.CMConfigurationTypeLabelKey]).NotTo(Equal(""))
 				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureFirstConfigType))
 				configHash = cm.Labels[constant.CMInsConfigurationHashLabelKey]
@@ -149,7 +149,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			}).Should(Succeed())
 
 			By("Update config, old version: " + configHash)
-			updatedCM := testapps.NewCustomizedObj("resources/mysql_ins_config_update.yaml", &corev1.ConfigMap{})
+			updatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-update.yaml", &corev1.ConfigMap{})
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = updatedCM.Data
 			})).Should(Succeed())
@@ -164,7 +164,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			}).Should(Succeed())
 
 			By("invalid Update")
-			invalidUpdatedCM := testapps.NewCustomizedObj("resources/mysql_ins_config_invalid_update.yaml", &corev1.ConfigMap{})
+			invalidUpdatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-invalid-update.yaml", &corev1.ConfigMap{})
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = invalidUpdatedCM.Data
 			})).Should(Succeed())
@@ -177,7 +177,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			}).Should(Succeed())
 
 			By("restart Update")
-			restartUpdatedCM := testapps.NewCustomizedObj("resources/mysql_ins_config_update_with_restart.yaml", &corev1.ConfigMap{})
+			restartUpdatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-update-with-restart.yaml", &corev1.ConfigMap{})
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = restartUpdatedCM.Data
 			})).Should(Succeed())

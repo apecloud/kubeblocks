@@ -8,7 +8,7 @@ sidebar_position: 1
 ApeCloud MySQL is a high-availability MySQL database provided by ApeCloud. It is fully compatible with MySQL with high availability(HA) and disaster recovery(DR) to help ensure business continuity for your database workloads.
   - When there are 3 or more replicas,  a strong consistent high-availability cluster is created with the consensus algorithm protocol to ensure that RPO=0 in the case of a single availability zone failure. Among them, the primary instance provides read/write capacity, and the remaining instances provide read-only services.
   - When there are 2 replicas, a Primary-Secondary replication cluster is created, in which the primary instance provides read/write capacity, and the secondary instance keeps in sync with the primary instance with asynchronous replication, providing read-only and fault tolerance capabilities.
-  - When there is only 1 instance, a standalone cluster is created to provide read/write capacity. Automatic fault recovery capability is still provided, and RPO=0 remains ensured if the cloud disk is not damaged.
+  - When there is only 1 replica, a standalone cluster is created to provide read/write capacity. Automatic fault recovery capability is still provided, and RPO=0 remains ensured if the cloud disk is not damaged.
 
 :::note
 
@@ -18,7 +18,7 @@ In this guide, we use KubeBlocks to manage ApeCloud MySQL.
 
 ## Instance Roles
 
-ApeCloud MySQL supports four roles, Leader, Follower, Candidate, and Learner. The Leader and a Follower form a high-availability cluster and ensure RPO=0.
+ApeCloud MySQL supports four roles, **Leader**, **Follower**, **Candidate**, and **Learner**. The Leader and a Follower form a high-availability cluster and ensure RPO=0.
 - Leader: This role is the primary instance of the cluster, and supports R/W with forced consistency. It is voted by all the Candidates participating in the election. The Candidates with the majority of votes become the Leader, and the other Candidates become the Follower.
 - Follower: Follower supports data consistency with read-only capacity, and forms a high-availability cluster with Leader and other Followers.
 - Learner: This role is usually used for cross-regional consistent read-only data. Data synchronization is performed through the Paxos protocol, and the data source can be a Leader or a Follower. The learner is a special role in the consensus algorithm protocol, and does not participate in voting or being elected as a Candidate role.

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -180,11 +181,11 @@ func (cs *ComponentStatusSynchronizer) updateComponentsPhase(
 	if podsAreReady != nil && *podsAreReady {
 		podsReadyTime = &metav1.Time{Time: time.Now()}
 	}
-	componentStatus := cs.getInitializedStatus()
+	componentStatus := cs.cluster.Status.Components[cs.componentSpec.Name]
 	if !componentIsRunning {
 		// if no operation is running in cluster or failed pod timed out,
 		// means the component is Failed or Abnormal.
-		if util.IsCompleted(cs.cluster.Status.Phase) || hasFailedPodTimedOut {
+		if slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cs.cluster.Status.Phase) || hasFailedPodTimedOut {
 			if phase, err := cs.component.GetPhaseWhenPodsNotReady(ctx, componentName); err != nil {
 				return err
 			} else if phase != "" {
@@ -195,10 +196,10 @@ func (cs *ComponentStatusSynchronizer) updateComponentsPhase(
 		if cs.componentSpec.Replicas == 0 {
 			// if replicas number of component is zero, the component has stopped.
 			// 'Stopped' is a special 'Running' for workload(StatefulSet/Deployment).
-			componentStatus.Phase = appsv1alpha1.StoppedPhase
+			componentStatus.Phase = appsv1alpha1.StoppedClusterCompPhase
 		} else {
 			// change component phase to Running when workloads of component are running.
-			componentStatus.Phase = appsv1alpha1.RunningPhase
+			componentStatus.Phase = appsv1alpha1.RunningClusterCompPhase
 		}
 		componentStatus.SetMessage(nil)
 	}
@@ -208,26 +209,9 @@ func (cs *ComponentStatusSynchronizer) updateComponentsPhase(
 	return nil
 }
 
-// getInitializedStatus is an internal helper method which gets the component status from the
-// Cluster.Status.Components map, and initializes the entry if it doesn't exist
-func (cs *ComponentStatusSynchronizer) getInitializedStatus() appsv1alpha1.ClusterComponentStatus {
-	var (
-		componentStatus appsv1alpha1.ClusterComponentStatus
-		ok              bool
-	)
-	status := &cs.cluster.Status
-	if componentStatus, ok = status.Components[cs.componentSpec.Name]; !ok {
-		componentStatus = appsv1alpha1.ClusterComponentStatus{
-			Phase: cs.cluster.Status.Phase,
-		}
-		cs.setStatus(componentStatus)
-	}
-	return componentStatus
-}
-
 // updateMessage is an internal helper method which updates the component status message in the Cluster.Status.Components map.
 func (cs *ComponentStatusSynchronizer) updateMessage(message appsv1alpha1.ComponentMessageMap) {
-	compStatus := cs.getInitializedStatus()
+	compStatus := cs.cluster.Status.Components[cs.componentSpec.Name]
 	compStatus.Message = message
 	cs.setStatus(compStatus)
 }
@@ -259,7 +243,7 @@ func isAnyContainerFailed(containersStatus []corev1.ContainerStatus) (bool, stri
 		}
 		terminatedState := v.State.Terminated
 		if terminatedState != nil && terminatedState.Message != "" {
-			return true, waitingState.Message
+			return true, terminatedState.Message
 		}
 	}
 	return false, ""

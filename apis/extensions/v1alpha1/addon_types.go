@@ -22,10 +22,9 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
-	"k8s.io/apimachinery/pkg/version"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/version"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 )

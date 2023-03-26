@@ -22,7 +22,6 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -107,7 +106,7 @@ func buildInitContainerWithFullBackup(
 	}
 	container.VolumeMounts = component.PodSpec.Containers[0].VolumeMounts
 	// add the volumeMounts with backup volume
-	randomVolumeName := fmt.Sprintf("%s-%s", backup.Status.RemoteVolume.Name, rand.String(6))
+	randomVolumeName := fmt.Sprintf("%s-%s", component.Name, backup.Status.RemoteVolume.Name)
 	backup.Status.RemoteVolume.Name = randomVolumeName
 	remoteVolumeMount := corev1.VolumeMount{}
 	remoteVolumeMount.Name = randomVolumeName

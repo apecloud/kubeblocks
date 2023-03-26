@@ -33,8 +33,8 @@ type Interface interface {
 	// DeleteK8sCluster deletes a kubernetes cluster
 	DeleteK8sCluster(name string) error
 
-	// GetExistedClusters get existed clusters
-	GetExistedClusters() ([]string, error)
+	// GetClusterInfo get cluster info
+	GetClusterInfo() (*K8sClusterInfo, error)
 }
 
 func New(provider, region, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {

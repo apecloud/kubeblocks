@@ -22,14 +22,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -68,24 +67,16 @@ var _ = BeforeSuite(func() {
 
 	var err error
 
+	err = corev1.AddToScheme(scheme.Scheme)
+	Expect(err).ShouldNot(HaveOccurred())
+
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{}
-
-	if testCtx.UsingExistingCluster() {
-		useExistingCluster := true
-		testEnv.UseExistingCluster = &useExistingCluster
-		testEnv.Config = config.GetConfigOrDie()
-	}
-
-	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
-
-	err = scheme.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
 
@@ -95,8 +86,9 @@ var _ = BeforeSuite(func() {
 
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme.Scheme,
-		MetricsBindAddress: "0",
+		Scheme:                scheme.Scheme,
+		MetricsBindAddress:    "0",
+		ClientDisableCacheFor: []client.Object{&corev1.Service{}, &corev1.Endpoints{}, &corev1.Pod{}},
 	})
 	Expect(err).ToNot(HaveOccurred())
 
@@ -126,7 +118,7 @@ var _ = BeforeSuite(func() {
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
-		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
+		Expect(err).ToNot(HaveOccurred(), "failed to run controller")
 	}()
 
 	k8sManager.GetCache().WaitForCacheSync(ctx)

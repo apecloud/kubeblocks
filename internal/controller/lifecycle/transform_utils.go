@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -29,7 +30,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -135,27 +135,9 @@ func isClusterUpdating(cluster appsv1alpha1.Cluster) bool {
 }
 
 func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
-	return !isClusterDeleting(cluster) && !isClusterUpdating(cluster)
-}
-
-// updateClusterPhaseWhenConditionsError when cluster status is ConditionsError and the cluster applies resources successful,
-// we should update the cluster to the correct state
-func updateClusterPhaseWhenConditionsError(cluster *appsv1alpha1.Cluster) {
-	if cluster.Status.Phase != appsv1alpha1.ConditionsErrorPhase {
-		return
-	}
-	if cluster.Status.ObservedGeneration == 0 {
-		cluster.Status.Phase = appsv1alpha1.CreatingPhase
-		return
-	}
-	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	// if no operations in cluster, means user update the cluster.spec directly
-	if len(opsRequestSlice) == 0 {
-		cluster.Status.Phase = appsv1alpha1.SpecUpdatingPhase
-		return
-	}
-	// if exits opsRequests are running, set the cluster phase to the early target phase with the OpsRequest
-	cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
+	// return !isClusterDeleting(cluster) && !isClusterUpdating(cluster)
+	return cluster.Status.ObservedGeneration == cluster.Generation &&
+		slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
 }
 
 func getBackupObjects(reqCtx intctrlutil.RequestCtx,

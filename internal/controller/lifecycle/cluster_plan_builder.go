@@ -76,10 +76,13 @@ func (c *clusterPlanBuilder) Validate() error {
 	validateExistence := func(key client.ObjectKey, object client.Object) error {
 		err := c.cli.Get(c.ctx.Ctx, key, object)
 		if err != nil {
-			_ = c.conMgr.setPreCheckErrorCondition(c.cluster, err)
-			// If using RequeueWithError and the user fixed this error,
-			// it may take up to 1000s to reconcile again, causing the user to think that the repair is not effective.
-			return newRequeueError(ControllerErrorRequeueTime, err.Error())
+			if apierrors.IsNotFound(err) {
+				if setErr := c.conMgr.setPreCheckErrorCondition(c.cluster, err); util.IgnoreNoOps(setErr) != nil {
+					return setErr
+				}
+				c.recorder.Eventf(c.cluster, corev1.EventTypeWarning, constant.ReasonNotFoundCR, err.Error())
+			}
+			return newRequeueError(requeueDuration, err.Error())
 		}
 		return nil
 	}
@@ -100,8 +103,12 @@ func (c *clusterPlanBuilder) Validate() error {
 	// validate cd & cv availability
 	if cd.Status.Phase != appsv1alpha1.AvailablePhase || (cv != nil && cv.Status.Phase != appsv1alpha1.AvailablePhase) {
 		message := fmt.Sprintf("ref resource is unavailable, this problem needs to be solved first. cd: %v, cv: %v", cd, cv)
-		_ = c.conMgr.setReferenceCRUnavailableCondition(c.cluster, message)
-		return newRequeueError(ControllerErrorRequeueTime, message)
+		if err := c.conMgr.setReferenceCRUnavailableCondition(c.cluster, message); util.IgnoreNoOps(err) != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+		}
+		return newRequeueError(requeueDuration, message)
 	}
 
 	// validate logs
@@ -162,7 +169,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// replication set horizontal scaling
 		&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
-		&clusterStatusTransformer{cc: *cr, cli: c.cli, ctx: c.ctx, recorder: c.recorder},
+		&clusterStatusTransformer{cc: *cr, cli: c.cli, ctx: c.ctx, recorder: c.recorder, conMgr: c.conMgr},
 	}
 
 	// new a DAG and apply chain on it, after that we should get the final Plan
@@ -342,7 +349,7 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 		if !reflect.DeepEqual(&origObj.Spec, &stsObj.Spec) {
 			// sync component phase
-			syncComponentPhaseWhenSpecUpdating(c.cluster, componentName)
+			updateComponentPhaseWithOperation(c.cluster, componentName)
 		}
 
 		return stsObj, nil
@@ -356,7 +363,7 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		if !reflect.DeepEqual(&origObj.Spec, &deployObj.Spec) {
 			// sync component phase
 			componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
-			syncComponentPhaseWhenSpecUpdating(c.cluster, componentName)
+			updateComponentPhaseWithOperation(c.cluster, componentName)
 		}
 		return deployObj, nil
 	}
@@ -396,14 +403,16 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster) error {
 	switch cluster.Spec.TerminationPolicy {
 	case appsv1alpha1.DoNotTerminate:
-		if cluster.Status.Phase != appsv1alpha1.DeletingPhase {
-			patch := client.MergeFrom(cluster.DeepCopy())
-			cluster.Status.ObservedGeneration = cluster.Generation
-			cluster.Status.Message = fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
-			if err := c.cli.Status().Patch(c.ctx.Ctx, cluster, patch); err != nil {
-				return err
-			}
-		}
+		// if cluster.Status.Phase != appsv1alpha1.DeletingClusterPhase {
+		// 	patch := client.MergeFrom(cluster.DeepCopy())
+		// 	cluster.Status.ObservedGeneration = cluster.Generation
+		// 	// cluster.Status.Message = fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
+		// 	if err := r.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
+		// 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+		// 	}
+		// }
+		// TODO: add warning event
+		return nil
 	case appsv1alpha1.Delete, appsv1alpha1.WipeOut:
 		if err := c.deletePVCs(cluster); err != nil && !apierrors.IsNotFound(err) {
 			return err
@@ -503,25 +512,19 @@ func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]s
 	return tmpAnnotations
 }
 
-// syncComponentPhaseWhenSpecUpdating when workload of the component changed
-// and component phase is not the phase of operations, sync component phase to 'SpecUpdating'.
-func syncComponentPhaseWhenSpecUpdating(cluster *appsv1alpha1.Cluster,
-	componentName string) {
+// updateComponentPhaseWithOperation if workload of component changes, should update the component phase.
+// REVIEW: this function need provide return value to determine mutation or not
+// Deprecated:
+func updateComponentPhaseWithOperation(cluster *appsv1alpha1.Cluster, componentName string) {
 	if len(componentName) == 0 {
 		return
 	}
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-			componentName: {
-				Phase: appsv1alpha1.SpecUpdatingPhase,
-			},
-		}
-		return
+	componentPhase := appsv1alpha1.SpecReconcilingClusterCompPhase
+	if cluster.Status.Phase == appsv1alpha1.StartingClusterPhase {
+		componentPhase = appsv1alpha1.StartingClusterCompPhase
 	}
 	compStatus := cluster.Status.Components[componentName]
-	// if component phase is not the phase of operations, sync component phase to 'SpecUpdating'
-	if util.IsCompleted(compStatus.Phase) {
-		compStatus.Phase = appsv1alpha1.SpecUpdatingPhase
-		cluster.Status.Components[componentName] = compStatus
-	}
+	// synchronous component phase is consistent with cluster phase
+	compStatus.Phase = componentPhase
+	cluster.Status.SetComponentStatus(componentName, compStatus)
 }

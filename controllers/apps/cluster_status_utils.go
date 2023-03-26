@@ -44,7 +44,7 @@ import (
 type postHandler func(cluster *appsv1alpha1.Cluster) error
 
 // clusterStatusHandler a cluster status handler which changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
-type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (bool, postHandler)
+type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (postHandler, error)
 
 const (
 	// EventTimeOut timeout of the event
@@ -62,16 +62,20 @@ func doChainClusterStatusHandler(ctx context.Context,
 		postHandlers    = make([]func(cluster *appsv1alpha1.Cluster) error, 0, len(handlers))
 	)
 	for _, statusHandler := range handlers {
-		needPatch, postFunc := statusHandler(cluster)
-		if needPatch {
-			needPatchStatus = true
+		postFunc, err := statusHandler(cluster)
+		if err != nil {
+			if err == util.ErrNoOps {
+				continue
+			}
+			return err
 		}
+		needPatchStatus = true
 		if postFunc != nil {
 			postHandlers = append(postHandlers, postFunc)
 		}
 	}
 	if !needPatchStatus {
-		return nil
+		return util.ErrNoOps
 	}
 	if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
@@ -127,7 +131,7 @@ func updateComponentStatusMessage(compStatus *appsv1alpha1.ClusterComponentStatu
 }
 
 // needSyncComponentStatusForEvent checks whether the component status needs to be synchronized the cluster status by event
-func needSyncComponentStatusForEvent(cluster *appsv1alpha1.Cluster, componentName string, phase appsv1alpha1.Phase, event *corev1.Event) bool {
+func needSyncComponentStatusForEvent(cluster *appsv1alpha1.Cluster, componentName string, phase appsv1alpha1.ClusterComponentPhase, event *corev1.Event) bool {
 	var (
 		status     = &cluster.Status
 		compStatus appsv1alpha1.ClusterComponentStatus
@@ -149,7 +153,7 @@ func needSyncComponentStatusForEvent(cluster *appsv1alpha1.Cluster, componentNam
 		return true
 	}
 	// check whether it is a new warning event and the component phase is running
-	if !isExistsEventMsg(compStatus.Message, event) && phase != appsv1alpha1.RunningPhase {
+	if !isExistsEventMsg(compStatus.Message, event) && phase != appsv1alpha1.RunningClusterCompPhase {
 		updateComponentStatusMessage(&compStatus, event)
 		status.SetComponentStatus(componentName, compStatus)
 		return true
@@ -184,6 +188,8 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 }
 
 // handleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.
+// REVIEW: seem duplicated handling
+// Deprecated:
 func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
 	componentMap map[string]string,
 	clusterAvailabilityEffectMap map[string]bool) {
@@ -195,10 +201,11 @@ func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
 		// determine whether other components are still doing operation, i.e., create/restart/scaling.
 		// waiting for operation to complete except for volumeExpansion operation.
 		// because this operation will not affect cluster availability.
-		if !util.IsCompleted(v.Phase) && v.Phase != appsv1alpha1.VolumeExpandingPhase {
+		// TODO: for appsv1alpha1.VolumeExpandingPhas requires extra handling
+		if !util.IsCompleted(v.Phase) {
 			return
 		}
-		if v.Phase == appsv1alpha1.FailedPhase {
+		if v.Phase == appsv1alpha1.FailedClusterCompPhase {
 			failedCompCount += 1
 			componentDefName := componentMap[k]
 			// if the component can affect cluster availability, set Cluster.status.phase to Failed
@@ -210,9 +217,9 @@ func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
 	}
 	// If all components fail or there are failed components that affect the availability of the cluster, set phase to Failed
 	if failedCompCount == len(cluster.Status.Components) || clusterIsFailed {
-		cluster.Status.Phase = appsv1alpha1.FailedPhase
+		cluster.Status.Phase = appsv1alpha1.FailedClusterPhase
 	} else {
-		cluster.Status.Phase = appsv1alpha1.AbnormalPhase
+		cluster.Status.Phase = appsv1alpha1.AbnormalClusterPhase
 	}
 }
 
@@ -258,7 +265,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	var (
 		cluster    = &appsv1alpha1.Cluster{}
 		clusterDef = &appsv1alpha1.ClusterDefinition{}
-		phase      appsv1alpha1.Phase
+		phase      appsv1alpha1.ClusterComponentPhase
 		err        error
 	)
 	object, err := getEventInvolvedObject(ctx, cli, event)
@@ -318,7 +325,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		{
 			// handle cronjob complete or fail event
 			pred: func() bool {
-				return event.InvolvedObject.Kind == constant.CronJob &&
+				return event.InvolvedObject.Kind == constant.CronJobKind &&
 					event.Reason == "SawCompletedJob"
 			},
 			processor: func() error {
@@ -392,7 +399,7 @@ func handleDeletePVCCronJobEvent(ctx context.Context,
 		ctx,
 		&cluster,
 		componentName,
-		appsv1alpha1.AbnormalPhase,
+		appsv1alpha1.AbnormalClusterCompPhase,
 		event.Message,
 		object); err != nil {
 		return err
@@ -430,7 +437,7 @@ func updateComponentStatusPhase(cli client.Client,
 	ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
-	phase appsv1alpha1.Phase,
+	phase appsv1alpha1.ClusterComponentPhase,
 	message string,
 	object client.Object) error {
 	c, ok := cluster.Status.Components[componentName]
@@ -443,25 +450,21 @@ func updateComponentStatusPhase(cli client.Client,
 	return cli.Status().Patch(ctx, cluster, patch)
 }
 
-// syncComponentPhaseWhenSpecUpdating when workload of the component changed
-// and component phase is not the phase of operations, sync component phase to 'SpecUpdating'.
-func syncComponentPhaseWhenSpecUpdating(cluster *appsv1alpha1.Cluster,
-	componentName string) {
+// updateComponentPhaseWithOperation if workload of component changes, should update the component phase.
+// REVIEW: this function need provide return value to determine mutation or not
+// Deprecated:
+func updateComponentPhaseWithOperation(cluster *appsv1alpha1.Cluster, componentName string) {
 	if len(componentName) == 0 {
 		return
 	}
-	if len(cluster.Status.Components) == 0 {
-		cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
-			Phase: appsv1alpha1.SpecUpdatingPhase,
-		})
-		return
+	componentPhase := appsv1alpha1.SpecReconcilingClusterCompPhase
+	if cluster.Status.Phase == appsv1alpha1.StartingClusterPhase {
+		componentPhase = appsv1alpha1.StartingClusterCompPhase
 	}
-
-	// if component phase is not the phase of operations, sync component phase to 'SpecUpdating'
-	if compStatus, ok := cluster.Status.Components[componentName]; ok && util.IsCompleted(compStatus.Phase) {
-		compStatus.Phase = appsv1alpha1.SpecUpdatingPhase
-		cluster.Status.SetComponentStatus(componentName, compStatus)
-	}
+	compStatus := cluster.Status.Components[componentName]
+	// synchronous component phase is consistent with cluster phase
+	compStatus.Phase = componentPhase
+	cluster.Status.SetComponentStatus(componentName, compStatus)
 }
 
 // existsOperations checks if the cluster is doing operations

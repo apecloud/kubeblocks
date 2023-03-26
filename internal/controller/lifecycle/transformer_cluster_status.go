@@ -54,13 +54,31 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
 
+	updateComponentPhase := func() {
+		vertices := findAllNot[*appsv1alpha1.Cluster](dag)
+		for _, vertex := range vertices {
+			v, _ := vertex.(*lifecycleVertex)
+			if v.immutable || v.action == nil || *v.action != CREATE {
+				continue
+			}
+			switch v.obj.(type) {
+			case *appsv1.StatefulSet, *appsv1.Deployment:
+				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
+			}
+		}
+	}
+
 	switch {
 	case isClusterDeleting(*origCluster):
 		// if cluster is deleting, set root(cluster) vertex.action to DELETE
 		rootVertex.action = actionPtr(DELETE)
 	case isClusterUpdating(*origCluster):
 		c.ctx.Log.Info("update cluster status")
-		defer func() { rootVertex.action = actionPtr(STATUS) }()
+		defer func() {
+			rootVertex.action = actionPtr(STATUS)
+			// update components' phase in cluster.status
+			updateComponentPhase()
+		}()
 		cluster.Status.ObservedGeneration = cluster.Generation
 		cluster.Status.ClusterDefGeneration = c.cc.cd.Generation
 		if cluster.Status.Phase == "" {

@@ -60,7 +60,7 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		rootVertex.action = actionPtr(DELETE)
 	case isClusterUpdating(*origCluster):
 		c.ctx.Log.Info("update cluster status")
-		defer func() {rootVertex.action = actionPtr(STATUS)}()
+		defer func() { rootVertex.action = actionPtr(STATUS) }()
 		cluster.Status.ObservedGeneration = cluster.Generation
 		cluster.Status.ClusterDefGeneration = c.cc.cd.Generation
 		if cluster.Status.Phase == "" {
@@ -81,7 +81,7 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 			c.recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
 		}
 	case isClusterStatusUpdating(*origCluster):
-		defer func() {rootVertex.action = actionPtr(STATUS)}()
+		defer func() { rootVertex.action = actionPtr(STATUS) }()
 		// checks if the controller is handling the garbage of restore.
 		if err := c.handleGarbageOfRestoreBeforeRunning(cluster); err == nil {
 			return nil

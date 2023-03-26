@@ -60,6 +60,7 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		rootVertex.action = actionPtr(DELETE)
 	case isClusterUpdating(*origCluster):
 		c.ctx.Log.Info("update cluster status")
+		defer func() {rootVertex.action = actionPtr(STATUS)}()
 		cluster.Status.ObservedGeneration = cluster.Generation
 		cluster.Status.ClusterDefGeneration = c.cc.cd.Generation
 		if cluster.Status.Phase == "" {
@@ -79,12 +80,8 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		if oldApplyCondition == nil || oldApplyCondition.Status != applyResourcesCondition.Status {
 			c.recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
 		}
-		rootVertex.action = actionPtr(STATUS)
 	case isClusterStatusUpdating(*origCluster):
-		defer func() {
-			// others, set root(cluster) vertex.action to STATUS
-			rootVertex.action = actionPtr(STATUS)
-		}()
+		defer func() {rootVertex.action = actionPtr(STATUS)}()
 		// checks if the controller is handling the garbage of restore.
 		if err := c.handleGarbageOfRestoreBeforeRunning(cluster); err == nil {
 			return nil
@@ -262,6 +259,9 @@ func (c *clusterStatusTransformer) reconcileClusterStatus(cluster *appsv1alpha1.
 
 // cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.
 func (c *clusterStatusTransformer) cleanupAnnotationsAfterRunning(cluster *appsv1alpha1.Cluster) {
+	if !slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase) {
+		return
+	}
 	if _, ok := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]; !ok {
 		return
 	}

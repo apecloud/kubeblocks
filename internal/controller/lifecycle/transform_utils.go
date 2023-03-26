@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -135,9 +134,9 @@ func isClusterUpdating(cluster appsv1alpha1.Cluster) bool {
 }
 
 func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
-	// return !isClusterDeleting(cluster) && !isClusterUpdating(cluster)
-	return cluster.Status.ObservedGeneration == cluster.Generation &&
-		slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
+	return !isClusterDeleting(cluster) && !isClusterUpdating(cluster)
+	// return cluster.Status.ObservedGeneration == cluster.Generation &&
+	//	slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
 }
 
 func getBackupObjects(reqCtx intctrlutil.RequestCtx,

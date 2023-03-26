@@ -264,7 +264,7 @@ func (c *clusterStatusTransformer) reconcileClusterStatus(cluster *appsv1alpha1.
 		return processClusterPhaseChanges(cluster, oldPhase, currentClusterPhase,
 			corev1.EventTypeNormal, message, action)
 	}
-	if err := doChainClusterStatusHandler(c.ctx.Ctx, c.cli, cluster,
+	if err := doChainClusterStatusHandler(cluster,
 		removeInvalidComponentsAndAnalysis,
 		handleClusterReadyCondition,
 		handleExistAbnormalOrFailed,
@@ -434,11 +434,8 @@ func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef appsv1alp
 }
 
 // doChainClusterStatusHandler chain processing clusterStatusHandler.
-func doChainClusterStatusHandler(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+func doChainClusterStatusHandler(cluster *appsv1alpha1.Cluster,
 	handlers ...clusterStatusHandler) error {
-	patch := client.MergeFrom(cluster.DeepCopy())
 	var (
 		needPatchStatus bool
 		postHandlers    = make([]func(cluster *appsv1alpha1.Cluster) error, 0, len(handlers))
@@ -458,9 +455,6 @@ func doChainClusterStatusHandler(ctx context.Context,
 	}
 	if !needPatchStatus {
 		return util.ErrNoOps
-	}
-	if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
-		return err
 	}
 	// perform the handlers after patched the cluster status.
 	for _, postFunc := range postHandlers {

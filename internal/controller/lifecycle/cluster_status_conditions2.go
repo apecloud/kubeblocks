@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -29,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
@@ -37,7 +35,6 @@ import (
 )
 
 type clusterConditionManager2 struct {
-	client.Client
 	Recorder record.EventRecorder
 	ctx      context.Context
 }
@@ -73,11 +70,11 @@ const (
 	// it will not be automatically repaired unless there is network jitter.
 	// so if the error lasts more than 5s, the cluster will enter the ConditionsError phase
 	// and prompt the user to repair manually according to the message.
-	ClusterControllerErrorDuration = 5 * time.Second
+	// ClusterControllerErrorDuration = 5 * time.Second
 
 	// ControllerErrorRequeueTime the requeue time to reconcile the error event of the cluster controller
 	// which need to respond to user repair events timely.
-	ControllerErrorRequeueTime = 5 * time.Second
+	// ControllerErrorRequeueTime = 5 * time.Second
 )
 
 // REVIEW: this handling patches co-relation object upon condition patch succeed (cascade issue),
@@ -86,14 +83,10 @@ const (
 // updateClusterConditions updates cluster.status condition and records event.
 // Deprecated: avoid monolithic and cascade processing
 func (conMgr clusterConditionManager2) updateStatusConditions(cluster *appsv1alpha1.Cluster, condition metav1.Condition) error {
-	patch := client.MergeFrom(cluster.DeepCopy())
 	oldCondition := meta.FindStatusCondition(cluster.Status.Conditions, condition.Type)
 	conditionChanged := !reflect.DeepEqual(oldCondition, condition)
 	if conditionChanged {
 		meta.SetStatusCondition(&cluster.Status.Conditions, condition)
-		if err := conMgr.Client.Status().Patch(conMgr.ctx, cluster, patch); err != nil {
-			return err
-		}
 	}
 	if conditionChanged {
 		eventType := corev1.EventTypeWarning

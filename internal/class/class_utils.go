@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package class
 
 import (
 	"context"
@@ -44,8 +44,8 @@ func GetCustomClassConfigMapName(cdName string, componentName string) string {
 }
 
 // ChooseComponentClasses Choose the classes to be used for a given component with some constraints
-func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClass, filters map[string]resource.Quantity) *v1alpha1.ComponentClass {
-	var candidates []*v1alpha1.ComponentClass
+func ChooseComponentClasses(classes map[string]*ComponentClass, filters map[string]resource.Quantity) *ComponentClass {
+	var candidates []*ComponentClass
 	for _, cls := range classes {
 		cpu, ok := filters[corev1.ResourceCPU.String()]
 		if ok && !cpu.Equal(cls.CPU) {
@@ -60,7 +60,7 @@ func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClass, filters
 	if len(candidates) == 0 {
 		return nil
 	}
-	sort.Sort(v1alpha1.ByClassCPUAndMemory(candidates))
+	sort.Sort(ByClassCPUAndMemory(candidates))
 	return candidates[0]
 }
 
@@ -87,7 +87,7 @@ func GetClassFamilies(dynamic dynamic.Interface) (map[string]*v1alpha1.ClassFami
 }
 
 // GetClasses Get all classes, including kubeblocks default classes and user custom classes
-func GetClasses(client kubernetes.Interface, cdName string) (map[string]map[string]*v1alpha1.ComponentClass, error) {
+func GetClasses(client kubernetes.Interface, cdName string) (map[string]map[string]*ComponentClass, error) {
 	selector := fmt.Sprintf("%s=%s,%s", constant.ClusterDefLabelKey, cdName, types.ClassProviderLabelKey)
 	cmList, err := client.CoreV1().ConfigMaps(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector,
@@ -98,9 +98,9 @@ func GetClasses(client kubernetes.Interface, cdName string) (map[string]map[stri
 	return ParseClasses(cmList)
 }
 
-func ParseClasses(cmList *corev1.ConfigMapList) (map[string]map[string]*v1alpha1.ComponentClass, error) {
+func ParseClasses(cmList *corev1.ConfigMapList) (map[string]map[string]*ComponentClass, error) {
 	var (
-		componentClasses = make(map[string]map[string]*v1alpha1.ComponentClass)
+		componentClasses = make(map[string]map[string]*ComponentClass)
 	)
 	for _, cm := range cmList.Items {
 		if _, ok := cm.GetLabels()[types.ClassProviderLabelKey]; !ok {
@@ -140,8 +140,8 @@ func ParseClasses(cmList *corev1.ConfigMapList) (map[string]map[string]*v1alpha1
 type classVersion int64
 
 // ParseComponentClasses parse configmap.data to component classes
-func ParseComponentClasses(data map[string]string) (map[string]*v1alpha1.ComponentClass, error) {
-	versions := make(map[classVersion][]*v1alpha1.ComponentClassFamilyDef)
+func ParseComponentClasses(data map[string]string) (map[string]*ComponentClass, error) {
+	versions := make(map[classVersion][]*ComponentClassFamilyDef)
 
 	for k, v := range data {
 		// ConfigMap data key follows the format: families-[version]
@@ -154,15 +154,15 @@ func ParseComponentClasses(data map[string]string) (map[string]*v1alpha1.Compone
 		if err != nil {
 			return nil, fmt.Errorf("invalid key: %s", k)
 		}
-		var families []*v1alpha1.ComponentClassFamilyDef
+		var families []*ComponentClassFamilyDef
 		if err := yaml.Unmarshal([]byte(v), &families); err != nil {
 			return nil, err
 		}
 		versions[classVersion(version)] = families
 	}
 
-	genClassDef := func(nameTpl string, bodyTpl string, vars []string, args []string) (v1alpha1.ComponentClassDef, error) {
-		var def v1alpha1.ComponentClassDef
+	genClassDef := func(nameTpl string, bodyTpl string, vars []string, args []string) (ComponentClassDef, error) {
+		var def ComponentClassDef
 		values := make(map[string]interface{})
 		for index, key := range vars {
 			values[key] = args[index]
@@ -184,7 +184,7 @@ func ParseComponentClasses(data map[string]string) (map[string]*v1alpha1.Compone
 		return def, nil
 	}
 
-	parser := func(family *v1alpha1.ComponentClassFamilyDef, series v1alpha1.ComponentClassSeriesDef, class v1alpha1.ComponentClassDef) (*v1alpha1.ComponentClass, error) {
+	parser := func(family *ComponentClassFamilyDef, series ComponentClassSeriesDef, class ComponentClassDef) (*ComponentClass, error) {
 		var (
 			err error
 			def = class
@@ -201,7 +201,7 @@ func ParseComponentClasses(data map[string]string) (map[string]*v1alpha1.Compone
 			}
 		}
 
-		result := &v1alpha1.ComponentClass{
+		result := &ComponentClass{
 			Name:   def.Name,
 			Family: family.Family,
 			CPU:    resource.MustParse(def.CPU),
@@ -209,7 +209,7 @@ func ParseComponentClasses(data map[string]string) (map[string]*v1alpha1.Compone
 		}
 
 		for _, disk := range def.Storage {
-			result.Storage = append(result.Storage, &v1alpha1.Disk{
+			result.Storage = append(result.Storage, &Disk{
 				Name:  disk.Name,
 				Class: disk.Class,
 				Size:  resource.MustParse(disk.Size),
@@ -219,7 +219,7 @@ func ParseComponentClasses(data map[string]string) (map[string]*v1alpha1.Compone
 		return result, nil
 	}
 
-	result := make(map[string]*v1alpha1.ComponentClass)
+	result := make(map[string]*ComponentClass)
 	for _, families := range versions {
 		for _, family := range families {
 			for _, series := range family.Series {

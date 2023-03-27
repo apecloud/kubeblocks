@@ -27,10 +27,9 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 )
 
 type ListOptions struct {
@@ -71,15 +70,15 @@ func (o *ListOptions) complete(f cmdutil.Factory) error {
 }
 
 func (o *ListOptions) run() error {
-	componentClasses, err := component.GetClasses(o.client, o.ClusterDefRef)
+	componentClasses, err := class.GetClasses(o.client, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
-	familyClassMap := make(map[string]map[string][]*v1alpha1.ComponentClass)
+	familyClassMap := make(map[string]map[string][]*class.ComponentClass)
 	for compName, items := range componentClasses {
 		for _, item := range items {
 			if _, ok := familyClassMap[item.Family]; !ok {
-				familyClassMap[item.Family] = make(map[string][]*v1alpha1.ComponentClass)
+				familyClassMap[item.Family] = make(map[string][]*class.ComponentClass)
 			}
 			familyClassMap[item.Family][compName] = append(familyClassMap[item.Family][compName], item)
 		}
@@ -98,11 +97,11 @@ func (o *ListOptions) run() error {
 	return nil
 }
 
-func (o *ListOptions) printClassFamily(family string, compName string, classes []*v1alpha1.ComponentClass) {
+func (o *ListOptions) printClassFamily(family string, compName string, classes []*class.ComponentClass) {
 	tbl := printer.NewTablePrinter(o.Out)
 	_, _ = fmt.Fprintf(o.Out, "\nFamily %s:\n", family)
 	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY", "STORAGE")
-	sort.Sort(v1alpha1.ByClassCPUAndMemory(classes))
+	sort.Sort(class.ByClassCPUAndMemory(classes))
 	for _, class := range classes {
 		var disks []string
 		for _, disk := range class.Storage {

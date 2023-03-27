@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package class
 
 import (
 	"fmt"
@@ -23,8 +23,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 var _ = Describe("utils", func() {
@@ -32,15 +30,15 @@ var _ = Describe("utils", func() {
 		cpuMin  = 1
 		cpuMax  = 64
 		scales  = []int{4, 8, 16}
-		classes map[string]*v1alpha1.ComponentClass
+		classes map[string]*ComponentClass
 	)
 
-	genComponentClasses := func(cpuMin int, cpuMax int, scales []int) map[string]*v1alpha1.ComponentClass {
-		results := make(map[string]*v1alpha1.ComponentClass)
+	genComponentClasses := func(cpuMin int, cpuMax int, scales []int) map[string]*ComponentClass {
+		results := make(map[string]*ComponentClass)
 		for cpu := cpuMin; cpu <= cpuMax; cpu++ {
 			for _, scale := range scales {
 				name := fmt.Sprintf("cpu-%d-scale-%d", cpu, scale)
-				results[name] = &v1alpha1.ComponentClass{
+				results[name] = &ComponentClass{
 					Name:   name,
 					CPU:    resource.MustParse(fmt.Sprintf("%d", cpu)),
 					Memory: resource.MustParse(fmt.Sprintf("%dGi", cpu*scale)),

@@ -46,6 +46,7 @@ import (
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -496,7 +497,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 }
 
 func removeFinalizer[T generics.Object, PT generics.PObject[T],
-L generics.ObjList[T], PL generics.PObjList[T, L]](
+	L generics.ObjList[T], PL generics.PObjList[T, L]](
 	r *ClusterReconciler, reqCtx intctrlutil.RequestCtx, _ func(T, L), opts ...client.ListOption) (*ctrl.Result, error) {
 	var (
 		objList L
@@ -599,7 +600,7 @@ func (r *ClusterReconciler) fillClass(reqCtx intctrlutil.RequestCtx, cluster *ap
 	if err := r.Client.List(reqCtx.Ctx, &cmList); err != nil {
 		return err
 	}
-	compClasses, err := component.ParseClasses(&cmList)
+	compClasses, err := class.ParseClasses(&cmList)
 	if err != nil {
 		return err
 	}
@@ -609,21 +610,21 @@ func (r *ClusterReconciler) fillClass(reqCtx intctrlutil.RequestCtx, cluster *ap
 		return err
 	}
 
-	matchClassFamilies := func(comp appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.ComponentClass {
-		var candidates []appsv1alpha1.ClassModelWithFamilyName
+	matchClassFamilies := func(comp appsv1alpha1.ClusterComponentSpec) *class.ComponentClass {
+		var candidates []class.ClassModelWithFamilyName
 		for _, family := range classFamilyList.Items {
 			models := family.FindMatchingModels(&comp.Resources)
 			for _, model := range models {
-				candidates = append(candidates, appsv1alpha1.ClassModelWithFamilyName{Family: family.Name, Model: model})
+				candidates = append(candidates, class.ClassModelWithFamilyName{Family: family.Name, Model: model})
 			}
 		}
 		if len(candidates) == 0 {
 			return nil
 		}
-		sort.Sort(appsv1alpha1.ByModelList(candidates))
+		sort.Sort(class.ByModelList(candidates))
 		candidate := candidates[0]
-		cpu, memory := appsv1alpha1.GetMinCPUAndMemory(candidate.Model)
-		cls := &appsv1alpha1.ComponentClass{
+		cpu, memory := class.GetMinCPUAndMemory(candidate.Model)
+		cls := &class.ComponentClass{
 			Name:   fmt.Sprintf("%s-%vc%vg", candidate.Family, cpu.AsDec().String(), memory.AsDec().String()),
 			CPU:    *cpu,
 			Memory: *memory,
@@ -631,22 +632,22 @@ func (r *ClusterReconciler) fillClass(reqCtx intctrlutil.RequestCtx, cluster *ap
 		return cls
 	}
 
-	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*appsv1alpha1.ComponentClass) *appsv1alpha1.ComponentClass {
-		filters := appsv1alpha1.Filters(make(map[string]resource.Quantity))
+	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*class.ComponentClass) *class.ComponentClass {
+		filters := class.Filters(make(map[string]resource.Quantity))
 		if comp.Resources.Requests.Cpu() != nil {
 			filters[corev1.ResourceCPU.String()] = *comp.Resources.Requests.Cpu()
 		}
 		if comp.Resources.Requests.Memory() != nil {
 			filters[corev1.ResourceMemory.String()] = *comp.Resources.Requests.Memory()
 		}
-		return component.ChooseComponentClasses(classes, filters)
+		return class.ChooseComponentClasses(classes, filters)
 	}
 
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for idx, comp := range cluster.Spec.ComponentSpecs {
 		classes := compClasses[comp.ComponentDefRef]
 
-		var cls *appsv1alpha1.ComponentClass
+		var cls *class.ComponentClass
 		className, ok := componentClassMapping[comp.Name]
 		switch {
 		case ok:

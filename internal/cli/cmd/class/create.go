@@ -34,11 +34,10 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 )
 
 type CreateOptions struct {
@@ -127,24 +126,24 @@ func (o *CreateOptions) complete(f cmdutil.Factory) error {
 }
 
 func (o *CreateOptions) run() error {
-	componentClasses, err := component.GetClasses(o.client, o.ClusterDefRef)
+	componentClasses, err := class.GetClasses(o.client, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
 
 	classes, ok := componentClasses[o.ComponentType]
 	if !ok {
-		classes = make(map[string]*v1alpha1.ComponentClass)
+		classes = make(map[string]*class.ComponentClass)
 	}
 
-	families, err := component.GetClassFamilies(o.dynamic)
+	families, err := class.GetClassFamilies(o.dynamic)
 	if err != nil {
 		return err
 	}
 
 	var (
 		// new class definition version key
-		cmK = component.BuildClassDefinitionVersion()
+		cmK = class.BuildClassDefinitionVersion()
 		// new class definition version value
 		cmV string
 		// newly created class names
@@ -156,15 +155,15 @@ func (o *CreateOptions) run() error {
 		if err != nil {
 			return err
 		}
-		newClasses, err := component.ParseComponentClasses(map[string]string{cmK: string(data)})
+		newClasses, err := class.ParseComponentClasses(map[string]string{cmK: string(data)})
 		if err != nil {
 			return err
 		}
-		for name, class := range newClasses {
-			if _, ok := families[class.Family]; !ok {
-				return fmt.Errorf("family %s is not found", class.Family)
+		for name, cls := range newClasses {
+			if _, ok = families[cls.Family]; !ok {
+				return fmt.Errorf("family %s is not found", cls.Family)
 			}
-			if _, ok := classes[name]; ok {
+			if _, ok = classes[name]; ok {
 				return fmt.Errorf("class name conflicted %s", name)
 			}
 			classNames = append(classNames, name)
@@ -181,7 +180,7 @@ func (o *CreateOptions) run() error {
 		if err != nil {
 			return err
 		}
-		data, err := yaml.Marshal([]*v1alpha1.ComponentClassFamilyDef{def})
+		data, err := yaml.Marshal([]*class.ComponentClassFamilyDef{def})
 		if err != nil {
 			return err
 		}
@@ -189,7 +188,7 @@ func (o *CreateOptions) run() error {
 		classNames = append(classNames, o.ClassName)
 	}
 
-	cmName := component.GetCustomClassConfigMapName(o.ClusterDefRef, o.ComponentType)
+	cmName := class.GetCustomClassConfigMapName(o.ClusterDefRef, o.ComponentType)
 	cm, err := o.client.CoreV1().ConfigMaps(CustomClassNamespace).Get(context.TODO(), cmName, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
@@ -203,7 +202,7 @@ func (o *CreateOptions) run() error {
 	} else {
 		cm = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      component.GetCustomClassConfigMapName(o.ClusterDefRef, o.ComponentType),
+				Name:      class.GetCustomClassConfigMapName(o.ClusterDefRef, o.ComponentType),
 				Namespace: CustomClassNamespace,
 				Labels: map[string]string{
 					constant.ClusterDefLabelKey:     o.ClusterDefRef,
@@ -222,11 +221,11 @@ func (o *CreateOptions) run() error {
 	return nil
 }
 
-func (o *CreateOptions) buildClassFamilyDef() (*v1alpha1.ComponentClassFamilyDef, error) {
-	clsDef := v1alpha1.ComponentClassDef{Name: o.ClassName, CPU: o.CPU, Memory: o.Memory}
+func (o *CreateOptions) buildClassFamilyDef() (*class.ComponentClassFamilyDef, error) {
+	clsDef := class.ComponentClassDef{Name: o.ClassName, CPU: o.CPU, Memory: o.Memory}
 	for _, disk := range o.Storage {
 		kvs := strings.Split(disk, ",")
-		def := v1alpha1.DiskDef{}
+		def := class.DiskDef{}
 		for _, kv := range kvs {
 			parts := strings.Split(kv, "=")
 			if len(parts) != 2 {
@@ -252,9 +251,9 @@ func (o *CreateOptions) buildClassFamilyDef() (*v1alpha1.ComponentClassFamilyDef
 		}
 		clsDef.Storage = append(clsDef.Storage, def)
 	}
-	def := &v1alpha1.ComponentClassFamilyDef{
+	def := &class.ComponentClassFamilyDef{
 		Family: o.ClassFamily,
-		Series: []v1alpha1.ComponentClassSeriesDef{{Classes: []v1alpha1.ComponentClassDef{clsDef}}},
+		Series: []class.ComponentClassSeriesDef{{Classes: []class.ComponentClassDef{clsDef}}},
 	}
 	return def, nil
 }

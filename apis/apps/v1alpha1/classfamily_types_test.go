@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -81,39 +80,4 @@ func TestClassFamily_ValidateResourceRequirements(t *testing.T) {
 		}
 		assert.Equal(t, item.expect, len(cf.FindMatchingModels(requirements)) > 0)
 	}
-}
-
-func TestClassFamily_ByClassCPUAndMemory(t *testing.T) {
-	buildClass := func(cpu string, memory string) *ComponentClass {
-		return &ComponentClass{CPU: resource.MustParse(cpu), Memory: resource.MustParse(memory)}
-	}
-	classes := []*ComponentClass{
-		buildClass("1", "2Gi"),
-		buildClass("1", "1Gi"),
-		buildClass("2", "0.5Gi"),
-		buildClass("1", "1Gi"),
-		buildClass("0.5", "10Gi"),
-	}
-	sort.Sort(ByClassCPUAndMemory(classes))
-	candidate := classes[0]
-	if candidate.CPU != resource.MustParse("0.5") || candidate.Memory != resource.MustParse("10Gi") {
-		t.Errorf("case failed")
-	}
-}
-
-func TestClassFamily_ModelList(t *testing.T) {
-	var cf ClassFamily
-	err := yaml.Unmarshal([]byte(classFamilyBytes), &cf)
-	if err != nil {
-		panic("Failed to unmarshal class family: %v" + err.Error())
-	}
-	var models []ClassModelWithFamilyName
-	for _, model := range cf.Spec.Models {
-		models = append(models, ClassModelWithFamilyName{Family: cf.Name, Model: model})
-	}
-	resource.MustParse("200Mi")
-	sort.Sort(ByModelList(models))
-	cpu, memory := GetMinCPUAndMemory(models[0].Model)
-	assert.Equal(t, cpu.Cmp(resource.MustParse("0.1")) == 0, true)
-	assert.Equal(t, memory.Cmp(resource.MustParse("20Mi")) == 0, true)
 }

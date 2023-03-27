@@ -17,6 +17,7 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"context"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,7 +34,7 @@ var _ = Describe("playground", func() {
 		config, err := buildClusterRunConfig("test")
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(config.Name).Should(ContainSubstring("test"))
-		Expect(setUpK3d(provider.ctx, nil)).Should(HaveOccurred())
+		Expect(setUpK3d(context.Background(), nil)).Should(HaveOccurred())
 		Expect(provider.DeleteK8sCluster(clusterName)).Should(HaveOccurred())
 	})
 })

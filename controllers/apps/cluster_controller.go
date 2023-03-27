@@ -208,6 +208,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, nil
 	}
 
+	// check no dirty resources left by last cluster with same name
+	var err error
+	hasDirtyResources := false
+	if hasDirtyResources, err = r.hasDirtyResources(ctx, cluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	// if there's any dirty resource, wait for next reconcile loop
+	if hasDirtyResources {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+	}
+
 	// observedGeneration and terminal phase check state
 	if cluster.Status.ObservedGeneration == cluster.Generation &&
 		slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase) {
@@ -289,17 +300,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	} else if res != nil {
 		return *res, nil
-	}
-
-	// check no dirty resources left by last cluster with same name
-	var err error
-	hasDirtyResources := false
-	if hasDirtyResources, err = r.hasDirtyResources(ctx, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-	// if there's any dirty resource, wait for next reconcile loop
-	if hasDirtyResources {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	}
 
 	// preCheck succeed, starting the cluster provisioning

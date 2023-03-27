@@ -1259,8 +1259,8 @@ var _ = Describe("Cluster Controller", func() {
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEmpty())
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
 
 			By("Removing pvc's finalizers to make it deleted, cleanup the resources")
 			Expect(testapps.ChangeObj(&testCtx, deletingPVC, func() {
@@ -1274,6 +1274,7 @@ var _ = Describe("Cluster Controller", func() {
 				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 
 			By("Checking reconcile succeed")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 			Eventually(testapps.GetClusterConditionStatus(&testCtx, clusterKey, ConditionTypeApplyResources)).Should(BeEquivalentTo(metav1.ConditionTrue))
 		})
 

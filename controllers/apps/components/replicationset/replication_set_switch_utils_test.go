@@ -56,7 +56,7 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		// testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
@@ -92,6 +92,7 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 			string(Primary):   clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-0",
 			string(Secondary): clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-1",
 		} {
+			// REVIEW: is mock sts workload necessary? why?
 			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
 				AddContainer(container).
 				AddAppInstanceLabel(clusterObj.Name).

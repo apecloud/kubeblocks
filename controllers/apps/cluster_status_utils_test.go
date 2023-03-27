@@ -56,8 +56,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
+		// testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		// testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 	}
 	BeforeEach(cleanEnv)
@@ -291,9 +291,11 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			createClusterDef()
 			createClusterVersion()
 			cluster := createCluster()
+			// REVIEW: follow expects is rather inaccurate
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Generation == tmpCluster.Status.ObservedGeneration).Should(BeTrue())
-				g.Expect(len(tmpCluster.Spec.ComponentSpecs) == len(tmpCluster.Status.Components)).Should(BeTrue())
+				g.Expect(tmpCluster.Status.ObservedGeneration).Should(Equal(tmpCluster.Generation))
+				// g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+				g.Expect(tmpCluster.Status.Components).Should(HaveLen(len(tmpCluster.Spec.ComponentSpecs)))
 			})).Should(Succeed())
 
 			changeAndCheckComponents := func(changeFunc func(), expectObservedGeneration int64, checkFun func(Gomega, *appsv1alpha1.Cluster)) {

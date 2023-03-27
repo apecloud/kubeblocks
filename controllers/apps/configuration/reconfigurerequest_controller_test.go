@@ -63,10 +63,10 @@ var _ = Describe("Reconfigure Controller", func() {
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -121,6 +121,7 @@ var _ = Describe("Reconfigure Controller", func() {
 					MountPath: "/mnt/config",
 				}},
 			}
+			// REVIEW: is mock sts workload necessary? why?
 			_ = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, statefulSetName, clusterObj.Name, statefulCompName).
 				AddConfigmapVolume(configVolumeName, configmap.Name).
 				AddContainer(container).

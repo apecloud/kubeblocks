@@ -16,3 +16,11 @@ data:
     host     all             all             ::1/128                 trust
     host      replication     all             0.0.0.0/0               md5
     host      replication     all             ::/0                    md5
+  kb_restore.conf: |
+    method: kb_restore_from_backup
+    kb_restore_from_backup:
+      command: sh /home/postgres/pgdata/kb_restore/kb_restore.sh
+      keep_existing_recovery_conf: false
+      recovery_conf:
+        restore_command: cp /home/postgres/pgdata/pgroot/arch/%f %p
+        recovery_target_timeline: latest

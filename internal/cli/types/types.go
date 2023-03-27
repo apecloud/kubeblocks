@@ -139,6 +139,12 @@ var (
 	KubeBlocksHelmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", KubeBlocksChartName, "owner", "helm")
 )
 
+// Playground
+var (
+	// K3dClusterName is the k3d cluster name for playground
+	K3dClusterName = "kb-playground"
+)
+
 type ConfigTemplateInfo struct {
 	Name  string
 	TPL   appsv1alpha1.ComponentConfigSpec

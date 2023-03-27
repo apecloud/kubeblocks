@@ -82,7 +82,7 @@ var _ = Describe("Deployment Controller", func() {
 
 			By("patch cluster to Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
-				cluster.Status.Phase = appsv1alpha1.RunningPhase
+				cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 			}))
 
 			By("create the deployment of the stateless component")
@@ -93,7 +93,7 @@ var _ = Describe("Deployment Controller", func() {
 			})).Should(Succeed())
 
 			By("check stateless component phase is Failed")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.FailedPhase))
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			By("mock error message and PodCondition about some pod's failure")
 			podName := fmt.Sprintf("%s-%s-%s", clusterName, statelessCompName, testCtx.GetRandomStr())
@@ -141,7 +141,7 @@ var _ = Describe("Deployment Controller", func() {
 			})).Should(Succeed())
 
 			By("waiting for the component to be running")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.RunningPhase))
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		})
 	})
 })

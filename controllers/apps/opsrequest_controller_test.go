@@ -84,18 +84,20 @@ var _ = Describe("OpsRequest Controller", func() {
 	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) {
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, namespacedName,
 			func(fetched *appsv1alpha1.Cluster) {
-				fetched.Status.Phase = appsv1alpha1.RunningPhase
+				// TODO: whould be better to have hint for cluster.status.phase is mocked,
+				// i.e., add annotation info for the mocked context
+				fetched.Status.Phase = appsv1alpha1.RunningClusterPhase
 				if len(fetched.Status.Components) == 0 {
 					fetched.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
 					for _, v := range fetched.Spec.ComponentSpecs {
 						fetched.Status.SetComponentStatus(v.Name, appsv1alpha1.ClusterComponentStatus{
-							Phase: appsv1alpha1.RunningPhase,
+							Phase: appsv1alpha1.RunningClusterCompPhase,
 						})
 					}
 					return
 				}
 				for componentKey, componentStatus := range fetched.Status.Components {
-					componentStatus.Phase = appsv1alpha1.RunningPhase
+					componentStatus.Phase = appsv1alpha1.RunningClusterCompPhase
 					fetched.Status.SetComponentStatus(componentKey, componentStatus)
 				}
 			})()).ShouldNot(HaveOccurred())
@@ -123,11 +125,26 @@ var _ = Describe("OpsRequest Controller", func() {
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
+		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
 
-		By("mock cluster status running")
-		// MOCK pods are created and running, so as the cluster
-		mockSetClusterStatusPhaseToRunning(clusterKey)
+		By("mock pod/sts are available and wait for cluster enter running phase")
+		podName := fmt.Sprintf("%s-%s-0", clusterObj.Name, mysqlCompName)
+		pod := testapps.MockConsensusComponentStsPod(testCtx, nil, clusterObj.Name, mysqlCompName,
+			podName, "leader", "ReadWrite")
+		if workloadType == testapps.StatefulMySQLComponent {
+			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
+			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+				testk8s.MockPodAvailable(pod, lastTransTime)
+			})).ShouldNot(HaveOccurred())
+		}
+		stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, mysqlCompName)
+		mysqlSts := stsList.Items[0]
+		Expect(testapps.ChangeObjStatus(&testCtx, &mysqlSts, func() {
+			testk8s.MockStatefulSetReady(&mysqlSts)
+		})).ShouldNot(HaveOccurred())
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("send VerticalScalingOpsRequest successfully")
 		opsKey := types.NamespacedName{Name: opsName, Namespace: testCtx.DefaultNamespace}
@@ -148,29 +165,24 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("check VerticalScalingOpsRequest running")
 		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-
-		By("mock new pod created with specified resources")
-		podName := fmt.Sprintf("%s-%s-0", clusterObj.Name, mysqlCompName)
-		pod := testapps.MockConsensusComponentStsPod(testCtx, nil, clusterObj.Name, mysqlCompName,
-			podName, "leader", "ReadWrite")
-		if workloadType == testapps.StatefulMySQLComponent {
-			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
-			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
-				testk8s.MockPodAvailable(pod, lastTransTime)
-			})).ShouldNot(HaveOccurred())
-		}
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
 
 		By("check Cluster and changed component phase is VerticalScaling")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.VerticalScalingPhase))
-			g.Expect(cluster.Status.Components[mysqlCompName].Phase).To(Equal(appsv1alpha1.VerticalScalingPhase))
+			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterPhase))                               // VerticalScalingPhase
+			g.Expect(cluster.Status.Components[mysqlCompName].Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // VerticalScalingPhase
 		})).Should(Succeed())
 
 		By("mock bring Cluster and changed component back to running status")
-		mockSetClusterStatusPhaseToRunning(clusterKey)
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(&mysqlSts), func(tmpSts *appsv1.StatefulSet) {
+			testk8s.MockStatefulSetReady(tmpSts)
+		})()).ShouldNot(HaveOccurred())
+		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("patch opsrequest controller to run")
-		Eventually(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
+		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
 			if verticalScalingOpsRequest.Annotations == nil {
 				verticalScalingOpsRequest.Annotations = map[string]string{}
 			}
@@ -262,7 +274,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				testk8s.MockStatefulSetReady(sts)
 			})).ShouldNot(HaveOccurred())
 			testapps.MockConsensusComponentPods(testCtx, sts, clusterKey.Name, mysqlCompName)
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningPhase))
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 			By("mock pvc created")
 			for i := 0; i < int(replicas); i++ {
@@ -293,9 +305,9 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("expect component is Running if don't support volume snapshot during doing h-scale ops")
 			// cluster phase changes to HorizontalScalingPhase first. then, it will be ConditionsError because it does not support snapshot backup after a period of time.
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeElementOf(appsv1alpha1.HorizontalScalingPhase, appsv1alpha1.ConditionsErrorPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase)) // HorizontalScalingPhase
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningPhase))
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 			By("delete h-scale ops")
 			testapps.DeleteObject(&testCtx, opsKey, ops)
@@ -307,7 +319,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 				cluster.Spec.ComponentSpecs[0].Replicas = int32(3)
 			})()).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
 	})
 
@@ -319,7 +331,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.GetListLen(&testCtx, intctrlutil.StatefulSetSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterObj.Name,
-				}, client.InNamespace(clusterObj.Namespace))).Should(Equal(2))
+				}, client.InNamespace(clusterObj.Namespace))).Should(BeEquivalentTo(2))
 			stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), testapps.DefaultRedisCompName)
 			for _, v := range stsList.Items {
 				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
@@ -356,7 +368,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			// mock sts ready and create pod
 			createStsPodAndMockStsReady()
 			// wait for cluster to running
-			Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).Should(Equal(appsv1alpha1.RunningPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
 
 		It("test stop/start ops", func() {
@@ -379,7 +391,7 @@ var _ = Describe("OpsRequest Controller", func() {
 					constant.ReconcileAnnotationKey: time.Now().Format(time.RFC3339Nano),
 				}
 			})).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StoppedPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StoppedClusterPhase))
 
 			By("should be Running before pods are not deleted successfully")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
@@ -408,7 +420,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 			// mock sts ready and create pod
 			createStsPodAndMockStsReady()
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
 
@@ -435,7 +447,8 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmlCluster *appsv1alpha1.Cluster) {
 				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(tmlCluster)
 				g.Expect(opsSlice).Should(HaveLen(1))
-				g.Expect(tmlCluster.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.VolumeExpandingPhase))
+				g.Expect(tmlCluster.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // VolumeExpandingPhase
+				// TODO: status conditions for VolumeExpandingPhase
 			})).Should(Succeed())
 
 			By("delete the Running ops")

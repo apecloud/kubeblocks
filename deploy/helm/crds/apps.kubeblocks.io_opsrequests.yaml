@@ -377,22 +377,12 @@ spec:
                         Cluster.status.component.phase.
                       enum:
                       - Running
+                      - Stopped
                       - Failed
                       - Abnormal
-                      - Creating
                       - Updating
-                      - Deleting
-                      - Deleted
-                      - VolumeExpanding
-                      - Reconfiguring
-                      - HorizontalScaling
-                      - VerticalScaling
-                      - VersionUpgrading
-                      - Rebooting
-                      - Stopped
-                      - Stopping
                       - Starting
-                      - Exposing
+                      - Stopping
                       type: string
                     progressDetails:
                       description: progressDetails describes the progress details

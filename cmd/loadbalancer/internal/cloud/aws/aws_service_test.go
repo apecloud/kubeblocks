@@ -272,19 +272,6 @@ var _ = Describe("AwsService", func() {
 		})
 	})
 
-	Context("Wait for ENI attached", func() {
-		It("", func() {
-			_, service, _ := setup(nil)
-
-			var err error
-			_, err = service.WaitForENIAttached(eniID2)
-			Expect(err).ShouldNot(BeNil())
-
-			_, err = service.WaitForENIAttached(eniID1)
-			Expect(err).Should(BeNil())
-		})
-	})
-
 	Context("Free ENI", func() {
 		It("", func() {
 			_, service, mockEC2 := setup(nil)

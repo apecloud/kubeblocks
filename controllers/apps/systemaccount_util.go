@@ -34,6 +34,10 @@ import (
 	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
 )
 
+const (
+	jobPrefix = "job-system-account-"
+)
+
 // SecretMapStore is a cache, recording all (key, secret) pair for accounts to be created.
 type secretMapStore struct {
 	cache.Store
@@ -165,7 +169,7 @@ func getLabelsForSecretsAndJobs(key componentUniqueKey) client.MatchingLabels {
 
 func renderJob(engine *customizedEngine, key componentUniqueKey, statement []string, endpoint string) *batchv1.Job {
 	randomStr, _ := password.Generate(6, 0, 0, true, false)
-	jobName := key.clusterName + "-" + randomStr
+	jobName := jobPrefix + key.clusterName + "-" + randomStr
 
 	// inject one more system env variables
 	statementEnv := corev1.EnvVar{

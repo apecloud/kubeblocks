@@ -16,5 +16,5 @@ limitations under the License.
 
 package agent
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -destination mocks/node_manager_mocks.go . NodeManager
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -destination mocks/node_mocks.go . Node
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -destination mocks/node_manager_mocks.go . NodeManager
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -destination mocks/node_mocks.go . Node

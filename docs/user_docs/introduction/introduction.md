@@ -26,4 +26,4 @@ It has multiple built-in database engines and provides consistent management exp
 * Resource overcommitment to allocate more database instances on one EC2 to decrease costs efficiently
 * Role-based access control (RBAC)
 * `kbcli`, an easy-to-use CLI, supports common operations such as database cluster creating, connecting, backup, restore, monitoring and trouble shooting.
-* Supports custom robot alarms for Slack, Feishu, Wechat and DingTalks.  
+* Supports custom robot alerts for Slack, Feishu, Wechat and DingTalks.  

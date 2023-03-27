@@ -307,12 +307,14 @@ func OpenBrowser(url string) error {
 }
 
 func TimeFormat(t *metav1.Time) string {
-	const layout = "Jan 02,2006 15:04 UTC-0700"
-
 	if t == nil || t.IsZero() {
 		return ""
 	}
+	return TimeTimeFormat(t.Time)
+}
 
+func TimeTimeFormat(t time.Time) string {
+	const layout = "Jan 02,2006 15:04 UTC-0700"
 	return t.Format(layout)
 }
 

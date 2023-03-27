@@ -48,8 +48,6 @@ type Provider interface {
 
 	AssignPrivateIPAddresses(eniID string, ip string) error
 
-	WaitForENIAttached(eniID string) (ENIMetadata, error)
-
 	ModifySourceDestCheck(eniID string, enabled bool) error
 }
 

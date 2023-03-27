@@ -71,7 +71,7 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRecorder := []appsv1alpha1.OpsRecorder{
 				{
 					Name:           "mysql-restart",
-					ToClusterPhase: appsv1alpha1.RebootingPhase,
+					ToClusterPhase: appsv1alpha1.SpecReconcilingClusterPhase,
 				},
 			}
 			Expect(patchClusterPhaseWhenExistsOtherOps(ctx, k8sClient, opsRes, opsRecorder)).Should(Succeed())

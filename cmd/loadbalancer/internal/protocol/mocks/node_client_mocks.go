@@ -174,23 +174,3 @@ func (mr *MockNodeClientMockRecorder) SetupNetworkForService(arg0, arg1 interfac
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetupNetworkForService", reflect.TypeOf((*MockNodeClient)(nil).SetupNetworkForService), varargs...)
 }
-
-// WaitForENIAttached mocks base method.
-func (m *MockNodeClient) WaitForENIAttached(arg0 context.Context, arg1 *protocol.WaitForENIAttachedRequest, arg2 ...grpc.CallOption) (*protocol.WaitForENIAttachedResponse, error) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0, arg1}
-	for _, a := range arg2 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "WaitForENIAttached", varargs...)
-	ret0, _ := ret[0].(*protocol.WaitForENIAttachedResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// WaitForENIAttached indicates an expected call of WaitForENIAttached.
-func (mr *MockNodeClientMockRecorder) WaitForENIAttached(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForENIAttached", reflect.TypeOf((*MockNodeClient)(nil).WaitForENIAttached), varargs...)
-}

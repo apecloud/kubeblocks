@@ -91,7 +91,7 @@ var _ = Describe("Replication Component", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
 				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 					testapps.DefaultRedisCompName: {
-						Phase: appsv1alpha1.RunningPhase,
+						Phase: appsv1alpha1.RunningClusterCompPhase,
 					},
 				}
 			})).Should(Succeed())
@@ -188,12 +188,12 @@ var _ = Describe("Replication Component", func() {
 			})).Should(Succeed())
 			testk8s.UpdatePodStatusNotReady(ctx, testCtx, podList[1].Name)
 			phase, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
-			Expect(phase).Should(Equal(appsv1alpha1.AbnormalPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			// mock primary pod is not ready
 			testk8s.UpdatePodStatusNotReady(ctx, testCtx, primaryPod.Name)
 			phase, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
-			Expect(phase).Should(Equal(appsv1alpha1.FailedPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			// mock pod label is empty
 			Expect(testapps.ChangeObj(&testCtx, primaryPod, func() {

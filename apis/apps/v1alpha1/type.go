@@ -30,30 +30,56 @@ const (
 	OpsRequestKind        = "OpsRequestKind"
 )
 
-// Phase defines the CR .Status.Phase
+// ClusterPhase defines the Cluster CR .status.phase
 // +enum
+// +kubebuilder:validation:Enum={Running,Stopped,Failed,Abnormal,Starting,Updating,Stopping}
+type ClusterPhase string
+
+const (
+	// REVIEW/TODO: AbnormalClusterPhase provides hybrid, consider remove it if possible
+	RunningClusterPhase         ClusterPhase = "Running"
+	StoppedClusterPhase         ClusterPhase = "Stopped"
+	FailedClusterPhase          ClusterPhase = "Failed"
+	AbnormalClusterPhase        ClusterPhase = "Abnormal" // Abnormal is a sub-state of failed, where one of the cluster components has "Failed" or "Abnormal" status phase.
+	StartingClusterPhase        ClusterPhase = "Starting"
+	SpecReconcilingClusterPhase ClusterPhase = "Updating"
+	StoppingClusterPhase        ClusterPhase = "Stopping"
+	// DeletingClusterPhase        ClusterPhase = "Deleting" // DO REVIEW: may merged with  Stopping
+)
+
+// ClusterComponentPhase defines the Cluster CR .status.components.phase
+// +enum
+// +kubebuilder:validation:Enum={Running,Stopped,Failed,Abnormal,Updating,Starting,Stopping}
+type ClusterComponentPhase string
+
+const (
+	RunningClusterCompPhase         ClusterComponentPhase = "Running"
+	StoppedClusterCompPhase         ClusterComponentPhase = "Stopped"
+	FailedClusterCompPhase          ClusterComponentPhase = "Failed"
+	AbnormalClusterCompPhase        ClusterComponentPhase = "Abnormal" // Abnormal is a sub-state of failed, where one or more workload pods is not in "Running" phase.
+	SpecReconcilingClusterCompPhase ClusterComponentPhase = "Updating"
+	StartingClusterCompPhase        ClusterComponentPhase = "Starting"
+	StoppingClusterCompPhase        ClusterComponentPhase = "Stopping"
+	// DeletingClusterCompPhase        ClusterComponentPhase = "Deleting" // DO REVIEW: may merged with  Stopping
+
+	// REVIEW: following are variant of "Updating", why not have "Updating" phase with detail Status.Conditions
+	// VolumeExpandingClusterCompPhase   ClusterComponentPhase = "VolumeExpanding"
+	// HorizontalScalingClusterCompPhase ClusterComponentPhase = "HorizontalScaling"
+	// VerticalScalingClusterCompPhase   ClusterComponentPhase = "VerticalScaling"
+	// VersionUpgradingClusterCompPhase  ClusterComponentPhase = "Upgrading"
+	// ReconfiguringClusterCompPhase     ClusterComponentPhase = "Reconfiguring"
+	// ExposingClusterCompPhase          ClusterComponentPhase = "Exposing"
+	// RollingClusterCompPhase           ClusterComponentPhase = "Rolling" // REVIEW: original value is Rebooting, and why not having stopping -> stopped -> starting -> running
+)
+
+// Phase defines the ClusterDefinition and ClusterVersion  CR .status.phase
+// +enum
+// +kubebuilder:validation:Enum={Available,Unavailable}
 type Phase string
 
 const (
-	AvailablePhase         Phase = "Available"
-	UnavailablePhase       Phase = "Unavailable"
-	DeletingPhase          Phase = "Deleting"
-	CreatingPhase          Phase = "Creating"
-	RunningPhase           Phase = "Running"
-	FailedPhase            Phase = "Failed"
-	SpecReconcilingPhase   Phase = "Updating"
-	VolumeExpandingPhase   Phase = "VolumeExpanding"
-	HorizontalScalingPhase Phase = "HorizontalScaling"
-	VerticalScalingPhase   Phase = "VerticalScaling"
-	RebootingPhase         Phase = "Rebooting"
-	VersionUpgradingPhase  Phase = "VersionUpgrading"
-	AbnormalPhase          Phase = "Abnormal"
-	ConditionsErrorPhase   Phase = "ConditionsError"
-	ReconfiguringPhase     Phase = "Reconfiguring"
-	StoppedPhase           Phase = "Stopped"
-	StoppingPhase          Phase = "Stopping"
-	StartingPhase          Phase = "Starting"
-	ExposingPhase          Phase = "Exposing"
+	AvailablePhase   Phase = "Available"
+	UnavailablePhase Phase = "Unavailable"
 )
 
 // OpsPhase defines opsRequest phase.
@@ -190,15 +216,15 @@ const (
 )
 
 type OpsRequestBehaviour struct {
-	FromClusterPhases []Phase
-	ToClusterPhase    Phase
+	FromClusterPhases []ClusterPhase
+	ToClusterPhase    ClusterPhase
 }
 
 type OpsRecorder struct {
 	// name OpsRequest name
 	Name string `json:"name"`
 	// clusterPhase the cluster phase when the OpsRequest is running
-	ToClusterPhase Phase `json:"clusterPhase"`
+	ToClusterPhase ClusterPhase `json:"clusterPhase"`
 }
 
 // ProvisionPolicyType defines the policy for creating accounts.

@@ -27,6 +27,7 @@ import (
 	dapr "github.com/dapr/go-sdk/client"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -161,4 +162,71 @@ func GetMapKeyFromRequest(req *dapr.InvokeBindingRequest) string {
 		buf.WriteString(fmt.Sprintf("%s:%s", k, req.Metadata[k]))
 	}
 	return buf.String()
+}
+
+// OperationHTTPClient is a mock client for operation, mainly used to hide curl command details.
+type OperationHTTPClient struct {
+	httpRequestPrefix string
+	RequestTimeout    time.Duration
+	containerName     string
+	exec              *exec.ExecOptions
+}
+
+// NewHTTPClientWithPod create a new OperationHTTPClient with pod
+func NewHTTPClientWithPod(exec *exec.ExecOptions, pod *corev1.Pod, characterType string) (*OperationHTTPClient, error) {
+	var (
+		err error
+	)
+
+	if characterType == "" {
+		return nil, fmt.Errorf("pod %v chacterType must be set", pod.Name)
+	}
+
+	ip := pod.Status.PodIP
+	if ip == "" {
+		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
+	}
+	container, err := intctrlutil.GetProbeContainerName(pod)
+	if err != nil {
+		return nil, err
+	}
+	port, err := intctrlutil.GetProbeHTTPPort(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &OperationHTTPClient{
+		httpRequestPrefix: fmt.Sprintf(HTTPRequestPrefx, port, characterType),
+		RequestTimeout:    10 * time.Second,
+		containerName:     container,
+		exec:              exec,
+	}
+	return client, nil
+}
+
+// SendRequest exec sql operation, this is a blocking operation and it will use pod EXEC subresource to send an http request to the probe pod
+func (cli *OperationHTTPClient) SendRequest(request SQLChannelRequest) (SQLChannelResponse, error) {
+	var (
+		response  = SQLChannelResponse{}
+		strBuffer bytes.Buffer
+		errBuffer bytes.Buffer
+		err       error
+	)
+
+	if jsonData, err := json.Marshal(request); err != nil {
+		return response, err
+	} else {
+		cli.exec.ContainerName = cli.containerName
+		cli.exec.Command = []string{"sh", "-c", cli.httpRequestPrefix + " -d '" + string(jsonData) + "'"}
+	}
+
+	// redirect output to strBuffer to be parsed later
+	if err = cli.exec.RunWithRedirect(&strBuffer, &errBuffer); err != nil {
+		return response, err
+	}
+
+	if err = json.Unmarshal(strBuffer.Bytes(), &response); err != nil {
+		return response, err
+	}
+	return response, nil
 }

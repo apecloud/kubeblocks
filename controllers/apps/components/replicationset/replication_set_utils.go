@@ -106,7 +106,7 @@ func handleComponentIsStopped(cluster *appsv1alpha1.Cluster) {
 	for _, clusterComp := range cluster.Spec.ComponentSpecs {
 		if clusterComp.Replicas == int32(0) {
 			replicationStatus := cluster.Status.Components[clusterComp.Name]
-			replicationStatus.Phase = appsv1alpha1.StoppedPhase
+			replicationStatus.Phase = appsv1alpha1.StoppedClusterCompPhase
 			cluster.Status.SetComponentStatus(clusterComp.Name, replicationStatus)
 		}
 	}
@@ -201,7 +201,9 @@ func syncReplicationSetClusterStatus(
 	}
 	oldReplicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
 	if oldReplicationSetStatus == nil {
-		util.InitClusterComponentStatusIfNeed(cluster, componentName, *componentDef)
+		if err = util.InitClusterComponentStatusIfNeed(cluster, componentName, *componentDef); err != nil {
+			return err
+		}
 		oldReplicationSetStatus = cluster.Status.Components[componentName].ReplicationSetStatus
 	}
 	if err := syncReplicationSetStatus(oldReplicationSetStatus, podList); err != nil {

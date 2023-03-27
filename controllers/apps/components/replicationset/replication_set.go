@@ -109,7 +109,7 @@ func (r *ReplicationSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, re
 // GetPhaseWhenPodsNotReady is the implementation of the type Component interface method,
 // when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
 // if return an empty phase, means the pods of component are ready and skips it.
-func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.Phase, error) {
+func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	componentStsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, componentStsList)
 	if err != nil || len(componentStsList.Items) == 0 {

@@ -23,11 +23,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -88,19 +86,21 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("test when clusterDefinition not found")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeProvisioningStarted)
-				g.Expect(condition != nil && condition.Reason == constant.ReasonNotFoundCR).Should(BeTrue())
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Reason).Should(BeEquivalentTo(constant.ReasonNotFoundCR))
 			})).Should(Succeed())
 
-			By("test conditionsError phase")
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
-				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeProvisioningStarted)
-				condition.LastTransitionTime = metav1.Time{Time: time.Now().Add(-(time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)) + time.Second))}
-				tmpCluster.SetStatusCondition(*condition)
-			})()).ShouldNot(HaveOccurred())
+			// TODO: removed conditionsError phase need to review correct-ness of following commented off block:
+			// By("test conditionsError phase")
+			// Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
+			// 	condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeProvisioningStarted)
+			// 	condition.LastTransitionTime = metav1.Time{Time: time.Now().Add(-(time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)) + time.Second))}
+			// 	meta.SetStatusCondition(&tmpCluster.Status.Conditions, *condition)
+			// })()).ShouldNot(HaveOccurred())
 
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Status.Phase == appsv1alpha1.ConditionsErrorPhase).Should(BeTrue())
-			})).Should(Succeed())
+			// Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+			// 	g.Expect(tmpCluster.Status.Phase == appsv1alpha1.ConditionsErrorPhase).Should(BeTrue())
+			// })).Should(Succeed())
 
 			By("test when clusterVersion not Available")
 			_ = testapps.CreateConsensusMysqlClusterDef(testCtx, clusterDefName, consensusCompType)
@@ -124,7 +124,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				updateClusterAnnotation(cluster)
 				g.Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 					condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
-					g.Expect(condition != nil && condition.Reason == constant.ReasonRefCRUnavailable).Should(BeTrue())
+					g.Expect(condition).ShouldNot(BeNil())
+					g.Expect(condition.Reason).Should(BeEquivalentTo(constant.ReasonRefCRUnavailable))
 				})).Should(Succeed())
 			}).Should(Succeed())
 
@@ -145,20 +146,13 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				g.Expect(condition != nil && condition.Reason == ReasonPreCheckFailed).Should(BeTrue())
 			})).Should(Succeed())
 
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
-				condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
-				condition.LastTransitionTime = metav1.Time{Time: time.Now().Add(-(time.Millisecond*time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)) + time.Second))}
-				tmpCluster.SetStatusCondition(*condition)
-			})()).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.ConditionsErrorPhase))
-
 			By("reset and waiting cluster to Creating")
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
 				tmpCluster.Spec.ComponentSpecs[0].EnabledLogs = []string{"error"}
 			})()).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.CreatingPhase))
+				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.StartingClusterPhase))
 				g.Expect(tmpCluster.Status.ObservedGeneration).ShouldNot(BeZero())
 			})).Should(Succeed())
 
@@ -167,10 +161,11 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				tmpCluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
 			})()).ShouldNot(HaveOccurred())
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeApplyResources)
-				g.Expect(condition != nil && condition.Reason == ReasonApplyResourcesFailed).Should(BeTrue())
-			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
+				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeApplyResources)
+					g.Expect(condition != nil && condition.Reason == ReasonApplyResourcesFailed).Should(BeTrue())
+				})).Should(Succeed())
 		})
 	})
 

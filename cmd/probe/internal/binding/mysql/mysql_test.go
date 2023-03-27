@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
 const (
@@ -63,7 +64,16 @@ func TestInit(t *testing.T) {
 	assert.Equal(t, 3306, mysqlOps.DBPort)
 	assert.NotNil(t, mysqlOps.OperationMap[GetRoleOperation])
 	assert.NotNil(t, mysqlOps.OperationMap[CheckStatusOperation])
+	assert.NotNil(t, mysqlOps.OperationMap[GetLagOperation])
+	assert.NotNil(t, mysqlOps.OperationMap[ExecOperation])
+	assert.NotNil(t, mysqlOps.OperationMap[QueryOperation])
 
+	assert.NotNil(t, mysqlOps.OperationMap[ListUsersOp])
+	assert.NotNil(t, mysqlOps.OperationMap[CreateUserOp])
+	assert.NotNil(t, mysqlOps.OperationMap[DeleteUserOp])
+	assert.NotNil(t, mysqlOps.OperationMap[DescribeUserOp])
+	assert.NotNil(t, mysqlOps.OperationMap[GrantUserRoleOp])
+	assert.NotNil(t, mysqlOps.OperationMap[RevokeUserRoleOp])
 	// Clear out previously set viper variables
 	viper.Reset()
 }
@@ -397,6 +407,189 @@ func TestExec(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestMySQLAccounts(t *testing.T) {
+	ctx := context.Background()
+	resp := &bindings.InvokeResponse{Metadata: map[string]string{}}
+	mysqlOps, mock, _ := mockDatabase(t)
+
+	const (
+		userName = "turning"
+		password = "red"
+		roleName = "readOnly"
+	)
+	t.Run("Create account", func(t *testing.T) {
+		var err error
+		var result OpsResult
+
+		req := &bindings.InvokeRequest{}
+		req.Operation = CreateUserOp
+		req.Metadata = map[string]string{}
+
+		result, err = mysqlOps.createUserOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveFail, result[RespTypEve])
+		assert.Equal(t, ErrNoUserName.Error(), result[RespTypMsg])
+
+		req.Metadata["userName"] = userName
+		result, err = mysqlOps.createUserOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveFail, result[RespTypEve])
+		assert.Equal(t, ErrNoPassword.Error(), result[RespTypMsg])
+
+		req.Metadata["password"] = password
+
+		createUserCmd := fmt.Sprintf("CREATE USER '%s'@'%%' IDENTIFIED BY '%s';", req.Metadata["userName"], req.Metadata["password"])
+		mock.ExpectExec(createUserCmd).WillReturnResult(sqlmock.NewResult(1, 1))
+		result, err = mysqlOps.createUserOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+	})
+
+	t.Run("Delete account", func(t *testing.T) {
+		var err error
+		var result OpsResult
+
+		req := &bindings.InvokeRequest{}
+		req.Operation = CreateUserOp
+		req.Metadata = map[string]string{}
+
+		result, err = mysqlOps.deleteUserOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveFail, result[RespTypEve])
+		assert.Equal(t, ErrNoUserName.Error(), result[RespTypMsg])
+
+		req.Metadata["userName"] = userName
+		deleteUserCmd := fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%';", req.Metadata["userName"])
+		mock.ExpectExec(deleteUserCmd).WillReturnResult(sqlmock.NewResult(1, 1))
+
+		result, err = mysqlOps.deleteUserOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+	})
+	t.Run("Describe account", func(t *testing.T) {
+		var err error
+		var result OpsResult
+
+		req := &bindings.InvokeRequest{}
+		req.Operation = CreateUserOp
+		req.Metadata = map[string]string{}
+
+		col1 := sqlmock.NewColumn("Grants for "+userName+"@%").OfType("STRING", "turning")
+		rows := sqlmock.NewRowsWithColumnDefinition(col1).AddRow(readOnlyRPriv)
+
+		result, err = mysqlOps.describeUserOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveFail, result[RespTypEve])
+		assert.Equal(t, ErrNoUserName.Error(), result[RespTypMsg])
+
+		req.Metadata["userName"] = userName
+
+		showGrantTpl := "SHOW GRANTS FOR '%s'@'%%';"
+		descUserCmd := fmt.Sprintf(showGrantTpl, req.Metadata["userName"])
+		mock.ExpectQuery(descUserCmd).WillReturnRows(rows)
+
+		result, err = mysqlOps.describeUserOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveSucc, result[RespTypEve])
+
+		data := result[RespTypMsg].(string)
+		users := []UserInfo{}
+		err = json.Unmarshal([]byte(data), &users)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(users))
+		assert.Equal(t, userName, users[0].UserName)
+		assert.NotEmpty(t, users[0].RoleName)
+		assert.Equal(t, users[0].RoleName, ReadOnlyRole)
+	})
+
+	t.Run("List accounts", func(t *testing.T) {
+		var err error
+		var result OpsResult
+
+		req := &bindings.InvokeRequest{}
+		req.Operation = CreateUserOp
+		req.Metadata = map[string]string{}
+
+		col1 := sqlmock.NewColumn("userName").OfType("STRING", "turning")
+		col2 := sqlmock.NewColumn("expired").OfType("STRING", "T")
+
+		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2).
+			AddRow(userName, "T").AddRow("testuser", "F")
+
+		listUserCmd := "SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired FROM mysql.user WHERE host = '%' and user <> 'root' and user not like 'kb%';"
+		mock.ExpectQuery(regexp.QuoteMeta(listUserCmd)).WillReturnRows(rows)
+
+		result, err = mysqlOps.listUsersOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+		data := result[RespTypMsg].(string)
+		users := []UserInfo{}
+		err = json.Unmarshal([]byte(data), &users)
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(users))
+		assert.Equal(t, userName, users[0].UserName)
+	})
+
+	t.Run("Grant Roles", func(t *testing.T) {
+		var err error
+		var result OpsResult
+
+		req := &bindings.InvokeRequest{}
+		req.Operation = CreateUserOp
+		req.Metadata = map[string]string{}
+
+		result, err = mysqlOps.grantUserRoleOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveFail, result[RespTypEve])
+		assert.Equal(t, ErrNoUserName.Error(), result[RespTypMsg])
+
+		req.Metadata["userName"] = userName
+		result, err = mysqlOps.grantUserRoleOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveFail, result[RespTypEve])
+		assert.Equal(t, ErrNoRoleName.Error(), result[RespTypMsg])
+
+		req.Metadata["roleName"] = roleName
+		roleDesc, err := mysqlOps.renderRoleByName(req.Metadata["roleName"])
+		assert.Nil(t, err)
+		grantRoleCmd := fmt.Sprintf("GRANT %s TO '%s'@'%%';", roleDesc, req.Metadata["userName"])
+
+		mock.ExpectExec(grantRoleCmd).WillReturnResult(sqlmock.NewResult(1, 1))
+		result, err = mysqlOps.grantUserRoleOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+	})
+
+	t.Run("Revoke Roles", func(t *testing.T) {
+		var err error
+		var result OpsResult
+
+		req := &bindings.InvokeRequest{}
+		req.Operation = CreateUserOp
+		req.Metadata = map[string]string{}
+
+		result, err = mysqlOps.revokeUserRoleOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveFail, result[RespTypEve])
+		assert.Equal(t, ErrNoUserName.Error(), result[RespTypMsg])
+
+		req.Metadata["userName"] = userName
+		result, err = mysqlOps.revokeUserRoleOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveFail, result[RespTypEve])
+		assert.Equal(t, ErrNoRoleName.Error(), result[RespTypMsg])
+
+		req.Metadata["roleName"] = roleName
+		roleDesc, err := mysqlOps.renderRoleByName(req.Metadata["roleName"])
+		assert.Nil(t, err)
+		revokeRoleCmd := fmt.Sprintf("REVOKE %s FROM '%s'@'%%';", roleDesc, req.Metadata["userName"])
+
+		mock.ExpectExec(revokeRoleCmd).WillReturnResult(sqlmock.NewResult(1, 1))
+		result, err = mysqlOps.revokeUserRoleOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+	})
+}
 func mockDatabase(t *testing.T) (*MysqlOperations, sqlmock.Sqlmock, error) {
 	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))

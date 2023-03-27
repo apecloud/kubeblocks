@@ -197,8 +197,10 @@ var _ = Describe("Eni", func() {
 			eni := cloud.ENIMetadata{ID: eniID5}
 			mockProvider.EXPECT().CreateENI(gomock.Any(), gomock.Any(), gomock.Any()).Return(eni.ID, nil)
 			mockProvider.EXPECT().AttachENI(gomock.Any(), gomock.Any()).Return(eni.ID, nil)
-			mockNodeClient.EXPECT().WaitForENIAttached(gomock.Any(), gomock.Any()).Return(nil, nil)
 			mockNodeClient.EXPECT().SetupNetworkForENI(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+			response := getDescribeAllENIResponse()
+			response.Enis[eniID5] = &pb.ENIMetadata{EniId: eniID5}
+			mockNodeClient.EXPECT().DescribeAllENIs(gomock.Any(), gomock.Any()).Return(response, nil).AnyTimes()
 			Expect(manager.ensureENI()).Should(Succeed())
 		})
 	})

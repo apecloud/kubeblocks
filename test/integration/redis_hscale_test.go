@@ -101,7 +101,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("Waiting for the cluster to be running")
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking statefulSet number")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -150,7 +150,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			})).Should(Succeed())
 
 			By("Wait for the cluster to be running")
-			Consistently(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
+			Consistently(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 			By("Checking pods' status and count are updated in cluster status after scale-out")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {

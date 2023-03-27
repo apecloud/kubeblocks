@@ -26,7 +26,6 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
 type ClusterDefinitionSpec struct {
-
 	// componentDefs provides cluster components definitions.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
@@ -52,7 +51,6 @@ type ClusterDefinitionSpec struct {
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 }
 
-// SystemAccountSpec specifies information to create system accounts.
 type SystemAccountSpec struct {
 	// cmdExecutorConfig configs how to get client SDK and perform statements.
 	// +kubebuilder:validation:Required
@@ -70,14 +68,11 @@ type SystemAccountSpec struct {
 	Accounts []SystemAccountConfig `json:"accounts" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
-// CmdExecutorConfig specifies how to perform creation and deletion statements.
 type CmdExecutorConfig struct {
 	CommandExecutorEnvItem `json:",inline"`
-
-	CommandExecutorItem `json:",inline"`
+	CommandExecutorItem    `json:",inline"`
 }
 
-// PasswordConfig helps provide to customize complexity of password generation pattern.
 type PasswordConfig struct {
 	// length defines the length of password.
 	// +kubebuilder:validation:Maximum=32
@@ -166,10 +161,6 @@ type ClusterDefinitionStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-func (r ClusterDefinitionStatus) GetTerminalPhases() []Phase {
-	return []Phase{AvailablePhase}
-}
-
 type ComponentTemplateSpec struct {
 	// Specify the name of configuration template.
 	// +kubebuilder:validation:Required
@@ -235,7 +226,6 @@ type ExporterConfig struct {
 	// +optional
 	ScrapePath string `json:"scrapePath,omitempty"`
 }
-
 type MonitorConfig struct {
 	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
 	// If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
@@ -277,9 +267,6 @@ type VolumeTypeSpec struct {
 	Type VolumeType `json:"type,omitempty"`
 }
 
-// ClusterComponentDefinition provides a workload component specification template,
-// with attributes that strongly work with stateful workloads and day-2 operations
-// behaviors.
 type ClusterComponentDefinition struct {
 	// Name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
@@ -287,6 +274,10 @@ type ClusterComponentDefinition struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
+	ClusterComponentDefinitionSpec `json:",inline"`
+}
+
+type ClusterComponentDefinitionSpec struct {
 	// The description of component definition.
 	// +optional
 	Description string `json:"description,omitempty"`
@@ -314,16 +305,15 @@ type ClusterComponentDefinition struct {
 
 	// The configSpec field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
-	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty"`
 
 	// The scriptSpec field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
-	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
@@ -340,11 +330,11 @@ type ClusterComponentDefinition struct {
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
 	// logConfigs is detail log file config which provided by provider.
-	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// podSpec define pod spec template of the cluster component.
@@ -448,7 +438,6 @@ type ClusterDefinitionProbe struct {
 }
 
 type ClusterDefinitionProbes struct {
-
 	// Probe for DB running check.
 	// +optional
 	RunningProbe *ClusterDefinitionProbe `json:"runningProbe,omitempty"`
@@ -662,4 +651,8 @@ func (r *ClusterDefinition) GetComponentDefByName(compDefName string) *ClusterCo
 		}
 	}
 	return nil
+}
+
+func (r ClusterDefinitionStatus) GetTerminalPhases() []Phase {
+	return []Phase{AvailablePhase}
 }

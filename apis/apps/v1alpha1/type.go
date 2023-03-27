@@ -434,3 +434,14 @@ const (
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }
+
+// DiscoveryType defines component discovery type.
+// +enum
+// +kubebuilder:validation:Enum={Helm,Manifests,ExistingCluster}
+type DiscoveryType string
+
+const (
+	HelmDiscoveryType            DiscoveryType = "Helm"
+	ManifestsDiscoveryType       DiscoveryType = "Manifests"
+	ExistingClusterDiscoveryType DiscoveryType = "ExistingCluster"
+)

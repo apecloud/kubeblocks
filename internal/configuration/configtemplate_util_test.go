@@ -186,8 +186,10 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 			comName:     comName,
 			cComponents: cComponents,
 			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:        comType,
-				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				Name: comType,
+				ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+					ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				},
 			}},
 			aComponents: []appsv1alpha1.ClusterComponentVersion{{
 				ComponentDefRef: comType,
@@ -205,8 +207,10 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 			comName:     "not exist component",
 			cComponents: cComponents,
 			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:        comType,
-				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				Name: comType,
+				ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+					ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				},
 			}},
 			aComponents: []appsv1alpha1.ClusterComponentVersion{{
 				ComponentDefRef: comType,
@@ -221,8 +225,10 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 			comName:     comName,
 			cComponents: cComponents,
 			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:        comType,
-				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				Name: comType,
+				ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+					ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				},
 			}},
 			aComponents: []appsv1alpha1.ClusterComponentVersion{{
 				ComponentDefRef: "not exist",

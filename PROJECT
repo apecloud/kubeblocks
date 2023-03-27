@@ -103,6 +103,14 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
+  domain: kubeblocks.io
+  group: apps
+  kind: ComponentsDiscovery
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
   controller: true
   domain: kubeblocks.io
   group: extensions
@@ -113,7 +121,6 @@ resources:
     crdVersion: v1
     namespaced: true
   domain: troubleshoot.sh
-  group:
   kind: HostPreflight
   path: github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2
   version: v1beta2
@@ -121,7 +128,6 @@ resources:
     crdVersion: v1
     namespaced: true
   domain: troubleshoot.sh
-  group:
   kind: Preflight
   path: github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2
   version: v1beta2

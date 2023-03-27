@@ -203,7 +203,7 @@ spec:
                 type: string
               helm:
                 description: Helm installation spec., it's only being processed if
-                  type=helm.
+                  type=Helm.
                 properties:
                   chartLocationURL:
                     description: A Helm Chart location URL.
@@ -541,7 +541,7 @@ spec:
                 - autoInstall
                 type: object
               type:
-                description: Addon type, valid value is helm.
+                description: Addon type, valid value is Helm.
                 enum:
                 - Helm
                 type: string

@@ -57,18 +57,20 @@ const (
 
 var (
 	statelessNginxComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Stateless,
-		CharacterType: "stateless",
-		PodSpec: &corev1.PodSpec{
-			Containers: []corev1.Container{{
-				Name: DefaultNginxContainerName,
-			}},
-		},
-		Service: &corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{
-				Protocol: corev1.ProtocolTCP,
-				Port:     80,
-			}},
+		ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+			WorkloadType:  appsv1alpha1.Stateless,
+			CharacterType: "stateless",
+			PodSpec: &corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name: DefaultNginxContainerName,
+				}},
+			},
+			Service: &corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{
+					Protocol: corev1.ProtocolTCP,
+					Port:     80,
+				}},
+			},
 		},
 	}
 
@@ -151,16 +153,18 @@ var (
 	}
 
 	statefulMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Stateful,
-		CharacterType: "mysql",
-		Service:       &defaultMySQLService,
-		PodSpec: &corev1.PodSpec{
-			Containers: []corev1.Container{defaultMySQLContainer},
+		ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+			WorkloadType:  appsv1alpha1.Stateful,
+			CharacterType: "mysql",
+			Service:       &defaultMySQLService,
+			PodSpec: &corev1.PodSpec{
+				Containers: []corev1.Container{defaultMySQLContainer},
+			},
+			VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
+				Name: DataVolumeName,
+				Type: appsv1alpha1.VolumeTypeData,
+			}},
 		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
-			Name: DataVolumeName,
-			Type: appsv1alpha1.VolumeTypeData,
-		}},
 	}
 
 	defaultConsensusSpec = appsv1alpha1.ConsensusSetSpec{
@@ -183,19 +187,21 @@ var (
 	}
 
 	consensusMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Consensus,
-		CharacterType: "mysql",
-		ConsensusSpec: &defaultConsensusSpec,
-		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleChangedProbe: &appsv1alpha1.ClusterDefinitionProbe{
-				FailureThreshold: 3,
-				PeriodSeconds:    1,
-				TimeoutSeconds:   5,
+		ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+			WorkloadType:  appsv1alpha1.Consensus,
+			CharacterType: "mysql",
+			ConsensusSpec: &defaultConsensusSpec,
+			Probes: &appsv1alpha1.ClusterDefinitionProbes{
+				RoleChangedProbe: &appsv1alpha1.ClusterDefinitionProbe{
+					FailureThreshold: 3,
+					PeriodSeconds:    1,
+					TimeoutSeconds:   5,
+				},
 			},
-		},
-		Service: &defaultMySQLService,
-		PodSpec: &corev1.PodSpec{
-			Containers: []corev1.Container{defaultMySQLContainer},
+			Service: &defaultMySQLService,
+			PodSpec: &corev1.PodSpec{
+				Containers: []corev1.Container{defaultMySQLContainer},
+			},
 		},
 	}
 
@@ -254,35 +260,37 @@ var (
 	}
 
 	replicationRedisComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Replication,
-		CharacterType: "redis",
-		Service:       &defaultRedisService,
-		PodSpec: &corev1.PodSpec{
-			Volumes: []corev1.Volume{
-				{
-					Name: ConfVolumeName,
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
+		ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+			WorkloadType:  appsv1alpha1.Replication,
+			CharacterType: "redis",
+			Service:       &defaultRedisService,
+			PodSpec: &corev1.PodSpec{
+				Volumes: []corev1.Volume{
+					{
+						Name: ConfVolumeName,
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{},
+						},
 					},
-				},
-				{
-					Name: ReplicationPodRoleVolume,
-					VolumeSource: corev1.VolumeSource{
-						DownwardAPI: &corev1.DownwardAPIVolumeSource{
-							Items: []corev1.DownwardAPIVolumeFile{
-								{
-									Path: "labels",
-									FieldRef: &corev1.ObjectFieldSelector{
-										FieldPath: ReplicationRoleLabelFieldPath,
+					{
+						Name: ReplicationPodRoleVolume,
+						VolumeSource: corev1.VolumeSource{
+							DownwardAPI: &corev1.DownwardAPIVolumeSource{
+								Items: []corev1.DownwardAPIVolumeFile{
+									{
+										Path: "labels",
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: ReplicationRoleLabelFieldPath,
+										},
 									},
 								},
 							},
 						},
 					},
 				},
+				InitContainers: []corev1.Container{defaultRedisInitContainer},
+				Containers:     []corev1.Container{defaultRedisContainer},
 			},
-			InitContainers: []corev1.Container{defaultRedisInitContainer},
-			Containers:     []corev1.Container{defaultRedisContainer},
 		},
 	}
 )

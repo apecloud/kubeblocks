@@ -61,7 +61,9 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 		},
 	}
 	component := &appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType: appsv1alpha1.Consensus,
+		ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+			WorkloadType: appsv1alpha1.Consensus,
+		},
 	}
 	if err := util.InitClusterComponentStatusIfNeed(cluster, componentName, *component); err != nil {
 		t.Errorf("caught error %v", err)

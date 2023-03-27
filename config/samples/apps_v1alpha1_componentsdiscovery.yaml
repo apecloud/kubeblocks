@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ComponentsDiscovery
+metadata:
+  labels:
+    app.kubernetes.io/name: componentsdiscovery
+    app.kubernetes.io/instance: componentsdiscovery-sample
+    app.kubernetes.io/part-of: kubeblocks
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kubeblocks
+  name: componentsdiscovery-sample
+spec:
+  # TODO(user): Add fields here

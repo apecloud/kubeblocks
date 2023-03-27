@@ -173,14 +173,16 @@ var _ = Describe("logs", func() {
 				ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{
 					{
 						Name: "component-type",
-						LogConfigs: []appsv1alpha1.LogConfig{
-							{
-								Name:            "slow",
-								FilePathPattern: "/log/mysql/*slow.log",
-							},
-							{
-								Name:            "error",
-								FilePathPattern: "/log/mysql/*.err",
+						ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+							LogConfigs: []appsv1alpha1.LogConfig{
+								{
+									Name:            "slow",
+									FilePathPattern: "/log/mysql/*slow.log",
+								},
+								{
+									Name:            "error",
+									FilePathPattern: "/log/mysql/*.err",
+								},
 							},
 						},
 					},

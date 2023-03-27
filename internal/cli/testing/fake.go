@@ -227,25 +227,29 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 	clusterDef.Name = ClusterDefName
 	clusterDef.Spec.ComponentDefs = []appsv1alpha1.ClusterComponentDefinition{
 		{
-			Name:          ComponentDefName,
-			CharacterType: "mysql",
-			SystemAccounts: &appsv1alpha1.SystemAccountSpec{
-				CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-					CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
-						Image: "",
+			Name: ComponentDefName,
+			ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+				CharacterType: "mysql",
+				SystemAccounts: &appsv1alpha1.SystemAccountSpec{
+					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
+						CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
+							Image: "",
+						},
+						CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+							Command: []string{"mysql"},
+							Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
+						},
 					},
-					CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
-						Command: []string{"mysql"},
-						Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
-					},
+					PasswordConfig: appsv1alpha1.PasswordConfig{},
+					Accounts:       []appsv1alpha1.SystemAccountConfig{},
 				},
-				PasswordConfig: appsv1alpha1.PasswordConfig{},
-				Accounts:       []appsv1alpha1.SystemAccountConfig{},
 			},
 		},
 		{
-			Name:          fmt.Sprintf("%s-%d", ComponentDefName, 1),
-			CharacterType: "mysql",
+			Name: fmt.Sprintf("%s-%d", ComponentDefName, 1),
+			ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+				CharacterType: "mysql",
+			},
 		},
 	}
 	return clusterDef

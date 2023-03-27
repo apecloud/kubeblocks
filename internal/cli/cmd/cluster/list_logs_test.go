@@ -85,10 +85,12 @@ var _ = Describe("listLogs test", func() {
 					ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{
 						{
 							Name: "component-type",
-							LogConfigs: []appsv1alpha1.LogConfig{
-								{
-									Name:            "slow",
-									FilePathPattern: "",
+							ClusterComponentDefinitionSpec: appsv1alpha1.ClusterComponentDefinitionSpec{
+								LogConfigs: []appsv1alpha1.LogConfig{
+									{
+										Name:            "slow",
+										FilePathPattern: "",
+									},
 								},
 							},
 						},

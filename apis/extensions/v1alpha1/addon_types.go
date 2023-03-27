@@ -35,11 +35,11 @@ type AddonSpec struct {
 	// +optional
 	Description string `json:"description,omitempty"`
 
-	// Addon type, valid value is helm.
+	// Addon type, valid value is Helm.
 	// +kubebuilder:validation:Required
 	Type AddonType `json:"type"`
 
-	// Helm installation spec., it's only being processed if type=helm.
+	// Helm installation spec., it's only being processed if type=Helm.
 	// +optional
 	Helm *HelmTypeInstallSpec `json:"helm,omitempty"`
 

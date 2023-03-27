@@ -54,9 +54,6 @@ spec:
               componentDefs:
                 description: componentDefs provides cluster components definitions.
                 items:
-                  description: ClusterComponentDefinition provides a workload component
-                    specification template, with attributes that strongly work with
-                    stateful workloads and day-2 operations behaviors.
                   properties:
                     characterType:
                       description: characterType defines well-known database component

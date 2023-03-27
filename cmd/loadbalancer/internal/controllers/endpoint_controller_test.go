@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -37,7 +38,7 @@ var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, types.Namesp
 			Name:      svc.GetName(),
 			Namespace: svc.GetNamespace(),
 			Labels: map[string]string{
-				"app": svc.GetName(),
+				constant.AppNameLabelKey: svc.GetName(),
 			},
 		},
 	}
@@ -68,21 +69,20 @@ var _ = Describe("EndpointController", func() {
 
 	AfterEach(cleanEnv)
 
-	Context("", func() {
-		It("", func() {
-			svc, svcKey := newSvcObj(false, node1IP)
-			ep, epKey := newEndpointsObj(svc)
-			Expect(testCtx.CreateObj(context.Background(), svc)).Should(Succeed())
-			Expect(testCtx.CreateObj(context.Background(), ep)).Should(Succeed())
-			Eventually(func() bool {
-				if err := k8sClient.Get(context.Background(), svcKey, svc); err != nil {
-					return false
-				}
-				if err := k8sClient.Get(context.Background(), epKey, ep); err != nil {
-					return false
-				}
-				return svc.Annotations[AnnotationKeyEndpointsVersion] == ep.GetObjectMeta().GetResourceVersion()
-			}).Should(BeTrue())
-		})
+	It("Check endpoint event", func() {
+		svc := newSvcObj(false, node1IP)
+		svcKey := client.ObjectKey{Namespace: svc.GetNamespace(), Name: svc.GetName()}
+		ep, epKey := newEndpointsObj(svc)
+		Expect(testCtx.CheckedCreateObj(context.Background(), svc)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(context.Background(), ep)).Should(Succeed())
+		Eventually(func() bool {
+			if err := k8sClient.Get(context.Background(), svcKey, svc); err != nil {
+				return false
+			}
+			if err := k8sClient.Get(context.Background(), epKey, ep); err != nil {
+				return false
+			}
+			return svc.Annotations[AnnotationKeyEndpointsVersion] == ep.GetObjectMeta().GetResourceVersion()
+		}).Should(BeTrue())
 	})
 })

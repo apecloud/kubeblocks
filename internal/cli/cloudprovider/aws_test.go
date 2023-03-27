@@ -23,13 +23,19 @@ import (
 
 var _ = Describe("aws cloud provider", func() {
 	const (
-		tfPath      = "../testing/testdata"
-		clusterName = "kb-playground-test"
-		clusterArn  = "arn-kb-playground-test"
+		tfPath              = "../testing/testdata"
+		expectedClusterName = "kb-playground-test"
+		expectedContextName = "arn-kb-playground-test"
 	)
-	It("get cluster name from state file", func() {
-		name, err := getClusterNameFromStateFile(tfPath)
+
+	It("new aws cloud provider", func() {
+
+		name, err := getOutputValue(clusterNameKey, tfPath)
 		Expect(err).Should(Succeed())
-		Expect(name).Should(Equal(clusterName))
+		Expect(name).Should(Equal(expectedClusterName))
+
+		contextName, err := getOutputValue(contextNameKey, tfPath)
+		Expect(err).Should(Succeed())
+		Expect(contextName).Should(Equal(expectedContextName))
 	})
 })

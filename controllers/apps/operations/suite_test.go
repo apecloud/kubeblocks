@@ -147,16 +147,16 @@ func initOperationsResources(clusterDefinitionName,
 	}
 	By("mock cluster is Running and the status operations")
 	Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-		clusterObject.Status.Phase = appsv1alpha1.RunningPhase
+		clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
 		clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 			consensusComp: {
-				Phase: appsv1alpha1.RunningPhase,
+				Phase: appsv1alpha1.RunningClusterCompPhase,
 			},
 			statelessComp: {
-				Phase: appsv1alpha1.RunningPhase,
+				Phase: appsv1alpha1.RunningClusterCompPhase,
 			},
 			statefulComp: {
-				Phase: appsv1alpha1.RunningPhase,
+				Phase: appsv1alpha1.RunningClusterCompPhase,
 			},
 		}
 	})).Should(Succeed())
@@ -175,7 +175,7 @@ func initConsensusPods(ctx context.Context, cli client.Client, opsRes *OpsResour
 	return podList.Items
 }
 
-func mockComponentIsOperating(cluster *appsv1alpha1.Cluster, expectPhase appsv1alpha1.Phase, compNames ...string) {
+func mockComponentIsOperating(cluster *appsv1alpha1.Cluster, expectPhase appsv1alpha1.ClusterComponentPhase, compNames ...string) {
 	Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 		for _, v := range compNames {
 			compStatus := cluster.Status.Components[v]

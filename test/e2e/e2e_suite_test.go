@@ -18,8 +18,10 @@ package e2e_test
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"go/build"
+	"log"
 	"path/filepath"
 	"testing"
 
@@ -45,9 +47,11 @@ import (
 var cfg *rest.Config
 var testEnv *envtest.Environment
 var TC *TestClient
+var version string
 
 func init() {
 	viper.AutomaticEnv()
+	flag.StringVar(&version, "VERSION", "", "kubeblocks test version")
 }
 
 func TestE2e(t *testing.T) {
@@ -81,6 +85,12 @@ func GetKubeconfigContext() error {
 }
 
 var _ = BeforeSuite(func() {
+	if len(version) == 0 {
+		log.Println("kubeblocks version is not specified")
+		return
+	}
+	log.Println("kb version:" + version)
+	Version = version
 	if viper.GetBool("ENABLE_DEBUG_LOG") {
 		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
 			o.TimeEncoder = zapcore.ISO8601TimeEncoder
@@ -132,11 +142,11 @@ var _ = Describe("e2e test", func() {
 
 	var _ = Describe("KubeBlocks operator installation", InstallationTest)
 
-	var _ = Describe("KubeBlocks somektest run", SmokeTest)
+	var _ = Describe("KubeBlocks smoke test run", SmokeTest)
 
-	// uninstallation tests, should have this in last Describe
 	var _ = Describe("KubeBlocks operator uninstallation", UninstallationTest)
 
 	var _ = Describe("Check environment has been cleaned", EnvGotCleanedTest)
 
+	var _ = Describe("KubeBlocks playground test", PlaygroundTest)
 })

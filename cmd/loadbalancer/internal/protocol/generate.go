@@ -18,4 +18,4 @@ package protocol
 
 //go:generate protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative node.proto
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -destination mocks/node_client_mocks.go . NodeClient
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -destination mocks/node_client_mocks.go . NodeClient

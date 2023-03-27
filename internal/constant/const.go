@@ -131,8 +131,9 @@ const (
 	StatefulSetKind           = "StatefulSet"
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
-	CronJob                   = "CronJob"
-	ReplicaSet                = "ReplicaSet"
+	CronJobKind               = "CronJob"
+	JobKind                   = "Job"
+	ReplicaSetKind            = "ReplicaSetKind"
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
 )

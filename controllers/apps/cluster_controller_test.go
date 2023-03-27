@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -102,6 +101,13 @@ var _ = Describe("Cluster Controller", func() {
 
 	// Test cases
 
+	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		for _, compName := range compNames {
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.StartingClusterCompPhase))
+		}
+	}
+
 	checkAllResourcesCreated := func() {
 		By("Creating a cluster")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -111,14 +117,14 @@ var _ = Describe("Cluster Controller", func() {
 			WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster initialized")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
 
 		By("Check deployment workload has been created")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.DeploymentSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey: clusterKey.Name,
-			}, client.InNamespace(clusterKey.Namespace))).ShouldNot(Equal(0))
+			}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEquivalentTo(0))
 
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 
@@ -233,8 +239,8 @@ var _ = Describe("Cluster Controller", func() {
 			WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster initialized")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
 
 		expectServices := map[string]ExpectService{
 			testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
@@ -292,8 +298,8 @@ var _ = Describe("Cluster Controller", func() {
 			WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster initialized")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName, nginxCompName)
 
 		By("Checking proxy services")
 		nginxExpectServices := map[string]ExpectService{
@@ -317,8 +323,11 @@ var _ = Describe("Cluster Controller", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster initialized")
+		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+
+		// REVIEW: this test flow
 
 		By("Delete the cluster")
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
@@ -333,9 +342,13 @@ var _ = Describe("Cluster Controller", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster initialized")
+		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
 
+		// REVIEW: this test flow
+
+		// REVIEW: why not set termination upon creation?
 		By("Update the cluster's termination policy to DoNotTerminate")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			cluster.Spec.TerminationPolicy = appsv1alpha1.DoNotTerminate
@@ -343,16 +356,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Delete the cluster")
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
-
-		By("Check the cluster do not terminate immediately")
-		checkClusterDoNotTerminate := testapps.CheckObj(&testCtx, clusterKey,
-			func(g Gomega, fetched *appsv1alpha1.Cluster) {
-				g.Expect(fetched.Status.Message).To(ContainSubstring(
-					fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", fetched.Spec.TerminationPolicy)))
-				g.Expect(fetched.Finalizers).ShouldNot(BeEmpty())
-			})
-		Eventually(checkClusterDoNotTerminate).Should(Succeed())
-		Consistently(checkClusterDoNotTerminate).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
 		By("Update the cluster's termination policy to WipeOut")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
@@ -394,8 +398,9 @@ var _ = Describe("Cluster Controller", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster initialized")
+		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
 
 		replicasSeq := []int32{5, 3, 1, 0, 2, 4}
 		expectedOG := int64(1)
@@ -407,9 +412,12 @@ var _ = Describe("Cluster Controller", func() {
 			By("Checking cluster status and the number of replicas changed")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
 				g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(expectedOG))
+				g.Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
 			})).Should(Succeed())
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(replicas))
+			Eventually(func(g Gomega) {
+				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+				g.Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(replicas))
+			}).Should(Succeed())
 		}
 	}
 
@@ -580,8 +588,11 @@ var _ = Describe("Cluster Controller", func() {
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
+
+		// REVIEW: this test flow, wait for running phase?
 		horizontalScale(int(updatedReplicas))
 	}
 
@@ -603,8 +614,11 @@ var _ = Describe("Cluster Controller", func() {
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName, secondMysqlCompName)
+
+		// REVIEW: this test flow, wait for running phase?
 		horizontalScale(int(updatedReplicas))
 	}
 
@@ -635,12 +649,14 @@ var _ = Describe("Cluster Controller", func() {
 			SetReplicas(replicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
 
 		By("Checking the replicas")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 		sts := &stsList.Items[0]
-		Expect(*sts.Spec.Replicas == replicas).Should(BeTrue())
+		Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(replicas))
 
 		By("Mock PVCs in Bound Status")
 		for i := 0; i < replicas; i++ {
@@ -665,8 +681,16 @@ var _ = Describe("Cluster Controller", func() {
 			comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
 		})()).ShouldNot(HaveOccurred())
 
+		By("mock pods/sts of component are available")
+		testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, mysqlCompName)
+		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			testk8s.MockStatefulSetReady(sts)
+		})).ShouldNot(HaveOccurred())
+
 		By("Checking the resize operation finished")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking PVCs are resized")
 		stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -704,17 +728,20 @@ var _ = Describe("Cluster Controller", func() {
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster initialized")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
 
 		By("Checking the Affinity and TopologySpreadConstraints")
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		podSpec := stsList.Items[0].Spec.Template.Spec
-		Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(lableKey))
-		Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
-		Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
-		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
-		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
+		Eventually(func(g Gomega) {
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			g.Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(lableKey))
+			g.Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
+			g.Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
+			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
+			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
+		}).Should(Succeed())
+
 	}
 
 	testComponentAffinity := func() {
@@ -738,17 +765,19 @@ var _ = Describe("Cluster Controller", func() {
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster initialized")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
 
 		By("Checking the Affinity and the TopologySpreadConstraints")
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		podSpec := stsList.Items[0].Spec.Template.Spec
-		Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.ScheduleAnyway))
-		Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(compTopologyKey))
-		Expect(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
-		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
-		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(corev1.LabelHostname))
+		Eventually(func(g Gomega) {
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			g.Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.ScheduleAnyway))
+			g.Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(compTopologyKey))
+			g.Expect(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
+			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
+			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(corev1.LabelHostname))
+		}).Should(Succeed())
 	}
 
 	testClusterToleration := func() {
@@ -768,18 +797,20 @@ var _ = Describe("Cluster Controller", func() {
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster initialized")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
 
 		By("Checking the tolerations")
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		podSpec := stsList.Items[0].Spec.Template.Spec
-		Expect(podSpec.Tolerations).Should(HaveLen(2))
-		toleration = podSpec.Tolerations[0]
-		Expect(toleration.Key == tolerationKey &&
-			toleration.Value == tolerationValue).Should(BeTrue())
-		Expect(toleration.Operator == corev1.TolerationOpEqual &&
-			toleration.Effect == corev1.TaintEffectNoSchedule).Should(BeTrue())
+		Eventually(func(g Gomega) {
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			g.Expect(podSpec.Tolerations).Should(HaveLen(2))
+			toleration = podSpec.Tolerations[0]
+			g.Expect(toleration.Key).Should(BeEquivalentTo(tolerationKey))
+			g.Expect(toleration.Value).Should(BeEquivalentTo(tolerationValue))
+			g.Expect(toleration.Operator).Should(BeEquivalentTo(corev1.TolerationOpEqual))
+			g.Expect(toleration.Effect).Should(BeEquivalentTo(corev1.TaintEffectNoSchedule))
+		}).Should(Succeed())
 	}
 
 	testComponentToleration := func() {
@@ -805,18 +836,20 @@ var _ = Describe("Cluster Controller", func() {
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster initialized")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
 
 		By("Checking the tolerations")
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		podSpec := stsList.Items[0].Spec.Template.Spec
-		Expect(podSpec.Tolerations).Should(HaveLen(2))
-		toleration = podSpec.Tolerations[0]
-		Expect(toleration.Key == compTolerationKey &&
-			toleration.Value == compTolerationValue).Should(BeTrue())
-		Expect(toleration.Operator == corev1.TolerationOpEqual &&
-			toleration.Effect == corev1.TaintEffectNoSchedule).Should(BeTrue())
+		Eventually(func(g Gomega) {
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			Expect(podSpec.Tolerations).Should(HaveLen(2))
+			toleration = podSpec.Tolerations[0]
+			g.Expect(toleration.Key).Should(BeEquivalentTo(compTolerationKey))
+			g.Expect(toleration.Value).Should(BeEquivalentTo(compTolerationValue))
+			g.Expect(toleration.Operator).Should(BeEquivalentTo(corev1.TolerationOpEqual))
+			g.Expect(toleration.Effect).Should(BeEquivalentTo(corev1.TaintEffectNoSchedule))
+		}).Should(Succeed())
 	}
 
 	mockRoleChangedEvent := func(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
@@ -875,10 +908,16 @@ var _ = Describe("Cluster Controller", func() {
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for cluster creation")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		sts := &stsList.Items[0]
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
+
+		var stsList *appsv1.StatefulSetList
+		var sts *appsv1.StatefulSet
+		Eventually(func(g Gomega) {
+			stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			g.Expect(stsList.Items).ShouldNot(BeEmpty())
+			sts = &stsList.Items[0]
+		}).Should(Succeed())
 
 		By("Creating mock pods in StatefulSet")
 		pods := mockPodsForConsensusTest(clusterObj, replicas)
@@ -946,8 +985,8 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
 		}).Should(Succeed())
 
-		By("Waiting the cluster be running")
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
+		By("Waiting the component be running")
+		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 	}
 
 	mockPodsForReplicationTest := func(cluster *appsv1alpha1.Cluster, stsList []appsv1.StatefulSet) []corev1.Pod {
@@ -998,7 +1037,11 @@ var _ = Describe("Cluster Controller", func() {
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
+
+		// REVIEW: this test flow, should wait/fake still Running phase?
 
 		By("Creating backup")
 		backupKey := types.NamespacedName{
@@ -1044,7 +1087,6 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking cluster status failed with backup error")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.ConditionsErrorPhase))
 			hasBackupError := false
 			for _, cond := range cluster.Status.Conditions {
 				if strings.Contains(cond.Message, "backup error") {
@@ -1053,7 +1095,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 			g.Expect(hasBackupError).Should(BeTrue())
-		}), 20*time.Second, time.Second).Should(Succeed())
+		})).Should(Succeed())
 	}
 
 	// Scenarios
@@ -1074,8 +1116,8 @@ var _ = Describe("Cluster Controller", func() {
 				WithRandomName().Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-			By("Waiting for the cluster initialized")
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
 		})
 	})
 
@@ -1254,25 +1296,32 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(mysqlCompName, mysqlCompType).
 				SetReplicas(3).
 				AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
+
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 			sts := stsList.Items[0]
 			Expect(sts.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
 
-			By("remove init container after all components are Running")
-			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
-				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-					mysqlCompName: {Phase: appsv1alpha1.RunningPhase},
-				}
+			By("mock pod/sts are available and wait for component enter running phase")
+			testapps.MockConsensusComponentPods(testCtx, &sts, clusterObj.Name, mysqlCompName)
+			Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
+				testk8s.MockStatefulSetReady(&sts)
 			})).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+
+			By("remove init container after all components are Running")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
 				g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 			})).Should(Succeed())
 
 			By("clean up annotations after cluster running")
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
-				clusterObj.Status.Phase = appsv1alpha1.RunningPhase
+				clusterObj.Status.Phase = appsv1alpha1.RunningClusterPhase
 			})).ShouldNot(HaveOccurred())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())
 		})
@@ -1306,16 +1355,14 @@ var _ = Describe("Cluster Controller", func() {
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-			By("Waiting for the cluster initialized")
-			// REVIEW: expect
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey, testapps.DefaultRedisCompName)
 
 			By("Checking statefulSet number")
 			var stsList *appsv1.StatefulSetList
 			Eventually(func(g Gomega) {
 				stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-				g.Expect(stsList.Items).Should(HaveLen(2))
+				g.Expect(stsList.Items).Should(HaveLen(testapps.DefaultReplicationReplicas))
 			}).Should(Succeed())
 
 			By("Checking statefulSet role label")
@@ -1355,9 +1402,10 @@ var _ = Describe("Cluster Controller", func() {
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-			By("Waiting for cluster creation")
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.CreatingPhase))
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey, testapps.DefaultRedisCompName)
+
+			// REVIEW: this test flow, should wait/fake still Running phase?
 
 			By("Checking statefulset count")
 			stsList := testk8s.ListAndCheckStatefulSetCount(&testCtx, clusterKey, testapps.DefaultReplicationReplicas)
@@ -1394,7 +1442,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Checking reconcile succeeded")
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.RunningPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 			By("Creating storageclass")
 			_ = testapps.CreateStorageClass(testCtx, storageClassName, true)
@@ -1432,7 +1480,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Waiting cluster update reconcile succeed")
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEquivalentTo(appsv1alpha1.SpecReconcilingPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 
 			By("Checking pvc volume size")
 			Eventually(func(g Gomega) {

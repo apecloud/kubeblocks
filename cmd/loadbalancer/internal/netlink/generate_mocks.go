@@ -16,5 +16,5 @@ limitations under the License.
 
 package netlink
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -destination mocks/netlink_mocks.go . NetLink
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -destination mocks/link_mocks.go github.com/vishvananda/netlink Link
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -destination mocks/netlink_mocks.go . NetLink
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -destination mocks/link_mocks.go github.com/vishvananda/netlink Link

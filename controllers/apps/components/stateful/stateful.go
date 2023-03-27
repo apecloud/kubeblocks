@@ -75,7 +75,7 @@ func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady(ctx context.Context, r
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (stateful *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.Phase, error) {
+func (stateful *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, stateful.Cli, *stateful.Cluster, componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {

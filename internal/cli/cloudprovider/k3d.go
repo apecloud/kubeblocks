@@ -34,7 +34,9 @@ import (
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"k8s.io/klog/v2"
 
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -66,18 +68,18 @@ type localCloudProvider struct {
 // localCloudProvider should be an implementation of cloud provider
 var _ Interface = &localCloudProvider{}
 
+func init() {
+	if !klog.V(1).Enabled() {
+		// set k3d log level to warning to avoid so much info log
+		l.Log().SetLevel(logrus.WarnLevel)
+	}
+}
+
 func NewLocalCloudProvider(stdout, stderr io.Writer) *localCloudProvider {
 	return &localCloudProvider{
 		ctx:    context.Background(),
 		stdout: stdout,
 		stderr: stderr,
-	}
-}
-
-func (p *localCloudProvider) VerboseLog(v bool) {
-	if !v {
-		// set k3d log level to warning to avoid so much info log
-		l.Log().SetLevel(logrus.WarnLevel)
 	}
 }
 
@@ -97,7 +99,7 @@ func (p *localCloudProvider) CreateK8sCluster(name string, init bool) error {
 		return errors.Wrapf(err, "failed to create k3d cluster %s", name)
 	}
 
-	return p.UpdateKubeconfig(name)
+	return p.UpdateKubeConfig(name)
 }
 
 // DeleteK8sCluster remove the k3d cluster
@@ -149,8 +151,8 @@ func (p *localCloudProvider) DeleteK8sCluster(name string) error {
 	return k3dClient.KubeconfigRemoveClusterFromDefaultConfig(p.ctx, cluster)
 }
 
-// UpdateKubeconfig generate a kubeconfig to access the k3d cluster
-func (p *localCloudProvider) UpdateKubeconfig(name string) error {
+// UpdateKubeConfig generate a kubeconfig to access the k3d cluster
+func (p *localCloudProvider) UpdateKubeConfig(name string) error {
 	var err error
 
 	configPath := util.ConfigPath("config")
@@ -187,17 +189,14 @@ func (p *localCloudProvider) UpdateKubeconfig(name string) error {
 	return nil
 }
 
-func (p *localCloudProvider) GetExistedClusters() ([]string, error) {
-	clusters, err := k3dClient.ClusterList(p.ctx, runtimes.SelectedRuntime)
-	if err != nil {
-		return nil, errors.Wrap(err, "fail to get k3d cluster list")
-	}
-
-	names := make([]string, len(clusters))
-	for i, c := range clusters {
-		names[i] = c.Name
-	}
-	return names, nil
+func (p *localCloudProvider) GetClusterInfo() (*K8sClusterInfo, error) {
+	return &K8sClusterInfo{
+		CloudProvider: p.Name(),
+		ClusterName:   types.K3dClusterName,
+		ContextName:   "k3d-" + types.K3dClusterName,
+		KubeConfig:    util.ConfigPath("config"),
+		Region:        "",
+	}, nil
 }
 
 // buildClusterRunConfig returns the run-config for the k3d cluster

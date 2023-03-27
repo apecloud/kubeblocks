@@ -338,6 +338,17 @@ func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
 	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
 }
 
+// GetProbeContainerName find the probe container from pod
+func GetProbeContainerName(pod *corev1.Pod) (string, error) {
+	for _, container := range pod.Spec.Containers {
+		if container.Name == constant.RoleProbeContainerName {
+			return constant.RoleProbeContainerName, nil
+		}
+	}
+	return "", fmt.Errorf("container %s not found", constant.RoleProbeContainerName)
+
+}
+
 // PodIsReadyWithLabel checks whether pod is ready or not if the component is ConsensusSet or ReplicationSet,
 // it will be available when the pod is ready and labeled with its role.
 func PodIsReadyWithLabel(pod corev1.Pod) bool {

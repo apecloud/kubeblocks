@@ -21,9 +21,7 @@ kbcli playground destroy [flags]
 ### Options
 
 ```
-      --cloud-provider string   Cloud provider type, one of [local,aws,azure,gcp,alibaba-cloud] (default "local")
-  -h, --help                    help for destroy
-      --region string           The region to create kubernetes cluster
+  -h, --help   help for destroy
 ```
 
 ### Options inherited from parent commands

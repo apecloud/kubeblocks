@@ -2,7 +2,8 @@ apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
   name: postgres-ha-basebackup
-  {{- include "postgresql.labels" . | nindent 4 }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
 spec:
   image: registry.cn-hangzhou.aliyuncs.com/apecloud/postgresql:14.7.0
   deployKind: job

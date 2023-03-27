@@ -14,7 +14,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 1. A Kubernetes environment is required.
 2. `kubectl` is required and can connect to your Kubernetes clusters. Refer to [Install and Set Up kubectl on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) for installation details.
    
-## Step 1. Install kbcli
+## Install kbcli
 
 1. Run the command below to install `kbcli`. `kbcli` can run on macOS and Linux.
     ```bash
@@ -32,31 +32,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
     kbcli version
     ```
 
-## Step 2. Enable kbcli automatic command line completion
-
-`kbcli` supports automatic command line completion. You can run the command below to enable this function.
-
-```bash
-# Configure SHELL-TYPE as one type from bash, fish, PowerShell, and zsh
-kbcli completion SHELL-TYPE -h
-```
-
-Here we take zsh as an example.
-
-1. Run the command below.
-    ```bash
-    kbcli completion zsh -h
-    ```
-2. Enable the completion function of your terminal first.
-    ```bash
-    echo "autoload -U compinit; compinit" >> ~/.zshrc
-    ```
-3. Run the command below to enable the `kbcli` automatic completion function.
-    ```bash
-    echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
-    ```
-
-## Step 3. Install KubeBlocks
+## Install KubeBlocks
 
 1. Run the command below to install KubeBlocks.
     ```bash
@@ -64,8 +40,8 @@ Here we take zsh as an example.
     ```
     ***Result***
 
-    * KubeBlocks is installed with built-in toleration which tolerates the node with the `kb-controller=false:NoSchedule` taint.
-    * KubeBlocks is installed with built-in node affinity which first deploys the node with the `kb-controller:true` tag.
+    * KubeBlocks is installed with built-in toleration which tolerates the node with the `kb-controller=true:NoSchedule` taint.
+    * KubeBlocks is installed with built-in node affinity which first deploys the node with the `kb-controller:true` label.
     * This command installs the latest version in your Kubernetes environment under the default namespace `kb-system` since your `kubectl` can connect to your Kubernetes clusters. If you want to install KubeBlocks in a specified namespace, run the command below.
        ```bash
        kbcli kubeblocks install -n <name> --create-namespace=true
@@ -161,7 +137,31 @@ Here we take zsh as an example.
     kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
     ```
 
-## Step 4. Uninstall KubeBlocks and kbcli
+## (Optional) Enable kbcli automatic command line completion
+
+`kbcli` supports automatic command line completion. You can run the command below to enable this function.
+
+```bash
+# Configure SHELL-TYPE as one type from bash, fish, PowerShell, and zsh
+kbcli completion SHELL-TYPE -h
+```
+
+Here we take zsh as an example.
+
+1. Run the command below.
+    ```bash
+    kbcli completion zsh -h
+    ```
+2. Enable the completion function of your terminal first.
+    ```bash
+    echo "autoload -U compinit; compinit" >> ~/.zshrc
+    ```
+3. Run the command below to enable the `kbcli` automatic completion function.
+    ```bash
+    echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
+    ```
+
+## Uninstall KubeBlocks and kbcli
 
 :::note
 

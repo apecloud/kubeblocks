@@ -196,8 +196,8 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 	podList *corev1.PodList,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
-	if compStatus.Phase == appsv1alpha1.RunningPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
-		return 0, fmt.Errorf("wait for the pods of deployment to be synchronized to client-go cache")
+	if compStatus.Phase == appsv1alpha1.RunningClusterCompPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
+		return 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of deployment to be synchronized")
 	}
 
 	currComponent, err := stateless.NewStateless(cli, opsRes.Cluster,
@@ -327,7 +327,7 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 }
 
 // podIsPendingDuringOperation checks if pod is pending during the component is doing operation.
-func podIsPendingDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod, componentPhase appsv1alpha1.Phase) bool {
+func podIsPendingDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod, componentPhase appsv1alpha1.ClusterComponentPhase) bool {
 	return pod.CreationTimestamp.Before(&opsStartTime) && !util.IsCompleted(componentPhase) && pod.DeletionTimestamp.IsZero()
 }
 
@@ -335,7 +335,7 @@ func podIsPendingDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod, comp
 func podIsFailedDuringOperation(
 	opsStartTime metav1.Time,
 	pod *corev1.Pod,
-	componentPhase appsv1alpha1.Phase,
+	componentPhase appsv1alpha1.ClusterComponentPhase,
 	opsIsCompleted bool) bool {
 	if !util.IsFailedOrAbnormal(componentPhase) {
 		return false
@@ -350,12 +350,12 @@ func podProcessedSuccessful(componentImpl types.Component,
 	opsStartTime metav1.Time,
 	pod *corev1.Pod,
 	minReadySeconds int32,
-	componentPhase appsv1alpha1.Phase,
+	componentPhase appsv1alpha1.ClusterComponentPhase,
 	opsIsCompleted bool) bool {
 	if !componentImpl.PodIsAvailable(pod, minReadySeconds) {
 		return false
 	}
-	return (opsIsCompleted && componentPhase == appsv1alpha1.RunningPhase) || !pod.CreationTimestamp.Before(&opsStartTime)
+	return (opsIsCompleted && componentPhase == appsv1alpha1.RunningClusterCompPhase) || !pod.CreationTimestamp.Before(&opsStartTime)
 }
 
 func getProgressProcessingMessage(opsMessageKey, objectKey, componentName string) string {
@@ -416,8 +416,8 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	if podList, err = util.GetComponentPodList(reqCtx.Ctx, cli, *opsRes.Cluster, clusterComponent.Name); err != nil {
 		return
 	}
-	if compStatus.Phase == appsv1alpha1.RunningPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
-		err = fmt.Errorf("wait for the pods of component to be synchronized")
+	if compStatus.Phase == appsv1alpha1.RunningClusterCompPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
+		err = intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of component to be synchronized")
 		return
 	}
 	dValue := *expectReplicas - *lastComponentReplicas

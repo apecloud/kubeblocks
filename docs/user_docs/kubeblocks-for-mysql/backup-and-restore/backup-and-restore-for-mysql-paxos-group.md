@@ -62,19 +62,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL Paxos Group
   
        kubectl patch sc/gp2 -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
        ```
-    - Configure default snapshot volumesnapshot class
-       ```bash
-       kubectl create -f - <<EOF
-       apiVersion: snapshot.storage.k8s.io/v1
-       kind: VolumeSnapshotClass
-       metadata:
-         name: csi-aws-vsc
-         annotations:
-           snapshot.storage.kubernetes.io/is-default-class: "true"
-       driver: ebs.csi.aws.com
-       deletionPolicy: Delete
-       EOF
-       ```
+    
 3. Create a MySQL Paxos Group. 
     
    ```bash
@@ -123,30 +111,4 @@ This section shows how to use `kbcli` to back up and restore a MySQL Paxos Group
    kbcli cluster connect mysql-new-from-snapshot
    
    select * from demo.msg;
-   ```
-9. Delete the ApeCloud MySQL cluster and clean up the backup.
-    
-   :::note
-
-   Expenses incurred when you have snapshots on the cloud. So it is recommended to delete the test cluster.
-
-   :::
-  
-   Delete a MySQL cluster with the following command.
-
-   ```bash
-   kbcli cluster delete mysql-cluster
-   kbcli cluster delete mysql-new-from-snapshot
-   ```
-
-   Delete the backup specified.
-
-   ```bash
-   kbcli cluster delete-backup mysql-cluster --name backup-default-mysql-cluster-20221124113440 
-   ```
-
-   Delete all backups with `mysql-cluster`.
-
-   ```bash
-   kbcli cluster delete-backup pg-cluster --force
    ```

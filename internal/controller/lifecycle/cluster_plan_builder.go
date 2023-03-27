@@ -313,7 +313,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 			return err
 		}
 		// TODO: find a better comparison way that knows whether fields are updated before calling the Update func
-		updateComponentPhaseIfNeeded(node.oriObj, o)
+		updateComponentPhaseIfNeeded(node.oriObj, node.obj)
 	case DELETE:
 		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
 			err := c.cli.Update(c.ctx.Ctx, node.obj)

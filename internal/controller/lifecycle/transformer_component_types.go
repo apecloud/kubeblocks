@@ -261,8 +261,6 @@ func (c *componentBase) updateStatefulSetWorkload(stsObj *appsv1.StatefulSet, id
 	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
 		c.workloadVertexs[idx].action = actionPtr(UPDATE)
-		// sync component phase
-		updateComponentPhaseWithOperation(c.GetCluster(), c.GetName())
 	}
 	return nil
 }
@@ -272,8 +270,6 @@ func (c *componentBase) updateDeploymentWorkload(deployObj *appsv1.Deployment) e
 	deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations, deployProto.Spec.Template.Annotations)
 	if !reflect.DeepEqual(&deployObj.Spec, &deployProto.Spec) {
 		c.workloadVertexs[0].action = actionPtr(UPDATE)
-		// sync component phase
-		updateComponentPhaseWithOperation(c.Cluster, c.GetName())
 	}
 	return nil
 }

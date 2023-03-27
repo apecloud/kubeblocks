@@ -60,18 +60,18 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 	// check whether the cluster is expanding volume
-	opsRequestName := getOpsRequestNameFromAnnotation(cluster, appsv1alpha1.SpecReconcilingClusterPhase)
-	if opsRequestName == "" {
+	opsRequestName := getOpsRequestNameFromAnnotation(cluster, appsv1alpha1.VolumeExpansionType)
+	if opsRequestName == nil {
 		return nil
 	}
 	// notice the OpsRequest to reconcile
-	err := opsutil.PatchOpsRequestReconcileAnnotation(reqCtx.Ctx, cli, cluster.Namespace, opsRequestName)
+	err := opsutil.PatchOpsRequestReconcileAnnotation(reqCtx.Ctx, cli, cluster, *opsRequestName)
 	// if the OpsRequest is not found, means it is deleted by user.
 	// we should delete the invalid OpsRequest annotation in the cluster and reconcile the cluster phase.
 	if apierrors.IsNotFound(err) {
 		opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 		notExistOps := map[string]struct{}{
-			opsRequestName: {},
+			*opsRequestName: {},
 		}
 		if err = opsutil.RemoveClusterInvalidOpsRequestAnnotation(reqCtx.Ctx, cli, cluster,
 			opsRequestSlice, notExistOps); err != nil {
@@ -158,12 +158,12 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 		return err
 	}
 	// get the volume expansion ops which is running on cluster.
-	opsRequestName := getOpsRequestNameFromAnnotation(cluster, appsv1alpha1.SpecReconcilingClusterPhase)
-	if opsRequestName == "" {
+	opsRequestName := getOpsRequestNameFromAnnotation(cluster, appsv1alpha1.VolumeExpansionType)
+	if opsRequestName == nil {
 		return nil
 	}
 	opsRequest := &appsv1alpha1.OpsRequest{}
-	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsRequestName, Namespace: pvc.Namespace}, opsRequest); err != nil {
+	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: *opsRequestName, Namespace: pvc.Namespace}, opsRequest); err != nil {
 		return err
 	}
 	compsStatus := opsRequest.Status.Components

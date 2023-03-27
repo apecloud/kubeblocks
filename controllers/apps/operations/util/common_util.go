@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -123,7 +122,7 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 	if len(notExistOps) != 0 {
 		return RemoveClusterInvalidOpsRequestAnnotation(ctx, cli, cluster, opsRequestSlice, notExistOps)
 	}
-	return componentutil.ErrNoOps
+	return nil
 }
 
 // RemoveClusterInvalidOpsRequestAnnotation deletes the OpsRequest annotation in cluster when the OpsRequest not existing.

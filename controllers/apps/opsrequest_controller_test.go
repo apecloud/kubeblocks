@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -81,6 +82,24 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	// Testcases
 
+	checkLatestOpsIsProcessing := func(clusterKey client.ObjectKey, opsType appsv1alpha1.OpsType) {
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
+			con := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
+			g.Expect(con).ShouldNot(BeNil())
+			g.Expect(con.Status).Should(Equal(metav1.ConditionFalse))
+			g.Expect(con.Reason).Should(Equal(appsv1alpha1.OpsRequestBehaviourMapper[opsType].ProcessingReasonInClusterCondition))
+		})).Should(Succeed())
+	}
+
+	checkLatestOpsHasProcessed := func(clusterKey client.ObjectKey) {
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
+			con := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
+			g.Expect(con).ShouldNot(BeNil())
+			g.Expect(con.Status).Should(Equal(metav1.ConditionTrue))
+			g.Expect(con.Reason).Should(Equal(ReasonOpsRequestProcessed))
+		})).Should(Succeed())
+	}
+
 	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) {
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, namespacedName,
 			func(fetched *appsv1alpha1.Cluster) {
@@ -127,7 +146,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		By("mock pod/sts are available and wait for cluster enter running phase")
 		podName := fmt.Sprintf("%s-%s-0", clusterObj.Name, mysqlCompName)
@@ -167,6 +186,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+		checkLatestOpsIsProcessing(clusterKey, verticalScalingOpsRequest.Spec.Type)
 
 		By("check Cluster and changed component phase is VerticalScaling")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
@@ -180,6 +200,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
+		checkLatestOpsHasProcessed(clusterKey)
 
 		By("patch opsrequest controller to run")
 		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
@@ -395,7 +416,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("should be Running before pods are not deleted successfully")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-
+			checkLatestOpsIsProcessing(clusterKey, stopOps.Spec.Type)
 			// mock pod deleted successfully
 			for _, pod := range podList {
 				Expect(testapps.ChangeObj(&testCtx, pod, func() {
@@ -410,6 +431,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				}
 			})).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+			checkLatestOpsHasProcessed(clusterKey)
 
 			By("test start ops")
 			startOpsName := "start-ops" + testCtx.GetRandomStr()

@@ -118,7 +118,7 @@ var _ = Describe("Cluster Controller", func() {
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		for _, compName := range compNames {
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.StartingClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 		}
 	}
 
@@ -365,7 +365,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		// REVIEW: this test flow
 
@@ -384,7 +384,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		// REVIEW: this test flow
 
@@ -440,7 +440,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		replicasSeq := []int32{5, 3, 1, 0, 2, 4}
 		expectedOG := int64(1)
@@ -452,7 +452,7 @@ var _ = Describe("Cluster Controller", func() {
 			By("Checking cluster status and the number of replicas changed")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
 				g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(expectedOG))
-				g.Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+				g.Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 			})).Should(Succeed())
 			Eventually(func(g Gomega) {
 				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)

@@ -1,4 +1,4 @@
-# Default values for apecloud-vitess-mysql-cluster.
+# Default values for apecloud-mysql-scale-cluster.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 

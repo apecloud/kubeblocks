@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: vitess-apecloud-mysql-scripts
+  name: apecloud-mysql-scale-scripts
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:

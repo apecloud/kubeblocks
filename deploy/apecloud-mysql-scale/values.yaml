@@ -73,12 +73,12 @@ metrics:
     tag: 0.14.1
     pullPolicy: IfNotPresent
 
-vitess:
+wesqlscale:
   cell: "zone1"
   keySpace: "commerce"
   shard: "0"    
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
-    repository: apecloud/vitesskubeblocks
-    tag: latest
+    repository: apecloud/apecloud-mysql-scale
+    tag: 16.0
     pullPolicy: IfNotPresent            

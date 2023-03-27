@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: vitess-mysql8.0-config-template
+  name: mysql8.0-scale-config-template
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:
@@ -11,7 +11,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: vitess-mysql-reload-script
+  name: mysql-scale-reload-script
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:

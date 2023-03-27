@@ -4,8 +4,8 @@ metadata:
   name: {{ .Release.Name }}
   labels: {{ include "apecloud-mysql-cluster.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-vitess-mysql  # ref clusterdefinition.name
-  clusterVersionRef: ac-vitess-mysql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
+  clusterDefinitionRef: apecloud-mysql-scale  # ref clusterdefinition.name
+  clusterVersionRef: ac-mysql-scale-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:
     {{- with .Values.topologyKeys }}

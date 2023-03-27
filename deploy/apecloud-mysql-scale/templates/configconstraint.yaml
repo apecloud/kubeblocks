@@ -2,7 +2,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
-  name: vitess-mysql8.0-config-constraints
+  name: mysql8.0-scale-config-constraints
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
@@ -10,7 +10,7 @@ spec:
   # tplRef: mysql-3node-tpl-8.0
   reloadOptions:
     tplScriptTrigger:
-      scriptConfigMapRef: vitess-mysql-reload-script
+      scriptConfigMapRef: mysql-scale-reload-script
       namespace: {{ .Release.Namespace }}
 
   # top level mysql configuration type

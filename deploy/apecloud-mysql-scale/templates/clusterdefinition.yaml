@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-vitess-mysql
+  name: apecloud-mysql-scale
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
@@ -31,13 +31,13 @@ spec:
         {{- end }}
       configSpecs:
         - name: mysql-consensusset-config
-          templateRef: vitess-mysql8.0-config-template
-          constraintRef: vitess-mysql8.0-config-constraints
+          templateRef: mysql8.0-scale-config-template
+          constraintRef: mysql8.0-scale-config-constraints
           volumeName: mysql-config
           namespace: {{ .Release.Namespace }}
       scriptSpecs:
         - name: apecloud-mysql-scripts
-          templateRef: vitess-apecloud-mysql-scripts
+          templateRef: apecloud-mysql-scale-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
@@ -70,7 +70,7 @@ spec:
       horizontalScalePolicy:
         type: Snapshot
         backupTemplateSelector:
-          "clusterdefinition.kubeblocks.io/name": apecloud-vitess-mysql
+          "clusterdefinition.kubeblocks.io/name": apecloud-mysql-scale
       podSpec:
         containers:
           - name: mysql
@@ -165,8 +165,8 @@ spec:
                 path: /
                 port: http-metrics
           - name: vttablet
-            image: {{ .Values.vitess.image.registry | default "docker.io" }}/{{ .Values.vitess.image.repository }}:{{ .Values.vitess.image.tag }}
-            imagePullPolicy: {{ default .Values.vitess.image.pullPolicy "IfNotPresent" }} 
+            image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
+            imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }} 
             ports:
               - containerPort: 15100
                 protocol: TCP
@@ -179,11 +179,11 @@ spec:
                 name: delvedebug  
             env:
               - name: CELL
-                value: {{ .Values.vitess.cell | default "zone1" | quote }}
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
               - name: KEYSPACE
-                value: {{ .Values.vitess.keySpace | default "commerce" | quote }}
+                value: {{ .Values.wesqlscale.keySpace | default "commerce" | quote }}
               - name: SHARD
-                value: {{ .Values.vitess.shard | default "0" | quote }}
+                value: {{ .Values.wesqlscale.shard | default "0" | quote }}
               - name: ETCD_SERVER
                 value: "$(KB_CLUSTER_NAME)-etcd-headless"
               - name: ETCD_PORT
@@ -209,7 +209,7 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password   
             command:
-              - bin/bash
+              - /bin/bash
               - -c
               - |
                 cell=${CELL:-'zone1'}
@@ -350,7 +350,7 @@ spec:
                 name: client
             env:
               - name: CELL
-                value: {{ .Values.vitess.cell | default "zone1" | quote }}
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
               - name: ETCDCTL_API
                 value: "2"
               - name: ETCD_SERVER
@@ -360,7 +360,7 @@ spec:
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"  
             command: 
-              - bin/sh
+              - /bin/bash
               - -c
               - |   
                 echo "staring etcd."
@@ -377,7 +377,7 @@ spec:
               postStart:
                 exec:
                   command:
-                    - bin/sh
+                    - /bin/bash
                     - -c
                     - |   
                       etcd_port=${ETCD_PORT:-'2379'}
@@ -435,7 +435,7 @@ spec:
                 name: delvedebug
             env:
               - name: CELL
-                value: {{ .Values.vitess.cell | default "zone1" | quote }}
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
               - name: VTCTLD_SERVER
                 value: "$(KB_CLUSTER_NAME)-vtctld-headless"
               - name: VTCTLD_WEB_PORT
@@ -449,7 +449,7 @@ spec:
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"                
             command:
-              - bin/sh
+              - /bin/bash
               - -c
               - |
                 echo "starting vtctld"
@@ -497,7 +497,7 @@ spec:
                 name: delvedebug
             env:
               - name: CELL
-                value: {{ .Values.vitess.cell | default "zone1" | quote }}
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
               - name: MYSQL_ROOT_USER
                 valueFrom:
                   secretKeyRef:
@@ -517,7 +517,7 @@ spec:
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"                
             command:
-              - bin/sh
+              - /bin/bash
               - -c
               - |
                 echo "starting vtconsensus"
@@ -589,7 +589,7 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password            
               - name: CELL
-                value: {{ .Values.vitess.cell | default "zone1" | quote }}
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
               - name: VTGATE_MYSQL_PORT
                 value: "15306"
               - name: VTGATE_WEB_PORT
@@ -603,7 +603,7 @@ spec:
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"                
             command:
-              - bin/sh
+              - /bin/bash
               - -c
               - |
                 cell=${CELL:-'zone1'}

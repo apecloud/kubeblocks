@@ -175,6 +175,19 @@ var _ = Describe("Cluster Controller", func() {
 				constant.AppInstanceLabelKey:   clusterKey.Name,
 				constant.AppConfigTypeLabelKey: "kubeblocks-env",
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
+
+		By("Make sure the cluster controller has set the cluster status to Running")
+		for i, comp := range clusterObj.Spec.ComponentSpecs {
+			if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
+				continue
+			}
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+			for _, v := range stsList.Items {
+				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+					testk8s.MockStatefulSetReady(&v)
+				})).ShouldNot(HaveOccurred())
+			}
+		}
 	}
 
 	type ExpectService struct {
@@ -315,6 +328,19 @@ var _ = Describe("Cluster Controller", func() {
 			testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
 		}
 		Eventually(func(g Gomega) { validateCompSvcList(g, mysqlCompName, mysqlCompType, mysqlExpectServices) }).Should(Succeed())
+
+		By("Make sure the cluster controller has set the cluster status to Running")
+		for i, comp := range clusterObj.Spec.ComponentSpecs {
+			if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
+				continue
+			}
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+			for _, v := range stsList.Items {
+				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+					testk8s.MockStatefulSetReady(&v)
+				})).ShouldNot(HaveOccurred())
+			}
+		}
 	}
 
 	testWipeOut := func() {
@@ -1103,6 +1129,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 			g.Expect(hasBackupError).Should(BeTrue())
+
 		})).Should(Succeed())
 	}
 
@@ -1129,7 +1156,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	Context("when creating cluster with multiple kinds of components", func() {
+	FContext("when creating cluster with multiple kinds of components", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).

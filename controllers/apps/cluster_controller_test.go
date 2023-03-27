@@ -573,6 +573,14 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking cluster status and the number of replicas changed")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initialGeneration + len(clusterObj.Spec.ComponentSpecs)))
+		for i := range clusterObj.Spec.ComponentSpecs {
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+			for _, v := range stsList.Items {
+				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+					testk8s.MockStatefulSetReady(&v)
+				})).ShouldNot(HaveOccurred())
+			}
+		}
 	}
 
 	testHorizontalScale := func() {
@@ -1382,7 +1390,13 @@ var _ = Describe("Cluster Controller", func() {
 						Expect(strings.HasPrefix(volume.VolumeSource.PersistentVolumeClaim.ClaimName, testapps.DataVolumeName+"-"+clusterKey.Name)).Should(BeTrue())
 					}
 				}
+				Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
+					testk8s.MockStatefulSetReady(&sts)
+				})).ShouldNot(HaveOccurred())
+				podName := sts.Name + "-0"
+				testapps.MockReplicationComponentStsPod(testCtx, &sts, clusterObj.Name, testapps.DefaultRedisCompName, podName, sts.Labels[constant.RoleLabelKey])
 			}
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
 
 		It("Should successfully doing volume expansion", func() {

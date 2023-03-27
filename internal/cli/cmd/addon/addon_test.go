@@ -20,8 +20,15 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
@@ -32,9 +39,26 @@ var _ = Describe("Manage applications related to KubeBlocks", func() {
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
 
+	const addonObjName = "test-addon"
+
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testNamespace)
+		addonObj := &extensionsv1alpha1.Addon{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: addonObjName,
+			},
+			Spec: extensionsv1alpha1.AddonSpec{
+				Type: extensionsv1alpha1.HelmType,
+			},
+		}
+		tf.FakeDynamicClient = clitesting.FakeDynamicClient(addonObj)
+		fakeVer := version.Info{
+			Major:      "1",
+			Minor:      "26",
+			GitVersion: "v1.26.1",
+		}
+		viper.SetDefault(constant.CfgKeyServerInfo, fakeVer)
 	})
 
 	AfterEach(func() {
@@ -64,6 +88,50 @@ var _ = Describe("Manage applications related to KubeBlocks", func() {
 			Expect(describeCmd.HasSubCommands()).ShouldNot(BeTrue())
 		})
 	})
+
+	// When("Run addon sub-cmds with no args", func() {
+	// 	It("Run list sub-cmd", func() {
+	// 		By("run list cmd")
+	// 		listCmd := newListCmd(tf, streams)
+	// 		listCmd.Run(listCmd, nil)
+	// 	})
+	// })
+
+	When("Run addon sub-cmds with addon args", func() {
+		It("Run describe sub-cmd", func() {
+			By("run describe cmd")
+			cmd := newDescribeCmd(tf, streams)
+			cmd.Run(cmd, []string{addonObjName})
+		})
+
+		// It("Run disable sub-cmd", func() {
+		// 	By("run disable cmd")
+		// 	cmd := newDisableCmd(tf, streams)
+		// 	cmd.Run(cmd, []string{addonObjName})
+		// })
+
+		// It("Run enable sub-cmd", func() {
+		// 	By("run enable cmd")
+		// 	cmd := newEnableCmd(tf, streams)
+		// 	cmd.Run(cmd, []string{addonObjName})
+		// })
+	})
+
+	// When("Enable an addon", func() {
+	// 	It("should set addon.spec.install.enabled=true", func() {
+	// 		By("Checking install helm chart by fake helm action config")
+	// 		enableCmd := newEnableCmd(tf, streams)
+	// 		enableCmd.Run(enableCmd, []string{"my-addon"})
+	// 	})
+	// })
+	//
+	// When("Disable an addon", func() {
+	// 	It("should set addon.spec.install.enabled=false", func() {
+	// 		By("Checking install helm chart by fake helm action config")
+	// 		disableCmd := newDisableCmd(tf, streams)
+	// 		disableCmd.Run(disableCmd, []string{"my-addon"})
+	// 	})
+	// })
 
 	// When("Enable an addon", func() {
 	// 	It("should set addon.spec.install.enabled=true", func() {

@@ -189,7 +189,6 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 		defer func() {
 			vertices := findAllNot[*appsv1alpha1.Cluster](dag)
 			for _, vertex := range vertices {
-				//dag.RemoveVertex(vertex)
 				v, _ := vertex.(*lifecycleVertex)
 				v.immutable = true
 			}

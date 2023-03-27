@@ -43,4 +43,9 @@ func TestReflect(t *testing.T) {
 	for _, e := range objects {
 		fmt.Println(e)
 	}
+
+	var o client.Object = &sts
+	ptr := reflect.ValueOf(o)
+	v = ptr.Elem().FieldByName("Spec")
+	fmt.Println(v)
 }

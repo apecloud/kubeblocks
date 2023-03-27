@@ -30,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -85,7 +86,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			By("test when clusterDefinition not found")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeProvisioningStarted)
+				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, lifecycle.ConditionTypeProvisioningStarted)
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Reason).Should(BeEquivalentTo(constant.ReasonNotFoundCR))
 			})).Should(Succeed())
@@ -123,7 +124,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Eventually(func(g Gomega) {
 				updateClusterAnnotation(cluster)
 				g.Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-					condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
+					condition := meta.FindStatusCondition(cluster.Status.Conditions, lifecycle.ConditionTypeProvisioningStarted)
 					g.Expect(condition).ShouldNot(BeNil())
 					g.Expect(condition.Reason).Should(BeEquivalentTo(constant.ReasonRefCRUnavailable))
 				})).Should(Succeed())
@@ -142,8 +143,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			updateClusterAnnotation(cluster)
 			By("test preCheckFailed")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-				condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
-				g.Expect(condition != nil && condition.Reason == ReasonPreCheckFailed).Should(BeTrue())
+				condition := meta.FindStatusCondition(cluster.Status.Conditions, lifecycle.ConditionTypeProvisioningStarted)
+				g.Expect(condition != nil && condition.Reason == lifecycle.ReasonPreCheckFailed).Should(BeTrue())
 			})).Should(Succeed())
 
 			By("reset and waiting cluster to Creating")
@@ -163,8 +164,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeApplyResources)
-					g.Expect(condition != nil && condition.Reason == ReasonApplyResourcesFailed).Should(BeTrue())
+					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, lifecycle.ConditionTypeApplyResources)
+					g.Expect(condition != nil && condition.Reason == lifecycle.ReasonApplyResourcesFailed).Should(BeTrue())
 				})).Should(Succeed())
 		})
 	})

@@ -92,7 +92,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// Automatically convert cue to openAPISchema.
-	if err := updateConfigurationSchema(configConstraint, r.Client, ctx); err != nil {
+	if err := updateConfigSchema(configConstraint, r.Client, ctx); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate openAPISchema")
 	}
 

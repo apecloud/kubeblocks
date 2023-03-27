@@ -42,17 +42,17 @@ const (
 
 	// condition and event reasons
 
-	ReasonReconfigureMerging        = "ReconfigureMerging"
-	ReasonReconfigureMerged         = "ReconfigureMerged"
-	ReasonReconfigureInvalidUpdated = "ReconfigureInvalidUpdated"
-	ReasonReconfigureFailed         = "ReconfigureFailed"
-	ReasonReconfigureSucceed        = "ReconfigureSucceed"
-	ReasonReconfigureRunning        = "ReconfigureRunning"
-	ReasonClusterPhaseMisMatch      = "ClusterPhaseMisMatch"
-	ReasonOpsTypeNotSupported       = "OpsTypeNotSupported"
-	ReasonValidateFailed            = "ValidateFailed"
-	ReasonClusterNotFound           = "ClusterNotFound"
-	ReasonOpsRequestFailed          = "OpsRequestFailed"
+	ReasonReconfigureMerging   = "ReconfigureMerging"
+	ReasonReconfigureMerged    = "ReconfigureMerged"
+	ReasonReconfigureFailed    = "ReconfigureFailed"
+	ReasonReconfigureNoChanged = "ReconfigureNoChanged"
+	ReasonReconfigureSucceed   = "ReconfigureSucceed"
+	ReasonReconfigureRunning   = "ReconfigureRunning"
+	ReasonClusterPhaseMisMatch = "ClusterPhaseMisMatch"
+	ReasonOpsTypeNotSupported  = "OpsTypeNotSupported"
+	ReasonValidateFailed       = "ValidateFailed"
+	ReasonClusterNotFound      = "ClusterNotFound"
+	ReasonOpsRequestFailed     = "OpsRequestFailed"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
@@ -221,15 +221,15 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 }
 
 // NewReconfigureRunningCondition creates a condition that the OpsRequest reconfigure workflow
-func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, tplName string, info ...string) *metav1.Condition {
+func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, configSpecName string, info ...string) *metav1.Condition {
 	status := metav1.ConditionTrue
 	if conditionType == ReasonReconfigureFailed {
 		status = metav1.ConditionFalse
 	}
-	message := fmt.Sprintf("Reconfiguring in Cluster: %s, Component: %s, ConfigTpl: %s",
+	message := fmt.Sprintf("Reconfiguring in Cluster: %s, Component: %s, ConfigSpec: %s",
 		ops.Spec.ClusterRef,
 		ops.Spec.Reconfigure.ComponentName,
-		tplName)
+		configSpecName)
 	if len(info) > 0 {
 		message = message + ", info: " + info[0]
 	}

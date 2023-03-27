@@ -84,13 +84,13 @@ func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(ctx context.Context,
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
 func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string) (appsv1alpha1.Phase, error) {
+	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	deployList := &appsv1.DeploymentList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, stateless.Cli, *stateless.Cluster, componentName, deployList)
 	if err != nil || len(deployList.Items) == 0 {
 		return "", err
 	}
-	// if the failed pod is not controlled by the new ReplicaSet
+	// if the failed pod is not controlled by the new ReplicaSetKind
 	checkExistFailedPodOfNewRS := func(pod *corev1.Pod, workload metav1.Object) bool {
 		d := workload.(*appsv1.Deployment)
 		return !intctrlutil.PodIsReady(pod) && belongToNewReplicaSet(d, pod)
@@ -168,7 +168,7 @@ func belongToNewReplicaSet(d *appsv1.Deployment, pod *corev1.Pod) bool {
 		return false
 	}
 	for _, v := range pod.OwnerReferences {
-		if v.Kind == constant.ReplicaSet && strings.Contains(condition.Message, v.Name) {
+		if v.Kind == constant.ReplicaSetKind && strings.Contains(condition.Message, v.Name) {
 			return d.Status.ObservedGeneration == d.Generation
 		}
 	}

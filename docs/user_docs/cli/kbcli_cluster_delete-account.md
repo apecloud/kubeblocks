@@ -1,24 +1,27 @@
 ---
-title: kbcli cluster diff-configure
+title: kbcli cluster delete-account
 ---
 
-Show the difference in parameters between the two submitted OpsRequest.
+Delete account for a cluster
 
 ```
-kbcli cluster diff-configure [flags]
+kbcli cluster delete-account [flags]
 ```
 
 ### Examples
 
 ```
-  # compare config files
-  kbcli cluster diff-configure opsrequest1 opsrequest2
+  # delete account by name
+  kbcli cluster delete-account NAME --component-name COMPNAME --username NAME
 ```
 
 ### Options
 
 ```
-  -h, --help   help for diff-configure
+      --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
+  -h, --help                    help for delete-account
+  -i, --instance string         Specify the name of instance to be connected.
+  -u, --username string         Required. Specify the name of user
 ```
 
 ### Options inherited from parent commands

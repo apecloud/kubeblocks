@@ -220,7 +220,7 @@ func (c *componentBase) updateStatefulSetWorkload(stsObj *appsv1.StatefulSet, id
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
 		c.workloadVertexs[idx].action = actionPtr(UPDATE)
 		// sync component phase
-		syncComponentPhaseWhenSpecUpdating(c.GetCluster(), c.GetName())
+		updateComponentPhaseWithOperation(c.GetCluster(), c.GetName())
 	}
 	return nil
 }

@@ -17,7 +17,7 @@ with open(os.getenv("GITHUB_ENV"), "a") as githubEnv:
         sys.exit(1)
 
     releaseVersion = gitRef[len(tagRefPrefix):]
-    releaseNotePath = "docs/release_notes/v{}.md".format(releaseVersion)
+    releaseNotePath = "docs/release_notes/v{}/v{}.md".format(releaseVersion,releaseVersion)
 
     if gitRef.find("-alpha.") > 0:
         print("Alpha release build from {} ...".format(gitRef))

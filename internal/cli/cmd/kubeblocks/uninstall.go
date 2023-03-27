@@ -89,7 +89,6 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().BoolVar(&o.removePVs, "remove-pvs", false, "Remove PersistentVolume or not")
 	cmd.Flags().BoolVar(&o.removePVCs, "remove-pvcs", false, "Remove PersistentVolumeClaim or not")
 	cmd.Flags().BoolVar(&o.removeNamespace, "remove-namespace", false, "Remove default created \"kb-system\" namespace or not")
-	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Show logs in detail.")
 	return cmd
 }
 
@@ -162,7 +161,7 @@ func (o *uninstallOptions) uninstall() error {
 		fmt.Fprintf(o.Out, "  %s\n", err.Error())
 	}
 	newSpinner := func(msg string) func(result bool) {
-		return util.Spinner(o.Out, fmt.Sprintf("%-50s", msg))
+		return printer.Spinner(o.Out, fmt.Sprintf("%-50s", msg))
 	}
 
 	// uninstall all KubeBlocks addons

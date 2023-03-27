@@ -420,58 +420,41 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		return err
 	}
 
-	// fetch data-pvc by fixed labels: "kubeblocks.io/volume-type=data"
-	dataPVC := corev1.PersistentVolumeClaimList{}
-	dataPVCLabels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
-	dataPVCLabels[constant.VolumeTypeLabelKey] = string(appsv1alpha1.VolumeTypeData)
-	if err = r.Client.List(reqCtx.Ctx, &dataPVC,
-		client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabels(dataPVCLabels)); err != nil {
-		return err
-	}
-	if len(dataPVC.Items) == 0 {
-		return errors.New("can not find any pvc to backup by labelsSelector")
-	}
-	pvcName := ""
-	targetPod, err := r.getTargetPod(reqCtx, backup, backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
+	targetPVCs, err := r.getTargetPVCs(reqCtx, backup, backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
 	if err != nil {
 		return err
 	}
-	targetVolumesBytes, _ := json.Marshal(targetPod.Spec.Volumes)
-	targetVolumesStr := string(targetVolumesBytes)
-	for _, pvc := range dataPVC.Items {
-		if strings.Contains(targetVolumesStr, pvc.Name) {
-			pvcName = pvc.Name
-			break
+	for _, target := range targetPVCs {
+		snapshotName := backup.Name
+		labels := buildBackupLabels(backup)
+		labels[constant.VolumeTypeLabelKey] = target.Labels[constant.VolumeTypeLabelKey]
+		if target.Labels[constant.VolumeTypeLabelKey] == string(appsv1alpha1.VolumeTypeLog) {
+			snapshotName += "-log"
 		}
-	}
-	if pvcName == "" {
-		return errors.New("can not find any pvc from pod name: " + targetPod.Name)
-	}
-
-	snap = &snapshotv1.VolumeSnapshot{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: reqCtx.Req.Namespace,
-			Name:      reqCtx.Req.Name,
-			Labels:    buildBackupLabels(backup),
-		},
-		Spec: snapshotv1.VolumeSnapshotSpec{
-			Source: snapshotv1.VolumeSnapshotSource{
-				PersistentVolumeClaimName: &pvcName,
+		snap = &snapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: reqCtx.Req.Namespace,
+				Name:      snapshotName,
+				Labels:    labels,
 			},
-		},
-	}
+			Spec: snapshotv1.VolumeSnapshotSpec{
+				Source: snapshotv1.VolumeSnapshotSource{
+					PersistentVolumeClaimName: &target.Name,
+				},
+			},
+		}
 
-	controllerutil.AddFinalizer(snap, dataProtectionFinalizerName)
+		controllerutil.AddFinalizer(snap, dataProtectionFinalizerName)
 
-	scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
-	if err := controllerutil.SetOwnerReference(backup, snap, scheme); err != nil {
-		return err
-	}
+		scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
+		if err = controllerutil.SetOwnerReference(backup, snap, scheme); err != nil {
+			return err
+		}
 
-	reqCtx.Log.V(1).Info("create a volumeSnapshot from backup", "snapshot", snap)
-	if err := r.Client.Create(reqCtx.Ctx, snap); err != nil {
-		return err
+		reqCtx.Log.V(1).Info("create a volumeSnapshot from backup", "snapshot", snap.Name)
+		if err := r.Client.Create(reqCtx.Ctx, snap); err != nil {
+			return err
+		}
 	}
 	msg := fmt.Sprintf("Waiting for a volume snapshot %s to be created by the backup.", snap.Name)
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatingVolumeSnapshot", msg)
@@ -736,6 +719,43 @@ func (r *BackupReconciler) getTargetPod(reqCtx intctrlutil.RequestCtx,
 	}
 	sort.Sort(intctrlutil.ByPodName(targetPod.Items))
 	return &targetPod.Items[0], nil
+}
+
+func (r *BackupReconciler) getTargetPVCs(reqCtx intctrlutil.RequestCtx,
+	backup *dataprotectionv1alpha1.Backup, podLabels map[string]string) ([]corev1.PersistentVolumeClaim, error) {
+	targetPod, err := r.getTargetPod(reqCtx, backup, podLabels)
+	if err != nil {
+		return nil, err
+	}
+	tempPVC := corev1.PersistentVolumeClaim{}
+	var dataPVC *corev1.PersistentVolumeClaim
+	var logPVC *corev1.PersistentVolumeClaim
+	for _, volume := range targetPod.Spec.Volumes {
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+		pvcKey := types.NamespacedName{Namespace: backup.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}
+		if err = r.Client.Get(reqCtx.Ctx, pvcKey, &tempPVC); err != nil && !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		switch tempPVC.Labels[constant.VolumeTypeLabelKey] {
+		case string(appsv1alpha1.VolumeTypeData):
+			dataPVC = tempPVC.DeepCopy()
+		case string(appsv1alpha1.VolumeTypeLog):
+			logPVC = tempPVC.DeepCopy()
+		}
+	}
+
+	if dataPVC == nil {
+		return nil, errors.New("can not find any pvc to backup by labelsSelector")
+	}
+
+	allPVCs := []corev1.PersistentVolumeClaim{*dataPVC}
+	if logPVC != nil {
+		allPVCs = append(allPVCs, *logPVC)
+	}
+
+	return allPVCs, nil
 }
 
 func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) (corev1.PodSpec, error) {

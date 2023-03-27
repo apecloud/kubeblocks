@@ -2879,6 +2879,9 @@ spec:
                 type: integer
               phase:
                 description: phase - in list of [Available,Unavailable]
+                enum:
+                - Available
+                - Unavailable
                 type: string
             type: object
         type: object

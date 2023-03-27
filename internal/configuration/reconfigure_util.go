@@ -47,7 +47,7 @@ func getUpdateParameterList(cfg *ConfigPatchInfo) ([]string, error) {
 }
 
 // IsUpdateDynamicParameters is used to check whether the changed parameters require a restart
-func IsUpdateDynamicParameters(tpl *appsv1alpha1.ConfigConstraintSpec, cfg *ConfigPatchInfo) (bool, error) {
+func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *ConfigPatchInfo) (bool, error) {
 	// TODO(zt) how to process new or delete file
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
 		return false, nil
@@ -60,21 +60,21 @@ func IsUpdateDynamicParameters(tpl *appsv1alpha1.ConfigConstraintSpec, cfg *Conf
 	updateParams := set.NewLinkedHashSetString(params...)
 
 	// if ConfigConstraint has StaticParameters, check updated parameter
-	if len(tpl.StaticParameters) > 0 {
-		staticParams := set.NewLinkedHashSetString(tpl.StaticParameters...)
+	if len(cc.StaticParameters) > 0 {
+		staticParams := set.NewLinkedHashSetString(cc.StaticParameters...)
 		union := Union(staticParams, updateParams)
 		if union.Length() > 0 {
 			return false, nil
 		}
 		// if no dynamicParameters is configured, reload is the default behavior
-		if len(tpl.DynamicParameters) == 0 {
+		if len(cc.DynamicParameters) == 0 {
 			return true, nil
 		}
 	}
 
 	// if ConfigConstraint has DynamicParameter, all updated param in dynamic params
-	if len(tpl.DynamicParameters) > 0 {
-		dynamicParams := set.NewLinkedHashSetString(tpl.DynamicParameters...)
+	if len(cc.DynamicParameters) > 0 {
+		dynamicParams := set.NewLinkedHashSetString(cc.DynamicParameters...)
 		union := Difference(updateParams, dynamicParams)
 		return union.Length() == 0, nil
 	}

@@ -18,7 +18,6 @@ package playground
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -59,9 +58,6 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 			util.CheckErr(o.destroy())
 		},
 	}
-
-	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of [%s]", strings.Join(cp.CloudProviders(), ",")))
-	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")
 	return cmd
 }
 
@@ -77,46 +73,41 @@ func newGuideCmd() *cobra.Command {
 }
 
 func (o *destroyOptions) destroy() error {
-	if o.cloudProvider == cp.Local {
+	if o.prevCluster == nil {
+		return fmt.Errorf("no playground cluster found")
+	}
+
+	if o.prevCluster.CloudProvider == cp.Local {
 		return o.destroyLocal()
 	}
 	return o.destroyCloud()
 }
 
+// destroyLocal destroy local k3d cluster that will destroy all resources
 func (o *destroyOptions) destroyLocal() error {
 	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
-	provider.VerboseLog(false)
-
-	spinner := util.Spinner(o.Out, "Destroy KubeBlocks playground k3d cluster %s", k8sClusterName)
+	spinner := printer.Spinner(o.Out, "Delete playground k3d cluster %s", o.prevCluster.ClusterName)
 	defer spinner(false)
-	// DeleteK8sCluster k3d cluster
-	if err := provider.DeleteK8sCluster(k8sClusterName); err != nil {
+	if err := provider.DeleteK8sCluster(o.prevCluster.ClusterName); err != nil {
 		return err
 	}
 	spinner(true)
-	return nil
+	return o.removeStateFile()
 }
 
+// destroyCloud destroy cloud kubernetes cluster, before destroy, we should delete
+// all clusters created by KubeBlocks, uninstall KubeBlocks and remove the KubeBlocks
+// namespace that will destroy all resources created by KubeBlocks, avoid to leave
+// some resources
 func (o *destroyOptions) destroyCloud() error {
 	cpPath, err := cloudProviderRepoDir()
 	if err != nil {
 		return err
 	}
 
-	// create cloud kubernetes cluster
-	provider, err := cp.New(o.cloudProvider, o.region, cpPath, o.Out, o.ErrOut)
+	provider, err := cp.New(o.prevCluster.CloudProvider, o.prevCluster.Region, cpPath, o.Out, o.ErrOut)
 	if err != nil {
 		return err
-	}
-
-	// get cluster name to delete
-	name, err := getExistedCluster(provider, cpPath)
-	// do not find any existed cluster
-	if name == "" {
-		fmt.Fprintf(o.Out, "Failed to find playground %s %s cluster in %s\n", o.cloudProvider, cp.K8sService(o.cloudProvider), cpPath)
-		if err != nil {
-			fmt.Fprintf(o.Out, "  error: %s", err.Error())
-		}
 	}
 
 	// start to destroy cluster
@@ -138,7 +129,7 @@ func (o *destroyOptions) destroyCloud() error {
 
 `)
 
-	fmt.Fprintf(o.Out, "Do you really want to destroy the kubernetes cluster %s?\n  This is no undo. Only 'yes' will be accepted to confirm.\n\n", name)
+	fmt.Fprintf(o.Out, "Do you really want to destroy the kubernetes cluster %s?\n  This is no undo. Only 'yes' will be accepted to confirm.\n\n", o.prevCluster.ClusterName)
 
 	// confirm to destroy
 	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
@@ -148,11 +139,28 @@ func (o *destroyOptions) destroyCloud() error {
 	}
 
 	o.startTime = time.Now()
-	fmt.Fprintf(o.Out, "Destroy %s %s cluster %s...\n", o.cloudProvider, cp.K8sService(o.cloudProvider), name)
-	if err = provider.DeleteK8sCluster(name); err != nil {
+
+	fmt.Fprintf(o.Out, "Destroy %s %s cluster %s...\n",
+		o.prevCluster.CloudProvider, cp.K8sService(o.prevCluster.CloudProvider), o.prevCluster.ClusterName)
+	if err = provider.DeleteK8sCluster(o.prevCluster.ClusterName); err != nil {
 		return err
 	}
-	fmt.Fprintf(o.Out, "\nPlayground destroy completed in %s.\n", time.Since(o.startTime).Truncate(time.Second))
 
+	if err = o.removeStateFile(); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(o.Out, "\nPlayground destroy completed in %s.\n", time.Since(o.startTime).Truncate(time.Second))
+	return nil
+}
+
+// remove state file
+func (o *destroyOptions) removeStateFile() error {
+	spinner := printer.Spinner(o.Out, "Remove state file %s", o.stateFilePath)
+	defer spinner(false)
+	if err := removeStateFile(o.stateFilePath); err != nil {
+		return err
+	}
+	spinner(true)
 	return nil
 }

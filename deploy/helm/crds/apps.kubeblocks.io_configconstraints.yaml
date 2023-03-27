@@ -224,12 +224,16 @@ spec:
                 format: int64
                 type: integer
               phase:
+                allOf:
+                - enum:
+                  - Available
+                  - Unavailable
+                - enum:
+                  - Available
+                  - Unavailable
+                  - Deleting
                 description: phase is status of configuration template, when set to
                   AvailablePhase, it can be referenced by ClusterDefinition or ClusterVersion.
-                enum:
-                - Available
-                - Unavailable
-                - Deleting
                 type: string
             type: object
         type: object

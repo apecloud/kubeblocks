@@ -29,16 +29,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+// GenerateOpenAPISchema generate openapi schema from cue type Definitions.
 func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSchemaProps, error) {
 	const (
-		OpenAPIVersion = "3.1.0"
+		openAPIVersion = "3.1.0"
 	)
 
-	cfg := &load.Config{
-		Stdin: strings.NewReader(cueTpl),
-	}
-
-	insts := load.Instances([]string{"-"}, cfg)
+	cueOption := &load.Config{Stdin: strings.NewReader(cueTpl)}
+	insts := load.Instances([]string{"-"}, cueOption)
 	for _, ins := range insts {
 		if err := ins.Err; err != nil {
 			return nil, WrapError(err, "failed to generate build.Instance for %s", schemaType)
@@ -48,37 +46,54 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 		return nil, MakeError("failed to create cue.Instances. [%s]", cueTpl)
 	}
 
-	openapicfg := &openapi.Config{
-		Version:       OpenAPIVersion,
+	openapiOption := &openapi.Config{
+		Version:       openAPIVersion,
 		SelfContained: true,
 		// ExpandReferences: true,
 		Info: ast.NewStruct(
 			"title", ast.NewString(fmt.Sprintf("%s configuration schema", schemaType)),
-			"version", ast.NewString(OpenAPIVersion),
+			"version", ast.NewString(openAPIVersion),
 		),
 	}
-
-	// schema, err := openapicfg.All(cue.Build(insts)[0]) //nolint:staticcheck
-	schema, err := openapicfg.Schemas(cue.Build(insts)[0]) //nolint:staticcheck
+	// schema, err := openapiOption.All(cue.Build(insts)[0]) //nolint:staticcheck
+	schema, err := openapiOption.Schemas(cue.Build(insts)[0]) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}
+	if schema == nil {
+		return nil, nil
+	}
+	return transformOpenAPISchema(schema, schemaType)
+}
 
-	var (
-		typeSchema *openapi.OrderedMap //nolint:staticcheck
-		all        = make([]string, len(schema.Elts))
-	)
-
-	for _, kv := range schema.Pairs() {
-		all = append(all, kv.Key)
-		if kv.Key == schemaType || schemaType == "" {
-			typeSchema = kv.Value.(*openapi.OrderedMap) //nolint:staticcheck
-			break
+func foundSchemaFromCueDefines(cueMap *openapi.OrderedMap, schemaType string) *openapi.OrderedMap {
+	for _, kv := range cueMap.Pairs() {
+		if schemaType == "" {
+			m, ok := kv.Value.(*openapi.OrderedMap)
+			if ok {
+				return m
+			}
+			continue
+		}
+		if kv.Key == schemaType {
+			return kv.Value.(*openapi.OrderedMap) //nolint:staticcheck
 		}
 	}
+	return nil
+}
 
+func transformOpenAPISchema(cueSchema *openapi.OrderedMap, schemaType string) (*apiextv1.JSONSchemaProps, error) {
+	allSchemaType := func(cueMap *openapi.OrderedMap) []string {
+		keys := make([]string, len(cueMap.Elts))
+		for i, pair := range cueMap.Pairs() {
+			keys[i] = pair.Key
+		}
+		return keys
+	}
+
+	typeSchema := foundSchemaFromCueDefines(cueSchema, schemaType)
 	if typeSchema == nil {
-		log.Log.Info(fmt.Sprintf("Cannot found schema. type:[%s], all: %s", schemaType, all))
+		log.Log.Info(fmt.Sprintf("Cannot found schema. type:[%s], all: %v", schemaType, allSchemaType(cueSchema)))
 		return nil, nil
 	}
 
@@ -87,15 +102,17 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 		return nil, WrapError(err, "failed to marshal OpenAPI schema")
 	}
 
-	j := &apiextv1.JSONSchemaProps{}
-	if err = json.Unmarshal(b, j); err != nil {
-		log.Log.Info(fmt.Sprintf("Cannot unmarshal raw OpenAPI schema to JSONSchemaProps: %v", err))
+	jsonProps := apiextv1.JSONSchemaProps{}
+	if err = json.Unmarshal(b, &jsonProps); err != nil {
+		log.Log.Error(err, "failed to unmarshal raw OpenAPI schema to JSONSchemaProps")
+		return nil, err
 	}
 
-	return &apiextv1.JSONSchemaProps{
+	r := apiextv1.JSONSchemaProps{
 		Type: "object",
 		Properties: map[string]apiextv1.JSONSchemaProps{
-			"spec": *j,
+			"spec": jsonProps,
 		},
-	}, nil
+	}
+	return &r, nil
 }

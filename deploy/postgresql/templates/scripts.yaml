@@ -66,8 +66,8 @@ data:
       # bitnami scripts will execute all the *.sh files in the /docker-entrypoint-initdb.d directory after setup
       cp /scripts/post_start.sh /docker-entrypoint-initdb.d
     fi
-    if [ -f ${PGDATA}/../init-scripts/restore.sh ]; then
+    if [ -f ${PGDATA}/../init-scripts/kb_restore.sh ]; then
         # add recovery.signal/standby.signal to trigger recovery
-        cp ${PGDATA}/../init-scripts/restore.sh /docker-entrypoint-preinitdb.d
+        cp ${PGDATA}/../init-scripts/kb_restore.sh /docker-entrypoint-preinitdb.d
     fi
     /opt/bitnami/scripts/postgresql/entrypoint.sh /opt/bitnami/scripts/postgresql/run.sh

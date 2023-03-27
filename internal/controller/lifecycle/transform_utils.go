@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
@@ -146,26 +145,8 @@ func isClusterUpdating(cluster appsv1alpha1.Cluster) bool {
 
 func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
 	return !isClusterDeleting(cluster) && !isClusterUpdating(cluster)
-}
-
-// updateClusterPhaseWhenConditionsError when cluster status is ConditionsError and the cluster applies resources successful,
-// we should update the cluster to the correct state
-func updateClusterPhaseWhenConditionsError(cluster *appsv1alpha1.Cluster) {
-	if cluster.Status.Phase != appsv1alpha1.ConditionsErrorPhase {
-		return
-	}
-	if cluster.Status.ObservedGeneration == 0 {
-		cluster.Status.Phase = appsv1alpha1.CreatingPhase
-		return
-	}
-	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	// if no operations in cluster, means user update the cluster.spec directly
-	if len(opsRequestSlice) == 0 {
-		cluster.Status.Phase = appsv1alpha1.SpecUpdatingPhase
-		return
-	}
-	// if exits opsRequests are running, set the cluster phase to the early target phase with the OpsRequest
-	cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
+	// return cluster.Status.ObservedGeneration == cluster.Generation &&
+	//	slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
 }
 
 // getClusterBackupSourceMap gets the backup source map from cluster.annotations

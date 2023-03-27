@@ -22,7 +22,6 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -73,27 +72,17 @@ type ClusterStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// phase describes the phase of the Cluster. the detail information of phase is as follows:
-	// Creating: creating Cluster.
-	// Running: Cluster is running, all components are available.
-	// SpecUpdating: the Cluster phase will be 'SpecUpdating' when directly updating Cluster.spec.
-	// VolumeExpanding: volume expansion operation is running.
-	// HorizontalScaling: horizontal scaling operation is running.
-	// VerticalScaling: vertical scaling operation is running.
-	// VersionUpgrading: upgrade operation is running.
-	// Rebooting: restart operation is running.
-	// Stopping: stop operation is running.
-	// Stopped: all components are stopped, or some components are stopped and other components are running.
-	// Starting: start operation is running.
-	// Reconfiguring: reconfiguration operation is running.
-	// Deleting/Deleted: deleting Cluster/Cluster is deleted.
-	// Failed: Cluster is unavailable.
-	// Abnormal: Cluster is still available, but part of its components are Abnormal.
+	// phase describes the phase of the Cluster, the detail information of the phases are as following:
+	// Running: cluster is running, all its components are available. [terminal state]
+	// Stopped: cluster has stopped, all its components are stopped. [terminal state]
+	// Failed: cluster is unavailable. [terminal state]
+	// Abnormal: Cluster is still running, but part of its components are Abnormal/Failed. [terminal state]
+	// Starting: Cluster has entered starting process.
+	// Updating: Cluster has entered updating process, triggered by Spec. updated.
+	// Stopping: Cluster has entered a stopping process.
 	// if the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
-	// ConditionsError: Cluster and all the components are still healthy, but some update/create API fails due to invalid parameters.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
 	// +optional
-	Phase Phase `json:"phase,omitempty"`
+	Phase ClusterPhase `json:"phase,omitempty"`
 
 	// message describes cluster details message in current phase.
 	// +optional
@@ -193,15 +182,18 @@ type ComponentMessageMap map[string]string
 
 // ClusterComponentStatus record components status information
 type ClusterComponentStatus struct {
-	// phase describes the phase of the Cluster. the detail information of phase is as follows:
+	// phase describes the phase of the component, the detail information of the phases are as following:
 	// Failed: component is unavailable, i.e, all pods are not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
-	// Abnormal: component available but part of its pods are not ready.
-	// Stopped: replicas number of component is 0.
+	// Running: component is running. [terminal state]
+	// Stopped: component is stopped, as no running pod. [terminal state]
+	// Failed: component has failed to start running. [terminal state]
+	// Abnormal: component is running but part of its pods are not ready. [terminal state]
+	// Starting: component has entered starting process.
+	// Updating: component has entered updating process, triggered by Spec. updated.
+	// Stopping: component has entered a stopping process.
 	// If the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
-	// Other phases behave the same as the cluster phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
-	Phase Phase `json:"phase,omitempty"`
+	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.
 	// keys are podName or deployName or statefulSetName, the format is `<ObjectKind>/<Name>`.
@@ -421,10 +413,6 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
-func (r *Cluster) SetStatusCondition(condition metav1.Condition) {
-	meta.SetStatusCondition(&r.Status.Conditions, condition)
-}
-
 // ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detect invalid values.
 func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	message := make([]string, 0)
@@ -554,7 +542,43 @@ func (r *ClusterComponentSpec) GetPrimaryIndex() int32 {
 	return *r.PrimaryIndex
 }
 
-// following are helper functions
+// GetClusterTerminalPhases return Cluster terminal phases.
+func GetClusterTerminalPhases() []ClusterPhase {
+	return []ClusterPhase{
+		RunningClusterPhase,
+		StoppedClusterPhase,
+		FailedClusterPhase,
+		AbnormalClusterPhase,
+	}
+}
+
+// GetClusterUpRunningPhases return Cluster running or partially running phases.
+func GetClusterUpRunningPhases() []ClusterPhase {
+	return []ClusterPhase{
+		RunningClusterPhase,
+		AbnormalClusterPhase,
+		// FailedClusterPhase, // REVIEW/TODO: single component with single pod component are handled as FailedClusterPhase, ought to remove this.
+	}
+}
+
+// GetClusterFailedPhases return Cluster failed or partially failed phases.
+func GetClusterFailedPhases() []ClusterPhase {
+	return []ClusterPhase{
+		FailedClusterPhase,
+		AbnormalClusterPhase,
+	}
+}
+
+// GetComponentTerminalPhases return Cluster's component terminal phases.
+func GetComponentTerminalPhases() []ClusterComponentPhase {
+	return []ClusterComponentPhase{
+		RunningClusterCompPhase,
+		StoppedClusterCompPhase,
+		FailedClusterCompPhase,
+		AbnormalClusterCompPhase,
+	}
+}
+
 func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
 	t := corev1.PersistentVolumeClaimTemplate{}
 	t.ObjectMeta.Name = template.Name

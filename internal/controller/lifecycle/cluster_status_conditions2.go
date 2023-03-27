@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -33,7 +32,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -74,23 +72,28 @@ const (
 	// it will not be automatically repaired unless there is network jitter.
 	// so if the error lasts more than 5s, the cluster will enter the ConditionsError phase
 	// and prompt the user to repair manually according to the message.
-	ClusterControllerErrorDuration = 5 * time.Second
+	// ClusterControllerErrorDuration = 5 * time.Second
 
 	// ControllerErrorRequeueTime the requeue time to reconcile the error event of the cluster controller
 	// which need to respond to user repair events timely.
-	ControllerErrorRequeueTime = 5 * time.Second
+	// ControllerErrorRequeueTime = 5 * time.Second
 )
 
+// REVIEW: this handling patches co-relation object upon condition patch succeed (cascade issue),
+// need better handling technique; function handling is monolithic, call for refactor.
+//
 // updateClusterConditions updates cluster.status condition and records event.
-func (conMgr clusterConditionManager2) updateStatusConditions(cluster *appsv1alpha1.Cluster, condition metav1.Condition) error {
+// Deprecated: avoid monolithic and cascade processing
+func (conMgr clusterConditionManager2) updateStatusConditions(cluster *appsv1alpha1.Cluster, condition metav1.Condition, isFailCondition bool) error {
 	patch := client.MergeFrom(cluster.DeepCopy())
 	oldCondition := meta.FindStatusCondition(cluster.Status.Conditions, condition.Type)
-	phaseChanged := conMgr.handleConditionForClusterPhase(cluster, oldCondition, condition)
 	conditionChanged := !reflect.DeepEqual(oldCondition, condition)
-	if conditionChanged || phaseChanged {
-		cluster.SetStatusCondition(condition)
-		if err := conMgr.Client.Status().Patch(conMgr.ctx, cluster, patch); err != nil {
-			return err
+	if conditionChanged {
+		meta.SetStatusCondition(&cluster.Status.Conditions, condition)
+		if isFailCondition {
+			if err := conMgr.Client.Status().Patch(conMgr.ctx, cluster, patch); err != nil {
+				return err
+			}
 		}
 	}
 	if conditionChanged {
@@ -100,37 +103,17 @@ func (conMgr clusterConditionManager2) updateStatusConditions(cluster *appsv1alp
 		}
 		conMgr.Recorder.Event(cluster, eventType, condition.Reason, condition.Message)
 	}
-	if phaseChanged {
-		// if cluster status changed, do it
-		return opsutil.MarkRunningOpsRequestAnnotation(conMgr.ctx, conMgr.Client, cluster)
-	}
-	return nil
-}
-
-// handleConditionForClusterPhase checks whether the condition can be repaired by cluster.
-// if it cannot be repaired after 30 seconds, set the cluster status to ConditionsError
-func (conMgr clusterConditionManager2) handleConditionForClusterPhase(cluster *appsv1alpha1.Cluster, oldCondition *metav1.Condition, condition metav1.Condition) bool {
-	if condition.Status == metav1.ConditionTrue {
-		return false
-	}
-
-	if oldCondition == nil || oldCondition.Reason != condition.Reason {
-		return false
-	}
-
-	if time.Now().Before(oldCondition.LastTransitionTime.Add(ClusterControllerErrorDuration)) {
-		return false
-	}
-	if !util.IsFailedOrAbnormal(cluster.Status.Phase) &&
-		cluster.Status.Phase != appsv1alpha1.ConditionsErrorPhase {
-		// the condition has occurred for more than 30 seconds and cluster status is not Failed/Abnormal, do it
-		cluster.Status.Phase = appsv1alpha1.ConditionsErrorPhase
-		return true
-	}
-	return false
+	// REVIEW/TODO: tmp remove following for interaction with OpsRequest
+	// if phaseChanged {
+	// 	// if cluster status changed, do it
+	// 	return opsutil.MarkRunningOpsRequestAnnotation(conMgr.ctx, conMgr.Client, conMgr.cluster)
+	// }
+	return util.ErrNoOps
 }
 
 // setProvisioningStartedCondition sets the provisioning started condition in cluster conditions.
+// @return could return ErrNoOps
+// Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager2) setProvisioningStartedCondition(cluster *appsv1alpha1.Cluster) error {
 	condition := metav1.Condition{
 		Type:    ConditionTypeProvisioningStarted,
@@ -138,51 +121,42 @@ func (conMgr clusterConditionManager2) setProvisioningStartedCondition(cluster *
 		Message: fmt.Sprintf("The operator has started the provisioning of Cluster: %s", cluster.Name),
 		Reason:  ReasonPreCheckSucceed,
 	}
-	return conMgr.updateStatusConditions(cluster, condition)
+	return conMgr.updateStatusConditions(cluster, condition, false)
 }
 
 // setPreCheckErrorCondition sets the error condition when preCheck failed.
+// @return could return ErrNoOps
+// Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager2) setPreCheckErrorCondition(cluster *appsv1alpha1.Cluster, err error) error {
-	condition := conMgr.newPreCheckErrorCondition(err)
-	return conMgr.updateStatusConditions(cluster, condition)
-}
-
-func (conMgr clusterConditionManager2) newPreCheckErrorCondition(err error) metav1.Condition {
 	reason := ReasonPreCheckFailed
 	if apierrors.IsNotFound(err) {
 		reason = constant.ReasonNotFoundCR
 	}
-	return metav1.Condition{
-		Type:    ConditionTypeProvisioningStarted,
-		Status:  metav1.ConditionFalse,
-		Message: err.Error(),
-		Reason:  reason,
-	}
+	return conMgr.updateStatusConditions(cluster, newFailedProvisioningStartedCondition(err.Error(), reason), true)
 }
 
 // setUnavailableCondition sets the condition that reference CRs are unavailable.
+// @return could return ErrNoOps
+// Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager2) setReferenceCRUnavailableCondition(cluster *appsv1alpha1.Cluster, message string) error {
-	condition := metav1.Condition{
-		Type:    ConditionTypeProvisioningStarted,
-		Status:  metav1.ConditionFalse,
-		Message: message,
-		Reason:  constant.ReasonRefCRUnavailable,
-	}
-	return conMgr.updateStatusConditions(cluster, condition)
+	return conMgr.updateStatusConditions(cluster, newFailedProvisioningStartedCondition(
+		message, constant.ReasonRefCRUnavailable), true)
 }
 
 // setApplyResourcesFailedCondition sets applied resources failed condition in cluster conditions.
+// @return could return ErrNoOps
+// Deprecated: avoid monolithic handling
 func (conMgr clusterConditionManager2) setApplyResourcesFailedCondition(cluster *appsv1alpha1.Cluster, err error) error {
-	condition := conMgr.newApplyResourcesFailedCondition(err)
-	return conMgr.updateStatusConditions(cluster, condition)
+	return conMgr.updateStatusConditions(cluster, newFailedApplyResourcesCondition(err.Error()), true)
 }
 
-func (conMgr clusterConditionManager2) newApplyResourcesFailedCondition(err error) metav1.Condition {
+// newApplyResourcesCondition creates a condition when applied resources succeed.
+func newFailedProvisioningStartedCondition(message, reason string) metav1.Condition {
 	return metav1.Condition{
-		Type:    ConditionTypeApplyResources,
+		Type:    ConditionTypeProvisioningStarted,
 		Status:  metav1.ConditionFalse,
-		Message: err.Error(),
-		Reason:  ReasonApplyResourcesFailed,
+		Message: message,
+		Reason:  reason,
 	}
 }
 
@@ -193,6 +167,16 @@ func newApplyResourcesCondition() metav1.Condition {
 		Status:  metav1.ConditionTrue,
 		Message: "Successfully applied for resources",
 		Reason:  ReasonApplyResourcesSucceed,
+	}
+}
+
+// newApplyResourcesCondition creates a condition when applied resources succeed.
+func newFailedApplyResourcesCondition(message string) metav1.Condition {
+	return metav1.Condition{
+		Type:    ConditionTypeApplyResources,
+		Status:  metav1.ConditionFalse,
+		Message: message,
+		Reason:  ReasonApplyResourcesFailed,
 	}
 }
 
@@ -213,7 +197,7 @@ func newReplicasNotReadyCondition(notReadyComponentNames map[string]struct{}) me
 	return metav1.Condition{
 		Type:    ConditionTypeReplicasReady,
 		Status:  metav1.ConditionFalse,
-		Message: fmt.Sprintf("pods are not ready in ComponentDefs: %v, refer to related component message in Cluster.status.components", cNameSlice),
+		Message: fmt.Sprintf("pods are not ready in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
 		Reason:  ReasonReplicasNotReady,
 	}
 }
@@ -249,28 +233,29 @@ func checkConditionIsChanged(oldCondition *metav1.Condition, newCondition metav1
 }
 
 // handleClusterReadyCondition handles the cluster conditions with ClusterReady and ReplicasReady type.
+// @return could return ErrNoOps
 func handleNotReadyConditionForCluster(cluster *appsv1alpha1.Cluster,
 	recorder record.EventRecorder,
 	replicasNotReadyCompNames map[string]struct{},
-	notReadyCompNames map[string]struct{}) (needPatch bool, postFunc postHandler) {
+	notReadyCompNames map[string]struct{}) (postHandler, error) {
 	oldReplicasReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReplicasReady)
 	if len(replicasNotReadyCompNames) == 0 {
 		// if all replicas of cluster are ready, set ReasonAllReplicasReady to status.conditions
 		readyCondition := newAllReplicasPodsReadyConditions()
 		if checkConditionIsChanged(oldReplicasReadyCondition, readyCondition) {
-			cluster.SetStatusCondition(readyCondition)
-			needPatch = true
-			postFunc = func(cluster *appsv1alpha1.Cluster) error {
+			meta.SetStatusCondition(&cluster.Status.Conditions, readyCondition)
+			postFunc := func(cluster *appsv1alpha1.Cluster) error {
 				// send an event when all pods of the components are ready.
 				recorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
 				return nil
 			}
+			return postFunc, nil
 		}
 	} else {
 		replicasNotReadyCond := newReplicasNotReadyCondition(replicasNotReadyCompNames)
 		if checkConditionIsChanged(oldReplicasReadyCondition, replicasNotReadyCond) {
-			cluster.SetStatusCondition(replicasNotReadyCond)
-			needPatch = true
+			meta.SetStatusCondition(&cluster.Status.Conditions, replicasNotReadyCond)
+			return nil, nil
 		}
 	}
 
@@ -278,9 +263,9 @@ func handleNotReadyConditionForCluster(cluster *appsv1alpha1.Cluster,
 		oldClusterReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReady)
 		clusterNotReadyCondition := newComponentsNotReadyCondition(notReadyCompNames)
 		if checkConditionIsChanged(oldClusterReadyCondition, clusterNotReadyCondition) {
-			cluster.SetStatusCondition(clusterNotReadyCondition)
-			needPatch = true
+			meta.SetStatusCondition(&cluster.Status.Conditions, clusterNotReadyCondition)
+			return nil, nil
 		}
 	}
-	return needPatch, postFunc
+	return nil, util.ErrNoOps
 }

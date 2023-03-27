@@ -295,14 +295,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dataprotectioncontrollers.BackupPolicyTemplateReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BackupPolicyTemplate")
-		os.Exit(1)
-	}
-
 	if err = (&appscontrollers.OpsRequestReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),

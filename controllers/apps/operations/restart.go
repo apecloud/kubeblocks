@@ -27,6 +27,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type restartOpsHandler struct{}
@@ -35,9 +36,11 @@ var _ OpsHandler = restartOpsHandler{}
 
 func init() {
 	restartBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase},
-		ToClusterPhase:    appsv1alpha1.RebootingPhase,
-		OpsHandler:        restartOpsHandler{},
+		// REVIEW: can do opsrequest if not running?
+		FromClusterPhases:          appsv1alpha1.GetClusterTerminalPhases(),
+		ToClusterPhase:             appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.RebootingPhase,
+		OpsHandler:                 restartOpsHandler{},
+		MaintainClusterPhaseBySelf: true,
 	}
 
 	opsMgr := GetOpsManager()
@@ -50,21 +53,21 @@ func (r restartOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRe
 }
 
 // Action restarts components by updating StatefulSet.
-func (r restartOpsHandler) Action(opsRes *OpsResource) error {
+func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
 	componentNameMap := opsRes.OpsRequest.GetRestartComponentNameMap()
-	if err := restartDeployment(opsRes, componentNameMap); err != nil {
+	if err := restartDeployment(reqCtx, cli, opsRes, componentNameMap); err != nil {
 		return err
 	}
-	return restartStatefulSet(opsRes, componentNameMap)
+	return restartStatefulSet(reqCtx, cli, opsRes, componentNameMap)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for volume expansion opsRequest.
-func (r restartOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
-	return ReconcileActionWithComponentOps(opsRes, "restart", handleComponentStatusProgress)
+func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
+	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", handleComponentStatusProgress)
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
@@ -74,17 +77,17 @@ func (r restartOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes in Cluster.spec.
 // empty implementation here.
-func (r restartOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
+func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
 }
 
 // restartStatefulSet restarts statefulSet workload
-func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]struct{}) error {
+func restartStatefulSet(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, componentNameMap map[string]struct{}) error {
 	var (
 		statefulSetList = &appv1.StatefulSetList{}
 		err             error
 	)
-	if err = opsRes.Client.List(opsRes.Ctx, statefulSetList,
+	if err = cli.List(reqCtx.Ctx, statefulSetList,
 		client.InNamespace(opsRes.Cluster.Namespace),
 		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
 		return err
@@ -94,7 +97,7 @@ func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]struct{
 		if isRestarted(opsRes, &v, componentNameMap, &v.Spec.Template) {
 			continue
 		}
-		if err = opsRes.Client.Update(opsRes.Ctx, &v); err != nil {
+		if err = cli.Update(reqCtx.Ctx, &v); err != nil {
 			return err
 		}
 	}
@@ -102,12 +105,12 @@ func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]struct{
 }
 
 // restartDeployment restarts deployment workload
-func restartDeployment(opsRes *OpsResource, componentNameMap map[string]struct{}) error {
+func restartDeployment(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, componentNameMap map[string]struct{}) error {
 	var (
 		deploymentList = &appv1.DeploymentList{}
 		err            error
 	)
-	if err = opsRes.Client.List(opsRes.Ctx, deploymentList,
+	if err = cli.List(reqCtx.Ctx, deploymentList,
 		client.InNamespace(opsRes.Cluster.Namespace),
 		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
 		return err
@@ -117,7 +120,7 @@ func restartDeployment(opsRes *OpsResource, componentNameMap map[string]struct{}
 		if isRestarted(opsRes, &v, componentNameMap, &v.Spec.Template) {
 			continue
 		}
-		if err = opsRes.Client.Update(opsRes.Ctx, &v); err != nil {
+		if err = cli.Update(reqCtx.Ctx, &v); err != nil {
 			return err
 		}
 	}

@@ -205,8 +205,8 @@ func (c *statelessComponent) updateWorkload(reqCtx intctrlutil.RequestCtx, cli c
 	deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations, deployProto.Spec.Template.Annotations)
 	if !reflect.DeepEqual(&deployObj.Spec, &deployProto.Spec) {
 		c.workloadVertexs[0].action = actionPtr(UPDATE)
-		// sync component phase to cluster status
-		syncComponentPhaseWhenSpecUpdating(c.Cluster, c.GetName())
+		// sync component phase
+		updateComponentPhaseWithOperation(c.Cluster, c.GetName())
 	}
 
 	return nil

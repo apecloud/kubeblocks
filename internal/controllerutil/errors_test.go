@@ -45,3 +45,18 @@ func TestNerErrorf(t *testing.T) {
 		t.Error("errors.As failed")
 	}
 }
+
+func TestIsTargetError(t *testing.T) {
+	var err1 error
+	if IsTargetError(err1, ErrorWaitCacheRefresh) {
+		t.Error("IsTargetError expects a false return, but got false")
+	}
+	err1 = NewError(ErrorWaitCacheRefresh, "test c2")
+	if !IsTargetError(err1, ErrorWaitCacheRefresh) {
+		t.Error("IsTargetError expects a true return, but got false")
+	}
+	err2 := errors.Wrap(err1, "test c1")
+	if !IsTargetError(err2, ErrorWaitCacheRefresh) {
+		t.Error("IsTargetError expects a true return, but got false")
+	}
+}

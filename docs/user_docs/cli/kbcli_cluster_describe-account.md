@@ -1,37 +1,27 @@
 ---
-title: kbcli cluster describe-configure
+title: kbcli cluster describe-account
 ---
 
-Show details of a specific reconfiguring.
+Describe account roles and related information
 
 ```
-kbcli cluster describe-configure [flags]
+kbcli cluster describe-account [flags]
 ```
 
 ### Examples
 
 ```
-  # describe a cluster, e.g. cluster name is mycluster
-  kbcli cluster describe-configure mycluster
-  
-  # describe a component, e.g. cluster name is mycluster, component name is mysql
-  kbcli cluster describe-configure mycluster --component-name=mysql
-  
-  # describe all configuration files.
-  kbcli cluster describe-configure mycluster --component-name=mysql --show-detail
-  
-  # describe a content of configuration file.
-  kbcli cluster describe-configure mycluster --component-name=mysql --configure-file=my.cnf --show-detail
+  # describe account and show role information
+  kbcli cluster describe-account NAME --component-name COMPNAME--username NAME
 ```
 
 ### Options
 
 ```
-      --component-name string    Specify the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter."
-      --configure-file strings   Specify the name of the configuration file to be describe (e.g. for mysql: --configure-file=my.cnf). If unset, all files.
-  -h, --help                     help for describe-configure
-      --show-detail              If true, the content of the files specified by configure-file will be printed.
-      --template-names strings   Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --template-names=mysql-3node-tpl)
+      --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
+  -h, --help                    help for describe-account
+  -i, --instance string         Specify the name of instance to be connected.
+  -u, --username string         Required. Specify the name of user
 ```
 
 ### Options inherited from parent commands

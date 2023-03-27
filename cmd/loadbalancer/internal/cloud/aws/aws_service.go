@@ -691,7 +691,7 @@ func (c *awsService) freeENI(eniID string, sleepDelayAfterDetach time.Duration) 
 	}
 	ctxLog.Info("Successfully detached ENI")
 
-	// It does take awhile for EC2 to detach ENI from instance, so we wait 2s before trying the delete.
+	// It does take a while for EC2 to detach ENI from instance, so we wait 2s before trying to delete.
 	time.Sleep(sleepDelayAfterDetach)
 	err = c.DeleteENI(eniID)
 	if err != nil {
@@ -737,28 +737,6 @@ func (c *awsService) getENIAttachmentID(ctxLog logr.Logger, eniID string) (*stri
 		attachID = firstNI.Attachment.AttachmentId
 	}
 	return attachID, nil
-}
-
-func (c *awsService) WaitForENIAttached(eniID string) (eniMetadata cloud.ENIMetadata, err error) {
-	var result cloud.ENIMetadata
-	f := func() error {
-		enis, err := c.GetAttachedENIs()
-		if err != nil {
-			c.logger.Error(err, "Failed to discover attached ENIs")
-			return ErrNoNetworkInterfaces
-		}
-		for _, eni := range enis {
-			if eniID == eni.ID {
-				result = eni
-				return nil
-			}
-		}
-		return ErrENINotFound
-	}
-	if err = util.DoWithRetry(context.Background(), c.logger, f, &util.RetryOptions{MaxRetry: 15, Delay: 3 * time.Second}); err != nil {
-		return result, errors.New("Giving up trying to retrieve ENIs from metadata service")
-	}
-	return result, nil
 }
 
 func (c *awsService) ModifySourceDestCheck(eniID string, enabled bool) error {

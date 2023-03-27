@@ -175,7 +175,7 @@ cue-fmt: cuetool ## Run cue fmt against code.
 	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fix
 
 .PHONY: fast-lint
-fast-lint: golangci staticcheck  # [INTERNAL] fast lint
+fast-lint: golangci staticcheck vet  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
@@ -531,7 +531,7 @@ install-docker-buildx: ## Create `docker buildx` builder.
 golangci: GOLANGCILINT_VERSION = v1.51.2
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
-	echo golangci-lint is already installed
+	@echo golangci-lint is already installed
 GOLANGCILINT=$(shell which golangci-lint)
 else ifeq (, $(shell which $(GOBIN)/golangci-lint))
 	@{ \
@@ -542,7 +542,7 @@ else ifeq (, $(shell which $(GOBIN)/golangci-lint))
 	}
 GOLANGCILINT=$(GOBIN)/golangci-lint
 else
-	echo golangci-lint is already installed
+	@echo golangci-lint is already installed
 GOLANGCILINT=$(GOBIN)/golangci-lint
 endif
 
@@ -842,6 +842,26 @@ endif
 minikube-delete: minikube ## Delete minikube cluster.
 	$(MINIKUBE) delete
 
+.PHONY: minikube-run
+minikube-run: manifests generate fmt vet minikube helmtool ## Start minikube cluster and helm install kubeblocks.
+ifneq (, $(shell which minikube))
+ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
+	$(MINIKUBE) start --wait=all --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS)
+endif
+endif
+	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+	$(HELM) upgrade --install kubeblocks deploy/helm --set versionOverride=$(VERSION),csi-hostpath-driver.enabled=true --reuse-values --wait --wait-for-jobs --atomic
+
+.PHONY: minikube-run-fast
+minikube-run-fast: minikube helmtool ## Fast start minikube cluster and helm install kubeblocks.
+ifneq (, $(shell which minikube))
+ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
+	$(MINIKUBE) start --wait=all --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS)
+endif
+endif
+	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+	$(HELM) upgrade --install kubeblocks deploy/helm --set versionOverride=$(VERSION),csi-hostpath-driver.enabled=true --reuse-values --wait --wait-for-jobs --atomic
+
 .PHONY: smoke-testdata-manifests
 smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
@@ -851,9 +871,12 @@ smoke-testdata-manifests: ## Update E2E test dataset
 
 ##@ Test E2E
 GINKGO=$(shell which ginkgo)
+ifeq ($(origin VERSION), command line)
+    VERSION ?= $(VERSION)
+endif
 .PHONY: test-e2e
-test-e2e: smoke-testdata-manifests ## Test End-to-end.
-	$(GINKGO) test -process -ginkgo.v test/e2e
+test-e2e: helm-package smoke-testdata-manifests ## Test End-to-end.
+	$(GINKGO) test -process -ginkgo.v test/e2e --junit-report=report.xml -- --VERSION=$(VERSION)
 
 # NOTE: include must be at the end
 ##@ Docker containers

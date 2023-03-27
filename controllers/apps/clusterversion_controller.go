@@ -62,7 +62,7 @@ func init() {
 // move the current state of the cluster closer to the desired state.
 //
 // For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
@@ -104,7 +104,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error()); err != nil {
 				return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 			}
-			return intctrlutil.RequeueAfter(time.Millisecond*requeueDuration, reqCtx.Log, "")
+			return intctrlutil.RequeueAfter(requeueDuration, reqCtx.Log, "")
 		}
 		return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 	}
@@ -125,7 +125,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.Reconciled()
 	}
 
-	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
+	if err := appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 

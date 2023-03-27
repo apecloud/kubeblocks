@@ -69,7 +69,7 @@ var _ = Describe("Cluster", func() {
 			Expect(cmd).ShouldNot(BeNil())
 			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
 			Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
-			Expect(cmd.Flags().Set("set", testComponentPath)).Should(Succeed())
+			Expect(cmd.Flags().Set("set-file", testComponentPath)).Should(Succeed())
 			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 
 			// must succeed otherwise exit 1 and make test fails

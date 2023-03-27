@@ -21,15 +21,16 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli/values"
+	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	. "github.com/apecloud/kubeblocks/test/e2e"
-
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	. "github.com/apecloud/kubeblocks/test/e2e"
 )
 
 const releaseName = "kubeblocks"
@@ -37,12 +38,11 @@ const releaseNS = "kubeblocks-e2e-test"
 
 var chart = helm.InstallOpts{
 	Name:      releaseName,
-	Chart:     "../../deploy/helm",
+	Chart:     "kubeblocks/kubeblocks",
 	Wait:      true,
 	Namespace: releaseNS,
 	ValueOpts: &values.Options{
 		Values: []string{
-			"image.tag=latest",
 			"image.pullPolicy=Always",
 			"wesql.enabled=false",
 		},
@@ -54,6 +54,7 @@ var chart = helm.InstallOpts{
 func InstallationTest() {
 
 	BeforeEach(func() {
+
 	})
 
 	AfterEach(func() {
@@ -63,8 +64,14 @@ func InstallationTest() {
 		AfterEach(func() {
 		})
 
+		It("add repo", func() {
+			err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		It("Install KubeBlocks via Helm", func() {
 			cfg := getHelmConfig()
+			chart.Version = Version
 			_, err := chart.Install(cfg)
 			Expect(err).NotTo(HaveOccurred())
 			// Expect(notes).NotTo(BeEmpty())

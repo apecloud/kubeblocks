@@ -25,15 +25,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
-// PatchClusterOpsAnnotations patches OpsRequest annotation in Cluster.annotations
-func PatchClusterOpsAnnotations(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	opsRequestSlice []appsv1alpha1.OpsRecorder) error {
-	patch := client.MergeFrom(cluster.DeepCopy())
+func setOpsRequestToCluster(cluster *appsv1alpha1.Cluster, opsRequestSlice []appsv1alpha1.OpsRecorder) {
 	if cluster.Annotations == nil {
 		cluster.Annotations = map[string]string{}
 	}
@@ -43,7 +39,25 @@ func PatchClusterOpsAnnotations(ctx context.Context,
 	} else {
 		delete(cluster.Annotations, intctrlutil.OpsRequestAnnotationKey)
 	}
+}
+
+// PatchClusterOpsAnnotations patches OpsRequest annotation in Cluster.annotations
+func PatchClusterOpsAnnotations(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	opsRequestSlice []appsv1alpha1.OpsRecorder) error {
+	patch := client.MergeFrom(cluster.DeepCopy())
+	setOpsRequestToCluster(cluster, opsRequestSlice)
 	return cli.Patch(ctx, cluster, patch)
+}
+
+// UpdateClusterOpsAnnotations updates OpsRequest annotation in Cluster.annotations
+func UpdateClusterOpsAnnotations(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	opsRequestSlice []appsv1alpha1.OpsRecorder) error {
+	setOpsRequestToCluster(cluster, opsRequestSlice)
+	return cli.Update(ctx, cluster)
 }
 
 // PatchOpsRequestReconcileAnnotation patches the reconcile annotation to OpsRequest
@@ -58,7 +72,7 @@ func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, 
 	}
 	// because many changes may be triggered within one second, if the accuracy is only seconds, the event may be lost.
 	// so we used RFC3339Nano format.
-	opsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+	opsRequest.Annotations[intctrlutil.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
 	return cli.Patch(ctx, opsRequest, patch)
 }
 
@@ -87,6 +101,7 @@ func GetOpsRequestSliceFromCluster(cluster *appsv1alpha1.Cluster) ([]appsv1alpha
 // then the related OpsRequest can reconcile.
 // Note: if the client-go fetches the Cluster resources from cache,
 // it should record the Cluster.ResourceVersion to check if the Cluster object from client-go is the latest in OpsRequest controller.
+// @return could return ErrNoOps
 func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
 	var (
 		opsRequestSlice []appsv1alpha1.OpsRecorder
@@ -108,7 +123,7 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 	if len(notExistOps) != 0 {
 		return RemoveClusterInvalidOpsRequestAnnotation(ctx, cli, cluster, opsRequestSlice, notExistOps)
 	}
-	return nil
+	return componentutil.ErrNoOps
 }
 
 // RemoveClusterInvalidOpsRequestAnnotation deletes the OpsRequest annotation in cluster when the OpsRequest not existing.

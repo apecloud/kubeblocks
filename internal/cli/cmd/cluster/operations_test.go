@@ -118,19 +118,19 @@ var _ = Describe("operations", func() {
 			clusterName        = "test-cluster"
 			statefulCompType   = "replicasets"
 			statefulCompName   = "mysql"
-			configTplName      = "mysql-config-tpl"
+			configSpecName     = "mysql-config-tpl"
 			configVolumeName   = "mysql-config"
 		)
 
 		By("Create configmap and config constraint obj")
-		configmap := testapps.NewCustomizedObj("resources/mysql_config_cm.yaml", &corev1.ConfigMap{}, testapps.WithNamespace(ns))
-		constraint := testapps.NewCustomizedObj("resources/mysql_config_template.yaml",
+		configmap := testapps.NewCustomizedObj("resources/mysql-config-template.yaml", &corev1.ConfigMap{}, testapps.WithNamespace(ns))
+		constraint := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{})
 		componentConfig := testapps.NewConfigMap(ns, cfgcore.GetComponentCfgName(clusterName, statefulCompName, configVolumeName), testapps.SetConfigMapData("my.cnf", ""))
 		By("Create a clusterDefinition obj")
 		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
-			AddConfigTemplate(configTplName, configmap.Name, constraint.Name, ns, configVolumeName).
+			AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, ns, configVolumeName).
 			GetObject()
 		By("Create a clusterVersion obj")
 		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
@@ -155,7 +155,7 @@ var _ = Describe("operations", func() {
 
 		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("updated parameter format"))
 		o.Parameters = []string{"abcd=test"}
-		o.CfgTemplateName = configTplName
+		o.CfgTemplateName = configSpecName
 		o.IOStreams = streams
 		in.Write([]byte(o.Name + "\n"))
 

@@ -33,6 +33,15 @@ func BoldRed(msg interface{}) string {
 	return color.New(color.FgRed).Add(color.Bold).Sprint(msg)
 }
 
+// BoldGreen returns a string formatted with green and bold.
+func BoldGreen(msg interface{}) string {
+	return color.New(color.FgGreen, color.Bold).Sprint(msg)
+}
+
 func Warning(out io.Writer, format string, i ...interface{}) {
 	fmt.Fprintf(out, "%s %s", BoldYellow("Warning:"), fmt.Sprintf(format, i...))
+}
+
+func Alert(out io.Writer, format string, i ...interface{}) {
+	fmt.Fprintf(out, "%s %s", BoldRed("Alert:"), fmt.Sprintf(format, i...))
 }

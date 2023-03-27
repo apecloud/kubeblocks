@@ -90,6 +90,7 @@ type CreateBackupPolicyOptions struct {
 	TTL              string `json:"ttl,omitempty"`
 	ConnectionSecret string `json:"connectionSecret,omitempty"`
 	PolicyTemplate   string `json:"policyTemplate,omitempty"`
+	Role             string `json:"role,omitempty"`
 	create.BaseOptions
 }
 
@@ -179,6 +180,11 @@ func (o *CreateBackupOptions) Validate() error {
 	if err != nil {
 		return err
 	}
+
+	role, err := o.getDefaultRole()
+	if err != nil {
+		return err
+	}
 	// apply backup policy
 	policyOptions := CreateBackupPolicyOptions{
 		TTL:              o.TTL,
@@ -186,6 +192,9 @@ func (o *CreateBackupOptions) Validate() error {
 		ConnectionSecret: connectionSecret,
 		PolicyTemplate:   backupPolicyTemplate,
 		BaseOptions:      o.BaseOptions,
+	}
+	if role != "" {
+		policyOptions.Role = role
 	}
 	policyOptions.Name = "backup-policy-" + o.Namespace + "-" + o.Name
 	inputs := create.Inputs{
@@ -249,6 +258,28 @@ func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
 		return "", fmt.Errorf("not found any backupPolicyTemplate for cluster %s", o.Name)
 	}
 	return objs.Items[0].GetName(), nil
+}
+
+func (o *CreateBackupOptions) getDefaultRole() (string, error) {
+	gvr := schema.GroupVersionResource{Version: "v1", Resource: "pods"}
+	opts := metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s",
+			constant.AppInstanceLabelKey, o.Name),
+	}
+	objs, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).List(context.TODO(), opts)
+	if err != nil {
+		return "", err
+	}
+	if len(objs.Items) == 0 {
+		return "", fmt.Errorf("not found any pods for cluster %s", o.Name)
+	}
+	pod := objs.Items[0]
+	// TODO(dsj):(hack fix) apecloud-mysql just support backup snapshot on the leader pod,
+	// backup snapshot on the follower will be support at the next version.
+	if o.BackupType == "snapshot" && pod.GetLabels()[constant.WorkloadTypeLabelKey] == string(appsv1alpha1.Consensus) {
+		return "leader", nil
+	}
+	return "", nil
 }
 
 func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -474,6 +505,9 @@ func (o *CreateRestoreOptions) Validate() error {
 			return fmt.Errorf("failed to generate a random cluster name")
 		}
 		o.Name = name
+	}
+	if o.Backup == "" {
+		return fmt.Errorf("backup name should be specified by --backup")
 	}
 	return nil
 }

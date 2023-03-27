@@ -62,6 +62,9 @@ const (
 	STATUS = Action("STATUS")
 )
 
+// default reconcile requeue after duration
+var requeueDuration = time.Millisecond * 100
+
 type gvkName struct {
 	gvk      schema.GroupVersionKind
 	ns, name string
@@ -125,7 +128,7 @@ type postHandler func(cluster *appsv1alpha1.Cluster) error
 
 // TODO: dedup
 // clusterStatusHandler a cluster status handler which changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
-type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (bool, postHandler)
+type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (postHandler, error)
 
 type delegateClient struct {
 	client.Client

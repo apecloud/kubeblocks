@@ -22,30 +22,29 @@ import (
 	"github.com/StudioSol/set"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/internal/unstructured"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func CreateConfigurePatch(oldVersion, newVersion map[string]string, format appsv1alpha1.CfgFileFormat, keys []string, enableExcludeDiff bool) (*ConfigPatchInfo, bool, error) {
-	var isExcludeDiff = false
+// CreateConfigPatch creates a patch for configuration files with difference version.
+func CreateConfigPatch(oldVersion, newVersion map[string]string, format appsv1alpha1.CfgFileFormat, keys []string, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
+	var hasFilesUpdated = false
 
-	if enableExcludeDiff && len(keys) > 0 {
-		isExcludeDiff = checkExcludeConfigDifference(oldVersion, newVersion, keys)
+	if comparableAllFiles && len(keys) > 0 {
+		hasFilesUpdated = checkExcludeConfigDifference(oldVersion, newVersion, keys)
 	}
 
 	cmKeySet := FromCMKeysSelector(keys)
 	patch, err := CreateMergePatch(
-		&K8sConfig{
-			Configurations: oldVersion,
-			CMKeys:         cmKeySet,
-		}, &K8sConfig{
-			Configurations: newVersion,
-			CMKeys:         cmKeySet,
-		}, CfgOption{
+		FromConfigData(oldVersion, cmKeySet),
+		FromConfigData(newVersion, cmKeySet),
+		CfgOption{
 			CfgType: format,
 			Type:    CfgTplType,
 			Log:     log.FromContext(context.TODO()),
 		})
-	return patch, isExcludeDiff, err
+	return patch, hasFilesUpdated, err
 }
 
 func checkExcludeConfigDifference(oldVersion map[string]string, newVersion map[string]string, keys []string) bool {
@@ -63,4 +62,23 @@ func checkExcludeConfigDifference(oldVersion map[string]string, newVersion map[s
 		}
 	}
 	return false
+}
+
+func LoadRawConfigObject(data map[string]string, formatConfig *appsv1alpha1.FormatterConfig, keys []string) (map[string]unstructured.ConfigObject, error) {
+	r := make(map[string]unstructured.ConfigObject)
+	cmKeySet := FromCMKeysSelector(keys)
+	for key, val := range data {
+		if cmKeySet != nil && !cmKeySet.InArray(key) {
+			continue
+		}
+		configObject, err := unstructured.LoadConfig(key, val, formatConfig.Format)
+		if err != nil {
+			return nil, err
+		}
+		if formatConfig.IniConfig != nil {
+			configObject = configObject.SubConfig(formatConfig.IniConfig.SectionName)
+		}
+		r[key] = configObject
+	}
+	return r, nil
 }

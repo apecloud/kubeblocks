@@ -492,29 +492,30 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 		}
 		return keyUnknown
 	}
-	buildSetMap := func(sets []string) map[setKey]string {
+	buildSetMap := func(sets []string) (map[setKey]string, error) {
 		res := map[setKey]string{}
 		for _, set := range sets {
 			kv := strings.Split(set, "=")
 			if len(kv) != 2 {
-				printer.Warning(os.Stdout, "unknown set format \"%s\", it will be ignored, should be like key1=value1\n", set)
-				continue
+				return nil, fmt.Errorf("unknown set format \"%s\", should be like key1=value1", set)
 			}
 
 			// only record the supported key
 			k := parseKey(kv[0])
 			if k == keyUnknown {
-				printer.Warning(os.Stdout, "unknown set key \"%s\", it will be ignored, should be one of [%s]\n", kv[0], strings.Join(keys, ","))
-				continue
+				return nil, fmt.Errorf("unknown set key \"%s\", should be one of [%s]", kv[0], strings.Join(keys, ","))
 			}
 			res[k] = kv[1]
 		}
-		return res
+		return res, nil
 	}
 
 	// each value corresponds to a component
 	for _, value := range values {
-		sets := buildSetMap(strings.Split(value, ","))
+		sets, err := buildSetMap(strings.Split(value, ","))
+		if err != nil {
+			return nil, err
+		}
 		if len(sets) == 0 {
 			continue
 		}
@@ -608,7 +609,7 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return []string{
 				"SharedNode\tpods of the cluster may share the same node",
-				"DedicatedNode\teach pod of the cluster will runs on their own dedicated node",
+				"DedicatedNode\teach pod of the cluster will run on their own dedicated node",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}))
 }

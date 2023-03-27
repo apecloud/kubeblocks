@@ -26,7 +26,6 @@ kbcli playground init [flags]
       --cluster-version string      Cluster definition
   -h, --help                        help for init
       --region string               The region to create kubernetes cluster
-      --verbose                     Output more log info
       --version string              KubeBlocks version
 ```
 

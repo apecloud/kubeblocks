@@ -43,21 +43,27 @@ const (
 	GoosDarwin = "darwin"
 	// GoosWindows is os.GOOS windows string
 	GoosWindows = "windows"
+)
 
-	// K8s core API group
+// K8s core API group
+const (
 	K8sCoreAPIVersion    = "v1"
 	ResourceDeployments  = "deployments"
 	ResourceConfigmaps   = "configmaps"
 	ResourceStatefulSets = "statefulsets"
 	ResourceSecrets      = "secrets"
+)
 
-	// K8s webhook API group
+// K8s webhook API group
+const (
 	WebhookAPIGroup                         = "admissionregistration.k8s.io"
 	K8sWebhookAPIVersion                    = "v1"
 	ResourceValidatingWebhookConfigurations = "validatingwebhookconfigurations"
 	ResourceMutatingWebhookConfigurations   = "mutatingwebhookconfigurations"
+)
 
-	// Apps API group
+// Apps API group
+const (
 	AppsAPIGroup                     = "apps.kubeblocks.io"
 	AppsAPIVersion                   = "v1alpha1"
 	ResourceClusters                 = "clusters"
@@ -73,13 +79,17 @@ const (
 	KindRestoreJob                   = "RestoreJob"
 	KindBackupPolicyTemplate         = "BackupPolicyTemplate"
 	KindOps                          = "OpsRequest"
+)
 
+// Annotations
+const (
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
 	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"
-	StorageClassAnnotationKey      = "kubeblocks.io/storage-class"
+)
 
-	// DataProtection API group
+// DataProtection API group
+const (
 	DPAPIGroup                    = "dataprotection.kubeblocks.io"
 	DPAPIVersion                  = "v1alpha1"
 	ResourceBackups               = "backups"
@@ -87,13 +97,20 @@ const (
 	ResourceRestoreJobs           = "restorejobs"
 	ResourceBackupPolicies        = "backuppolicies"
 	ResourceBackupPolicyTemplates = "backuppolicytemplates"
+)
 
-	// Extensions API group
+// Extensions API group
+const (
 	ExtensionsAPIGroup   = "extensions.kubeblocks.io"
 	ExtensionsAPIVersion = "v1alpha1"
 	ResourceAddons       = "addons"
+)
 
+const (
 	None = "<none>"
+
+	// AddonReleasePrefix is the prefix of addon release name
+	AddonReleasePrefix = "kb-addon"
 )
 
 var (
@@ -112,9 +129,6 @@ var (
 	// GitLabHelmChartRepo the helm chart repo in GitLab
 	GitLabHelmChartRepo = "https://jihulab.com/api/v4/projects/85949/packages/helm/stable"
 
-	// AddonReleasePrefix is the prefix of addon release name
-	AddonReleasePrefix = "kb-addon"
-
 	// InstanceLabelSelector app.kubernetes.io/instance=kubeblocks, hit most workloads and configuration
 	InstanceLabelSelector = fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, KubeBlocksChartName)
 
@@ -125,25 +139,11 @@ var (
 	KubeBlocksHelmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", KubeBlocksChartName, "owner", "helm")
 )
 
-type BackupJobInfo struct {
-	Name           string
-	Namespace      string
-	Phase          string
-	StartTime      string
-	CompletionTime string
-	Labels         string
-}
-
-type BackupSnapInfo struct {
-	Name          string
-	Namespace     string
-	ReadyToUse    bool
-	CreationTime  string
-	RestoreSize   string
-	SourcePVC     string
-	SnapshotClass string
-	Labels        string
-}
+// Playground
+var (
+	// K3dClusterName is the k3d cluster name for playground
+	K3dClusterName = "kb-playground"
+)
 
 type ConfigTemplateInfo struct {
 	Name  string

@@ -68,7 +68,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		cleanupObjects()
 	})
 
-	addClusterRequestAnnotation := func(cluster *Cluster, opsName string, toClusterPhase Phase) {
+	addClusterRequestAnnotation := func(cluster *Cluster, opsName string, toClusterPhase ClusterPhase) {
 		clusterPatch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Annotations = map[string]string{
 			opsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"%s"}]`, opsName, toClusterPhase),
@@ -110,20 +110,23 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
 
 		By("Test Cluster Phase")
+		opsRequest.Name = opsRequestName + "-upgrade-cluster-phase"
 		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
-			FromClusterPhases: []Phase{RunningPhase},
-			ToClusterPhase:    VersionUpgradingPhase,
+			FromClusterPhases: []ClusterPhase{RunningClusterPhase},
+			ToClusterPhase:    SpecReconcilingClusterPhase, // original VersionUpgradingPhase,
 		}
+		// TODO: do VersionUpgradingPhase condition value check
+
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("Upgrade is forbidden"))
 		// update cluster phase to Running
 		clusterPatch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Phase = RunningPhase
+		cluster.Status.Phase = RunningClusterPhase
 		Expect(k8sClient.Status().Patch(ctx, cluster, clusterPatch)).Should(Succeed())
 
 		By("Test existing other operations in cluster")
 		// update cluster existing operations
-		addClusterRequestAnnotation(cluster, "testOpsName", VersionUpgradingPhase)
+		addClusterRequestAnnotation(cluster, "testOpsName", SpecReconcilingClusterPhase)
 		Eventually(func() string {
 			err := testCtx.CreateObj(ctx, opsRequest)
 			if err == nil {
@@ -132,7 +135,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			return err.Error()
 		}).Should(ContainSubstring("Existing OpsRequest: testOpsName"))
 		// test opsRequest reentry
-		addClusterRequestAnnotation(cluster, opsRequest.Name, VersionUpgradingPhase)
+		addClusterRequestAnnotation(cluster, opsRequest.Name, SpecReconcilingClusterPhase)
 		By("By creating a upgrade opsRequest, it should be succeed")
 		Eventually(func() bool {
 			opsRequest.Spec.Upgrade.ClusterVersionRef = newClusterVersion.Name
@@ -156,7 +159,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		// so we should add eventually block.
 		Eventually(func() bool {
 			patch := client.MergeFrom(opsRequest.DeepCopy())
-			opsRequest.Status.Phase = SucceedPhase
+			opsRequest.Status.Phase = OpsSucceedPhase
 			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
 
 			patch = client.MergeFrom(opsRequest.DeepCopy())

@@ -250,11 +250,11 @@ func (c *eniManager) ensureENI() error {
 			c.logger.Info("Limit exceed, can not create new eni", "current", len(describeENIResponse.Enis), "max", c.maxENI)
 			return nil
 		}
-		if err := c.tryCreateAndAttachENI(); err != nil {
+		if err = c.tryCreateAndAttachENI(); err != nil {
 			c.logger.Error(err, "Failed to create and attach new ENI")
 		}
 	} else if totalSpare > max {
-		if err := c.tryDetachAndDeleteENI(managedENIs); err != nil {
+		if err = c.tryDetachAndDeleteENI(managedENIs); err != nil {
 			c.logger.Error(err, "Failed to detach and delete idle ENI")
 		}
 	}
@@ -280,7 +280,7 @@ func (c *eniManager) tryCreateAndAttachENI() error {
 	c.logger.Info("Successfully attach new eni, waiting for it to take effect", "eni id", eniID)
 
 	// waiting for ENI attached
-	if err := c.waitForENIAttached(eniID); err != nil {
+	if err = c.waitForENIAttached(eniID); err != nil {
 		return errors.Wrap(err, "Unable to discover attached ENI from metadata service")
 	}
 	c.logger.Info("Successfully find eni attached", "eni id", eniID)
@@ -348,11 +348,28 @@ func (c *eniManager) cleanLeakedENIs() error {
 	return nil
 }
 
+var (
+	ErrNoNetworkInterfaces = errors.New("No network interfaces found for ENI")
+	ErrENINotFound         = errors.New("ENI is not found")
+)
+
 func (c *eniManager) waitForENIAttached(eniID string) error {
-	request := &pb.WaitForENIAttachedRequest{
-		RequestId: util.GenRequestID(),
-		Eni:       &pb.ENIMetadata{EniId: eniID},
+	f := func() error {
+		describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestID()}
+		enis, err := c.nc.DescribeAllENIs(context.Background(), describeENIRequest)
+		if err != nil {
+			c.logger.Error(err, "Failed to discover attached ENIs")
+			return ErrNoNetworkInterfaces
+		}
+		for _, eni := range enis.GetEnis() {
+			if eniID == eni.EniId {
+				return nil
+			}
+		}
+		return ErrENINotFound
 	}
-	_, err := c.nc.WaitForENIAttached(context.Background(), request)
-	return err
+	if err := util.DoWithRetry(context.Background(), c.logger, f, &util.RetryOptions{MaxRetry: 15, Delay: 3 * time.Second}); err != nil {
+		return fmt.Errorf("giving up trying to retrieve ENIs from metadata service")
+	}
+	return nil
 }

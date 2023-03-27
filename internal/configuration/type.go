@@ -105,13 +105,13 @@ type ConfigOperator interface {
 
 type GetResourceFn func(key client.ObjectKey) (map[string]string, error)
 
-type K8sConfig struct {
-	CfgKey     client.ObjectKey
-	ResourceFn GetResourceFn
+type ConfigResource struct {
+	CfgKey         client.ObjectKey
+	ResourceReader GetResourceFn
 
 	// configmap data
-	Configurations map[string]string
-	CMKeys         *set.LinkedHashSetString
+	ConfigData map[string]string
+	CMKeys     *set.LinkedHashSetString
 }
 
 type CfgOption struct {
@@ -125,8 +125,15 @@ type CfgOption struct {
 	Path    string
 	RawData []byte
 
-	// K8sKey for k8s resource
-	K8sKey *K8sConfig
+	// ConfigResource for k8s resource
+	ConfigResource *ConfigResource
+}
+
+func FromConfigData(data map[string]string, cmKeys *set.LinkedHashSetString) *ConfigResource {
+	return &ConfigResource{
+		ConfigData: data,
+		CMKeys:     cmKeys,
+	}
 }
 
 // GenerateTPLUniqLabelKeyWithConfig generate uniq key for configuration template

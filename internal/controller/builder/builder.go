@@ -429,7 +429,8 @@ func BuildDeployLow(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster
 func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	vct corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
-	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
+	snapshotName string,
+	component *component.SynthesizedComponent) (*corev1.PersistentVolumeClaim, error) {
 
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := buildFromCUE("pvc_template.cue", map[string]any{
@@ -440,7 +441,7 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	}, "pvc", &pvc); err != nil {
 		return nil, err
 	}
-
+	BuildPersistentVolumeClaimLabels(sts, &pvc, component, vct.Name)
 	return &pvc, nil
 }
 

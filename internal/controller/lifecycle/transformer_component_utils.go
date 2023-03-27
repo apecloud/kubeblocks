@@ -394,7 +394,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				reqCtx.Ctx,
 				pvcKey,
 				cluster,
-				component.Name,
+				component,
 				vct,
 				stsObj); err != nil {
 				reqCtx.Log.Error(err, "checkedCreatePVCFromSnapshot failed")
@@ -503,7 +503,7 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 	ctx context.Context,
 	pvcKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
-	componentName string,
+	component *component.SynthesizedComponent,
 	vct corev1.PersistentVolumeClaimTemplate,
 	stsObj *appsv1.StatefulSet) (client.Object, error) {
 	pvc := corev1.PersistentVolumeClaim{}
@@ -512,13 +512,13 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 		if !apierrors.IsNotFound(err) {
 			return nil, err
 		}
-		ml := getBackupMatchingLabels(cluster.Name, componentName)
+		ml := getBackupMatchingLabels(cluster.Name, component.Name)
 		vsList := snapshotv1.VolumeSnapshotList{}
 		if err := cli.List(ctx, &vsList, ml); err != nil {
 			return nil, err
 		}
 		if len(vsList.Items) == 0 {
-			return nil, fmt.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, componentName)
+			return nil, fmt.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, component.Name)
 		}
 		// exclude volumes that are deleting
 		vsName := ""
@@ -529,7 +529,7 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 			vsName = vs.Name
 			break
 		}
-		return createPVCFromSnapshot(vct, cluster, stsObj, pvcKey, vsName)
+		return createPVCFromSnapshot(vct, cluster, stsObj, pvcKey, vsName, component)
 	}
 	return nil, nil
 }
@@ -607,8 +607,9 @@ func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
 	cluster *appsv1alpha1.Cluster,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
-	snapshotName string) (client.Object, error) {
-	pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName)
+	snapshotName string,
+	component *component.SynthesizedComponent) (client.Object, error) {
+	pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName, component)
 	if err != nil {
 		return nil, err
 	}

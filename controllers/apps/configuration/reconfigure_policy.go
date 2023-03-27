@@ -71,13 +71,13 @@ type reconfigureParams struct {
 	Restart bool
 
 	// Name is a config template name.
-	TplName string
+	ConfigSpecName string
 
 	// Configuration files patch.
 	ConfigPatch *cfgcore.ConfigPatchInfo
 
 	// Configmap object of the configuration template instance in the component.
-	CfgCM *corev1.ConfigMap
+	ConfigMap *corev1.ConfigMap
 
 	// ConfigConstraint pointer
 	ConfigConstraint *appsv1alpha1.ConfigConstraintSpec
@@ -130,16 +130,16 @@ func GetClientFactory() createReconfigureClient {
 }
 
 func (param *reconfigureParams) getConfigKey() string {
-	for _, tpl := range param.Component.ConfigSpecs {
-		if tpl.Name == param.TplName {
-			return tpl.VolumeName
+	for _, configSpec := range param.Component.ConfigSpecs {
+		if configSpec.Name == param.ConfigSpecName {
+			return configSpec.VolumeName
 		}
 	}
 	return ""
 }
 
 func (param *reconfigureParams) getTargetVersionHash() string {
-	hash, err := cfgcore.ComputeHash(param.CfgCM.Data)
+	hash, err := cfgcore.ComputeHash(param.ConfigMap.Data)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to cal configuration version!")
 		return ""
@@ -195,7 +195,7 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(appsv1alpha1.AutoReload)
 }
 
-func NewReconfigurePolicy(tpl *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgcore.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
+func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgcore.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
 	if !cfgPatch.IsModify {
 		// not exec here
 		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfgPatch)
@@ -203,8 +203,7 @@ func NewReconfigurePolicy(tpl *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgc
 
 	actionType := policy
 	if !restart {
-		if dynamicUpdate, err := cfgcore.IsUpdateDynamicParameters(tpl, cfgPatch); err != nil {
-			return nil, err
+		if dynamicUpdate, err := cfgcore.IsUpdateDynamicParameters(cc, cfgPatch); err != nil {
 		} else if dynamicUpdate {
 			actionType = appsv1alpha1.AutoReload
 		}

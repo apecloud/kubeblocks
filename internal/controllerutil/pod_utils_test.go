@@ -270,22 +270,22 @@ var _ = Describe("pod utils", func() {
 
 	})
 
-	// for test GetContainerByConfigTemplate
-	Context("GetContainerByConfigTemplate test", func() {
+	// for test GetContainerByConfigSpec
+	Context("GetContainerByConfigSpec test", func() {
 		// found name: mysql3
 		It("Should success with no error", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
-			Expect(GetContainerByConfigTemplate(podSpec, configTemplates)).To(Equal(&podSpec.Containers[2]))
+			Expect(GetContainerByConfigSpec(podSpec, configTemplates)).To(Equal(&podSpec.Containers[2]))
 		})
 		// found name: init_mysql
 		It("Should success with no error", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
-			Expect(GetContainerByConfigTemplate(podSpec, foundInitContainerConfigTemplates)).To(Equal(&podSpec.InitContainers[0]))
+			Expect(GetContainerByConfigSpec(podSpec, foundInitContainerConfigTemplates)).To(Equal(&podSpec.InitContainers[0]))
 		})
 		// not found container
 		It("Should failed", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
-			Expect(GetContainerByConfigTemplate(podSpec, notFoundConfigTemplates)).To(BeNil(), "get container is nil!")
+			Expect(GetContainerByConfigSpec(podSpec, notFoundConfigTemplates)).To(BeNil(), "get container is nil!")
 		})
 	})
 

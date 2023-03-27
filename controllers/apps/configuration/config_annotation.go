@@ -60,25 +60,25 @@ func setCfgUpgradeFlag(cli client.Client, ctx intctrlutil.RequestCtx, config *co
 	return nil
 }
 
-// applyConfigurationChange is
-func applyConfigurationChange(client client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap) (bool, error) {
-	annotations := config.GetAnnotations()
+// checkAndApplyConfigsChanged check if configs changed
+func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCtx, cm *corev1.ConfigMap) (bool, error) {
+	annotations := cm.GetAnnotations()
 
-	configData, err := json.Marshal(config.Data)
+	configData, err := json.Marshal(cm.Data)
 	if err != nil {
 		return false, err
 	}
 
 	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotation]
 	if !ok {
-		return updateAppliedConfiguration(client, ctx, config, configData, ReconfigureFirstConfigType)
+		return updateAppliedConfigs(client, ctx, cm, configData, ReconfigureFirstConfigType)
 	}
 
 	return lastConfig == string(configData), nil
 }
 
-// updateAppliedConfiguration update hash label and last applied config
-func updateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigureType string) (bool, error) {
+// updateAppliedConfigs update hash label and last applied config
+func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigureType string) (bool, error) {
 
 	patch := client.MergeFrom(config.DeepCopy())
 	if config.ObjectMeta.Annotations == nil {
@@ -102,9 +102,9 @@ func updateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 	return true, nil
 }
 
-func getLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
+func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
 	data := make(map[string]string, 0)
-	cfgContent, ok := cfg.GetAnnotations()[constant.LastAppliedConfigAnnotation]
+	cfgContent, ok := cm.GetAnnotations()[constant.LastAppliedConfigAnnotation]
 	if !ok {
 		return data, nil
 	}
@@ -116,12 +116,12 @@ func getLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
 	return data, nil
 }
 
-func getUpgradePolicy(cfg *corev1.ConfigMap) appsv1alpha1.UpgradePolicy {
+func getUpgradePolicy(cm *corev1.ConfigMap) appsv1alpha1.UpgradePolicy {
 	const (
 		DefaultUpgradePolicy = appsv1alpha1.NormalPolicy
 	)
 
-	annotations := cfg.GetAnnotations()
+	annotations := cm.GetAnnotations()
 	value, ok := annotations[constant.UpgradePolicyAnnotationKey]
 	if !ok {
 		return DefaultUpgradePolicy

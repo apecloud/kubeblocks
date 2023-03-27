@@ -20,6 +20,7 @@ options: {
 	ttl:              string
 	connectionSecret: string
 	policyTemplate:   string
+	role:             string
 }
 
 // required, k8s api resource content
@@ -36,6 +37,9 @@ content: {
 			labelsSelector: {
 				matchLabels: {
 					"app.kubernetes.io/instance": options.clusterName
+					if options.role != _|_ {
+						"kubeblocks.io/role": options.role
+					}
 				}
 			}
 			secret: {

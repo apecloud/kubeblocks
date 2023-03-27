@@ -14,7 +14,7 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL Standa
 - [Install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) to ensure that you can connect to the EKS cluster.
 - Install `kbcli`. Refer to [Install kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
    ```bash
-   curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
+   curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
    ```
 
 ***Steps:***
@@ -62,19 +62,7 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL Standa
   
        kubectl patch sc/gp2 -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
        ```
-    - Configure default snapshot volumesnapshot class
-       ```bash
-       kubectl create -f - <<EOF
-       apiVersion: snapshot.storage.k8s.io/v1
-       kind: VolumeSnapshotClass
-       metadata:
-         name: csi-aws-vsc
-         annotations:
-           snapshot.storage.kubernetes.io/is-default-class: "true"
-       driver: ebs.csi.aws.com
-       deletionPolicy: Delete
-       EOF
-       ```
+
 3. Create a PostgreSQL Standalone. 
     
     ```bash

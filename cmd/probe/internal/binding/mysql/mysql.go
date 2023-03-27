@@ -36,8 +36,10 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
 // MysqlOperations represents MySQL output bindings.
@@ -46,6 +48,8 @@ type MysqlOperations struct {
 	mu sync.Mutex
 	BaseOperations
 }
+
+var _ BaseInternalOps = &MysqlOperations{}
 
 const (
 	// configurations to connect to Mysql, either a data source name represent by URL.
@@ -65,6 +69,25 @@ const (
 	maxOpenConnsKey    = "maxOpenConns"
 	connMaxLifetimeKey = "connMaxLifetime"
 	connMaxIdleTimeKey = "connMaxIdleTime"
+)
+
+const (
+	superUserPriv = "SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON *.*"
+	readWritePriv = "SELECT, INSERT, UPDATE, DELETE ON *.*"
+	readOnlyRPriv = "SELECT ON *.*"
+	noPriv        = "USAGE ON *.*"
+
+	listUserTpl  = "SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired FROM mysql.user WHERE host = '%' and user <> 'root' and user not like 'kb%';"
+	showGrantTpl = "SHOW GRANTS FOR '%s'@'%%';"
+	getUserTpl   = `
+	SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired 
+	FROM mysql.user 
+	WHERE host = '%%' and user <> 'root' and user not like 'kb%%' and user ='%s';"
+	`
+	createUserTpl = "CREATE USER '%s'@'%%' IDENTIFIED BY '%s';"
+	deleteUserTpl = "DROP USER IF EXISTS '%s'@'%%';"
+	grantTpl      = "GRANT %s TO '%s'@'%%';"
+	revokeTpl     = "REVOKE %s FROM '%s'@'%%';"
 )
 
 var (
@@ -99,6 +122,14 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.RegisterOperation(CheckStatusOperation, mysqlOps.CheckStatusOps)
 	mysqlOps.RegisterOperation(ExecOperation, mysqlOps.ExecOps)
 	mysqlOps.RegisterOperation(QueryOperation, mysqlOps.QueryOps)
+
+	// following are ops for account management
+	mysqlOps.RegisterOperation(ListUsersOp, mysqlOps.listUsersOps)
+	mysqlOps.RegisterOperation(CreateUserOp, mysqlOps.createUserOps)
+	mysqlOps.RegisterOperation(DeleteUserOp, mysqlOps.deleteUserOps)
+	mysqlOps.RegisterOperation(DescribeUserOp, mysqlOps.describeUserOps)
+	mysqlOps.RegisterOperation(GrantUserRoleOp, mysqlOps.grantUserRoleOps)
+	mysqlOps.RegisterOperation(RevokeUserRoleOp, mysqlOps.revokeUserRoleOps)
 	return nil
 }
 
@@ -218,8 +249,8 @@ func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.Invo
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
-		result["event"] = OperationFailed
-		result["message"] = "no sql provided"
+		result["event"] = "ExecFailed"
+		result["message"] = ErrNoSQL
 		return result, nil
 	}
 	count, err := mysqlOps.exec(ctx, sql)
@@ -447,4 +478,190 @@ func (mysqlOps *MysqlOperations) convert(columnTypes []*sql.ColumnType, values [
 		}
 	}
 	return r
+}
+
+// InternalQuery is used for internal query, implement BaseInternalOps interface
+func (mysqlOps *MysqlOperations) InternalQuery(ctx context.Context, sql string) ([]byte, error) {
+	return mysqlOps.query(ctx, sql)
+}
+
+// InternalExec is used for internal execution, implement BaseInternalOps interface
+func (mysqlOps *MysqlOperations) InternalExec(ctx context.Context, sql string) (int64, error) {
+	return mysqlOps.exec(ctx, sql)
+}
+
+// GetLogger is used for getting logger, implement BaseInternalOps interface
+func (mysqlOps *MysqlOperations) GetLogger() logger.Logger {
+	return mysqlOps.Logger
+}
+
+func (mysqlOps *MysqlOperations) listUsersOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind = ListUsersOp
+	)
+	sqlTplRend := func(user UserInfo) string {
+		return listUserTpl
+	}
+	return QueryObject(ctx, mysqlOps, req, opsKind, nil, sqlTplRend, nil)
+}
+
+func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind = DescribeUserOp
+	)
+
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		return nil
+	}
+
+	// get user grants
+	sqlTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(showGrantTpl, user.UserName)
+	}
+
+	dataProcessor := func(data []byte) (interface{}, error) {
+		roles := make([]map[string]string, 0)
+		err := json.Unmarshal(data, &roles)
+		if err != nil {
+			return nil, err
+		}
+		user := UserInfo{}
+		userRoles := make([]string, 0)
+		for _, roleMap := range roles {
+			for k, v := range roleMap {
+				if len(user.UserName) == 0 {
+					user.UserName = strings.TrimPrefix(strings.TrimSuffix(k, "@%"), "Grants for ")
+				}
+				userRoles = append(userRoles, mysqlOps.inferRoleFromPriv(strings.TrimPrefix(v, "GRANT ")))
+			}
+		}
+		user.RoleName = strings.Join(userRoles, ",")
+		if jsonData, err := json.Marshal([]UserInfo{user}); err != nil {
+			return nil, err
+		} else {
+			return string(jsonData), nil
+		}
+	}
+
+	return QueryObject(ctx, mysqlOps, req, opsKind, validFn, sqlTplRend, dataProcessor)
+}
+
+func (mysqlOps *MysqlOperations) createUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind = CreateUserOp
+	)
+
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		if len(user.Password) == 0 {
+			return ErrNoPassword
+		}
+		return nil
+	}
+
+	sqlTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(createUserTpl, user.UserName, user.Password)
+	}
+
+	msgTplRend := func(user UserInfo) string {
+		return fmt.Sprintf("created user: %s, with password: %s", user.UserName, user.Password)
+	}
+
+	return ExecuteObject(ctx, mysqlOps, req, opsKind, validFn, sqlTplRend, msgTplRend)
+}
+
+func (mysqlOps *MysqlOperations) deleteUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind = DeleteUserOp
+	)
+
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		return nil
+	}
+	sqlTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(deleteUserTpl, user.UserName)
+	}
+	msgTplRend := func(user UserInfo) string {
+		return fmt.Sprintf("deleted user: %s", user.UserName)
+	}
+	return ExecuteObject(ctx, mysqlOps, req, opsKind, validFn, sqlTplRend, msgTplRend)
+}
+
+func (mysqlOps *MysqlOperations) grantUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		succMsgTpl = "role %s granted to user: %s"
+	)
+	return mysqlOps.managePrivillege(ctx, req, GrantUserRoleOp, grantTpl, succMsgTpl)
+}
+
+func (mysqlOps *MysqlOperations) revokeUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		succMsgTpl = "role %s revoked from user: %s"
+	)
+	return mysqlOps.managePrivillege(ctx, req, RevokeUserRoleOp, revokeTpl, succMsgTpl)
+}
+
+func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *bindings.InvokeRequest, op bindings.OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		if len(user.RoleName) == 0 {
+			return ErrNoRoleName
+		}
+		roles := []string{ReadOnlyRole, ReadWriteRole, SuperUserRole}
+		if !slices.Contains(roles, strings.ToLower(user.RoleName)) {
+			return ErrInvalidRoleName
+		}
+		return nil
+	}
+	sqlTplRend := func(user UserInfo) string {
+		// render sql stmts
+		roleDesc, _ := mysqlOps.renderRoleByName(user.RoleName)
+		// update privilege
+		sql := fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
+		return sql
+	}
+	msgTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(succMsgTpl, user.RoleName, user.UserName)
+	}
+
+	return ExecuteObject(ctx, mysqlOps, req, op, validFn, sqlTplRend, msgTplRend)
+}
+
+func (mysqlOps *MysqlOperations) renderRoleByName(roleName string) (string, error) {
+	switch strings.ToLower(roleName) {
+	case SuperUserRole:
+		return superUserPriv, nil
+	case ReadWriteRole:
+		return readWritePriv, nil
+	case ReadOnlyRole:
+		return readOnlyRPriv, nil
+	default:
+		return "", fmt.Errorf("role name: %s is not supported", roleName)
+	}
+}
+
+func (mysqlOps *MysqlOperations) inferRoleFromPriv(priv string) string {
+	if strings.HasPrefix(priv, readOnlyRPriv) {
+		return ReadOnlyRole
+	}
+	if strings.HasPrefix(priv, readWritePriv) {
+		return ReadWriteRole
+	}
+	if strings.HasPrefix(priv, superUserPriv) {
+		return SuperUserRole
+	}
+	if strings.HasPrefix(priv, noPriv) {
+		return NoPrivileges
+	}
+	return CustomizedRole
 }

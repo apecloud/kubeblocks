@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/StudioSol/set"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -31,8 +30,8 @@ type ParamPairs struct {
 	UpdatedParams map[string]interface{}
 }
 
-// MergeAndValidateConfiguration does merge configuration files and validate
-func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstraintSpec, baseCfg map[string]string, cmKey []string, updatedParams []ParamPairs) (map[string]string, error) {
+// MergeAndValidateConfigs does merge configuration files and validate
+func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []ParamPairs) (map[string]string, error) {
 	var (
 		err error
 		fc  = configConstraint.FormatterConfig
@@ -43,17 +42,13 @@ func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstrain
 	)
 
 	cmKeySet := FromCMKeysSelector(cmKey)
-	if configOperator, err = NewConfigLoader(CfgOption{
-		Type:    CfgCmType,
-		Log:     log.FromContext(context.TODO()),
-		CfgType: fc.Format,
-		K8sKey: &K8sConfig{
-			CfgKey: client.ObjectKey{},
-			ResourceFn: func(key client.ObjectKey) (map[string]string, error) {
-				return baseCfg, nil
-			},
-			CMKeys: cmKeySet,
-		}}); err != nil {
+	configOption := CfgOption{
+		Type:           CfgCmType,
+		Log:            log.FromContext(context.TODO()),
+		CfgType:        fc.Format,
+		ConfigResource: FromConfigData(baseConfigs, cmKeySet),
+	}
+	if configOperator, err = NewConfigLoader(configOption); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +81,7 @@ func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstrain
 	if err = NewConfigValidator(&configConstraint, WithKeySelector(cmKey)).Validate(updatedCfg); err != nil {
 		return nil, WrapError(err, "failed to validate updated config")
 	}
-	return mergeUpdatedConfig(baseCfg, updatedCfg), nil
+	return mergeUpdatedConfig(baseConfigs, updatedCfg), nil
 }
 
 // mergeUpdatedConfig replaces the file content of the changed key.

@@ -228,9 +228,6 @@ func ParseComponentClasses(data map[string]string) (map[string]*v1alpha1.Compone
 					if err != nil {
 						return nil, err
 					}
-					if !out.Enabled() {
-						continue
-					}
 					if _, exists := result[out.Name]; exists {
 						return nil, fmt.Errorf("duplicate component class name: %s", out.Name)
 					}

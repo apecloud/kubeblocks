@@ -84,6 +84,7 @@ rules:
   verbs:
   - get
   - list
+  - watch
 - apiGroups:
   - apps.kubeblocks.io
   resources:

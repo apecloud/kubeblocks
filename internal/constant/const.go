@@ -107,6 +107,9 @@ const (
 
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
+
+	// ClassAnnotationKey is used to specify the class of components
+	ClassAnnotationKey = "cluster.kubeblocks.io/component-class"
 )
 
 const (

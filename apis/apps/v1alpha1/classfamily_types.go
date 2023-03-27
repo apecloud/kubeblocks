@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"golang.org/x/exp/slices"
@@ -27,9 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // ClassFamilySpec defines the desired state of ClassFamily
 type ClassFamilySpec struct {
 	// Class family models, generally, a model is a static memory/cpu ratio or a range.
@@ -37,27 +35,29 @@ type ClassFamilySpec struct {
 }
 
 type ClassFamilyModel struct {
+	// The constraint for CPU cores
 	// +kubebuilder:validation:Required
 	CPU CPUConstraint `json:"cpu,omitempty"`
 
+	// The constraint for memory size
 	// +kubebuilder:validation:Required
 	Memory MemoryConstraint `json:"memory,omitempty"`
 }
 
 type CPUConstraint struct {
-	// The maximum count of vcpu
+	// The maximum count of vcpu cores.
 	// +optional
 	Max *resource.Quantity `json:"max,omitempty"`
 
-	// The minimum count of vcpu
+	// The minimum count of vcpu cores.
 	// +optional
 	Min *resource.Quantity `json:"min,omitempty"`
 
-	// The minimum granularity of vcpu
+	// The minimum granularity of vcpu cores.
 	// +optional
 	Step *resource.Quantity `json:"step,omitempty"`
 
-	// The available vcpu enums
+	// The available vcpu cores,
 	// +optional
 	Slots []resource.Quantity `json:"slots,omitempty"`
 }
@@ -76,14 +76,7 @@ type MemoryConstraint struct {
 	MinPerCPU *resource.Quantity `json:"minPerCPU,omitempty"`
 }
 
-// ClassFamilyStatus defines the observed state of ClassFamily
-type ClassFamilyStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-}
-
 // +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all},scope=Cluster,shortName=cf
 
 // ClassFamily is the Schema for the classfamilies API
@@ -91,8 +84,7 @@ type ClassFamily struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClassFamilySpec   `json:"spec,omitempty"`
-	Status ClassFamilyStatus `json:"status,omitempty"`
+	Spec ClassFamilySpec `json:"spec,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -108,17 +100,14 @@ func init() {
 	SchemeBuilder.Register(&ClassFamily{}, &ClassFamilyList{})
 }
 
-func (m *ClassFamilyModel) ValidateCPU(cpu *resource.Quantity) bool {
-	if cpu == nil {
-		return true
-	}
-	if m.CPU.Min != nil && m.CPU.Min.Cmp(*cpu) > 0 {
+func (m *ClassFamilyModel) ValidateCPU(cpu resource.Quantity) bool {
+	if m.CPU.Min != nil && m.CPU.Min.Cmp(cpu) > 0 {
 		return false
 	}
-	if m.CPU.Max != nil && m.CPU.Max.Cmp(*cpu) < 0 {
+	if m.CPU.Max != nil && m.CPU.Max.Cmp(cpu) < 0 {
 		return false
 	}
-	if m.CPU.Slots != nil && slices.Index(m.CPU.Slots, *cpu) < 0 {
+	if m.CPU.Slots != nil && slices.Index(m.CPU.Slots, cpu) < 0 {
 		return false
 	}
 	return true
@@ -155,7 +144,7 @@ func (m *ClassFamilyModel) ValidateResourceRequirements(r *corev1.ResourceRequir
 		return true
 	}
 
-	if !m.ValidateCPU(cpu) {
+	if !m.ValidateCPU(*cpu) {
 		return false
 	}
 
@@ -238,13 +227,9 @@ type ComponentClass struct {
 	Memory  resource.Quantity `json:"memory,omitempty"`
 	Storage []*Disk           `json:"storage,omitempty"`
 	Family  string            `json:"-"`
-
-	disabled bool
 }
 
-func (c *ComponentClass) Enabled() bool {
-	return !c.disabled
-}
+var _ sort.Interface = ByClassCPUAndMemory{}
 
 type ByClassCPUAndMemory []*ComponentClass
 
@@ -269,10 +254,6 @@ func (b ByClassCPUAndMemory) Swap(i, j int) {
 }
 
 type Filters map[string]resource.Quantity
-
-func (f Filters) Add(k string, v resource.Quantity) {
-	f[k] = v
-}
 
 func (f Filters) String() string {
 	var result []string

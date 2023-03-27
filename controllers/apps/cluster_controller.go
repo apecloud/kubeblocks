@@ -104,7 +104,7 @@ import (
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
 
 // classfamily get list
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=classfamilies,verbs=get;list
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=classfamilies,verbs=get;list;watch
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
@@ -496,7 +496,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 }
 
 func removeFinalizer[T generics.Object, PT generics.PObject[T],
-	L generics.ObjList[T], PL generics.PObjList[T, L]](
+L generics.ObjList[T], PL generics.PObjList[T, L]](
 	r *ClusterReconciler, reqCtx intctrlutil.RequestCtx, _ func(T, L), opts ...client.ListOption) (*ctrl.Result, error) {
 	var (
 		objList L
@@ -587,7 +587,7 @@ func (r *ClusterReconciler) checkReferencedCRStatus(
 
 func (r *ClusterReconciler) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
 	var (
-		value                 = cluster.GetAnnotations()[classAnnotationKey]
+		value                 = cluster.GetAnnotations()[constant.ClassAnnotationKey]
 		componentClassMapping = make(map[string]string)
 	)
 	if value != "" {

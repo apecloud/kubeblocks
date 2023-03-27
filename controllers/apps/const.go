@@ -38,9 +38,6 @@ const (
 	// logs will be recorded in more detail, and some ephemeral pods (esp. those created by jobs) will retain after execution.
 	debugClusterAnnotationKey = "cluster.kubeblocks.io/debug"
 
-	// classAnnotationKey is used to specify the class of components
-	classAnnotationKey = "cluster.kubeblocks.io/component-class"
-
 	// annotations values
 	lifecycleDeletePVCAnnotation = "delete-pvc"
 )

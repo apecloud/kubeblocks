@@ -46,23 +46,24 @@ spec:
                 items:
                   properties:
                     cpu:
+                      description: The constraint for CPU cores
                       properties:
                         max:
                           anyOf:
                           - type: integer
                           - type: string
-                          description: The maximum count of vcpu
+                          description: The maximum count of vcpu cores.
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
                         min:
                           anyOf:
                           - type: integer
                           - type: string
-                          description: The minimum count of vcpu
+                          description: The minimum count of vcpu cores.
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
                         slots:
-                          description: The available vcpu enums
+                          description: The available vcpu cores,
                           items:
                             anyOf:
                             - type: integer
@@ -74,11 +75,12 @@ spec:
                           anyOf:
                           - type: integer
                           - type: string
-                          description: The minimum granularity of vcpu
+                          description: The minimum granularity of vcpu cores.
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
                       type: object
                     memory:
+                      description: The constraint for memory size
                       properties:
                         maxPerCPU:
                           anyOf:
@@ -105,11 +107,6 @@ spec:
                   type: object
                 type: array
             type: object
-          status:
-            description: ClassFamilyStatus defines the observed state of ClassFamily
-            type: object
         type: object
     served: true
     storage: true
-    subresources:
-      status: {}

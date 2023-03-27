@@ -302,8 +302,6 @@ ARGUMENTS=
 DEBUG_PORT=2345
 run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
-
-
 ##@ Deployment
 
 ifndef ignore-not-found

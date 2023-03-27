@@ -21,7 +21,7 @@ kbcli playground init [flags]
 ### Options
 
 ```
-      --cloud-provider string       Cloud provider type, one of [local,aws,azure,gcp,alibaba-cloud] (default "local")
+      --cloud-provider string       Cloud provider type, one of [tencentcloud alicloud aws local] (default "local")
       --cluster-definition string   Cluster definition (default "apecloud-mysql")
       --cluster-version string      Cluster definition
   -h, --help                        help for init

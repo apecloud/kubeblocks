@@ -264,6 +264,7 @@ func (c *clusterStatusTransformer) reconcileClusterStatus(cluster *appsv1alpha1.
 		return processClusterPhaseChanges(cluster, oldPhase, currentClusterPhase,
 			corev1.EventTypeNormal, message, action)
 	}
+
 	if err := doChainClusterStatusHandler(cluster,
 		removeInvalidComponentsAndAnalysis,
 		handleClusterReadyCondition,

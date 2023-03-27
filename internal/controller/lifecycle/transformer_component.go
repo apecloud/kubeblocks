@@ -72,7 +72,6 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 	}
 
 	for compName := range deleteSet {
-		// TODO: compSpecMap[compName] is not exist, should fix it
 		comp, err := NewComponent(&c.cc.cd, &c.cc.cv, cluster, compName, dag4Component)
 		if err != nil {
 			return err
@@ -93,9 +92,18 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 		}
 	}
 
+	for _, v := range dag4Component.Vertices() {
+		node, ok := v.(*lifecycleVertex)
+		if !ok {
+			panic("runtime error, unexpected lifecycle vertex type")
+		}
+		if node.obj == nil {
+			panic("runtime error, nil vertex object")
+		}
+	}
 	dag.Merge(dag4Component)
 
-	fmt.Printf("DAG: %s\n", dag)
+	fmt.Printf("cluster: %s, dag: %s\n", cluster.GetName(), dag)
 
 	return nil
 }

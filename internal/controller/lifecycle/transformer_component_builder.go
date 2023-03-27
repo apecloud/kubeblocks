@@ -49,19 +49,19 @@ type componentBuilder interface {
 
 // single workload component
 type componentBuilderBase struct {
-	ReqCtx          intctrlutil.RequestCtx
-	Client          client.Client
-	Comp            Component
+	reqCtx          intctrlutil.RequestCtx
+	client          client.Client
+	comp            Component
 	defaultAction   *Action
 	concreteBuilder componentBuilder
-	Error           error
-	EnvConfig       *corev1.ConfigMap
+	error           error
+	envConfig       *corev1.ConfigMap
 }
 
 func (b *componentBuilderBase) buildEnv() componentBuilder {
 	buildfn := func() ([]client.Object, error) {
-		envCfg, err := builder.BuildEnvConfigLow(b.ReqCtx, b.Client, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
-		b.EnvConfig = envCfg
+		envCfg, err := builder.BuildEnvConfigLow(b.reqCtx, b.client, b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
+		b.envConfig = envCfg
 		return []client.Object{envCfg}, err
 	}
 	return b.buildWrapper(buildfn)
@@ -72,18 +72,18 @@ func (b *componentBuilderBase) buildConfig(idx int32) componentBuilder {
 		workload := b.concreteBuilder.mutableWorkload(idx)
 		if workload == nil {
 			return nil, fmt.Errorf("build config but workload is nil, cluster: %s, component: %s",
-				b.Comp.GetClusterName(), b.Comp.GetName())
+				b.comp.GetClusterName(), b.comp.GetName())
 		}
 
-		return plan.BuildCfgLow(b.Comp.GetVersion(), b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), workload,
-			b.concreteBuilder.mutablePodSpec(idx), b.ReqCtx.Ctx, b.Client)
+		return plan.BuildCfgLow(b.comp.GetVersion(), b.comp.GetCluster(), b.comp.GetSynthesizedComponent(), workload,
+			b.concreteBuilder.mutablePodSpec(idx), b.reqCtx.Ctx, b.client)
 	}
 	return b.buildWrapper(buildfn)
 }
 
 func (b *componentBuilderBase) buildHeadlessService() componentBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svc, err := builder.BuildHeadlessSvcLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		svc, err := builder.BuildHeadlessSvcLow(b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
 		return []client.Object{svc}, err
 	}
 	return b.buildWrapper(buildfn)
@@ -91,11 +91,11 @@ func (b *componentBuilderBase) buildHeadlessService() componentBuilder {
 
 func (b *componentBuilderBase) buildService() componentBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svcList, err := builder.BuildSvcListLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		svcList, err := builder.BuildSvcListLow(b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}
-		objs := make([]client.Object, len(svcList))
+		objs := make([]client.Object, 0, len(svcList))
 		for _, svc := range svcList {
 			objs = append(objs, svc)
 		}
@@ -112,7 +112,7 @@ func (b *componentBuilderBase) buildVolumeMount(idx int32) componentBuilder {
 	buildfn := func() ([]client.Object, error) {
 		if b.concreteBuilder.mutableWorkload(idx) == nil {
 			return nil, fmt.Errorf("build volume mount but workload is nil, cluster: %s, component: %s",
-				b.Comp.GetClusterName(), b.Comp.GetName())
+				b.comp.GetClusterName(), b.comp.GetName())
 		}
 
 		podSpec := b.concreteBuilder.mutablePodSpec(idx)
@@ -141,8 +141,8 @@ func (b *componentBuilderBase) buildVolumeMount(idx int32) componentBuilder {
 
 func (b *componentBuilderBase) buildTLSCert() componentBuilder {
 	buildfn := func() ([]client.Object, error) {
-		cluster := b.Comp.GetCluster()
-		component := b.Comp.GetSynthesizedComponent()
+		cluster := b.comp.GetCluster()
+		component := b.comp.GetSynthesizedComponent()
 		if !component.TLS {
 			return nil, nil
 		}
@@ -153,7 +153,7 @@ func (b *componentBuilderBase) buildTLSCert() componentBuilder {
 		objs := make([]client.Object, 0)
 		switch component.Issuer.Name {
 		case appsv1alpha1.IssuerUserProvided:
-			if err := plan.CheckTLSSecretRef(b.ReqCtx, b.Client, cluster.Namespace, component.Issuer.SecretRef); err != nil {
+			if err := plan.CheckTLSSecretRef(b.reqCtx, b.client, cluster.Namespace, component.Issuer.SecretRef); err != nil {
 				return nil, err
 			}
 		case appsv1alpha1.IssuerKubeBlocks:
@@ -172,38 +172,38 @@ func (b *componentBuilderBase) buildTLSVolume(idx int32) componentBuilder {
 	buildfn := func() ([]client.Object, error) {
 		if b.concreteBuilder.mutableWorkload(idx) == nil {
 			return nil, fmt.Errorf("build TLS volumes but workload is nil, cluster: %s, component: %s",
-				b.Comp.GetClusterName(), b.Comp.GetName())
+				b.comp.GetClusterName(), b.comp.GetName())
 		}
 		// build secret volume and volume mount
 		podSpec := b.concreteBuilder.mutablePodSpec(idx)
-		return nil, updateTLSVolumeAndVolumeMount(podSpec, b.Comp.GetClusterName(), *b.Comp.GetSynthesizedComponent())
+		return nil, updateTLSVolumeAndVolumeMount(podSpec, b.comp.GetClusterName(), *b.comp.GetSynthesizedComponent())
 	}
 	return b.buildWrapper(buildfn)
 }
 
 func (b *componentBuilderBase) complete() error {
-	if b.Error != nil {
-		return b.Error
+	if b.error != nil {
+		return b.error
 	}
 	workload := b.concreteBuilder.mutableWorkload(0)
 	if workload == nil {
 		return fmt.Errorf("fail to create compoennt workloads, cluster: %s, component: %s",
-			b.Comp.GetClusterName(), b.Comp.GetName())
+			b.comp.GetClusterName(), b.comp.GetName())
 	}
-	b.Comp.addWorkload(workload, b.defaultAction, nil)
+	b.comp.addWorkload(workload, b.defaultAction, nil)
 	return nil
 }
 
 func (b *componentBuilderBase) buildWrapper(buildfn func() ([]client.Object, error)) componentBuilder {
-	if b.Error != nil || buildfn == nil {
+	if b.error != nil || buildfn == nil {
 		return b.concreteBuilder
 	}
 	objs, err := buildfn()
 	if err != nil {
-		b.Error = err
+		b.error = err
 	} else {
 		for _, obj := range objs {
-			b.Comp.addResource(obj, b.defaultAction, nil)
+			b.comp.addResource(obj, b.defaultAction, nil)
 		}
 	}
 	return b.concreteBuilder

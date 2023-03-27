@@ -51,12 +51,12 @@ func (b *consensusComponentBuilder) mutablePodSpec(_ int32) *corev1.PodSpec {
 
 func (b *consensusComponentBuilder) buildService() componentBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svcList, err := builder.BuildSvcListLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		svcList, err := builder.BuildSvcListLow(b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}
 		objs := make([]client.Object, 0, len(svcList))
-		leader := b.Comp.GetSynthesizedComponent().ConsensusSpec.Leader
+		leader := b.comp.GetSynthesizedComponent().ConsensusSpec.Leader
 		for _, svc := range svcList {
 			if len(leader.Name) > 0 {
 				svc.Spec.Selector[constant.RoleLabelKey] = leader.Name
@@ -70,13 +70,13 @@ func (b *consensusComponentBuilder) buildService() componentBuilder {
 
 func (b *consensusComponentBuilder) buildWorkload(_ int32) componentBuilder {
 	buildfn := func() ([]client.Object, error) {
-		if b.EnvConfig == nil {
+		if b.envConfig == nil {
 			return nil, fmt.Errorf("build consensus workload but env config is nil, cluster: %s, component: %s",
-				b.Comp.GetClusterName(), b.Comp.GetName())
+				b.comp.GetClusterName(), b.comp.GetName())
 		}
 
-		component := b.Comp.GetSynthesizedComponent()
-		sts, err := builder.BuildStsLow(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		component := b.comp.GetSynthesizedComponent()
+		sts, err := builder.BuildStsLow(b.reqCtx, b.comp.GetCluster(), component, b.envConfig.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +86,7 @@ func (b *consensusComponentBuilder) buildWorkload(_ int32) componentBuilder {
 
 		// build PDB object
 		if component.MaxUnavailable != nil {
-			pdb, err := builder.BuildPDBLow(b.Comp.GetCluster(), component)
+			pdb, err := builder.BuildPDBLow(b.comp.GetCluster(), component)
 			if err != nil {
 				return nil, err
 			}
@@ -106,12 +106,12 @@ func (c *consensusComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 	builder := &consensusComponentBuilder{
 		componentBuilderBase: componentBuilderBase{
-			ReqCtx:        reqCtx,
-			Client:        cli,
-			Comp:          c,
+			reqCtx:        reqCtx,
+			client:        cli,
+			comp:          c,
 			defaultAction: action,
-			Error:         nil,
-			EnvConfig:     nil,
+			error:         nil,
+			envConfig:     nil,
 		},
 		workload: nil,
 	}
@@ -162,6 +162,10 @@ func (c *consensusComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Cl
 
 func (c *consensusComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	if err := c.init(reqCtx, cli, nil); err != nil {
+		return err
+	}
+
+	if err := c.Restart(reqCtx, cli); err != nil {
 		return err
 	}
 
@@ -246,6 +250,14 @@ func (c *consensusComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli 
 		c.GetName(), c.GetClusterName(), int(c.Component.Replicas)-ret, c.Component.Replicas)
 
 	return nil
+}
+
+func (c *consensusComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	sts, err := c.runningWorkload(reqCtx, cli)
+	if err != nil {
+		return err
+	}
+	return c.restartWorkload(&sts.Spec.Template)
 }
 
 func (c *consensusComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.StatefulSet, error) {

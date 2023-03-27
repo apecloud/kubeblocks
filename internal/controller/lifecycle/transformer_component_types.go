@@ -19,16 +19,22 @@ package lifecycle
 import (
 	"fmt"
 	"reflect"
+	"time"
 
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
+// TODO: status management
 type Component interface {
 	GetName() string
 	GetNamespace() string
@@ -39,6 +45,9 @@ type Component interface {
 	GetVersion() *appsv1alpha1.ClusterVersion
 	GetCluster() *appsv1alpha1.Cluster
 	GetSynthesizedComponent() *component.SynthesizedComponent
+
+	GetPhase() appsv1alpha1.ClusterComponentPhase
+	GetStatus() appsv1alpha1.ClusterComponentStatus
 
 	// Exist checks whether the component exists in cluster
 	Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error)
@@ -51,6 +60,8 @@ type Component interface {
 	ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 
 	HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error
+
+	Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 
 	addResource(obj client.Object, action *Action, parent *lifecycleVertex) *lifecycleVertex
 	addWorkload(obj client.Object, action *Action, parent *lifecycleVertex)
@@ -85,7 +96,6 @@ func NewComponent(definition *appsv1alpha1.ClusterDefinition,
 	case appsv1alpha1.Stateless:
 		return newComponent[statelessComponent](definition, cluster, compDef, compVer, compSpec, dag), nil
 	}
-
 	return nil, fmt.Errorf("unknown workload type: %s, cluster: %s, component: %s, component definition ref: %s",
 		compDef.WorkloadType, cluster.Name, compSpec.Name, compSpec.ComponentDefRef)
 }
@@ -106,7 +116,7 @@ func newComponent[Tp statelessComponent | statefulComponent | replicationCompone
 			CompSpec:        compSpec,
 			Component:       nil,
 			workloadVertexs: make([]*lifecycleVertex, 0),
-			Dag:             dag,
+			dag:             dag,
 		},
 	}
 }
@@ -124,21 +134,24 @@ type componentBase struct {
 	// built synthesized component
 	Component *component.SynthesizedComponent
 
-	// DAG vertex of main workload object
-	workloadVertexs []*lifecycleVertex // TODO
+	// DAG vertex of main workload object(s)
+	workloadVertexs []*lifecycleVertex
 
-	Dag *graph.DAG
+	dag *graph.DAG
 }
 
 func (c *componentBase) addResource(obj client.Object, action *Action, parent *lifecycleVertex) *lifecycleVertex {
+	if obj == nil {
+		panic("try to add nil object")
+	}
 	vertex := &lifecycleVertex{
 		obj:    obj,
 		action: action,
 	}
-	c.Dag.AddVertex(vertex)
+	c.dag.AddVertex(vertex)
 
 	if parent != nil {
-		c.Dag.Connect(parent, vertex)
+		c.dag.Connect(parent, vertex)
 	}
 	return vertex
 }
@@ -187,23 +200,52 @@ func (c *componentBase) GetSynthesizedComponent() *component.SynthesizedComponen
 	return c.Component
 }
 
+func (c *componentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {
+	return c.GetStatus().Phase // TODO: impl
+}
+
+func (c *componentBase) GetStatus() appsv1alpha1.ClusterComponentStatus {
+	return appsv1alpha1.ClusterComponentStatus{} // TODO: impl
+}
+
 func (c *componentBase) updateService(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	//labels := map[string]string{
-	//	constant.AppManagedByLabelKey:   constant.AppName,
-	//	constant.AppInstanceLabelKey:    c.GetClusterName(),
-	//	constant.KBAppComponentLabelKey: c.GetName(),
-	//}
-	//svcObjList, err := listObjWithLabelsInNamespace(reqCtx, cli, generics.ServiceSignature, c.GetNamespace(), labels)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//svcProtoList := findAll[*corev1.Service](c.Dag)
-	//for _, svc := range svcList {
-	//	svcObj := origObj.DeepCopy()
-	//	svcObj.Spec = svcProto.Spec
-	//	svcObj.Annotations = mergeServiceAnnotations(svcObj.Annotations, svcProto.Annotations)
-	//}
+	labels := map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppInstanceLabelKey:    c.GetClusterName(),
+		constant.KBAppComponentLabelKey: c.GetName(),
+	}
+	svcObjList, err := listObjWithLabelsInNamespace(reqCtx, cli, generics.ServiceSignature, c.GetNamespace(), labels)
+	if err != nil {
+		return err
+	}
+
+	svcProtoList := findAll[*corev1.Service](c.dag)
+
+	// create new services or update existed services
+	for _, vertex := range svcProtoList {
+		node, _ := vertex.(*lifecycleVertex)
+		svcProto, _ := node.obj.(*corev1.Service)
+
+		if pos := slices.IndexFunc(svcObjList, func(svc *corev1.Service) bool {
+			return svc.GetName() == svcProto.GetName()
+		}); pos < 0 {
+			node.action = actionPtr(CREATE)
+		} else {
+			svcProto.Annotations = mergeServiceAnnotations(svcObjList[pos].Annotations, svcProto.Annotations)
+			node.action = actionPtr(UPDATE)
+		}
+	}
+
+	// delete useless services
+	for _, svc := range svcObjList {
+		if pos := slices.IndexFunc(svcProtoList, func(vertex graph.Vertex) bool {
+			node, _ := vertex.(*lifecycleVertex)
+			svcProto, _ := node.obj.(*corev1.Service)
+			return svcProto.GetName() == svc.GetName()
+		}); pos < 0 {
+			c.deleteResource(svc, nil)
+		}
+	}
 	return nil
 }
 
@@ -222,5 +264,32 @@ func (c *componentBase) updateStatefulSetWorkload(stsObj *appsv1.StatefulSet, id
 		// sync component phase
 		updateComponentPhaseWithOperation(c.GetCluster(), c.GetName())
 	}
+	return nil
+}
+
+func (c *componentBase) updateDeploymentWorkload(deployObj *appsv1.Deployment) error {
+	deployProto := c.workloadVertexs[0].obj.(*appsv1.Deployment)
+	deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations, deployProto.Spec.Template.Annotations)
+	if !reflect.DeepEqual(&deployObj.Spec, &deployProto.Spec) {
+		c.workloadVertexs[0].action = actionPtr(UPDATE)
+		// sync component phase
+		updateComponentPhaseWithOperation(c.Cluster, c.GetName())
+	}
+	return nil
+}
+
+func (c *componentBase) restartWorkload(podTemplate *corev1.PodTemplateSpec) error {
+	if podTemplate.Annotations == nil {
+		podTemplate.Annotations = map[string]string{}
+	}
+
+	// startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
+	startTimestamp := time.Now() // TODO: impl
+	restartTimestamp := podTemplate.Annotations[constant.RestartAnnotationKey]
+	// if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.After(res) {
+	if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.Before(res) {
+		podTemplate.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
+	}
+
 	return nil
 }

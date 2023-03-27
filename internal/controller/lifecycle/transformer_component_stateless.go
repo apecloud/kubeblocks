@@ -18,7 +18,6 @@ package lifecycle
 
 import (
 	"fmt"
-	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -49,7 +48,7 @@ func (b *statelessComponentBuilder) mutablePodSpec(_ int32) *corev1.PodSpec {
 
 func (b *statelessComponentBuilder) buildWorkload(_ int32) componentBuilder {
 	buildfn := func() ([]client.Object, error) {
-		deploy, err := builder.BuildDeployLow(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		deploy, err := builder.BuildDeployLow(b.reqCtx, b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}
@@ -70,12 +69,12 @@ func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 	builder := &statelessComponentBuilder{
 		componentBuilderBase: componentBuilderBase{
-			ReqCtx:        reqCtx,
-			Client:        cli,
-			Comp:          c,
+			reqCtx:        reqCtx,
+			client:        cli,
+			comp:          c,
 			defaultAction: action,
-			Error:         nil,
-			EnvConfig:     nil,
+			error:         nil,
+			envConfig:     nil,
 		},
 		workload: nil,
 	}
@@ -129,6 +128,10 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
+	if err := c.Restart(reqCtx, cli); err != nil {
+		return err
+	}
+
 	// cluster.spec.componentSpecs[*].volumeClaimTemplates[*].spec.resources.requests[corev1.ResourceStorage]
 	if err := c.ExpandVolume(reqCtx, cli); err != nil {
 		return err
@@ -159,6 +162,14 @@ func (c *statelessComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli 
 			c.GetName(), c.GetClusterName(), *deploy.Spec.Replicas, c.Component.Replicas)
 	}
 	return nil
+}
+
+func (c *statelessComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	deploy, err := c.runningWorkload(reqCtx, cli)
+	if err != nil {
+		return err
+	}
+	return c.restartWorkload(&deploy.Spec.Template)
 }
 
 func (c *statelessComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.Deployment, error) {
@@ -200,14 +211,5 @@ func (c *statelessComponent) updateWorkload(reqCtx intctrlutil.RequestCtx, cli c
 	if err != nil {
 		return err
 	}
-
-	deployProto := c.workloadVertexs[0].obj.(*appsv1.Deployment)
-	deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations, deployProto.Spec.Template.Annotations)
-	if !reflect.DeepEqual(&deployObj.Spec, &deployProto.Spec) {
-		c.workloadVertexs[0].action = actionPtr(UPDATE)
-		// sync component phase
-		updateComponentPhaseWithOperation(c.Cluster, c.GetName())
-	}
-
-	return nil
+	return c.updateDeploymentWorkload(deployObj)
 }

@@ -53,11 +53,11 @@ func (b *replicationComponentBuilder) mutablePodSpec(idx int32) *corev1.PodSpec 
 
 func (b *replicationComponentBuilder) buildService() componentBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svcList, err := builder.BuildSvcListLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		svcList, err := builder.BuildSvcListLow(b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}
-		objs := make([]client.Object, len(svcList))
+		objs := make([]client.Object, 0, len(svcList))
 		for _, svc := range svcList {
 			svc.Spec.Selector[constant.RoleLabelKey] = string(replicationset.Primary)
 			objs = append(objs, svc)
@@ -69,13 +69,13 @@ func (b *replicationComponentBuilder) buildService() componentBuilder {
 
 func (b *replicationComponentBuilder) buildWorkload(idx int32) componentBuilder {
 	buildfn := func() ([]client.Object, error) {
-		component := b.Comp.GetSynthesizedComponent()
-		if b.EnvConfig == nil {
+		component := b.comp.GetSynthesizedComponent()
+		if b.envConfig == nil {
 			return nil, fmt.Errorf("build replication workload but env config is nil, cluster: %s, component: %s",
-				b.Comp.GetClusterName(), component.Name)
+				b.comp.GetClusterName(), component.Name)
 		}
 
-		sts, err := builder.BuildStsLow(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		sts, err := builder.BuildStsLow(b.reqCtx, b.comp.GetCluster(), component, b.envConfig.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -104,10 +104,10 @@ func (b *replicationComponentBuilder) buildVolume(idx int32) componentBuilder {
 		workload := b.mutableWorkload(idx)
 		// if workload == nil {
 		// 	return nil, fmt.Errorf("build replication volumes but workload is nil, cluster: %s, component: %s",
-		// 		b.Comp.GetClusterName(), b.Comp.GetName())
+		// 		b.comp.GetClusterName(), b.comp.GetName())
 		// }
 
-		component := b.Comp.GetSynthesizedComponent()
+		component := b.comp.GetSynthesizedComponent()
 		sts := workload.(*appsv1.StatefulSet)
 		objs := make([]client.Object, 0)
 
@@ -148,16 +148,16 @@ func (b *replicationComponentBuilder) buildVolume(idx int32) componentBuilder {
 // TODO: fix it within replication set
 // replication set will create duplicate env configmap and headless service
 func (b *replicationComponentBuilder) complete() error {
-	if b.Error != nil {
-		return b.Error
+	if b.error != nil {
+		return b.error
 	}
 	if len(b.workloads) == 0 || b.workloads[0] == nil {
 		return fmt.Errorf("fail to create compoennt workloads, cluster: %s, component: %s",
-			b.Comp.GetClusterName(), b.Comp.GetName())
+			b.comp.GetClusterName(), b.comp.GetName())
 	}
 
 	for _, obj := range b.workloads {
-		b.Comp.addWorkload(obj, b.defaultAction, nil)
+		b.comp.addWorkload(obj, b.defaultAction, nil)
 	}
 	return nil
 }
@@ -171,14 +171,14 @@ func (c *replicationComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Cl
 
 	builder := &replicationComponentBuilder{
 		componentBuilderBase: componentBuilderBase{
-			ReqCtx:        reqCtx,
-			Client:        cli,
-			Comp:          c,
+			reqCtx:        reqCtx,
+			client:        cli,
+			comp:          c,
 			defaultAction: action,
-			Error:         nil,
-			EnvConfig:     nil,
+			error:         nil,
+			envConfig:     nil,
 		},
-		workloads: make([]*appsv1.StatefulSet, synthesizedComp.Replicas),
+		workloads: make([]*appsv1.StatefulSet, 0, synthesizedComp.Replicas),
 	}
 	builder.concreteBuilder = builder
 
@@ -190,8 +190,8 @@ func (c *replicationComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Cl
 					buildConfig(i).
 					buildTLSVolume(i).
 					buildVolumeMount(i)
-		if builder.Error != nil {
-			return builder.Error
+		if builder.error != nil {
+			return builder.error
 		}
 	}
 	return builder.buildService().buildTLSCert().complete()
@@ -233,6 +233,10 @@ func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.
 		return err
 	}
 
+	if err := c.Restart(reqCtx, cli); err != nil {
+		return err
+	}
+
 	// cluster.spec.componentSpecs[*].volumeClaimTemplates[*].spec.resources.requests[corev1.ResourceStorage]
 	if err := c.ExpandVolume(reqCtx, cli); err != nil {
 		return err
@@ -270,7 +274,7 @@ func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli c
 				continue
 			}
 
-			if vertex := FindMatchedVertex[*corev1.PersistentVolumeClaim](c.Dag, key); vertex == nil {
+			if vertex := FindMatchedVertex[*corev1.PersistentVolumeClaim](c.dag, key); vertex == nil {
 				return fmt.Errorf("cann't find PVC object when to update it, cluster: %s, component: %s, pvc: %s",
 					c.Cluster.Name, c.Component.Name, key)
 			} else {
@@ -305,6 +309,20 @@ func (c *replicationComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cl
 		"start horizontal scale component %s of cluster %s from %d to %d",
 		c.GetName(), c.GetClusterName(), int(c.Component.Replicas)-ret, c.Component.Replicas)
 
+	return nil
+}
+
+func (c *replicationComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	stsList, err := c.runningWorkloads(reqCtx, cli)
+	if err != nil {
+		return err
+	}
+
+	for _, sts := range stsList {
+		if err := c.restartWorkload(&sts.Spec.Template); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -380,6 +398,7 @@ func (c *replicationComponent) updateWorkloads(reqCtx intctrlutil.RequestCtx, cl
 	return nil
 }
 
+// TODO: fix it
 func dedupResources(resources []client.Object) []client.Object {
 	objects := make([]client.Object, 0)
 	for _, resource := range resources {

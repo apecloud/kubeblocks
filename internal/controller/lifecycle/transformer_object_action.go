@@ -121,8 +121,6 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 		for name := range createSet {
 			v, _ := newNameVertices[name].(*lifecycleVertex)
 			if v.action != nil && *v.action != CREATE {
-				fmt.Printf("try to create new vertix, but action is not nil, kind: %s, name: %s, action: %s\n",
-					v.obj.GetObjectKind(), v.obj.GetName(), *v.action)
 				//// TODO(dbg): remove
 				//panic(fmt.Sprintf("inconsistent resource action, expected: CREATE, actual: %s", *v.action))
 			}
@@ -137,7 +135,8 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 			v.oriObj = oldSnapshot[name]
 			if v.action != nil && *v.action != UPDATE && *v.action != DELETE {
 				// TODO(dbg): remove
-				panic(fmt.Sprintf("inconsistent resource action, expected: CREATE, actual: %s", *v.action))
+				panic(fmt.Sprintf("inconsistent resource action, expected: UPDATE, actual: %s, kind: %s, name: %s",
+					*v.action, v.obj.GetObjectKind(), v.obj.GetName()))
 			}
 			if v.action == nil {
 				v.action = actionPtr(UPDATE)

@@ -1156,7 +1156,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	FContext("when creating cluster with multiple kinds of components", func() {
+	Context("when creating cluster with multiple kinds of components", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).

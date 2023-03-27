@@ -292,6 +292,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// check no dirty resources left by last cluster with same name
+	var err error
 	hasDirtyResources := false
 	if hasDirtyResources, err = r.hasDirtyResources(ctx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

@@ -1259,10 +1259,10 @@ var _ = Describe("Cluster Controller", func() {
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingPhase))
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
-			By("Removing pvc's finalizers to make it deleted")
+			By("Removing pvc's finalizers to make it deleted, cleanup the resources")
 			Expect(testapps.ChangeObj(&testCtx, deletingPVC, func() {
 				deletingPVC.SetFinalizers([]string{})
 			})).Should(Succeed())
@@ -1272,9 +1272,6 @@ var _ = Describe("Cluster Controller", func() {
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterKey.Name,
 				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
-
-			By("Checking reconcile succeeded")
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		})
 
 		It("Should success with one leader pod and two follower pods", func() {

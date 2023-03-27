@@ -52,7 +52,7 @@ data:
     done
     CONFIGSVR=""
     if [ ""$IS_CONFIGSVR = "true" ]; then CONFIGSVR="configsvr: true,"; fi
-    until mongosh --quiet --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", $CONFIGSVR members: [$MEMBERS]})"; do sleep 1; done
+    mongosh --quiet --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", $CONFIGSVR members: [$MEMBERS]})";
 
     $(until mongosh --quiet --port 27018 --eval "rs.isMaster().isWritablePrimary"|grep true; do sleep 1; done;
     echo "create user";

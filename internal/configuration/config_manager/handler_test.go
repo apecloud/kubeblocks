@@ -39,7 +39,7 @@ func init() {
 func TestFindParentPidFromProcessName(t *testing.T) {
 	processName := getProcName()
 	fmt.Printf("current test program name: %s\n", processName)
-	pid, err := findParentPidFromProcessName(processName)
+	pid, err := findPidFromProcessName(processName)
 	require.Nil(t, err)
 	require.Equal(t, PID(os.Getpid()), pid)
 }

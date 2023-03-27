@@ -704,6 +704,7 @@ spec:
                           - parallel
                           - rolling
                           - autoReload
+                          - operatorSyncUpdate
                           type: string
                         updatedParameters:
                           description: updatedParameters describes the updated parameters.

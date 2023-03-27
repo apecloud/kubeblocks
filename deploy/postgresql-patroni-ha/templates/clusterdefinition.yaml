@@ -7,7 +7,7 @@ metadata:
 spec:
   connectionCredential:
     username: postgres
-    password: "$(RANDOM_PASSWD)"
+    password: {{ (include "postgresql.postgresPassword" .) | quote  }}
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-postgresql)"
@@ -59,6 +59,9 @@ spec:
           - name: http-metrics-postgresql
             port: 9187
             targetPort: http-metrics
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         serviceAccountName: operator
         securityContext:

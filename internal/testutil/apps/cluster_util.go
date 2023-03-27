@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -95,5 +96,18 @@ func GetClusterObservedGeneration(testCtx *testutil.TestContext, clusterKey type
 		cluster := &appsv1alpha1.Cluster{}
 		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(gomega.Succeed())
 		return cluster.Status.ObservedGeneration
+	}
+}
+
+func GetClusterConditionStatus(testCtx *testutil.TestContext, clusterKey types.NamespacedName, condType string) func(gomega.Gomega) metav1.ConditionStatus {
+	return func(g gomega.Gomega) metav1.ConditionStatus {
+		cluster := &appsv1alpha1.Cluster{}
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(gomega.Succeed())
+		for _, cond := range cluster.Status.Conditions {
+			if cond.Type == condType {
+				return cond.Status
+			}
+		}
+		return metav1.ConditionUnknown
 	}
 }

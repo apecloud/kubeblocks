@@ -30,6 +30,7 @@ const (
 	ConfVolumeName      = "conf"
 	DataVolumeName      = "data"
 	ScriptsVolumeName   = "scripts"
+	ShmVolumeName       = "shm"
 	ServiceVPCName      = "a-vpc-lb-service-for-app"
 	ServiceInternetName = "a-internet-lb-service-for-app"
 
@@ -51,6 +52,13 @@ const (
 	DefaultRedisImageName         = "redis:7.0.5"
 	DefaultRedisContainerName     = "redis"
 	DefaultRedisInitContainerName = "redis-init-container"
+
+	PostgresType                     = "state.postgresql"
+	DefaultPostgresCompType          = "postgresql"
+	DefaultPostgresCompName          = "postgresql"
+	DefaultPostgresImageName         = "apecloud/postgresql:latest"
+	DefaultPostgresContainerName     = "postgresql"
+	DefaultPostgresInitContainerName = "postgresql-init-container"
 )
 
 var (
@@ -281,6 +289,109 @@ var (
 			},
 			InitContainers: []corev1.Container{defaultRedisInitContainer},
 			Containers:     []corev1.Container{defaultRedisContainer},
+		},
+	}
+
+	defaultPostgresService = corev1.ServiceSpec{
+		Ports: []corev1.ServicePort{{
+			Protocol: corev1.ProtocolTCP,
+			Port:     5432,
+		}},
+	}
+
+	defaultPostgresVolumeMounts = []corev1.VolumeMount{
+		{
+			Name:      DataVolumeName,
+			MountPath: "/postgresql",
+		},
+		{
+			Name:      ScriptsVolumeName,
+			MountPath: "/scripts",
+		},
+		{
+			Name:      ConfVolumeName,
+			MountPath: "/postgressql/conf",
+		},
+		{
+			Name:      ShmVolumeName,
+			MountPath: "/dev/shm",
+		},
+	}
+
+	defaultPostgresInitContainer = corev1.Container{
+		Name:            DefaultPostgresInitContainerName,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		VolumeMounts:    defaultPostgresVolumeMounts,
+		Command:         []string{"/scripts/setup.sh"},
+	}
+
+	defaultPostgresContainer = corev1.Container{
+		Name:            DefaultPostgresContainerName,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Ports: []corev1.ContainerPort{{
+			Name:          "tcp-postgres",
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: 5432,
+		}},
+		VolumeMounts: defaultPostgresVolumeMounts,
+		Env: []corev1.EnvVar{{
+			Name: "PGUSER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: constant.ConnCredentialPlaceHolder,
+					},
+					Key: "username",
+				},
+			},
+		}, {
+			Name: "PGPASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: constant.ConnCredentialPlaceHolder,
+					},
+					Key: "postgres-password",
+				},
+			},
+		}, {
+			Name: "POSTGRES_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: constant.ConnCredentialPlaceHolder,
+					},
+					Key: "username",
+				},
+			},
+		}, {
+			Name: "POSTGRES_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: constant.ConnCredentialPlaceHolder,
+					},
+					Key: "postgres-password",
+				},
+			},
+		},
+		},
+	}
+
+	replicationPostgresComponent = appsv1alpha1.ClusterComponentDefinition{
+		WorkloadType:  appsv1alpha1.Replication,
+		CharacterType: "postgresql",
+		Service:       &defaultPostgresService,
+		PodSpec: &corev1.PodSpec{
+			InitContainers: []corev1.Container{defaultPostgresInitContainer},
+			Containers:     []corev1.Container{defaultPostgresContainer},
+		},
+		Probes: &appsv1alpha1.ClusterDefinitionProbes{
+			RoleChangedProbe: &appsv1alpha1.ClusterDefinitionProbe{
+				FailureThreshold: 3,
+				PeriodSeconds:    1,
+				TimeoutSeconds:   5,
+			},
 		},
 	}
 )

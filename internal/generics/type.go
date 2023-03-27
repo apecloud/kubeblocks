@@ -22,6 +22,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -53,6 +54,9 @@ type PObjList[T Object, L ObjList[T]] interface {
 
 var SecretSignature = func(_ corev1.Secret, _ corev1.SecretList) {}
 var ServiceSignature = func(_ corev1.Service, _ corev1.ServiceList) {}
+var ServiceAccountSignature = func(_ corev1.ServiceAccount, _ corev1.ServiceAccountList) {}
+var ClusterRoleSignature = func(_ rbacv1.ClusterRole, _ rbacv1.ClusterRoleList) {}
+var ClusterRoleBindingSignature = func(_ rbacv1.ClusterRoleBinding, _ rbacv1.ClusterRoleBindingList) {}
 var PersistentVolumeClaimSignature = func(_ corev1.PersistentVolumeClaim, _ corev1.PersistentVolumeClaimList) {}
 var PodSignature = func(_ corev1.Pod, _ corev1.PodList) {}
 var EventSignature = func(_ corev1.Event, _ corev1.EventList) {}

@@ -229,6 +229,178 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 	return clusterDefObj, clusterVersionObj, clusterObj
 }
 
+func CreatePatroniClusterWithConfig(
+	testCtx testutil.TestContext,
+	clusterDefName,
+	clusterVersionName,
+	clusterName,
+	patroniConfigTemplatePath,
+	patroniConfigConstraintPath,
+	patroniScriptsPath,
+	patroniRBACPath string) (
+	*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
+
+	const patroniCompName = "patroni"
+	const patroniCompType = "patroni"
+
+	const patroniConfigName = "postgresql-ha-configuration"
+	const patroniConfigConstraintName = "postgresql14-ha-cc"
+	const patroniScriptsName = "patroni-scripts"
+
+	const patroniDataVolumeName = "data"
+	const patroniConfigVolumeName = "postgresql-config"
+	const patroniShmVolumeName = "dshm"
+	const patroniScriptsVolumeName = "scripts"
+
+	const patroniInitScriptsPath = "/scripts/setup.sh"
+	const patroniScriptsPath = "/scripts/start.sh"
+	const patroniRunningFilePath = "/postgresql/data/log/postgresql-*"
+
+	By("Create a config template")
+	configmap := testapps.CreateCustomizedObj(&testCtx,
+		patroniConfigTemplatePath, &corev1.ConfigMap{},
+		testCtx.UseDefaultNamespace(),
+		testapps.WithLabels(
+			constant.AppNameLabelKey, clusterName,
+			constant.AppInstanceLabelKey, clusterName,
+			constant.AppConfigTypeLabelKey, "tpl",
+		))
+
+	_ = testapps.CreateCustomizedObj(&testCtx, patroniScriptsPath, &corev1.ConfigMap{},
+		testapps.WithName(patroniScriptsName), testCtx.UseDefaultNamespace())
+
+	By("Create a constraint obj")
+	constraint := testapps.CreateCustomizedObj(&testCtx,
+		patroniConfigConstraintPath,
+		&appsv1alpha1.ConfigConstraint{})
+
+	patroniVolumeMounts := []corev1.VolumeMount{
+		{
+			Name:      patroniShmVolumeName,
+			MountPath: "/dev/shm",
+		},
+		{
+			Name:      patroniDataVolumeName,
+			MountPath: "/home/postgres/pgdata",
+		},
+		{
+			Name:      patroniConfigVolumeName,
+			MountPath: "/home/postgres/conf",
+		},
+		{
+			Name:      patroniScriptsName,
+			MountPath: "/scripts",
+		},
+	}
+
+	getEnvVar := func(name string, value string) (v corev1.EnvVar) {
+		v = corev1.EnvVar{
+			Name:  name,
+			Value: value,
+		}
+		return v
+	}
+	getEnvVarSecret := func(name string, key string) (v corev1.EnvVar) {
+		v = corev1.EnvVar{
+			Name: name,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: constant.ConnCredentialPlaceHolder,
+					},
+					Key: key,
+				},
+			},
+		}
+		return v
+	}
+	getPodVar := func(name string, field string) (v corev1.EnvVar) {
+		v = corev1.EnvVar{
+			Name: name,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  field,
+				},
+			},
+		}
+		return v
+	}
+
+	dcsAPI := getEnvVar("DCS_ENABLE_KUBERNETES_API", "true")
+	useConfigmap := getEnvVar("KUBERNETES_USE_CONFIGMAPS", "true")
+	allowNoSSL := getEnvVar("ALLOW_NOSSL", "true")
+	podIP := getPodVar("POD_IP", "status.podIP")
+	podNameSpace := getPodVar("POD_NAMESPACE", "metadata.namespace")
+	scopeLabel := getEnvVar("KUBERNETES_SCOPE_LABEL", "apps.kubeblocks.io/component-name")
+	roleLabel := getEnvVar("KUBERNETES_ROLE_LABEL", "apps.kubeblocks.pg.patroni/role")
+	k8sLabel := getEnvVar("KUBERNETES_LABELS", "{\"app.kubernetes.io/instance\":\"$(KB_CLUSTER_NAME)\",\"apps.kubeblocks.io/component-name\":\"$(KB_COMP_NAME)\"}")
+	superUser := getEnvVarSecret("PGUSER_SUPERUSER", "username")
+	superUserPasswd := getEnvVarSecret("PGPASSWORD_SUPERUSER", "password")
+	adminUser := getEnvVar("PGUSER_ADMIN", "superadmin")
+	adminUserPasswd := getEnvVarSecret("PGPASSWORD_ADMIN", "password")
+	standbyPasswd := getEnvVarSecret("PGPASSWORD_STANDBY", "password")
+	scope := getEnvVar("SCOPE", "$(KB_COMP_NAME)")
+	pgroot := getEnvVar("PGROOT", "/home/postgres/pgdata/pgroot")
+	pgUser := getEnvVarSecret("PGUSER", "username")
+	pgPasswd := getEnvVarSecret("PGPASSWORD", "password")
+	spiloConfig := getEnvVar("SPILO_CONFIGURATION", `
+		bootstrap:
+			initdb:
+				- auth-host: md5
+				- auth-local: trust
+		postgresql:
+			config_dir: /home/postgres/pgdata/conf `,
+	)
+
+	By("Create a clusterDefinition obj")
+	mode := int32(0755)
+	clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+		SetConnectionCredential(map[string]string{"username": "postgres", "password": ""}, nil).
+		AddComponent(testapps.ReplicationPostgresComponent, patroniCompType).
+		AddConfigTemplate(patroniConfigName, configmap.Name, constraint.Name,
+			testCtx.DefaultNamespace, patroniConfigVolumeName).
+		AddScriptTemplate(patroniScriptsName, patroniScriptsName, testCtx.DefaultNamespace, patroniScriptsVolumeName, &mode).
+		AddContainerVolumeMounts(testapps.DefaultPostgresContainerName, patroniVolumeMounts).
+		AddLogConfig("running", patroniRunningFilePath).
+		AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(patroniConfigName), configmap.Name,
+			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+		AddInitContainerScripts(testapps.DefaultPostgresInitContainerName, patroniInitScriptsPath, "").
+		AddContainerScripts(testapps.DefaultPostgresContainerName, patroniScriptsPath, "").
+		AddContainerEnvList(testapps.DefaultPostgresContainerName, []corev1.EnvVar{
+			dcsAPI, useConfigmap, allowNoSSL, podIP, podNameSpace, scopeLabel, roleLabel, k8sLabel,
+			superUser, superUserPasswd, adminUser, adminUserPasswd, standbyPasswd, scope, pgroot,
+			pgUser, pgPasswd, spiloConfig}).
+		Create(&testCtx).GetObject()
+
+	By("Create a clusterVersion obj")
+	clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+		AddComponent(mysqlCompType).
+		AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+		AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(mysqlConfigName), configmap.Name,
+			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+		Create(&testCtx).GetObject()
+
+	By("Creating a cluster")
+	pvcSpec := &corev1.PersistentVolumeClaimSpec{
+		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+		clusterDefObj.Name, clusterVersionObj.Name).
+		AddComponent(mysqlCompName, mysqlCompType).
+		SetReplicas(3).
+		SetEnabledLogs("error", "general", "slow").
+		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+		Create(&testCtx).GetObject()
+
+	return clusterDefObj, clusterVersionObj, clusterObj
+}
+
 var _ = BeforeSuite(func() {
 	if viper.GetBool("ENABLE_DEBUG_LOG") {
 		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {

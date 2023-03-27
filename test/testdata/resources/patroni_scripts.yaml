@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: patroni-scripts
+data:
+  setup.sh: |
+    #!/bin/bash
+    set -ex
+    mkdir -p /home/postgres/pgdata/conf
+    chmod +777 -R /home/postgres/pgdata/conf
+    cp /home/postgres/conf/pg_hba.conf /home/postgres/pgdata/conf
+    cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf
+    chmod +777 /home/postgres/pgdata/conf/pg_hba.conf
+    chmod +777 /home/postgres/pgdata/conf/postgresql.conf
+
+  start.sh: |
+    set -ex
+    KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
+    if [ "$KB_PRIMARY_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
+        sleep 3
+    fi
+    exec /launch.sh init

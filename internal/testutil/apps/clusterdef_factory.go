@@ -17,18 +17,18 @@ limitations under the License.
 package apps
 
 import (
-	corev1 "k8s.io/api/core/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type ComponentTplType string
 
 const (
-	StatefulMySQLComponent    ComponentTplType = "stateful-mysql"
-	ConsensusMySQLComponent   ComponentTplType = "consensus-mysql"
-	ReplicationRedisComponent ComponentTplType = "replication-redis"
-	StatelessNginxComponent   ComponentTplType = "stateless-nginx"
+	StatefulMySQLComponent       ComponentTplType = "stateful-mysql"
+	ConsensusMySQLComponent      ComponentTplType = "consensus-mysql"
+	ReplicationRedisComponent    ComponentTplType = "replication-redis"
+	ReplicationPostgresComponent ComponentTplType = "replication-postgres"
+	StatelessNginxComponent      ComponentTplType = "stateless-nginx"
 )
 
 type MockClusterDefFactory struct {
@@ -63,6 +63,8 @@ func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, new
 		component = &consensusMySQLComponent
 	case ReplicationRedisComponent:
 		component = &replicationRedisComponent
+	case ReplicationPostgresComponent:
+		component = &replicationPostgresComponent
 	case StatelessNginxComponent:
 		component = &statelessNginxComponent
 	}
@@ -150,6 +152,24 @@ func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envV
 	return factory
 }
 
+func (factory *MockClusterDefFactory) AddContainerEnvList(containerName string, envVars []corev1.EnvVar) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return nil
+	}
+	for i, container := range comp.PodSpec.Containers {
+		if container.Name == containerName {
+			c := comp.PodSpec.Containers[i]
+			for _, v := range envVars {
+				c.Env = append(c.Env, v)
+			}
+			comp.PodSpec.Containers[i] = c
+			break
+		}
+	}
+	return factory
+}
+
 func (factory *MockClusterDefFactory) SetConnectionCredential(
 	connectionCredential map[string]string, svc *corev1.ServiceSpec) *MockClusterDefFactory {
 	factory.get().Spec.ConnectionCredential = connectionCredential
@@ -191,12 +211,30 @@ func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *appsv1al
 	return factory
 }
 
+func (factory *MockClusterDefFactory) AddInitContainerScripts(containerName string, scriptsPath string, args string) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return factory
+	}
+	comp.PodSpec.InitContainers = appendContainerScripts(comp.PodSpec.InitContainers, containerName, scriptsPath, args)
+	return factory
+}
+
 func (factory *MockClusterDefFactory) AddInitContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
 		return factory
 	}
 	comp.PodSpec.InitContainers = appendContainerVolumeMounts(comp.PodSpec.InitContainers, containerName, volumeMounts)
+	return factory
+}
+
+func (factory *MockClusterDefFactory) AddContainerScripts(containerName string, scriptsPath string, args string) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return factory
+	}
+	comp.PodSpec.InitContainers = appendContainerScripts(comp.PodSpec.InitContainers, containerName, scriptsPath, args)
 	return factory
 }
 
@@ -242,4 +280,32 @@ func appendContainerVolumeMounts(containers []corev1.Container, targetContainerN
 		}
 	}
 	return containers
+}
+
+func appendContainerScripts(containers []corev1.Container, targetContainerName string, scriptsPath string, args string) []corev1.Container {
+	for index := range containers {
+		c := &containers[index]
+		if c.Name == targetContainerName {
+			c.Command = append(c.Command, scriptsPath)
+			c.Args = append(c.Args, args)
+			break
+		}
+	}
+	return containers
+}
+
+func appendContainerEnvList(container *corev1.Container, envVars []corev1.EnvVar) []corev1.EnvVar {
+	envMap := make(map[string]corev1.EnvVar)
+	mergedEnvs := make([]corev1.EnvVar, 0)
+
+	for _, e := range container.Env {
+		envMap[e.Name] = e
+	}
+	for _, e := range envVars {
+		envMap[e.Name] = e
+	}
+	for _, e := range envMap {
+		mergedEnvs = append(mergedEnvs, e)
+	}
+	return mergedEnvs
 }

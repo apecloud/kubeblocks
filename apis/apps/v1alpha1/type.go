@@ -336,14 +336,15 @@ const (
 
 // UpgradePolicy defines the policy of reconfiguring.
 // +enum
-// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload}
+// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate}
 type UpgradePolicy string
 
 const (
-	NormalPolicy  UpgradePolicy = "simple"
-	RestartPolicy UpgradePolicy = "parallel"
-	RollingPolicy UpgradePolicy = "rolling"
-	AutoReload    UpgradePolicy = "autoReload"
+	NormalPolicy       UpgradePolicy = "simple"
+	RestartPolicy      UpgradePolicy = "parallel"
+	RollingPolicy      UpgradePolicy = "rolling"
+	AutoReload         UpgradePolicy = "autoReload"
+	OperatorSyncUpdate UpgradePolicy = "operatorSyncUpdate"
 )
 
 // CfgReloadType defines reload method.

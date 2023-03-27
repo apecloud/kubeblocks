@@ -246,6 +246,18 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	if node.action == nil {
 		return errors.New("node action can't be nil")
 	}
+	updateComponentPhaseIfNeeded := func(orig, curr client.Object) {
+		switch orig.(type) {
+		case *appsv1.StatefulSet, *appsv1.Deployment:
+			componentName := orig.GetLabels()[constant.KBAppComponentLabelKey]
+			origSpec := reflect.ValueOf(orig).Elem().FieldByName("Spec").Interface()
+			newSpec := reflect.ValueOf(curr).Elem().FieldByName("Spec").Interface()
+			if !reflect.DeepEqual(origSpec, newSpec) {
+				// sync component phase
+				updateComponentPhaseWithOperation(c.cluster, componentName)
+			}
+		}
+	}
 	// cluster object has more business to do, handle them here
 	if _, ok := node.obj.(*appsv1alpha1.Cluster); ok {
 		cluster := node.obj.(*appsv1alpha1.Cluster).DeepCopy()
@@ -298,6 +310,8 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 			c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", o, node.oriObj, o))
 			return err
 		}
+		// TODO: find a better comparison way that knows whether fields are updated before calling the Update func
+		updateComponentPhaseIfNeeded(node.oriObj, o)
 	case DELETE:
 		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
 			err := c.cli.Update(c.ctx.Ctx, node.obj)
@@ -347,11 +361,6 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		stsObj.Spec.Template = stsProto.Spec.Template
 		stsObj.Spec.Replicas = stsProto.Spec.Replicas
 		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
-		if !reflect.DeepEqual(&origObj.Spec, &stsObj.Spec) {
-			// sync component phase
-			updateComponentPhaseWithOperation(c.cluster, componentName)
-		}
-
 		return stsObj, nil
 	}
 
@@ -360,11 +369,6 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations,
 			deployProto.Spec.Template.Annotations)
 		deployObj.Spec = deployProto.Spec
-		if !reflect.DeepEqual(&origObj.Spec, &deployObj.Spec) {
-			// sync component phase
-			componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
-			updateComponentPhaseWithOperation(c.cluster, componentName)
-		}
 		return deployObj, nil
 	}
 

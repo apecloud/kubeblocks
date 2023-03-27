@@ -152,7 +152,7 @@ func (r *RestoreJobReconciler) doRestoreNewPhaseAction(
 	if err := r.Client.Status().Update(reqCtx.Ctx, restoreJob); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	return intctrlutil.RequeueAfter(5*time.Second, reqCtx.Log, "")
+	return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 }
 
 func (r *RestoreJobReconciler) doRestoreInProgressPhyAction(
@@ -162,11 +162,11 @@ func (r *RestoreJobReconciler) doRestoreInProgressPhyAction(
 	if err != nil {
 		// not found backup job, retry create job
 		reqCtx.Log.Info(err.Error())
-		return intctrlutil.RequeueAfter(5*time.Second, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	}
 	jobStatusConditions := job.Status.Conditions
 	if len(jobStatusConditions) == 0 {
-		return intctrlutil.RequeueAfter(5*time.Second, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	}
 
 	switch jobStatusConditions[0].Type {

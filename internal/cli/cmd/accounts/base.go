@@ -210,15 +210,15 @@ func (o *AccountBaseOptions) printUserInfo(response sqlchannel.SQLChannelRespons
 	}
 	// decode user info from metatdata
 	users := []sqlchannel.UserInfo{}
-	err := json.Unmarshal([]byte(response.Data), &users)
+	err := json.Unmarshal([]byte(response.Message), &users)
 	if err != nil {
 		return err
 	}
 
 	// render user info with username and pasword expired boolean
-	tblPrinter := o.newTblPrinterWithStyle("USER INFO", []interface{}{"USERNAME", "ROLES"})
+	tblPrinter := o.newTblPrinterWithStyle("USER INFO", []interface{}{"USERNAME", "EXPIRED"})
 	for _, user := range users {
-		tblPrinter.AddRow(user.UserName, user.RoleName)
+		tblPrinter.AddRow(user.UserName, user.Expired)
 	}
 
 	tblPrinter.Print()
@@ -233,14 +233,14 @@ func (o *AccountBaseOptions) printRoleInfo(response sqlchannel.SQLChannelRespons
 
 	// decode role info from metatdata
 	users := []sqlchannel.UserInfo{}
-	err := json.Unmarshal([]byte(response.Data), &users)
+	err := json.Unmarshal([]byte(response.Message), &users)
 	if err != nil {
 		return err
 	}
 
-	tblPrinter := o.newTblPrinterWithStyle("USER ROLE INFO", []interface{}{"USERNAME", "EXPIRED", "ROLES"})
+	tblPrinter := o.newTblPrinterWithStyle("USER INFO", []interface{}{"USERNAME", "ROLE"})
 	for _, user := range users {
-		tblPrinter.AddRow(user.UserName, user.Expired, user.RoleName)
+		tblPrinter.AddRow(user.UserName, user.RoleName)
 	}
 	tblPrinter.Print()
 	return nil

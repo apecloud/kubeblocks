@@ -37,7 +37,8 @@ type ExposeOpsHandler struct {
 func init() {
 	// ToClusterPhase is not defined, because expose not affect the cluster status.
 	exposeBehavior := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase},
+		// REVIEW: can do opsrequest if not running?
+		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
 		OpsHandler:        ExposeOpsHandler{},
 	}
 
@@ -74,7 +75,7 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		opsRequest.Status.Components = make(map[string]appsv1alpha1.OpsRequestComponentStatus)
 		for _, v := range opsRequest.Spec.ExposeList {
 			opsRequest.Status.Components[v.ComponentName] = appsv1alpha1.OpsRequestComponentStatus{
-				Phase: appsv1alpha1.ExposingPhase,
+				Phase: appsv1alpha1.SpecReconcilingClusterCompPhase, // appsv1alpha1.ExposingPhase,
 			}
 		}
 	}
@@ -94,7 +95,7 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		// update component status if completed
 		if actualCount == expectCount {
 			p := opsRequest.Status.Components[v.ComponentName]
-			p.Phase = appsv1alpha1.RunningPhase
+			p.Phase = appsv1alpha1.RunningClusterCompPhase
 		}
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", actualProgressCount, expectProgressCount)

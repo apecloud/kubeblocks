@@ -34,8 +34,9 @@ var _ OpsHandler = StopOpsHandler{}
 
 func init() {
 	stopBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase},
-		ToClusterPhase:    appsv1alpha1.StoppingPhase,
+		// REVIEW: can do opsrequest if not running?
+		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.StoppingPhase,
 		OpsHandler:        StopOpsHandler{},
 	}
 

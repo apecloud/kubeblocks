@@ -89,7 +89,7 @@ var _ = Describe("Stateful Component", func() {
 			stateful, err := NewStateful(k8sClient, cluster, clusterComponent, *componentDef)
 			Expect(err).Should(Succeed())
 			phase, _ := stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
-			Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
+			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("test pods are not ready")
 			updateRevison := fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "6fdd48d9cd")
@@ -117,7 +117,7 @@ var _ = Describe("Stateful Component", func() {
 				g.Expect(tmpSts.Status.AvailableReplicas == *sts.Spec.Replicas-1).Should(BeTrue())
 			})).Should(Succeed())
 			phase, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
-			Expect(phase == appsv1alpha1.AbnormalPhase).Should(BeTrue())
+			Expect(phase == appsv1alpha1.AbnormalClusterCompPhase).Should(BeTrue())
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision

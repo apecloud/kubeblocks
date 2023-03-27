@@ -25,9 +25,7 @@ import (
 const (
 	RespTypEve  = "event"
 	RespTypMsg  = "message"
-	RespTypData = "data"
 	RespTypMeta = "metadata"
-
 	RespEveSucc = "Success"
 	RespEveFail = "Failed"
 
@@ -66,7 +64,6 @@ type SQLChannelRequest struct {
 type SQLChannelResponse struct {
 	Event    string         `json:"event,omitempty"`
 	Message  string         `json:"message,omitempty"`
-	Data     string         `json:"data,omitempty"`
 	Metadata SQLChannelMeta `json:"metadata,omitempty"`
 }
 

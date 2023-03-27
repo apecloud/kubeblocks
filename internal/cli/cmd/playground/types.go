@@ -30,13 +30,17 @@ const (
 
 	// defaultNamespace is the namespace of playground cluster
 	defaultNamespace = "default"
+
+	// stateFileName is the file name of playground state file
+	stateFileName = "kb-playground.state"
+
+	// CloudClusterNamePrefix the prefix of cloud kubernetes cluster name
+	cloudClusterNamePrefix = "kb-playground"
 )
 
 var (
 	// kbClusterName is the playground cluster name that created by KubeBlocks
 	kbClusterName = "mycluster"
-	// k8sClusterName is the k3d cluster name for playground
-	k8sClusterName = "kb-playground"
 )
 
 var guideStr = `

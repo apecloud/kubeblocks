@@ -126,7 +126,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting the cluster is created")
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking pods' role label")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)

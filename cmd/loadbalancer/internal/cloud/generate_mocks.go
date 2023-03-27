@@ -16,4 +16,4 @@ limitations under the License.
 
 package cloud
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -destination mocks/provider_mocks.go . Provider
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -destination mocks/provider_mocks.go . Provider

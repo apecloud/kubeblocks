@@ -46,7 +46,6 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	// TODO(user): your logic here
 	// mutate the fields in pod
 
 	// // when pod.namespace is empty, using req.namespace

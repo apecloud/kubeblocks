@@ -8988,6 +8988,9 @@ spec:
                 description: ClusterDefinition phase, valid values are <empty>, Available.
                   Available is ClusterDefinition become available, and can be referenced
                   for co-related objects.
+                enum:
+                - Available
+                - Unavailable
                 type: string
             type: object
         type: object

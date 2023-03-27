@@ -44,8 +44,7 @@ func TestReflect(t *testing.T) {
 		fmt.Println(e)
 	}
 
-	var o client.Object
-	o = &sts
+	var o client.Object = &sts
 	ptr := reflect.ValueOf(o)
 	v = ptr.Elem().FieldByName("Spec")
 	fmt.Println(v)

@@ -32,9 +32,9 @@ spec:
       serviceAccountName: {{ include "kubeblocks.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      initContainers: # only download manager-debug image to local
-        - name: manager-debug
-          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repositoryDebug }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+      initContainers: # only download debug image to local
+        - name: debug
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.debug.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - /bin/true
@@ -72,7 +72,7 @@ spec:
             - name: KUBEBLOCKS_IMAGE
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_DEBUG_IMAGE
-              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repositoryDebug }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.debug.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}

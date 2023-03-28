@@ -445,23 +445,24 @@ func NeedReloadVolume(config appsv1alpha1.ComponentConfigSpec) bool {
 	return config.ConfigConstraintRef != ""
 }
 
-func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ReloadOptions, error) {
+func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ReloadOptions, *appsv1alpha1.FormatterConfig, error) {
 	for _, configSpec := range configSpecs {
 		if !NeedReloadVolume(configSpec) {
 			continue
 		}
-		cfgConst := &appsv1alpha1.ConfigConstraint{}
-		if err := cli.Get(ctx, client.ObjectKey{
+		ccKey := client.ObjectKey{
 			Namespace: "",
 			Name:      configSpec.ConfigConstraintRef,
-		}, cfgConst); err != nil {
-			return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
+		}
+		cfgConst := &appsv1alpha1.ConfigConstraint{}
+		if err := cli.Get(ctx, ccKey, cfgConst); err != nil {
+			return nil, nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 		}
 		if cfgConst.Spec.ReloadOptions != nil {
-			return cfgConst.Spec.ReloadOptions, nil
+			return cfgConst.Spec.ReloadOptions, cfgConst.Spec.FormatterConfig, nil
 		}
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 func getComponentFromClusterDefinition(

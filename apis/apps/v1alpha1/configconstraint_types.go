@@ -123,6 +123,17 @@ type ShellTrigger struct {
 	// exec used to execute for reload.
 	// +kubebuilder:validation:Required
 	Exec string `json:"exec"`
+
+	// scriptConfigMapRef used to execute for reload.
+	// +kubebuilder:validation:Required
+	ScriptConfigMapRef string `json:"scriptConfigMapRef"`
+
+	// Specify the namespace of the referenced the tpl script ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
 
 type TPLScriptTrigger struct {

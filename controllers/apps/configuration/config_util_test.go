@@ -363,7 +363,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}, testutil.WithMaxTimes(len(tests))))
 
 			for _, tt := range tests {
-				got, err := GetReloadOptions(k8sMockClient.Client(), ctx, tt.tpls)
+				got, _, err := GetReloadOptions(k8sMockClient.Client(), ctx, tt.tpls)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 				Expect(reflect.DeepEqual(got, tt.want)).Should(BeTrue())
 			}

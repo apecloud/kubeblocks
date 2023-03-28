@@ -451,7 +451,13 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	return volumeDirs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.CfgManagerBuildParams, error) {
+func buildConfigManagerParams(cli client.Client, ctx context.Context, configSpec []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.CfgManagerBuildParams, error) {
+	var (
+		err             error
+		reloadOptions   *appsv1alpha1.ReloadOptions
+		formatterConfig *appsv1alpha1.FormatterConfig
+	)
+
 	configManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:   constant.ConfigSidecarName,
 		CharacterType: params.Component.CharacterType,
@@ -461,15 +467,13 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplat
 		Cluster:       params.Cluster,
 	}
 
-	var err error
-	var reloadOptions *appsv1alpha1.ReloadOptions
-	if reloadOptions, err = cfgutil.GetReloadOptions(cli, ctx, cfgTemplates); err != nil {
+	if reloadOptions, formatterConfig, err = cfgutil.GetReloadOptions(cli, ctx, configSpec); err != nil {
 		return nil, err
 	}
-	if reloadOptions == nil {
+	if reloadOptions == nil || formatterConfig == nil {
 		return nil, nil
 	}
-	if err = cfgcm.BuildConfigManagerContainerArgs(reloadOptions, volumeDirs, cli, ctx, configManagerParams); err != nil {
+	if err = cfgcm.BuildConfigManagerContainerArgs(reloadOptions, volumeDirs, cli, ctx, configManagerParams, formatterConfig); err != nil {
 		return nil, err
 	}
 	return configManagerParams, nil

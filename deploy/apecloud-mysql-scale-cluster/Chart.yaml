@@ -1,0 +1,9 @@
+apiVersion: v2
+name: apecloud-mysql-scale-cluster
+description: An ApeCloud MySQL-Scale Cluster Helm chart for KubeBlocks.
+
+type: application
+
+version: 0.1.0
+
+appVersion: "8.0.30"

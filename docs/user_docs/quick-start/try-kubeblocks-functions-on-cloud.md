@@ -2,7 +2,7 @@
 title: Try out basic functions of KubeBlocks on Cloud
 description: How to run KubeBlocks on Playground
 sidebar_position: 1
-sidebar_label: Try out basic functions on Playground
+sidebar_label: Try out KubeBlocks on cloud
 ---
 
 import Tabs from '@theme/Tabs';

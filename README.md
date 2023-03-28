@@ -30,7 +30,20 @@
 
 
 ## What is KubeBlocks
-KubeBlocks is an open-source and cloud-prem tool that helps application developers and platform engineers build and manage Kubernetes native data platforms. Based on the best experience of public cloud fully managed services, KubeBlocks improves the service availability, resource utilization, and developer productivity of data platforms on Kubernetes.
+KubeBlocks is an open-source tool designed to help developers and platform engineers build and manage stateful workloads, such as databases and analytics, on Kubernetes. It is cloud-neutral and supports multiple public cloud providers. KubeBlocks provides a unified and declarative approach to increace productivity in DevOps practices.
+
+The name KubeBlocks is derived from Kubernetes and building blocks, which indicates that standardizing databases and analytics on Kubernetes can be both enjoyable and productive, like playing with construction toys. KubeBlocks combines the large-scale production experiences of top public cloud providers with enhanced usability and stability.
+
+### Why you need KubeBlocks
+
+Kubernetes has become the de facto standard for container orchestration. It manages an ever-increasing number of stateless workloads with the scalability and availability provided by ReplicaSet and the rollout and rollback capabilities provided by Deployment. However, managing stateful workloads poses great challenges for Kubernetes. Although statefulSet provides stable persistent storage and unique network identifiers, these abilities are far from enough for complex stateful workloads.
+
+To address these challenges, and solve the problem of complexity, KubeBlocks introduces ReplicationSet and ConsensusSet, with the following capabilities:
+
+- Role-based update order reduces downtime caused by upgrading versions, scaling, and rebooting.
+- Latency-based election weight reduces the possibility of related workloads or components being located in different available zones.
+- Maintains the status of data replication and automatically repairs replication errors or delays.
+
 ### Goals
 - Enhance stateful applications control plane manageability on Kubernetes clusters, being open sourced and cloud neutral 
 - Manage data platforms without a high cognitive load of cloud computing, Kubernetes, and database knowledge 
@@ -38,15 +51,15 @@ KubeBlocks is an open-source and cloud-prem tool that helps application develope
 - Reduce costs by only paying for the infrastructure and increasing the utilization of resources with flexible scheduling
 - Support the most popular databases, analytical software, and their bundled tools
 - Provide the most advanced user experience based on the concepts of IaC and GitOps
-### Key Features
-- Runs in Kubernetes clusters on public clouds such as AWS/GCP/Azure
-- 50% cost down under the same workload, compared with fully managed database services
-- Operates with A Kubernetes-style declarative API
-- Provides kbcli, an easy-to-use intuitive command-line tool
-- Enables a complete experience of Day-2 automated operation and maintenance, such as lifecycle management, backup, and monitoring
-- Supports mainstream open-source database software, such as MySQL, PostgreSQL, Redis and etc.
-  - KubeBlocks supports conventional replication and consensus replication with ReplicationSet and ConsensusSet
-  - KubeBlocks deploys MySQL to 3 available zones and ensures availability when a single AZ is unavailable (RTO is less than 30 seconds) and supports role configuration and complex topological relationships of Leader, Follower, and Learner
+
+### Key features
+- Kubernetes-native and multi-cloud supported.
+- Supports multiple database engines, including MySQL, PostgreSQL, Redis, MongoDB, and more.
+- Provides production-level performance, resilience, scalability, and observability.
+- Simplifies day-2 operations, such as upgrading, scaling, monitoring, backup, and restore.
+- Declarative configuration is made simple, and imperative commands are made powerful.
+- The learning curve is flat, and you are welcome to submit new issues on GitHub.
+
 
 For detailed feature information, see [Feature list](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/user_docs/Introduction/feature_list.md)
 

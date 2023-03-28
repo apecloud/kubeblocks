@@ -43,7 +43,7 @@ var _ = Describe("PersistentVolumeClaim Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.PersistentVolumeClaimSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)

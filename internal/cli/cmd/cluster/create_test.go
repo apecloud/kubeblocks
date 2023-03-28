@@ -153,7 +153,7 @@ var _ = Describe("create", func() {
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		comps, err := buildClusterComp(cd, nil)
 		Expect(err).ShouldNot(HaveOccurred())
-		checkComponent(comps, "10Gi", 1, "1", "1Gi")
+		checkComponent(comps, "20Gi", 1, "1", "1Gi")
 	})
 
 	It("build default cluster component with environment", func() {

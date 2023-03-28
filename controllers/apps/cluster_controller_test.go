@@ -77,7 +77,9 @@ var _ = Describe("Cluster Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
@@ -176,6 +178,19 @@ var _ = Describe("Cluster Controller", func() {
 				constant.AppInstanceLabelKey:   clusterKey.Name,
 				constant.AppConfigTypeLabelKey: "kubeblocks-env",
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
+
+		By("Make sure the cluster controller has set the cluster status to Running")
+		for i, comp := range clusterObj.Spec.ComponentSpecs {
+			if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
+				continue
+			}
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+			for _, v := range stsList.Items {
+				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+					testk8s.MockStatefulSetReady(&v)
+				})).ShouldNot(HaveOccurred())
+			}
+		}
 	}
 
 	type ExpectService struct {
@@ -316,6 +331,19 @@ var _ = Describe("Cluster Controller", func() {
 			testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
 		}
 		Eventually(func(g Gomega) { validateCompSvcList(g, mysqlCompName, mysqlCompType, mysqlExpectServices) }).Should(Succeed())
+
+		By("Make sure the cluster controller has set the cluster status to Running")
+		for i, comp := range clusterObj.Spec.ComponentSpecs {
+			if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
+				continue
+			}
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+			for _, v := range stsList.Items {
+				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+					testk8s.MockStatefulSetReady(&v)
+				})).ShouldNot(HaveOccurred())
+			}
+		}
 	}
 
 	testWipeOut := func() {
@@ -592,6 +620,14 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking cluster status and the number of replicas changed")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initialGeneration + len(clusterObj.Spec.ComponentSpecs)))
+		for i := range clusterObj.Spec.ComponentSpecs {
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+			for _, v := range stsList.Items {
+				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+					testk8s.MockStatefulSetReady(&v)
+				})).ShouldNot(HaveOccurred())
+			}
+		}
 	}
 
 	testHorizontalScale := func() {
@@ -1013,6 +1049,7 @@ var _ = Describe("Cluster Controller", func() {
 		clusterName := cluster.Name
 		pods := make([]corev1.Pod, 0)
 		for _, sts := range stsList {
+			t := true
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        sts.Name + "-0",
@@ -1023,6 +1060,16 @@ var _ = Describe("Cluster Controller", func() {
 						constant.AppInstanceLabelKey:          clusterName,
 						constant.KBAppComponentLabelKey:       componentName,
 						appsv1.ControllerRevisionHashLabelKey: sts.Status.UpdateRevision,
+					},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         "apps/v1",
+							Kind:               constant.StatefulSetKind,
+							Controller:         &t,
+							BlockOwnerDeletion: &t,
+							Name:               sts.Name,
+							UID:                sts.GetUID(),
+						},
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -1114,6 +1161,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 			g.Expect(hasBackupError).Should(BeTrue())
+
 		})).Should(Succeed())
 	}
 
@@ -1408,7 +1456,13 @@ var _ = Describe("Cluster Controller", func() {
 						Expect(strings.HasPrefix(volume.VolumeSource.PersistentVolumeClaim.ClaimName, testapps.DataVolumeName+"-"+clusterKey.Name)).Should(BeTrue())
 					}
 				}
+				Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
+					testk8s.MockStatefulSetReady(&sts)
+				})).ShouldNot(HaveOccurred())
+				podName := sts.Name + "-0"
+				testapps.MockReplicationComponentStsPod(testCtx, &sts, clusterObj.Name, testapps.DefaultRedisCompName, podName, sts.Labels[constant.RoleLabelKey])
 			}
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
 
 		It("Should successfully doing volume expansion", func() {

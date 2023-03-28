@@ -2,7 +2,7 @@
 title: Try out KubeBlocks in 5 minutes on Local Host
 description: A quick tour of KubeBlocks in 5 minutes on Local host on Playground
 sidebar_position: 1
-sidebar_label: Try KubeBlocks in 5m on Local Host
+sidebar_label: Try out KubeBlocks on local host
 ---
 
 

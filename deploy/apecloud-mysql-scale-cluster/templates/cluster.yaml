@@ -1,0 +1,74 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}
+  labels: {{ include "apecloud-mysql-cluster.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: apecloud-mysql-scale  # ref clusterdefinition.name
+  clusterVersionRef: ac-mysql-scale-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  affinity:
+    {{- with .Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  componentSpecs:
+    - name: mysql # user-defined
+      componentDefRef: mysql # ref clusterdefinition componentDefs.name
+      monitor: {{ .Values.monitor.enabled | default false }}
+      replicas: {{ .Values.replicaCount | default 3 }}
+      enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
+      {{- with  .Values.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.persistence.data.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.persistence.data.size }}
+        {{- if .Values.persistence.wal.enabled }}
+        - name: wallog
+          spec:
+            storageClassName: {{ .Values.persistence.wal.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.persistence.wal.size }}
+        {{- end }}
+        {{- if  .Values.persistence.log.enabled }}
+        - name: log
+          spec:
+            storageClassName: {{ .Values.persistence.log.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.persistence.log.size }}
+        {{- end }}
+      {{- end }}
+    - name: etcd
+      componentDefRef: etcd # ref clusterdefinition componentDefs.name
+      replicas: 1
+    - name: vtctld
+      componentDefRef: vtctld # ref clusterdefinition componentDefs.name
+      replicas: 1   
+    - name: vtconsensus
+      componentDefRef: vtconsensus # ref clusterdefinition componentDefs.name
+      replicas: 1       
+    - name: vtgate
+      componentDefRef: vtgate # ref clusterdefinition componentDefs.name
+      replicas: 1           

@@ -56,7 +56,7 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		// testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 

@@ -65,7 +65,7 @@ var _ = Describe("StatefulSet Controller", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
 		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
-		// testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 

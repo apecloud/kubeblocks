@@ -63,7 +63,7 @@ var _ = Describe("Deployment Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		// testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 

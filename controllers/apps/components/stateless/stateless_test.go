@@ -59,7 +59,7 @@ var _ = Describe("Stateful Component", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
 		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
-		// testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 

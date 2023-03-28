@@ -115,6 +115,7 @@ func init() {
 	SchemeBuilder.Register(&ClassFamily{}, &ClassFamilyList{})
 }
 
+// ValidateCPU validate if the CPU matches the class family model constraint
 func (m *ClassFamilyModel) ValidateCPU(cpu resource.Quantity) bool {
 	if m == nil {
 		return false
@@ -131,6 +132,7 @@ func (m *ClassFamilyModel) ValidateCPU(cpu resource.Quantity) bool {
 	return true
 }
 
+// ValidateMemory validate if the memory matches the class family model constraint
 func (m *ClassFamilyModel) ValidateMemory(cpu *resource.Quantity, memory *resource.Quantity) bool {
 	if m == nil {
 		return false
@@ -156,6 +158,7 @@ func (m *ClassFamilyModel) ValidateMemory(cpu *resource.Quantity, memory *resour
 	return true
 }
 
+// ValidateResourceRequirements validate if the resource matches the class family model constraints
 func (m *ClassFamilyModel) ValidateResourceRequirements(r *corev1.ResourceRequirements) bool {
 	var (
 		cpu    = r.Requests.Cpu()
@@ -181,6 +184,7 @@ func (m *ClassFamilyModel) ValidateResourceRequirements(r *corev1.ResourceRequir
 	return true
 }
 
+// FindMatchingModels find all class family models that resource matches
 func (c *ClassFamily) FindMatchingModels(r *corev1.ResourceRequirements) []ClassFamilyModel {
 	if c == nil {
 		return nil

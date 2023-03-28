@@ -450,7 +450,8 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 
 	// it's possible at time of external resource deletion, cluster definition has already been deleted.
 	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppManagedByLabelKey: constant.AppName,
+		constant.AppInstanceLabelKey:  cluster.GetName(),
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 

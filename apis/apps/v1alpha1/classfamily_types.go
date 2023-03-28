@@ -116,6 +116,9 @@ func init() {
 }
 
 func (m *ClassFamilyModel) ValidateCPU(cpu resource.Quantity) bool {
+	if m == nil {
+		return false
+	}
 	if m.CPU.Min != nil && m.CPU.Min.Cmp(cpu) > 0 {
 		return false
 	}
@@ -129,6 +132,10 @@ func (m *ClassFamilyModel) ValidateCPU(cpu resource.Quantity) bool {
 }
 
 func (m *ClassFamilyModel) ValidateMemory(cpu *resource.Quantity, memory *resource.Quantity) bool {
+	if m == nil {
+		return false
+	}
+
 	if memory == nil {
 		return true
 	}
@@ -155,6 +162,10 @@ func (m *ClassFamilyModel) ValidateResourceRequirements(r *corev1.ResourceRequir
 		memory = r.Requests.Memory()
 	)
 
+	if m == nil {
+		return false
+	}
+
 	if cpu.IsZero() && memory.IsZero() {
 		return true
 	}
@@ -171,6 +182,9 @@ func (m *ClassFamilyModel) ValidateResourceRequirements(r *corev1.ResourceRequir
 }
 
 func (c *ClassFamily) FindMatchingModels(r *corev1.ResourceRequirements) []ClassFamilyModel {
+	if c == nil {
+		return nil
+	}
 	var models []ClassFamilyModel
 	for _, model := range c.Spec.Models {
 		if model.ValidateResourceRequirements(r) {

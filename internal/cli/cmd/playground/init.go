@@ -122,7 +122,7 @@ func (o *initOptions) run() error {
 
 // local bootstraps a playground in the local host
 func (o *initOptions) local() error {
-	provider, err := cp.New(o.cloudProvider, "", "", o.Out, o.ErrOut)
+	provider, err := cp.New(o.cloudProvider, "", o.Out, o.ErrOut)
 	if err != nil {
 		return err
 	}
@@ -236,11 +236,11 @@ func (o *initOptions) cloud() error {
 
 	// clone apecloud/cloud-provider repo to local path
 	fmt.Fprintf(o.Out, "Clone ApeCloud cloud-provider repo to %s...\n", cpPath)
-	if err = util.CloneGitRepo(cp.GitRepoURL, "ack", cpPath); err != nil {
+	if err = util.CloneGitRepo(cp.GitRepoURL, "kb-playground", cpPath); err != nil {
 		return err
 	}
 
-	provider, err := cp.New(o.cloudProvider, o.region, cpPath, o.Out, o.ErrOut)
+	provider, err := cp.New(o.cloudProvider, cpPath, o.Out, o.ErrOut)
 	if err != nil {
 		return err
 	}

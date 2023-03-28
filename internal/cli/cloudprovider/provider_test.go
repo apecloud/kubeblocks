@@ -17,20 +17,36 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"os"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("aws cloud provider", func() {
 	const (
-		tfPath              = "../testing/testdata"
+		tfPath              = "./testdata"
 		expectedClusterName = "kb-playground-test"
+		expectedRegion      = "cn-northwest-1"
 	)
 
-	It("new aws cloud provider", func() {
-		vals, err := getOutputValues(tfPath, clusterNameKey)
+	It("new cloud provider", func() {
+		By("invalid cloud provider")
+		provider, err := New("test", tfPath, os.Stdout, os.Stderr)
+		Expect(err).Should(HaveOccurred())
+		Expect(provider).Should(BeNil())
+
+		By("valid cloud provider")
+		provider, err = New("aws", tfPath, os.Stdout, os.Stderr)
 		Expect(err).Should(Succeed())
-		Expect(vals).Should(HaveLen(1))
-		Expect(vals).Should(ContainElement(expectedClusterName))
+		Expect(provider).ShouldNot(BeNil())
+		Expect(provider.Name()).Should(Equal("aws"))
+
+		By("get and check cluster info")
+		clusterInfo, err := provider.GetClusterInfo()
+		Expect(err).Should(Succeed())
+		Expect(clusterInfo).ShouldNot(BeNil())
+		Expect(clusterInfo.ClusterName).Should(Equal(expectedClusterName))
+		Expect(clusterInfo.Region).Should(Equal(expectedRegion))
 	})
 })

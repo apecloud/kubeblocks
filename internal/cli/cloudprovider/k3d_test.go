@@ -27,7 +27,7 @@ import (
 var _ = Describe("playground", func() {
 	var (
 		provider    = NewLocalCloudProvider(os.Stdout, os.Stderr)
-		clusterName = "k3d-test"
+		clusterName = "k3d-tb-est"
 	)
 
 	It("k3d util function", func() {
@@ -35,6 +35,6 @@ var _ = Describe("playground", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(config.Name).Should(ContainSubstring("test"))
 		Expect(setUpK3d(context.Background(), nil)).Should(HaveOccurred())
-		Expect(provider.DeleteK8sCluster(clusterName)).Should(HaveOccurred())
+		Expect(provider.DeleteK8sCluster(&K8sClusterInfo{ClusterName: clusterName})).Should(HaveOccurred())
 	})
 })

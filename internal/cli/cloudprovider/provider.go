@@ -56,7 +56,7 @@ func (p *cloudProvider) Name() string {
 	return p.name
 }
 
-// CreateK8sCluster create a EKS cluster
+// CreateK8sCluster create a kubernetes cluster
 func (p *cloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo, init bool) error {
 	// init terraform
 	fmt.Fprintf(p.stdout, "Check and install terraform... \n")

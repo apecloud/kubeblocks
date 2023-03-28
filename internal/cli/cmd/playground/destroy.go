@@ -113,7 +113,7 @@ func (o *destroyOptions) destroyCloud() error {
 		return err
 	}
 
-	provider, err := cp.New(o.prevCluster.CloudProvider, o.prevCluster.Region, cpPath, o.Out, o.ErrOut)
+	provider, err := cp.New(o.prevCluster.CloudProvider, cpPath, o.Out, o.ErrOut)
 	if err != nil {
 		return err
 	}

@@ -37,7 +37,7 @@ type Interface interface {
 	GetClusterInfo() (*K8sClusterInfo, error)
 }
 
-func New(provider, region, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {
+func New(provider, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {
 	switch provider {
 	case AWS, TencentCloud, AliCloud:
 		return NewCloudProvider(provider, tfRootPath, stdout, stderr)

@@ -39,6 +39,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -1171,4 +1172,54 @@ func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string
 	compBackupMap := map[string]string{}
 	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
 	return compBackupMap, err
+}
+
+// deletePostgresPatroniConfigMap deletes the configmap of postgres patroni when the cluster is deleted.
+func deletePostgresPatroniConfigMap(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) error {
+	if cluster == nil {
+		return nil
+	}
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		compDef, err := componentutil.GetComponentDefByCluster(reqCtx.Ctx, cli, *cluster, compSpec.ComponentDefRef)
+		if err != nil {
+			return err
+		}
+		if compDef.WorkloadType != appsv1alpha1.Replication || compDef.CharacterType != constant.PgCharacterType {
+			continue
+		}
+		// we should check there is no pod under the component before deleting the configmap, otherwise the patroni configMap will be recreated by postgres Pod.
+		podList := &corev1.PodList{}
+		if err := cli.List(reqCtx.Ctx, podList, client.InNamespace(cluster.Namespace), client.MatchingLabels(componentutil.GetComponentMatchLabels(cluster.Name, compSpec.Name))); err != nil {
+			return err
+		}
+		if len(podList.Items) > 0 {
+			return errors.New("the component has pods, can not delete postgres patroni configmap")
+		}
+
+		var patroniConfigMapNameList []string
+		builtInEnvMap := component.GetReplacementMapForBuiltInEnv(cluster.Name, compSpec.Name)
+		for _, patroniConfigMap := range []string{
+			constant.PgPatroniConfigMapLeaderPlaceHolder,
+			constant.PgPatroniConfigMapConfigPlaceHolder,
+			constant.PgPatroniConfigMapFailoverPlaceHolder,
+		} {
+			patroniConfigMap = component.ReplaceNamedVars(builtInEnvMap, patroniConfigMap, -1, true)
+			patroniConfigMapNameList = append(patroniConfigMapNameList, patroniConfigMap)
+		}
+
+		for _, patroniConfigMapName := range patroniConfigMapNameList {
+			patroniConfigMap := &corev1.ConfigMap{}
+			if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: patroniConfigMapName}, patroniConfigMap); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+			if patroniConfigMap.Name == "" {
+				continue
+			}
+			reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "Deleting", "Deleting Patroni ConfigMap %s", patroniConfigMap.Name)
+			if err := cli.Delete(reqCtx.Ctx, patroniConfigMap); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+	return nil
 }

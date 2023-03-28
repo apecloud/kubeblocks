@@ -191,3 +191,10 @@ const (
 const (
 	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
 )
+
+const (
+	PgCharacterType                       = "postgresql"
+	PgPatroniConfigMapLeaderPlaceHolder   = "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-leader"
+	PgPatroniConfigMapConfigPlaceHolder   = "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-config"
+	PgPatroniConfigMapFailoverPlaceHolder = "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-failover"
+)

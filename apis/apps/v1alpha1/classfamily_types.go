@@ -26,48 +26,67 @@ import (
 
 // ClassFamilySpec defines the desired state of ClassFamily
 type ClassFamilySpec struct {
-	// Class family models, generally, a model is a static memory/cpu ratio or a range.
+	// Class family models, generally, a model is a specific constraint for CPU, memory and their relation.
 	Models []ClassFamilyModel `json:"models,omitempty"`
 }
 
 type ClassFamilyModel struct {
-	// The constraint for CPU cores
+	// The constraint for vcpu cores.
 	// +kubebuilder:validation:Required
 	CPU CPUConstraint `json:"cpu,omitempty"`
 
-	// The constraint for memory size
+	// The constraint for memory size.
 	// +kubebuilder:validation:Required
 	Memory MemoryConstraint `json:"memory,omitempty"`
 }
 
 type CPUConstraint struct {
-	// The maximum count of vcpu cores.
+	// The maximum count of vcpu cores, [Min, Max] defines a range for valid vcpu cores, and the value in this range
+	// must be multiple times of Step. It's useful to define a large number of valid values without defining them one by
+	// one. Please see the documentation for Step for some examples.
+	// If Slots is specified, Max, Min, and Step are ignored
 	// +optional
 	Max *resource.Quantity `json:"max,omitempty"`
 
-	// The minimum count of vcpu cores.
+	// The minimum count of vcpu cores, [Min, Max] defines a range for valid vcpu cores, and the value in this range
+	// must be multiple times of Step. It's useful to define a large number of valid values without defining them one by
+	// one. Please see the documentation for Step for some examples.
+	// If Slots is specified, Max, Min, and Step are ignored
 	// +optional
 	Min *resource.Quantity `json:"min,omitempty"`
 
-	// The minimum granularity of vcpu cores.
+	// The minimum granularity of vcpu cores, [Min, Max] defines a range for valid vcpu cores and the value in this range must be
+	// multiple times of Step.
+	// For example:
+	// 1. Min is 2, Max is 8, Step is 2, and the valid vcpu core is {2, 4, 6, 8}.
+	// 2. Min is 0.5, Max is 2, Step is 0.5, and the valid vcpu core is {0.5, 1, 1.5, 2}.
 	// +optional
 	Step *resource.Quantity `json:"step,omitempty"`
 
-	// The available vcpu cores,
+	// The valid vcpu cores, it's useful if you want to define valid vcpu cores explicitly.
+	// If Slots is specified, Max, Min, and Step are ignored
 	// +optional
 	Slots []resource.Quantity `json:"slots,omitempty"`
 }
 
 type MemoryConstraint struct {
-	// The size of memory per vcpu
+	// The size of memory per vcpu core.
+	// For example: 1Gi, 200Mi.
+	// If SizePerCPU is specified, MinPerCPU and MaxPerCPU are ignore.
 	// +optional
 	SizePerCPU *resource.Quantity `json:"sizePerCPU,omitempty"`
 
-	// The maximum memory per vcpu
+	// The maximum size of memory per vcpu core, [MinPerCPU, MaxPerCPU] defines a range for valid memory size per vcpu core.
+	// It is useful on GCP as the ratio between the CPU and memory may be a range.
+	// If SizePerCPU is specified, MinPerCPU and MaxPerCPU are ignored.
+	// Reference: https://cloud.google.com/compute/docs/general-purpose-machines#custom_machine_types
 	// +optional
 	MaxPerCPU *resource.Quantity `json:"maxPerCPU,omitempty"`
 
-	// The minimum memory per vcpu
+	// The minimum size of memory per vcpu core, [MinPerCPU, MaxPerCPU] defines a range for valid memory size per vcpu core.
+	// It is useful on GCP as the ratio between the CPU and memory may be a range.
+	// If SizePerCPU is specified, MinPerCPU and MaxPerCPU are ignored.
+	// Reference: https://cloud.google.com/compute/docs/general-purpose-machines#custom_machine_types
 	// +optional
 	MinPerCPU *resource.Quantity `json:"minPerCPU,omitempty"`
 }

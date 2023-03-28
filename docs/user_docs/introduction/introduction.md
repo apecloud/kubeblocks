@@ -7,10 +7,19 @@ sidebar_position: 1
 # KubeBlocks overview
 
 ## Introduction
+KubeBlocks is an open-source tool designed to help developers and platform engineers build and manage stateful workloads, such as databases and analytics, on Kubernetes. It is cloud-neutral and supports multiple public cloud providers. KubeBlocks provides a unified and declarative approach to increace productivity in DevOps practices.
 
-KubeBlocks is an open-source and cloud-prem tool that helps application developers and platform engineers build and manage Kubernetes native data platforms with the most popular databases, analytical software, and their bundled tools.
+The name KubeBlocks is derived from Kubernetes and building blocks, which indicates that standardizing databases and analytics on Kubernetes can be both enjoyable and productive, like playing with construction toys. KubeBlocks combines the large-scale production experiences of top public cloud providers with enhanced usability and stability.
 
-It has multiple built-in database engines and provides consistent management experience through `kbcli`, the command line tool of KubeBlocks. KubeBlocks runs on Kubernetes and supports multicloud environments. Any data product can access KubeBlocks in a declarative and configurable way to meet your needs to move to/off clouds and migrate across clouds. KubeBlocks can improve the utilization rate of your cloud resources and decrease the data computing and storage costs through shared instances and resource overcommitment.
+## Why You Need KubeBlocks
+
+Kubernetes has become the de facto standard for container orchestration. It manages an ever-increasing number of stateless workloads with the scalability and availability provided by ReplicaSet and the rollout and rollback capabilities provided by Deployment. However, managing stateful workloads poses great challenges for Kubernetes. Although statefulSet provides stable persistent storage and unique network identifiers, these abilities are far from enough for complex stateful workloads.
+
+To address these challenges, and solve the problem of complexity, KubeBlocks introduces ReplicationSet and ConsensusSet, with the following capabilities:
+
+- Role-based update order reduces downtime caused by upgrading versions, scaling, and rebooting.
+- Latency-based election weight reduces the possibility of related workloads or components being located in different available zones.
+- Maintains the status of data replication and automatically repairs replication errors or delays.
 
 ## Feature list
 

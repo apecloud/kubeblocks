@@ -42,29 +42,19 @@ func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec,
 	)
 
 	cmKeySet := FromCMKeysSelector(cmKey)
-	configOption := CfgOption{
+	configLoaderOption := CfgOption{
 		Type:           CfgCmType,
 		Log:            log.FromContext(context.TODO()),
 		CfgType:        fc.Format,
 		ConfigResource: FromConfigData(baseConfigs, cmKeySet),
 	}
-	if configOperator, err = NewConfigLoader(configOption); err != nil {
+	if configOperator, err = NewConfigLoader(configLoaderOption); err != nil {
 		return nil, err
-	}
-
-	// process special formatter options
-	mergedOptions := func(ctx *CfgOpOption) {
-		// process special formatter
-		if fc.Format == appsv1alpha1.Ini && fc.IniConfig != nil {
-			ctx.IniContext = &IniContext{
-				SectionName: fc.IniConfig.SectionName,
-			}
-		}
 	}
 
 	// merge param to config file
 	for _, params := range updatedParams {
-		if err := configOperator.MergeFrom(params.UpdatedParams, NewCfgOptions(params.Key, mergedOptions)); err != nil {
+		if err := configOperator.MergeFrom(params.UpdatedParams, NewCfgOptions(params.Key, WithFormatterConfig(fc))); err != nil {
 			return nil, err
 		}
 		updatedKeys.Add(params.Key)
@@ -111,4 +101,34 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 		}
 	}
 	return r
+}
+
+// FromStringMap converts a map[string]string to a map[string]interface{}
+func FromStringMap(m map[string]string) map[string]interface{} {
+	r := make(map[string]interface{}, len(m))
+	for key, v := range m {
+		r[key] = v
+	}
+	return r
+}
+
+func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]string, formatConfig *appsv1alpha1.FormatterConfig) (string, error) {
+	configLoaderOption := CfgOption{
+		Type:    CfgRawType,
+		Log:     log.FromContext(context.TODO()),
+		CfgType: formatConfig.Format,
+		RawData: baseCfg,
+	}
+	configWrapper, err := NewConfigLoader(configLoaderOption)
+	if err != nil {
+		return "", err
+	}
+
+	mergedOptions := NewCfgOptions("", WithFormatterConfig(formatConfig))
+	err = configWrapper.MergeFrom(FromStringMap(updatedParameters), mergedOptions)
+	if err != nil {
+		return "", err
+	}
+	mergedConfig := configWrapper.getConfigObject(mergedOptions)
+	return mergedConfig.Marshal()
 }

@@ -55,7 +55,7 @@ var _ = Describe("ConfigManager Test", func() {
 				volumeDirs    []corev1.VolumeMount
 				cli           client.Client
 				ctx           context.Context
-				param         *ConfigManagerParams
+				param         *CfgManagerBuildParams
 			}
 			tests := []struct {
 				name         string
@@ -120,7 +120,7 @@ var _ = Describe("ConfigManager Test", func() {
 						}},
 					cli: mockK8sCli.Client(),
 					ctx: context.TODO(),
-					param: &ConfigManagerParams{
+					param: &CfgManagerBuildParams{
 						Cluster: &appsv1alpha1.Cluster{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "abcd",
@@ -139,7 +139,7 @@ var _ = Describe("ConfigManager Test", func() {
 			for _, tt := range tests {
 				param := tt.args.param
 				if param == nil {
-					param = &ConfigManagerParams{}
+					param = &CfgManagerBuildParams{}
 				}
 				err := BuildConfigManagerContainerArgs(tt.args.reloadOptions, tt.args.volumeDirs, tt.args.cli, tt.args.ctx, param)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))

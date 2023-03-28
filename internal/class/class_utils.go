@@ -109,7 +109,7 @@ func ParseClasses(cmList *corev1.ConfigMapList) (map[string]map[string]*Componen
 		level := cm.GetLabels()[types.ClassLevelLabelKey]
 		switch level {
 		case "component":
-			componentType := cm.GetLabels()[constant.KBAppComponentLabelKey]
+			componentType := cm.GetLabels()[constant.KBAppComponentDefRefLabelKey]
 			if componentType == "" {
 				return nil, fmt.Errorf("failed to find component type")
 			}

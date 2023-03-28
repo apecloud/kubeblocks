@@ -5,7 +5,7 @@ metadata:
   labels:
     class.kubeblocks.io/level: component
     class.kubeblocks.io/provider: kubeblocks
-    apps.kubeblocks.io/component-name: mysql
+    apps.kubeblocks.io/component-def-ref: mysql
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
 data:
   families-20230223162700: |

@@ -325,12 +325,12 @@ func (o *CreateOptions) buildClassMappings(components []*appsv1alpha1.ClusterCom
 		}
 		classMappings[comp.Name] = class
 	}
-	if o.Annotations == nil {
-		o.Annotations = make(map[string]string)
-	}
 	bytes, err := json.Marshal(classMappings)
 	if err != nil {
 		return err
+	}
+	if o.Annotations == nil {
+		o.Annotations = make(map[string]string)
 	}
 	o.Annotations[types.ComponentClassAnnotationKey] = string(bytes)
 	return nil

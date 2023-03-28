@@ -59,6 +59,7 @@ const (
 	// kubeblocks.io labels
 	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
 	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
+	KBAppComponentDefRefLabelKey    = "apps.kubeblocks.io/component-def-ref"
 	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
 	AppConfigTypeLabelKey           = "apps.kubeblocks.io/config-type"
 	WorkloadTypeLabelKey            = "apps.kubeblocks.io/workload-type"

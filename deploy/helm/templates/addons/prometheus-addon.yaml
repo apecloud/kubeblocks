@@ -76,7 +76,11 @@ spec:
         - key: KubeGitVersion
           operator: Contains
           values:
-            - ack
+            # the format of alicloud ACK GitVersion is v1.24.6-aliyun.1
+            - aliyun
+            # for TKE, the smallest storage size is 10Gi, we also set its storage size to 20Gi
+            # the format of tencentcloud TKE GitVersion is v1.24.4-tke.5
+            - tke
       replicas: 1
       storageClass: alicloud-disk-efficiency
       resources:

@@ -114,9 +114,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				client.MatchingLabels{
 					constant.KBAppComponentLabelKey: componentName,
 					constant.AppInstanceLabelKey:    clusterName},
-				client.Limit(1))).Should(Succeed())
+				client.Limit(1))).ShouldNot(HaveOccurred())
 			g.Expect(deployList.Items).Should(HaveLen(1))
-		}).Should(BeTrue())
+		}).Should(Succeed())
 		return &deployList.Items[0]
 	}
 
@@ -124,15 +124,16 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		expectClusterPhase appsv1alpha1.ClusterPhase,
 		expectCompPhase appsv1alpha1.ClusterComponentPhase,
 		checkClusterPhase bool) {
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, func(g Gomega, newCluster *appsv1alpha1.Cluster) {
-			g.Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
-			if checkClusterPhase {
-				g.Expect(newCluster.Status.Phase == expectClusterPhase).Should(BeTrue())
-				return
-			}
-			compStatus := newCluster.Status.Components[componentName]
-			g.Expect(compStatus.Phase == expectCompPhase).Should(BeTrue())
-		})).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace},
+			func(g Gomega, newCluster *appsv1alpha1.Cluster) {
+				g.Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
+				if checkClusterPhase {
+					g.Expect(newCluster.Status.Phase == expectClusterPhase).Should(BeTrue())
+					return
+				}
+				compStatus := newCluster.Status.Components[componentName]
+				g.Expect(compStatus.Phase == expectCompPhase).Should(BeTrue())
+			})).Should(Succeed())
 	}
 
 	setInvolvedObject := func(event *corev1.Event, kind, objectName string) {

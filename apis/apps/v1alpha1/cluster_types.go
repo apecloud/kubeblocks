@@ -54,11 +54,11 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Affinity is a group of affinity scheduling rules.
+	// affinity is a group of affinity scheduling rules.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
-	// Tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+	// tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
@@ -108,7 +108,7 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// ComponentDefRef reference componentDef defined in ClusterDefinition spec.
+	// componentDefRef reference componentDef defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
@@ -155,7 +155,7 @@ type ClusterComponentSpec struct {
 	// +patchStrategy=merge,retainKeys
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Services expose endpoints can be accessed by clients
+	// services expose endpoints can be accessed by clients
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
@@ -168,11 +168,11 @@ type ClusterComponentSpec struct {
 	// +optional
 	SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
 
-	// TLS should be enabled or not
+	// tls should be enabled or not
 	// +optional
 	TLS bool `json:"tls,omitempty"`
 
-	// Issuer who provides tls certs
+	// issuer who provides tls certs
 	// required when TLS enabled
 	// +optional
 	Issuer *Issuer `json:"issuer,omitempty"`
@@ -287,14 +287,14 @@ type ClusterComponentVolumeClaimTemplate struct {
 }
 
 type Affinity struct {
-	// PodAntiAffinity describes the anti-affinity level of pods within a component.
+	// podAntiAffinity describes the anti-affinity level of pods within a component.
 	// Preferred means try spread pods by `TopologyKeys`.
 	// Required means must spread pods by `TopologyKeys`.
 	// +kubebuilder:default=Preferred
 	// +optional
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 
-	// TopologyKey is the key of node labels.
+	// topologyKey is the key of node labels.
 	// Nodes that have a label with this key and identical values are considered to be in the same topology.
 	// It's used as the topology domain for pod anti-affinity and pod spread constraint.
 	// Some well-known label keys, such as "kubernetes.io/hostname" and "topology.kubernetes.io/zone"
@@ -303,11 +303,11 @@ type Affinity struct {
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty"`
 
-	// NodeLabels describes that pods must be scheduled to the nodes with the specified node labels.
+	// nodeLabels describes that pods must be scheduled to the nodes with the specified node labels.
 	// +optional
 	NodeLabels map[string]string `json:"nodeLabels,omitempty"`
 
-	// Tenancy describes how pods are distributed across node.
+	// tenancy describes how pods are distributed across node.
 	// SharedNode means multiple pods may share the same node.
 	// DedicatedNode means each pod runs on their own dedicated node.
 	// +kubebuilder:default=SharedNode
@@ -317,7 +317,7 @@ type Affinity struct {
 
 // Issuer defines Tls certs issuer
 type Issuer struct {
-	// Name of issuer
+	// name of issuer
 	// options supported:
 	// - KubeBlocks - Certificates signed by KubeBlocks Operator.
 	// - UserProvided - User provided own CA-signed certificates.
@@ -326,7 +326,7 @@ type Issuer struct {
 	// +kubebuilder:validation:Required
 	Name IssuerName `json:"name"`
 
-	// SecretRef, Tls certs Secret reference
+	// secretRef, Tls certs Secret reference
 	// required when from is UserProvided
 	// +optional
 	SecretRef *TLSSecretRef `json:"secretRef,omitempty"`
@@ -334,19 +334,19 @@ type Issuer struct {
 
 // TLSSecretRef defines Secret contains Tls certs
 type TLSSecretRef struct {
-	// Name of the Secret
+	// name of the Secret
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// CA cert key in Secret
+	// ca cert key in Secret
 	// +kubebuilder:validation:Required
 	CA string `json:"ca"`
 
-	// Cert key in Secret
+	// cert key in Secret
 	// +kubebuilder:validation:Required
 	Cert string `json:"cert"`
 
-	// Key of TLS private key in Secret
+	// key of TLS private key in Secret
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
 }

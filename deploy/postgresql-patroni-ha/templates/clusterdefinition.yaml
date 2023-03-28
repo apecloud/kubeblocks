@@ -15,6 +15,16 @@ spec:
     - name: postgresql-ha
       workloadType: Replication
       characterType: postgresql
+      customLabelSpecs:
+        - key: apps.kubeblocks.postgres.patroni/scope
+          value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)"
+          resources:
+            - gvk: "v1/Pod"
+              selector:
+                app.kubernetes.io/managed-by: kubeblocks
+            - gvk: "apps/v1/StatefulSet"
+              selector:
+                app.kubernetes.io/managed-by: kubeblocks
       probes:
         roleChangedProbe:
           failureThreshold: 2
@@ -90,6 +100,20 @@ spec:
               runAsUser: 0
             command:
               - /kb-scripts/setup.sh
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - -ee
+                  - |
+                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm
@@ -111,22 +135,14 @@ spec:
                 value: "true"
               - name: KUBERNETES_USE_CONFIGMAPS
                 value: "true"
-              - name: POD_IP
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: status.podIP
-              - name: POD_NAMESPACE
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.namespace
+              - name: SCOPE
+                value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)"
               - name: KUBERNETES_SCOPE_LABEL
-                value: "apps.kubeblocks.io/component-name"
+                value: "apps.kubeblocks.postgres.patroni/scope"
               - name: KUBERNETES_ROLE_LABEL
-                value: "apps.kubeblocks.pg.patroni/role"
+                value: "apps.kubeblocks.postgres.patroni/role"
               - name: KUBERNETES_LABELS
-                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
+                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)","app.kubernetes.io/managed-by":"kubeblocks"}'
               - name: RESTORE_DATA_DIR
                 value: /home/postgres/pgdata/kb_restore
               - name: SPILO_CONFIGURATION
@@ -137,6 +153,18 @@ spec:
                       - auth-local: trust
               - name: ALLOW_NOSSL
                 value: "true"
+              - name: PGROOT
+                value: /home/postgres/pgdata/pgroot
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
               - name: PGUSER_SUPERUSER
                 valueFrom:
                   secretKeyRef:
@@ -159,10 +187,6 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
-              - name: SCOPE
-                value: "$(KB_COMP_NAME)"
-              - name: PGROOT
-                value: /home/postgres/pgdata/pgroot
               - name: PGUSER
                 valueFrom:
                   secretKeyRef:

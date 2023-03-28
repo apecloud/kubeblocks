@@ -175,6 +175,19 @@ var _ = Describe("Cluster Controller", func() {
 				constant.AppInstanceLabelKey:   clusterKey.Name,
 				constant.AppConfigTypeLabelKey: "kubeblocks-env",
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
+
+		By("Make sure the cluster controller has set the cluster status to Running")
+		for i, comp := range clusterObj.Spec.ComponentSpecs {
+			if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
+				continue
+			}
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+			for _, v := range stsList.Items {
+				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+					testk8s.MockStatefulSetReady(&v)
+				})).ShouldNot(HaveOccurred())
+			}
+		}
 	}
 
 	type ExpectService struct {
@@ -315,6 +328,19 @@ var _ = Describe("Cluster Controller", func() {
 			testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
 		}
 		Eventually(func(g Gomega) { validateCompSvcList(g, mysqlCompName, mysqlCompType, mysqlExpectServices) }).Should(Succeed())
+
+		By("Make sure the cluster controller has set the cluster status to Running")
+		for i, comp := range clusterObj.Spec.ComponentSpecs {
+			if comp.ComponentDefRef != mysqlCompType || comp.Name != mysqlCompName {
+				continue
+			}
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+			for _, v := range stsList.Items {
+				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+					testk8s.MockStatefulSetReady(&v)
+				})).ShouldNot(HaveOccurred())
+			}
+		}
 	}
 
 	testWipeOut := func() {
@@ -573,6 +599,14 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking cluster status and the number of replicas changed")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initialGeneration + len(clusterObj.Spec.ComponentSpecs)))
+		for i := range clusterObj.Spec.ComponentSpecs {
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+			for _, v := range stsList.Items {
+				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+					testk8s.MockStatefulSetReady(&v)
+				})).ShouldNot(HaveOccurred())
+			}
+		}
 	}
 
 	testHorizontalScale := func() {
@@ -1095,6 +1129,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 			g.Expect(hasBackupError).Should(BeTrue())
+
 		})).Should(Succeed())
 	}
 
@@ -1382,7 +1417,13 @@ var _ = Describe("Cluster Controller", func() {
 						Expect(strings.HasPrefix(volume.VolumeSource.PersistentVolumeClaim.ClaimName, testapps.DataVolumeName+"-"+clusterKey.Name)).Should(BeTrue())
 					}
 				}
+				Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
+					testk8s.MockStatefulSetReady(&sts)
+				})).ShouldNot(HaveOccurred())
+				podName := sts.Name + "-0"
+				testapps.MockReplicationComponentStsPod(testCtx, &sts, clusterObj.Name, testapps.DefaultRedisCompName, podName, sts.Labels[constant.RoleLabelKey])
 			}
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
 
 		It("Should successfully doing volume expansion", func() {

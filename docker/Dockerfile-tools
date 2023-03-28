@@ -68,5 +68,7 @@ COPY --from=builder /workspace/killer /bin
 COPY --from=builder /workspace/kbcli /bin
 
 WORKDIR /
-RUN mkdir /.kbcli && chown -R 65532:65532 /.kbcli
+# mkdir kbcli config dir and helm cache dir.
+RUN mkdir /.kbcli && chown -R 65532:65532 /.kbcli \
+    && mkdir /.cache && chown -R 65532:65532 /.cache
 USER 65532:65532

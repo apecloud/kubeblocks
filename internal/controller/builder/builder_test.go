@@ -468,7 +468,7 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds config manager sidecar container correctly", func() {
-			sidecarRenderedParam := &cfgcm.ConfigManagerParams{
+			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
 				CharacterType: "mysql",
 				SecreteName:   "test-secret",

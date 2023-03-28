@@ -153,7 +153,7 @@ func CreateTPLScriptHandler(tplScripts string, dirs []string, fileRegex string, 
 		if err != nil {
 			return err
 		}
-		if err := wrapGoTemplateRun(tplScripts, string(tplContent), updatedParams); err != nil {
+		if err := wrapGoTemplateRun(tplScripts, string(tplContent), updatedParams, formatConfig); err != nil {
 			return err
 		}
 		return backupLastConfigFiles(currFiles, backupPath)

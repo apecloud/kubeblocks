@@ -103,7 +103,7 @@ func (r *reconfigureProxy) initOnlineUpdater(opt *VolumeWatcherOpts) error {
 		return nil
 	}
 
-	updater, err := cfgcm.OnlineUpdateParamsHandle(opt.TPLScriptPath)
+	updater, err := cfgcm.OnlineUpdateParamsHandle(opt.TPLScriptPath, opt.FormatterConfig)
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to create online updater")
 	}

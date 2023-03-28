@@ -372,25 +372,25 @@ func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []ap
 	var (
 		err error
 
-		volumeDirs          []corev1.VolumeMount
-		configManagerParams *cfgcm.ConfigManagerParams
+		volumeDirs  []corev1.VolumeMount
+		buildParams *cfgcm.CfgManagerBuildParams
 	)
 
 	if volumeDirs = getUsingVolumesByCfgTemplates(podSpec, cfgTemplates); len(volumeDirs) == 0 {
 		return nil
 	}
-	if configManagerParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, params); err != nil {
+	if buildParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, params); err != nil {
 		return err
 	}
-	if configManagerParams == nil {
+	if buildParams == nil {
 		return nil
 	}
 
-	container, err := builder.BuildCfgManagerContainer(configManagerParams)
+	container, err := builder.BuildCfgManagerContainer(buildParams)
 	if err != nil {
 		return err
 	}
-	updateTPLScriptVolume(podSpec, configManagerParams)
+	updateTPLScriptVolume(podSpec, buildParams)
 
 	// Add sidecar to podTemplate
 	podSpec.Containers = append(podSpec.Containers, *container)
@@ -400,7 +400,7 @@ func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []ap
 	return nil
 }
 
-func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.ConfigManagerParams) {
+func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.CfgManagerBuildParams) {
 	scriptVolume := configManager.ScriptVolume
 	if scriptVolume == nil {
 		return
@@ -451,8 +451,8 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	return volumeDirs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
-	configManagerParams := &cfgcm.ConfigManagerParams{
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.CfgManagerBuildParams, error) {
+	configManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:   constant.ConfigSidecarName,
 		CharacterType: params.Component.CharacterType,
 		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),

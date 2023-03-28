@@ -339,28 +339,11 @@ func ClearResourcesWithRemoveFinalizerOption[T intctrlutil.Object, PT intctrluti
 // environment without UseExistingCluster set, where garbage collection lacks.
 func ClearClusterResources(testCtx *testutil.TestContext) {
 	inNS := client.InNamespace(testCtx.DefaultNamespace)
-
 	ClearResources(testCtx, intctrlutil.ClusterSignature, inNS,
 		client.HasLabels{testCtx.TestObjLabelKey})
-
 	// finalizer of ConfigMap are deleted in ClusterDef&ClusterVersion controller
 	ClearResources(testCtx, intctrlutil.ClusterVersionSignature,
 		client.HasLabels{testCtx.TestObjLabelKey})
 	ClearResources(testCtx, intctrlutil.ClusterDefinitionSignature,
 		client.HasLabels{testCtx.TestObjLabelKey})
-
-	// // mock behavior of garbage collection inside KCM
-	// if !testCtx.UsingExistingCluster() {
-	// 	// only delete internal resources managed by kubeblocks
-	// 	filter := client.MatchingLabels{constant.AppManagedByLabelKey: constant.AppName}
-
-	// 	ClearResources(testCtx, intctrlutil.StatefulSetSignature, inNS, filter)
-	// 	ClearResources(testCtx, intctrlutil.DeploymentSignature, inNS, filter)
-	// 	ClearResources(testCtx, intctrlutil.ConfigMapSignature, inNS, filter)
-	// 	ClearResources(testCtx, intctrlutil.ServiceSignature, inNS, filter)
-	// 	ClearResources(testCtx, intctrlutil.SecretSignature, inNS, filter)
-	// 	ClearResources(testCtx, intctrlutil.PodDisruptionBudgetSignature, inNS, filter)
-	// 	ClearResources(testCtx, intctrlutil.JobSignature, inNS, filter)
-	// 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, filter)
-	// }
 }

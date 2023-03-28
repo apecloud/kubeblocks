@@ -58,6 +58,7 @@ func BuildComponent(
 		TLS:                   clusterCompSpec.TLS,
 		Issuer:                clusterCompSpec.Issuer,
 		VolumeTypes:           clusterCompDefObj.VolumeTypes,
+		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
 	}
 
 	// resolve component.ConfigTemplates
@@ -232,6 +233,15 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 		for _, c := range cc {
 			c.Env = ReplaceSecretEnvVars(namedValuesMap, c.Env)
 		}
+	}
+}
+
+// GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
+func GetReplacementMapForBuiltInEnv(clusterName, componentName string) map[string]string {
+	return map[string]string{
+		constant.KBClusterNamePlaceHolder:     clusterName,
+		constant.KBCompNamePlaceHolder:        componentName,
+		constant.KBClusterCompNamePlaceHolder: fmt.Sprintf("%s-%s", clusterName, componentName),
 	}
 }
 

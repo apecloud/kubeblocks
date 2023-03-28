@@ -55,13 +55,13 @@ import (
 
 // owned K8s core API resources controller-gen RBAC marker
 // full access on core API resources
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=secrets/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=configmaps/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=services/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
 
@@ -77,15 +77,15 @@ import (
 // +kubebuilder:rbac:groups=apps,resources=replicasets/status,verbs=get
 // +kubebuilder:rbac:groups=apps,resources=replicasets/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
 // +kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
 // +kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
 
 // read + update access
@@ -450,34 +450,66 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 
 	// it's possible at time of external resource deletion, cluster definition has already been deleted.
 	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppManagedByLabelKey: constant.AppName,
+		constant.AppInstanceLabelKey:  cluster.GetName(),
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 
+	removeFinalizers := func() (*ctrl.Result, error) {
+		if ret, err := removeFinalizer(r, reqCtx, generics.StatefulSetSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+
+		if ret, err := removeFinalizer(r, reqCtx, generics.DeploymentSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+
+		if ret, err := removeFinalizer(r, reqCtx, generics.ServiceSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+
+		if ret, err := removeFinalizer(r, reqCtx, generics.SecretSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+
+		if ret, err := removeFinalizer(r, reqCtx, generics.ConfigMapSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+
+		if ret, err := removeFinalizer(r, reqCtx, generics.PodDisruptionBudgetSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+		return nil, nil
+	}
+
+	deleteResources := func() error {
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &appsv1.StatefulSet{}, inNS, ml); err != nil {
+			return err
+		}
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &appsv1.Deployment{}, inNS, ml); err != nil {
+			return err
+		}
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &corev1.Service{}, inNS, ml); err != nil {
+			return err
+		}
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &corev1.Secret{}, inNS, ml); err != nil {
+			return err
+		}
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &corev1.ConfigMap{}, inNS, ml); err != nil {
+			return err
+		}
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &policyv1.PodDisruptionBudget{}, inNS, ml); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	// all resources created in reconcileClusterWorkloads should be handled properly
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.StatefulSetSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizers(); err != nil {
 		return ret, err
 	}
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.DeploymentSignature, inNS, ml); err != nil {
-		return ret, err
-	}
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.ServiceSignature, inNS, ml); err != nil {
-		return ret, err
-	}
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.SecretSignature, inNS, ml); err != nil {
-		return ret, err
-	}
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.ConfigMapSignature, inNS, ml); err != nil {
-		return ret, err
-	}
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.PodDisruptionBudgetSignature, inNS, ml); err != nil {
-		return ret, err
+	if err := deleteResources(); err != nil {
+		return nil, err
 	}
 
 	return nil, nil

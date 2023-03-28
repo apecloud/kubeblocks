@@ -454,30 +454,61 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 
+	removeFinalizers := func() (*ctrl.Result, error) {
+		if ret, err := removeFinalizer(r, reqCtx, generics.StatefulSetSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+
+		if ret, err := removeFinalizer(r, reqCtx, generics.DeploymentSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+
+		if ret, err := removeFinalizer(r, reqCtx, generics.ServiceSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+
+		if ret, err := removeFinalizer(r, reqCtx, generics.SecretSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+
+		if ret, err := removeFinalizer(r, reqCtx, generics.ConfigMapSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+
+		if ret, err := removeFinalizer(r, reqCtx, generics.PodDisruptionBudgetSignature, inNS, ml); err != nil {
+			return ret, err
+		}
+		return nil, nil
+	}
+
+	deleteResources := func() error {
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &appsv1.StatefulSet{}, inNS, ml); err != nil {
+			return err
+		}
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &appsv1.Deployment{}, inNS, ml); err != nil {
+			return err
+		}
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &corev1.Service{}, inNS, ml); err != nil {
+			return err
+		}
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &corev1.Secret{}, inNS, ml); err != nil {
+			return err
+		}
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &corev1.ConfigMap{}, inNS, ml); err != nil {
+			return err
+		}
+		if err := r.Client.DeleteAllOf(reqCtx.Ctx, &policyv1.PodDisruptionBudget{}, inNS, ml); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	// all resources created in reconcileClusterWorkloads should be handled properly
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.StatefulSetSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizers(); err != nil {
 		return ret, err
 	}
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.DeploymentSignature, inNS, ml); err != nil {
-		return ret, err
-	}
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.ServiceSignature, inNS, ml); err != nil {
-		return ret, err
-	}
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.SecretSignature, inNS, ml); err != nil {
-		return ret, err
-	}
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.ConfigMapSignature, inNS, ml); err != nil {
-		return ret, err
-	}
-
-	if ret, err := removeFinalizer(r, reqCtx, generics.PodDisruptionBudgetSignature, inNS, ml); err != nil {
-		return ret, err
+	if err := deleteResources(); err != nil {
+		return nil, err
 	}
 
 	return nil, nil

@@ -48,9 +48,18 @@ var (
 		kbcli playground init
 
 		# create an AWS EKS cluster and install KubeBlocks, the region is required
-		kbcli playground init --cloud-provider aws --region cn-northwest-1`)
+		kbcli playground init --cloud-provider aws --region cn-northwest-1
 
-	supportedCloudProviders = []string{cp.TencentCloud, cp.AliCloud, cp.AWS, cp.Local}
+		# create an alibaba cloud ACK cluster and install KubeBlocks, the region is required
+		kbcli playground init --cloud-provider alicloud --region cn-hangzhou
+
+		# create a tencent cloud TKE cluster and install KubeBlocks, the region is required
+		kbcli playground init --cloud-provider tencentcloud --region ap-chengdu
+
+		# create a Google cloud GKE cluster and install KubeBlocks, the region is required
+		kbcli playground init --cloud-provider gcp --region us-central1`)
+
+	supportedCloudProviders = []string{cp.Local, cp.AWS, cp.GCP, cp.AliCloud, cp.TencentCloud}
 )
 
 type initOptions struct {
@@ -407,7 +416,7 @@ func (o *initOptions) checkExistedCluster() error {
 		return nil
 	}
 
-	// previous kubernetes cluster is a cloud provider cluster, check if it is region
+	// previous kubernetes cluster is a cloud provider cluster, check if the region
 	// is same with the new cluster region, if not, informer user to destroy the previous
 	// cluster first
 	if o.prevCluster.Region != o.region {

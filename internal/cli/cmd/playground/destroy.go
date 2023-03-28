@@ -34,11 +34,8 @@ import (
 
 var (
 	destroyExample = templates.Examples(`
-		# destroy local host playground cluster
-		kbcli playground destroy
-
-		# destroy the AWS EKS cluster, the region is required
-		kbcli playground destroy --cloud-provider aws --region cn-northwest-1`)
+		# destroy playground cluster
+		kbcli playground destroy`)
 )
 
 type destroyOptions struct {

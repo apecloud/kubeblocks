@@ -185,7 +185,7 @@ func (cs *ComponentStatusSynchronizer) updateComponentsPhase(
 	if !componentIsRunning {
 		// if no operation is running in cluster or failed pod timed out,
 		// means the component is Failed or Abnormal.
-		if slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cs.cluster.Status.Phase) || hasFailedPodTimedOut {
+		if slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), cs.cluster.Status.Phase) || hasFailedPodTimedOut {
 			if phase, err := cs.component.GetPhaseWhenPodsNotReady(ctx, componentName); err != nil {
 				return err
 			} else if phase != "" {

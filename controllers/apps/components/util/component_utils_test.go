@@ -161,7 +161,7 @@ var _ = Describe("Consensus Component", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		// testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 

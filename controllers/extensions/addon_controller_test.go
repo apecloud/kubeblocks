@@ -48,10 +48,10 @@ var _ = Describe("Addon controller", func() {
 		By("clean resources")
 		// non-namespaced
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResources(&testCtx, intctrlutil.AddonSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.AddonSignature, true, ml)
 
 		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
-		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS,
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS,
 			client.HasLabels{
 				constant.AddonNameLabelKey,
 			})

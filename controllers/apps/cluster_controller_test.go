@@ -76,7 +76,9 @@ var _ = Describe("Cluster Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)

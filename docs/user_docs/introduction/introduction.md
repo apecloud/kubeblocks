@@ -15,7 +15,7 @@ The name KubeBlocks is derived from Kubernetes and building blocks, which indica
 
 Kubernetes has become the de facto standard for container orchestration. It manages an ever-increasing number of stateless workloads with the scalability and availability provided by ReplicaSet and the rollout and rollback capabilities provided by Deployment. However, managing stateful workloads poses great challenges for Kubernetes. Although statefulSet provides stable persistent storage and unique network identifiers, these abilities are far from enough for complex stateful workloads.
 
-To address these challenges, and solve the problem of complexity. KubeBlocks introduces ReplicationSet and ConsensusSet, with the following capabilities:
+To address these challenges, and solve the problem of complexity, KubeBlocks introduces ReplicationSet and ConsensusSet, with the following capabilities:
 
 - Role-based update order reduces downtime caused by upgrading versions, scaling, and rebooting.
 - Latency-based election weight reduces the possibility of related workloads or components being located in different available zones.

@@ -109,11 +109,13 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	getDeployment := func(componentName string) *appsv1.Deployment {
 		deployList := &appsv1.DeploymentList{}
-		Eventually(func() bool {
-			Expect(k8sClient.List(ctx, deployList, client.MatchingLabels{
-				constant.KBAppComponentLabelKey: componentName,
-				constant.AppInstanceLabelKey:    clusterName}, client.Limit(1))).Should(Succeed())
-			return len(deployList.Items) == 1
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.List(ctx, deployList,
+				client.MatchingLabels{
+					constant.KBAppComponentLabelKey: componentName,
+					constant.AppInstanceLabelKey:    clusterName},
+				client.Limit(1))).Should(Succeed())
+			g.Expect(deployList.Items).Should(HaveLen(1))
 		}).Should(BeTrue())
 		return &deployList.Items[0]
 	}
@@ -314,7 +316,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 					cluster.Spec.ComponentSpecs = cluster.Spec.ComponentSpecs[:2]
 				}, 2,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-					g.Expect(len(tmpCluster.Status.Components) == 2).Should(BeTrue())
+					g.Expect(tmpCluster.Status.Components).Should(HaveLen(2))
 				})
 
 			// TODO check when delete and add the same component, wait for deleting related workloads when delete component in lifecycle.
@@ -326,7 +328,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				}, 3,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					_, isExist := tmpCluster.Status.Components[consensusClusterComponent.Name]
-					g.Expect(len(tmpCluster.Status.Components) == 3 && isExist).Should(BeTrue())
+					g.Expect(tmpCluster.Status.Components).Should(HaveLen(3))
+					g.Expect(isExist).Should(BeTrue())
 				})
 
 			By("modify consensus component name")

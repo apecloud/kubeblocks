@@ -1,4 +1,4 @@
-# Build the kubeblocks debug binaries
+# Build the kubeblocks tools binaries
 # includes kbcli, kubectl, and manager tools.
 FROM --platform=${BUILDPLATFORM} golang:1.19 as builder
 
@@ -44,9 +44,6 @@ COPY apis/ apis/
 
 # Download binaries
 RUN curl -fsSL https://dl.k8s.io/v1.25.7/kubernetes-client-${TARGETOS}-${TARGETARCH}.tar.gz | tar -zxv
-RUN curl -L https://get.helm.sh/helm-v3.11.1-${TARGETOS}-${TARGETARCH}.tar.gz -o helm.tar.gz && \
-    tar xvf helm.tar.gz && \
-    mv ./${TARGETOS}-${TARGETARCH}/helm ./helm
 
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o reloader cmd/reloader/main.go
@@ -54,15 +51,16 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o probe cmd/probe/main.go
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o kbcli cmd/cli/main.go
 
-# curl binary layer
-FROM --platform=${TARGETPLATFORM} tarampampam/curl:7.85.0 as binary-downloader
-
 # Use alpine
 FROM docker.io/alpine:3.17
 
-COPY --from=binary-downloader /bin/curl /bin
+# install tools via apk
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add --no-cache curl \
+    && apk add --no-cache helm \
+    && rm -rf /var/cache/apk/*
+
 COPY --from=builder /workspace/kubernetes/client/bin/kubectl /bin
-COPY --from=builder /workspace/helm /bin
 COPY config/probe config/probe
 COPY --from=builder /workspace/probe /bin
 COPY --from=builder /workspace/reloader /bin

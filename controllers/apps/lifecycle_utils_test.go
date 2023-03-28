@@ -178,7 +178,7 @@ spec:
   volumeSnapshotClassName: csi-aws-ebs-snapclass
 `
 		vs := snapshotv1.VolumeSnapshot{}
-		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).ShouldNot(HaveOccurred())
 		labels := map[string]string{
 			constant.KBManagedByKey:         "cluster",
 			constant.AppInstanceLabelKey:    clusterName,
@@ -228,16 +228,16 @@ spec:
 
 			By("doBackup should return requeue=false")
 			shouldRequeue, err := doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
-			Expect(shouldRequeue).Should(BeFalse())
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(shouldRequeue).Should(BeFalse())
 
 			By("Set ReadyToUse to nil, doBackup should return requeue=true")
 			Expect(testapps.ChangeObjStatus(&testCtx, vs, func() {
 				vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: nil}
 			})).Should(Succeed())
 			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
-			Expect(shouldRequeue).Should(BeTrue())
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(shouldRequeue).Should(BeTrue())
 		})
 
 		// REIVEW: this test seems always failed

@@ -84,8 +84,6 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
-		// HACK: explicit delete STS resources
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 	}
 
 	BeforeEach(func() {

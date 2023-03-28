@@ -72,7 +72,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
 		// mgr namespaced
 		inMgrNS := client.InNamespace(mgrNamespace)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inMgrNS, ml)

@@ -286,7 +286,15 @@ func DeleteObject[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 // ClearResources clears all resources of the given type T satisfying the input ListOptions.
 func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
-	testCtx *testutil.TestContext, _ func(T, L), opts ...client.DeleteAllOfOption) {
+	testCtx *testutil.TestContext, funcSig func(T, L), opts ...client.DeleteAllOfOption) {
+	ClearResourcesWithRemoveFinalizerOption[T, PT, L, PL](testCtx, funcSig, false, opts...)
+}
+
+// ClearResourcesWithRemoveFinalizerOption clears all resources of the given type T with
+// removeFinalizer specifier, and satisfying the input ListOptions.
+func ClearResourcesWithRemoveFinalizerOption[T intctrlutil.Object, PT intctrlutil.PObject[T],
+	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+	testCtx *testutil.TestContext, _ func(T, L), removeFinalizer bool, opts ...client.DeleteAllOfOption) {
 	var (
 		obj     T
 		objList L
@@ -302,21 +310,24 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 
 	gvk, _ := apiutil.GVKForObject(PL(&objList), testCtx.Cli.Scheme())
 	ginkgo.By("clear resources " + strings.TrimSuffix(gvk.Kind, "List"))
-
-	gomega.Eventually(func() error {
-		return testCtx.Cli.DeleteAllOf(testCtx.Ctx, PT(&obj), opts...)
-	}).Should(gomega.Succeed())
-
 	gomega.Eventually(func(g gomega.Gomega) {
+		g.Expect(testCtx.Cli.DeleteAllOf(testCtx.Ctx, PT(&obj), opts...)).ShouldNot(gomega.HaveOccurred())
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)).Should(gomega.Succeed())
 		items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
 		for _, obj := range items {
 			pobj := PT(&obj)
+			if pobj.GetDeletionTimestamp().IsZero() {
+				panic("expected DeletionTimestamp is not nil")
+			}
 			finalizers := pobj.GetFinalizers()
 			if len(finalizers) > 0 {
-				g.Expect(ChangeObj(testCtx, pobj, func() {
-					pobj.SetFinalizers([]string{})
-				})).To(gomega.Succeed())
+				if removeFinalizer {
+					g.Expect(ChangeObj(testCtx, pobj, func() {
+						pobj.SetFinalizers([]string{})
+					})).To(gomega.Succeed())
+				} else {
+					g.Expect(finalizers).Should(gomega.BeEmpty())
+				}
 			}
 		}
 		g.Expect(items).Should(gomega.BeEmpty())
@@ -328,28 +339,11 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 // environment without UseExistingCluster set, where garbage collection lacks.
 func ClearClusterResources(testCtx *testutil.TestContext) {
 	inNS := client.InNamespace(testCtx.DefaultNamespace)
-
 	ClearResources(testCtx, intctrlutil.ClusterSignature, inNS,
 		client.HasLabels{testCtx.TestObjLabelKey})
-
 	// finalizer of ConfigMap are deleted in ClusterDef&ClusterVersion controller
 	ClearResources(testCtx, intctrlutil.ClusterVersionSignature,
 		client.HasLabels{testCtx.TestObjLabelKey})
 	ClearResources(testCtx, intctrlutil.ClusterDefinitionSignature,
 		client.HasLabels{testCtx.TestObjLabelKey})
-
-	// mock behavior of garbage collection inside KCM
-	if !testCtx.UsingExistingCluster() {
-		// only delete internal resources managed by kubeblocks
-		filter := client.MatchingLabels{constant.AppManagedByLabelKey: constant.AppName}
-
-		ClearResources(testCtx, intctrlutil.StatefulSetSignature, inNS, filter)
-		ClearResources(testCtx, intctrlutil.DeploymentSignature, inNS, filter)
-		ClearResources(testCtx, intctrlutil.ConfigMapSignature, inNS, filter)
-		ClearResources(testCtx, intctrlutil.ServiceSignature, inNS, filter)
-		ClearResources(testCtx, intctrlutil.SecretSignature, inNS, filter)
-		ClearResources(testCtx, intctrlutil.PodDisruptionBudgetSignature, inNS, filter)
-		ClearResources(testCtx, intctrlutil.JobSignature, inNS, filter)
-		ClearResources(testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, filter)
-	}
 }

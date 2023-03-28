@@ -521,6 +521,9 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 	// HACK(TODO): remove configMap created by postgres patroni independently, because the patroni configmap must be deleted after the Pod is deleted,
 	// otherwise it will be recreated again. Subsequent refactoring requires a custom resource deletion strategy.
 	if err := deletePostgresPatroniConfigMap(reqCtx, r.Client, cluster); err != nil {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
+			return intctrlutil.ResultToP(intctrlutil.RequeueAfter(requeueDuration, reqCtx.Log, ""))
+		}
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	return nil, nil

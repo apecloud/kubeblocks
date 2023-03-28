@@ -194,7 +194,7 @@ const (
 
 const (
 	PgCharacterType                       = "postgresql"
-	PgPatroniConfigMapLeaderPlaceHolder   = "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-leader"
-	PgPatroniConfigMapConfigPlaceHolder   = "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-config"
-	PgPatroniConfigMapFailoverPlaceHolder = "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-failover"
+	PgPatroniConfigMapLeaderPlaceHolder   = "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni-leader"
+	PgPatroniConfigMapConfigPlaceHolder   = "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni-config"
+	PgPatroniConfigMapFailoverPlaceHolder = "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni-failover"
 )

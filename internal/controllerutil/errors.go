@@ -41,6 +41,8 @@ const (
 	ErrorTypeBackupNotCompleted ErrorType = "BackupNotCompleted"
 	// ErrorWaitCacheRefresh waits for synchronization of the corresponding object cache in client-go from ApiServer.
 	ErrorWaitCacheRefresh = "WaitCacheRefresh"
+	// ErrorWaitDependencyReady waits for the dependency to be ready.
+	ErrorWaitDependencyReady = "ErrorWaitDependencyReady"
 )
 
 var ErrFailedToAddFinalizer = errors.New("failed to add finalizer")

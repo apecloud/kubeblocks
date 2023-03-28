@@ -1193,7 +1193,7 @@ func deletePostgresPatroniConfigMap(reqCtx intctrlutil.RequestCtx, cli client.Cl
 			return err
 		}
 		if len(podList.Items) > 0 {
-			return errors.New("the component has pods, can not delete postgres patroni configmap")
+			return intctrlutil.NewError(intctrlutil.ErrorWaitDependencyReady, "the component has pods, can not delete postgres patroni configmap")
 		}
 
 		var patroniConfigMapNameList []string
@@ -1209,16 +1209,16 @@ func deletePostgresPatroniConfigMap(reqCtx intctrlutil.RequestCtx, cli client.Cl
 
 		for _, patroniConfigMapName := range patroniConfigMapNameList {
 			patroniConfigMap := &corev1.ConfigMap{}
-			if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: patroniConfigMapName}, patroniConfigMap); err != nil && !apierrors.IsNotFound(err) {
+			if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: patroniConfigMapName}, patroniConfigMap); err != nil {
 				return err
 			}
 			if patroniConfigMap.Name == "" {
 				continue
 			}
-			reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "Deleting", "Deleting Patroni ConfigMap %s", patroniConfigMap.Name)
 			if err := cli.Delete(reqCtx.Ctx, patroniConfigMap); err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
+			reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "Deleting", "Deleting Patroni ConfigMap %s", patroniConfigMap.Name)
 		}
 	}
 	return nil

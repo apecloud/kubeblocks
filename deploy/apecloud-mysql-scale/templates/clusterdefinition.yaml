@@ -12,6 +12,10 @@ spec:
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_mysql)"
   componentDefs:
+    # TODO: In the future, ApeCloud MySQL-Scale is expected to support
+    # independent cluster deployment and will no longer need to be deployed
+    # together with ApeCloud MySQL cluster. ApeCloud MySQL-Scale can
+    # register vttablets as sidecars to an existing ApeCloud MySQL cluster.
     - name: mysql
       characterType: mysql
       probes:

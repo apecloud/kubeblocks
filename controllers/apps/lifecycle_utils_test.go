@@ -129,11 +129,6 @@ var _ = Describe("lifecycle_utils", func() {
 		return clusterObj, clusterDefObj, clusterVersionObj, key
 	}
 
-	// NOTES: following code are problematic, caused "Ginkgo detected an issue with your spec structure":
-	//   It looks like you are calling By outside of a running spec.  Make sure you
-	//   call By inside a runnable node such as It or BeforeEach and not inside the
-	//   body of a container such as Describe or Context.
-	// REVIEW: is mock sts workload necessary? why?
 	newStsObj := func() *appsv1.StatefulSet {
 		container := corev1.Container{
 			Name: "mysql",
@@ -243,6 +238,7 @@ spec:
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
+		// REIVEW: this test seems always failed
 		// It("should do backup to create volumesnapshot when there exists a deleting volumesnapshot", func() {
 		// 	By("prepare cluster and construct component")
 		// 	reqCtx := newReqCtx()

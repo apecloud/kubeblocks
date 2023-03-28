@@ -92,7 +92,6 @@ var _ = Describe("ReplicationSet Util", func() {
 			string(Primary):   clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-0",
 			string(Secondary): secondaryName,
 		} {
-			// REVIEW: is mock sts workload necessary? why?
 			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
 				AddFinalizers([]string{DBClusterFinalizerName}).
 				AddContainer(container).
@@ -207,7 +206,6 @@ var _ = Describe("ReplicationSet Util", func() {
 
 		By("Creating a statefulSet of replication workloadType.")
 		mockStsName := "mock-stateful-set-0"
-		// REVIEW: is mock sts workload necessary? why?
 		mockSts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, mockStsName, clusterObj.Name, testapps.DefaultRedisCompName).
 			AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 			Create(&testCtx).GetObject()
@@ -254,7 +252,6 @@ var _ = Describe("ReplicationSet Util", func() {
 			string(Primary):   clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-0",
 			string(Secondary): secondaryName,
 		} {
-			// REVIEW: is mock sts workload necessary? why?
 			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
 				AddContainer(container).
 				AddAppInstanceLabel(clusterObj.Name).

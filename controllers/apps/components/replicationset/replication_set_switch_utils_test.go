@@ -92,7 +92,6 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 			string(Primary):   clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-0",
 			string(Secondary): clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-1",
 		} {
-			// REVIEW: is mock sts workload necessary? why?
 			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
 				AddContainer(container).
 				AddAppInstanceLabel(clusterObj.Name).

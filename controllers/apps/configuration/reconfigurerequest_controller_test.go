@@ -121,7 +121,6 @@ var _ = Describe("Reconfigure Controller", func() {
 					MountPath: "/mnt/config",
 				}},
 			}
-			// REVIEW: is mock sts workload necessary? why?
 			_ = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, statefulSetName, clusterObj.Name, statefulCompName).
 				AddConfigmapVolume(configVolumeName, configmap.Name).
 				AddContainer(container).

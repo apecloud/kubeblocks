@@ -122,7 +122,6 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 			BeforeEach(func() {
 				deploymentName := clusterName + "-" + compName
-				// REVIEW: is mock deploy workload necessary? why?
 				deployment = testapps.NewDeploymentFactory(testCtx.DefaultNamespace, deploymentName, clusterName, compName).
 					SetMinReadySeconds(int32(10)).
 					SetReplicas(int32(1)).
@@ -236,7 +235,6 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
-				// REVIEW: is mock sts workload necessary? why?
 				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 					SetReplicas(int32(3)).
 					AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
@@ -363,7 +361,6 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
-				// REVIEW: is mock sts workload necessary? why?
 				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 					SetReplicas(int32(3)).
 					AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
@@ -490,7 +487,6 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
-				// REVIEW: is mock sts workload necessary? why?
 				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 					SetReplicas(int32(2)).
 					AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).

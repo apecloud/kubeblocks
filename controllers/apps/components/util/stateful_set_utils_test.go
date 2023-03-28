@@ -120,7 +120,6 @@ var _ = Describe("StatefulSet utils test", func() {
 	When("Updating a StatefulSet with `OnDelete` UpdateStrategy", func() {
 		It("will not update pods of the StatefulSet util the pods have been manually deleted", func() {
 			By("Creating a StatefulSet")
-			// REVIEW: is mock sts workload necessary? why?
 			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, testapps.DefaultRedisCompName).
 				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 				AddAppInstanceLabel(clusterName).

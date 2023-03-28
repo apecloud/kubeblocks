@@ -1209,11 +1209,12 @@ func deletePostgresPatroniConfigMap(reqCtx intctrlutil.RequestCtx, cli client.Cl
 
 		for _, patroniConfigMapName := range patroniConfigMapNameList {
 			patroniConfigMap := &corev1.ConfigMap{}
-			if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: patroniConfigMapName}, patroniConfigMap); err != nil {
-				return err
-			}
-			if patroniConfigMap.Name == "" {
+			err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: patroniConfigMapName}, patroniConfigMap)
+			if apierrors.IsNotFound(err) {
 				continue
+			}
+			if err != nil {
+				return err
 			}
 			if err := cli.Delete(reqCtx.Ctx, patroniConfigMap); err != nil && !apierrors.IsNotFound(err) {
 				return err

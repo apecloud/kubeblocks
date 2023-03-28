@@ -69,6 +69,7 @@ const (
 	ClusterAccountLabelKey          = "account.kubeblocks.io/name"
 	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
 	KBManagedByKey                  = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
+	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey        = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster

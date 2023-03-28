@@ -36,10 +36,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -299,7 +303,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// fill class
-	if err := r.fillClass(reqCtx, cluster); err != nil {
+	if err := r.fillClass(reqCtx, cluster, clusterDefinition); err != nil {
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		return intctrlutil.RequeueAfter(time.Millisecond*requeueDuration, reqCtx.Log, err.Error())
 	}
@@ -372,6 +376,10 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
+		Watches(&source.Kind{Type: &appsv1alpha1.ClassFamily{}},
+			&handler.EnqueueRequestForObject{},
+			builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool { return true })),
+		).
 		Complete(r)
 }
 
@@ -586,18 +594,23 @@ func (r *ClusterReconciler) checkReferencedCRStatus(
 	return intctrlutil.ResultToP(intctrlutil.RequeueAfter(requeueDuration, reqCtx.Log, ""))
 }
 
-func (r *ClusterReconciler) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
+func (r *ClusterReconciler) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, clusterDefinition *appsv1alpha1.ClusterDefinition) error {
 	var (
 		value                 = cluster.GetAnnotations()[constant.ClassAnnotationKey]
 		componentClassMapping = make(map[string]string)
+		cmList                corev1.ConfigMapList
 	)
 	if value != "" {
 		if err := json.Unmarshal([]byte(value), &componentClassMapping); err != nil {
 			return err
 		}
 	}
-	var cmList corev1.ConfigMapList
-	if err := r.Client.List(reqCtx.Ctx, &cmList); err != nil {
+
+	cmLabels := []client.ListOption{
+		client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefinition.Name},
+		client.HasLabels{constant.ClassProviderLabelKey},
+	}
+	if err := r.Client.List(reqCtx.Ctx, &cmList, cmLabels...); err != nil {
 		return err
 	}
 	compClasses, err := class.ParseClasses(&cmList)

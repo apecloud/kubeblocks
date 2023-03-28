@@ -1049,6 +1049,7 @@ var _ = Describe("Cluster Controller", func() {
 		clusterName := cluster.Name
 		pods := make([]corev1.Pod, 0)
 		for _, sts := range stsList {
+			t := true
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        sts.Name + "-0",
@@ -1059,6 +1060,16 @@ var _ = Describe("Cluster Controller", func() {
 						constant.AppInstanceLabelKey:          clusterName,
 						constant.KBAppComponentLabelKey:       componentName,
 						appsv1.ControllerRevisionHashLabelKey: sts.Status.UpdateRevision,
+					},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         "apps/v1",
+							Kind:               constant.StatefulSetKind,
+							Controller:         &t,
+							BlockOwnerDeletion: &t,
+							Name:               sts.Name,
+							UID:                sts.GetUID(),
+						},
 					},
 				},
 				Spec: corev1.PodSpec{

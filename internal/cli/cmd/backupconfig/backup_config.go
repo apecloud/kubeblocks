@@ -33,12 +33,6 @@ var backupConfigExample = templates.Examples(`
 
 		# If you have already installed a snapshot-controller, only enable the snapshot backup feature
         kbcli backup-config --set dataProtection.enableVolumeSnapshot=true
-
-		# Schedule automatic backup at 18:00 every day (UTC timezone)
-		kbcli backup-config --set dataProtection.backupSchedule="0 18 * * *"
-
-		# Set automatic backup retention for 7 days
-		kbcli backup-config --set dataProtection.backupTTL="168h0m0s"
 	`)
 
 // NewBackupConfigCmd creates the backup-config command

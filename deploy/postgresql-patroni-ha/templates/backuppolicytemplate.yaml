@@ -1,0 +1,24 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: postgresql-backup-policy-template
+  labels:
+    clusterdefinition.kubeblocks.io/name: postgresql
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: postgresql
+  backupPolicies:
+  - componentDefRef: postgresql
+    ttl: 7d
+    schedule:
+      baseBackup:
+        type: snapshot
+        enable: false
+        cronExpression: "0 2 * * 1"
+    snapshot:
+      target:
+        connectionCredentialKeyword:
+          passwordKey: password
+          usernameKey: username
+    full:
+      backupToolName: postgres-basebackup

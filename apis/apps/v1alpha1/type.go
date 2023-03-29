@@ -442,6 +442,11 @@ const (
 	VolumeTypeLog  VolumeType = "log"
 )
 
+// BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.
+// +enum
+// +kubebuilder:validation:Enum={full,snapshot}
+type BaseBackupType string
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

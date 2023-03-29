@@ -106,6 +106,13 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
+  - backuppolicytemplates
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
   - classfamilies
   verbs:
   - get
@@ -492,32 +499,6 @@ rules:
   - dataprotection.kubeblocks.io
   resources:
   - backuppolicies/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicytemplates
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicytemplates/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicytemplates/status
   verbs:
   - get
   - patch

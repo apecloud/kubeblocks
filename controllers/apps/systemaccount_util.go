@@ -217,8 +217,8 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, statement []str
 
 func renderSecretWithPwd(key componentUniqueKey, username, passwd string) *corev1.Secret {
 	secretData := map[string][]byte{}
-	secretData[accountNameForSecret] = []byte(username)
-	secretData[accountPasswdForSecret] = []byte(passwd)
+	secretData[constant.AccountNameForSecret] = []byte(username)
+	secretData[constant.AccountPasswdForSecret] = []byte(passwd)
 
 	ml := getLabelsForSecretsAndJobs(key)
 	ml[constant.ClusterAccountLabelKey] = username

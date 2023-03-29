@@ -20,10 +20,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -35,6 +37,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
@@ -45,10 +48,12 @@ import (
 )
 
 var _ = Describe("DataProtection", func() {
+	const policyName = "policy"
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
+	var out *bytes.Buffer
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, out, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 		tf.Client = &clientfake.RESTClient{}
 	})
@@ -58,6 +63,39 @@ var _ = Describe("DataProtection", func() {
 	})
 
 	Context("backup", func() {
+
+		initClient := func(policies ...*dataprotectionv1alpha1.BackupPolicy) {
+			clusterDef := testing.FakeClusterDef()
+			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
+			clusterDefLabel := map[string]string{
+				constant.ClusterDefLabelKey: clusterDef.Name,
+			}
+			cluster.SetLabels(clusterDefLabel)
+			pods := testing.FakePods(1, testing.Namespace, testing.ClusterName)
+			objects := []runtime.Object{
+				cluster, clusterDef, &pods.Items[0],
+			}
+			for _, v := range policies {
+				objects = append(objects, v)
+			}
+			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, objects...)
+		}
+
+		It("list-backup-policy", func() {
+			By("fake client")
+			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
+			policy2 := testing.FakeBackupPolicy("policy1", testing.ClusterName)
+			initClient(defaultBackupPolicy, policy2)
+
+			By("test list-backup-policy cmd")
+			cmd := NewListBackupPolicyCmd(tf, streams)
+			Expect(cmd).ShouldNot(BeNil())
+			cmd.Run(cmd, nil)
+			Expect(out.String()).Should(ContainSubstring(defaultBackupPolicy.Name))
+			Expect(out.String()).Should(ContainSubstring("true"))
+			Expect(len(strings.Split(strings.Trim(out.String(), "\n"), "\n"))).Should(Equal(3))
+		})
+
 		It("validate create backup", func() {
 			By("without cluster name")
 			o := &CreateBackupOptions{
@@ -69,34 +107,35 @@ var _ = Describe("DataProtection", func() {
 			o.IOStreams = streams
 			Expect(o.Validate()).To(MatchError("missing cluster name"))
 
-			By("not found connection secret")
+			By("test without default backupPolicy")
 			o.Name = testing.ClusterName
-			Expect(o.Validate()).Should(HaveOccurred())
+			o.Namespace = testing.Namespace
+			initClient()
+			o.Dynamic = tf.FakeDynamicClient
+			Expect(o.Validate()).Should(MatchError(fmt.Errorf(`not found any backup policy for cluster "%s"`, testing.ClusterName)))
+
+			By("test with two default backupPolicy")
+			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
+			initClient(defaultBackupPolicy, testing.FakeBackupPolicy("policy2", testing.ClusterName))
+			o.Dynamic = tf.FakeDynamicClient
+			Expect(o.Validate()).Should(MatchError(fmt.Errorf(`cluster "%s" has multiple default backup policies`, o.Name)))
+
+			By("test with one default backupPolicy")
+			initClient(defaultBackupPolicy)
+			o.Dynamic = tf.FakeDynamicClient
+			Expect(o.Validate()).Should(Succeed())
 		})
 
 		It("run backup command", func() {
-			clusterDef := testing.FakeClusterDef()
-			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
-			clusterDefLabel := map[string]string{
-				constant.ClusterDefLabelKey: clusterDef.Name,
-			}
-			cluster.SetLabels(clusterDefLabel)
-
-			template := testing.FakeBackupPolicyTemplate()
-			template.SetLabels(clusterDefLabel)
-
-			secrets := testing.FakeSecrets(testing.Namespace, testing.ClusterName)
-			pods := testing.FakePods(1, testing.Namespace, testing.ClusterName)
-			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-				scheme.Scheme, &secrets.Items[0], cluster, clusterDef, template, &pods.Items[0])
-			tf.Client = &clientfake.RESTClient{}
+			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
+			initClient(defaultBackupPolicy)
+			By("test with specified backupPolicy")
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
-			_ = cmd.Flags().Set("backup-type", "snapshot")
+			_ = cmd.Flags().Set("backup-policy", defaultBackupPolicy.Name)
 			cmd.Run(cmd, []string{testing.ClusterName})
 		})
-
 	})
 
 	It("delete-backup", func() {
@@ -129,7 +168,7 @@ var _ = Describe("DataProtection", func() {
 		Expect(cmd).ShouldNot(BeNil())
 		By("test list-backup cmd with no backup")
 		tf.FakeDynamicClient = testing.FakeDynamicClient()
-		o := list.NewListOptions(tf, streams, types.BackupGVR())
+		o := ListBackupOptions{ListOptions: list.NewListOptions(tf, streams, types.BackupGVR())}
 		Expect(printBackupList(o)).Should(Succeed())
 		Expect(o.ErrOut.(*bytes.Buffer).String()).Should(ContainSubstring("No backups found"))
 
@@ -186,15 +225,13 @@ var _ = Describe("DataProtection", func() {
 			constant.ClusterDefLabelKey: clusterDef.Name,
 		}
 		cluster.SetLabels(clusterDefLabel)
-
-		template := testing.FakeBackupPolicyTemplate()
-		template.SetLabels(clusterDefLabel)
+		backupPolicy := testing.FakeBackupPolicy("backPolicy", cluster.Name)
 
 		pods := testing.FakePods(1, testing.Namespace, clusterName)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, template)
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterDef, cluster, template)
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterDef, cluster, backupPolicy)
 		tf.Client = &clientfake.RESTClient{}
 		// create backup
 		cmd := NewCreateBackupCmd(tf, streams)

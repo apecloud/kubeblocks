@@ -53,7 +53,6 @@ const (
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupToolName      = "fake-backup-tool"
-	BackupTemplateName  = "fake-backup-policy-template"
 )
 
 func GetRandomStr() string {
@@ -288,14 +287,21 @@ func FakeBackupTool() *dpv1alpha1.BackupTool {
 	return tool
 }
 
-func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
-	template := &dpv1alpha1.BackupPolicyTemplate{
+func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPolicy {
+	template := &dpv1alpha1.BackupPolicy{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
-			Kind:       types.KindBackupPolicyTemplate,
+			Kind:       types.KindBackupPolicy,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: BackupTemplateName,
+			Name:      backupPolicyName,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: clusterName,
+			},
+			Annotations: map[string]string{
+				constant.DefaultBackupPolicyAnnotationKey: "true",
+			},
 		},
 	}
 	return template

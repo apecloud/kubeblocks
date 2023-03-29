@@ -59,7 +59,7 @@ spec:
                 description: the target database workload to restore
                 properties:
                   labelsSelector:
-                    description: LabelSelector is used to find matching pods. Pods
+                    description: labelsSelector is used to find matching pods. Pods
                       that match this label selector are counted to determine the
                       number of pods in their corresponding topology domain.
                     properties:
@@ -106,7 +106,7 @@ spec:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                   secret:
-                    description: Secret is used to connect to the target database
+                    description: secret is used to connect to the target database
                       cluster. If not set, secret will be inherited from backup policy
                       template. if still not set, the controller will check if any
                       system account for dataprotection has been created.
@@ -116,11 +116,13 @@ spec:
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       passwordKeyword:
-                        description: PasswordKeyword the map keyword of the password
+                        default: password
+                        description: passwordKeyword the map keyword of the password
                           in the connection credential secret
                         type: string
                       userKeyword:
-                        description: UserKeyword the map keyword of the user in the
+                        default: username
+                        description: userKeyword the map keyword of the user in the
                           connection credential secret
                         type: string
                     required:

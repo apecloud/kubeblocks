@@ -43,7 +43,7 @@ var _ = Describe("Backup Controller test", func() {
 	const backupRemoteVolumeName = "backup-remote-volume"
 	const backupRemotePVCName = "backup-remote-pvc"
 	const defaultSchedule = "0 3 * * *"
-	const defaultTTL = "168h0m0s"
+	const defaultTTL = "7d"
 	const backupName = "test-backup-job"
 
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
@@ -129,14 +129,19 @@ var _ = Describe("Backup Controller test", func() {
 
 			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
 			_ = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-				SetBackupToolName(backupTool.Name).
-				SetSchedule(defaultSchedule).
 				SetTTL(defaultTTL).
+				AddSnapshotPolicy().
+				SetSchedule(defaultSchedule, true).
 				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 				AddMatchLabels(constant.RoleLabelKey, "leader").
 				SetTargetSecretName(clusterName).
 				AddHookPreCommand("touch /data/mysql/.restore;sync").
 				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+				AddFullPolicy().
+				SetBackupToolName(backupTool.Name).
+				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+				AddMatchLabels(constant.RoleLabelKey, "leader").
+				SetTargetSecretName(clusterName).
 				SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
 				Create(&testCtx).GetObject()
 		})
@@ -147,7 +152,6 @@ var _ = Describe("Backup Controller test", func() {
 			BeforeEach(func() {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
@@ -198,7 +202,6 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
 					Create(&testCtx).GetObject()
@@ -297,7 +300,6 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
 					Create(&testCtx).GetObject()
@@ -312,7 +314,6 @@ var _ = Describe("Backup Controller test", func() {
 			It("should fail without pvc", func() {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
 					Create(&testCtx).GetObject()
@@ -343,19 +344,17 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("By creating a backupPolicy from backupTool: " + backupTool.Name)
 				_ = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddFullPolicy().
 					SetBackupToolName(backupTool.Name).
-					SetSchedule(defaultSchedule).
+					SetSchedule(defaultSchedule, true).
 					SetTTL(defaultTTL).
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
-					AddHookPreCommand("touch /data/mysql/.restore;sync").
-					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
 					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
 					Create(&testCtx).GetObject()
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
@@ -378,7 +377,6 @@ var _ = Describe("Backup Controller test", func() {
 			BeforeEach(func() {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()

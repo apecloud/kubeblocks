@@ -73,8 +73,7 @@ spec:
             targetPort: delvedebug
       horizontalScalePolicy:
         type: Snapshot
-        backupTemplateSelector:
-          "clusterdefinition.kubeblocks.io/name": apecloud-mysql-scale
+        backupPolicyTemplateName: apecloud-mysql-backup-policy-template
       podSpec:
         containers:
           - name: mysql

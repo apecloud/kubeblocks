@@ -1,25 +1,33 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: backup-policy-template-postgresql
+  name: postgresql-backup-policy-template
   labels:
     clusterdefinition.kubeblocks.io/name: postgresql
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  # which backup tool to perform database backup, only support one tool.
-  backupToolName: volumesnapshot
-  ttl: 168h0m0s
-
-  credentialKeyword:
-    userKeyword: username
-    passwordKeyword: password
-
-  hooks:
-    containerName: postgresql
-    preCommands:
-      - psql -c "CHECKPOINT"
-  backupStatusUpdates:
-    - path: manifests.backupLog
-      containerName: postgresql
-      script: /scripts/backup-log-collector.sh
-      updateStage: pre
+  clusterDefinitionRef: postgresql
+  backupPolicies:
+  - componentDefRef: pg-replication
+    ttl: 7d
+    schedule:
+      baseBackup:
+        type: snapshot
+        enable: false
+        cronExpression: "0 2 * * 1"
+    snapshot:
+      hooks:
+        containerName: postgresql
+        preCommands:
+          - psql -c "CHECKPOINT"
+      backupStatusUpdates:
+        - path: manifests.backupLog
+          containerName: postgresql
+          script: /scripts/backup-log-collector.sh
+          updateStage: pre
+      target:
+        connectionCredentialKeyword:
+          passwordKey: password
+          usernameKey: username
+    full:
+      backupToolName: pg-basebackup

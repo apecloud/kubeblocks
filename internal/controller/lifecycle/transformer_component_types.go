@@ -19,11 +19,13 @@ package lifecycle
 import (
 	"fmt"
 	"reflect"
-	"time"
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -49,7 +51,12 @@ type Component interface {
 	GetPhase() appsv1alpha1.ClusterComponentPhase
 	GetStatus() appsv1alpha1.ClusterComponentStatus
 
-	// Exist checks whether the component exists in cluster
+	GetMatchingLabels() client.MatchingLabels
+
+	// GetWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error)
+
+	// Exist checks whether the component exists in cluster, we say that a component exists iff the main workloads
+	// exist in cluster, such as stateful set for consensus/replication/stateful and deployment for stateless.
 	Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error)
 
 	Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error
@@ -63,6 +70,9 @@ type Component interface {
 
 	Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 
+	Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error
+
+	// impl-related
 	addResource(obj client.Object, action *Action, parent *lifecycleVertex) *lifecycleVertex
 	addWorkload(obj client.Object, action *Action, parent *lifecycleVertex)
 }
@@ -145,6 +155,14 @@ type componentBase struct {
 	dag *graph.DAG
 }
 
+type deploymentComponentBase struct {
+	componentBase
+}
+
+type statefulsetComponentBase struct {
+	componentBase
+}
+
 func (c *componentBase) addResource(obj client.Object, action *Action, parent *lifecycleVertex) *lifecycleVertex {
 	if obj == nil {
 		panic("try to add nil object")
@@ -215,6 +233,51 @@ func (c *componentBase) GetStatus() appsv1alpha1.ClusterComponentStatus {
 	return appsv1alpha1.ClusterComponentStatus{} // TODO: impl
 }
 
+func (c *componentBase) GetMatchingLabels() client.MatchingLabels {
+	return client.MatchingLabels{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppInstanceLabelKey:    c.GetClusterName(),
+		constant.KBAppComponentLabelKey: c.GetName(),
+	}
+}
+
+func (c *componentBase) Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return nil // TODO: impl
+}
+
+func (c *componentBase) updateStatefulSetWorkload(stsObj *appsv1.StatefulSet, idx int32) {
+	stsObjCopy := stsObj.DeepCopy()
+	stsProto := c.workloadVertexs[idx].obj.(*appsv1.StatefulSet)
+
+	// keep the original template annotations.
+	// if annotations exist and are replaced, the statefulSet will be updated.
+	stsProto.Spec.Template.Annotations = mergeAnnotations(stsObjCopy.Spec.Template.Annotations, stsProto.Spec.Template.Annotations)
+	stsObjCopy.Spec.Template = stsProto.Spec.Template
+	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
+	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
+	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
+		c.workloadVertexs[idx].obj = stsObjCopy
+		c.workloadVertexs[idx].action = actionPtr(UPDATE)
+
+		// sync component phase
+		//updateComponentPhaseWithOperation2(c.GetCluster(), c.GetName())
+	}
+}
+
+func (c *componentBase) updateDeploymentWorkload(deployObj *appsv1.Deployment) {
+	deployObjCopy := deployObj.DeepCopy()
+	deployProto := c.workloadVertexs[0].obj.(*appsv1.Deployment)
+
+	deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations, deployProto.Spec.Template.Annotations)
+	deployObjCopy.Spec = deployProto.Spec
+	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
+		c.workloadVertexs[0].obj = deployObjCopy
+		c.workloadVertexs[0].action = actionPtr(UPDATE)
+		// sync component phase
+		//updateComponentPhaseWithOperation2(c.GetCluster(), c.GetName())
+	}
+}
+
 func (c *componentBase) updateService(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	labels := map[string]string{
 		constant.AppManagedByLabelKey:   constant.AppName,
@@ -223,7 +286,7 @@ func (c *componentBase) updateService(reqCtx intctrlutil.RequestCtx, cli client.
 	}
 	svcObjList, err := listObjWithLabelsInNamespace(reqCtx, cli, generics.ServiceSignature, c.GetNamespace(), labels)
 	if err != nil {
-		return err
+		return client.IgnoreNotFound(err)
 	}
 
 	svcProtoList := findAll[*corev1.Service](c.dag)
@@ -256,48 +319,69 @@ func (c *componentBase) updateService(reqCtx intctrlutil.RequestCtx, cli client.
 	return nil
 }
 
-func (c *componentBase) updateStatefulSetWorkload(stsObj *appsv1.StatefulSet, idx int32) error {
-	stsObjCopy := stsObj.DeepCopy()
-	stsProto := c.workloadVertexs[idx].obj.(*appsv1.StatefulSet)
+func (c *componentBase) updatePVC(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+	pvcNameSet := sets.New[string]()
+	for _, v := range findAll[*corev1.PersistentVolumeClaim](c.dag) {
+		pvcNameSet.Insert(v.(*lifecycleVertex).obj.GetName())
+	}
 
-	// keep the original template annotations.
-	// if annotations exist and are replaced, the statefulSet will be updated.
-	stsProto.Spec.Template.Annotations = mergeAnnotations(stsObjCopy.Spec.Template.Annotations, stsProto.Spec.Template.Annotations)
-	stsObjCopy.Spec.Template = stsProto.Spec.Template
-	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
-	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
-	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
-		c.workloadVertexs[idx].obj = stsObjCopy
-		c.workloadVertexs[idx].action = actionPtr(UPDATE)
+	for _, vct := range c.Component.VolumeClaimTemplates {
+		for i := c.Component.Replicas - 1; i >= 0; i-- {
+			pvcName := fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i)
+			if pvcNameSet.Has(pvcName) {
+				continue
+			}
+
+			pvc := &corev1.PersistentVolumeClaim{}
+			pvcKey := types.NamespacedName{
+				Namespace: stsObj.Namespace,
+				Name:      pvcName,
+			}
+			if err := cli.Get(reqCtx.Ctx, pvcKey, pvc); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				return err
+			}
+			c.updateResource(pvc, c.workloadVertexs[0]).immutable = true
+		}
 	}
 	return nil
 }
 
-func (c *componentBase) updateDeploymentWorkload(deployObj *appsv1.Deployment) error {
-	deployObjCopy := deployObj.DeepCopy()
-	deployProto := c.workloadVertexs[0].obj.(*appsv1.Deployment)
-
-	deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations, deployProto.Spec.Template.Annotations)
-	deployObjCopy.Spec = deployProto.Spec
-	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
-		c.workloadVertexs[0].obj = deployObjCopy
-		c.workloadVertexs[0].action = actionPtr(UPDATE)
+// validateObjectsAction validates the action of all objects in dag has been determined
+func (c *componentBase) validateObjectsAction() error {
+	for _, v := range c.dag.Vertices() {
+		if node, ok := v.(*lifecycleVertex); !ok {
+			return fmt.Errorf("unexpected vertex type, cluster: %s, component: %s, vertex: %T",
+				c.GetClusterName(), c.GetName(), v)
+		} else if node.action == nil {
+			return fmt.Errorf("unexpected nil vertex action, cluster: %s, component: %s, vertex: %T",
+				c.GetClusterName(), c.GetName(), v)
+		}
 	}
 	return nil
 }
 
-func (c *componentBase) restartWorkload(podTemplate *corev1.PodTemplateSpec) error {
-	if podTemplate.Annotations == nil {
-		podTemplate.Annotations = map[string]string{}
+// resolveObjectsAction resolves the action of objects in dag to guarantee that all object actions will be determined
+func (c *componentBase) resolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	snapshot, err := readCacheSnapshot(reqCtx, cli, c.GetCluster())
+	if err != nil {
+		return err
 	}
-
-	// startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
-	startTimestamp := time.Now() // TODO: impl
-	restartTimestamp := podTemplate.Annotations[constant.RestartAnnotationKey]
-	// if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.After(res) {
-	if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.Before(res) {
-		podTemplate.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
+	for _, v := range c.dag.Vertices() {
+		if node, ok := v.(*lifecycleVertex); !ok {
+			fmt.Printf("unexpected vertex type, cluster: %s, component: %s, vertex: %T",
+				c.GetClusterName(), c.GetName(), v)
+			return fmt.Errorf("unexpected vertex type, cluster: %s, component: %s, vertex: %T",
+				c.GetClusterName(), c.GetName(), v)
+		} else if node.action == nil {
+			if action, err := resolveObjectAction(snapshot, node); err != nil {
+				return err
+			} else {
+				node.action = action
+			}
+		}
 	}
-
-	return nil
+	return c.validateObjectsAction()
 }

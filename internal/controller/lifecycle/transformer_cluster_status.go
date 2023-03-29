@@ -72,6 +72,12 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 	case isClusterDeleting(*origCluster):
 		// if cluster is deleting, set root(cluster) vertex.action to DELETE
 		rootVertex.action = actionPtr(DELETE)
+		// TODO: move from object action, check it again
+		for _, vertex := range dag.Vertices() {
+			v, _ := vertex.(*lifecycleVertex)
+			v.action = actionPtr(DELETE)
+		}
+		// TODO: delete orphan resources which are not in dag?
 	case isClusterUpdating(*origCluster):
 		c.ctx.Log.Info("update cluster status")
 		defer func() {
@@ -99,7 +105,18 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 			c.recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
 		}
 	case isClusterStatusUpdating(*origCluster):
-		defer func() { rootVertex.action = actionPtr(STATUS) }()
+		defer func() {
+			rootVertex.action = actionPtr(STATUS)
+			// TODO: move from object action, check it again
+			vertices := findAllNot[*appsv1alpha1.Cluster](dag)
+			for _, vertex := range vertices {
+				v, _ := vertex.(*lifecycleVertex)
+				// TODO: fix me, workaround for h-scaling to update stateful set
+				if _, ok := v.obj.(*appsv1.StatefulSet); !ok {
+					v.immutable = true
+				}
+			}
+		}()
 		// checks if the controller is handling the garbage of restore.
 		if err := c.handleGarbageOfRestoreBeforeRunning(cluster); err == nil {
 			return nil

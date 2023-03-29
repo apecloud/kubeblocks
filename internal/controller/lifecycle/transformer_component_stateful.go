@@ -22,7 +22,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -90,14 +89,14 @@ func (c *statefulComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clien
 
 	// runtime, config, script, env, volume, service, monitor, probe
 	return builder.buildEnv(). // TODO: workload & scaling related
-					buildWorkload(0). // build workload here since other objects depend on it.
-					buildHeadlessService().
-					buildConfig(0).
-					buildTLSVolume(0).
-					buildVolumeMount(0).
-					buildService().
-					buildTLSCert().
-					complete()
+		buildWorkload(0). // build workload here since other objects depend on it.
+		buildHeadlessService().
+		buildConfig(0).
+		buildTLSVolume(0).
+		buildVolumeMount(0).
+		buildService().
+		buildTLSCert().
+		complete()
 }
 
 func (c *statefulComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -105,7 +104,7 @@ func (c *statefulComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *statefulComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
-	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name); err != nil {
+	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels()); err != nil {
 		return false, err
 	} else {
 		return len(stsList) > 0, nil // component.replica can not be zero
@@ -116,14 +115,17 @@ func (c *statefulComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	if err := c.init(reqCtx, cli, actionPtr(CREATE)); err != nil {
 		return err
 	}
+
+	// do a double check
 	if exist, err := c.Exist(reqCtx, cli); err != nil || exist {
 		if err != nil {
 			return err
 		}
 		return fmt.Errorf("component to be created is already exist, cluster: %s, component: %s",
-			c.Cluster.Name, c.CompSpec.Name)
+			c.GetClusterName(), c.GetName())
 	}
-	return nil
+
+	return c.validateObjectsAction()
 }
 
 func (c *statefulComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -150,7 +152,11 @@ func (c *statefulComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		return err
 	}
 
-	return c.updateUnderlyingResources(reqCtx, cli)
+	if err := c.updateUnderlyingResources(reqCtx, cli); err != nil {
+		return err
+	}
+
+	return c.resolveObjectsAction(reqCtx, cli)
 }
 
 func (c *statefulComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -229,11 +235,11 @@ func (c *statefulComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if err != nil {
 		return err
 	}
-	return c.restartWorkload(&sts.Spec.Template)
+	return restartPod(&sts.Spec.Template)
 }
 
 func (c *statefulComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.StatefulSet, error) {
-	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name)
+	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
@@ -412,9 +418,7 @@ func (c *statefulComponent) updateUnderlyingResources(reqCtx intctrlutil.Request
 		return err
 	}
 
-	if err := c.updateStatefulSetWorkload(stsObj, 0); err != nil {
-		return err
-	}
+	c.updateStatefulSetWorkload(stsObj, 0)
 
 	if err := c.updateService(reqCtx, cli); err != nil {
 		return err
@@ -425,25 +429,5 @@ func (c *statefulComponent) updateUnderlyingResources(reqCtx intctrlutil.Request
 		return err
 	}
 
-	return nil
-}
-
-func (c *statefulComponent) updatePVC(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
-	for _, vct := range c.Component.VolumeClaimTemplates {
-		for i := c.Component.Replicas - 1; i >= 0; i-- {
-			pvc := &corev1.PersistentVolumeClaim{}
-			pvcKey := types.NamespacedName{
-				Namespace: stsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-			}
-			if err := cli.Get(reqCtx.Ctx, pvcKey, pvc); err != nil {
-				if apierrors.IsNotFound(err) {
-					continue
-				}
-				return err
-			}
-			c.updateResource(pvc, c.workloadVertexs[0]).immutable = true
-		}
-	}
 	return nil
 }

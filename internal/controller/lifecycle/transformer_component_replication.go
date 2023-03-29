@@ -199,7 +199,7 @@ func (c *replicationComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *replicationComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
-	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name); err != nil {
+	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels()); err != nil {
 		return false, err
 	} else {
 		return len(stsList) > 0, nil // component.replica can not be zero
@@ -210,6 +210,7 @@ func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.
 	if err := c.init(reqCtx, cli, actionPtr(CREATE)); err != nil {
 		return err
 	}
+
 	if exist, err := c.Exist(reqCtx, cli); err != nil || exist {
 		if err != nil {
 			return err
@@ -217,7 +218,8 @@ func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.
 		return fmt.Errorf("component to be created is already exist, cluster: %s, component: %s",
 			c.Cluster.Name, c.CompSpec.Name)
 	}
-	return nil
+
+	return c.validateObjectsAction()
 }
 
 func (c *replicationComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -244,7 +246,11 @@ func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.
 		return err
 	}
 
-	return c.updateUnderlyingResources(reqCtx, cli)
+	if err := c.updateUnderlyingResources(reqCtx, cli); err != nil {
+		return err
+	}
+
+	return c.resolveObjectsAction(reqCtx, cli)
 }
 
 func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -283,7 +289,7 @@ func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli c
 }
 
 func (c *replicationComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetClusterName(), c.GetName())
+	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return err
 	}
@@ -317,7 +323,7 @@ func (c *replicationComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client
 	}
 
 	for _, sts := range stsList {
-		if err := c.restartWorkload(&sts.Spec.Template); err != nil {
+		if err := restartPod(&sts.Spec.Template); err != nil {
 			return err
 		}
 	}
@@ -325,7 +331,7 @@ func (c *replicationComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client
 }
 
 func (c *replicationComponent) runningWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]*appsv1.StatefulSet, error) {
-	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name)
+	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
@@ -367,9 +373,7 @@ func (c *replicationComponent) updateUnderlyingResources(reqCtx intctrlutil.Requ
 	}
 
 	for i, stsObj := range stsObjList {
-		if err := c.updateStatefulSetWorkload(stsObj, int32(i)); err != nil {
-			return err
-		}
+		c.updateStatefulSetWorkload(stsObj, int32(i))
 	}
 
 	if err := c.updateService(reqCtx, cli); err != nil {

@@ -60,7 +60,7 @@ func (c *clusterCredentialTransformer) Transform(dag *graph.DAG) error {
 	}
 
 	if secret != nil {
-		vertex := &lifecycleVertex{obj: secret}
+		vertex := &lifecycleVertex{obj: secret, action: actionPtr(CREATE)}
 		dag.AddVertex(vertex)
 		dag.Connect(rootVertex, vertex)
 	}

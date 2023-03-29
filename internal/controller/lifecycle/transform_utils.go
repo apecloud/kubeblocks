@@ -159,8 +159,3 @@ func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string
 	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
 	return compBackupMap, err
 }
-
-func isTypeOf[T interface{}](obj client.Object) bool {
-	_, ok := obj.(T)
-	return ok
-}

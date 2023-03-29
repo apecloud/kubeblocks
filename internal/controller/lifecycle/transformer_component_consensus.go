@@ -22,7 +22,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -135,7 +134,7 @@ func (c *consensusComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *consensusComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
-	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name); err != nil {
+	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels()); err != nil {
 		return false, err
 	} else {
 		return len(stsList) > 0, nil // component.replica can not be zero
@@ -146,6 +145,7 @@ func (c *consensusComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if err := c.init(reqCtx, cli, actionPtr(CREATE)); err != nil {
 		return err
 	}
+
 	if exist, err := c.Exist(reqCtx, cli); err != nil || exist {
 		if err != nil {
 			return err
@@ -153,7 +153,8 @@ func (c *consensusComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return fmt.Errorf("component to be created is already exist, cluster: %s, component: %s",
 			c.Cluster.Name, c.CompSpec.Name)
 	}
-	return nil
+
+	return c.validateObjectsAction()
 }
 
 func (c *consensusComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -180,7 +181,11 @@ func (c *consensusComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
-	return c.updateUnderlyingResources(reqCtx, cli)
+	if err := c.updateUnderlyingResources(reqCtx, cli); err != nil {
+		return err
+	}
+
+	return c.resolveObjectsAction(reqCtx, cli)
 }
 
 func (c *consensusComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -258,11 +263,11 @@ func (c *consensusComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.C
 	if err != nil {
 		return err
 	}
-	return c.restartWorkload(&sts.Spec.Template)
+	return restartPod(&sts.Spec.Template)
 }
 
 func (c *consensusComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.StatefulSet, error) {
-	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name)
+	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
@@ -441,9 +446,7 @@ func (c *consensusComponent) updateUnderlyingResources(reqCtx intctrlutil.Reques
 		return err
 	}
 
-	if err := c.updateStatefulSetWorkload(stsObj, 0); err != nil {
-		return err
-	}
+	c.updateStatefulSetWorkload(stsObj, 0)
 
 	if err := c.updateService(reqCtx, cli); err != nil {
 		return err
@@ -454,25 +457,5 @@ func (c *consensusComponent) updateUnderlyingResources(reqCtx intctrlutil.Reques
 		return err
 	}
 
-	return nil
-}
-
-func (c *consensusComponent) updatePVC(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
-	for _, vct := range c.Component.VolumeClaimTemplates {
-		for i := c.Component.Replicas - 1; i >= 0; i-- {
-			pvc := &corev1.PersistentVolumeClaim{}
-			pvcKey := types.NamespacedName{
-				Namespace: stsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-			}
-			if err := cli.Get(reqCtx.Ctx, pvcKey, pvc); err != nil {
-				if apierrors.IsNotFound(err) {
-					continue
-				}
-				return err
-			}
-			c.updateResource(pvc, c.workloadVertexs[0]).immutable = true
-		}
-	}
 	return nil
 }

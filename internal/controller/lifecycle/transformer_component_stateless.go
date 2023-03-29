@@ -82,14 +82,14 @@ func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 	// runtime, config, script, env, volume, service, monitor, probe
 	return builder.buildEnv(). // TODO: workload & scaling related
-		buildWorkload(0). // build workload here since other objects depend on it.
-		buildHeadlessService().
-		buildConfig(0).
-		buildTLSVolume(0).
-		buildVolumeMount(0).
-		buildService().
-		buildTLSCert().
-		complete()
+					buildWorkload(0). // build workload here since other objects depend on it.
+					buildHeadlessService().
+					buildConfig(0).
+					buildTLSVolume(0).
+					buildVolumeMount(0).
+					buildService().
+					buildTLSCert().
+					complete()
 }
 
 func (c *statelessComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -97,7 +97,7 @@ func (c *statelessComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *statelessComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
-	if stsList, err := listDeployOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name); err != nil {
+	if stsList, err := listDeployOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels()); err != nil {
 		return false, err
 	} else {
 		return len(stsList) > 0, nil // component.replica can not be zero
@@ -108,6 +108,7 @@ func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if err := c.init(reqCtx, cli, actionPtr(CREATE)); err != nil {
 		return err
 	}
+
 	if exist, err := c.Exist(reqCtx, cli); err != nil || exist {
 		if err != nil {
 			return err
@@ -115,7 +116,8 @@ func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return fmt.Errorf("component to be created is already exist, cluster: %s, component: %s",
 			c.Cluster.Name, c.CompSpec.Name)
 	}
-	return nil
+
+	return c.validateObjectsAction()
 }
 
 func (c *statelessComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -142,7 +144,11 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
-	return c.updateUnderlyingResources(reqCtx, cli)
+	if err := c.updateUnderlyingResources(reqCtx, cli); err != nil {
+		return err
+	}
+
+	return c.resolveObjectsAction(reqCtx, cli)
 }
 
 func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -169,11 +175,11 @@ func (c *statelessComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.C
 	if err != nil {
 		return err
 	}
-	return c.restartWorkload(&deploy.Spec.Template)
+	return restartPod(&deploy.Spec.Template)
 }
 
 func (c *statelessComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.Deployment, error) {
-	deployList, err := listDeployOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name)
+	deployList, err := listDeployOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
@@ -202,9 +208,7 @@ func (c *statelessComponent) updateUnderlyingResources(reqCtx intctrlutil.Reques
 		return err
 	}
 
-	if err := c.updateDeploymentWorkload(deployObj); err != nil {
-		return err
-	}
+	c.updateDeploymentWorkload(deployObj)
 
 	if err := c.updateService(reqCtx, cli); err != nil {
 		return err

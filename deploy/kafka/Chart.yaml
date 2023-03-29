@@ -8,9 +8,9 @@ annotations:
 
 type: application
 
-version: 0.1.1
+version: 0.5.0-alpha.0
 
-appVersion: 3.4.0
+appVersion: 0.5.0-alpha.0
 
 home: https://kubeblocks.io/
 icon: https://bitnami.com/assets/stacks/kafka/img/kafka-stack-220x234.png

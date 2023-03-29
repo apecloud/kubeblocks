@@ -49,7 +49,18 @@ var (
 		kbcli playground init
 
 		# create an AWS EKS cluster and install KubeBlocks, the region is required
-		kbcli playground init --cloud-provider aws --region cn-northwest-1`)
+		kbcli playground init --cloud-provider aws --region cn-northwest-1
+
+		# create an Alibaba cloud ACK cluster and install KubeBlocks, the region is required
+		kbcli playground init --cloud-provider alicloud --region cn-hangzhou
+
+		# create a Tencent cloud TKE cluster and install KubeBlocks, the region is required
+		kbcli playground init --cloud-provider tencentcloud --region ap-chengdu
+
+		# create a Google cloud GKE cluster and install KubeBlocks, the region is required
+		kbcli playground init --cloud-provider gcp --region us-central1`)
+
+	supportedCloudProviders = []string{cp.Local, cp.AWS, cp.GCP, cp.AliCloud, cp.TencentCloud}
 )
 
 type initOptions struct {
@@ -82,7 +93,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Cluster definition")
 	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Cluster definition")
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
-	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of [%s]", strings.Join(cp.CloudProviders(), ",")))
+	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
 	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
@@ -94,12 +105,8 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func (o *initOptions) validate() error {
-	if !slices.Contains(cp.CloudProviders(), o.cloudProvider) {
-		return fmt.Errorf("%s is not a valid cloud provider", o.cloudProvider)
-	}
-
-	if o.cloudProvider != cp.Local && o.cloudProvider != cp.AWS {
-		return fmt.Errorf("cloud provider %s is not supported yet", o.cloudProvider)
+	if !slices.Contains(supportedCloudProviders, o.cloudProvider) {
+		return fmt.Errorf("cloud provider %s is not supported, only support %v", o.cloudProvider, supportedCloudProviders)
 	}
 
 	if o.cloudProvider != cp.Local && o.region == "" {
@@ -125,15 +132,21 @@ func (o *initOptions) run() error {
 
 // local bootstraps a playground in the local host
 func (o *initOptions) local() error {
-	provider, err := cp.New(o.cloudProvider, "", "", o.Out, o.ErrOut)
+	provider, err := cp.New(o.cloudProvider, "", o.Out, o.ErrOut)
 	if err != nil {
 		return err
 	}
 
 	o.startTime = time.Now()
-	clusterInfo, err := provider.GetClusterInfo()
-	if err != nil {
-		return err
+
+	var clusterInfo *cp.K8sClusterInfo
+	if o.prevCluster != nil {
+		clusterInfo = o.prevCluster
+	} else {
+		clusterInfo = &cp.K8sClusterInfo{
+			CloudProvider: provider.Name(),
+			ClusterName:   types.K3dClusterName,
+		}
 	}
 
 	if err = writeClusterInfoToFile(o.stateFilePath, clusterInfo); err != nil {
@@ -143,10 +156,14 @@ func (o *initOptions) local() error {
 	// create a local kubernetes cluster (k3d cluster) to deploy KubeBlocks
 	spinner := printer.Spinner(o.Out, "%-40s", "Create k3d cluster: "+clusterInfo.ClusterName)
 	defer spinner(false)
-	if err = provider.CreateK8sCluster(clusterInfo.ClusterName, true); err != nil {
+	if err = provider.CreateK8sCluster(clusterInfo, true); err != nil {
 		return errors.Wrap(err, "failed to set up k3d cluster")
 	}
 	spinner(true)
+
+	if err = o.setKubeConfig(provider); err != nil {
+		return err
+	}
 
 	// install KubeBlocks and create a database cluster
 	return o.installKBAndCluster(clusterInfo.ClusterName)
@@ -202,30 +219,21 @@ func (o *initOptions) cloud() error {
 		return err
 	}
 
-	provider, err := cp.New(o.cloudProvider, o.region, cpPath, o.Out, o.ErrOut)
-	if err != nil {
-		return err
-	}
-
-	var (
-		clusterName string
-		clusterInfo *cp.K8sClusterInfo
-	)
+	var clusterInfo *cp.K8sClusterInfo
 
 	// if kubernetes cluster exists, confirm to continue or not, if not, user should
 	// destroy the old cluster first
 	if o.prevCluster != nil {
-		clusterName = o.prevCluster.ClusterName
+		clusterInfo = o.prevCluster
 		if err = o.confirmToContinue(); err != nil {
 			return err
 		}
 	} else {
-		clusterName = fmt.Sprintf("%s-%s", cloudClusterNamePrefix, rand.String(5))
+		clusterName := fmt.Sprintf("%s-%s", cloudClusterNamePrefix, rand.String(5))
 		clusterInfo = &cp.K8sClusterInfo{
 			ClusterName:   clusterName,
 			CloudProvider: o.cloudProvider,
 			Region:        o.region,
-			KubeConfig:    util.ConfigPath("config"),
 		}
 		if err = o.confirmInitNewKubeCluster(); err != nil {
 			return err
@@ -244,26 +252,29 @@ func (o *initOptions) cloud() error {
 
 	// clone apecloud/cloud-provider repo to local path
 	fmt.Fprintf(o.Out, "Clone ApeCloud cloud-provider repo to %s...\n", cpPath)
-	if err = util.CloneGitRepo(cp.GitRepoURL, cpPath); err != nil {
+	branchName := "kb-playground"
+	if version.Version != "" && version.Version != "edge" {
+		branchName = fmt.Sprintf("%s-%s", branchName, strings.Split(version.Version, "-")[0])
+	}
+	if err = util.CloneGitRepo(cp.GitRepoURL, branchName, cpPath); err != nil {
 		return err
 	}
 
-	if err = provider.CreateK8sCluster(clusterName, true); err != nil {
+	provider, err := cp.New(o.cloudProvider, cpPath, o.Out, o.ErrOut)
+	if err != nil {
+		return err
+	}
+
+	if err = provider.CreateK8sCluster(clusterInfo, true); err != nil {
 		return err
 	}
 	printer.PrintBlankLine(o.Out)
 
-	// get kubernetes cluster context name that created by cloud provider and write
-	// it to state file
-	clusterInfo, err = provider.GetClusterInfo()
-	if err != nil {
+	if err = o.setKubeConfig(provider); err != nil {
 		return err
 	}
-	if err = writeClusterInfoToFile(o.stateFilePath, clusterInfo); err != nil {
-		return errors.Wrapf(err, "failed to write kubernetes cluster info to state file %s:\n  %v", o.stateFilePath, clusterInfo)
-	}
 
-	return o.installKBAndCluster(clusterName)
+	return o.installKBAndCluster(clusterInfo.ClusterName)
 }
 
 // confirmToContinue confirms to continue init or not if there is an existed kubernetes cluster
@@ -286,9 +297,9 @@ func (o *initOptions) confirmInitNewKubeCluster() error {
 `)
 
 	fmt.Fprintf(o.Out, `
-The whole process takes about %s, please wait patiently,
+The whole process wll take about %s, please wait patiently,
 if it takes a long time, please check the network environment and try again.
-`, printer.BoldRed("20~30 minutes"))
+`, printer.BoldRed("20 minutes"))
 
 	// confirm to run
 	fmt.Fprintf(o.Out, "\nDo you want to perform this action?\n  Only 'yes' will be accepted to approve.\n\n")
@@ -302,6 +313,39 @@ if it takes a long time, please check the network environment and try again.
 
 func printGuide() {
 	fmt.Fprintf(os.Stdout, guideStr, kbClusterName)
+}
+
+func (o *initOptions) setKubeConfig(provider cp.Interface) error {
+	// get kubernetes cluster info with the kubeconfig and write it to state file
+	clusterInfo, err := provider.GetClusterInfo()
+	if err != nil {
+		return err
+	}
+	if clusterInfo.KubeConfig == "" {
+		return errors.New("failed to get kubernetes cluster kubeconfig")
+	}
+	if err = writeClusterInfoToFile(o.stateFilePath, clusterInfo); err != nil {
+		return errors.Wrapf(err, "failed to write kubernetes cluster info to state file %s:\n  %v", o.stateFilePath, clusterInfo)
+	}
+
+	// merge created kubernetes cluster kubeconfig to ~/.kube/config and set it as default
+	configPath := util.ConfigPath("config")
+	spinner := printer.Spinner(o.Out, "Write kubeconfig to %s", configPath)
+	defer spinner(false)
+	if err = kubeConfigWrite(clusterInfo.KubeConfig, configPath, writeKubeConfigOptions{UpdateExisting: true, UpdateCurrentContext: true}); err != nil {
+		return errors.Wrapf(err, "failed to write cluster %s kubeconfig", clusterInfo.ClusterName)
+	}
+	spinner(true)
+
+	currentContext, err := kubeConfigCurrentContext(clusterInfo.KubeConfig)
+	spinner = printer.Spinner(o.Out, "Switch current context to %s", currentContext)
+	defer spinner(false)
+	if err != nil {
+		return err
+	}
+	spinner(true)
+
+	return nil
 }
 
 func (o *initOptions) installKubeBlocks() error {
@@ -383,7 +427,7 @@ func (o *initOptions) checkExistedCluster() error {
 		return nil
 	}
 
-	// previous kubernetes cluster is a cloud provider cluster, check if it is region
+	// previous kubernetes cluster is a cloud provider cluster, check if the region
 	// is same with the new cluster region, if not, informer user to destroy the previous
 	// cluster first
 	if o.prevCluster.Region != o.region {

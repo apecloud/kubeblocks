@@ -159,7 +159,7 @@ func (o *destroyOptions) destroyCloud() error {
 		return err
 	}
 
-	fmt.Fprintf(o.Out, "\nPlayground destroy completed in %s.\n", time.Since(o.startTime).Truncate(time.Second))
+	fmt.Fprintf(o.Out, "Playground destroy completed in %s.\n", time.Since(o.startTime).Truncate(time.Second))
 	return nil
 }
 

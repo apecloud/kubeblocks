@@ -85,7 +85,6 @@ func (c *K8sClusterInfo) IsValid() bool {
 func (c *K8sClusterInfo) String() string {
 	fields := []string{"  cloud provider: " + c.CloudProvider,
 		"cluster name: " + c.ClusterName,
-		"kube_config: " + c.KubeConfig,
 	}
 	if c.CloudProvider != Local {
 		fields = append(fields, "region: "+c.Region)

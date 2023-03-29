@@ -146,6 +146,36 @@ var _ = Describe("ConfigManager Test", func() {
 						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
 							ScriptConfigMapRef: "script_cm",
 							Namespace:          "default",
+							Sync:               func() *bool { b := true; return &b }()}},
+					volumeDirs: []corev1.VolumeMount{
+						{
+							MountPath: "/postgresql/conf",
+							Name:      "pg_config",
+						}},
+					cli: mockK8sCli.Client(),
+					ctx: context.TODO(),
+					param: &CfgManagerBuildParams{
+						Cluster: &appsv1alpha1.Cluster{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "abcd",
+								Namespace: "default",
+							},
+						},
+					},
+				},
+				expectedArgs: []string{
+					`--notify-type`, `tpl`,
+					`--tpl-config`, `/opt/config/reload/reload.yaml`,
+					`--operator-update-enable`,
+				},
+				wantErr: false,
+			}, {
+				name: "buildCfgContainerParamsWithOutSync",
+				args: args{
+					reloadOptions: &appsv1alpha1.ReloadOptions{
+						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
+							ScriptConfigMapRef: "script_cm",
+							Namespace:          "default",
 						}},
 					volumeDirs: []corev1.VolumeMount{
 						{

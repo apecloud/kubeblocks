@@ -45,7 +45,7 @@ func TestConfigMapVolumeWatcherFailed(t *testing.T) {
 	defer volumeWatcher.Close()
 
 	require.EqualError(t, volumeWatcher.Run(), "require process event handler.")
-	volumeWatcher.AddHandler(func(event fsnotify.Event) error {
+	volumeWatcher.AddHandler(func(_ context.Context, event fsnotify.Event) error {
 		return nil
 	})
 	require.Regexp(t, "no such file or directory", volumeWatcher.Run().Error())
@@ -75,7 +75,7 @@ func TestConfigMapVolumeWatcher(t *testing.T) {
 	regexFilter, err := CreateCfgRegexFilter(`.*`)
 	require.Nil(t, err)
 	volumeWatcher.SetRetryCount(2).
-		AddHandler(func(event fsnotify.Event) error {
+		AddHandler(func(_ context.Context, event fsnotify.Event) error {
 			zapLog.Info(fmt.Sprintf("handl volume event: %v", event))
 			retryCount++
 			// mock failed to handle

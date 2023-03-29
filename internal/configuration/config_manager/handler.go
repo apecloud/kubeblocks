@@ -17,6 +17,7 @@ limitations under the License.
 package configmanager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -86,7 +87,7 @@ func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string) (Watch
 		logger.Error(err, "failed to create signal handler")
 		return nil, err
 	}
-	return func(event fsnotify.Event) error {
+	return func(_ context.Context, event fsnotify.Event) error {
 		pid, err := findPidFromProcessName(processName)
 		if err != nil {
 			return err
@@ -102,7 +103,7 @@ func CreateExecHandler(command string) (WatchEventHandler, error) {
 		return nil, cfgutil.MakeError("invalid command: %s", command)
 	}
 	cmd := exec.Command(args[0], args[1:]...)
-	return func(_ fsnotify.Event) error {
+	return func(_ context.Context, _ fsnotify.Event) error {
 		stdout, err := cfgcontainer.ExecShellCommand(cmd)
 		if err == nil {
 			logger.V(1).Info(fmt.Sprintf("exec: [%s], result: [%s]", command, stdout))
@@ -116,7 +117,7 @@ func IsValidUnixSignal(sig appsv1alpha1.SignalType) bool {
 	return ok
 }
 
-func CreateTPLScriptHandler(tplScripts string, dirs []string, fileRegex string, backupPath string, formatConfig *appsv1alpha1.FormatterConfig) (WatchEventHandler, error) {
+func CreateTPLScriptHandler(tplScripts string, dirs []string, fileRegex string, backupPath string, formatConfig *appsv1alpha1.FormatterConfig, dataType string, dsn string) (WatchEventHandler, error) {
 	logger.V(1).Info(fmt.Sprintf("config file regex: %s", fileRegex))
 	logger.V(1).Info(fmt.Sprintf("config file reload script: %s", tplScripts))
 	if _, err := os.Stat(tplScripts); err != nil {
@@ -136,7 +137,7 @@ func CreateTPLScriptHandler(tplScripts string, dirs []string, fileRegex string, 
 	if err := backupConfigFiles(dirs, filter, backupPath); err != nil {
 		return nil, err
 	}
-	return func(event fsnotify.Event) error {
+	return func(ctx context.Context, event fsnotify.Event) error {
 		var (
 			lastVersion = []string{backupPath}
 			currVersion = []string{filepath.Dir(event.Name)}
@@ -153,7 +154,7 @@ func CreateTPLScriptHandler(tplScripts string, dirs []string, fileRegex string, 
 		if err != nil {
 			return err
 		}
-		if err := wrapGoTemplateRun(tplScripts, string(tplContent), updatedParams, formatConfig); err != nil {
+		if err := wrapGoTemplateRun(ctx, tplScripts, string(tplContent), updatedParams, formatConfig, dataType, dsn); err != nil {
 			return err
 		}
 		return backupLastConfigFiles(currFiles, backupPath)

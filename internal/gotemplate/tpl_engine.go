@@ -41,7 +41,9 @@ const (
 )
 
 const (
-	goTemplateExtendBuildInRegexSubString = "regexStringSubmatch"
+	goTemplateExtendBuildInRegexSubString      = "regexStringSubmatch"
+	goTemplateExtendBuildInFromYamlString      = "fromYaml"
+	goTemplateExtendBuildInFromYamlArrayString = "fromYamlArray"
 )
 
 type TplValues map[string]interface{}
@@ -156,6 +158,8 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 
 	// Wrap regex.FindStringSubmatch
 	funcs[goTemplateExtendBuildInRegexSubString] = regexStringSubmatch
+	funcs[goTemplateExtendBuildInFromYamlString] = fromYAML
+	funcs[goTemplateExtendBuildInFromYamlArrayString] = fromYAMLArray
 
 	t.tpl.Option(DefaultTemplateOps)
 	t.tpl.Funcs(funcs)

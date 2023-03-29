@@ -84,7 +84,7 @@ func (r *reconfigureProxy) StopContainer(ctx context.Context, request *cfgproto.
 	return &cfgproto.StopContainerResponse{}, nil
 }
 
-func (r *reconfigureProxy) OnlineUpgradeParams(_ context.Context, request *cfgproto.OnlineUpgradeParamsRequest) (*cfgproto.OnlineUpgradeParamsResponse, error) {
+func (r *reconfigureProxy) OnlineUpgradeParams(ctx context.Context, request *cfgproto.OnlineUpgradeParamsRequest) (*cfgproto.OnlineUpgradeParamsResponse, error) {
 	if r.updater == nil {
 		return nil, cfgcore.MakeError("online updater is not initialized.")
 	}
@@ -92,7 +92,7 @@ func (r *reconfigureProxy) OnlineUpgradeParams(_ context.Context, request *cfgpr
 	if len(params) == 0 {
 		return nil, cfgcore.MakeError("update params not empty.")
 	}
-	if err := r.updater(params); err != nil {
+	if err := r.updater(ctx, params); err != nil {
 		return nil, err
 	}
 	return &cfgproto.OnlineUpgradeParamsResponse{}, nil
@@ -103,7 +103,7 @@ func (r *reconfigureProxy) initOnlineUpdater(opt *VolumeWatcherOpts) error {
 		return nil
 	}
 
-	updater, err := cfgcm.OnlineUpdateParamsHandle(opt.TPLScriptPath, opt.FormatterConfig)
+	updater, err := cfgcm.OnlineUpdateParamsHandle(opt.TPLScriptPath, opt.FormatterConfig, opt.DataType, opt.DSN)
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to create online updater")
 	}

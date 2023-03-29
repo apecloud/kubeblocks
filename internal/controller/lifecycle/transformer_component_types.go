@@ -86,6 +86,11 @@ func NewComponent(definition *appsv1alpha1.ClusterDefinition,
 		}
 	}
 
+	if compSpec == nil || compDef == nil {
+		// TODO: fix me
+		return nil, fmt.Errorf("NotSupported")
+	}
+
 	switch compDef.WorkloadType {
 	case appsv1alpha1.Replication:
 		return newComponent[replicationComponent](definition, cluster, compDef, compVer, compSpec, dag), nil
@@ -165,7 +170,9 @@ func (c *componentBase) createResource(obj client.Object, parent *lifecycleVerte
 }
 
 func (c *componentBase) deleteResource(obj client.Object, parent *lifecycleVertex) *lifecycleVertex {
-	return c.addResource(obj, actionPtr(DELETE), parent)
+	vertex := c.addResource(obj, actionPtr(DELETE), parent)
+	vertex.isOrphan = true
+	return vertex
 }
 
 func (c *componentBase) updateResource(obj client.Object, parent *lifecycleVertex) *lifecycleVertex {
@@ -255,20 +262,25 @@ func (c *componentBase) updateStatefulSetWorkload(stsObj *appsv1.StatefulSet, id
 
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the statefulSet will be updated.
-	stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations, stsProto.Spec.Template.Annotations)
+	stsProto.Spec.Template.Annotations = mergeAnnotations(stsObjCopy.Spec.Template.Annotations, stsProto.Spec.Template.Annotations)
 	stsObjCopy.Spec.Template = stsProto.Spec.Template
 	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
 	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
+		c.workloadVertexs[idx].obj = stsObjCopy
 		c.workloadVertexs[idx].action = actionPtr(UPDATE)
 	}
 	return nil
 }
 
 func (c *componentBase) updateDeploymentWorkload(deployObj *appsv1.Deployment) error {
+	deployObjCopy := deployObj.DeepCopy()
 	deployProto := c.workloadVertexs[0].obj.(*appsv1.Deployment)
+
 	deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations, deployProto.Spec.Template.Annotations)
-	if !reflect.DeepEqual(&deployObj.Spec, &deployProto.Spec) {
+	deployObjCopy.Spec = deployProto.Spec
+	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
+		c.workloadVertexs[0].obj = deployObjCopy
 		c.workloadVertexs[0].action = actionPtr(UPDATE)
 	}
 	return nil

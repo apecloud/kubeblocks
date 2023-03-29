@@ -53,8 +53,9 @@ func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 	}
 
 	objs := make([]PT, 0)
-	for _, obj := range reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T) {
-		objs = append(objs, &obj)
+	items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
+	for i, _ := range items {
+		objs = append(objs, &items[i])
 	}
 	return objs, nil
 }

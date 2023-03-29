@@ -17,7 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"fmt"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -74,10 +73,14 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 	for compName := range deleteSet {
 		comp, err := NewComponent(&c.cc.cd, &c.cc.cv, cluster, compName, dag4Component)
 		if err != nil {
-			return err
+			if err.Error() != "NotSupported" {
+				return err
+			}
 		}
-		if err := comp.Delete(c.ctx, c.cli); err != nil {
-			return err
+		if comp != nil {
+			if err := comp.Delete(c.ctx, c.cli); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -101,9 +104,8 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 			panic("runtime error, nil vertex object")
 		}
 	}
-	dag.Merge(dag4Component)
 
-	fmt.Printf("cluster: %s, dag: %s\n", cluster.GetName(), dag)
+	dag.Merge(dag4Component)
 
 	return nil
 }

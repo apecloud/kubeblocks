@@ -95,7 +95,7 @@ func (b *componentBuilderBase) buildService() componentBuilder {
 		if err != nil {
 			return nil, err
 		}
-		objs := make([]client.Object, 0, len(svcList))
+		objs := make([]client.Object, 0)
 		for _, svc := range svcList {
 			objs = append(objs, svc)
 		}

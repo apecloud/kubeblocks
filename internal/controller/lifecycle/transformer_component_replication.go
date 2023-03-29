@@ -18,7 +18,6 @@ package lifecycle
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -91,14 +90,13 @@ func (b *replicationComponentBuilder) buildWorkload(idx int32) componentBuilder 
 		}
 		sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
 
-		b.workloads[idx] = sts
+		b.workloads = append(b.workloads, sts)
 
 		return nil, nil // don't return sts here, and it will not add to resource queue now
 	}
 	return b.buildWrapper(buildfn)
 }
 
-// TODO: idx
 func (b *replicationComponentBuilder) buildVolume(idx int32) componentBuilder {
 	buildfn := func() ([]client.Object, error) {
 		workload := b.mutableWorkload(idx)
@@ -145,8 +143,6 @@ func (b *replicationComponentBuilder) buildVolume(idx int32) componentBuilder {
 	return b.buildWrapper(buildfn)
 }
 
-// TODO: fix it within replication set
-// replication set will create duplicate env configmap and headless service
 func (b *replicationComponentBuilder) complete() error {
 	if b.error != nil {
 		return b.error
@@ -178,18 +174,19 @@ func (c *replicationComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Cl
 			error:         nil,
 			envConfig:     nil,
 		},
-		workloads: make([]*appsv1.StatefulSet, 0, synthesizedComp.Replicas),
+		workloads: make([]*appsv1.StatefulSet, 0),
 	}
 	builder.concreteBuilder = builder
 
+	// env and headless service are component level resources
+	builder.buildEnv(). // TODO: workload & scaling related
+				buildHeadlessService()
 	for i := int32(0); i < synthesizedComp.Replicas; i++ {
-		builder.buildEnv(). // TODO: workload related, scaling related
-					buildWorkload(i). // build workload here since other objects depend on it.
-					buildVolume(i).
-					buildHeadlessService().
-					buildConfig(i).
-					buildTLSVolume(i).
-					buildVolumeMount(i)
+		builder.buildWorkload(i). // build workload here since other objects depend on it.
+						buildVolume(i).
+						buildConfig(i).
+						buildTLSVolume(i).
+						buildVolumeMount(i)
 		if builder.error != nil {
 			return builder.error
 		}
@@ -247,7 +244,7 @@ func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.
 		return err
 	}
 
-	return c.updateUnderlayResources(reqCtx, cli)
+	return c.updateUnderlyingResources(reqCtx, cli)
 }
 
 func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -286,15 +283,16 @@ func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli c
 }
 
 func (c *replicationComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	ret, err := c.horizontalScaling(reqCtx, cli)
+	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetClusterName(), c.GetName())
 	if err != nil {
 		return err
-	} else if ret == 0 {
-		return nil
 	}
 
-	if ret < 0 {
-		if err := c.scaleIn(reqCtx, cli); err != nil {
+	ret := c.horizontalScaling(stsList)
+	if ret == 0 {
+		return nil
+	} else if ret < 0 {
+		if err := c.scaleIn(reqCtx, cli, stsList); err != nil {
 			return err
 		}
 	} else {
@@ -339,22 +337,12 @@ func (c *replicationComponent) runningWorkloads(reqCtx intctrlutil.RequestCtx, c
 }
 
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
-func (c *replicationComponent) horizontalScaling(reqCtx intctrlutil.RequestCtx, cli client.Client) (int, error) {
-	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetClusterName(), c.GetName())
-	if err != nil {
-		return 0, err
-	}
-
+func (c *replicationComponent) horizontalScaling(stsList []*appsv1.StatefulSet) int {
 	// TODO: should use a more stable status
-	return int(c.Component.Replicas) - len(stsList), nil
+	return int(c.Component.Replicas) - len(stsList)
 }
 
-func (c *replicationComponent) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetClusterName(), c.GetName())
-	if err != nil {
-		return err
-	}
-
+func (c *replicationComponent) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsList []*appsv1.StatefulSet) error {
 	stsToDelete, err := replicationset.HandleComponentHorizontalScaleIn(reqCtx.Ctx, cli, c.Cluster, c.GetSynthesizedComponent(), stsList)
 	if err != nil {
 		return err
@@ -367,24 +355,10 @@ func (c *replicationComponent) scaleIn(reqCtx intctrlutil.RequestCtx, cli client
 }
 
 func (c *replicationComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	podList, err := listPodOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetClusterName(), c.GetName())
-	if err != nil {
-		return err
-	}
-	return replicationset.SyncReplicationSetClusterStatus(c.Cluster, c.GetName(), podList)
-}
-
-func (c *replicationComponent) updateUnderlayResources(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.updateWorkloads(reqCtx, cli); err != nil {
-		return err
-	}
-	if err := c.updateService(reqCtx, cli); err != nil {
-		return err
-	}
 	return nil
 }
 
-func (c *replicationComponent) updateWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *replicationComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	stsObjList, err := c.runningWorkloads(reqCtx, cli)
 	if err != nil {
 		return err
@@ -395,23 +369,10 @@ func (c *replicationComponent) updateWorkloads(reqCtx intctrlutil.RequestCtx, cl
 			return err
 		}
 	}
-	return nil
-}
 
-// TODO: fix it
-func dedupResources(resources []client.Object) []client.Object {
-	objects := make([]client.Object, 0)
-	for _, resource := range resources {
-		contains := false
-		for _, object := range objects {
-			if reflect.DeepEqual(resource, object) {
-				contains = true
-				break
-			}
-		}
-		if !contains {
-			objects = append(objects, resource)
-		}
+	if err := c.updateService(reqCtx, cli); err != nil {
+		return err
 	}
-	return objects
+
+	return nil
 }

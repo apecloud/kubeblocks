@@ -81,15 +81,15 @@ func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	builder.concreteBuilder = builder
 
 	// runtime, config, script, env, volume, service, monitor, probe
-	return builder.buildEnv(). // TODO: workload related, scaling related
-					buildWorkload(0). // build workload here since other objects depend on it.
-					buildHeadlessService().
-					buildConfig(0).
-					buildTLSVolume(0).
-					buildVolumeMount(0).
-					buildService().
-					buildTLSCert().
-					complete()
+	return builder.buildEnv(). // TODO: workload & scaling related
+		buildWorkload(0). // build workload here since other objects depend on it.
+		buildHeadlessService().
+		buildConfig(0).
+		buildTLSVolume(0).
+		buildVolumeMount(0).
+		buildService().
+		buildTLSCert().
+		complete()
 }
 
 func (c *statelessComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -142,7 +142,7 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
-	return c.updateUnderlayResources(reqCtx, cli)
+	return c.updateUnderlyingResources(reqCtx, cli)
 }
 
 func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -196,20 +196,19 @@ func (c *statelessComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli 
 	return deploy, nil
 }
 
-func (c *statelessComponent) updateUnderlayResources(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.updateWorkload(reqCtx, cli); err != nil {
-		return err
-	}
-	if err := c.updateService(reqCtx, cli); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *statelessComponent) updateWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *statelessComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	deployObj, err := c.runningWorkload(reqCtx, cli)
 	if err != nil {
 		return err
 	}
-	return c.updateDeploymentWorkload(deployObj)
+
+	if err := c.updateDeploymentWorkload(deployObj); err != nil {
+		return err
+	}
+
+	if err := c.updateService(reqCtx, cli); err != nil {
+		return err
+	}
+
+	return nil
 }

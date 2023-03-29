@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -118,7 +119,7 @@ func (c *consensusComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	builder.concreteBuilder = builder
 
 	// runtime, config, script, env, volume, service, monitor, probe
-	return builder.buildEnv(). // TODO: workload related, scaling related
+	return builder.buildEnv(). // TODO: workload & scaling related
 					buildWorkload(0). // build workload here since other objects depend on it.
 					buildHeadlessService().
 					buildConfig(0).
@@ -179,7 +180,7 @@ func (c *consensusComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
-	return c.updateUnderlayResources(reqCtx, cli)
+	return c.updateUnderlyingResources(reqCtx, cli)
 }
 
 func (c *consensusComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -226,19 +227,20 @@ func (c *consensusComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli cli
 }
 
 func (c *consensusComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	ret, err := c.horizontalScaling(reqCtx, cli)
+	sts, err := c.runningWorkload(reqCtx, cli)
 	if err != nil {
 		return err
-	} else if ret == 0 {
-		return nil
 	}
 
-	if ret < 0 {
-		if err := c.scaleIn(reqCtx, cli); err != nil {
+	ret := c.horizontalScaling(sts)
+	if ret == 0 {
+		return nil
+	} else if ret < 0 {
+		if err := c.scaleIn(reqCtx, cli, sts); err != nil {
 			return err
 		}
 	} else {
-		if err := c.scaleOut(reqCtx, cli); err != nil {
+		if err := c.scaleOut(reqCtx, cli, sts); err != nil {
 			return err
 		}
 	}
@@ -285,20 +287,11 @@ func (c *consensusComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli 
 }
 
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
-func (c *consensusComponent) horizontalScaling(reqCtx intctrlutil.RequestCtx, cli client.Client) (int, error) {
-	sts, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
-		return 0, err
-	}
-	return int(c.Component.Replicas - *sts.Spec.Replicas), nil
+func (c *consensusComponent) horizontalScaling(sts *appsv1.StatefulSet) int {
+	return int(c.Component.Replicas - *sts.Spec.Replicas)
 }
 
-func (c *consensusComponent) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	stsObj, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-
+func (c *consensusComponent) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	// if scale in to 0, do not delete pvc
 	// TODO: why check the volume claims of current stateful set?
 	if c.CompSpec.Replicas == 0 || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
@@ -322,12 +315,7 @@ func (c *consensusComponent) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.C
 	return nil
 }
 
-func (c *consensusComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	stsObj, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-
+func (c *consensusComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	key := client.ObjectKey{
 		Namespace: stsObj.Namespace,
 		Name:      stsObj.Name,
@@ -448,20 +436,44 @@ func (c *consensusComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.
 	return nil
 }
 
-func (c *consensusComponent) updateUnderlayResources(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.updateWorkload(reqCtx, cli); err != nil {
-		return err
-	}
-	if err := c.updateService(reqCtx, cli); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *consensusComponent) updateWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *consensusComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	stsObj, err := c.runningWorkload(reqCtx, cli)
 	if err != nil {
 		return err
 	}
-	return c.updateStatefulSetWorkload(stsObj, 0)
+
+	if err := c.updateStatefulSetWorkload(stsObj, 0); err != nil {
+		return err
+	}
+
+	if err := c.updateService(reqCtx, cli); err != nil {
+		return err
+	}
+
+	// TODO: to workaround that the scaled PVC will be deleted at object action
+	if err := c.updatePVC(reqCtx, cli, stsObj); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *consensusComponent) updatePVC(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+	for _, vct := range c.Component.VolumeClaimTemplates {
+		for i := c.Component.Replicas - 1; i >= 0; i-- {
+			pvc := &corev1.PersistentVolumeClaim{}
+			pvcKey := types.NamespacedName{
+				Namespace: stsObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+			}
+			if err := cli.Get(reqCtx.Ctx, pvcKey, pvc); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				return err
+			}
+			c.updateResource(pvc, c.workloadVertexs[0]).immutable = true
+		}
+	}
+	return nil
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 
@@ -120,10 +119,6 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 	createNewVertices := func() {
 		for name := range createSet {
 			v, _ := newNameVertices[name].(*lifecycleVertex)
-			if v.action != nil && *v.action != CREATE {
-				//// TODO(dbg): remove
-				//panic(fmt.Sprintf("inconsistent resource action, expected: CREATE, actual: %s", *v.action))
-			}
 			if v.action == nil {
 				v.action = actionPtr(CREATE)
 			}
@@ -133,12 +128,7 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 		for name := range updateSet {
 			v, _ := newNameVertices[name].(*lifecycleVertex)
 			v.oriObj = oldSnapshot[name]
-			if v.action != nil && *v.action != UPDATE && *v.action != DELETE {
-				// TODO(dbg): remove
-				panic(fmt.Sprintf("inconsistent resource action, expected: UPDATE, actual: %s, kind: %s, name: %s",
-					*v.action, v.obj.GetObjectKind(), v.obj.GetName()))
-			}
-			if v.action == nil {
+			if v.action == nil || *v.action != DELETE {
 				v.action = actionPtr(UPDATE)
 			}
 		}
@@ -190,7 +180,10 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 			vertices := findAllNot[*appsv1alpha1.Cluster](dag)
 			for _, vertex := range vertices {
 				v, _ := vertex.(*lifecycleVertex)
-				v.immutable = true
+				// TODO: fix me, workaround for h-scaling to update stateful set
+				if _, ok := v.obj.(*appsv1.StatefulSet); !ok {
+					v.immutable = true
+				}
 			}
 		}()
 		fallthrough

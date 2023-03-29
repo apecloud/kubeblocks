@@ -137,9 +137,15 @@ func (o *initOptions) local() error {
 	}
 
 	o.startTime = time.Now()
-	clusterInfo, err := provider.GetClusterInfo()
-	if err != nil {
-		return err
+
+	var clusterInfo *cp.K8sClusterInfo
+	if o.prevCluster != nil {
+		clusterInfo = o.prevCluster
+	} else {
+		clusterInfo = &cp.K8sClusterInfo{
+			CloudProvider: provider.Name(),
+			ClusterName:   types.K3dClusterName,
+		}
 	}
 
 	if err = writeClusterInfoToFile(o.stateFilePath, clusterInfo); err != nil {

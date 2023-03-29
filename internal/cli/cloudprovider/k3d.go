@@ -33,8 +33,8 @@ import (
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/yaml"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -162,7 +162,7 @@ func (p *localCloudProvider) GetKubeConfig() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	cfgBytes, err := yaml.Marshal(kubeConfig)
+	cfgBytes, err := clientcmd.Write(*kubeConfig)
 	if err != nil {
 		return "", err
 	}

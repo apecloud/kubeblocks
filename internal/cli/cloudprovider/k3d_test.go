@@ -17,6 +17,7 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"context"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -26,14 +27,14 @@ import (
 var _ = Describe("playground", func() {
 	var (
 		provider    = NewLocalCloudProvider(os.Stdout, os.Stderr)
-		clusterName = "k3d-test"
+		clusterName = "k3d-tb-est"
 	)
 
 	It("k3d util function", func() {
 		config, err := buildClusterRunConfig("test")
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(config.Name).Should(ContainSubstring("test"))
-		Expect(setUpK3d(provider.ctx, nil)).Should(HaveOccurred())
-		Expect(provider.DeleteK8sCluster(clusterName)).Should(HaveOccurred())
+		Expect(setUpK3d(context.Background(), nil)).Should(HaveOccurred())
+		Expect(provider.DeleteK8sCluster(&K8sClusterInfo{ClusterName: clusterName})).Should(HaveOccurred())
 	})
 })

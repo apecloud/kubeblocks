@@ -76,6 +76,19 @@ jobs:
       GO_VERSION: 1.19
     secrets: inherit
 
+  check-tools-image:
+    name: check image
+    needs: trigger-mode
+    if: needs.trigger-mode.outputs.trigger-mode == '[docker]'
+    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    with:
+      MAKE_OPS_PRE: "generate"
+      MAKE_OPS: "build-manager-tools-image"
+      IMG: "apecloud/kubeblocks-tools"
+      VERSION: "check"
+      GO_VERSION: 1.19
+    secrets: inherit
+
   check-helm:
     name: check helm
     needs: trigger-mode

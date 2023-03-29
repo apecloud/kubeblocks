@@ -456,7 +456,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplat
 		ManagerName:   constant.ConfigSidecarName,
 		CharacterType: params.Component.CharacterType,
 		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
-		Image:         viper.GetString(constant.ConfigSidecarIMAGE),
+		Image:         viper.GetString(constant.KBToolsImage),
 		Volumes:       volumeDirs,
 		Cluster:       params.Cluster,
 	}

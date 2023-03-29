@@ -120,3 +120,30 @@ else
 endif
 endif
 
+.PHONY: build-manager-tools-image
+build-manager-tools-image: generate ## Build Operator manager-tools container image.
+ifneq ($(BUILDX_ENABLED), true)
+	docker build . -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile-tools -t ${IMG}:latest
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest $(BUILDX_ARGS)
+else
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} $(BUILDX_ARGS)
+endif
+endif
+
+.PHONY: push-manager-tools-image
+push-manager-tools-image: generate ## Push Operator manager-tools container image.
+ifneq ($(BUILDX_ENABLED), true)
+ifeq ($(TAG_LATEST), true)
+	docker push ${IMG}:latest
+else
+	docker push ${IMG}:${VERSION}
+endif
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest --push $(BUILDX_ARGS)
+else
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push $(BUILDX_ARGS)
+endif
+endif

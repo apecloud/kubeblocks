@@ -19,6 +19,7 @@ package plan
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -57,8 +58,9 @@ type PointInTimeRecoveryManager struct {
 	namespace     string
 	restoreTime   *metav1.Time
 	sourceCluster string
-	resourceObjs  []client.Object
 }
+
+const recoveryFinishedKey = "kubeblocks.io/restore-finished"
 
 func (p *PointInTimeRecoveryManager) listCompletedBackups() (backupItems []dpv1alpha1.Backup, err error) {
 	backups := dpv1alpha1.BackupList{}
@@ -140,7 +142,7 @@ func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, 
 		}
 	}
 	if latestBackup == nil {
-		return nil, fmt.Errorf("can not found latest base backup via restore time %s", p.restoreTime)
+		return nil, errors.New("can not found latest base backup")
 	}
 
 	return latestBackup, nil
@@ -162,48 +164,53 @@ func (p *PointInTimeRecoveryManager) getNextBackup() (*dpv1alpha1.Backup, error)
 		}
 	}
 	if nextBackup == nil {
-		return nil, fmt.Errorf("can not found next earliest base backup via restore time %s", p.restoreTime)
+		return nil, errors.New("can not found next earliest base backup")
 	}
 
 	return nextBackup, nil
 }
 
-// checkAndInit check if cluster need to be restored, return value: true: need, false: no need
-func (p *PointInTimeRecoveryManager) checkAndInit() (bool, error) {
+func (p *PointInTimeRecoveryManager) basicCheckAndInit() (need bool, err error) {
 	// check args if pitr supported
 	cluster := p.Cluster
-	if cluster.Annotations == nil {
+	if cluster.Spec.RestoreFrom == nil || cluster.Spec.RestoreFrom.PointIn == nil ||
+		cluster.Spec.RestoreFrom.PointIn.Time == nil {
 		return false, nil
 	}
 
-	restoreTime := &metav1.Time{}
-	restoreTimeStr, hasKey := cluster.Annotations["restore-from-time"]
-	if !hasKey {
-		return false, nil
+	restoreTime := cluster.Spec.RestoreFrom.PointIn.Time
+	sourceCuster := cluster.Spec.RestoreFrom.PointIn.SourceClusterName
+	if sourceCuster == "" {
+		return false, errors.New("need specify a source cluster name to recovery")
 	}
-	sourceCluster, hasKey := cluster.Annotations["restore-from-cluster"]
-	if !hasKey {
-		return false, nil
-	}
-	if restoreTimeStr != "" {
-		if err := restoreTime.UnmarshalQueryParameter(restoreTimeStr); err != nil {
-			return false, err
-		}
-	}
-
 	vctCount := 0
 	for _, item := range cluster.Spec.ComponentSpecs {
 		vctCount += len(item.VolumeClaimTemplates)
 	}
 	if vctCount == 0 {
-		return false, fmt.Errorf("not support pitr without any volume claim templates")
+		return false, errors.New("not support pitr without any volume claim templates")
 	}
 
 	// init args
 	p.restoreTime = restoreTime
-	p.sourceCluster = sourceCluster
+	p.sourceCluster = sourceCuster
 	p.namespace = cluster.Namespace
 	return true, nil
+}
+
+func (p *PointInTimeRecoveryManager) checkAndInitForCleanup() (need bool, err error) {
+	if p.Cluster.Annotations[recoveryFinishedKey] != "true" {
+		return false, nil
+	}
+	return p.basicCheckAndInit()
+}
+
+// checkAndInit check if cluster need to be restored, return value: true: need, false: no need
+func (p *PointInTimeRecoveryManager) checkAndInit() (need bool, err error) {
+	if p.Cluster.Annotations[recoveryFinishedKey] == "true" {
+		return false, nil
+	}
+	return p.basicCheckAndInit()
 }
 
 func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupPointInTimeRecovery, error) {
@@ -217,17 +224,17 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupPointI
 		return nil, err
 	}
 	if len(templateList.Items) == 0 {
-		return nil, fmt.Errorf("not support recovery because of non-existed backupPolicyTemplate in clusterDef: %s",
-			p.Cluster.Spec.ClusterDefRef)
+		return nil, errors.New("not support recovery because of non-existed backupPolicyTemplate")
 	}
 	recoveryInfo := templateList.Items[0].Spec.PointInTimeRecovery
 	if nil == recoveryInfo {
-		return nil, fmt.Errorf("not support recovery because of empty pitr definition in backupPolicyTemplate")
+		return nil, errors.New("not support recovery because of empty pitr definition in backupPolicyTemplate")
 	}
 	return recoveryInfo, nil
 }
 
-func (p *PointInTimeRecoveryManager) runScriptsJob() error {
+func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, err error) {
+	objs = make([]client.Object, 0)
 	for _, component := range p.Cluster.Spec.ComponentSpecs {
 		if len(component.VolumeClaimTemplates) == 0 {
 			continue
@@ -245,22 +252,22 @@ func (p *PointInTimeRecoveryManager) runScriptsJob() error {
 			constant.KBAppComponentLabelKey:          component.Name,
 			constant.VolumeClaimTemplateNameLabelKey: "data",
 		}
-		if err := p.Client.List(p.Ctx, &dataPVCList,
+		if err = p.Client.List(p.Ctx, &dataPVCList,
 			client.InNamespace(p.namespace),
 			client.MatchingLabels(dataPVCLabels)); err != nil {
-			return err
+			return objs, err
 		}
 		if len(dataPVCList.Items) == 0 {
-			return fmt.Errorf("not found data pvc")
+			return objs, errors.New("not found data pvc")
 		}
 		dataPVC := dataPVCList.Items[0]
 		if dataPVC.Status.Phase != corev1.ClaimBound {
-			return fmt.Errorf("waiting PVC Bound")
+			return objs, errors.New("waiting PVC Bound")
 		}
 
 		nextBackup, err := p.getNextBackup()
 		if err != nil {
-			return err
+			return objs, err
 		}
 		pitrPVCName := fmt.Sprintf("pitr-%s-%s-0", p.Cluster.Name, component.Name)
 		pitrPVCKey := types.NamespacedName{
@@ -269,7 +276,7 @@ func (p *PointInTimeRecoveryManager) runScriptsJob() error {
 		}
 		pitrPVC, err := builder.BuildPVCFromSnapshot(sts, vct, pitrPVCKey, nextBackup.Name, nil)
 		if err != nil {
-			return err
+			return objs, err
 		}
 		if pitrPVC.Annotations == nil {
 			pitrPVC.Annotations = map[string]string{}
@@ -287,31 +294,36 @@ func (p *PointInTimeRecoveryManager) runScriptsJob() error {
 
 		recoveryInfo, err := p.getRecoveryInfo()
 		if err != nil {
-			return err
+			return objs, err
 		}
 
 		// render the job cue template
 		job, err := builder.BuildPITRJob(p.Cluster, recoveryInfo.Scripts.Image, recoveryInfo.Scripts.Command, volumes, volumeMounts)
 		if err != nil {
-			return err
+			return objs, err
 		}
 		if job.Annotations == nil {
 			job.Annotations = map[string]string{}
 		}
 		// collect pvcs and jobs for later deletion
-		p.resourceObjs = append(p.resourceObjs, pitrPVC)
-		p.resourceObjs = append(p.resourceObjs, job)
+		objs = append(objs, pitrPVC)
+		objs = append(objs, job)
+	}
+	return objs, nil
+}
 
-		err = p.Client.Create(p.Ctx, pitrPVC)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-		err = p.Client.Create(p.Ctx, job)
+func (p *PointInTimeRecoveryManager) runScriptsJob() error {
+	objs, err := p.buildResourceObjs()
+	if err != nil {
+		return err
+	}
+
+	for _, obj := range objs {
+		err = p.Client.Create(p.Ctx, obj)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -329,7 +341,7 @@ func (p *PointInTimeRecoveryManager) checkJobDone(key client.ObjectKey) (bool, e
 		if jobStatusCondition.Type == batchv1.JobComplete {
 			return true, nil
 		} else if jobStatusCondition.Type == batchv1.JobFailed {
-			return true, fmt.Errorf(jobStatusCondition.Reason)
+			return true, errors.New(jobStatusCondition.Reason)
 		}
 	}
 	// if found, return true
@@ -339,7 +351,11 @@ func (p *PointInTimeRecoveryManager) checkJobDone(key client.ObjectKey) (bool, e
 func (p *PointInTimeRecoveryManager) ensureScriptsJobDone() bool {
 	var jobObj *batchv1.Job
 	var ok bool
-	for _, obj := range p.resourceObjs {
+	objs, err := p.buildResourceObjs()
+	if err != nil {
+		return false
+	}
+	for _, obj := range objs {
 		if jobObj, ok = obj.(*batchv1.Job); !ok {
 			continue
 		}
@@ -353,8 +369,12 @@ func (p *PointInTimeRecoveryManager) ensureScriptsJobDone() bool {
 }
 
 func (p *PointInTimeRecoveryManager) cleanupScriptsJob() error {
-	if p.Cluster.Status.Phase == appsv1alpha1.RunningPhase {
-		for _, obj := range p.resourceObjs {
+	objs, err := p.buildResourceObjs()
+	if err != nil {
+		return err
+	}
+	if p.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase {
+		for _, obj := range objs {
 			if err := intctrlutil.BackgroundDeleteObject(p.Client, p.Ctx, obj); err != nil {
 				return err
 			}
@@ -365,11 +385,10 @@ func (p *PointInTimeRecoveryManager) cleanupScriptsJob() error {
 
 // DoRecoveryJob prepare data before point in time recovery
 func (p *PointInTimeRecoveryManager) DoRecoveryJob() (shouldRequeue bool, err error) {
-	shouldRequeue = false
-	if required, err := p.checkAndInit(); err != nil {
-		return shouldRequeue, err
-	} else if !required {
-		return shouldRequeue, nil
+	if need, err := p.checkAndInit(); err != nil {
+		return false, err
+	} else if !need {
+		return false, nil
 	}
 
 	// mount the data+log pvc, and run scripts job to prepare data
@@ -377,7 +396,7 @@ func (p *PointInTimeRecoveryManager) DoRecoveryJob() (shouldRequeue bool, err er
 		if err.Error() == "waiting PVC Bound" {
 			return true, nil
 		}
-		return shouldRequeue, err
+		return false, err
 	}
 
 	// check job done
@@ -388,46 +407,35 @@ func (p *PointInTimeRecoveryManager) DoRecoveryJob() (shouldRequeue bool, err er
 	// remove init container
 	for _, componentSpec := range p.Cluster.Spec.ComponentSpecs {
 		if err = p.removeStsInitContainer(p.Cluster, componentSpec.Name); err != nil {
-			return shouldRequeue, err
+			return false, err
 		}
 	}
 
-	// clean up job
-	if err != p.cleanupScriptsJob() {
-		return shouldRequeue, nil
+	// mark recovery finished annotation in cluster
+	if err = p.markClusterFinished(); err != nil {
+		return false, err
 	}
 
-	// clean annotations restore in cluster
-	if err != p.cleanupClusterAnnotations() {
-		return shouldRequeue, nil
-	}
-
-	// rollback cluster status to creating
-	if err != p.rollbackClusterConfigMaps() {
-		return shouldRequeue, nil
-	}
-
-	return shouldRequeue, nil
+	return false, nil
 
 }
 
-// cleanupClusterAnnotations cleans up the cluster annotations after cluster is Running.
-func (p *PointInTimeRecoveryManager) cleanupClusterAnnotations() error {
+// markClusterFinished mark the cluster recovery finished in annotations.
+func (p *PointInTimeRecoveryManager) markClusterFinished() error {
 	cluster := p.Cluster
-	if cluster.Status.Phase != appsv1alpha1.RunningPhase {
-		return nil
-	}
-	patch := client.MergeFrom(cluster.DeepCopy())
-	delete(cluster.Annotations, "restore-from-time")
-	delete(cluster.Annotations, "restore-from-cluster")
 
+	patch := client.MergeFrom(cluster.DeepCopy())
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	cluster.Annotations[recoveryFinishedKey] = "true"
 	return p.Client.Patch(p.Ctx, cluster, patch)
 }
 
 // rollbackClusterStatusToCreating rollback the cluster status to creating after cluster is Running.
 func (p *PointInTimeRecoveryManager) rollbackClusterConfigMaps() error {
 	cluster := p.Cluster
-	if cluster.Status.Phase != appsv1alpha1.RunningPhase {
+	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 		return nil
 	}
 	cmList := corev1.ConfigMapList{}
@@ -465,9 +473,9 @@ func (p *PointInTimeRecoveryManager) rollbackClusterConfigMaps() error {
 
 // DoPrepare prepare init container and pvc before point in time recovery
 func (p *PointInTimeRecoveryManager) DoPrepare(component *component.SynthesizedComponent) error {
-	if required, err := p.checkAndInit(); err != nil {
+	if need, err := p.checkAndInit(); err != nil {
 		return err
-	} else if !required {
+	} else if !need {
 		return nil
 	}
 	// prepare init container
@@ -478,7 +486,7 @@ func (p *PointInTimeRecoveryManager) DoPrepare(component *component.SynthesizedC
 
 	// prepare data pvc
 	if len(component.VolumeClaimTemplates) == 0 {
-		return fmt.Errorf("not found data pvc")
+		return errors.New("not found data pvc")
 	}
 	latestBackup, err := p.getLatestBaseBackup()
 	if err != nil {
@@ -523,9 +531,9 @@ func (p *PointInTimeRecoveryManager) removeStsInitContainer(
 
 // MergeConfigMap to merge from config when recovery to point time from cluster.
 func (p *PointInTimeRecoveryManager) MergeConfigMap(configMap *corev1.ConfigMap) error {
-	if required, err := p.checkAndInit(); err != nil {
+	if need, err := p.checkAndInit(); err != nil {
 		return err
-	} else if !required {
+	} else if !need {
 		return nil
 	}
 
@@ -549,6 +557,54 @@ func (p *PointInTimeRecoveryManager) MergeConfigMap(configMap *corev1.ConfigMap)
 			// append pitr config map into cluster config
 			configMap.Data[key] = v + "\n" + pitrConfigMap[key]
 		}
+	}
+	return nil
+}
+
+// DoPITRPrepare prepare init container and pvc before point in time recovery
+func DoPITRPrepare(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
+	// build pitr init container to wait prepare data
+	// prepare data if PITR needed
+	pitrMgr := PointInTimeRecoveryManager{
+		Cluster: cluster,
+		Client:  cli,
+		Ctx:     ctx,
+	}
+	if err := pitrMgr.DoPrepare(component); err != nil {
+		return err
+	}
+	return nil
+}
+
+// DoPITRIfNeed check if run restore job and copy data for point in time recovery
+func DoPITRIfNeed(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
+	pitrMgr := PointInTimeRecoveryManager{
+		Cluster: cluster,
+		Client:  cli,
+		Ctx:     ctx,
+	}
+	return pitrMgr.DoRecoveryJob()
+}
+
+// DoPITRCleanup cleanup resource and config after point in time recovery
+func DoPITRCleanup(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
+	pitrMgr := PointInTimeRecoveryManager{
+		Cluster: cluster,
+		Client:  cli,
+		Ctx:     ctx,
+	}
+	if need, err := pitrMgr.checkAndInitForCleanup(); err != nil {
+		return err
+	} else if !need {
+		return nil
+	}
+	// clean up job
+	if err := pitrMgr.cleanupScriptsJob(); err != nil {
+		return err
+	}
+	// rollback cluster status to creating
+	if err := pitrMgr.rollbackClusterConfigMaps(); err != nil {
+		return err
 	}
 	return nil
 }

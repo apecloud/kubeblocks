@@ -62,6 +62,40 @@ type ClusterSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// cluster RestoreFrom backup or point in time
+	// +optional
+	RestoreFrom *RestoreFromSpec `json:"restoreFrom,omitempty"`
+}
+
+type RestoreFromSpec struct {
+	// use the backup name and component name for restore, support for multiple components' recovery.
+	// +optional
+	Backup []FromBackupSpec `json:"backup,omitempty"`
+
+	// specified the point in time to recovery
+	// +optional
+	PointIn *FromPointInSpec `json:"pointIn,omitempty"`
+}
+
+type FromBackupSpec struct {
+	// specify a backup name to restore
+	// +optional
+	BackupName string `json:"backupName,omitempty"`
+
+	// specify a component name to restore
+	// +optional
+	ComponentName string `json:"componentName,omitempty"`
+}
+
+type FromPointInSpec struct {
+	// specify the time point to restore, with UTC as the time zone.
+	// +optional
+	Time *metav1.Time `json:"time,omitempty"`
+
+	// specify the source cluster name to restore
+	// +optional
+	SourceClusterName string `json:"sourceClusterName,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster

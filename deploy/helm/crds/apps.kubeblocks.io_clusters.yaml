@@ -629,6 +629,35 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              restoreFrom:
+                description: cluster RestoreFrom backup or point in time
+                properties:
+                  backup:
+                    description: use the backup name and component name for restore,
+                      support for multiple components' recovery.
+                    items:
+                      properties:
+                        backupName:
+                          description: specify a backup name to restore
+                          type: string
+                        componentName:
+                          description: specify a component name to restore
+                          type: string
+                      type: object
+                    type: array
+                  pointIn:
+                    description: specified the point in time to recovery
+                    properties:
+                      sourceClusterName:
+                        description: specify the source cluster name to restore
+                        type: string
+                      time:
+                        description: specify the time point to restore, with UTC as
+                          the time zone.
+                        format: date-time
+                        type: string
+                    type: object
+                type: object
               terminationPolicy:
                 description: Cluster termination policy. One of DoNotTerminate, Halt,
                   Delete, WipeOut. DoNotTerminate will block delete operation. Halt

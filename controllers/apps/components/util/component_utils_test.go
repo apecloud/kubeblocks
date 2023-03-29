@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -160,7 +161,7 @@ var _ = Describe("Consensus Component", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		// testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
@@ -185,16 +186,95 @@ var _ = Describe("Consensus Component", func() {
 			newCluster, _ := GetClusterByObject(ctx, k8sClient, sts)
 			Expect(newCluster != nil).Should(BeTrue())
 
-			By("test GetComponentPodList function")
-			Eventually(func() bool {
-				podList, _ := GetComponentPodList(ctx, k8sClient, *cluster, consensusCompName)
-				return len(podList.Items) > 0
-			}).Should(BeTrue())
+			By("test consensusSet InitClusterComponentStatusIfNeed function")
+			err := InitClusterComponentStatusIfNeed(cluster, consensusCompName, *componentDef)
+			Expect(err).Should(Succeed())
+			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus).ShouldNot(BeNil())
+			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(ComponentStatusDefaultPodName))
+
+			By("test ReplicationSet InitClusterComponentStatusIfNeed function")
+			componentDef.WorkloadType = appsv1alpha1.Replication
+			err = InitClusterComponentStatusIfNeed(cluster, consensusCompName, *componentDef)
+			Expect(err).Should(Succeed())
+			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus).ShouldNot(BeNil())
+			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(ComponentStatusDefaultPodName))
 
 			By("test GetObjectListByComponentName function")
 			stsList := &appsv1.StatefulSetList{}
 			_ = GetObjectListByComponentName(ctx, k8sClient, *cluster, stsList, consensusCompName)
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
+
+			By("test GetObjectListByCustomLabels function")
+			stsList = &appsv1.StatefulSetList{}
+			matchLabel := GetComponentMatchLabels(cluster.Name, consensusCompName)
+			_ = GetObjectListByCustomLabels(ctx, k8sClient, *cluster, stsList, client.MatchingLabels(matchLabel))
+			Expect(len(stsList.Items) > 0).Should(BeTrue())
+
+			By("test GetClusterComponentSpecByName function")
+			clusterComp := GetClusterComponentSpecByName(*cluster, consensusCompName)
+			Expect(clusterComp).ShouldNot(BeNil())
+
+			By("test ComponentRuntimeReqArgsCheck function")
+			err = ComponentRuntimeReqArgsCheck(k8sClient, cluster, clusterComp)
+			Expect(err).Should(Succeed())
+			Expect(IgnoreNoOps(err)).Should(Succeed())
+			By("test ComponentRuntimeReqArgsCheck function when cluster nil")
+			err = ComponentRuntimeReqArgsCheck(k8sClient, nil, clusterComp)
+			Expect(err).ShouldNot(Succeed())
+			By("test ComponentRuntimeReqArgsCheck function when clusterComp nil")
+			err = ComponentRuntimeReqArgsCheck(k8sClient, cluster, nil)
+			Expect(err).ShouldNot(Succeed())
+
+			By("test UpdateObjLabel function")
+			stsObj := stsList.Items[0]
+			err = UpdateObjLabel(ctx, k8sClient, stsObj, "test", "test")
+			Expect(err).Should(Succeed())
+
+			By("test PatchGVRCustomLabels of clusterDefinition")
+			resource := &appsv1alpha1.GVKResource{
+				Selector: GetComponentMatchLabels(cluster.Name, consensusCompName),
+			}
+			customLabelSpec := &appsv1alpha1.CustomLabelSpec{
+				Key:       "custom-label-key",
+				Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
+				Resources: []appsv1alpha1.GVKResource{*resource},
+			}
+			By("test statefulSet resource PatchGVRCustomLabels")
+			resource.GVK = "apps/v1/StatefulSet"
+			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			Expect(err).Should(Succeed())
+			By("test Pod resource PatchGVRCustomLabels")
+			resource.GVK = "v1/Pod"
+			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			Expect(err).Should(Succeed())
+			By("test Deployment resource PatchGVRCustomLabels")
+			resource.GVK = "apps/v1/Deployment"
+			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			Expect(err).Should(Succeed())
+			By("test Service resource PatchGVRCustomLabels")
+			resource.GVK = "/v1/Service"
+			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			Expect(err).Should(Succeed())
+			By("test ConfigMap resource PatchGVRCustomLabels")
+			resource.GVK = "/v1/ConfigMap"
+			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			Expect(err).Should(Succeed())
+			By("test CronJob resource PatchGVRCustomLabels")
+			resource.GVK = "batch/v1/CronJob"
+			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			Expect(err).Should(Succeed())
+			By("test Invalid resource PatchGVRCustomLabels")
+			resource.GVK = "Invalid"
+			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			Expect(err.Error()).Should(ContainSubstring("invalid pattern"))
+			By("test Invalid resource PatchGVRCustomLabels")
+			resource.GVK = "apps/v1/Invalid"
+			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			Expect(err.Error()).Should(ContainSubstring("kind is not supported for custom labels"))
+
+			By("test GetCustomLabelWorkloadKind")
+			workloadList := GetCustomLabelWorkloadKind()
+			Expect(len(workloadList)).Should(Equal(5))
 
 			By("test GetComponentStatusMessageKey function")
 			Expect(GetComponentStatusMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
@@ -211,6 +291,20 @@ var _ = Describe("Consensus Component", func() {
 			stsList = &appsv1.StatefulSetList{}
 			podList, _ := GetCompRelatedObjectList(ctx, k8sClient, *cluster, consensusCompName, stsList)
 			Expect(len(stsList.Items) > 0 && len(podList.Items) > 0).Should(BeTrue())
+
+			By("test GetComponentInfoByPod function")
+			componentName, componentDef, err := GetComponentInfoByPod(ctx, k8sClient, *cluster, &podList.Items[0])
+			Expect(err).Should(Succeed())
+			Expect(componentName).Should(Equal(consensusCompName))
+			Expect(componentDef).ShouldNot(BeNil())
+			By("test GetComponentInfoByPod function when Pod is nil")
+			_, _, err = GetComponentInfoByPod(ctx, k8sClient, *cluster, nil)
+			Expect(err).ShouldNot(Succeed())
+			By("test GetComponentInfoByPod function when Pod component label is nil")
+			podNoLabel := &podList.Items[0]
+			delete(podNoLabel.Labels, constant.KBAppComponentLabelKey)
+			_, _, err = GetComponentInfoByPod(ctx, k8sClient, *cluster, podNoLabel)
+			Expect(err).ShouldNot(Succeed())
 
 			By("test GetComponentPhaseWhenPodsNotReady function")
 			consensusComp := cluster.GetComponentByName(consensusCompName)

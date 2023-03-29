@@ -56,6 +56,7 @@ var _ = Describe("lifecycle_utils", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
 		// non-namespaced
@@ -129,11 +130,6 @@ var _ = Describe("lifecycle_utils", func() {
 		return clusterObj, clusterDefObj, clusterVersionObj, key
 	}
 
-	// NOTES: following code are problematic, caused "Ginkgo detected an issue with your spec structure":
-	//   It looks like you are calling By outside of a running spec.  Make sure you
-	//   call By inside a runnable node such as It or BeforeEach and not inside the
-	//   body of a container such as Describe or Context.
-
 	newStsObj := func() *appsv1.StatefulSet {
 		container := corev1.Container{
 			Name: "mysql",
@@ -143,6 +139,7 @@ var _ = Describe("lifecycle_utils", func() {
 			}},
 		}
 		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
+			AddLabels(testCtx.TestObjLabelKey, "true").
 			AddAppNameLabel("mock-app").
 			AddAppInstanceLabel(clusterName).
 			AddAppComponentLabel(mysqlCompName).
@@ -181,7 +178,7 @@ spec:
   volumeSnapshotClassName: csi-aws-ebs-snapclass
 `
 		vs := snapshotv1.VolumeSnapshot{}
-		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).ShouldNot(HaveOccurred())
 		labels := map[string]string{
 			constant.KBManagedByKey:         "cluster",
 			constant.AppInstanceLabelKey:    clusterName,
@@ -231,18 +228,19 @@ spec:
 
 			By("doBackup should return requeue=false")
 			shouldRequeue, err := doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
-			Expect(shouldRequeue).Should(BeFalse())
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(shouldRequeue).Should(BeFalse())
 
 			By("Set ReadyToUse to nil, doBackup should return requeue=true")
 			Expect(testapps.ChangeObjStatus(&testCtx, vs, func() {
 				vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: nil}
 			})).Should(Succeed())
 			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
-			Expect(shouldRequeue).Should(BeTrue())
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(shouldRequeue).Should(BeTrue())
 		})
 
+		// REIVEW: this test seems always failed
 		It("should do backup to create volumesnapshot when there exists a deleting volumesnapshot", func() {
 			By("prepare cluster and construct component")
 			reqCtx := newReqCtx()
@@ -320,7 +318,7 @@ spec:
 							Namespace: cluster.Namespace,
 							Name:      fmt.Sprintf("%s-%s-%d", testapps.DataVolumeName, sts.Name, i)},
 						pvc)).Should(Succeed())
-					g.Expect(pvc.Spec.DataSource.Name == snapshotKey.Name).Should(BeTrue())
+					g.Expect(pvc.Spec.DataSource.Name).Should(Equal(snapshotKey.Name))
 				}
 			}).Should(Succeed())
 

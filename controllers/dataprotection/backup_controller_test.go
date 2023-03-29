@@ -66,7 +66,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
 		//
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
@@ -293,7 +293,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				// delete rest mocked objects
 				inNS := client.InNamespace(testCtx.DefaultNamespace)
 				ml := client.HasLabels{testCtx.TestObjLabelKey}
-				testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
+				testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
 			})
 
 			It("should fail when disable volumesnapshot", func() {

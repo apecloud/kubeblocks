@@ -31,7 +31,10 @@ const (
 )
 
 const (
-	ConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	ConnCredentialPlaceHolder    = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBCompNamePlaceHolder        = "$(KB_COMP_NAME)"
+	KBClusterNamePlaceHolder     = "$(KB_CLUSTER_NAME)"
+	KBClusterCompNamePlaceHolder = "$(KB_CLUSTER_COMP_NAME)"
 )
 
 const (
@@ -136,6 +139,7 @@ const (
 	ReplicaSetKind            = "ReplicaSetKind"
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
+	ConfigMapKind             = "ConfigMap"
 )
 
 const (

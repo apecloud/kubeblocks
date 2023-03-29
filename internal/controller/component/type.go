@@ -52,6 +52,7 @@ type SynthesizedComponent struct {
 	TLS                   bool                                `json:"tls"`
 	Issuer                *v1alpha1.Issuer                    `json:"issuer,omitempty"`
 	VolumeTypes           []v1alpha1.VolumeTypeSpec           `json:"VolumeTypes,omitempty"`
+	CustomLabelSpecs      []v1alpha1.CustomLabelSpec          `json:"customLabelSpecs,omitempty"`
 }
 
 // GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is

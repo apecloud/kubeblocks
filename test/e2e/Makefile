@@ -27,9 +27,13 @@ help: ## Display this help.
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
 	go install github.com/onsi/ginkgo/v2/ginkgo@v$(GINKGO_VERSION)
 
+ifeq ($(origin VERSION), command line)
+    VERSION ?= $(VERSION)
+endif
 .PHONY: run
 run: ginkgo ## Run end-to-end tests.
-	ACK_GINKGO_DEPRECATIONS=$(GINKGO_VERSION) $(GINKGO) run .
+	#ACK_GINKGO_DEPRECATIONS=$(GINKGO_VERSION) $(GINKGO) run .
+	$(GINKGO) test -process -ginkgo.v . --json-report=report.json -- --VERSION=$(VERSION)
 
 build: ginkgo ## Run ginkgo build e2e test suite binary.
 	$(GINKGO) build .

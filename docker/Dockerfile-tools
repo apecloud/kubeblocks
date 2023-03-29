@@ -43,7 +43,7 @@ COPY cmd/cli/ cmd/cli/
 COPY apis/ apis/
 
 # Download binaries
-RUN curl -fsSL https://dl.k8s.io/v1.25.7/kubernetes-client-${TARGETOS}-${TARGETARCH}.tar.gz | tar -zxv
+RUN curl -fsSL https://dl.k8s.io/v1.26.3/kubernetes-client-${TARGETOS}-${TARGETARCH}.tar.gz | tar -zxv
 
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o reloader cmd/reloader/main.go
@@ -55,16 +55,18 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_
 FROM docker.io/alpine:3.17
 
 # install tools via apk
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
-    && apk add --no-cache curl \
-    && apk add --no-cache helm \
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+RUN apk add --no-cache curl helm \
     && rm -rf /var/cache/apk/*
 
+# use apk to install kubectl in the next alpine version.
 COPY --from=builder /workspace/kubernetes/client/bin/kubectl /bin
+
+# copy kubeblocks tools
+COPY --from=builder /workspace/killer /bin
+COPY --from=builder /workspace/reloader /bin
 COPY config/probe config/probe
 COPY --from=builder /workspace/probe /bin
-COPY --from=builder /workspace/reloader /bin
-COPY --from=builder /workspace/killer /bin
 COPY --from=builder /workspace/kbcli /bin
 
 WORKDIR /

@@ -192,7 +192,7 @@ jobs:
   check-tools-image:
     name: check image
     needs: trigger-mode
-    if: needs.trigger-mode.outputs.trigger-mode == '[docker]'
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
     uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
     with:
       MAKE_OPS_PRE: "generate"

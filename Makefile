@@ -364,7 +364,7 @@ ifeq ($(GOOS), darwin)
 	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
 else
 	sed -i "s/^version:.*/version: $(VERSION)/" deploy/$(chart)/Chart.yaml
-	ed -i "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
+	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
 endif
 
 .PHONY: bump-chart-ver

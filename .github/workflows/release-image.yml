@@ -46,3 +46,14 @@ jobs:
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: 1.19
     secrets: inherit
+
+  release-tools-image:
+    needs: image-tag
+    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    with:
+      MAKE_OPS_PRE: "generate"
+      MAKE_OPS: "push-manager-tools-image"
+      IMG: "apecloud/kubeblocks-tools"
+      VERSION: "${{ needs.image-tag.outputs.tag-name }}"
+      GO_VERSION: 1.19
+    secrets: inherit

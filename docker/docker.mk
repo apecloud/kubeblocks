@@ -25,6 +25,7 @@ DOCKERFILE_DIR?=./docker
 IMG ?= docker.io/apecloud/$(APP_NAME)
 CLI_IMG ?= docker.io/apecloud/kbcli
 CLI_TAG ?= v$(CLI_VERSION)
+IMG_TOOLS ?= $(IMG)-tools
 
 # Update whenever you upgrade dev container image
 DEV_CONTAINER_VERSION_TAG ?= latest
@@ -120,3 +121,30 @@ else
 endif
 endif
 
+.PHONY: build-manager-tools-image
+build-manager-tools-image: generate ## Build Operator manager-tools container image.
+ifneq ($(BUILDX_ENABLED), true)
+	docker build . -t ${IMG_TOOLS}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile-tools -t ${IMG_TOOLS}:latest
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG_TOOLS}:latest $(BUILDX_ARGS)
+else
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG_TOOLS}:${VERSION} $(BUILDX_ARGS)
+endif
+endif
+
+.PHONY: push-manager-tools-image
+push-manager-tools-image: generate ## Push Operator manager-tools container image.
+ifneq ($(BUILDX_ENABLED), true)
+ifeq ($(TAG_LATEST), true)
+	docker push ${IMG_TOOLS}:latest
+else
+	docker push ${IMG_TOOLS}:${VERSION}
+endif
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG_TOOLS}:latest --push $(BUILDX_ARGS)
+else
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG_TOOLS}:${VERSION} --push $(BUILDX_ARGS)
+endif
+endif

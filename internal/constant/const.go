@@ -41,9 +41,8 @@ const (
 	KBPrefix = "KB"
 )
 
-const KBImage = "KUBEBLOCKS_IMAGE"
-
 const (
+	KBToolsImage      = "KUBEBLOCKS_TOOLS_IMAGE"
 	KBImagePullPolicy = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 )
 
@@ -177,9 +176,6 @@ const (
 )
 
 const (
-
-	// ConfigSidecarIMAGE for config manager sidecar
-	ConfigSidecarIMAGE       = "KUBEBLOCKS_IMAGE"
 	ConfigSidecarName        = "config-manager"
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
 

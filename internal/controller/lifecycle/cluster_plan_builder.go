@@ -20,9 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 
-	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -149,10 +147,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&fixClusterLabelsTransformer{},
 		// create cluster connection credential secret object
 		&clusterCredentialTransformer{cc: *cr},
-		// components to K8s objects and put them into dag
+		// create all components objects
 		&componentTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
-		//// tls certs secret
-		// &tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 		// add our finalizer to all objects
 		&ownershipTransformer{finalizer: dbClusterFinalizerName},
 		// make all non-secret objects depending on all secrets
@@ -163,12 +159,6 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&objectActionTransformer{cli: roClient, ctx: c.ctx},
 		// handle TerminationPolicyType=DoNotTerminate
 		&doNotTerminateTransformer{},
-		//// horizontal scaling
-		// &stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
-		//// stateful set pvc Update
-		// &stsPVCTransformer{cli: c.cli, ctx: c.ctx},
-		//// replication set horizontal scaling
-		// &rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
 		&clusterStatusTransformer{cc: *cr, cli: c.cli, ctx: c.ctx, recorder: c.recorder, conMgr: c.conMgr},
 	}
@@ -240,10 +230,10 @@ func (c *clusterPlanBuilder) getClusterRefResources() (*clusterRefResources, err
 }
 
 func (c *clusterPlanBuilder) defaultWalkFuncWithDebug(vertex graph.Vertex) error {
-	//node, _ := vertex.(*lifecycleVertex)
+	node, _ := vertex.(*lifecycleVertex)
 	err := c.defaultWalkFunc(vertex)
 	if err != nil {
-		//fmt.Printf("walking object %s error: %s\n", node, err.Error())
+		fmt.Printf("walking object %s error: %s\n", node, err.Error())
 	} else {
 		//fmt.Printf("walking object %s OK\n", node)
 	}
@@ -315,10 +305,6 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		if node.immutable {
 			return nil
 		}
-		//o, err := c.buildUpdateObj(node)
-		//if err != nil {
-		//	return err
-		//}
 		err := c.cli.Update(c.ctx.Ctx, node.obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", node.obj, node.oriObj, node.obj))
@@ -340,81 +326,11 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 				return err
 			}
 		}
-		//// TODO: delete backup objects created in scale-out
-		//// TODO: should manage backup objects in a better way
-		//if isTypeOf[*snapshotv1.VolumeSnapshot](node.obj) ||
-		//	isTypeOf[*dataprotectionv1alpha1.BackupPolicy](node.obj) ||
-		//	isTypeOf[*dataprotectionv1alpha1.Backup](node.obj) {
-		//	_ = c.cli.Delete(c.ctx.Ctx, node.obj)
-		//}
 	case STATUS:
 		patch := client.MergeFrom(node.oriObj)
 		return c.cli.Status().Patch(c.ctx.Ctx, node.obj, patch)
 	}
 	return nil
-}
-
-func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Object, error) {
-	handleSts := func(origObj, stsProto *appsv1.StatefulSet) (client.Object, error) {
-		stsObj := origObj.DeepCopy()
-		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
-		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-			c.recorder.Eventf(c.cluster,
-				corev1.EventTypeNormal,
-				"HorizontalScale",
-				"Start horizontal scale component %s from %d to %d",
-				componentName,
-				*stsObj.Spec.Replicas,
-				*stsProto.Spec.Replicas)
-		}
-		// keep the original template annotations.
-		// if annotations exist and are replaced, the statefulSet will be updated.
-		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
-			stsProto.Spec.Template.Annotations)
-		stsObj.Spec.Template = stsProto.Spec.Template
-		stsObj.Spec.Replicas = stsProto.Spec.Replicas
-		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
-		return stsObj, nil
-	}
-
-	handleDeploy := func(origObj, deployProto *appsv1.Deployment) (client.Object, error) {
-		deployObj := origObj.DeepCopy()
-		deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations,
-			deployProto.Spec.Template.Annotations)
-		deployObj.Spec = deployProto.Spec
-		return deployObj, nil
-	}
-
-	handleSvc := func(origObj, svcProto *corev1.Service) (client.Object, error) {
-		svcObj := origObj.DeepCopy()
-		svcObj.Spec = svcProto.Spec
-		svcObj.Annotations = mergeServiceAnnotations(svcObj.Annotations, svcProto.Annotations)
-		return svcObj, nil
-	}
-
-	handlePVC := func(origObj, pvcProto *corev1.PersistentVolumeClaim) (client.Object, error) {
-		pvcObj := origObj.DeepCopy()
-		if pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] == pvcProto.Spec.Resources.Requests[corev1.ResourceStorage] {
-			return pvcObj, nil
-		}
-		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
-		return pvcObj, nil
-	}
-
-	switch v := node.obj.(type) {
-	case *appsv1.StatefulSet:
-		return handleSts(node.oriObj.(*appsv1.StatefulSet), v)
-	case *appsv1.Deployment:
-		return handleDeploy(node.oriObj.(*appsv1.Deployment), v)
-	case *corev1.Service:
-		return handleSvc(node.oriObj.(*corev1.Service), v)
-	case *corev1.PersistentVolumeClaim:
-		return handlePVC(node.oriObj.(*corev1.PersistentVolumeClaim), v)
-	case *corev1.Secret, *corev1.ConfigMap:
-		return v, nil
-	}
-
-	return node.obj, nil
 }
 
 func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster) error {
@@ -499,34 +415,6 @@ func (c *clusterPlanBuilder) deleteBackups(cluster *appsv1alpha1.Cluster) error 
 		}
 	}
 	return nil
-}
-
-// mergeAnnotations keeps the original annotations.
-// if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
-func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
-	if restartAnnotation, ok := originalAnnotations[constant.RestartAnnotationKey]; ok {
-		if targetAnnotations == nil {
-			targetAnnotations = map[string]string{}
-		}
-		targetAnnotations[constant.RestartAnnotationKey] = restartAnnotation
-	}
-	return targetAnnotations
-}
-
-// mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
-// if annotations exist and are replaced, the Service will be updated.
-func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
-	if len(originalAnnotations) == 0 {
-		return targetAnnotations
-	}
-	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
-	for k, v := range originalAnnotations {
-		if !strings.HasPrefix(k, "prometheus.io") {
-			tmpAnnotations[k] = v
-		}
-	}
-	maps.Copy(tmpAnnotations, targetAnnotations)
-	return tmpAnnotations
 }
 
 // updateComponentPhaseWithOperation if workload of component changes, should update the component phase.

@@ -336,6 +336,8 @@ func (c *replicationComponent) runningWorkloads(reqCtx intctrlutil.RequestCtx, c
 	return stsList, nil
 }
 
+// TODO: fix stale cache problem
+// TODO: if sts created in last reconcile-loop not present in cache, hasReplicationSetHScaling return false positive
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
 func (c *replicationComponent) horizontalScaling(stsList []*appsv1.StatefulSet) int {
 	// TODO: should use a more stable status

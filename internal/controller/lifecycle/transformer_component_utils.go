@@ -23,7 +23,9 @@ import (
 	"strings"
 	"time"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,8 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -88,6 +88,34 @@ func listDeployOwnedByComponent(reqCtx intctrlutil.RequestCtx, cli client.Client
 		constant.KBAppComponentLabelKey: compName,
 	}
 	return listObjWithLabelsInNamespace(reqCtx, cli, generics.DeploymentSignature, namespace, labels)
+}
+
+// mergeAnnotations keeps the original annotations.
+// if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
+func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
+	if restartAnnotation, ok := originalAnnotations[constant.RestartAnnotationKey]; ok {
+		if targetAnnotations == nil {
+			targetAnnotations = map[string]string{}
+		}
+		targetAnnotations[constant.RestartAnnotationKey] = restartAnnotation
+	}
+	return targetAnnotations
+}
+
+// mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
+// if annotations exist and are replaced, the Service will be updated.
+func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
+	if len(originalAnnotations) == 0 {
+		return targetAnnotations
+	}
+	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
+	for k, v := range originalAnnotations {
+		if !strings.HasPrefix(k, "prometheus.io") {
+			tmpAnnotations[k] = v
+		}
+	}
+	maps.Copy(tmpAnnotations, targetAnnotations)
+	return tmpAnnotations
 }
 
 func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, component component.SynthesizedComponent) error {
@@ -466,12 +494,6 @@ func doSnapshot(cli types2.ReadonlyClient,
 		}
 		objs = append(objs, snapshot)
 
-		// TODO: why set it again?
-		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-		// TODO: SetOwnership
-		if err := controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
-			return nil, err
-		}
 		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
 	}
 	return objs, nil

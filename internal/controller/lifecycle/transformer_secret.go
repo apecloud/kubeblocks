@@ -23,7 +23,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// secretTransformer puts the all secrets at the beginning of the DAG
+// secretTransformer puts all the secrets at the beginning of the DAG
 type secretTransformer struct{}
 
 func (c *secretTransformer) Transform(dag *graph.DAG) error {

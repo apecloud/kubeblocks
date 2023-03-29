@@ -203,9 +203,8 @@ func (c *consensusComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli cli
 			continue
 		}
 
-		// TODO:
-		//   1. check that cann't decrease the storage size.
-		//   2. since we can't update the storage size of stateful set, so we can't use it to determine the expansion.
+		// TODO: 1. check that can't decrease the storage size.
+		// TODO: 2. since we can't update the storage size of stateful set, so we can't use it to determine the expansion.
 		if vct.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Resources.Requests[corev1.ResourceStorage] {
 			continue
 		}

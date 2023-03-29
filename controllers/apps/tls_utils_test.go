@@ -286,6 +286,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					SetTLS(false).
 					Create(&testCtx).
 					GetObject()
+				Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(clusterObj))).Should(BeEquivalentTo(1))
 				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
 				sts := stsList.Items[0]
 				cd := &appsv1alpha1.ClusterDefinition{}

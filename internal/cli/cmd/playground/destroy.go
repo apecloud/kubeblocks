@@ -18,6 +18,7 @@ package playground
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -33,11 +34,8 @@ import (
 
 var (
 	destroyExample = templates.Examples(`
-		# destroy local host playground cluster
-		kbcli playground destroy
-
-		# destroy the AWS EKS cluster, the region is required
-		kbcli playground destroy --cloud-provider aws --region cn-northwest-1`)
+		# destroy playground cluster
+		kbcli playground destroy`)
 )
 
 type destroyOptions struct {
@@ -88,10 +86,17 @@ func (o *destroyOptions) destroyLocal() error {
 	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
 	spinner := printer.Spinner(o.Out, "Delete playground k3d cluster %s", o.prevCluster.ClusterName)
 	defer spinner(false)
-	if err := provider.DeleteK8sCluster(o.prevCluster.ClusterName); err != nil {
-		return err
+	if err := provider.DeleteK8sCluster(o.prevCluster); err != nil {
+		if !strings.Contains(err.Error(), "no cluster found") &&
+			!strings.Contains(err.Error(), "does not exist") {
+			return err
+		}
 	}
 	spinner(true)
+
+	if err := o.removeKubeConfig(); err != nil {
+		return err
+	}
 	return o.removeStateFile()
 }
 
@@ -105,7 +110,7 @@ func (o *destroyOptions) destroyCloud() error {
 		return err
 	}
 
-	provider, err := cp.New(o.prevCluster.CloudProvider, o.prevCluster.Region, cpPath, o.Out, o.ErrOut)
+	provider, err := cp.New(o.prevCluster.CloudProvider, cpPath, o.Out, o.ErrOut)
 	if err != nil {
 		return err
 	}
@@ -142,7 +147,11 @@ func (o *destroyOptions) destroyCloud() error {
 
 	fmt.Fprintf(o.Out, "Destroy %s %s cluster %s...\n",
 		o.prevCluster.CloudProvider, cp.K8sService(o.prevCluster.CloudProvider), o.prevCluster.ClusterName)
-	if err = provider.DeleteK8sCluster(o.prevCluster.ClusterName); err != nil {
+	if err = provider.DeleteK8sCluster(o.prevCluster); err != nil {
+		return err
+	}
+
+	if err = o.removeKubeConfig(); err != nil {
 		return err
 	}
 
@@ -150,7 +159,18 @@ func (o *destroyOptions) destroyCloud() error {
 		return err
 	}
 
-	fmt.Fprintf(o.Out, "\nPlayground destroy completed in %s.\n", time.Since(o.startTime).Truncate(time.Second))
+	fmt.Fprintf(o.Out, "Playground destroy completed in %s.\n", time.Since(o.startTime).Truncate(time.Second))
+	return nil
+}
+
+func (o *destroyOptions) removeKubeConfig() error {
+	configPath := util.ConfigPath("config")
+	spinner := printer.Spinner(o.Out, "Remove kubeconfig from %s", configPath)
+	defer spinner(false)
+	if err := kubeConfigRemove(o.prevCluster.KubeConfig, configPath); err != nil {
+		return err
+	}
+	spinner(true)
 	return nil
 }
 

@@ -56,8 +56,6 @@ func (c *objectActionTransformer) readCacheSnapshot(cluster appsv1alpha1.Cluster
 	// list what kinds of object cluster owns
 	kinds := ownKinds()
 	snapshot := make(clusterSnapshot)
-	sts := appsv1.StatefulSet{}
-	sts.GroupVersionKind()
 	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
 	inNS := client.InNamespace(cluster.Namespace)
 	for _, list := range kinds {

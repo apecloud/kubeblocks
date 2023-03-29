@@ -160,24 +160,6 @@ func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string
 	return compBackupMap, err
 }
 
-// func getBackupObjects(reqCtx intctrlutil.RequestCtx,
-//	cli types2.ReadonlyClient,
-//	namespace string,
-//	backupName string) (*dataprotectionv1alpha1.Backup, *dataprotectionv1alpha1.BackupTool, error) {
-//	// get backup
-//	backup := &dataprotectionv1alpha1.Backup{}
-//	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, backup); err != nil {
-//		return nil, nil, err
-//	}
-//
-//	// get backup tool
-//	backupTool := &dataprotectionv1alpha1.BackupTool{}
-//	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
-//		return nil, nil, err
-//	}
-//	return backup, backupTool, nil
-//}
-
 func isTypeOf[T interface{}](obj client.Object) bool {
 	_, ok := obj.(T)
 	return ok

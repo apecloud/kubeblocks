@@ -14,27 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
+package lifecycle
 
 import (
-	"context"
-	"os"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("playground", func() {
-	var (
-		provider    = NewLocalCloudProvider(os.Stdout, os.Stderr)
-		clusterName = "k3d-tb-est"
-	)
+// These tests use Ginkgo (BDD-style Go testing framework). Refer to
+// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-	It("k3d util function", func() {
-		config, err := buildClusterRunConfig("test")
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(config.Name).Should(ContainSubstring("test"))
-		Expect(setUpK3d(context.Background(), nil)).Should(HaveOccurred())
-		Expect(provider.DeleteK8sCluster(&K8sClusterInfo{ClusterName: clusterName})).Should(HaveOccurred())
-	})
+func init() {
+}
+
+func TestAPIs(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	RunSpecs(t, "Lifecycle Suite")
+}
+
+var _ = BeforeSuite(func() {
+	go func() {
+		defer GinkgoRecover()
+	}()
+})
+
+var _ = AfterSuite(func() {
 })

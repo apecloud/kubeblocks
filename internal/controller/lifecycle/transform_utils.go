@@ -17,22 +17,32 @@ limitations under the License.
 package lifecycle
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+func FindMatchedVertex[T interface{}](dag *graph.DAG, objectKey client.ObjectKey) graph.Vertex {
+	for _, vertex := range dag.Vertices() {
+		v, _ := vertex.(*lifecycleVertex)
+		if _, ok := v.obj.(T); ok {
+			if client.ObjectKeyFromObject(v.obj) == objectKey {
+				return vertex
+			}
+		}
+	}
+	return nil
+}
 
 func findAll[T interface{}](dag *graph.DAG) []graph.Vertex {
 	vertices := make([]graph.Vertex, 0)
@@ -139,25 +149,13 @@ func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
 	//	slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
 }
 
-func getBackupObjects(reqCtx intctrlutil.RequestCtx,
-	cli types2.ReadonlyClient,
-	namespace string,
-	backupName string) (*dataprotectionv1alpha1.Backup, *dataprotectionv1alpha1.BackupTool, error) {
-	// get backup
-	backup := &dataprotectionv1alpha1.Backup{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, backup); err != nil {
-		return nil, nil, err
+// getClusterBackupSourceMap gets the backup source map from cluster.annotations
+func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string, error) {
+	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	if len(compBackupMapString) == 0 {
+		return nil, nil
 	}
-
-	// get backup tool
-	backupTool := &dataprotectionv1alpha1.BackupTool{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
-		return nil, nil, err
-	}
-	return backup, backupTool, nil
-}
-
-func isTypeOf[T interface{}](obj client.Object) bool {
-	_, ok := obj.(T)
-	return ok
+	compBackupMap := map[string]string{}
+	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
+	return compBackupMap, err
 }

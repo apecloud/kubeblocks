@@ -45,100 +45,24 @@ import (
 // like Secret, ConfigMap, Service, StatefulSet, Deployment, Volume, PodDisruptionBudget etc.
 // Generated resources are cached in task.applyObjs.
 func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
-	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := builder.BuildEnvConfig(task.GetBuilderParams(), reqCtx, cli)
-		if err != nil {
-			return err
-		}
-		task.AppendResource(envConfig)
-
-		workload, err := customSetup(envConfig)
-		if err != nil {
-			return err
-		}
-
-		defer func() {
-			// workload object should be appended last
-			task.AppendResource(workload)
-		}()
-
-		svc, err := builder.BuildHeadlessSvc(task.GetBuilderParams())
-		if err != nil {
-			return err
-		}
-		task.AppendResource(svc)
-
-		var podSpec *corev1.PodSpec
-		sts, ok := workload.(*appsv1.StatefulSet)
-		if ok {
-			podSpec = &sts.Spec.Template.Spec
-		} else {
-			deploy, ok := workload.(*appsv1.Deployment)
-			if ok {
-				podSpec = &deploy.Spec.Template.Spec
-			}
-		}
-		if podSpec == nil {
-			return nil
-		}
-
-		defer func() {
-			for _, cc := range []*[]corev1.Container{
-				&podSpec.Containers,
-				&podSpec.InitContainers,
-			} {
-				volumes := podSpec.Volumes
-				for _, c := range *cc {
-					for _, v := range c.VolumeMounts {
-						// if persistence is not found, add emptyDir pod.spec.volumes[]
-						volumes, _ = intctrlutil.CreateOrUpdateVolume(volumes, v.Name, func(volumeName string) corev1.Volume {
-							return corev1.Volume{
-								Name: v.Name,
-								VolumeSource: corev1.VolumeSource{
-									EmptyDir: &corev1.EmptyDirVolumeSource{},
-								},
-							}
-						}, nil)
-					}
-				}
-				podSpec.Volumes = volumes
-			}
-		}()
-
-		// render config template
-		configs, err := buildCfg(task, workload, podSpec, reqCtx.Ctx, cli)
-		if err != nil {
-			return err
-		}
-		if configs != nil {
-			task.AppendResource(configs...)
-		}
-		// end render config
-
-		// tls certs secret volume and volumeMount
-		if err := updateTLSVolumeAndVolumeMount(podSpec, task.Cluster.Name, *task.Component); err != nil {
-			return err
-		}
-		return nil
-	}
 
 	switch task.Component.WorkloadType {
 	case appsv1alpha1.Stateless:
-		if err := workloadProcessor(
+		if err := prepareComponentWorkloads(reqCtx, cli, task,
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return builder.BuildDeploy(reqCtx, task.GetBuilderParams())
 			}); err != nil {
 			return err
 		}
 	case appsv1alpha1.Stateful:
-		if err := workloadProcessor(
+		if err := prepareComponentWorkloads(reqCtx, cli, task,
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfig.Name)
 			}); err != nil {
 			return err
 		}
 	case appsv1alpha1.Consensus:
-		if err := workloadProcessor(
+		if err := prepareComponentWorkloads(reqCtx, cli, task,
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return buildConsensusSet(reqCtx, task, envConfig.Name)
 			}); err != nil {
@@ -171,7 +95,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		//  then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
 		replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
 		for index := int32(0); index < int32(replicaCount); index++ {
-			if err := workloadProcessor(
+			if err := prepareComponentWorkloads(reqCtx, cli, task,
 				func(envConfig *corev1.ConfigMap) (client.Object, error) {
 					return buildReplicationSet(reqCtx, task, envConfig.Name, index)
 				}); err != nil {
@@ -218,6 +142,84 @@ func addLeaderSelectorLabels(service *corev1.Service, component *component.Synth
 	if len(leader.Name) > 0 {
 		service.Spec.Selector[constant.RoleLabelKey] = leader.Name
 	}
+}
+
+func prepareComponentWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask,
+	customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
+	envConfig, err := builder.BuildEnvConfig(task.GetBuilderParams(), reqCtx, cli)
+	if err != nil {
+		return err
+	}
+	task.AppendResource(envConfig)
+
+	workload, err := customSetup(envConfig)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		// workload object should be appended last
+		task.AppendResource(workload)
+	}()
+
+	svc, err := builder.BuildHeadlessSvc(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	task.AppendResource(svc)
+
+	var podSpec *corev1.PodSpec
+	sts, ok := workload.(*appsv1.StatefulSet)
+	if ok {
+		podSpec = &sts.Spec.Template.Spec
+	} else {
+		deploy, ok := workload.(*appsv1.Deployment)
+		if ok {
+			podSpec = &deploy.Spec.Template.Spec
+		}
+	}
+	if podSpec == nil {
+		return nil
+	}
+
+	defer func() {
+		for _, cc := range []*[]corev1.Container{
+			&podSpec.Containers,
+			&podSpec.InitContainers,
+		} {
+			volumes := podSpec.Volumes
+			for _, c := range *cc {
+				for _, v := range c.VolumeMounts {
+					// if persistence is not found, add emptyDir pod.spec.volumes[]
+					volumes, _ = intctrlutil.CreateOrUpdateVolume(volumes, v.Name, func(volumeName string) corev1.Volume {
+						return corev1.Volume{
+							Name: v.Name,
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						}
+					}, nil)
+				}
+			}
+			podSpec.Volumes = volumes
+		}
+	}()
+
+	// render config template
+	configs, err := buildCfg(task, workload, podSpec, reqCtx.Ctx, cli)
+	if err != nil {
+		return err
+	}
+	if configs != nil {
+		task.AppendResource(configs...)
+	}
+	// end render config
+
+	// tls certs secret volume and volumeMount
+	if err := updateTLSVolumeAndVolumeMount(podSpec, task.Cluster.Name, *task.Component); err != nil {
+		return err
+	}
+	return nil
 }
 
 // buildConsensusSet build on a stateful set
@@ -302,26 +304,35 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	podSpec *corev1.PodSpec,
 	ctx context.Context,
 	cli client.Client) ([]client.Object, error) {
+	return BuildCfgLow(task.ClusterVersion, task.Cluster, task.Component, obj, podSpec, ctx, cli)
+}
+
+func BuildCfgLow(clusterVersion *appsv1alpha1.ClusterVersion,
+	cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	obj client.Object,
+	podSpec *corev1.PodSpec,
+	ctx context.Context,
+	cli client.Client) ([]client.Object, error) {
 	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
-	if len(task.Component.ConfigTemplates) == 0 && len(task.Component.ScriptTemplates) == 0 {
+	if len(component.ConfigTemplates) == 0 && len(component.ScriptTemplates) == 0 {
 		return nil, nil
 	}
 
-	clusterName := task.Cluster.Name
-	namespaceName := task.Cluster.Namespace
-	// New ConfigTemplateBuilder
-	templateBuilder := newTemplateBuilder(clusterName, namespaceName, task.Cluster, task.ClusterVersion, ctx, cli)
+	clusterName := cluster.Name
+	namespaceName := cluster.Namespace
+	templateBuilder := newTemplateBuilder(clusterName, namespaceName, cluster, clusterVersion, ctx, cli)
 	// Prepare built-in objects and built-in functions
-	if err := templateBuilder.injectBuiltInObjectsAndFunctions(podSpec, task.Component.ConfigTemplates, task.Component); err != nil {
+	if err := templateBuilder.injectBuiltInObjectsAndFunctions(podSpec, component.ConfigTemplates, component); err != nil {
 		return nil, err
 	}
 
-	renderWrapper := newTemplateRenderWrapper(templateBuilder, task.Cluster, task.GetBuilderParams(), ctx, cli)
-	if err := renderWrapper.renderConfigTemplate(task); err != nil {
+	renderWrapper := newTemplateRenderWrapper(templateBuilder, cluster, ctx, cli)
+	if err := renderWrapper.renderConfigTemplate(cluster, component); err != nil {
 		return nil, err
 	}
-	if err := renderWrapper.renderScriptTemplate(task); err != nil {
+	if err := renderWrapper.renderScriptTemplate(cluster, component); err != nil {
 		return nil, err
 	}
 
@@ -334,7 +345,7 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
 	}
 
-	if err := updateConfigManagerWithComponent(podSpec, task.Component.ConfigTemplates, ctx, cli, task.GetBuilderParams()); err != nil {
+	if err := updateConfigManagerWithComponent(podSpec, component.ConfigTemplates, ctx, cli, cluster, component); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
 
@@ -368,7 +379,8 @@ func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotat
 
 // updateConfigManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec, ctx context.Context, cli client.Client, params builder.BuilderParams) error {
+func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec,
+	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
 	var (
 		err error
 
@@ -379,7 +391,7 @@ func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []ap
 	if volumeDirs = getUsingVolumesByCfgTemplates(podSpec, cfgTemplates); len(volumeDirs) == 0 {
 		return nil
 	}
-	if configManagerParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, params); err != nil {
+	if configManagerParams, err = buildConfigManagerParams(cli, ctx, cluster, component, cfgTemplates, volumeDirs); err != nil {
 		return err
 	}
 	if configManagerParams == nil {
@@ -451,14 +463,15 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	return volumeDirs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster,
+	comp *component.SynthesizedComponent, cfgTemplates []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount) (*cfgcm.ConfigManagerParams, error) {
 	configManagerParams := &cfgcm.ConfigManagerParams{
 		ManagerName:   constant.ConfigSidecarName,
-		CharacterType: params.Component.CharacterType,
-		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
+		CharacterType: comp.CharacterType,
+		SecreteName:   component.GenerateConnCredential(cluster.Name),
 		Image:         viper.GetString(constant.KBToolsImage),
 		Volumes:       volumeDirs,
-		Cluster:       params.Cluster,
+		Cluster:       cluster,
 	}
 
 	var err error

@@ -222,7 +222,7 @@ func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) erro
 	// if status changed, do update
 	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
 		patch := client.MergeFrom((*r.Cluster).DeepCopy())
-		if err = util.InitClusterComponentStatusIfNeed(r.Cluster, componentName, *component); err != nil {
+		if err = util.InitClusterComponentStatusIfNeed(r.Cluster, componentName, component.WorkloadType); err != nil {
 			return err
 		}
 		componentStatus := r.Cluster.Status.Components[componentName]

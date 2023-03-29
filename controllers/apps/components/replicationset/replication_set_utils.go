@@ -32,6 +32,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -101,14 +102,67 @@ func handleReplicationSetHorizontalScale(ctx context.Context,
 	return nil
 }
 
-// handleComponentIsStopped checks the component status is stopped and updates it.
-func handleComponentIsStopped(cluster *appsv1alpha1.Cluster) {
-	for _, clusterComp := range cluster.Spec.ComponentSpecs {
-		if clusterComp.Replicas == int32(0) {
-			replicationStatus := cluster.Status.Components[clusterComp.Name]
-			replicationStatus.Phase = appsv1alpha1.StoppedClusterCompPhase
-			cluster.Status.SetComponentStatus(clusterComp.Name, replicationStatus)
+func HandleComponentHorizontalScaleIn(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	stsList []*appsv1.StatefulSet) ([]client.Object, error) {
+	// remove cluster status and delete sts when horizontal scale-in
+	dos := make([]*appsv1.StatefulSet, 0)
+	// var primarySts *appsv1.StatefulSet
+	for _, sts := range stsList {
+		// if current primary statefulSet ordinal is larger than target number replica, return err
+		stsIsPrimary, err := checkObjRoleLabelIsPrimary(sts)
+		// primarySts = sts
+		if err != nil {
+			return nil, err
 		}
+		// check if the current primary statefulSet ordinal is larger than target replicas number of component when the target number is not 0.
+		if int32(util.GetOrdinalSts(sts)) >= component.Replicas && stsIsPrimary && component.Replicas != 0 {
+			return nil, fmt.Errorf("current primary statefulset ordinal is larger than target number replicas, can not be reduce, please switchover first")
+		}
+		dos = append(dos, sts.DeepCopy())
+	}
+
+	// sort the statefulSets by their ordinals desc
+	sort.Sort(util.DescendingOrdinalSts(dos))
+
+	deleteCnt := int32(len(stsList)) - component.Replicas
+	if err := RemoveReplicationSetClusterStatus(cli, ctx, cluster, dos[:deleteCnt], component.Replicas); err != nil {
+		return nil, err
+	}
+
+	objs := make([]client.Object, deleteCnt)
+	for _, sts := range dos[:deleteCnt] {
+		objs = append(objs, sts)
+	}
+
+	// TODO: review and add it back
+	//// reconcile the primary statefulSet after deleting other sts to make component phase is correct.
+	// if component.Replicas != 0 {
+	//	if err := util.MarkPrimaryStsToReconcile(ctx, cli, primarySts); err != nil {
+	//		return nil, client.IgnoreNotFound(err)
+	//	}
+	// }
+
+	// if component replicas is 0, handle replication component status after scaling down the replicas.
+	handleComponentIsStopped(cluster, component.Name, component.Replicas)
+
+	return objs, nil
+}
+
+func handleComponentIsStopped(cluster *appsv1alpha1.Cluster, compName string, replica int32) {
+	if replica == int32(0) {
+		replicationStatus := cluster.Status.Components[compName]
+		replicationStatus.Phase = appsv1alpha1.StoppedClusterCompPhase
+		cluster.Status.SetComponentStatus(compName, replicationStatus)
+	}
+}
+
+// handleClusterComponentIsStopped checks the component status is stopped and updates it.
+func handleClusterComponentIsStopped(cluster *appsv1alpha1.Cluster) {
+	for _, clusterComp := range cluster.Spec.ComponentSpecs {
+		handleComponentIsStopped(cluster, clusterComp.Name, clusterComp.Replicas)
 	}
 }
 
@@ -177,39 +231,44 @@ func doHorizontalScaleDown(ctx context.Context,
 	}
 
 	// if component replicas is 0, handle replication component status after scaling down the replicas.
-	handleComponentIsStopped(cluster)
+	handleClusterComponentIsStopped(cluster)
+	return nil
+}
+
+func SyncReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
+	compName string, podList []*corev1.Pod) error {
+	oldReplicationSetStatus := cluster.Status.Components[compName].ReplicationSetStatus
+	if oldReplicationSetStatus == nil {
+		if err := util.InitClusterComponentStatusIfNeed(cluster, compName, appsv1alpha1.Replication); err != nil {
+			return err
+		}
+		oldReplicationSetStatus = cluster.Status.Components[compName].ReplicationSetStatus
+	}
+	if err := syncReplicationSetStatus(oldReplicationSetStatus, podList); err != nil {
+		return err
+	}
 	return nil
 }
 
 // syncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
-func syncReplicationSetClusterStatus(
+func syncReplicationSetClusterStatus(ctx context.Context,
 	cli client.Client,
-	ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	podList []*corev1.Pod) error {
 	if len(podList) == 0 {
 		return nil
 	}
 
-	// update cluster status
 	componentName, componentDef, err := util.GetComponentInfoByPod(ctx, cli, *cluster, podList[0])
 	if err != nil {
 		return err
 	}
-	if componentDef == nil {
+	if componentDef == nil || componentDef.WorkloadType != appsv1alpha1.Replication {
 		return nil
 	}
-	oldReplicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
-	if oldReplicationSetStatus == nil {
-		if err = util.InitClusterComponentStatusIfNeed(cluster, componentName, *componentDef); err != nil {
-			return err
-		}
-		oldReplicationSetStatus = cluster.Status.Components[componentName].ReplicationSetStatus
-	}
-	if err := syncReplicationSetStatus(oldReplicationSetStatus, podList); err != nil {
-		return err
-	}
-	return nil
+
+	// update cluster status
+	return SyncReplicationSetClusterStatus(cluster, componentName, podList)
 }
 
 // syncReplicationSetStatus syncs the target pod info in cluster.status.components.

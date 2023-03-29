@@ -117,14 +117,18 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 	createNewVertices := func() {
 		for name := range createSet {
 			v, _ := newNameVertices[name].(*lifecycleVertex)
-			v.action = actionPtr(CREATE)
+			if v.action == nil {
+				v.action = actionPtr(CREATE)
+			}
 		}
 	}
 	updateVertices := func() {
 		for name := range updateSet {
 			v, _ := newNameVertices[name].(*lifecycleVertex)
 			v.oriObj = oldSnapshot[name]
-			v.action = actionPtr(UPDATE)
+			if v.action == nil || *v.action != DELETE {
+				v.action = actionPtr(UPDATE)
+			}
 		}
 	}
 	deleteOrphanVertices := func() {
@@ -174,7 +178,10 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 			vertices := findAllNot[*appsv1alpha1.Cluster](dag)
 			for _, vertex := range vertices {
 				v, _ := vertex.(*lifecycleVertex)
-				v.immutable = true
+				// TODO: fix me, workaround for h-scaling to update stateful set
+				if _, ok := v.obj.(*appsv1.StatefulSet); !ok {
+					v.immutable = true
+				}
 			}
 		}()
 		fallthrough

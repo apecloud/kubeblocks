@@ -187,14 +187,14 @@ var _ = Describe("Consensus Component", func() {
 			Expect(newCluster != nil).Should(BeTrue())
 
 			By("test consensusSet InitClusterComponentStatusIfNeed function")
-			err := InitClusterComponentStatusIfNeed(cluster, consensusCompName, *componentDef)
+			err := InitClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus).ShouldNot(BeNil())
 			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(ComponentStatusDefaultPodName))
 
 			By("test ReplicationSet InitClusterComponentStatusIfNeed function")
 			componentDef.WorkloadType = appsv1alpha1.Replication
-			err = InitClusterComponentStatusIfNeed(cluster, consensusCompName, *componentDef)
+			err = InitClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus).ShouldNot(BeNil())
 			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(ComponentStatusDefaultPodName))

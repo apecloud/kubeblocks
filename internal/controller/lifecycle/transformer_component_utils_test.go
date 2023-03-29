@@ -21,7 +21,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("cluster plan utils test", func() {
+var _ = Describe("transformer component utils test", func() {
 	Context("test mergeServiceAnnotations", func() {
 		It("original and target annotations are nil", func() {
 			Expect(mergeServiceAnnotations(nil, nil)).Should(BeNil())

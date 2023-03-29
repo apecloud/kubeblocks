@@ -93,9 +93,11 @@ type lifecycleVertex struct {
 
 func (v lifecycleVertex) String() string {
 	if v.action == nil {
-		return fmt.Sprintf("{obj:%T, immutable: %v, action: nil}", v.obj, v.immutable)
+		return fmt.Sprintf("{obj:%T, name: %s, immutable: %v, orphan: %v, action: nil}",
+			v.obj, v.obj.GetName(), v.immutable, v.isOrphan)
 	}
-	return fmt.Sprintf("{obj:%T, immutable: %v, action: %v}", v.obj, v.immutable, *v.action)
+	return fmt.Sprintf("{obj:%T, name: %s, immutable: %v, orphan: %v, action: %v}",
+		v.obj, v.obj.GetName(), v.immutable, v.isOrphan, *v.action)
 }
 
 type clusterSnapshot map[gvkName]client.Object

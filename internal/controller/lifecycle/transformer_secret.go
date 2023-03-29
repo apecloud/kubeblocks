@@ -23,10 +23,10 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// credentialTransformer puts the credential Secret at the beginning of the DAG
-type credentialTransformer struct{}
+// secretTransformer puts all the secrets at the beginning of the DAG
+type secretTransformer struct{}
 
-func (c *credentialTransformer) Transform(dag *graph.DAG) error {
+func (c *secretTransformer) Transform(dag *graph.DAG) error {
 	var secretVertices, noneRootVertices []graph.Vertex
 	secretVertices = findAll[*corev1.Secret](dag)
 	noneRootVertices = findAllNot[*appsv1alpha1.Cluster](dag)

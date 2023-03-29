@@ -286,9 +286,9 @@ func (o *initOptions) confirmInitNewKubeCluster() error {
 `)
 
 	fmt.Fprintf(o.Out, `
-The whole process takes about %s, please wait patiently,
+The whole process wll take about %s, please wait patiently,
 if it takes a long time, please check the network environment and try again.
-`, printer.BoldRed("20~30 minutes"))
+`, printer.BoldRed("20 minutes"))
 
 	// confirm to run
 	fmt.Fprintf(o.Out, "\nDo you want to perform this action?\n  Only 'yes' will be accepted to approve.\n\n")

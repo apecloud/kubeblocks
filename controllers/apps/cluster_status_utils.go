@@ -40,54 +40,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// postHandler defines the handler after patching cluster status.
-type postHandler func(cluster *appsv1alpha1.Cluster) error
-
-// clusterStatusHandler a cluster status handler which changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
-type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (postHandler, error)
-
 const (
 	// EventTimeOut timeout of the event
 	EventTimeOut = 30 * time.Second
 )
-
-// doChainClusterStatusHandler chain processing clusterStatusHandler.
-func doChainClusterStatusHandler(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	handlers ...clusterStatusHandler) error {
-	patch := client.MergeFrom(cluster.DeepCopy())
-	var (
-		needPatchStatus bool
-		postHandlers    = make([]func(cluster *appsv1alpha1.Cluster) error, 0, len(handlers))
-	)
-	for _, statusHandler := range handlers {
-		postFunc, err := statusHandler(cluster)
-		if err != nil {
-			if err == util.ErrNoOps {
-				continue
-			}
-			return err
-		}
-		needPatchStatus = true
-		if postFunc != nil {
-			postHandlers = append(postHandlers, postFunc)
-		}
-	}
-	if !needPatchStatus {
-		return util.ErrNoOps
-	}
-	if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
-		return err
-	}
-	// perform the handlers after patched the cluster status.
-	for _, postFunc := range postHandlers {
-		if err := postFunc(cluster); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // isTargetKindForEvent checks the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
@@ -448,23 +404,6 @@ func updateComponentStatusPhase(cli client.Client,
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.SetComponentStatus(componentName, c)
 	return cli.Status().Patch(ctx, cluster, patch)
-}
-
-// updateComponentPhaseWithOperation if workload of component changes, should update the component phase.
-// REVIEW: this function need provide return value to determine mutation or not
-// Deprecated:
-func updateComponentPhaseWithOperation(cluster *appsv1alpha1.Cluster, componentName string) {
-	if len(componentName) == 0 {
-		return
-	}
-	componentPhase := appsv1alpha1.SpecReconcilingClusterCompPhase
-	if cluster.Status.Phase == appsv1alpha1.StartingClusterPhase {
-		componentPhase = appsv1alpha1.StartingClusterCompPhase
-	}
-	compStatus := cluster.Status.Components[componentName]
-	// synchronous component phase is consistent with cluster phase
-	compStatus.Phase = componentPhase
-	cluster.Status.SetComponentStatus(componentName, compStatus)
 }
 
 // existsOperations checks if the cluster is doing operations

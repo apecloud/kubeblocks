@@ -12,19 +12,19 @@ kbcli cluster volume-expand [flags]
 
 ```
   # restart specifies the component, separate with commas when <component-name> more than one
-  kbcli cluster volume-expand <my-cluster> --component-names=<component-name> \
-  --volume-claim-template-names=data --storage=10Gi
+  kbcli cluster volume-expand <my-cluster> --components=<component-name> \
+  --volume-claim-templates=data --storage=10Gi
 ```
 
 ### Options
 
 ```
-      --component-names strings                Component names to this operations
-  -h, --help                                  help for volume-expand
-      --name string                           OpsRequest name. if not specified, it will be randomly generated 
-      --storage string                        Volume storage size (required)
-      --ttlSecondsAfterSucceed int            Time to live after the OpsRequest succeed
-      --volume-claim-template-names strings   VolumeClaimTemplate names in components (required)
+      --components strings                Component names to this operations
+  -h, --help                             help for volume-expand
+      --name string                      OpsRequest name. if not specified, it will be randomly generated 
+      --storage string                   Volume storage size (required)
+      --ttlSecondsAfterSucceed int       Time to live after the OpsRequest succeed
+  -t, --volume-claim-templates strings   VolumeClaimTemplate names in components (required)
 ```
 
 ### Options inherited from parent commands

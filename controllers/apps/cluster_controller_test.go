@@ -1615,9 +1615,9 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("test when clusterDefinition not found")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, lifecycle.ConditionTypeProvisioningStarted)
+				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 				g.Expect(condition).ShouldNot(BeNil())
-				g.Expect(condition.Reason).Should(BeEquivalentTo(constant.ReasonNotFoundCR))
+				g.Expect(condition.Reason).Should(BeEquivalentTo(lifecycle.ReasonPreCheckFailed))
 			})).Should(Succeed())
 
 			// TODO: removed conditionsError phase need to review correct-ness of following commented off block:
@@ -1653,9 +1653,9 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(func(g Gomega) {
 				updateClusterAnnotation(cluster)
 				g.Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-					condition := meta.FindStatusCondition(cluster.Status.Conditions, lifecycle.ConditionTypeProvisioningStarted)
+					condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 					g.Expect(condition).ShouldNot(BeNil())
-					g.Expect(condition.Reason).Should(BeEquivalentTo(constant.ReasonRefCRUnavailable))
+					g.Expect(condition.Reason).Should(BeEquivalentTo(lifecycle.ReasonPreCheckFailed))
 				})).Should(Succeed())
 			}).Should(Succeed())
 
@@ -1672,7 +1672,7 @@ var _ = Describe("Cluster Controller", func() {
 			updateClusterAnnotation(cluster)
 			By("test preCheckFailed")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-				condition := meta.FindStatusCondition(cluster.Status.Conditions, lifecycle.ConditionTypeProvisioningStarted)
+				condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 				g.Expect(condition != nil && condition.Reason == lifecycle.ReasonPreCheckFailed).Should(BeTrue())
 			})).Should(Succeed())
 
@@ -1682,7 +1682,7 @@ var _ = Describe("Cluster Controller", func() {
 			})()).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.StartingClusterPhase))
+				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 				g.Expect(tmpCluster.Status.ObservedGeneration).ShouldNot(BeZero())
 			})).Should(Succeed())
 
@@ -1693,7 +1693,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, lifecycle.ConditionTypeApplyResources)
+					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, appsv1alpha1.ConditionTypeApplyResources)
 					g.Expect(condition != nil && condition.Reason == lifecycle.ReasonApplyResourcesFailed).Should(BeTrue())
 				})).Should(Succeed())
 		})

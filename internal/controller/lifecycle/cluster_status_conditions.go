@@ -14,33 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apps
+package lifecycle
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"strings"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 )
-
-type clusterConditionManager struct {
-	client.Client
-	Recorder record.EventRecorder
-	ctx      context.Context
-	cluster  *appsv1alpha1.Cluster
-}
 
 const (
 	ReasonOpsRequestProcessed   = "Processed"             // ReasonOpsRequestProcessed the latest OpsRequest has been processed.
@@ -53,25 +39,6 @@ const (
 	ReasonComponentsNotReady    = "ComponentsNotReady"    // ReasonComponentsNotReady the components of cluster are not ready
 	ReasonClusterReady          = "ClusterReady"          // ReasonClusterReady the components of cluster are ready, the component phase are running
 )
-
-// updateClusterConditions updates cluster.status condition and records event.
-func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Condition) error {
-	oldCondition := meta.FindStatusCondition(conMgr.cluster.Status.Conditions, condition.Type)
-	if !conditionIsChanged(oldCondition, condition) {
-		return nil
-	}
-	patch := client.MergeFrom(conMgr.cluster.DeepCopy())
-	meta.SetStatusCondition(&conMgr.cluster.Status.Conditions, condition)
-	if err := conMgr.Client.Status().Patch(conMgr.ctx, conMgr.cluster, patch); err != nil {
-		return err
-	}
-	eventType := corev1.EventTypeWarning
-	if condition.Status == metav1.ConditionTrue {
-		eventType = corev1.EventTypeNormal
-	}
-	conMgr.Recorder.Event(conMgr.cluster, eventType, condition.Reason, condition.Message)
-	return nil
-}
 
 // conditionIsChanged checks if the condition is changed.
 func conditionIsChanged(oldCondition *metav1.Condition, newCondition metav1.Condition) bool {
@@ -91,15 +58,6 @@ func newProvisioningStartedCondition(clusterName string, clusterGeneration int64
 		Message:            fmt.Sprintf("The operator has started the provisioning of Cluster: %s", clusterName),
 		Reason:             ReasonPreCheckSucceed,
 	}
-}
-
-// newPreCheckErrorCondition creates a condition when preCheck failed.
-func newPreCheckErrorCondition(err error) metav1.Condition {
-	reason := ReasonPreCheckFailed
-	if apierrors.IsNotFound(err) {
-		reason = constant.ReasonNotFoundCR
-	}
-	return newFailedProvisioningStartedCondition(err.Error(), reason)
 }
 
 // newApplyResourcesCondition creates a condition when applied resources succeed.

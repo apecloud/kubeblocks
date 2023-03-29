@@ -34,6 +34,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -96,7 +97,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			con := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
 			g.Expect(con).ShouldNot(BeNil())
 			g.Expect(con.Status).Should(Equal(metav1.ConditionTrue))
-			g.Expect(con.Reason).Should(Equal(ReasonOpsRequestProcessed))
+			g.Expect(con.Reason).Should(Equal(lifecycle.ReasonOpsRequestProcessed))
 		})).Should(Succeed())
 	}
 
@@ -325,9 +326,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(testCtx.CreateObj(testCtx.Ctx, ops)).Should(Succeed())
 
 			By("expect component is Running if don't support volume snapshot during doing h-scale ops")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 			// cluster phase changes to HorizontalScalingPhase first. then, it will be ConditionsError because it does not support snapshot backup after a period of time.
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase)) // HorizontalScalingPhase
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 			By("delete h-scale ops")

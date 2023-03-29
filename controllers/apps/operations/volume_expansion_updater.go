@@ -65,7 +65,7 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return nil
 	}
 	// notice the OpsRequest to reconcile
-	err := opsutil.PatchOpsRequestReconcileAnnotation(reqCtx.Ctx, cli, cluster, *opsRequestName)
+	err := opsutil.PatchOpsRequestReconcileAnnotation(reqCtx.Ctx, cli, cluster.Namespace, *opsRequestName)
 	// if the OpsRequest is not found, means it is deleted by user.
 	// we should delete the invalid OpsRequest annotation in the cluster and reconcile the cluster phase.
 	if apierrors.IsNotFound(err) {

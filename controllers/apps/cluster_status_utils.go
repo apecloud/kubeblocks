@@ -19,7 +19,6 @@ package apps
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -28,8 +27,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,237 +42,6 @@ import (
 
 // EventTimeOut timeout of the event
 const EventTimeOut = 30 * time.Second
-
-// postHandler defines the handler after patching cluster status.
-type postHandler func(cluster *appsv1alpha1.Cluster) error
-
-// phaseSyncLevel defines a phase synchronization level to notify the status synchronizer how to handle cluster phase.
-type phaseSyncLevel int
-
-type clusterStatusSynchronizer struct {
-	clusterPhaseFactor        phaseSyncLevel
-	existsAbnormalOrFailed    bool
-	notReadyCompNames         map[string]struct{}
-	replicasNotReadyCompNames map[string]struct{}
-	postHandlers              []postHandler
-}
-
-const (
-	clusterPhaseNoChange         phaseSyncLevel = iota
-	clusterIsRunning                            // cluster is running
-	clusterIsStopped                            // cluster is stopped
-	clusterExistFailedOrAbnormal                // cluster exists failed or abnormal component
-)
-
-func newClusterStatusSynchronizer() clusterStatusSynchronizer {
-	return clusterStatusSynchronizer{
-		notReadyCompNames:         map[string]struct{}{},
-		replicasNotReadyCompNames: map[string]struct{}{},
-		postHandlers:              []postHandler{},
-		clusterPhaseFactor:        clusterPhaseNoChange,
-	}
-}
-
-// syncStatus syncs the cluster phase and conditions according to components status.
-func (r *clusterStatusSynchronizer) syncStatus(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	recorder record.EventRecorder,
-	cluster *appsv1alpha1.Cluster,
-	clusterDef *appsv1alpha1.ClusterDefinition) error {
-	clusterDeepCopy := cluster.DeepCopy()
-	// removes the invalid component of status.components which is deleted from spec.components.
-	r.removeInvalidCompStatus(cluster)
-
-	// do analysis of Cluster.Status.component and update the results to status synchronizer.
-	r.doAnalysisAndUpdateSynchronizer(cluster)
-
-	// sync the LatestOpsRequestProcessed condition.
-	r.syncOpsRequestProcessedCondition(cluster, recorder)
-
-	// handle the ready condition.
-	r.syncReadyConditionForCluster(cluster, recorder)
-
-	// sync the cluster phase.
-	switch r.clusterPhaseFactor {
-	case clusterIsRunning:
-		if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
-			r.syncClusterPhaseToRunning(reqCtx.Ctx, cli, recorder, cluster)
-		}
-	case clusterIsStopped:
-		if cluster.Status.Phase != appsv1alpha1.StoppedClusterPhase {
-			r.syncClusterPhaseToStopped(reqCtx.Ctx, cli, recorder, cluster)
-		}
-	case clusterExistFailedOrAbnormal:
-		r.handleExistAbnormalOrFailed(reqCtx.Ctx, cli, recorder, cluster, clusterDef)
-	}
-	// if no changes, return.
-	if reflect.DeepEqual(clusterDeepCopy.Status, cluster.Status) {
-		return nil
-	}
-	if err := cli.Status().Patch(reqCtx.Ctx, cluster, client.MergeFrom(clusterDeepCopy)); err != nil {
-		return err
-	}
-	// execute the post handlers after pathing cluster status.
-	for _, handler := range r.postHandlers {
-		if err := handler(cluster); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// removeInvalidCompStatus removes the invalid component of status.components which is deleted from spec.components.
-func (r *clusterStatusSynchronizer) removeInvalidCompStatus(cluster *appsv1alpha1.Cluster) {
-	// remove the invalid component in status.components when the component is deleted from spec.components.
-	tmpCompsStatus := map[string]appsv1alpha1.ClusterComponentStatus{}
-	compsStatus := cluster.Status.Components
-	for _, v := range cluster.Spec.ComponentSpecs {
-		if compStatus, ok := compsStatus[v.Name]; ok {
-			tmpCompsStatus[v.Name] = compStatus
-		}
-	}
-	// keep valid components' status
-	cluster.Status.Components = tmpCompsStatus
-}
-
-// doAnalysisAndUpdateSynchronizer analyses the Cluster.Status.Components and updates the results to the synchronizer.
-func (r *clusterStatusSynchronizer) doAnalysisAndUpdateSynchronizer(cluster *appsv1alpha1.Cluster) {
-	var (
-		runningCompCount int
-		stoppedCompCount int
-	)
-	// analysis the status of components and calculate the cluster phase.
-	for k, v := range cluster.Status.Components {
-		if v.PodsReady == nil || !*v.PodsReady {
-			r.replicasNotReadyCompNames[k] = struct{}{}
-			r.notReadyCompNames[k] = struct{}{}
-		}
-		switch v.Phase {
-		case appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.FailedClusterCompPhase:
-			r.existsAbnormalOrFailed, r.notReadyCompNames[k] = true, struct{}{}
-		case appsv1alpha1.RunningClusterCompPhase:
-			runningCompCount += 1
-		case appsv1alpha1.StoppedClusterCompPhase:
-			stoppedCompCount += 1
-		}
-	}
-	if r.existsAbnormalOrFailed {
-		r.clusterPhaseFactor = clusterExistFailedOrAbnormal
-		return
-	}
-	switch len(cluster.Status.Components) {
-	case runningCompCount:
-		r.clusterPhaseFactor = clusterIsRunning
-	case stoppedCompCount:
-		// cluster is Stopped when cluster is not Running and all components are Stopped or Running
-		r.clusterPhaseFactor = clusterIsStopped
-	}
-}
-
-// handleOpsRequestProcessedCondition syncs the condition that OpsRequest has been processed.
-func (r *clusterStatusSynchronizer) syncOpsRequestProcessedCondition(cluster *appsv1alpha1.Cluster,
-	recorder record.EventRecorder) {
-	opsCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
-	if opsCondition == nil || opsCondition.Status == metav1.ConditionTrue {
-		return
-	}
-	opsRecords, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	if len(opsRecords) != 0 {
-		return
-	}
-	processedCondition := newOpsRequestProcessedCondition(opsCondition.Message)
-	oldCondition := meta.FindStatusCondition(cluster.Status.Conditions, processedCondition.Type)
-	if !conditionIsChanged(oldCondition, processedCondition) {
-		return
-	}
-	meta.SetStatusCondition(&cluster.Status.Conditions, processedCondition)
-	postFunc := func(cluster *appsv1alpha1.Cluster) error {
-		// send an event when all pods of the components are ready.
-		recorder.Event(cluster, corev1.EventTypeNormal, processedCondition.Reason, processedCondition.Message)
-		return nil
-	}
-	r.postHandlers = append(r.postHandlers, postFunc)
-}
-
-// syncReadyConditionForCluster syncs the cluster conditions with ClusterReady and ReplicasReady type.
-func (r *clusterStatusSynchronizer) syncReadyConditionForCluster(cluster *appsv1alpha1.Cluster,
-	recorder record.EventRecorder) {
-	if len(r.replicasNotReadyCompNames) == 0 {
-		oldReplicasReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeReplicasReady)
-		// if all replicas of cluster are ready, set ReasonAllReplicasReady to status.conditions
-		readyCondition := newAllReplicasPodsReadyConditions()
-		meta.SetStatusCondition(&cluster.Status.Conditions, readyCondition)
-		if oldReplicasReadyCondition == nil || oldReplicasReadyCondition.Status == metav1.ConditionFalse {
-			postFunc := func(cluster *appsv1alpha1.Cluster) error {
-				// send an event when all pods of the components are ready.
-				recorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
-				return nil
-			}
-			r.postHandlers = append(r.postHandlers, postFunc)
-		}
-	} else {
-		meta.SetStatusCondition(&cluster.Status.Conditions, newReplicasNotReadyCondition(r.replicasNotReadyCompNames))
-	}
-
-	if len(r.notReadyCompNames) > 0 {
-		meta.SetStatusCondition(&cluster.Status.Conditions, newComponentsNotReadyCondition(r.notReadyCompNames))
-	}
-}
-
-// syncClusterPhaseToRunning syncs the cluster phase to Running.
-func (r *clusterStatusSynchronizer) syncClusterPhaseToRunning(
-	ctx context.Context,
-	cli client.Client,
-	recorder record.EventRecorder,
-	cluster *appsv1alpha1.Cluster) {
-	cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
-	meta.SetStatusCondition(&cluster.Status.Conditions, newClusterReadyCondition(cluster.Name))
-	postFunc := func(currCluster *appsv1alpha1.Cluster) error {
-		message := fmt.Sprintf("Cluster: %s is ready, current phase is Running", cluster.Name)
-		recorder.Event(currCluster, corev1.EventTypeNormal, string(appsv1alpha1.RunningClusterPhase), message)
-		return opsutil.MarkRunningOpsRequestAnnotation(ctx, cli, currCluster)
-	}
-	r.postHandlers = append(r.postHandlers, postFunc)
-}
-
-// syncClusterToStopped syncs the cluster phase to Stopped.
-func (r *clusterStatusSynchronizer) syncClusterPhaseToStopped(
-	ctx context.Context,
-	cli client.Client,
-	recorder record.EventRecorder,
-	cluster *appsv1alpha1.Cluster) {
-	cluster.Status.Phase = appsv1alpha1.StoppedClusterPhase
-	postFunc := func(currCluster *appsv1alpha1.Cluster) error {
-		message := fmt.Sprintf("Cluster: %s stopped successfully.", cluster.Name)
-		recorder.Event(currCluster, corev1.EventTypeNormal, string(cluster.Status.Phase), message)
-		return opsutil.MarkRunningOpsRequestAnnotation(ctx, cli, currCluster)
-	}
-	r.postHandlers = append(r.postHandlers, postFunc)
-}
-
-// handleExistAbnormalOrFailed handles the cluster status when some components are not ready.
-func (r *clusterStatusSynchronizer) handleExistAbnormalOrFailed(
-	ctx context.Context,
-	cli client.Client,
-	recorder record.EventRecorder,
-	cluster *appsv1alpha1.Cluster,
-	clusterDef *appsv1alpha1.ClusterDefinition) {
-	oldPhase := cluster.Status.Phase
-	componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster,
-		clusterDef, "")
-	// handle the cluster status when some components are not ready.
-	handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
-	currPhase := cluster.Status.Phase
-	if slices.Contains(appsv1alpha1.GetClusterFailedPhases(), currPhase) && oldPhase != currPhase {
-		postFunc := func(currCluster *appsv1alpha1.Cluster) error {
-			message := fmt.Sprintf("Cluster: %s is %s, check according to the components message",
-				cluster.Name, currPhase)
-			recorder.Event(currCluster, corev1.EventTypeWarning, string(cluster.Status.Phase), message)
-			return opsutil.MarkRunningOpsRequestAnnotation(ctx, cli, currCluster)
-		}
-		r.postHandlers = append(r.postHandlers, postFunc)
-	}
-}
 
 // isTargetKindForEvent checks the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
@@ -637,18 +403,6 @@ func updateComponentStatusPhase(cli client.Client,
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.SetComponentStatus(componentName, c)
 	return cli.Status().Patch(ctx, cluster, patch)
-}
-
-// updateComponentPhaseWithOperation if workload of component changes, should update the component phase.
-func updateComponentPhaseWithOperation(cluster *appsv1alpha1.Cluster, componentName string) {
-	componentPhase := appsv1alpha1.SpecReconcilingClusterCompPhase
-	if cluster.Status.Phase == appsv1alpha1.CreatingClusterPhase {
-		componentPhase = appsv1alpha1.CreatingClusterCompPhase
-	}
-	compStatus := cluster.Status.Components[componentName]
-	// synchronous component phase is consistent with cluster phase
-	compStatus.Phase = componentPhase
-	cluster.Status.SetComponentStatus(componentName, compStatus)
 }
 
 // existsOperations checks if the cluster is doing operations

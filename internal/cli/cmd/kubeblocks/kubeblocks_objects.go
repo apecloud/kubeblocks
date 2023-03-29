@@ -112,6 +112,29 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 	getWebhooks(types.ValidatingWebhookConfigurationGVR())
 	getWebhooks(types.MutatingWebhookConfigurationGVR())
 
+	// get cluster roles and cluster role bindings by label
+	getRBACResources := func(labelSelector string, gvr schema.GroupVersionResource, global bool) {
+		ns := namespace
+		if global {
+			ns = metav1.NamespaceAll
+		}
+		objs, err := dynamic.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+		if err != nil {
+			appendErr(err)
+			return
+		}
+
+		if _, ok := kbObjs[gvr]; !ok {
+			kbObjs[gvr] = &unstructured.UnstructuredList{}
+		}
+		target := kbObjs[gvr]
+		target.Items = append(target.Items, objs.Items...)
+	}
+	getRBACResources(buildAddonLabelSelector(), types.ClusterRoleGVR(), true)
+	getRBACResources(buildAddonLabelSelector(), types.ClusterRoleBindingGVR(), true)
+
 	// get objects by label selector
 	getObjects := func(labelSelector string, gvr schema.GroupVersionResource) {
 		objs, err := dynamic.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{
@@ -156,6 +179,7 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 
 	// get configmap
 	getObjects(configMapLabelSelector, types.ConfigmapGVR())
+	getObjects(buildAddonLabelSelector(), types.ConfigmapGVR())
 
 	// get PVs by PVC
 	if pvcs, ok := kbObjs[types.PVCGVR()]; ok {

@@ -20,10 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -486,49 +484,4 @@ func (c *clusterPlanBuilder) deleteBackups(cluster *appsv1alpha1.Cluster) error 
 		}
 	}
 	return nil
-}
-
-// mergeAnnotations keeps the original annotations.
-// if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
-func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
-	if restartAnnotation, ok := originalAnnotations[constant.RestartAnnotationKey]; ok {
-		if targetAnnotations == nil {
-			targetAnnotations = map[string]string{}
-		}
-		targetAnnotations[constant.RestartAnnotationKey] = restartAnnotation
-	}
-	return targetAnnotations
-}
-
-// mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
-// if annotations exist and are replaced, the Service will be updated.
-func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
-	if len(originalAnnotations) == 0 {
-		return targetAnnotations
-	}
-	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
-	for k, v := range originalAnnotations {
-		if !strings.HasPrefix(k, "prometheus.io") {
-			tmpAnnotations[k] = v
-		}
-	}
-	maps.Copy(tmpAnnotations, targetAnnotations)
-	return tmpAnnotations
-}
-
-// updateComponentPhaseWithOperation if workload of component changes, should update the component phase.
-// REVIEW: this function need provide return value to determine mutation or not
-// Deprecated:
-func updateComponentPhaseWithOperation(cluster *appsv1alpha1.Cluster, componentName string) {
-	if len(componentName) == 0 {
-		return
-	}
-	componentPhase := appsv1alpha1.SpecReconcilingClusterCompPhase
-	if cluster.Status.Phase == appsv1alpha1.StartingClusterPhase {
-		componentPhase = appsv1alpha1.StartingClusterCompPhase
-	}
-	compStatus := cluster.Status.Components[componentName]
-	// synchronous component phase is consistent with cluster phase
-	compStatus.Phase = componentPhase
-	cluster.Status.SetComponentStatus(componentName, compStatus)
 }

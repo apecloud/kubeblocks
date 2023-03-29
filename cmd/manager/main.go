@@ -46,6 +46,9 @@ import (
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	"github.com/apecloud/kubeblocks/internal/constant"
 
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
+
 	// +kubebuilder:scaffold:imports
 
 	discoverycli "k8s.io/client-go/discovery"
@@ -76,6 +79,7 @@ func init() {
 	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -324,6 +328,17 @@ func main() {
 		}
 	}
 
+	if err = (&workloadscontrollers.ConsensusSetReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ConsensusSet")
+		os.Exit(1)
+	}
+	if err = (&workloadsv1alpha1.ConsensusSet{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ConsensusSet")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err = (&configuration.ReconfigureRequestReconciler{

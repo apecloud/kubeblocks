@@ -113,7 +113,6 @@ resources:
     crdVersion: v1
     namespaced: true
   domain: troubleshoot.sh
-  group:
   kind: HostPreflight
   path: github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2
   version: v1beta2
@@ -121,8 +120,20 @@ resources:
     crdVersion: v1
     namespaced: true
   domain: troubleshoot.sh
-  group:
   kind: Preflight
   path: github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2
   version: v1beta2
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: workloads
+  kind: ConsensusSet
+  path: github.com/apecloud/kubeblocks/apis/workloads/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
 version: "3"

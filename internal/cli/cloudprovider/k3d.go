@@ -18,6 +18,7 @@ package cloudprovider
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"io"
 	"net"
@@ -55,6 +56,9 @@ var (
 	// K3dProxyImage is k3d proxy image repo
 	K3dProxyImage = "docker.io/apecloud/k3d-proxy:" + version.K3dVersion
 )
+
+//go:embed assets/k3d-entrypoint-mount.sh
+var k3dMountEntrypoint []byte
 
 // localCloudProvider will handle the k3d playground cluster creation and management
 type localCloudProvider struct {
@@ -370,14 +374,13 @@ func setUpK3d(ctx context.Context, cluster *config.ClusterConfig) error {
 
 	// exec "mount --make-rshared /" to fix csi driver plugins crash
 	cluster.ClusterCreateOpts.NodeHooks = append(cluster.ClusterCreateOpts.NodeHooks, k3d.NodeHook{
-		Stage: k3d.LifecycleStagePostStart,
-		Action: actions.ExecAction{
-			Runtime: runtimes.SelectedRuntime,
-			Command: []string{
-				"sh", "-c", "mount --make-rshared /",
-			},
-			Retries:     0,
-			Description: "Inject 'mount --make-rshared /' for csi driver",
+		Stage: k3d.LifecycleStagePreStart,
+		Action: actions.WriteFileAction{
+			Runtime:     runtimes.SelectedRuntime,
+			Content:     k3dMountEntrypoint,
+			Dest:        "/bin/k3d-entrypoint-mount.sh",
+			Mode:        0744,
+			Description: "Write entrypoint script for mount shared fix",
 		},
 	})
 

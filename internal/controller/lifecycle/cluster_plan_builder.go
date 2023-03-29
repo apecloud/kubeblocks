@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -156,6 +155,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// make config configmap immutable
 		&configTransformer{},
 		// read old snapshot from cache, and generate diff plan
+		// TODO: move this into component
 		&objectActionTransformer{cli: roClient, ctx: c.ctx},
 		// handle TerminationPolicyType=DoNotTerminate
 		&doNotTerminateTransformer{},
@@ -173,7 +173,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	// we got the execution plan
 	plan := &clusterPlan{
 		dag:      dag,
-		walkFunc: c.defaultWalkFuncWithDebug,
+		walkFunc: c.defaultWalkFuncWithLogging,
 		cluster:  c.cluster,
 		conMgr:   c.conMgr,
 	}
@@ -229,13 +229,17 @@ func (c *clusterPlanBuilder) getClusterRefResources() (*clusterRefResources, err
 	return cc, nil
 }
 
-func (c *clusterPlanBuilder) defaultWalkFuncWithDebug(vertex graph.Vertex) error {
-	node, _ := vertex.(*lifecycleVertex)
+func (c *clusterPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) error {
+	node, ok := vertex.(*lifecycleVertex)
 	err := c.defaultWalkFunc(vertex)
 	if err != nil {
-		fmt.Printf("walking object %s error: %s\n", node, err.Error())
-	} else {
-		//fmt.Printf("walking object %s OK\n", node)
+		if !ok {
+			c.ctx.Log.Error(err, "")
+		} else if node.action == nil {
+			c.ctx.Log.Error(err, "%T", node)
+		} else {
+			c.ctx.Log.Error(err, "%s %T error", *node.action, node.obj)
+		}
 	}
 	return err
 }
@@ -249,52 +253,18 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		return errors.New("node action can't be nil")
 	}
 
-	updateComponentPhaseIfNeeded := func(orig, curr client.Object) {
-		switch orig.(type) {
-		case *appsv1.StatefulSet, *appsv1.Deployment:
-			componentName := orig.GetLabels()[constant.KBAppComponentLabelKey]
-			origSpec := reflect.ValueOf(orig).Elem().FieldByName("Spec").Interface()
-			newSpec := reflect.ValueOf(curr).Elem().FieldByName("Spec").Interface()
-			if !reflect.DeepEqual(origSpec, newSpec) {
-				// sync component phase
-				updateComponentPhaseWithOperation(c.cluster, componentName)
-			}
-		}
-	}
-
 	// cluster object has more business to do, handle them here
 	if _, ok := node.obj.(*appsv1alpha1.Cluster); ok {
-		cluster := node.obj.(*appsv1alpha1.Cluster).DeepCopy()
-		origCluster := node.oriObj.(*appsv1alpha1.Cluster)
-		switch *node.action {
-		// cluster.meta and cluster.spec might change
-		case CREATE, UPDATE, STATUS:
-			if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
-				!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
-				// TODO: we should Update instead of Patch cluster object,
-				// TODO: but Update failure happens too frequently as other controllers are updating cluster object too.
-				// TODO: use Patch here, revert to Update after refactoring done
-				// if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
-				//	tmpCluster := &appsv1alpha1.Cluster{}
-				//	err = c.cli.Get(c.ctx.Ctx,client.ObjectKeyFromObject(origCluster), tmpCluster)
-				//	c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v, api-server: %v", origCluster, origCluster, cluster, tmpCluster))
-				//	return err
-				// }
-				patch := client.MergeFrom(origCluster.DeepCopy())
-				if err := c.cli.Patch(c.ctx.Ctx, cluster, patch); err != nil {
-					c.ctx.Log.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
-					return err
-				}
-			}
-		case DELETE:
-			if err := c.handleClusterDeletion(cluster); err != nil {
-				return err
-			}
-			if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {
-				return nil
-			}
+		if done, err := c.reconcileCluster(node); err != nil {
+			return err
+		} else if done {
+			return nil
 		}
 	}
+	return c.reconcileObject(node)
+}
+
+func (c *clusterPlanBuilder) reconcileObject(node *lifecycleVertex) error {
 	switch *node.action {
 	case CREATE:
 		err := c.cli.Create(c.ctx.Ctx, node.obj)
@@ -307,16 +277,12 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		}
 		err := c.cli.Update(c.ctx.Ctx, node.obj)
 		if err != nil && !apierrors.IsNotFound(err) {
-			c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", node.obj, node.oriObj, node.obj))
 			return err
 		}
-		// TODO: find a better comparison way that knows whether fields are updated before calling the Update func
-		updateComponentPhaseIfNeeded(node.oriObj, node.obj)
 	case DELETE:
 		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
 			err := c.cli.Update(c.ctx.Ctx, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
-				c.ctx.Log.Error(err, fmt.Sprintf("delete %T error, orig: %v, curr: %v", node.obj, node.oriObj, node.obj))
 				return err
 			}
 		}
@@ -331,6 +297,39 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		return c.cli.Status().Patch(c.ctx.Ctx, node.obj, patch)
 	}
 	return nil
+}
+
+func (c *clusterPlanBuilder) reconcileCluster(node *lifecycleVertex) (bool, error) {
+	cluster := node.obj.(*appsv1alpha1.Cluster).DeepCopy()
+	origCluster := node.oriObj.(*appsv1alpha1.Cluster)
+	switch *node.action {
+	// cluster.meta and cluster.spec might change
+	case CREATE, UPDATE, STATUS:
+		if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
+			!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
+			// TODO: we should Update instead of Patch cluster object,
+			// TODO: but Update failure happens too frequently as other controllers are updating cluster object too.
+			// TODO: use Patch here, revert to Update after refactoring done
+			// if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
+			//	tmpCluster := &appsv1alpha1.Cluster{}
+			//	err = c.cli.Get(c.ctx.Ctx,client.ObjectKeyFromObject(origCluster), tmpCluster)
+			//	c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v, api-server: %v", origCluster, origCluster, cluster, tmpCluster))
+			//	return err
+			// }
+			patch := client.MergeFrom(origCluster.DeepCopy())
+			if err := c.cli.Patch(c.ctx.Ctx, cluster, patch); err != nil {
+				return false, err
+			}
+		}
+	case DELETE:
+		if err := c.handleClusterDeletion(cluster); err != nil {
+			return false, err
+		}
+		if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster) error {

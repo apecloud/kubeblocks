@@ -105,7 +105,7 @@ func (c *statefulComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *statefulComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
-	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name); err != nil {
+	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels()); err != nil {
 		return false, err
 	} else {
 		return len(stsList) > 0, nil // component.replica can not be zero
@@ -229,11 +229,11 @@ func (c *statefulComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if err != nil {
 		return err
 	}
-	return c.restartWorkload(&sts.Spec.Template)
+	return restartPod(&sts.Spec.Template)
 }
 
 func (c *statefulComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.StatefulSet, error) {
-	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name)
+	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
@@ -412,9 +412,7 @@ func (c *statefulComponent) updateUnderlyingResources(reqCtx intctrlutil.Request
 		return err
 	}
 
-	if err := c.updateStatefulSetWorkload(stsObj, 0); err != nil {
-		return err
-	}
+	c.updateStatefulSetWorkload(stsObj, 0)
 
 	if err := c.updateService(reqCtx, cli); err != nil {
 		return err

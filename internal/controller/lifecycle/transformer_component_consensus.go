@@ -135,7 +135,7 @@ func (c *consensusComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *consensusComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
-	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name); err != nil {
+	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels()); err != nil {
 		return false, err
 	} else {
 		return len(stsList) > 0, nil // component.replica can not be zero
@@ -181,6 +181,8 @@ func (c *consensusComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	}
 
 	return c.updateUnderlyingResources(reqCtx, cli)
+
+	// TODO: resolve all vertexes action here, so we can avoid to determine object action globally and prohibit from some tricky workaround.
 }
 
 func (c *consensusComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -258,11 +260,11 @@ func (c *consensusComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.C
 	if err != nil {
 		return err
 	}
-	return c.restartWorkload(&sts.Spec.Template)
+	return restartPod(&sts.Spec.Template)
 }
 
 func (c *consensusComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.StatefulSet, error) {
-	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.Cluster.Namespace, c.Cluster.Name, c.Component.Name)
+	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
@@ -441,9 +443,7 @@ func (c *consensusComponent) updateUnderlyingResources(reqCtx intctrlutil.Reques
 		return err
 	}
 
-	if err := c.updateStatefulSetWorkload(stsObj, 0); err != nil {
-		return err
-	}
+	c.updateStatefulSetWorkload(stsObj, 0)
 
 	if err := c.updateService(reqCtx, cli); err != nil {
 		return err

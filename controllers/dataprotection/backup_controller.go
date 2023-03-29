@@ -31,6 +31,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -179,12 +180,15 @@ func (r *BackupReconciler) doNewPhaseAction(
 	default:
 		commonPolicy := backupPolicy.Spec.GetCommonPolicy(backup.Spec.BackupType)
 		if commonPolicy == nil {
-			return r.updateStatusIfFailed(reqCtx, backup, fmt.Errorf("backup type %s not supported", backup.Spec.BackupType))
+			return r.updateStatusIfFailed(reqCtx, backup, intctrlutil.NewNotFound(`backup type "%s" not supported in the backupPolicy "%s"`, backup.Spec.BackupType, backupPolicy.Name))
 		}
 		// save the backup message for restore
-		backup.Status.RemoteVolume = &commonPolicy.RemoteVolume
+		backup.Status.PersistentVolumeClaimName = commonPolicy.PersistentVolumeClaim.Name
 		backup.Status.BackupToolName = commonPolicy.BackupToolName
 		targetCluster = commonPolicy.Target
+		if err = r.handlePersistentVolumeClaim(reqCtx, backupPolicy.Name, commonPolicy); err != nil {
+			return r.updateStatusIfFailed(reqCtx, backup, err)
+		}
 	}
 
 	target, err := r.getTargetPod(reqCtx, backup, targetCluster.LabelsSelector.MatchLabels)
@@ -210,6 +214,51 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+// handlePersistentVolumeClaim handles the persistent volume claim for the backup, the rules are as follows
+// - if CreatePolicy is "Never", it will check if the pvc exists. if not exist, will report an error.
+// - if CreatePolicy is "IfNotPresent", if the pvc not exists, will create the pvc automatically.
+func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.RequestCtx,
+	backupPolicyName string,
+	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) error {
+	pvc := &corev1.PersistentVolumeClaim{}
+	pvcConfig := commonPolicy.PersistentVolumeClaim
+	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace,
+		Name: pvcConfig.Name}, pvc); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if len(pvc.Name) > 0 {
+		return nil
+	}
+	if pvcConfig.CreatePolicy == dataprotectionv1alpha1.CreatePVCPolicyNever {
+		return intctrlutil.NewNotFound(`persistent volume claim "%s" not found`, pvcConfig.Name)
+	}
+	pvc = &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pvcConfig.Name,
+			Namespace: reqCtx.Req.Namespace,
+			Annotations: map[string]string{
+				dataProtectionAnnotationCreateByPolicyKey: "true",
+				dataProtectionLabelBackupPolicyKey:        backupPolicyName,
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			StorageClassName: pvcConfig.StorageClassName,
+			Resources: corev1.ResourceRequirements{
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceStorage: pvcConfig.InitCapacity,
+				},
+			},
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteMany,
+			},
+		},
+	}
+	// add a finalizer
+	controllerutil.AddFinalizer(pvc, dataProtectionFinalizerName)
+	err := r.Client.Create(reqCtx.Ctx, pvc)
+	return client.IgnoreAlreadyExists(err)
 }
 
 func (r *BackupReconciler) doInProgressPhaseAction(
@@ -877,8 +926,15 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	remoteBackupPath := "/backupdata"
 
 	// TODO(dsj): mount multi remote backup volumes
-	remoteVolumeName := fmt.Sprintf("backup-%s", commonPolicy.RemoteVolume.Name)
-	commonPolicy.RemoteVolume.Name = remoteVolumeName
+	remoteVolumeName := fmt.Sprintf("backup-%s", commonPolicy.PersistentVolumeClaim.Name)
+	remoteVolume := corev1.Volume{
+		Name: remoteVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: commonPolicy.PersistentVolumeClaim.Name,
+			},
+		},
+	}
 	remoteVolumeMount := corev1.VolumeMount{
 		Name:      remoteVolumeName,
 		MountPath: remoteBackupPath,
@@ -944,7 +1000,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	podSpec.Containers = []corev1.Container{container}
 
 	podSpec.Volumes = clusterPod.Spec.Volumes
-	podSpec.Volumes = append(podSpec.Volumes, commonPolicy.RemoteVolume)
+	podSpec.Volumes = append(podSpec.Volumes, remoteVolume)
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 
 	// the pod of job needs to be scheduled on the same node as the workload pod, because it needs to share one pvc

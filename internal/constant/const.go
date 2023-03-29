@@ -24,6 +24,10 @@ const (
 	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
 	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
 	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS" // accept time
+	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"            // the global pvc name which persistent volume claim to store the backup data
+	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"   // the init capacity of pvc for creating the pvc, e.g. 10Gi.
+	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"   // the pvc storage class name.
+	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"   // the pvc create policy. support "IfNotPresent" or "Never"
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
@@ -208,3 +212,5 @@ const (
 	AccountNameForSecret   = "username"
 	AccountPasswdForSecret = "password"
 )
+
+const DefaultBackupPvcInitCapacity = "100Gi"

@@ -30,7 +30,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/backupconfig"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
@@ -95,7 +94,6 @@ A Command Line Interface for KubeBlocks`,
 		bench.NewBenchCmd(),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
-		backupconfig.NewBackupConfigCmd(f, ioStreams),
 		dashboard.NewDashboardCmd(f, ioStreams),
 		clusterversion.NewClusterVersionCmd(f, ioStreams),
 		clusterdefinition.NewClusterDefinitionCmd(f, ioStreams),

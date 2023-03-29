@@ -38,6 +38,8 @@ secret:
   # S3 Secret Key
   secretKey: ""
   # Endpoint
+  # For AWS set it to "https://s3.<region>.amazonaws.com", for example https://s3.eu-central-1.amazonaws.com
+  # In China set it to "https://s3.<region>.amazonaws.com.cn", for example https://s3.cn-north-1.amazonaws.com.cn
   endpoint: https://storage.yandexcloud.net
 
 tolerations:
@@ -58,3 +60,8 @@ affinity:
               operator: In
               values:
                 - "true"
+            - key: kubernetes.io/arch
+              operator: In
+              values:
+                - "amd64"
+

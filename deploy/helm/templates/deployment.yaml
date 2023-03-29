@@ -123,6 +123,8 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
+          - mountPath: /etc/kubeblocks
+            name: manager-config
           {{- if .Values.admissionWebhooks.enabled }}
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
@@ -154,7 +156,7 @@ spec:
       volumes:
         - name: manager-config
           configMap:
-            name: manager-config
+            name: {{ include "kubeblocks.fullname" . }}-manager-config
         {{- if .Values.admissionWebhooks.enabled }}
         - name: cert
           secret:

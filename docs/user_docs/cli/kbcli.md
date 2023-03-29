@@ -56,7 +56,6 @@ kbcli [flags]
 
 * [kbcli addon](kbcli_addon.md)	 - Addon command.
 * [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
-* [kbcli backup-config](kbcli_backup-config.md)	 - KubeBlocks backup config.
 * [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
 * [kbcli class](kbcli_class.md)	 - Manage classes
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command.

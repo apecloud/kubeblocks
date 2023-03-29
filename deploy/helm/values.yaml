@@ -246,6 +246,10 @@ dataProtection:
   ## @param dataProtection.enableVolumeSnapshot - set this to true if cluster does have snapshot.storage.k8s.io API installed
   ##
   enableVolumeSnapshot: false
+  backupPVCName: ""
+  backupPVCInitCapacity: ""
+  backupPVCStorageClassName: ""
+  backupPVCCreatePolicy: ""
 
 ## Addon controller settings, this will require cluster-admin clusterrole.
 addonController:

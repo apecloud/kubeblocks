@@ -1633,8 +1633,8 @@ var _ = Describe("Cluster Controller", func() {
 			// })).Should(Succeed())
 
 			By("test when clusterVersion not Available")
-			_ = testapps.CreateConsensusMysqlClusterDef(testCtx, clusterDefName, consensusCompType)
-			clusterVersion := testapps.CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName, consensusCompType)
+			_ = testapps.CreateConsensusMysqlClusterDef(testCtx, clusterDefNameRand, consensusCompType)
+			clusterVersion := testapps.CreateConsensusMysqlClusterVersion(testCtx, clusterDefNameRand, clusterVersionNameRand, consensusCompType)
 			clusterVersionKey := client.ObjectKeyFromObject(clusterVersion)
 			// mock clusterVersion unavailable
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterVersionKey, func(clusterVersion *appsv1alpha1.ClusterVersion) {

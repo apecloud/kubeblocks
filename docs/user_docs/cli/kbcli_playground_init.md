@@ -17,10 +17,10 @@ kbcli playground init [flags]
   # create an AWS EKS cluster and install KubeBlocks, the region is required
   kbcli playground init --cloud-provider aws --region cn-northwest-1
   
-  # create an alibaba cloud ACK cluster and install KubeBlocks, the region is required
+  # create an Alibaba cloud ACK cluster and install KubeBlocks, the region is required
   kbcli playground init --cloud-provider alicloud --region cn-hangzhou
   
-  # create a tencent cloud TKE cluster and install KubeBlocks, the region is required
+  # create a Tencent cloud TKE cluster and install KubeBlocks, the region is required
   kbcli playground init --cloud-provider tencentcloud --region ap-chengdu
   
   # create a Google cloud GKE cluster and install KubeBlocks, the region is required

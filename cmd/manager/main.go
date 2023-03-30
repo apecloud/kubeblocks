@@ -338,12 +338,9 @@ func main() {
 	if err = (&workloadscontrollers.ConsensusSetReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("consensus-set-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ConsensusSet")
-		os.Exit(1)
-	}
-	if err = (&workloadsv1alpha1.ConsensusSet{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ConsensusSet")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
@@ -441,6 +438,11 @@ func main() {
 
 		if err = (&appsv1alpha1.OpsRequest{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "OpsRequest")
+			os.Exit(1)
+		}
+
+		if err = (&workloadsv1alpha1.ConsensusSet{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ConsensusSet")
 			os.Exit(1)
 		}
 

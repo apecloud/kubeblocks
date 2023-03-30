@@ -19,18 +19,27 @@ package workloads
 import (
 	"context"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ConsensusSetReconciler reconciles a ConsensusSet object
 type ConsensusSetReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=consensussets,verbs=get;list;watch;create;update;patch;delete
@@ -47,16 +56,34 @@ type ConsensusSetReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithName("ConsensusSet")
 
-	// TODO(user): your logic here
+	requeueError := func(err error) (ctrl.Result, error) {
+		if re, ok := err.(model.RequeueError); ok {
+			return intctrlutil.RequeueAfter(re.RequeueAfter(), logger, re.Reason())
+		}
+		return intctrlutil.CheckedRequeueWithError(err, logger, "")
+	}
 
-	return ctrl.Result{}, nil
+	planBuilder := consensusset.NewPlanBuilder(ctx, r.Client, req, logger, r.Recorder)
+	if err := planBuilder.Init(); err != nil {
+		return requeueError(err)
+	} else if err := planBuilder.Validate(); err != nil {
+		return requeueError(err)
+	} else if plan, err := planBuilder.Build(); err != nil {
+		return requeueError(err)
+	} else if err = plan.Execute(); err != nil {
+		return requeueError(err)
+	}
+
+	return intctrlutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ConsensusSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&workloadsv1alpha1.ConsensusSet{}).
+		For(&workloads.ConsensusSet{}).
+		Owns(&appsv1.StatefulSet{}).
+		Watches(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{OwnerType: &workloads.ConsensusSet{}, IsController: false}).
 		Complete(r)
 }

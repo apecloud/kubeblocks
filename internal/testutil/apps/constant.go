@@ -180,6 +180,9 @@ var (
 			Protocol: corev1.ProtocolTCP,
 			Port:     3306,
 		}},
+		Selector: map[string]string{
+			constant.RoleLabelKey: "mock_role",
+		},
 	}
 
 	consensusMySQLComponent = appsv1alpha1.ClusterComponentDefinition{

@@ -207,6 +207,7 @@ var _ = Describe("Cluster Controller", func() {
 	type ExpectService struct {
 		headless bool
 		svcType  corev1.ServiceType
+		selector map[string]string
 	}
 
 	getHeadlessSvcPorts := func(g Gomega, compDefName string) []corev1.ServicePort {
@@ -227,6 +228,27 @@ var _ = Describe("Cluster Controller", func() {
 		return headlessSvcPorts
 	}
 
+	getExpectSelector := func(expectService ExpectService, compName string, compType string) map[string]string {
+		compDef := clusterDefObj.GetComponentDefByName(compType)
+		expectSelector := map[string]string{
+			"app.kubernetes.io/instance":        clusterObj.GetName(),
+			"app.kubernetes.io/managed-by":      "kubeblocks",
+			"apps.kubeblocks.io/component-name": compName,
+		}
+		if len(expectService.selector) > 0 {
+			for k, v := range expectService.selector {
+				expectSelector[k] = v
+			}
+		} else {
+			if compDef.Service != nil && compDef.Service.Selector != nil {
+				for k, v := range compDef.Service.Selector {
+					expectSelector[k] = v
+				}
+			}
+		}
+		return expectSelector
+	}
+
 	validateCompSvcList := func(g Gomega, compName string, compType string, expectServices map[string]ExpectService) {
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -236,19 +258,22 @@ var _ = Describe("Cluster Controller", func() {
 			constant.KBAppComponentLabelKey: compName,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 
-		for svcName, svcSpec := range expectServices {
+		for name, expSvc := range expectServices {
 			idx := slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
-				return strings.HasSuffix(e.Name, svcName)
+				return strings.HasSuffix(e.Name, name)
 			})
 			g.Expect(idx >= 0).To(BeTrue())
 			svc := svcList.Items[idx]
-			g.Expect(svc.Spec.Type).Should(Equal(svcSpec.svcType))
+			g.Expect(svc.Spec.Type).Should(Equal(expSvc.svcType))
+			expSelector := getExpectSelector(expSvc, compName, compType)
 			switch {
 			case svc.Spec.Type == corev1.ServiceTypeLoadBalancer:
 				g.Expect(svc.Spec.ExternalTrafficPolicy).Should(Equal(corev1.ServiceExternalTrafficPolicyTypeLocal))
-			case svc.Spec.Type == corev1.ServiceTypeClusterIP && !svcSpec.headless:
+				g.Expect(reflect.DeepEqual(svc.Spec.Selector, expSelector)).Should(BeTrue())
+			case svc.Spec.Type == corev1.ServiceTypeClusterIP && !expSvc.headless:
 				g.Expect(svc.Spec.ClusterIP).ShouldNot(Equal(corev1.ClusterIPNone))
-			case svc.Spec.Type == corev1.ServiceTypeClusterIP && svcSpec.headless:
+				g.Expect(reflect.DeepEqual(svc.Spec.Selector, expSelector)).Should(BeTrue())
+			case svc.Spec.Type == corev1.ServiceTypeClusterIP && expSvc.headless:
 				g.Expect(svc.Spec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
 				g.Expect(reflect.DeepEqual(svc.Spec.Ports, getHeadlessSvcPorts(g, compType))).Should(BeTrue())
 			}
@@ -257,12 +282,22 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	testServiceAddAndDelete := func() {
+		customSelector := map[string]string{
+			"custom_selector_key": "custom_selector_value",
+		}
 		By("Creating a cluster with two LoadBalancer services")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
-			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
-			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
+			AddService(appsv1alpha1.ClusterComponentService{
+				Name:        testapps.ServiceVPCName,
+				ServiceType: corev1.ServiceTypeLoadBalancer,
+				Selector:    customSelector,
+			}).
+			AddService(appsv1alpha1.ClusterComponentService{
+				Name:        testapps.ServiceInternetName,
+				ServiceType: corev1.ServiceTypeLoadBalancer,
+			}).
 			WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -272,7 +307,7 @@ var _ = Describe("Cluster Controller", func() {
 		expectServices := map[string]ExpectService{
 			testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
 			testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
-			testapps.ServiceVPCName:      {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
+			testapps.ServiceVPCName:      {svcType: corev1.ServiceTypeLoadBalancer, headless: false, selector: customSelector},
 			testapps.ServiceInternetName: {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
 		}
 		Eventually(func(g Gomega) { validateCompSvcList(g, mysqlCompName, mysqlCompType, expectServices) }).Should(Succeed())

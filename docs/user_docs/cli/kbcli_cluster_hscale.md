@@ -12,13 +12,13 @@ kbcli cluster hscale [flags]
 
 ```
   # expand storage resources of specified components, separate with commas when <component-name> more than one
-  kbcli cluster hscale <my-cluster> --component-names=<component-name> --replicas=3
+  kbcli cluster hscale <my-cluster> --components=<component-name> --replicas=3
 ```
 
 ### Options
 
 ```
-      --component-names strings       Component names to this operations
+      --components strings            Component names to this operations
   -h, --help                         help for hscale
       --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --replicas int                 Replicas with the specified components

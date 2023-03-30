@@ -21,6 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -80,6 +81,14 @@ const (
 	KindRestoreJob                   = "RestoreJob"
 	KindBackupPolicyTemplate         = "BackupPolicyTemplate"
 	KindOps                          = "OpsRequest"
+)
+
+// K8S rbac API group
+const (
+	RBACAPIGroup        = rbacv1.GroupName
+	RBACAPIVersion      = "v1"
+	ClusterRoles        = "clusterroles"
+	ClusterRoleBindings = "clusterrolebindings"
 )
 
 // Annotations
@@ -267,4 +276,11 @@ func MutatingWebhookConfigurationGVR() schema.GroupVersionResource {
 		Version:  K8sWebhookAPIVersion,
 		Resource: ResourceMutatingWebhookConfigurations,
 	}
+}
+
+func ClusterRoleGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: ClusterRoles}
+}
+func ClusterRoleBindingGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: ClusterRoleBindings}
 }

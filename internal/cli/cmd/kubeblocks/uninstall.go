@@ -143,6 +143,8 @@ func (o *uninstallOptions) preCheck() error {
 	kbNamespace, err := util.GetKubeBlocksNamespace(o.Client)
 	if err != nil {
 		printer.Warning(o.Out, "failed to locate KubeBlocks meta, will clean up all KubeBlocks resources.\n")
+		fmt.Fprintf(o.Out, "to find out the namespace where KubeBlocks is installed, please use:\n\t'kbcli kubeblocks status'\n")
+		fmt.Fprintf(o.Out, "to uninstall KubeBlocks completely, please use:\n\t`kbcli kubeblocks uninstall -n <namespace>`\n")
 	} else if o.Namespace != kbNamespace {
 		o.Namespace = kbNamespace
 		fmt.Fprintf(o.Out, "Uninstall KubeBlocks in namespace \"%s\"\n", kbNamespace)

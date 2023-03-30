@@ -57,6 +57,8 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			Message: "Cluster Operation Commands:",
 			Commands: []*cobra.Command{
 				NewUpdateCmd(f, streams),
+				NewStopCmd(f, streams),
+				NewStartCmd(f, streams),
 				NewRestartCmd(f, streams),
 				NewUpgradeCmd(f, streams),
 				NewVolumeExpansionCmd(f, streams),
@@ -70,8 +72,6 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewDescribeReconfigureCmd(f, streams),
 				NewExplainReconfigureCmd(f, streams),
 				NewDiffConfigureCmd(f, streams),
-				NewStopCmd(f, streams),
-				NewStartCmd(f, streams),
 			},
 		},
 		{

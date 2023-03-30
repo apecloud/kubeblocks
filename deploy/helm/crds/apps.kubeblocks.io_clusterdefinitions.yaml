@@ -113,7 +113,7 @@ spec:
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           volumeName:
-                            description: VolumeName is the volume name of PodTemplate,
+                            description: volumeName is the volume name of PodTemplate,
                               which the configuration file produced through the configuration
                               template will be mounted to the corresponding volume.
                               The volume name must be defined in podSpec.containers[*].volumeMounts.
@@ -133,12 +133,12 @@ spec:
                         workloadType is Consensus, required if workloadType is Consensus.
                       properties:
                         followers:
-                          description: Followers, has voting right but not Leader.
+                          description: followers, has voting right but not Leader.
                           items:
                             properties:
                               accessMode:
                                 default: ReadWrite
-                                description: AccessMode, what service this member
+                                description: accessMode, what service this member
                                   capable.
                                 enum:
                                 - None
@@ -147,11 +147,11 @@ spec:
                                 type: string
                               name:
                                 default: leader
-                                description: Name, role name.
+                                description: name, role name.
                                 type: string
                               replicas:
                                 default: 0
-                                description: Replicas, number of Pods of this role.
+                                description: replicas, number of Pods of this role.
                                   default 1 for Leader default 0 for Learner default
                                   Cluster.spec.componentSpec[*].Replicas - Leader.Replicas
                                   - Learner.Replicas for Followers
@@ -164,11 +164,11 @@ spec:
                             type: object
                           type: array
                         leader:
-                          description: Leader, one single leader.
+                          description: leader, one single leader.
                           properties:
                             accessMode:
                               default: ReadWrite
-                              description: AccessMode, what service this member capable.
+                              description: accessMode, what service this member capable.
                               enum:
                               - None
                               - Readonly
@@ -176,11 +176,11 @@ spec:
                               type: string
                             name:
                               default: leader
-                              description: Name, role name.
+                              description: name, role name.
                               type: string
                             replicas:
                               default: 0
-                              description: Replicas, number of Pods of this role.
+                              description: replicas, number of Pods of this role.
                                 default 1 for Leader default 0 for Learner default
                                 Cluster.spec.componentSpec[*].Replicas - Leader.Replicas
                                 - Learner.Replicas for Followers
@@ -192,11 +192,11 @@ spec:
                           - name
                           type: object
                         learner:
-                          description: Learner, no voting right.
+                          description: learner, no voting right.
                           properties:
                             accessMode:
                               default: ReadWrite
-                              description: AccessMode, what service this member capable.
+                              description: accessMode, what service this member capable.
                               enum:
                               - None
                               - Readonly
@@ -204,11 +204,11 @@ spec:
                               type: string
                             name:
                               default: leader
-                              description: Name, role name.
+                              description: name, role name.
                               type: string
                             replicas:
                               default: 0
-                              description: Replicas, number of Pods of this role.
+                              description: replicas, number of Pods of this role.
                                 default 1 for Leader default 0 for Learner default
                                 Cluster.spec.componentSpec[*].Replicas - Leader.Replicas
                                 - Learner.Replicas for Followers
@@ -221,7 +221,7 @@ spec:
                           type: object
                         updateStrategy:
                           default: Serial
-                          description: 'UpdateStrategy, Pods update strategy. serial:
+                          description: 'updateStrategy, Pods update strategy. serial:
                             update Pods one by one that guarantee minimum component
                             unavailable time. Learner -> Follower(with AccessMode=none)
                             -> Follower(with AccessMode=readonly) -> Follower(with
@@ -238,6 +238,47 @@ spec:
                       required:
                       - leader
                       type: object
+                    customLabelSpecs:
+                      description: customLabelSpecs is used for custom label tags
+                        which you want to add to the component resources.
+                      items:
+                        properties:
+                          key:
+                            description: key name of label
+                            type: string
+                          resources:
+                            description: resources defines the resources to be labeled.
+                            items:
+                              properties:
+                                gvk:
+                                  description: gvk is Group/Version/Kind, for example
+                                    "v1/Pod", "apps/v1/StatefulSet", etc. when the
+                                    gvk resource filtered by the selector already
+                                    exists, if there is no corresponding custom label,
+                                    it will be added, and if label already exists,
+                                    it will be updated.
+                                  type: string
+                                selector:
+                                  additionalProperties:
+                                    type: string
+                                  description: selector is a label query over a set
+                                    of resources.
+                                  type: object
+                              required:
+                              - gvk
+                              type: object
+                            type: array
+                          value:
+                            description: value of label
+                            type: string
+                        required:
+                        - key
+                        - value
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - key
+                      x-kubernetes-list-type: map
                     description:
                       description: The description of component definition.
                       type: string
@@ -248,12 +289,12 @@ spec:
                         backupTemplateSelector:
                           additionalProperties:
                             type: string
-                          description: BackupTemplateSelector defines the label selector
+                          description: backupTemplateSelector defines the label selector
                             for finding associated BackupTemplate API object.
                           type: object
                         type:
                           default: None
-                          description: 'Type controls what kind of data synchronization
+                          description: 'type controls what kind of data synchronization
                             do when component scale out. Policy is in enum of {None,
                             Snapshot}. The default policy is `None`. None: Default
                             policy, do nothing. Snapshot: Do native volume snapshot
@@ -269,7 +310,7 @@ spec:
                           - Snapshot
                           type: string
                         volumeMountsName:
-                          description: VolumeMountsName defines which volumeMount
+                          description: volumeMountsName defines which volumeMount
                             of the container to do backup, only work if Type is not
                             None if not specified, the 1st volumeMount will be chosen
                           type: string
@@ -327,12 +368,12 @@ spec:
                           properties:
                             scrapePath:
                               default: /metrics
-                              description: ScrapePath is exporter url path for Time
+                              description: scrapePath is exporter url path for Time
                                 Series Database to scrape metrics.
                               maxLength: 128
                               type: string
                             scrapePort:
-                              description: ScrapePort is exporter port for Time Series
+                              description: scrapePort is exporter port for Time Series
                                 Database to scrape metrics.
                               format: int32
                               maximum: 65535
@@ -343,7 +384,7 @@ spec:
                           type: object
                       type: object
                     name:
-                      description: Name of the component, it can be any valid string.
+                      description: name of the component, it can be any valid string.
                       maxLength: 18
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
@@ -8285,7 +8326,7 @@ spec:
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           volumeName:
-                            description: VolumeName is the volume name of PodTemplate,
+                            description: volumeName is the volume name of PodTemplate,
                               which the configuration file produced through the configuration
                               template will be mounted to the corresponding volume.
                               The volume name must be defined in podSpec.containers[*].volumeMounts.
@@ -8899,7 +8940,7 @@ spec:
                       - passwordConfig
                       type: object
                     volumeTypes:
-                      description: "VolumeTypes is used to describe the purpose of
+                      description: "volumeTypes is used to describe the purpose of
                         the volumes mapping the name of the VolumeMounts in the PodSpec.Container
                         field, such as data volume, log volume, etc. When backing
                         up the volume, the volume can be correctly backed up according
@@ -8912,14 +8953,14 @@ spec:
                       items:
                         properties:
                           name:
-                            description: Name definition is the same as the name of
+                            description: name definition is the same as the name of
                               the VolumeMounts field in PodSpec.Container, similar
                               to the relations of Volumes[*].name and VolumesMounts[*].name
                               in Pod.Spec.
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           type:
-                            description: 'Type is in enum of {data, log}. VolumeTypeData:
+                            description: 'type is in enum of {data, log}. VolumeTypeData:
                               the volume is for the persistent data storage. VolumeTypeLog:
                               the volume is for the persistent log storage.'
                             enum:

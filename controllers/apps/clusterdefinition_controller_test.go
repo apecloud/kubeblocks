@@ -59,7 +59,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
 
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)
 	}
 
 	BeforeEach(func() {

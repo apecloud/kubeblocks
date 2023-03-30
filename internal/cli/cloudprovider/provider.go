@@ -19,31 +19,84 @@ package cloudprovider
 import (
 	"fmt"
 	"io"
-
-	"github.com/pkg/errors"
+	"os"
+	"path/filepath"
 )
 
-type Interface interface {
-	// Name return the cloud provider name
-	Name() string
+type cloudProvider struct {
+	name   string
+	tfPath string
 
-	// CreateK8sCluster creates a kubernetes cluster
-	CreateK8sCluster(name string, init bool) error
-
-	// DeleteK8sCluster deletes a kubernetes cluster
-	DeleteK8sCluster(name string) error
-
-	// GetClusterInfo get cluster info
-	GetClusterInfo() (*K8sClusterInfo, error)
+	stdout io.Writer
+	stderr io.Writer
 }
 
-func New(provider, region, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {
-	switch provider {
-	case AWS:
-		return NewAWSCloudProvider(region, tfRootPath, stdout, stderr)
-	case Local:
-		return NewLocalCloudProvider(stdout, stderr), nil
-	default:
-		return nil, errors.New(fmt.Sprintf("Unknown cloud provider %s", provider))
+var _ Interface = &cloudProvider{}
+
+func NewCloudProvider(provider, rootPath string, stdout, stderr io.Writer) (Interface, error) {
+	k8sSvc := K8sService(provider)
+	if k8sSvc == "" {
+		return nil, fmt.Errorf("unknown cloud provider %s", provider)
 	}
+
+	tfPath := filepath.Join(rootPath, provider, k8sSvc)
+	if _, err := os.Stat(tfPath); err != nil {
+		return nil, err
+	}
+
+	return &cloudProvider{
+		name:   provider,
+		tfPath: tfPath,
+		stdout: stdout,
+		stderr: stderr,
+	}, nil
+}
+
+func (p *cloudProvider) Name() string {
+	return p.name
+}
+
+// CreateK8sCluster create a kubernetes cluster
+func (p *cloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo, init bool) error {
+	// init terraform
+	fmt.Fprintf(p.stdout, "Check and install terraform... \n")
+	if err := initTerraform(); err != nil {
+		return err
+	}
+
+	// create cluster
+	fmt.Fprintf(p.stdout, "\nInit and apply %s in %s\n", K8sService(p.name), p.tfPath)
+	return tfInitAndApply(p.tfPath, init, p.stdout, p.stderr, clusterInfo.buildApplyOpts()...)
+}
+
+func (p *cloudProvider) DeleteK8sCluster(clusterInfo *K8sClusterInfo) error {
+	var err error
+	if clusterInfo == nil {
+		clusterInfo, err = p.GetClusterInfo()
+		if err != nil {
+			return err
+		}
+	}
+	// init terraform
+	fmt.Fprintf(p.stdout, "Check and install terraform... \n")
+	if err = initTerraform(); err != nil {
+		return err
+	}
+
+	// destroy cluster
+	fmt.Fprintf(p.stdout, "\nDestroy %s cluster in %s\n", K8sService(p.name), p.tfPath)
+	return tfDestroy(p.tfPath, p.stdout, p.stderr, clusterInfo.buildDestroyOpts()...)
+}
+
+func (p *cloudProvider) GetClusterInfo() (*K8sClusterInfo, error) {
+	vals, err := getOutputValues(p.tfPath, clusterNameKey, regionKey, kubeConfigKey)
+	if err != nil {
+		return nil, err
+	}
+	return &K8sClusterInfo{
+		CloudProvider: p.Name(),
+		ClusterName:   vals[0],
+		Region:        vals[1],
+		KubeConfig:    vals[2],
+	}, nil
 }

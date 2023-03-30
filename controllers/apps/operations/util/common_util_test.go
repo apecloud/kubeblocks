@@ -67,7 +67,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			testapps.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("test PatchOpsRequestReconcileAnnotation function")
-			Expect(PatchOpsRequestReconcileAnnotation(ctx, k8sClient, cluster, testOpsName)).Should(Succeed())
+			Expect(PatchOpsRequestReconcileAnnotation(ctx, k8sClient, cluster.Namespace, testOpsName)).Should(Succeed())
 			opsRecordSlice := []appsv1alpha1.OpsRecorder{
 				{
 					Name:           testOpsName,

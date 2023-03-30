@@ -11,11 +11,8 @@ kbcli playground destroy [flags]
 ### Examples
 
 ```
-  # destroy local host playground cluster
+  # destroy playground cluster
   kbcli playground destroy
-  
-  # destroy the AWS EKS cluster, the region is required
-  kbcli playground destroy --cloud-provider aws --region cn-northwest-1
 ```
 
 ### Options

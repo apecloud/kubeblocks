@@ -472,7 +472,7 @@ var _ = Describe("builder", func() {
 				ManagerName:   "cfgmgr",
 				CharacterType: "mysql",
 				SecreteName:   "test-secret",
-				Image:         constant.KBImage,
+				Image:         constant.KBToolsImage,
 				Args:          []string{},
 				Envs:          []corev1.EnvVar{},
 				Volumes:       []corev1.VolumeMount{},

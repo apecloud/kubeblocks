@@ -6,7 +6,18 @@
         {{ break }}
     {{- end }}
 {{- end }}
-{{ $params := dict "parameters" $.arg0 }}
+
+## update json example:
+{
+    "postgresql":{
+        "parameters":{
+            "shared_buffers":"128MB",
+            "max_connections":"666"
+        }
+    }
+}
+
+{{- $params := dict "parameters" $.arg0 }}
 {{- $err := execSql ( dict "postgresql" $params | toJson ) "config" }}
 {{- if $err }}
     {{- failed $err }}

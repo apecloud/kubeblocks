@@ -28,8 +28,8 @@ port 26379
 sentinel resolve-hostnames yes
 sentinel announce-hostnames yes
 sentinel monitor {{ $sentinel_monitor }} 6379 2
-sentinel down-after-milliseconds {{ $clusterName }}-{{ $sentinel_component.name }} 60000
-sentinel failover-timeout {{ $clusterName }}-{{ $sentinel_component.name }} 180000
+sentinel down-after-milliseconds {{ $clusterName }}-{{ $sentinel_component.name }} 5000
+sentinel failover-timeout {{ $clusterName }}-{{ $sentinel_component.name }} 60000
 sentinel parallel-syncs {{ $clusterName }}-{{ $sentinel_component.name }} 1
 {{- /* $primary_svc := printf "%s-%s.%s.svc" $clusterName $redis_component.name $namespace */}}
 EOF

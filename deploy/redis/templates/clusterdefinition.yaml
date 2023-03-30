@@ -84,6 +84,9 @@ spec:
         - name: data
           type: data
       podSpec:
+        volumes:
+          - name: redis-conf
+            emptyDir: { }
         containers:
           - name: redis
             ports:
@@ -96,7 +99,9 @@ spec:
                 mountPath: /etc/conf
               - name: scripts
                 mountPath: /scripts
-            args: [ "/etc/conf/redis.conf" ]
+              - name: redis-conf
+                mountPath: /etc/redis
+            command: ["/scripts/redis-start.sh"]
             lifecycle:
               postStart:
                 exec:

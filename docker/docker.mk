@@ -1,5 +1,5 @@
 #
-# Copyright 2022 The KubeBlocks Authors
+# Copyright ApeCloud, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -34,7 +34,9 @@ DEV_CONTAINER_DOCKERFILE = Dockerfile-dev
 DOCKERFILE_DIR = ./docker
 BUILDX_ARGS ?=
 
-.PHONY: build-dev-image
+##@ Docker containers
+
+.PHONY: build-dev-container-image
 build-dev-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
 build-dev-image: ## Build dev container image.
 ifneq ($(BUILDX_ENABLED), true)
@@ -44,7 +46,7 @@ else
 endif
 
 
-.PHONY: push-dev-image
+.PHONY: push-dev-container-image
 push-dev-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
 push-dev-image: ## Push dev container image.
 ifneq ($(BUILDX_ENABLED), true)
@@ -52,15 +54,6 @@ ifneq ($(BUILDX_ENABLED), true)
 else
 	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f $(DOCKERFILE_DIR)/$(DEV_CONTAINER_DOCKERFILE) -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG) --push $(BUILDX_ARGS)
 endif
-
-
-.PHONY: build-cli-image
-build-cli-image: clean-kbcli build-checks bin/kbcli.linux.amd64 bin/kbcli.linux.arm64 bin/kbcli.darwin.arm64 bin/kbcli.darwin.amd64 bin/kbcli.windows.amd64 ## Build kbcli container image.
-	docker build . -t ${CLI_IMG}:${CLI_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-cli
-
-.PHONY: push-cli-image
-push-cli-image: clean-kbcli build-checks bin/kbcli.linux.amd64 bin/kbcli.linux.arm64 bin/kbcli.darwin.arm64 bin/kbcli.darwin.amd64 bin/kbcli.windows.amd64 ## Push kbcli container image.
-	docker push ${CLI_IMG}:${CLI_TAG}
 
 
 .PHONY: build-manager-image
@@ -120,3 +113,30 @@ else
 endif
 endif
 
+.PHONY: build-tools-image
+build-tools-image: generate ## Build tools container image.
+ifneq ($(BUILDX_ENABLED), true)
+	docker build . -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile-tools -t ${IMG}:latest
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest $(BUILDX_ARGS)
+else
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} $(BUILDX_ARGS)
+endif
+endif
+
+.PHONY: push-tools-image
+push-tools-image: generate ## Push tools container image.
+ifneq ($(BUILDX_ENABLED), true)
+ifeq ($(TAG_LATEST), true)
+	docker push ${IMG}:latest
+else
+	docker push ${IMG}:${VERSION}
+endif
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest --push $(BUILDX_ARGS)
+else
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push $(BUILDX_ARGS)
+endif
+endif

@@ -10,6 +10,7 @@ versionOverride:
 ## @param image.pullPolicy KubeBlocks image pull policy
 ## @param image.tag KubeBlocks image tag (immutable tags are recommended)
 ## @param image.imagePullSecrets KubeBlocks image pull secrets
+## @param image.tools.repository KubeBlocks tools image repository
 image:
   registry: registry.cn-hangzhou.aliyuncs.com
   repository: apecloud/kubeblocks
@@ -17,6 +18,8 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
   imagePullSecrets: []
+  tools:
+    repository: apecloud/kubeblocks-tools
 
 ## @param replicaCount
 ##

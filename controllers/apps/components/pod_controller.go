@@ -99,6 +99,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if err = r.Client.Patch(reqCtx.Ctx, pod, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+	r.Recorder.Eventf(pod, corev1.EventTypeNormal, "AddAnnotation", "add annotation %s=%s", constant.LeaderAnnotationKey, componentStatus.ConsensusSetStatus.Leader.Pod)
 
 	return intctrlutil.Reconciled()
 }

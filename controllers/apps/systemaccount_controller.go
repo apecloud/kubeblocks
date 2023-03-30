@@ -157,8 +157,8 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// wait till the cluster is running
-	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase && cluster.Status.Phase != appsv1alpha1.StartingClusterPhase {
-		reqCtx.Log.Info("Cluster is not ready yet", "cluster", req.NamespacedName)
+	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+		reqCtx.Log.V(1).Info("Cluster is not ready yet", "cluster", req.NamespacedName)
 		return intctrlutil.Reconciled()
 	}
 

@@ -37,9 +37,10 @@ func init() {
 		// REVIEW: can do opsrequest if not running?
 		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
 		// TODO: add cluster reconcile Reconfiguring phase.
-		ToClusterPhase:             appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.ReconfiguringPhase,
-		MaintainClusterPhaseBySelf: true,
-		OpsHandler:                 &reAction,
+		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
+		MaintainClusterPhaseBySelf:         true,
+		OpsHandler:                         &reAction,
+		ProcessingReasonInClusterCondition: ProcessingReasonReconfiguring,
 	}
 	cfgcore.ConfigEventHandlerMap["ops_status_reconfigure"] = &reAction
 	opsManager.RegisterOps(appsv1alpha1.ReconfiguringType, reconfigureBehaviour)

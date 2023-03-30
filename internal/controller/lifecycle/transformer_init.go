@@ -22,13 +22,13 @@ import (
 )
 
 type initTransformer struct {
-	cluster *appsv1alpha1.Cluster
+	cluster       *appsv1alpha1.Cluster
+	originCluster *appsv1alpha1.Cluster
 }
 
 func (i *initTransformer) Transform(dag *graph.DAG) error {
 	// put the cluster object first, it will be root vertex of DAG
-	oriCluster := i.cluster.DeepCopy()
-	rootVertex := &lifecycleVertex{obj: i.cluster, oriObj: oriCluster}
+	rootVertex := &lifecycleVertex{obj: i.cluster, oriObj: i.originCluster}
 	dag.AddVertex(rootVertex)
 	return nil
 }

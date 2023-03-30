@@ -101,7 +101,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				}
 			})).ShouldNot(HaveOccurred())
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(err.Error()).Should(ContainSubstring("Existing OpsRequest:"))
+			Expect(err.Error()).Should(ContainSubstring("existing OpsRequest:"))
 
 			// reset cluster annotation
 			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func() {

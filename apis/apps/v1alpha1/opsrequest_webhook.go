@@ -114,7 +114,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 		// 1. the opsRequest is Reentrant.
 		// 2. the opsRequest supports concurrent execution of the same kind.
 		if v.Name != r.Name {
-			return  fmt.Errorf("existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", v.Name, cluster.Name)
+			return fmt.Errorf("existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", v.Name, cluster.Name)
 		}
 		opsNamesInQueue[i] = v.Name
 	}

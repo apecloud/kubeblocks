@@ -59,3 +59,15 @@ func (r *ReconcileTask) AppendResource(objs ...client.Object) {
 	}
 	*r.Resources = append(*r.Resources, objs...)
 }
+
+func (r *ReconcileTask) GetResourceWithObjectKey(objKey client.ObjectKey) client.Object {
+	if r.Resources == nil {
+		return nil
+	}
+	for _, obj := range *r.Resources {
+		if obj.GetName() == objKey.Name && obj.GetNamespace() == objKey.Namespace {
+			return obj
+		}
+	}
+	return nil
+}

@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -157,23 +158,24 @@ func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues,
 func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	podSpec *corev1.PodSpec,
 	configs []appsv1alpha1.ComponentConfigSpec,
-	component *component.SynthesizedComponent) error {
+	component *component.SynthesizedComponent,
+	task *intctrltypes.ReconcileTask) error {
 	if err := c.injectBuiltInObjects(podSpec, component, configs); err != nil {
 		return err
 	}
-	if err := c.injectBuiltInFunctions(component); err != nil {
+	if err := c.injectBuiltInFunctions(component, task); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.SynthesizedComponent) error {
+func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.SynthesizedComponent, task *intctrltypes.ReconcileTask) error {
 	// TODO add built-in function
 	c.builtInFunctions = &gotemplate.BuiltInObjectsFunc{
 		builtInMysqlCalBufferFunctionName:     calDBPoolSize,
 		builtInGetVolumeFunctionName:          getVolumeMountPathByName,
 		builtInGetPvcFunctionName:             getPVCByName,
-		builtInGetEnvFunctionName:             getEnvByName,
+		builtInGetEnvFunctionName:             c.wrapEnvByName(task),
 		builtInGetPortFunctionName:            getPortByName,
 		builtInGetArgFunctionName:             getArgByName,
 		builtInGetContainerFunctionName:       getPodContainerByName,

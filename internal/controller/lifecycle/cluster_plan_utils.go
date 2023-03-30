@@ -28,7 +28,7 @@ import (
 // if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
 func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) {
 	if targetAnnotations == nil {
-		targetAnnotations = map[string]string{}
+		return
 	}
 	for k, v := range originalAnnotations {
 		// if the annotation not exist in targetAnnotations, copy it from original.

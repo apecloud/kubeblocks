@@ -354,6 +354,9 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		}
 		// keep the original template annotations.
 		// if annotations exist and are replaced, the statefulSet will be updated.
+		if stsProto.Spec.Template.Annotations == nil {
+			stsProto.Spec.Template.Annotations = map[string]string{}
+		}
 		mergeAnnotations(stsObj.Spec.Template.Annotations,
 			stsProto.Spec.Template.Annotations)
 		stsObj.Spec.Template = stsProto.Spec.Template
@@ -364,6 +367,9 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 
 	handleDeploy := func(origObj, deployProto *appsv1.Deployment) (client.Object, error) {
 		deployObj := origObj.DeepCopy()
+		if deployProto.Spec.Template.Annotations == nil {
+			deployProto.Spec.Template.Annotations = map[string]string{}
+		}
 		mergeAnnotations(deployObj.Spec.Template.Annotations,
 			deployProto.Spec.Template.Annotations)
 		deployObj.Spec = deployProto.Spec

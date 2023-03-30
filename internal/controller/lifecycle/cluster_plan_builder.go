@@ -144,6 +144,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	chain := &graph.TransformerChain{
 		// init dag, that is put cluster vertex into dag
 		&initTransformer{cluster: c.cluster},
+		// fill class related info
+		&fillClass{cc: *cr, cli: c.cli, ctx: c.ctx},
 		// fix cd&cv labels of cluster
 		&fixClusterLabelsTransformer{},
 		// cluster to K8s objects and put them into dag

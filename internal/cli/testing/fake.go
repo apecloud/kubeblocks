@@ -255,18 +255,16 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 
 func FakeComponentClassDef(clusterDef *appsv1alpha1.ClusterDefinition, def []byte) *corev1.ConfigMapList {
 	result := &corev1.ConfigMapList{}
-	for _, component := range clusterDef.Spec.ComponentDefs {
-		cm := &corev1.ConfigMap{}
-		cm.Name = fmt.Sprintf("fake-kubeblocks-classes-%s", component.Name)
-		cm.SetLabels(map[string]string{
-			types.ClassLevelLabelKey:        "component",
-			constant.KBAppComponentLabelKey: component.Name,
-			types.ClassProviderLabelKey:     "kubeblocks",
-			constant.ClusterDefLabelKey:     clusterDef.Name,
-		})
-		cm.Data = map[string]string{"families-20230223162700": string(def)}
-		result.Items = append(result.Items, *cm)
-	}
+	cm := &corev1.ConfigMap{}
+	cm.Name = fmt.Sprintf("fake-kubeblocks-classes-%s", ComponentName)
+	cm.SetLabels(map[string]string{
+		types.ClassLevelLabelKey:              "component",
+		constant.KBAppComponentDefRefLabelKey: ComponentDefName,
+		types.ClassProviderLabelKey:           "kubeblocks",
+		constant.ClusterDefLabelKey:           clusterDef.Name,
+	})
+	cm.Data = map[string]string{"families-20230223162700": string(def)}
+	result.Items = append(result.Items, *cm)
 	return result
 }
 

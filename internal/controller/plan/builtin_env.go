@@ -40,7 +40,7 @@ func (c *configTemplateBuilder) wrapEnvByName(localObjects *intctrltypes.Reconci
 	}
 }
 
-func (c configTemplateBuilder) getEnvName(container *corev1.Container, envName string, localObjects *intctrltypes.ReconcileTask) (string, error) {
+func (c *configTemplateBuilder) getEnvName(container *corev1.Container, envName string, localObjects *intctrltypes.ReconcileTask) (string, error) {
 	for _, v := range container.Env {
 		if v.Name != envName {
 			continue

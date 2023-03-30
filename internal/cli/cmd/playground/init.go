@@ -217,7 +217,11 @@ if it takes a long time, please check the network environment and try again.
 
 	// clone apecloud/cloud-provider repo to local path
 	fmt.Fprintf(o.Out, "Clone cloud provider terraform script to %s...\n", cpPath)
-	if err = util.CloneGitRepo(cp.GitRepoURL, cpPath); err != nil {
+	branchName := "kb-playground"
+	if version.Version != "" && version.Version != "edge" {
+		branchName = fmt.Sprintf("%s-%s", branchName, strings.Split(version.Version, "-")[0])
+	}
+	if err = util.CloneGitRepo(cp.GitRepoURL, branchName, cpPath); err != nil {
 		return err
 	}
 
@@ -296,6 +300,11 @@ func (o *initOptions) createCluster() error {
 	options, err := newCreateOptions(o.clusterDef, o.clusterVersion)
 	if err != nil {
 		return err
+	}
+
+	// if we are running on cloud, create cluster with three replicas
+	if o.cloudProvider != cp.Local {
+		options.Values = append(options.Values, "replicas=3")
 	}
 
 	inputs := create.Inputs{

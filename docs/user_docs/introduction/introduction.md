@@ -7,7 +7,7 @@ sidebar_position: 1
 # KubeBlocks overview
 
 ## Introduction
-KubeBlocks is an open-source tool designed to help developers and platform engineers build and manage stateful workloads, such as databases and analytics, on Kubernetes. It is cloud-neutral and supports multiple public cloud providers providing a unified and declarative approach to increase productivity in DevOps practices.
+KubeBlocks is an open-source tool designed to help developers and platform engineers build and manage stateful workloads, such as databases and analytics, on Kubernetes. It is cloud-neutral and supports multiple public cloud providers, providing a unified and declarative approach to increase productivity in DevOps practices.
 
 The name KubeBlocks is derived from Kubernetes and building blocks, which indicates that standardizing databases and analytics on Kubernetes can be both productive and enjoyable, like playing with construction toys. KubeBlocks combines the large-scale production experiences of top public cloud providers with enhanced usability and stability.
 

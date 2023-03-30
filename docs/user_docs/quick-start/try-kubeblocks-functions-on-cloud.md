@@ -10,19 +10,20 @@ import TabItem from '@theme/TabItem';
 
 # Try out basic functions of KubeBlocks on Cloud 
 This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command. 
-With Playground, you can try out KubeBlocks both on your local host (macOS) and on a cloud environment (AWS).
+With Playground, you can try out KubeBlocks both on your local host and on a cloud environment.
+
+## Preparation
+When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find the script at [Github repository](https://github.com/apecloud/cloud-provider).
+
+When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repository to the local host, calls the terraform commands to initialize the cluster, then deploys KubeBlocks on this cluster.
 
 <Tabs>
 <TabItem value="AWS" label="AWS" default>
 
-## Before you start to try KubeBlocks on Cloud (AWS)
-  
-When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find the script at [Github repository](https://github.com/apecloud/cloud-provider).
+### Before you start to try KubeBlocks on Cloud (AWS)
 
-When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repository to the local host, calls the terraform commands to initialize the cluster, then deploys KubeBlocks on this cluster.
 * Install AWS CLI. Refer to [Installing or updating the latest version of the AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) for details.
-* Make sure the following tools are installed on your local host.
-  * Docker: v20.10.5 (runc ≥ v1.0.0-rc93) or above. For installation details, refer to [Get Docker](https://docs.docker.com/get-docker/).
+* Make sure the following tools are installed.
   * `kubectl`: It is used to interact with Kubernetes clusters. For installation details, refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
   * `kbcli`: It is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. Follow the steps below to install `kbcli`.
     1. Install `kbcli`.
@@ -31,7 +32,7 @@ When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repos
          ```
     2. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.
 
-## Configure access key
+### Configure access key
 
 Configure the Access Key of cloud resources.
 For AWS, there are two options.
@@ -55,7 +56,7 @@ export AWS_ACCESS_KEY_ID="anaccesskey"
 export AWS_SECRET_ACCESS_KEY="asecretkey"
 ```
 
-## Initialize Playground
+### Initialize Playground
 
 Initialize Playground.
 
@@ -101,6 +102,81 @@ kbcli cluster list
 The initialization lasts about 20 minutes. If the installation fails after a long time, please check your network environment.
 
 :::
+
+</TabItem>
+<TabItem value="GCP" label="GCP">
+
+### Before you start to try KubeBlocks on Cloud (GCP)
+Make sure you have all the followings prepared.
+* Google cloud account.
+* `kubectl`: to interact with Kubernetes clusters. For installation details, refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
+* `kbcli`: the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. 
+  
+
+### Configure GCP environmnent
+
+***Steps：***
+1. Install gcloud SDK.
+
+```
+# macOS brew install
+brew install --cask google-cloud-sdk
+
+# windows
+ choco install gcloudsdk
+ ```
+
+2. Initialize GCP.
+
+```
+gcloud init
+```
+3. Log in to GCP.
+
+ ```
+ gcloud auth application-default login
+ ```
+4. Configure GOOGLE_PROJECT environment variables，```kbcli playground``` creates GKE cluster in the project.
+
+```
+export GOOGLE_PROJECT=<project-name>
+```
+
+### Initialize Playground
+:::note
+
+ Note: Execute ``` export GOOGLE_PROJECT=<project-name>``` to specify project name.
+:::
+The following command deploy a GKE service in available region ```us-central1 ``` on google cloud, and install KubeBlocks.
+
+```bash
+kbcli playground init --cloud-provider gcp --region us-central1
+```
+
+* `cloud-provider` specifies the cloud provider. 
+* `region` specifies the region to deploy a Kubernetes cluster.
+
+During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the path `~/.kbcli/playground` and calls the terraform script to create cloud resources. And then `kbcli` deploys KubeBlocks automatically and installs a MySQL cluster.
+
+After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the deployed cluster.
+
+```bash
+# View kbcli version
+kbcli version
+
+# View the cluster list
+kbcli cluster list
+```
+
+:::note
+
+The initialization takes about 20 minutes. If the installation fails after a long time, please check your network environment.
+
+:::
+
+
+</TabItem>
+</Tabs>
 
 ## Try KubeBlocks with Playground
 
@@ -324,10 +400,9 @@ kbcli kubeblocks uninstall --remove-pvcs --remove-pvs
 Run the command below to destroy Playground.
 
 ```bash
-kbcli playground destroy --cloud-provider aws --region cn-northwest-1
+kbcli playground destroy 
 ```
 
-Like the parameters in `kbcli playground init`, use `--cloud-provider` and `--region` to specify the cloud provider and the region.
 
 :::caution
 
@@ -336,10 +411,4 @@ Like the parameters in `kbcli playground init`, use `--cloud-provider` and `--re
 :::
 
 
-</TabItem>
-<TabItem value="GCP" label="GCP">
 
-Coming soon!
-
-</TabItem>
-</Tabs>

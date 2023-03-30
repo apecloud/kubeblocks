@@ -31,7 +31,7 @@ import (
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
-var _ = Describe("tpl template", func() {
+var _ = Describe("tpl env template", func() {
 
 	patroniTemplate := `
 bootstrap:

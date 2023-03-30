@@ -17,30 +17,44 @@ limitations under the License.
 package plan
 
 import (
-	"context"
 	b64 "encoding/base64"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	coreclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	"github.com/apecloud/kubeblocks/internal/controller/client"
 	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 type envBuildInFunc func(container interface{}, envName string) (string, error)
 
-func (c *configTemplateBuilder) wrapEnvByName(localObjects *intctrltypes.ReconcileTask) envBuildInFunc {
+type envWrapper struct {
+	*configTemplateBuilder
+
+	// configmap or secret not yet submitted.
+	localObjects *intctrltypes.ReconcileTask
+	// cache remoted configmap and secret.
+	cache map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object
+}
+
+func wrapGetEnvByName(templateBuilder *configTemplateBuilder, localObjects *intctrltypes.ReconcileTask) envBuildInFunc {
+	wrapper := &envWrapper{
+		configTemplateBuilder: templateBuilder,
+		localObjects:          localObjects,
+		cache:                 make(map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object),
+	}
 	return func(args interface{}, envName string) (string, error) {
 		container, err := fromJSONObject[corev1.Container](args)
 		if err != nil {
 			return "", err
 		}
-		return c.getEnvName(container, envName, localObjects)
+		return wrapper.getEnvByName(container, envName)
 	}
 }
 
-func (c *configTemplateBuilder) getEnvName(container *corev1.Container, envName string, localObjects *intctrltypes.ReconcileTask) (string, error) {
+func (w *envWrapper) getEnvByName(container *corev1.Container, envName string) (string, error) {
 	for _, v := range container.Env {
 		if v.Name != envName {
 			continue
@@ -49,21 +63,21 @@ func (c *configTemplateBuilder) getEnvName(container *corev1.Container, envName 
 		case v.ValueFrom == nil:
 			return v.Value, nil
 		case v.ValueFrom.ConfigMapKeyRef != nil:
-			return configMapValue(v.ValueFrom.ConfigMapKeyRef, c.ctx, c.cli, c.namespace, localObjects)
+			return w.configMapValue(v.ValueFrom.ConfigMapKeyRef)
 		case v.ValueFrom.SecretKeyRef != nil:
-			return secretValue(v.ValueFrom.SecretKeyRef, c.ctx, c.cli, c.namespace, localObjects)
+			return w.secretValue(v.ValueFrom.SecretKeyRef)
 		case v.ValueFrom.FieldRef != nil:
-			return fieldRefValue(v.ValueFrom.FieldRef, c.podSpec)
+			return fieldRefValue(v.ValueFrom.FieldRef, w.podSpec)
 		case v.ValueFrom.ResourceFieldRef != nil:
-			return resourceRefValue(v.ValueFrom.ResourceFieldRef, c.podSpec.Containers)
+			return resourceRefValue(v.ValueFrom.ResourceFieldRef, w.podSpec.Containers)
 		}
 	}
-	return c.getEnvFromResources(container.EnvFrom, envName, localObjects)
+	return w.getEnvFromResources(container.EnvFrom, envName)
 }
 
-func (c *configTemplateBuilder) getEnvFromResources(envSources []corev1.EnvFromSource, envName string, localObjects *intctrltypes.ReconcileTask) (string, error) {
+func (w *envWrapper) getEnvFromResources(envSources []corev1.EnvFromSource, envName string) (string, error) {
 	for _, source := range envSources {
-		if value, err := c.getEnvFromResource(source, envName, localObjects); err != nil {
+		if value, err := w.getEnvFromResource(source, envName); err != nil {
 			return "", err
 		} else if value != "" {
 			return value, nil
@@ -72,7 +86,7 @@ func (c *configTemplateBuilder) getEnvFromResources(envSources []corev1.EnvFromS
 	return "", nil
 }
 
-func (c *configTemplateBuilder) getEnvFromResource(envSource corev1.EnvFromSource, envName string, localObjects *intctrltypes.ReconcileTask) (string, error) {
+func (w *envWrapper) getEnvFromResource(envSource corev1.EnvFromSource, envName string) (string, error) {
 	fromConfigMap := func(ConfigMapRef *corev1.ConfigMapEnvSource) *corev1.ConfigMapKeySelector {
 		return &corev1.ConfigMapKeySelector{
 			Key:                  envName,
@@ -85,74 +99,74 @@ func (c *configTemplateBuilder) getEnvFromResource(envSource corev1.EnvFromSourc
 			LocalObjectReference: corev1.LocalObjectReference{Name: SecretRef.Name},
 		}
 	}
-
 	if envSource.ConfigMapRef != nil {
-		return configMapValue(fromConfigMap(envSource.ConfigMapRef), c.ctx, c.cli, c.namespace, localObjects)
+		return w.configMapValue(fromConfigMap(envSource.ConfigMapRef))
 	}
 	if envSource.SecretRef != nil {
-		return secretValue(fromSecret(envSource.SecretRef), c.ctx, c.cli, c.namespace, localObjects)
+		return w.secretValue(fromSecret(envSource.SecretRef))
 	}
 	return "", nil
 }
 
-func resourceRefValue(resourceRef *corev1.ResourceFieldSelector, containers []corev1.Container) (string, error) {
-	return "", cfgcore.MakeError("not support resource field ref")
-}
-
-func fieldRefValue(podReference *corev1.ObjectFieldSelector, podSpec *corev1.PodSpec) (string, error) {
-	return "", cfgcore.MakeError("not support pod field ref")
-}
-
-func getResourceFromLocal(localObjects *intctrltypes.ReconcileTask, key coreclient.ObjectKey) coreclient.Object {
-	if localObjects == nil {
-		return nil
-	}
-	return localObjects.GetResourceWithObjectKey(key)
-}
-
-func getSecretResourceObject(key coreclient.ObjectKey, localObjects *intctrltypes.ReconcileTask, ctx context.Context, cli client.ReadonlyClient) (*corev1.Secret, error) {
-	object := getResourceFromLocal(localObjects, key)
-	if v, ok := object.(*corev1.Secret); ok {
-		return v, nil
-	}
-	obj := &corev1.Secret{}
-	if err := cli.Get(ctx, key, obj); err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-func getConfigMapResourceObject(key coreclient.ObjectKey, localObjects *intctrltypes.ReconcileTask, ctx context.Context, cli client.ReadonlyClient) (*corev1.ConfigMap, error) {
-	object := getResourceFromLocal(localObjects, key)
-	if v, ok := object.(*corev1.ConfigMap); ok {
-		return v, nil
-	}
-	obj := &corev1.ConfigMap{}
-	if err := cli.Get(ctx, key, obj); err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-func secretValue(secretRef *corev1.SecretKeySelector, ctx context.Context, cli client.ReadonlyClient, namespace string, localObjects *intctrltypes.ReconcileTask) (string, error) {
-	if cli == nil {
+func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector) (string, error) {
+	if w.cli == nil {
 		return "", cfgcore.MakeError("not support secret[%s] value in local mode, cli is nil", secretRef.Name)
 	}
 
 	secretKey := coreclient.ObjectKey{
 		Name:      secretRef.Name,
-		Namespace: namespace,
+		Namespace: w.namespace,
 	}
-
-	secret, err := getSecretResourceObject(secretKey, localObjects, ctx, cli)
+	secret, err := getResourceObject(w, &corev1.Secret{}, secretKey)
 	if err != nil {
 		return "", err
 	}
-
 	if v, ok := secret.Data[secretRef.Key]; ok {
 		return decodeString(v)
 	}
 	return "", nil
+}
+
+func (w *envWrapper) configMapValue(configmapRef *corev1.ConfigMapKeySelector) (string, error) {
+	if w.cli == nil {
+		return "", cfgcore.MakeError("not support configmap[%s] value in local mode, cli is nil", configmapRef.Name)
+	}
+
+	cmKey := coreclient.ObjectKey{
+		Name:      configmapRef.Name,
+		Namespace: w.namespace,
+	}
+	cm, err := getResourceObject(w, &corev1.ConfigMap{}, cmKey)
+	if err != nil {
+		return "", err
+	}
+	return cm.Data[configmapRef.Key], nil
+}
+
+func (w *envWrapper) getResourceFromLocal(key coreclient.ObjectKey, gvk schema.GroupVersionKind) coreclient.Object {
+	if _, ok := w.cache[gvk]; !ok {
+		w.cache[gvk] = make(map[coreclient.ObjectKey]coreclient.Object)
+	}
+	if v, ok := w.cache[gvk][key]; ok {
+		return v
+	}
+	if w.localObjects == nil {
+		return nil
+	}
+	return w.localObjects.GetLocalResourceWithObjectKey(key, gvk)
+}
+
+func getResourceObject[T generics.Object, PT generics.PObject[T]](w *envWrapper, obj PT, key coreclient.ObjectKey) (PT, error) {
+	gvk := generics.ToGVK(obj)
+	object := w.getResourceFromLocal(key, gvk)
+	if v, ok := object.(PT); ok {
+		return v, nil
+	}
+	if err := w.cli.Get(w.ctx, key, obj); err != nil {
+		return nil, err
+	}
+	w.cache[gvk][key] = obj
+	return obj, nil
 }
 
 func decodeString(encoded []byte) (string, error) {
@@ -163,19 +177,10 @@ func decodeString(encoded []byte) (string, error) {
 	return string(decoded), nil
 }
 
-func configMapValue(configmapRef *corev1.ConfigMapKeySelector, ctx context.Context, cli client.ReadonlyClient, namespace string, localObjects *intctrltypes.ReconcileTask) (string, error) {
-	if cli == nil {
-		return "", cfgcore.MakeError("not support configmap[%s] value in local mode, cli is nil", configmapRef.Name)
-	}
+func resourceRefValue(resourceRef *corev1.ResourceFieldSelector, containers []corev1.Container) (string, error) {
+	return "", cfgcore.MakeError("not support resource field ref")
+}
 
-	cmKey := coreclient.ObjectKey{
-		Name:      configmapRef.Name,
-		Namespace: namespace,
-	}
-	cm, err := getConfigMapResourceObject(cmKey, localObjects, ctx, cli)
-	if err != nil {
-		return "", err
-	}
-
-	return cm.Data[configmapRef.Key], nil
+func fieldRefValue(podReference *corev1.ObjectFieldSelector, podSpec *corev1.PodSpec) (string, error) {
+	return "", cfgcore.MakeError("not support pod field ref")
 }

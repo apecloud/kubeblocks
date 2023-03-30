@@ -17,6 +17,8 @@ limitations under the License.
 package types
 
 import (
+	"github.com/apecloud/kubeblocks/internal/generics"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -60,13 +62,15 @@ func (r *ReconcileTask) AppendResource(objs ...client.Object) {
 	*r.Resources = append(*r.Resources, objs...)
 }
 
-func (r *ReconcileTask) GetResourceWithObjectKey(objKey client.ObjectKey) client.Object {
+func (r *ReconcileTask) GetLocalResourceWithObjectKey(objKey client.ObjectKey, gvk schema.GroupVersionKind) client.Object {
 	if r.Resources == nil {
 		return nil
 	}
 	for _, obj := range *r.Resources {
 		if obj.GetName() == objKey.Name && obj.GetNamespace() == objKey.Namespace {
-			return obj
+			if generics.ToGVK(obj) == gvk {
+				return obj
+			}
 		}
 	}
 	return nil

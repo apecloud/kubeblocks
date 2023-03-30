@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -153,7 +154,7 @@ var _ = Describe("create", func() {
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		comps, err := buildClusterComp(cd, nil)
 		Expect(err).ShouldNot(HaveOccurred())
-		checkComponent(comps, "10Gi", 1, "1", "1Gi")
+		checkComponent(comps, "20Gi", 1, "1", "1Gi")
 	})
 
 	It("build default cluster component with environment", func() {

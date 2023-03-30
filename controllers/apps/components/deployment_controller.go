@@ -20,6 +20,7 @@ import (
 	"context"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -67,6 +68,11 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return workloadCompClusterReconcile(reqCtx, r.Client, deploy,
 		func(cluster *appsv1alpha1.Cluster, componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
 			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, deploy, componentSpec)
+			// patch the current componentSpec workload's custom labels
+			if err := patchWorkloadCustomLabel(reqCtx.Ctx, r.Client, cluster, componentSpec); err != nil {
+				reqCtx.Recorder.Event(cluster, corev1.EventTypeWarning, "Deployment Controller PatchWorkloadCustomLabelFailed", err.Error())
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			}
 			if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			} else if requeueAfter != 0 {

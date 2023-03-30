@@ -20,16 +20,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
+	componentutil "github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 const (
@@ -98,7 +104,7 @@ func IsFailedOrAbnormal(phase appsv1alpha1.ClusterComponentPhase) bool {
 }
 
 // GetComponentMatchLabels gets the labels for matching the cluster component
-func GetComponentMatchLabels(clusterName, componentName string) client.ListOption {
+func GetComponentMatchLabels(clusterName, componentName string) map[string]string {
 	return client.MatchingLabels{
 		constant.AppInstanceLabelKey:    clusterName,
 		constant.KBAppComponentLabelKey: componentName,
@@ -110,7 +116,7 @@ func GetComponentMatchLabels(clusterName, componentName string) client.ListOptio
 func GetComponentPodList(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, componentName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
-		GetComponentMatchLabels(cluster.Name, componentName))
+		client.MatchingLabels(GetComponentMatchLabels(cluster.Name, componentName)))
 	return podList, err
 }
 
@@ -145,14 +151,20 @@ func GetComponentPhase(isFailed, isAbnormal bool) appsv1alpha1.ClusterComponentP
 }
 
 // GetObjectListByComponentName gets k8s workload list with component
-func GetObjectListByComponentName(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
+func GetObjectListByComponentName(ctx context.Context, cli client2.ReadonlyClient, cluster appsv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
 	matchLabels := GetComponentMatchLabels(cluster.Name, componentName)
+	inNamespace := client.InNamespace(cluster.Namespace)
+	return cli.List(ctx, objectList, client.MatchingLabels(matchLabels), inNamespace)
+}
+
+// GetObjectListByCustomLabels gets k8s workload list with custom labels
+func GetObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, objectList client.ObjectList, matchLabels client.ListOption) error {
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
 // GetComponentDefByCluster gets component from ClusterDefinition with compDefName
-func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
+func GetComponentDefByCluster(ctx context.Context, cli client2.ReadonlyClient, cluster appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err
@@ -269,15 +281,11 @@ func GetComponentInfoByPod(ctx context.Context,
 	cluster appsv1alpha1.Cluster,
 	pod *corev1.Pod) (componentName string, componentDef *appsv1alpha1.ClusterComponentDefinition, err error) {
 	if pod == nil || pod.Labels == nil {
-		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
-		// error type checking (errors.Is)
-		return "", nil, fmt.Errorf("pod %s or pod's label is nil", pod.Name)
+		return "", nil, errors.New("pod or pod's label is nil")
 	}
 	componentName, ok := pod.Labels[constant.KBAppComponentLabelKey]
 	if !ok {
-		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
-		// error type checking (errors.Is)
-		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, constant.KBAppComponentLabelKey)
+		return "", nil, errors.New("pod component name label is nil")
 	}
 	compDefName := cluster.GetComponentDefRefName(componentName)
 	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, compDefName)
@@ -364,4 +372,150 @@ func GetCompPhaseByConditions(existLatestRevisionFailedPod bool,
 		return appsv1alpha1.AbnormalClusterCompPhase
 	}
 	return ""
+}
+
+// UpdateObjLabel updates the value of the role label of the object.
+func UpdateObjLabel[T generics.Object, PT generics.PObject[T]](
+	ctx context.Context, cli client.Client, obj T, labelKey, labelValue string) error {
+	pObj := PT(&obj)
+	patch := client.MergeFrom(PT(pObj.DeepCopy()))
+	if v, ok := pObj.GetLabels()[labelKey]; ok && v == labelValue {
+		return nil
+	}
+	pObj.GetLabels()[labelKey] = labelValue
+	if err := cli.Patch(ctx, pObj, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+// PatchGVRCustomLabels patches the custom labels to the object list of the specified GVK.
+func PatchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster,
+	resource appsv1alpha1.GVKResource, componentName, labelKey, labelValue string) error {
+	gvk, err := ParseCustomLabelPattern(resource.GVK)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(getCustomLabelSupportKind(), gvk.Kind) {
+		return errors.New("kind is not supported for custom labels")
+	}
+
+	objectList := getObjectListMapOfResourceKind()[gvk.Kind]
+	matchLabels := GetComponentMatchLabels(cluster.Name, componentName)
+	for k, v := range resource.Selector {
+		matchLabels[k] = v
+	}
+	if err := GetObjectListByCustomLabels(ctx, cli, *cluster, objectList, client.MatchingLabels(matchLabels)); err != nil {
+		return err
+	}
+	labelKey = replaceKBEnvPlaceholderTokens(cluster.Name, componentName, labelKey)
+	labelValue = replaceKBEnvPlaceholderTokens(cluster.Name, componentName, labelValue)
+	switch gvk.Kind {
+	case constant.StatefulSetKind:
+		stsList := objectList.(*appsv1.StatefulSetList)
+		for _, sts := range stsList.Items {
+			if err := UpdateObjLabel(ctx, cli, sts, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	case constant.DeploymentKind:
+		deployList := objectList.(*appsv1.DeploymentList)
+		for _, deploy := range deployList.Items {
+			if err := UpdateObjLabel(ctx, cli, deploy, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	case constant.PodKind:
+		podList := objectList.(*corev1.PodList)
+		for _, pod := range podList.Items {
+			if err := UpdateObjLabel(ctx, cli, pod, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	case constant.ServiceKind:
+		svcList := objectList.(*corev1.ServiceList)
+		for _, svc := range svcList.Items {
+			if err := UpdateObjLabel(ctx, cli, svc, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	case constant.ConfigMapKind:
+		cmList := objectList.(*corev1.ConfigMapList)
+		for _, cm := range cmList.Items {
+			if err := UpdateObjLabel(ctx, cli, cm, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	case constant.CronJobKind:
+		cjList := objectList.(*batchv1.CronJobList)
+		for _, cj := range cjList.Items {
+			if err := UpdateObjLabel(ctx, cli, cj, labelKey, labelValue); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// ParseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
+func ParseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
+	patterns := strings.Split(pattern, "/")
+	switch len(patterns) {
+	case 2:
+		return schema.GroupVersionKind{
+			Group:   "",
+			Version: patterns[0],
+			Kind:    patterns[1],
+		}, nil
+	case 3:
+		return schema.GroupVersionKind{
+			Group:   patterns[0],
+			Version: patterns[1],
+			Kind:    patterns[2],
+		}, nil
+	}
+	return schema.GroupVersionKind{}, fmt.Errorf("invalid pattern %s", pattern)
+}
+
+// getCustomLabelSupportKind returns the kinds that support custom label.
+func getCustomLabelSupportKind() []string {
+	return []string{
+		constant.CronJobKind,
+		constant.StatefulSetKind,
+		constant.DeploymentKind,
+		constant.ReplicaSetKind,
+		constant.ServiceKind,
+		constant.ConfigMapKind,
+		constant.PodKind,
+	}
+}
+
+// GetCustomLabelWorkloadKind returns the kinds that support custom label.
+func GetCustomLabelWorkloadKind() []string {
+	return []string{
+		constant.CronJobKind,
+		constant.StatefulSetKind,
+		constant.DeploymentKind,
+		constant.ReplicaSetKind,
+		constant.PodKind,
+	}
+}
+
+// getObjectListMapOfResourceKind returns the mapping of resource kind and its object list.
+func getObjectListMapOfResourceKind() map[string]client.ObjectList {
+	return map[string]client.ObjectList{
+		constant.CronJobKind:     &batchv1.CronJobList{},
+		constant.StatefulSetKind: &appsv1.StatefulSetList{},
+		constant.DeploymentKind:  &appsv1.DeploymentList{},
+		constant.ReplicaSetKind:  &appsv1.ReplicaSetList{},
+		constant.ServiceKind:     &corev1.ServiceList{},
+		constant.ConfigMapKind:   &corev1.ConfigMapList{},
+		constant.PodKind:         &corev1.PodList{},
+	}
+}
+
+// replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.
+func replaceKBEnvPlaceholderTokens(clusterName, componentName, strToReplace string) string {
+	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(clusterName, componentName)
+	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }

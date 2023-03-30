@@ -31,6 +31,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -53,7 +54,7 @@ func CreateOrCheckTLSCerts(reqCtx controllerutil.RequestCtx,
 		}
 		switch comp.Issuer.Name {
 		case dbaasv1alpha1.IssuerUserProvided:
-			if err := checkTLSSecretRef(reqCtx, cli, cluster.Namespace, comp.Issuer.SecretRef); err != nil {
+			if err := CheckTLSSecretRef(reqCtx, cli, cluster.Namespace, comp.Issuer.SecretRef); err != nil {
 				return nil, err
 			}
 		case dbaasv1alpha1.IssuerKubeBlocks:
@@ -130,7 +131,7 @@ func buildFromTemplate(tpl string, vars interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func checkTLSSecretRef(reqCtx controllerutil.RequestCtx, cli client.Client, namespace string,
+func CheckTLSSecretRef(reqCtx controllerutil.RequestCtx, cli client2.ReadonlyClient, namespace string,
 	secretRef *dbaasv1alpha1.TLSSecretRef) error {
 	if secretRef == nil {
 		return errors.New("issuer.secretRef shouldn't be nil when issuer is UserProvided")

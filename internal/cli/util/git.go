@@ -20,10 +20,11 @@ import (
 	"os"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 // CloneGitRepo clone git repo to local path
-func CloneGitRepo(url string, path string) error {
+func CloneGitRepo(url, branch, path string) error {
 	pullFunc := func(repo *git.Repository) error {
 		// Get the working directory for the repository
 		w, err := repo.Worktree()
@@ -54,8 +55,10 @@ func CloneGitRepo(url string, path string) error {
 
 	// repo does not exists, clone it
 	_, err = git.PlainClone(path, false, &git.CloneOptions{
-		URL:      url,
-		Progress: os.Stdout,
+		URL:           url,
+		Progress:      os.Stdout,
+		ReferenceName: plumbing.NewBranchReferenceName(branch),
+		SingleBranch:  true,
 	})
 	return err
 }

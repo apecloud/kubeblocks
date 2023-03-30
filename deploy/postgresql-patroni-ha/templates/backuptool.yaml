@@ -3,6 +3,7 @@ kind: BackupTool
 metadata:
   name: postgres-ha-basebackup
   labels:
+    clusterdefinition.kubeblocks.io/name: postgresql-ha
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
   image: registry.cn-hangzhou.aliyuncs.com/apecloud/postgresql:14.7.0

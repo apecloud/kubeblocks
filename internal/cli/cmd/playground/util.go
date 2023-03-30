@@ -18,13 +18,16 @@ package playground
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 func playgroundDir() (string, error) {
@@ -41,7 +44,12 @@ func cloudProviderRepoDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, cp.GitRepoName), err
+	major := strings.Split(version.Version, "-")[0]
+	cpDir := cp.GitRepoName
+	if major != "" {
+		cpDir = fmt.Sprintf("%s-%s", cp.GitRepoName, major)
+	}
+	return filepath.Join(dir, cpDir), err
 }
 
 func initPlaygroundDir() error {

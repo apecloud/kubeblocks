@@ -924,8 +924,8 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 	}
 	container.Image = backupPolicy.Spec.Hooks.Image
 	if container.Image == "" {
-		container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
-		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
+		container.Image = viper.GetString(constant.KBToolsImage)
+		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	}
 	allowPrivilegeEscalation := false
 	runAsUser := int64(0)

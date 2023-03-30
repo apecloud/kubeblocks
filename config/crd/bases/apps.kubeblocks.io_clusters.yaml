@@ -59,17 +59,17 @@ spec:
             description: ClusterSpec defines the desired state of Cluster
             properties:
               affinity:
-                description: Affinity is a group of affinity scheduling rules.
+                description: affinity is a group of affinity scheduling rules.
                 properties:
                   nodeLabels:
                     additionalProperties:
                       type: string
-                    description: NodeLabels describes that pods must be scheduled
+                    description: nodeLabels describes that pods must be scheduled
                       to the nodes with the specified node labels.
                     type: object
                   podAntiAffinity:
                     default: Preferred
-                    description: PodAntiAffinity describes the anti-affinity level
+                    description: podAntiAffinity describes the anti-affinity level
                       of pods within a component. Preferred means try spread pods
                       by `TopologyKeys`. Required means must spread pods by `TopologyKeys`.
                     enum:
@@ -78,7 +78,7 @@ spec:
                     type: string
                   tenancy:
                     default: SharedNode
-                    description: Tenancy describes how pods are distributed across
+                    description: tenancy describes how pods are distributed across
                       node. SharedNode means multiple pods may share the same node.
                       DedicatedNode means each pod runs on their own dedicated node.
                     enum:
@@ -86,7 +86,7 @@ spec:
                     - DedicatedNode
                     type: string
                   topologyKeys:
-                    description: TopologyKey is the key of node labels. Nodes that
+                    description: topologyKey is the key of node labels. Nodes that
                       have a label with this key and identical values are considered
                       to be in the same topology. It's used as the topology domain
                       for pod anti-affinity and pod spread constraint. Some well-known
@@ -120,12 +120,12 @@ spec:
                         nodeLabels:
                           additionalProperties:
                             type: string
-                          description: NodeLabels describes that pods must be scheduled
+                          description: nodeLabels describes that pods must be scheduled
                             to the nodes with the specified node labels.
                           type: object
                         podAntiAffinity:
                           default: Preferred
-                          description: PodAntiAffinity describes the anti-affinity
+                          description: podAntiAffinity describes the anti-affinity
                             level of pods within a component. Preferred means try
                             spread pods by `TopologyKeys`. Required means must spread
                             pods by `TopologyKeys`.
@@ -135,7 +135,7 @@ spec:
                           type: string
                         tenancy:
                           default: SharedNode
-                          description: Tenancy describes how pods are distributed
+                          description: tenancy describes how pods are distributed
                             across node. SharedNode means multiple pods may share
                             the same node. DedicatedNode means each pod runs on their
                             own dedicated node.
@@ -144,7 +144,7 @@ spec:
                           - DedicatedNode
                           type: string
                         topologyKeys:
-                          description: TopologyKey is the key of node labels. Nodes
+                          description: topologyKey is the key of node labels. Nodes
                             that have a label with this key and identical values are
                             considered to be in the same topology. It's used as the
                             topology domain for pod anti-affinity and pod spread constraint.
@@ -157,7 +157,7 @@ spec:
                           x-kubernetes-list-type: set
                       type: object
                     componentDefRef:
-                      description: ComponentDefRef reference componentDef defined
+                      description: componentDefRef reference componentDef defined
                         in ClusterDefinition spec.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
@@ -172,12 +172,12 @@ spec:
                       type: array
                       x-kubernetes-list-type: set
                     issuer:
-                      description: Issuer who provides tls certs required when TLS
+                      description: issuer who provides tls certs required when TLS
                         enabled
                       properties:
                         name:
                           default: KubeBlocks
-                          description: 'Name of issuer options supported: - KubeBlocks
+                          description: 'name of issuer options supported: - KubeBlocks
                             - Certificates signed by KubeBlocks Operator. - UserProvided
                             - User provided own CA-signed certificates.'
                           enum:
@@ -185,20 +185,20 @@ spec:
                           - UserProvided
                           type: string
                         secretRef:
-                          description: SecretRef, Tls certs Secret reference required
+                          description: secretRef, Tls certs Secret reference required
                             when from is UserProvided
                           properties:
                             ca:
-                              description: CA cert key in Secret
+                              description: ca cert key in Secret
                               type: string
                             cert:
-                              description: Cert key in Secret
+                              description: cert key in Secret
                               type: string
                             key:
-                              description: Key of TLS private key in Secret
+                              description: key of TLS private key in Secret
                               type: string
                             name:
-                              description: Name of the Secret
+                              description: name of the Secret
                               type: string
                           required:
                           - ca
@@ -286,7 +286,7 @@ spec:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
                     services:
-                      description: Services expose endpoints can be accessed by clients
+                      description: services expose endpoints can be accessed by clients
                       items:
                         properties:
                           annotations:
@@ -339,7 +339,7 @@ spec:
                           type: string
                       type: object
                     tls:
-                      description: TLS should be enabled or not
+                      description: tls should be enabled or not
                       type: boolean
                     tolerations:
                       description: Component tolerations will override ClusterSpec.Tolerations
@@ -643,7 +643,7 @@ spec:
                 - WipeOut
                 type: string
               tolerations:
-                description: Tolerations are attached to tolerate any taint that matches
+                description: tolerations are attached to tolerate any taint that matches
                   the triple <key,value,effect> using the matching operator <operator>.
                 items:
                   description: The pod this Toleration is attached to tolerates any

@@ -7,23 +7,25 @@ sidebar_position: 1
 # KubeBlocks overview
 
 ## Introduction
+KubeBlocks is an open-source tool designed to help developers and platform engineers build and manage stateful workloads, such as databases and analytics, on Kubernetes. It is cloud-neutral and supports multiple public cloud providers, providing a unified and declarative approach to increase productivity in DevOps practices.
 
-KubeBlocks is an open-source and cloud-prem tool that helps application developers and platform engineers build and manage Kubernetes native data platforms with the most popular databases, analytical software, and their bundled tools.
+The name KubeBlocks is derived from Kubernetes and building blocks, which indicates that standardizing databases and analytics on Kubernetes can be both productive and enjoyable, like playing with construction toys. KubeBlocks combines the large-scale production experiences of top public cloud providers with enhanced usability and stability.
 
-It has multiple built-in database engines and provides consistent management experience through `kbcli`, the command line tool of KubeBlocks. KubeBlocks runs on Kubernetes and supports multicloud environments. Any data product can access KubeBlocks in a declarative and configurable way to meet your needs to move to/off clouds and migrate across clouds. KubeBlocks can improve the utilization rate of your cloud resources and decrease the data computing and storage costs through shared instances and resource overcommitment.
+## Why You Need KubeBlocks
 
-## Feature list
+Kubernetes has become the de facto standard for container orchestration. It manages an ever-increasing number of stateless workloads with the scalability and availability provided by ReplicaSet and the rollout and rollback capabilities provided by Deployment. However, managing stateful workloads poses great challenges for Kubernetes. Although statefulSet provides stable persistent storage and unique network identifiers, these abilities are far from enough for complex stateful workloads.
 
-* Kubernetes native and multi-cloud supported
-* Provisioning a database cluster within several minutes without the knowledge of Kubernetes
-* Supports multiple database engines including MySQL, PostgreSQL, Redis and Apache Kafka
-* Provides high-availability database clusters with single-availability zone deployment, double-availability zone deployment, or three-availability zone deployment.
-* Automatic operation and maintenance, including vertical scaling, horizontal scaling, volume expansion and restarting clusters
-* Snapshot backup at minute-level through EBS
-* Scheduled backup
-* Point in time restore
-* Built-in Prometheus, Grafana, and AlertManager
-* Resource overcommitment to allocate more database instances on one EC2 to decrease costs efficiently
-* Role-based access control (RBAC)
-* `kbcli`, an easy-to-use CLI, supports common operations such as database cluster creating, connecting, backup, restore, monitoring and trouble shooting.
-* Supports custom robot alerts for Slack, Feishu, Wechat and DingTalks.  
+To address these challenges, and solve the problem of complexity, KubeBlocks introduces ReplicationSet and ConsensusSet, with the following capabilities:
+
+- Role-based update order reduces downtime caused by upgrading versions, scaling, and rebooting.
+- Latency-based election weight reduces the possibility of related workloads or components being located in different available zones.
+- Maintains the status of data replication and automatically repairs replication errors or delays.
+
+## KubeBlocks Key Features
+
+- Kubernetes-native and multi-cloud supported.
+- Supports multiple database engines, including MySQL, PostgreSQL, Redis, MongoDB, and more.
+- Provides production-level performance, resilience, scalability, and observability.
+- Simplifies day-2 operations, such as upgrading, scaling, monitoring, backup, and restore.
+- Declarative configuration is made simple, and imperative commands are made powerful.
+- The learning curve is flat, and you are welcome to submit new issues on GitHub.

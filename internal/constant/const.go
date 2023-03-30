@@ -31,16 +31,18 @@ const (
 )
 
 const (
-	ConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	ConnCredentialPlaceHolder    = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBCompNamePlaceHolder        = "$(KB_COMP_NAME)"
+	KBClusterNamePlaceHolder     = "$(KB_CLUSTER_NAME)"
+	KBClusterCompNamePlaceHolder = "$(KB_CLUSTER_COMP_NAME)"
 )
 
 const (
 	KBPrefix = "KB"
 )
 
-const KBImage = "KUBEBLOCKS_IMAGE"
-
 const (
+	KBToolsImage      = "KUBEBLOCKS_TOOLS_IMAGE"
 	KBImagePullPolicy = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 )
 
@@ -136,6 +138,7 @@ const (
 	ReplicaSetKind            = "ReplicaSetKind"
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
+	ConfigMapKind             = "ConfigMap"
 )
 
 const (
@@ -173,9 +176,6 @@ const (
 )
 
 const (
-
-	// ConfigSidecarIMAGE for config manager sidecar
-	ConfigSidecarIMAGE       = "KUBEBLOCKS_IMAGE"
 	ConfigSidecarName        = "config-manager"
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
 

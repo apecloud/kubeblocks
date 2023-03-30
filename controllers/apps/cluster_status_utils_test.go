@@ -56,8 +56,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
+		// testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		// testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 	}
 	BeforeEach(cleanEnv)
@@ -109,12 +109,14 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	getDeployment := func(componentName string) *appsv1.Deployment {
 		deployList := &appsv1.DeploymentList{}
-		Eventually(func() bool {
-			Expect(k8sClient.List(ctx, deployList, client.MatchingLabels{
-				constant.KBAppComponentLabelKey: componentName,
-				constant.AppInstanceLabelKey:    clusterName}, client.Limit(1))).Should(Succeed())
-			return len(deployList.Items) == 1
-		}).Should(BeTrue())
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.List(ctx, deployList,
+				client.MatchingLabels{
+					constant.KBAppComponentLabelKey: componentName,
+					constant.AppInstanceLabelKey:    clusterName},
+				client.Limit(1))).ShouldNot(HaveOccurred())
+			g.Expect(deployList.Items).Should(HaveLen(1))
+		}).Should(Succeed())
 		return &deployList.Items[0]
 	}
 
@@ -122,15 +124,16 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		expectClusterPhase appsv1alpha1.ClusterPhase,
 		expectCompPhase appsv1alpha1.ClusterComponentPhase,
 		checkClusterPhase bool) {
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, func(g Gomega, newCluster *appsv1alpha1.Cluster) {
-			g.Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
-			if checkClusterPhase {
-				g.Expect(newCluster.Status.Phase == expectClusterPhase).Should(BeTrue())
-				return
-			}
-			compStatus := newCluster.Status.Components[componentName]
-			g.Expect(compStatus.Phase == expectCompPhase).Should(BeTrue())
-		})).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace},
+			func(g Gomega, newCluster *appsv1alpha1.Cluster) {
+				g.Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
+				if checkClusterPhase {
+					g.Expect(newCluster.Status.Phase == expectClusterPhase).Should(BeTrue())
+					return
+				}
+				compStatus := newCluster.Status.Components[componentName]
+				g.Expect(compStatus.Phase == expectCompPhase).Should(BeTrue())
+			})).Should(Succeed())
 	}
 
 	setInvolvedObject := func(event *corev1.Event, kind, objectName string) {
@@ -291,9 +294,11 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			createClusterDef()
 			createClusterVersion()
 			cluster := createCluster()
+			// REVIEW: follow expects is rather inaccurate
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Generation == tmpCluster.Status.ObservedGeneration).Should(BeTrue())
-				g.Expect(len(tmpCluster.Spec.ComponentSpecs) == len(tmpCluster.Status.Components)).Should(BeTrue())
+				g.Expect(tmpCluster.Status.ObservedGeneration).Should(Equal(tmpCluster.Generation))
+				// g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+				g.Expect(tmpCluster.Status.Components).Should(HaveLen(len(tmpCluster.Spec.ComponentSpecs)))
 			})).Should(Succeed())
 
 			changeAndCheckComponents := func(changeFunc func(), expectObservedGeneration int64, checkFun func(Gomega, *appsv1alpha1.Cluster)) {
@@ -312,7 +317,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 					cluster.Spec.ComponentSpecs = cluster.Spec.ComponentSpecs[:2]
 				}, 2,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-					g.Expect(len(tmpCluster.Status.Components) == 2).Should(BeTrue())
+					g.Expect(tmpCluster.Status.Components).Should(HaveLen(2))
 				})
 
 			// TODO check when delete and add the same component, wait for deleting related workloads when delete component in lifecycle.
@@ -324,7 +329,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				}, 3,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					_, isExist := tmpCluster.Status.Components[consensusClusterComponent.Name]
-					g.Expect(len(tmpCluster.Status.Components) == 3 && isExist).Should(BeTrue())
+					g.Expect(tmpCluster.Status.Components).Should(HaveLen(3))
+					g.Expect(isExist).Should(BeTrue())
 				})
 
 			By("modify consensus component name")

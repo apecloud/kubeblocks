@@ -354,7 +354,7 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		}
 		// keep the original template annotations.
 		// if annotations exist and are replaced, the statefulSet will be updated.
-		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
+		mergeAnnotations(stsObj.Spec.Template.Annotations,
 			stsProto.Spec.Template.Annotations)
 		stsObj.Spec.Template = stsProto.Spec.Template
 		stsObj.Spec.Replicas = stsProto.Spec.Replicas
@@ -364,7 +364,7 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 
 	handleDeploy := func(origObj, deployProto *appsv1.Deployment) (client.Object, error) {
 		deployObj := origObj.DeepCopy()
-		deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations,
+		mergeAnnotations(deployObj.Spec.Template.Annotations,
 			deployProto.Spec.Template.Annotations)
 		deployObj.Spec = deployProto.Spec
 		return deployObj, nil

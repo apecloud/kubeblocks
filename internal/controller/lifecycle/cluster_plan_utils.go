@@ -26,7 +26,7 @@ import (
 
 // mergeAnnotations keeps the original annotations.
 // if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
-func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
+func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) {
 	if targetAnnotations == nil {
 		targetAnnotations = map[string]string{}
 	}
@@ -36,7 +36,6 @@ func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) 
 			targetAnnotations[k] = v
 		}
 	}
-	return targetAnnotations
 }
 
 // mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.

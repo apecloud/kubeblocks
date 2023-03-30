@@ -36,11 +36,13 @@ var _ OpsHandler = restartOpsHandler{}
 
 func init() {
 	restartBehaviour := OpsBehaviour{
-		// REVIEW: can do opsrequest if not running?
-		FromClusterPhases:          appsv1alpha1.GetClusterTerminalPhases(),
-		ToClusterPhase:             appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.RebootingPhase,
-		OpsHandler:                 restartOpsHandler{},
-		MaintainClusterPhaseBySelf: true,
+		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
+		// TODO: we should add "force" flag for these opsRequest.
+		FromClusterPhases:                  appsv1alpha1.GetClusterTerminalPhases(),
+		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.RebootingPhase,
+		OpsHandler:                         restartOpsHandler{},
+		MaintainClusterPhaseBySelf:         true,
+		ProcessingReasonInClusterCondition: ProcessingReasonRestarting,
 	}
 
 	opsMgr := GetOpsManager()

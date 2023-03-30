@@ -59,14 +59,14 @@ var _ = Describe("cluster plan utils test", func() {
 				targetKey:  "true",
 				updatedKey: "true",
 			}
-			mergeAnnotations(originalAnnotations, targetAnnotations)
+			mergeAnnotations(originalAnnotations, &targetAnnotations)
 			Expect(targetAnnotations[targetKey]).ShouldNot(BeEmpty())
 			Expect(targetAnnotations[originalKey]).ShouldNot(BeEmpty())
 			Expect(targetAnnotations[updatedKey]).Should(Equal("true"))
 			By("merging with target being nil")
 			var nilAnnotations map[string]string
-			mergeAnnotations(originalAnnotations, nilAnnotations)
-			Expect(nilAnnotations).Should(BeNil())
+			mergeAnnotations(originalAnnotations, &nilAnnotations)
+			Expect(nilAnnotations).ShouldNot(BeNil())
 		})
 	})
 })

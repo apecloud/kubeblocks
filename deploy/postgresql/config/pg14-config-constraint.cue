@@ -14,18 +14,26 @@
 
 // PostgreSQL parameters: https://postgresqlco.nf/doc/en/param/
 #PGParameter: {
+	// Allows tablespaces directly inside pg_tblspc, for testing, pg version: 15
+	allow_in_place_tablespaces?: bool
+	// Allows modification of the structure of system tables as well as certain other risky actions on system tables. This is otherwise not allowed even for superusers. Ill-advised use of this setting can cause irretrievable data loss or seriously corrupt the database system. 
+	allow_system_table_mods?: bool
 	// Sets the application name to be reported in statistics and logs.
 	application_name?: string
 	// Sets the shell command that will be called to archive a WAL file.
 	archive_command?: string
+	// The library to use for archiving completed WAL file segments. If set to an empty string (the default), archiving via shell is enabled, and archive_command is used. Otherwise, the specified shared library is used for archiving. The WAL archiver process is restarted by the postmaster when this parameter changes. For more information, see backup-archiving-wal and archive-modules.
+	archive_library?: string
+	// When archive_mode is enabled, completed WAL segments are sent to archive storage by setting archive_command or guc-archive-library. In addition to off, to disable, there are two modes: on, and always. During normal operation, there is no difference between the two modes, but when set to always the WAL archiver is enabled also during archive recovery or standby mode. In always mode, all files restored from the archive or streamed with streaming replication will be archived (again). See continuous-archiving-in-standby for details.
+	archive_mode: string & "always" | "on" | "off"
 	// (s) Forces a switch to the next xlog file if a new file has not been started within N seconds.
 	archive_timeout: int & >=0 & <=2147483647 | *300 @timeDurationResource(1s)
 	// Enable input of NULL elements in arrays.
-	array_nulls?: bool & false | true
+	array_nulls?: bool
 	// (s) Sets the maximum allowed time to complete client authentication.
-	authentication_timeout?: int & >=1 & <=600 @timeDurationResource()
+	authentication_timeout?: int & >=1 & <=600 @timeDurationResource(1s)
 	// Use EXPLAIN ANALYZE for plan logging.
-	"auto_explain.log_analyze"?: bool & false | true
+	"auto_explain.log_analyze"?: bool
 	// Log buffers usage.
 	"auto_explain.log_buffers"?: bool & false | true
 	// EXPLAIN format to be used for plan logging.
@@ -50,7 +58,7 @@
 	"auto_explain.sample_rate"?: float & >=0 & <=1
 
 	// Starts the autovacuum subprocess.
-	autovacuum?: bool & false | true
+	autovacuum?: bool
 
 	// Number of tuple inserts, updates or deletes prior to analyze as a fraction of reltuples.
 	autovacuum_analyze_scale_factor: float & >=0 & <=100 | *0.05
@@ -59,7 +67,7 @@
 	autovacuum_analyze_threshold?: int & >=0 & <=2147483647
 
 	// Age at which to autovacuum a table to prevent transaction ID wraparound.
-	autovacuum_freeze_max_age?: int & >=100000000 & <=750000000
+	autovacuum_freeze_max_age?: int & >=100000 & <=2000000000
 
 	// Sets the maximum number of simultaneously running autovacuum worker processes.
 	autovacuum_max_workers?: int & >=1 & <=8388607
@@ -71,7 +79,7 @@
 	autovacuum_naptime: int & >=1 & <=2147483 | *15 @timeDurationResource(1s)
 
 	// (ms) Vacuum cost delay in milliseconds, for autovacuum.
-	autovacuum_vacuum_cost_delay?: int & >=-1 & <=100
+	autovacuum_vacuum_cost_delay?: int & >=-1 & <=100 @timeDurationResource()
 
 	// Vacuum cost amount available before napping, for autovacuum.
 	autovacuum_vacuum_cost_limit?: int & >=-1 & <=10000
@@ -92,9 +100,9 @@
 	autovacuum_work_mem?: int & >=-1 & <=2147483647 @storeResource(1KB)
 
 	// (8Kb) Number of pages after which previously performed writes are flushed to disk.
-	backend_flush_after?: int & >=0 & <=256
+	backend_flush_after?: int & >=0 & <=256 @storeResource(8KB)
 
-	// Sets whether \ is allowed in string literals.
+	// Sets whether "\" is allowed in string literals.
 	backslash_quote?: string & "safe_encoding" | "on" | "off"
 
 	// Log backtrace for errors in these functions.
@@ -104,7 +112,7 @@
 	bgwriter_delay?: int & >=10 & <=10000 @timeDurationResource()
 
 	// (8Kb) Number of pages after which previously performed writes are flushed to disk.
-	bgwriter_flush_after?: int & >=0 & <=256
+	bgwriter_flush_after?: int & >=0 & <=256 @storeResource(8KB)
 
 	// Background writer maximum number of LRU pages to flush per round.
 	bgwriter_lru_maxpages?: int & >=0 & <=1000
@@ -352,6 +360,9 @@
 	// Use of huge pages on Linux.
 	huge_pages?: string & "on" | "off" | "try"
 
+	// The size of huge page that should be requested. Controls the size of huge pages, when they are enabled with huge_pages. The default is zero (0). When set to 0, the default huge page size on the system will be used. This parameter can only be set at server start. 
+	huge_page_size?: int & >=0 & <=2147483647 @storeResource(1KB)
+
 	// Sets the servers ident configuration file.
 	ident_file?: string
 
@@ -368,7 +379,7 @@
 	intervalstyle?: string & "postgres" | "postgres_verbose" | "sql_standard" | "iso_8601"
 
 	// Allow JIT compilation.
-	jit: bool & false | true | *false
+	jit: bool
 
 	// Perform JIT compilation if query is more expensive.
 	jit_above_cost?: float & >=-1 & <=1.79769e+308
@@ -484,6 +495,9 @@
 	// (kB) Automatic log file rotation will occur after N kilobytes.
 	log_rotation_size?: int & >=0 & <=2097151 @storeResource(1KB)
 
+	// Time between progress updates for long-running startup operations. Sets the amount of time after which the startup process will log a message about a long-running operation that is still in progress, as well as the interval between further progress messages for that operation. The default is 10 seconds. A setting of 0 disables the feature. If this value is specified without units, it is taken as milliseconds. This setting is applied separately to each operation. This parameter can only be set in the postgresql.conf file or on the server command line.  
+	log_startup_progress_interval: int & >=0 & <=2147483647 @timeDurationResource()
+
 	// Sets the type of statements logged.
 	log_statement?: string & "none" | "ddl" | "mod" | "all"
 
@@ -491,7 +505,7 @@
 	log_statement_sample_rate?: float & >=0 & <=1
 
 	// Writes cumulative performance statistics to the server log.
-	log_statement_stats?: bool & false | true
+	log_statement_stats?: bool
 
 	// (kB) Log the use of temporary files larger than this number of kilobytes.
 	log_temp_files?: int & >=-1 & <=2147483647 @storeResource(1KB)
@@ -577,6 +591,9 @@
 	// (8kB) Sets the minimum amount of index data for a parallel scan.
 	min_parallel_index_scan_size?: int & >=0 & <=715827882 @storeResource(8KB)
 
+	// Sets the minimum size of relations to be considered for parallel scan. Sets the minimum size of relations to be considered for parallel scan. 
+	min_parallel_relation_size?: int & >=0 & <=715827882 @storeResource(8KB)
+
 	// (8kB) Sets the minimum amount of table data for a parallel scan.
 	min_parallel_table_scan_size?: int & >=0 & <=715827882 @storeResource(8KB)
 
@@ -584,7 +601,7 @@
 	min_wal_size: int & >=128 & <=201326592 | *192 @storeResource(1MB)
 
 	// (min) Time before a snapshot is too old to read pages changed after the snapshot was taken.
-	old_snapshot_threshold?: int & >=-1 & <=86400
+	old_snapshot_threshold?: int & >=-1 & <=86400 @timeDurationResource(1min)
 
 	// Emulate oracle's date output behaviour.
 	"orafce.nls_date_format"?: string
@@ -838,6 +855,12 @@
 	// Sets the TCP port the server listens on.
 	port?: int & >=1 & <=65535
 
+	// Sets the amount of time to wait after authentication on connection startup. The amount of time to delay when a new server process is started, after it conducts the authentication procedure. This is intended to give developers an opportunity to attach to the server process with a debugger. If this value is specified without units, it is taken as seconds. A value of zero (the default) disables the delay. This parameter cannot be changed after session start.
+	post_auth_delay?: int & >=0 & <=2147 @timeDurationResource(1s)
+
+	// Sets the amount of time to wait before authentication on connection startup. The amount of time to delay just after a new server process is forked, before it conducts the authentication procedure. This is intended to give developers an opportunity to attach to the server process with a debugger to trace down misbehavior in authentication. If this value is specified without units, it is taken as seconds. A value of zero (the default) disables the delay. This parameter can only be set in the postgresql.conf file or on the server command line.
+	pre_auth_delay?: int & >=0 & <=60 @timeDurationResource(1s)
+
 	// Enable for disable GDAL drivers used with PostGIS in Postgres 9.3.5 and above.
 	"postgis.gdal_enabled_drivers"?: string & "ENABLE_ALL" | "DISABLE_ALL"
 
@@ -938,11 +961,14 @@
 	// (s) Time between TCP keepalive retransmits.
 	tcp_keepalives_interval?: int & >=0 & <=2147483647 @timeDurationResource(1s)
 
+	// TCP user timeout. Specifies the amount of time that transmitted data may remain unacknowledged before the TCP connection is forcibly closed. If this value is specified without units, it is taken as milliseconds. A value of 0 (the default) selects the operating system's default. This parameter is supported only on systems that support TCP_USER_TIMEOUT; on other systems, it must be zero. In sessions connected via a Unix-domain socket, this parameter is ignored and always reads as zero.
+	tcp_user_timeout?: int & >=0 & <=2147483647 @timeDurationResource()
+
 	// (8kB) Sets the maximum number of temporary buffers used by each session.
 	temp_buffers?: int & >=100 & <=1073741823 @storeResource(8KB)
 
 	// (kB) Limits the total size of all temporary files used by each process.
-	temp_file_limit?: int & >=-1 & <=2147483647 @storeResource(8KB)
+	temp_file_limit?: int & >=-1 & <=2147483647 @storeResource(1KB)
 
 	// Sets the tablespace(s) to use for temporary tables and sort files.
 	temp_tablespaces?: string
@@ -954,7 +980,7 @@
 	track_activities?: bool & false | true
 
 	// Sets the size reserved for pg_stat_activity.current_query, in bytes.
-	track_activity_query_size: int & >=100 & <=1048576 | *4096
+	track_activity_query_size: int & >=100 & <=1048576 | *4096 @storeResource()
 
 	// Collects transaction commit time.
 	track_commit_timestamp?: bool & false | true
@@ -1028,6 +1054,12 @@
 	// Compresses full-page writes written in WAL file.
 	wal_compression: bool & false | true | *true
 
+	// Sets the WAL resource managers for which WAL consistency checks are done.
+	wal_consistency_checking?: string
+
+	// Buffer size for reading ahead in the WAL during recovery. 
+	wal_decode_buffer_size: int & >=65536 & <=1073741823 | *524288 @storeResource()
+
 	// (MB) Sets the size of WAL files held for standby servers.
 	wal_keep_size: int & >=0 & <=2147483647 | *2048 @storeResource(1MB)
 
@@ -1039,6 +1071,12 @@
 
 	// (ms) Sets the maximum wait time to receive data from the primary.
 	wal_receiver_timeout: int & >=0 & <=3600000 | *30000 @timeDurationResource()
+
+	// Recycles WAL files by renaming them. If set to on (the default), this option causes WAL files to be recycled by renaming them, avoiding the need to create new ones. On COW file systems, it may be faster to create new ones, so the option is given to disable this behavior.
+	wal_recycle?: bool
+
+	// Sets the time to wait before retrying to retrieve WAL after a failed attempt. Specifies how long the standby server should wait when WAL data is not available from any sources (streaming replication, local pg_wal or WAL archive) before trying again to retrieve WAL data. If this value is specified without units, it is taken as milliseconds. The default value is 5 seconds. This parameter can only be set in the postgresql.conf file or on the server command line.
+	wal_retrieve_retry_interval: int & >=1 & <=2147483647 | *5000 @timeDurationResource()
 
 	// (ms) Sets the maximum time to wait for WAL replication.
 	wal_sender_timeout: int & >=0 & <=3600000 | *30000 @timeDurationResource()

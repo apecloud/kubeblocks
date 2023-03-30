@@ -25,6 +25,8 @@ spec:
         ports:
           - protocol: TCP
             port: 2379
+        selector:
+          kubeblocks.io/role: leader
       podSpec:
         containers:
           - name: etcd

@@ -58,6 +58,8 @@ spec:
         ports:
           - protocol: TCP
             port: 6379
+        selector:
+          kubeblocks.io/role: primary
       configSpecs:
         - name: redis-replication-config
           templateRef: redis7-config-template

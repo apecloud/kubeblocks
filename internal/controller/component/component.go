@@ -119,6 +119,9 @@ func BuildComponent(
 				Spec: *clusterCompDefObj.Service,
 			}
 			service.Spec.Type = item.ServiceType
+			if len(item.Selector) > 0 {
+				service.Spec.Selector = item.Selector
+			}
 			component.Services = append(component.Services, service)
 		}
 	}

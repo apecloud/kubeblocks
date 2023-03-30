@@ -83,6 +83,20 @@ spec:
                           name:
                             description: Service name
                             type: string
+                          selector:
+                            additionalProperties:
+                              type: string
+                            description: 'Route service traffic to pods with label
+                              keys and values matching this selector. Only applies
+                              to types ClusterIP, NodePort, and LoadBalancer. Ignored
+                              if type is ExternalName. If empty or not present, use
+                              default value in ClusterDefinition spec. The following
+                              three Labels are automatically added by KubeBlocks and
+                              can not be changed. 1. app.kubernetes.io/instance: ${cluster-name}
+                              2. app.kubernetes.io/managed-by: kubeblocks 3. apps.kubeblocks.io/component-name:
+                              ${component-name} More info: https://kubernetes.io/docs/concepts/services-networking/service/'
+                            type: object
+                            x-kubernetes-map-type: atomic
                           serviceType:
                             default: ClusterIP
                             description: 'serviceType determines how the Service is
@@ -581,6 +595,21 @@ spec:
                               name:
                                 description: Service name
                                 type: string
+                              selector:
+                                additionalProperties:
+                                  type: string
+                                description: 'Route service traffic to pods with label
+                                  keys and values matching this selector. Only applies
+                                  to types ClusterIP, NodePort, and LoadBalancer.
+                                  Ignored if type is ExternalName. If empty or not
+                                  present, use default value in ClusterDefinition
+                                  spec. The following three Labels are automatically
+                                  added by KubeBlocks and can not be changed. 1. app.kubernetes.io/instance:
+                                  ${cluster-name} 2. app.kubernetes.io/managed-by:
+                                  kubeblocks 3. apps.kubeblocks.io/component-name:
+                                  ${component-name} More info: https://kubernetes.io/docs/concepts/services-networking/service/'
+                                type: object
+                                x-kubernetes-map-type: atomic
                               serviceType:
                                 default: ClusterIP
                                 description: 'serviceType determines how the Service

@@ -56,6 +56,8 @@ spec:
         ports:
           - protocol: TCP
             port: 27018
+        selector:
+          kubeblocks.io/role: leader
       podSpec:
         containers:
           - name: configsvr
@@ -105,6 +107,8 @@ spec:
         ports:
           - protocol: TCP
             port: 27018
+        selector:
+          kubeblocks.io/role: leader
       podSpec:
         containers:
           - name: shard

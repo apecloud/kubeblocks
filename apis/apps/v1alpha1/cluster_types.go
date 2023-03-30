@@ -380,6 +380,19 @@ type ClusterComponentService struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Route service traffic to pods with label keys and values matching this
+	// selector. Only applies to types ClusterIP, NodePort, and LoadBalancer.
+	// Ignored if type is ExternalName.
+	// If empty or not present, use default value in ClusterDefinition spec.
+	// The following three Labels are automatically added by KubeBlocks and can not be changed.
+	// 1. app.kubernetes.io/instance: ${cluster-name}
+	// 2. app.kubernetes.io/managed-by: kubeblocks
+	// 3. apps.kubeblocks.io/component-name: ${component-name}
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/
+	// +optional
+	// +mapType=atomic
+	Selector map[string]string `json:"selector,omitempty"`
 }
 
 // +kubebuilder:object:root=true

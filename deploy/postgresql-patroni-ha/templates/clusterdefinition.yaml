@@ -69,6 +69,8 @@ spec:
           - name: http-metrics-postgresql
             port: 9187
             targetPort: http-metrics
+        selector:
+          kubeblocks.io/role: primary
       volumeTypes:
         - name: data
           type: data

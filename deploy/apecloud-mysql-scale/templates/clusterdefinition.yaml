@@ -71,6 +71,8 @@ spec:
             port: 40000
             targetPort: delvedebug
             name: delvedebug   
+        selector:
+          kubeblocks.io/role: leader
       horizontalScalePolicy:
         type: Snapshot
         backupTemplateSelector:

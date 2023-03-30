@@ -193,12 +193,6 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		return err
 	}
 	for _, svc := range svcList {
-		if task.Component.WorkloadType == appsv1alpha1.Consensus {
-			addLeaderSelectorLabels(svc, task.Component)
-		}
-		if task.Component.WorkloadType == appsv1alpha1.Replication {
-			svc.Spec.Selector[constant.RoleLabelKey] = string(replicationset.Primary)
-		}
 		task.AppendResource(svc)
 	}
 
@@ -210,14 +204,6 @@ func needBuildPDB(task *intctrltypes.ReconcileTask) bool {
 	// TODO: add ut
 	comp := task.Component
 	return comp.WorkloadType == appsv1alpha1.Consensus && comp.MaxUnavailable != nil
-}
-
-// TODO multi roles with same accessMode support
-func addLeaderSelectorLabels(service *corev1.Service, component *component.SynthesizedComponent) {
-	leader := component.ConsensusSpec.Leader
-	if len(leader.Name) > 0 {
-		service.Spec.Selector[constant.RoleLabelKey] = leader.Name
-	}
 }
 
 // buildConsensusSet build on a stateful set

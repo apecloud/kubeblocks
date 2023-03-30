@@ -54,6 +54,8 @@ spec:
           - protocol: TCP
             port: 3306
             targetPort: mysql
+        selector:
+          kubeblocks.io/role: leader
       horizontalScalePolicy:
         type: Snapshot
         backupTemplateSelector:

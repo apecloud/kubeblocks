@@ -32,6 +32,7 @@ service: {
 	spec: {
 		ports: [...]
 		type: string
+		selector: {}
 	}
 }
 
@@ -59,6 +60,9 @@ svc: {
 			"app.kubernetes.io/instance":        "\(cluster.metadata.name)"
 			"app.kubernetes.io/managed-by":      "kubeblocks"
 			"apps.kubeblocks.io/component-name": "\(component.name)"
+			for k, v in service.spec.selector {
+				"\(k)": "\(v)"
+			}
 		}
 		ports: service.spec.ports
 		if service.spec.type != _|_ {

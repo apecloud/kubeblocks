@@ -37,7 +37,6 @@ var _ = Describe("Backup Controller test", func() {
 	const clusterName = "wesql-cluster"
 	const componentName = "replicasets-primary"
 	const containerName = "mysql"
-	const defaultPVCSize = "1Gi"
 	const backupPolicyName = "test-backup-policy"
 	const backupRemoteVolumeName = "backup-remote-volume"
 	const backupRemotePVCName = "backup-remote-pvc"
@@ -59,7 +58,6 @@ var _ = Describe("Backup Controller test", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
-		//testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
@@ -79,16 +77,6 @@ var _ = Describe("Backup Controller test", func() {
 		By("mock a cluster")
 		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			"test-cd", "test-cv").Create(&testCtx)
-		/*
-			By("By mocking a statefulset")
-			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
-				AddAppInstanceLabel(clusterName).
-				AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
-				AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
-					ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
-					Spec:       testapps.NewPVC(defaultPVCSize),
-				}).Create(&testCtx).GetObject()
-		*/
 		podGenerateName := clusterName + "-" + componentName
 		By("By mocking a pvc belonging to the pod")
 		pvc := testapps.NewPersistentVolumeClaimFactory(

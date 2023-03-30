@@ -458,7 +458,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		}
 
 		reqCtx.Log.V(1).Info("create a volumeSnapshot from backup", "snapshot", snap.Name)
-		if err := r.Client.Create(reqCtx.Ctx, snap); err != nil {
+		if err = r.Client.Create(reqCtx.Ctx, snap); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
@@ -511,7 +511,7 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	}
 	msg := fmt.Sprintf("creating job %s", key.Name)
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatingJob-"+key.Name, msg)
-	return r.Client.Create(reqCtx.Ctx, job)
+	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))
 }
 
 func (r *BackupReconciler) createBackupToolJob(
@@ -646,10 +646,7 @@ func (r *BackupReconciler) createBatchV1Job(
 	controllerutil.AddFinalizer(job, dataProtectionFinalizerName)
 
 	reqCtx.Log.V(1).Info("create a built-in job from backup", "job", job)
-	if err := r.Client.Create(reqCtx.Ctx, job); err != nil {
-		return err
-	}
-	return nil
+	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))
 }
 
 func (r *BackupReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) (*batchv1.Job, error) {
@@ -1018,12 +1015,13 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 	container.Name = backup.Name
 	container.Command = []string{"sh", "-c"}
 	args := "KB_BACKUP_MANIFESTS=$(kubectl -n %s exec -it pod/%s -c %s -- sh -c '%s') && " +
-		"kubectl -n %s patch backup %s --subresource=status --type=merge --patch \"status: { manifests: { $KB_BACKUP_MANIFESTS }}\""
+		"kubectl -n %s patch backup %s --subresource=status --type=merge --patch " +
+		"\"status: { manifests: { $KB_BACKUP_MANIFESTS }}\""
 	args = fmt.Sprintf(args, targetPod.Namespace, targetPod.Name, backupPolicy.Spec.Hooks.ContainerName,
 		backupPolicy.Spec.Hooks.ManifestsCommands, backup.Namespace, backup.Name)
 	container.Args = []string{args}
-	// TODO(dsj): get kubeblocks debug image
-	container.Image = "appscode/kubectl:1.25"
+	container.Image = constant.KBToolsImage
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	podSpec.Containers = []corev1.Container{container}
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")

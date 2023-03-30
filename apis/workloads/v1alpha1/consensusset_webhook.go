@@ -17,7 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -54,22 +57,85 @@ var _ webhook.Validator = &ConsensusSet{}
 func (r *ConsensusSet) ValidateCreate() error {
 	consensussetlog.Info("validate create", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object creation.
-	return nil
+	return r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *ConsensusSet) ValidateUpdate(old runtime.Object) error {
 	consensussetlog.Info("validate update", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object update.
-	return nil
+	return r.validate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *ConsensusSet) ValidateDelete() error {
 	consensussetlog.Info("validate delete", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object deletion.
+	return r.validate()
+}
+
+func (r *ConsensusSet) validate() error {
+	var allErrs field.ErrorList
+
+	// roleObserveQuery and Leader are required
+	if r.Spec.Leader.Name == "" {
+		allErrs = append(allErrs,
+			field.Required(field.NewPath("spec.leader.name"),
+				"leader name can't be blank"))
+	}
+
+	// Leader.Replicas should not be present or should set to 1
+	if *r.Spec.Leader.Replicas != 0 && *r.Spec.Leader.Replicas != 1 {
+		allErrs = append(allErrs,
+			field.Invalid(field.NewPath("spec.leader.replicas"),
+				r.Spec.Leader.Replicas,
+				"leader replicas can only be 1"))
+	}
+
+	// Leader.replicas + Follower.replicas should be odd
+	candidates := int32(1)
+	for _, member := range r.Spec.Followers {
+		if member.Replicas != nil {
+			candidates += *member.Replicas
+		}
+	}
+	if candidates%2 == 0 {
+		allErrs = append(allErrs,
+			field.Invalid(field.NewPath("spec.candidates(leader.replicas+followers[*].replicas)"),
+				candidates,
+				"candidates(leader+followers) should be odd"))
+	}
+	// if spec.replicas is 1, then only Leader should be present. just omit if present
+
+	// if Followers.Replicas present, Leader.Replicas(that is 1) + Followers.Replicas + Learner.Replicas should equal to spec.Replicas
+	isFollowerPresent := false
+	memberCount := int32(1)
+	for _, member := range r.Spec.Followers {
+		if member.Replicas != nil && *member.Replicas > 0 {
+			isFollowerPresent = true
+			memberCount += *member.Replicas
+		}
+	}
+	if isFollowerPresent {
+		if r.Spec.Learner != nil && r.Spec.Learner.Replicas != nil {
+			memberCount += *r.Spec.Learner.Replicas
+		}
+		if memberCount != r.Spec.Replicas {
+			allErrs = append(allErrs,
+				field.Invalid(field.NewPath("spec.Replicas"),
+					r.Spec.Replicas,
+					"#(members) should be equal to Replicas"))
+		}
+	}
+
+	if len(allErrs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{
+				Group: "core.kubeblocks.io/v1alpha1",
+				Kind:  "ConsensusBlock",
+			},
+			r.Name, allErrs)
+	}
+
 	return nil
 }

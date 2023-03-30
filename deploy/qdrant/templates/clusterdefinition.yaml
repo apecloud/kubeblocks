@@ -1,0 +1,97 @@
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: qdrant-standalone
+  labels:
+    {{- include "qdrant.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-qdrant)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-qdrant)"
+  componentDefs:
+    - name: qdrant
+      workloadType: Stateful
+      characterType: qdrant
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9187
+      logConfigs:
+      configSpecs:
+        - name: qdrant-standalone-config-template
+          templateRef: qdrant-standalone-config-template
+          volumeName: qdrant-config
+          namespace: {{ .Release.Namespace }}
+      service:
+        ports:
+          - name: tcp-qdrant
+            protocol: TCP
+            port: 6333
+            targetPort: tcp-qdrant
+          - name: grpc-qdrant
+            protocol: TCP
+            port: 6334
+            targetPort: grpc-qdrant
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: qdrant
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /
+                port: 6333
+                scheme: HTTP
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 10
+            readinessProbe:
+              failureThreshold: 2
+              httpGet:
+                path: /
+                port: 6333
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /
+                port: 6333
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /qdrant/config/
+                name: qdrant-config
+              - mountPath: /qdrant/storage
+                name: data
+            dnsPolicy: ClusterFirst
+            enableServiceLinks: true
+            ports:
+              - name: tcp-qdrant
+                containerPort: 6333
+              - name: tcp-metrics
+                containerPort: 9091
+            command:
+              - ./qdrant
+            env:
+

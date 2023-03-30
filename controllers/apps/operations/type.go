@@ -65,11 +65,6 @@ type OpsBehaviour struct {
 	// StatefulSet/Deployment by Cluster controller and make pod to rebuilt, you need to maintain the cluster/component phase yourself.
 	MaintainClusterPhaseBySelf bool
 
-	// ProcessingReasonInClusterCondition indicates the reason of the condition that type is "OpsRequestProcessed" in Cluster.Status.Conditions and
-	// is only valid when ToClusterPhase is not empty. it will indicate what operation the cluster is doing and
-	// will be displayed of "kblic cluster list".
-	ProcessingReasonInClusterCondition string
-
 	OpsHandler OpsHandler
 }
 
@@ -92,22 +87,3 @@ type progressResource struct {
 	clusterComponentDef *appsv1alpha1.ClusterComponentDefinition
 	opsIsCompleted      bool
 }
-
-const (
-	// ProcessingReasonHorizontalScaling is the reason of the "OpsRequestProcessed" condition for the horizontal scaling opsRequest processing in cluster.
-	ProcessingReasonHorizontalScaling = "HorizontalScaling"
-	// ProcessingReasonVerticalScaling is the reason of the "OpsRequestProcessed" condition for the vertical scaling opsRequest processing in cluster.
-	ProcessingReasonVerticalScaling = "VerticalScaling"
-	// ProcessingReasonVolumeExpanding is the reason of the "OpsRequestProcessed" condition for the volume expansion opsRequest processing in cluster.
-	ProcessingReasonVolumeExpanding = "VolumeExpanding"
-	// ProcessingReasonStarting is the reason of the "OpsRequestProcessed" condition for the start opsRequest processing in cluster.
-	ProcessingReasonStarting = "Starting"
-	// ProcessingReasonStopping is the reason of the "OpsRequestProcessed" condition for the stop opsRequest processing in cluster.
-	ProcessingReasonStopping = "Stopping"
-	// ProcessingReasonRestarting is the reason of the "OpsRequestProcessed" condition for the restart opsRequest processing in cluster.
-	ProcessingReasonRestarting = "Restarting"
-	// ProcessingReasonReconfiguring is the reason of the "OpsRequestProcessed" condition for the reconfiguration opsRequest processing in cluster.
-	ProcessingReasonReconfiguring = "Reconfiguring"
-	// ProcessingReasonVersionUpgrading is the reason of the "OpsRequestProcessed" condition for the version upgrade opsRequest processing in cluster.
-	ProcessingReasonVersionUpgrading = "VersionUpgrading"
-)

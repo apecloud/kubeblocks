@@ -167,7 +167,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				func(g Gomega, fetched *appsv1alpha1.Cluster) {
 					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
 					g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(1))
-					g.Expect(fetched.Status.Phase).To(Equal(appsv1alpha1.CreatingClusterPhase))
+					g.Expect(fetched.Status.Phase).To(Equal(appsv1alpha1.StartingClusterPhase))
 				})).Should(Succeed())
 
 			By("watch normal event")

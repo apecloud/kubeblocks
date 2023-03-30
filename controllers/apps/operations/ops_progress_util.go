@@ -328,8 +328,7 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 
 // podIsPendingDuringOperation checks if pod is pending during the component is doing operation.
 func podIsPendingDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod, componentPhase appsv1alpha1.ClusterComponentPhase) bool {
-	return pod.CreationTimestamp.Before(&opsStartTime) && pod.DeletionTimestamp.IsZero() &&
-		!slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), componentPhase)
+	return pod.CreationTimestamp.Before(&opsStartTime) && !util.IsCompleted(componentPhase) && pod.DeletionTimestamp.IsZero()
 }
 
 // podIsFailedDuringOperation checks if pod is failed during operation.

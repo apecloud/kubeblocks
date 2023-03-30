@@ -380,8 +380,9 @@ spec:
                       - Stopped
                       - Failed
                       - Abnormal
-                      - Creating
                       - Updating
+                      - Starting
+                      - Stopping
                       type: string
                     progressDetails:
                       description: progressDetails describes the progress details

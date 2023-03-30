@@ -216,14 +216,21 @@ func PatchValidateErrorCondition(ctx context.Context, cli client.Client, opsRes 
 }
 
 // getOpsRequestNameFromAnnotation gets OpsRequest.name from cluster.annotations
-func getOpsRequestNameFromAnnotation(cluster *appsv1alpha1.Cluster, opsType appsv1alpha1.OpsType) *string {
+func getOpsRequestNameFromAnnotation(cluster *appsv1alpha1.Cluster, toClusterPhase appsv1alpha1.ClusterPhase) string {
 	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+	opsRecorder := getOpsRecorderWithClusterPhase(opsRequestSlice, toClusterPhase)
+	return opsRecorder.Name
+}
+
+// getOpsRecorderWithClusterPhase gets OpsRequest recorder from slice by target cluster phase
+func getOpsRecorderWithClusterPhase(opsRequestSlice []appsv1alpha1.OpsRecorder,
+	toClusterPhase appsv1alpha1.ClusterPhase) appsv1alpha1.OpsRecorder {
 	for _, v := range opsRequestSlice {
-		if v.Type == opsType {
-			return &v.Name
+		if v.ToClusterPhase == toClusterPhase {
+			return v
 		}
 	}
-	return nil
+	return appsv1alpha1.OpsRecorder{}
 }
 
 // GetOpsRecorderFromSlice gets OpsRequest recorder from slice by target cluster phase
@@ -250,23 +257,18 @@ func patchOpsRequestToCreating(ctx context.Context,
 	return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCoy, appsv1alpha1.OpsCreatingPhase, validatePassCondition, condition)
 }
 
-// patchClusterStatusAndRecordEvent records the ops event in the cluster and
-// will update the cluster status if the ops need to maintain cluster status by self.
-func patchClusterStatusAndRecordEvent(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	opsBehaviour OpsBehaviour) error {
-	sendStartOpsRequestEvent := func() {
-		opsRes.Recorder.Eventf(opsRes.Cluster, corev1.EventTypeNormal, string(opsRes.OpsRequest.Spec.Type),
-			`Start to process the %s opsRequest "%s" in Cluster: %s`, opsRes.OpsRequest.Spec.Type,
-			opsRes.OpsRequest.Name, opsRes.Cluster.Name)
+// patchClusterStatus updates Cluster.status to record cluster and components information if the ops need to maintain cluster status by self.
+func patchClusterStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, opsBehaviour OpsBehaviour) error {
+	toClusterPhase := opsBehaviour.ToClusterPhase
+	if toClusterPhase == "" {
+		return nil
 	}
-	if opsBehaviour.ToClusterPhase == "" || !opsBehaviour.MaintainClusterPhaseBySelf {
-		sendStartOpsRequestEvent()
+	// if ops does not maintain the cluster phase by self, return
+	if !opsBehaviour.MaintainClusterPhaseBySelf {
 		return nil
 	}
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
-	opsRes.Cluster.Status.Phase = opsBehaviour.ToClusterPhase
+	opsRes.Cluster.Status.Phase = toClusterPhase
 	// update cluster.status.components phase
 	realChangeCompMap := opsBehaviour.OpsHandler.GetRealAffectedComponentMap(opsRes.OpsRequest)
 	for k := range realChangeCompMap {
@@ -278,7 +280,8 @@ func patchClusterStatusAndRecordEvent(reqCtx intctrlutil.RequestCtx,
 	if err := cli.Status().Patch(reqCtx.Ctx, opsRes.Cluster, patch); err != nil {
 		return err
 	}
-	sendStartOpsRequestEvent()
+	opsRes.Recorder.Eventf(opsRes.Cluster, corev1.EventTypeNormal, string(opsRes.OpsRequest.Spec.Type),
+		"Start %s in Cluster: %s", opsRes.OpsRequest.Spec.Type, opsRes.Cluster.Name)
 	return nil
 }
 
@@ -298,6 +301,9 @@ func DeleteOpsRequestAnnotationInCluster(ctx context.Context, cli client.Client,
 	}
 	// delete the opsRequest information in Cluster.annotations
 	opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
+	if err = patchClusterPhaseWhenExistsOtherOps(ctx, cli, opsRes, opsRequestSlice); err != nil {
+		return err
+	}
 	return opsutil.PatchClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
 }
 
@@ -325,10 +331,24 @@ func addOpsRequestAnnotationToCluster(ctx context.Context, cli client.Client, op
 		opsRequestSlice = make([]appsv1alpha1.OpsRecorder, 0)
 	}
 	opsRequestSlice = append(opsRequestSlice, appsv1alpha1.OpsRecorder{
-		Name: opsRes.OpsRequest.Name,
-		Type: opsRes.OpsRequest.Spec.Type,
+		Name:           opsRes.OpsRequest.Name,
+		ToClusterPhase: opsBehaviour.ToClusterPhase,
 	})
 	return opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
+}
+
+// patchClusterPhaseWhenExistsOtherOps
+func patchClusterPhaseWhenExistsOtherOps(ctx context.Context, cli client.Client, opsRes *OpsResource, opsRequestSlice []appsv1alpha1.OpsRecorder) error {
+	// If there are other OpsRequests running, modify the cluster.status.phase with other opsRequest's ToClusterPhase
+	if len(opsRequestSlice) == 0 {
+		return nil
+	}
+	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
+	opsRes.Cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
+	if err := cli.Status().Patch(ctx, opsRes.Cluster, patch); err != nil {
+		return err
+	}
+	return nil
 }
 
 // isOpsRequestFailedPhase checks the OpsRequest phase is Failed

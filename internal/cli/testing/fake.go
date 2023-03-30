@@ -58,7 +58,7 @@ func GetRandomStr() string {
 	return seq
 }
 
-func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1alpha1.Cluster {
+func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 	var replicas int32 = 1
 	return &appsv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
@@ -82,7 +82,6 @@ func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1
 					},
 				},
 			},
-			Conditions: conditions,
 		},
 		Spec: appsv1alpha1.ClusterSpec{
 			ClusterDefRef:     ClusterDefName,

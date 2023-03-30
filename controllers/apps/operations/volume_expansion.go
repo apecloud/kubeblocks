@@ -45,11 +45,11 @@ const (
 func init() {
 	// the volume expansion operation only support online expanding now, so this operation not affect the cluster availability.
 	volumeExpansionBehaviour := OpsBehaviour{
-		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
-		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
-		MaintainClusterPhaseBySelf:         true,
-		OpsHandler:                         volumeExpansionOpsHandler{},
-		ProcessingReasonInClusterCondition: ProcessingReasonVolumeExpanding,
+		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.VolumeExpandingPhase,
+		// TODO: add cluster reconcile VolumeExpanding phase.
+		MaintainClusterPhaseBySelf: true,
+		OpsHandler:                 volumeExpansionOpsHandler{},
 	}
 
 	opsMgr := GetOpsManager()

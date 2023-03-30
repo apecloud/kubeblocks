@@ -82,16 +82,17 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			consensusCompName, "data").SetStorage("2Gi").SetStorageClass(storageClassName).Create(&testCtx)
 	}
 
-	mockDoOperationOnCluster := func(cluster *appsv1alpha1.Cluster, opsRequestName string, opsType appsv1alpha1.OpsType) {
+	mockDoOperationOnCluster := func(cluster *appsv1alpha1.Cluster, opsRequestName string, toClusterPhase appsv1alpha1.ClusterPhase) {
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 			if tmpCluster.Annotations == nil {
 				tmpCluster.Annotations = map[string]string{}
 			}
-			tmpCluster.Annotations[constant.OpsRequestAnnotationKey] = fmt.Sprintf(`[{"type": "%s", "name":"%s"}]`, opsType, opsRequestName)
+			tmpCluster.Annotations[constant.OpsRequestAnnotationKey] = fmt.Sprintf(`[{"clusterPhase": "%s", "name":"%s"}]`, toClusterPhase, opsRequestName)
 		})()).ShouldNot(HaveOccurred())
 
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, myCluster *appsv1alpha1.Cluster) {
-			g.Expect(getOpsRequestNameFromAnnotation(myCluster, appsv1alpha1.VolumeExpansionType)).ShouldNot(BeNil())
+			g.Expect(getOpsRequestNameFromAnnotation(myCluster, appsv1alpha1.SpecReconcilingClusterPhase)).ShouldNot(BeEmpty()) // appsv1alpha1.VolumeExpandingPhase
+			// TODO: add status condition expect for appsv1alpha1.VolumeExpandingPhase
 		})).Should(Succeed())
 	}
 
@@ -116,7 +117,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		ops = testapps.CreateOpsRequest(ctx, testCtx, ops)
 
 		By("mock do operation on cluster")
-		mockDoOperationOnCluster(clusterObject, ops.Name, appsv1alpha1.VolumeExpansionType)
+		mockDoOperationOnCluster(clusterObject, ops.Name, appsv1alpha1.SpecReconcilingClusterPhase) // appsv1alpha1.VolumeExpandingPhase
+		// TODO: add status condition expect for appsv1alpha1.VolumeExpandingPhase
 
 		// create-pvc
 		pvcName := fmt.Sprintf("%s-%s-%s-%d", vctName, clusterObject.Name, consensusCompName, index)
@@ -141,7 +143,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		opsRes.OpsRequest = newOps
 		_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(err == nil).Should(BeTrue())
-		Eventually(testapps.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+		Eventually(testapps.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // VolumeExpandingPhase
+		// TODO: add status condition expect for VolumeExpandingPhase
 	}
 
 	testWarningEventOnPVC := func(reqCtx intctrlutil.RequestCtx, clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource) {
@@ -167,7 +170,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		event.InvolvedObject = stsInvolvedObject
 		pvcEventHandler := PersistentVolumeClaimEventHandler{}
 		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-		Eventually(testapps.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+		Eventually(testapps.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // VolumeExpandingPhase
+		// TODO: add status condition expect for VolumeExpandingPhase
 
 		// test when the event reach the conditions
 		event.Count = 5
@@ -240,7 +244,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		// init resources for volume expansion
 		newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, 2)
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-			clusterObject.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
+			clusterObject.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase // appsv1alpha1.VolumeExpandingPhase
+			// TODO: add status condition for VolumeExpandingPhase
 		})).ShouldNot(HaveOccurred())
 		Expect(k8sClient.Delete(ctx, newOps)).Should(Succeed())
 		Eventually(func() error {

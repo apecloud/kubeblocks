@@ -47,7 +47,15 @@ var (
 	ErrReqClusterObj              = errors.New("required arg *appsv1alpha1.Cluster is nil")
 	ErrReqClusterComponentDefObj  = errors.New("required arg *appsv1alpha1.ClusterComponentDefinition is nil")
 	ErrReqClusterComponentSpecObj = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
+	ErrNoOps                      = errors.New("no operation required")
 )
+
+func IgnoreNoOps(err error) error {
+	if err != nil && err != ErrNoOps {
+		return err
+	}
+	return nil
+}
 
 func ComponentRuntimeReqArgsCheck(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
@@ -80,6 +88,13 @@ func GetClusterByObject(ctx context.Context,
 		return nil, err
 	}
 	return cluster, nil
+}
+
+// IsCompleted checks whether the component has completed the operation
+//
+// Deprecated: should use appsv1alpha1.ClusterStatus.GetTerminalPhase()
+func IsCompleted(phase appsv1alpha1.ClusterComponentPhase) bool {
+	return slices.Index(appsv1alpha1.GetComponentTerminalPhases(), phase) != -1
 }
 
 func IsFailedOrAbnormal(phase appsv1alpha1.ClusterComponentPhase) bool {

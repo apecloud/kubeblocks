@@ -43,6 +43,7 @@ import (
 // and send the BackOff (Normal) event. If it has already consumed the 25 burst quota to send event, event can only be
 // sent in the rate of once per 300s, in this way, the subsequent warning events of ImagePullError would be dropped.
 type ComponentStatusSynchronizer struct {
+	ctx           context.Context
 	cli           client.Client
 	cluster       *appsv1alpha1.Cluster
 	component     types.Component
@@ -63,6 +64,7 @@ func newClusterStatusSynchronizer(ctx context.Context,
 		return nil, err
 	}
 	return &ComponentStatusSynchronizer{
+		ctx:           ctx,
 		cli:           cli,
 		cluster:       cluster,
 		component:     component,
@@ -135,7 +137,7 @@ func (cs *ComponentStatusSynchronizer) Update(ctx context.Context, obj client.Ob
 		logger.Info("component status changed", "componentName", componentName, "phase",
 			componentStatus.Phase, "componentIsRunning", isRunning, "podsAreReady", podsReady)
 		patch := client.MergeFrom(clusterDeepCopy)
-		if err = cs.cli.Status().Patch(ctx, cluster, patch); err != nil {
+		if err = cs.cli.Status().Patch(cs.ctx, cluster, patch); err != nil {
 			return false, err
 		}
 	}

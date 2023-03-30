@@ -99,10 +99,6 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 	newNameVertices := make(map[gvkName]graph.Vertex)
 	for _, vertex := range dag.Vertices() {
 		v, _ := vertex.(*lifecycleVertex)
-		if v == rootVertex {
-			// ignore root vertex, i.e, cluster object.
-			continue
-		}
 		name, err := getGVKName(v.obj, scheme)
 		if err != nil {
 			return err

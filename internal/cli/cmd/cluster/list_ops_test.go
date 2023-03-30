@@ -82,21 +82,27 @@ var _ = Describe("Expose", func() {
 	}
 
 	initOpsRequests := func() {
-		opsKeys := []struct {
-			opsType appsv1alpha1.OpsType
-			phase   appsv1alpha1.OpsPhase
-		}{
-			{appsv1alpha1.UpgradeType, appsv1alpha1.OpsPendingPhase},
-			{appsv1alpha1.HorizontalScalingType, appsv1alpha1.OpsFailedPhase},
-			{appsv1alpha1.HorizontalScalingType, appsv1alpha1.OpsSucceedPhase},
-			{appsv1alpha1.RestartType, appsv1alpha1.OpsSucceedPhase},
-			{appsv1alpha1.VerticalScalingType, appsv1alpha1.OpsRunningPhase},
-			{appsv1alpha1.VerticalScalingType, appsv1alpha1.OpsFailedPhase},
-			{appsv1alpha1.VerticalScalingType, appsv1alpha1.OpsRunningPhase},
+		opsTypes := []appsv1alpha1.OpsType{
+			appsv1alpha1.UpgradeType,
+			appsv1alpha1.HorizontalScalingType,
+			appsv1alpha1.HorizontalScalingType,
+			appsv1alpha1.RestartType,
+			appsv1alpha1.VerticalScalingType,
+			appsv1alpha1.VerticalScalingType,
+			appsv1alpha1.VerticalScalingType,
 		}
-		opsList := make([]runtime.Object, len(opsKeys))
-		for i := range opsKeys {
-			opsList[i] = generateOpsObject(opsKeys[i].opsType, opsKeys[i].phase)
+		phases := []appsv1alpha1.OpsPhase{
+			appsv1alpha1.OpsPendingPhase,
+			appsv1alpha1.OpsFailedPhase,
+			appsv1alpha1.OpsSucceedPhase,
+			appsv1alpha1.OpsSucceedPhase,
+			appsv1alpha1.OpsRunningPhase,
+			appsv1alpha1.OpsFailedPhase,
+			appsv1alpha1.OpsRunningPhase,
+		}
+		opsList := make([]runtime.Object, len(opsTypes))
+		for i := range opsTypes {
+			opsList[i] = generateOpsObject(opsTypes[i], phases[i])
 		}
 		opsName = opsList[0].(*appsv1alpha1.OpsRequest).Name
 		tf.FakeDynamicClient = clitesting.FakeDynamicClient(opsList...)

@@ -77,8 +77,10 @@ type ClusterStatus struct {
 	// Stopped: cluster has stopped, all its components are stopped. [terminal state]
 	// Failed: cluster is unavailable. [terminal state]
 	// Abnormal: Cluster is still running, but part of its components are Abnormal/Failed. [terminal state]
-	// Creating: Cluster has entered creating process.
+	// Starting: Cluster has entered starting process.
 	// Updating: Cluster has entered updating process, triggered by Spec. updated.
+	// Stopping: Cluster has entered a stopping process.
+	// if the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// +optional
 	Phase ClusterPhase `json:"phase,omitempty"`
 
@@ -181,14 +183,16 @@ type ComponentMessageMap map[string]string
 // ClusterComponentStatus record components status information
 type ClusterComponentStatus struct {
 	// phase describes the phase of the component, the detail information of the phases are as following:
+	// Failed: component is unavailable, i.e, all pods are not ready for Stateless/Stateful component;
+	// Leader/Primary pod is not ready for Consensus/Replication component.
 	// Running: component is running. [terminal state]
 	// Stopped: component is stopped, as no running pod. [terminal state]
-	// Failed: component is unavailable. i.e, all pods are not ready for Stateless/Stateful component,
-	// Leader/Primary pod is not ready for Consensus/Replication component. [terminal state]
-	// Abnormal: component is running but part of its pods are not ready.
-	// Leader/Primary pod is ready for Consensus/Replication component. [terminal state]
-	// Creating: component has entered creating process.
+	// Failed: component has failed to start running. [terminal state]
+	// Abnormal: component is running but part of its pods are not ready. [terminal state]
+	// Starting: component has entered starting process.
 	// Updating: component has entered updating process, triggered by Spec. updated.
+	// Stopping: component has entered a stopping process.
+	// If the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.
@@ -553,7 +557,7 @@ func GetClusterUpRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
 		AbnormalClusterPhase,
-		FailedClusterPhase, // REVIEW/TODO: single component with single pod component are handled as FailedClusterPhase, ought to remove this.
+		// FailedClusterPhase, // REVIEW/TODO: single component with single pod component are handled as FailedClusterPhase, ought to remove this.
 	}
 }
 

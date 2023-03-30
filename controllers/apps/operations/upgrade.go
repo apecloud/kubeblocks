@@ -34,12 +34,9 @@ var _ OpsHandler = upgradeOpsHandler{}
 
 func init() {
 	upgradeBehaviour := OpsBehaviour{
-		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
-		// TODO: we should add "force" flag for these opsRequest.
-		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
-		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
-		OpsHandler:                         upgradeOpsHandler{},
-		ProcessingReasonInClusterCondition: ProcessingReasonVersionUpgrading,
+		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.VersionUpgradingPhase,
+		OpsHandler:        upgradeOpsHandler{},
 	}
 
 	opsMgr := GetOpsManager()

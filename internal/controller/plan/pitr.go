@@ -60,7 +60,10 @@ type PointInTimeRecoveryManager struct {
 	sourceCluster string
 }
 
-const recoveryFinishedKey = "kubeblocks.io/restore-finished"
+const (
+	recoveryFinishedKey = "kubeblocks.io/restore-finished"
+	recoveryTrue        = "true"
+)
 
 func (p *PointInTimeRecoveryManager) listCompletedBackups() (backupItems []dpv1alpha1.Backup, err error) {
 	backups := dpv1alpha1.BackupList{}
@@ -199,7 +202,7 @@ func (p *PointInTimeRecoveryManager) basicCheckAndInit() (need bool, err error) 
 }
 
 func (p *PointInTimeRecoveryManager) checkAndInitForCleanup() (need bool, err error) {
-	if p.Cluster.Annotations[recoveryFinishedKey] != "true" {
+	if p.Cluster.Annotations[recoveryFinishedKey] != recoveryTrue {
 		return false, nil
 	}
 	return p.basicCheckAndInit()
@@ -207,7 +210,7 @@ func (p *PointInTimeRecoveryManager) checkAndInitForCleanup() (need bool, err er
 
 // checkAndInit check if cluster need to be restored, return value: true: need, false: no need
 func (p *PointInTimeRecoveryManager) checkAndInit() (need bool, err error) {
-	if p.Cluster.Annotations[recoveryFinishedKey] == "true" {
+	if p.Cluster.Annotations[recoveryFinishedKey] == recoveryTrue {
 		return false, nil
 	}
 	return p.basicCheckAndInit()
@@ -428,7 +431,7 @@ func (p *PointInTimeRecoveryManager) markClusterFinished() error {
 	if cluster.Annotations == nil {
 		cluster.Annotations = map[string]string{}
 	}
-	cluster.Annotations[recoveryFinishedKey] = "true"
+	cluster.Annotations[recoveryFinishedKey] = recoveryTrue
 	return p.Client.Patch(p.Ctx, cluster, patch)
 }
 

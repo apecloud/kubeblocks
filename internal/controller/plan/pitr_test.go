@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -106,7 +105,7 @@ var _ = Describe("PITR Functions", func() {
 				SetCredentialKeyword("username", "password").
 				AddHookPreCommand("touch /data/mysql/.restore;sync").
 				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-				SetPointInTimeRecovery(&corev1.Container{Image: "111", Args: []string{"111"}}, map[string]string{"111": "222"}).
+				SetPointInTimeRecovery(&dpv1alpha1.ScriptSpec{Image: "111", Args: []string{"111"}}, map[string]string{"111": "222"}).
 				Create(&testCtx).GetObject()
 
 			By("By creating earlier backup: ")
@@ -156,7 +155,7 @@ var _ = Describe("PITR Functions", func() {
 				LogConfigs:            clusterCompDefObj.LogConfigs,
 				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
 			}
-			Expect(pitrMgr.DoPrepare(synthesizedComponent)).Should(HaveOccurred())
+			Expect(pitrMgr.DoPrepare(synthesizedComponent)).Should(Succeed())
 		})
 
 	})

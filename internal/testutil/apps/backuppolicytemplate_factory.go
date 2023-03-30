@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -91,7 +90,7 @@ func (factory *MockBackupPolicyTemplateFactory) SetLabels(labels map[string]stri
 	return factory
 }
 
-func (factory *MockBackupPolicyTemplateFactory) SetPointInTimeRecovery(scripts *corev1.Container, configs map[string]string) *MockBackupPolicyTemplateFactory {
+func (factory *MockBackupPolicyTemplateFactory) SetPointInTimeRecovery(scripts *dataprotectionv1alpha1.ScriptSpec, configs map[string]string) *MockBackupPolicyTemplateFactory {
 	pitr := dataprotectionv1alpha1.BackupPointInTimeRecovery{
 		Scripts: scripts,
 		Config:  configs,

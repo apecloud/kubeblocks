@@ -23,19 +23,14 @@ import (
 	"reflect"
 	"strings"
 
-	"golang.org/x/exp/maps"
-	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/kubectl/pkg/util/storage"
-
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -73,7 +68,7 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	opsrequestlog.Info("validate update", "name", r.Name)
 	lastOpsRequest := old.(*OpsRequest)
 	if r.isForbiddenUpdate() && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
-		return newInvalidError(OpsRequestKind, r.Name, "spec", fmt.Sprintf("update OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
+		return fmt.Errorf("update OpsRequest: %s is forbidden when status.Phase is %s", r.Name, r.Status.Phase)
 	}
 	// if no spec updated, we should skip validation.
 	// if not, we can not delete the OpsRequest when cluster has been deleted.
@@ -121,10 +116,20 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorder); err != nil {
 		return nil
 	}
-	for _, v := range opsRecorder {
-		if v.Name != r.Name {
-			return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", v.Name, cluster.Name))
+	opsNamesInQueue := make([]string, len(opsRecorder))
+	for i, v := range opsRecorder {
+		// judge whether the opsRequest meets the following conditions:
+		// 1. the opsRequest is Reentrant.
+		// 2. the opsRequest supports concurrent execution of the same kind.
+		if v.Name != r.Name && !slices.Contains(opsBehaviour.FromClusterPhases, v.ToClusterPhase) {
+			return fmt.Errorf("existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", v.Name, cluster.Name)
 		}
+		opsNamesInQueue[i] = v.Name
+	}
+	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
+	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) &&
+		!slices.Contains(opsNamesInQueue, r.Name) {
+		return fmt.Errorf("opsRequest kind: %s is forbidden when Cluster.status.Phase is %s", r.Spec.Type, cluster.Status.Phase)
 	}
 	return nil
 }
@@ -137,17 +142,9 @@ func (r *OpsRequest) getCluster(ctx context.Context, k8sClient client.Client) (*
 	cluster := &Cluster{}
 	// get cluster resource
 	if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: r.Spec.ClusterRef}, cluster); err != nil {
-		return nil, newInvalidError(OpsRequestKind, r.Name, "spec.clusterRef", err.Error())
+		return nil, fmt.Errorf("get cluster: %s failed, err: %s", r.Spec.ClusterRef, err.Error())
 	}
 	return cluster, nil
-}
-
-func (r *OpsRequest) getClusterDefinition(ctx context.Context, cli client.Client, cluster *Cluster) (*ClusterDefinition, error) {
-	cd := &ClusterDefinition{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
-		return nil, err
-	}
-	return cd, nil
 }
 
 // Validate validates OpsRequest
@@ -155,17 +152,12 @@ func (r *OpsRequest) Validate(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster,
 	isCreate bool) error {
-	var allErrs field.ErrorList
 	if isCreate {
 		if err := r.validateClusterPhase(cluster); err != nil {
 			return err
 		}
 	}
-	r.validateOps(ctx, k8sClient, cluster, &allErrs)
-	if len(allErrs) > 0 {
-		return apierrors.NewInvalid(schema.GroupKind{Group: APIVersion, Kind: OpsRequestKind}, r.Name, allErrs)
-	}
-	return nil
+	return r.validateOps(ctx, k8sClient, cluster)
 }
 
 // ValidateEntry OpsRequest webhook validate entry
@@ -185,63 +177,59 @@ func (r *OpsRequest) validateEntry(isCreate bool) error {
 // validateOps validates ops attributes
 func (r *OpsRequest) validateOps(ctx context.Context,
 	k8sClient client.Client,
-	cluster *Cluster,
-	allErrs *field.ErrorList) {
+	cluster *Cluster) error {
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
-		r.validateUpgrade(ctx, k8sClient, cluster, allErrs)
+		return r.validateUpgrade(ctx, k8sClient)
 	case VerticalScalingType:
-		r.validateVerticalScaling(cluster, allErrs)
+		return r.validateVerticalScaling(cluster)
 	case HorizontalScalingType:
-		r.validateHorizontalScaling(ctx, k8sClient, cluster, allErrs)
+		return r.validateHorizontalScaling(ctx, k8sClient, cluster)
 	case VolumeExpansionType:
-		r.validateVolumeExpansion(ctx, k8sClient, cluster, allErrs)
+		return r.validateVolumeExpansion(ctx, k8sClient, cluster)
 	case RestartType:
-		r.validateRestart(cluster, allErrs)
+		return r.validateRestart(cluster)
 	case ReconfiguringType:
-		r.validateReconfigure(cluster, allErrs)
+		return r.validateReconfigure(cluster)
 	}
+	return nil
 }
 
 // validateUpgrade validates spec.restart
-func (r *OpsRequest) validateRestart(cluster *Cluster, allErrs *field.ErrorList) {
+func (r *OpsRequest) validateRestart(cluster *Cluster) error {
 	restartList := r.Spec.RestartList
 	if len(restartList) == 0 {
-		addInvalidError(allErrs, "spec.restart", restartList, "can not be empty")
-		return
+		return notEmptyError("spec.restart")
 	}
 
 	compNames := make([]string, len(restartList))
 	for i, v := range restartList {
 		compNames[i] = v.ComponentName
 	}
-	r.checkComponentExistence(nil, cluster, compNames, allErrs)
+	return r.checkComponentExistence(cluster, compNames)
 }
 
 // validateUpgrade validates spec.clusterOps.upgrade
 func (r *OpsRequest) validateUpgrade(ctx context.Context,
-	k8sClient client.Client,
-	cluster *Cluster,
-	allErrs *field.ErrorList) {
+	k8sClient client.Client) error {
 	if r.Spec.Upgrade == nil {
-		addNotFoundError(allErrs, "spec.upgrade", "")
-		return
+		return notEmptyError("spec.upgrade")
 	}
 
 	clusterVersion := &ClusterVersion{}
 	clusterVersionRef := r.Spec.Upgrade.ClusterVersionRef
 	if err := k8sClient.Get(ctx, types.NamespacedName{Name: clusterVersionRef}, clusterVersion); err != nil {
-		addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", clusterVersionRef, err.Error())
+		return fmt.Errorf("get clusterVersion: %s failed, err: %s", clusterVersionRef, err.Error())
 	}
+	return nil
 }
 
 // validateVerticalScaling validates api when spec.type is VerticalScaling
-func (r *OpsRequest) validateVerticalScaling(cluster *Cluster, allErrs *field.ErrorList) {
+func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 	verticalScalingList := r.Spec.VerticalScalingList
 	if len(verticalScalingList) == 0 {
-		addInvalidError(allErrs, "spec.verticalScaling", verticalScalingList, "can not be empty")
-		return
+		return notEmptyError("spec.verticalScaling")
 	}
 
 	// validate resources is legal and get component name slice
@@ -249,29 +237,25 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster, allErrs *field.Er
 	for i, v := range verticalScalingList {
 		componentNames[i] = v.ComponentName
 		if invalidValue, err := validateVerticalResourceList(v.Requests); err != nil {
-			addInvalidError(allErrs, fmt.Sprintf("spec.verticalScaling[%d].requests", i), invalidValue, err.Error())
-			continue
+			return invalidValueError(invalidValue, err.Error())
 		}
 		if invalidValue, err := validateVerticalResourceList(v.Limits); err != nil {
-			addInvalidError(allErrs, fmt.Sprintf("spec.verticalScaling[%d].limits", i), invalidValue, err.Error())
-			continue
+			return invalidValueError(invalidValue, err.Error())
 		}
 		if invalidValue, err := compareRequestsAndLimits(v.ResourceRequirements); err != nil {
-			addInvalidError(allErrs, fmt.Sprintf("spec.verticalScaling[%d].requests", i), invalidValue, err.Error())
+			return invalidValueError(invalidValue, err.Error())
 		}
 	}
-
-	r.checkComponentExistence(nil, cluster, componentNames, allErrs)
+	return r.checkComponentExistence(cluster, componentNames)
 }
 
 // validateVerticalScaling validate api is legal when spec.type is VerticalScaling
-func (r *OpsRequest) validateReconfigure(cluster *Cluster, allErrs *field.ErrorList) {
+func (r *OpsRequest) validateReconfigure(cluster *Cluster) error {
 	reconfigure := r.Spec.Reconfigure
 	if reconfigure == nil {
-		addInvalidError(allErrs, "spec.reconfigure", reconfigure, "can not be empty")
-		return
+		return notEmptyError("spec.reconfigure")
 	}
-
+	return nil
 	// TODO validate updated params
 }
 
@@ -298,89 +282,59 @@ func compareQuantity(requestQuantity, limitQuantity *resource.Quantity) bool {
 }
 
 // validateHorizontalScaling validates api when spec.type is HorizontalScaling
-func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.Client, cluster *Cluster, allErrs *field.ErrorList) {
+func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.Client, cluster *Cluster) error {
 	horizontalScalingList := r.Spec.HorizontalScalingList
 	if len(horizontalScalingList) == 0 {
-		addInvalidError(allErrs, "spec.horizontalScaling", horizontalScalingList, "can not be empty")
-		return
+		return notEmptyError("spec.horizontalScaling")
 	}
 
 	componentNames := make([]string, len(horizontalScalingList))
 	for i, v := range horizontalScalingList {
 		componentNames[i] = v.ComponentName
 	}
-
-	clusterDef, err := r.getClusterDefinition(ctx, cli, cluster)
-	if err != nil {
-		addInvalidError(allErrs, "spec.horizontalScaling", horizontalScalingList, "get cluster definition error: "+err.Error())
-		return
-	}
-	r.checkComponentExistence(clusterDef, cluster, componentNames, allErrs)
+	return r.checkComponentExistence(cluster, componentNames)
 }
 
 // validateVolumeExpansion validates volumeExpansion api when spec.type is VolumeExpansion
-func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Client, cluster *Cluster, allErrs *field.ErrorList) {
+func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Client, cluster *Cluster) error {
 	volumeExpansionList := r.Spec.VolumeExpansionList
 	if len(volumeExpansionList) == 0 {
-		addInvalidError(allErrs, "spec.volumeExpansion", volumeExpansionList, "can not be empty")
-		return
+		return notEmptyError("spec.volumeExpansion")
 	}
 
 	componentNames := make([]string, len(volumeExpansionList))
 	for i, v := range volumeExpansionList {
 		componentNames[i] = v.ComponentName
 	}
-	r.checkComponentExistence(nil, cluster, componentNames, allErrs)
+	if err := r.checkComponentExistence(cluster, componentNames); err != nil {
+		return err
+	}
 
-	r.checkVolumesAllowExpansion(ctx, cli, cluster, allErrs)
+	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
 }
 
 // checkComponentExistence checks whether components to be operated exist in cluster spec.
-func (r *OpsRequest) checkComponentExistence(clusterDef *ClusterDefinition, cluster *Cluster, compNames []string, errs *field.ErrorList) {
+func (r *OpsRequest) checkComponentExistence(cluster *Cluster, compNames []string) error {
 	compSpecNameMap := make(map[string]bool)
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compSpecNameMap[compSpec.Name] = true
 	}
 
-	// To keep the compatibility, do a cross validation with ClusterDefinition's components to meet the topology constraint,
-	// but we should still carefully consider the necessity for the validation here.
-	validCompNameMap := make(map[string]bool)
-	if clusterDef == nil {
-		validCompNameMap = compSpecNameMap
-	} else {
-		for _, compSpec := range cluster.Spec.ComponentSpecs {
-			for _, compDef := range clusterDef.Spec.ComponentDefs {
-				if compSpec.ComponentDefRef == compDef.Name {
-					validCompNameMap[compSpec.Name] = true
-					break
-				}
-			}
-		}
-	}
-
 	var notFoundCompNames []string
-	var notSupportCompNames []string
 	for _, compName := range compNames {
 		if _, ok := compSpecNameMap[compName]; !ok {
 			notFoundCompNames = append(notFoundCompNames, compName)
-			continue
-		}
-		if _, ok := validCompNameMap[compName]; !ok {
-			notSupportCompNames = append(notSupportCompNames, compName)
 		}
 	}
 
 	if len(notFoundCompNames) > 0 {
-		addInvalidError(errs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(r.Spec.Type)),
-			notFoundCompNames, "not found in Cluster.spec.components[*].name")
+		return fmt.Errorf("components: %v not found, you can view the components by command: "+
+			"kbcli cluster describe %s -n %s", notFoundCompNames, cluster.Name, r.Namespace)
 	}
-	if len(notSupportCompNames) > 0 {
-		addInvalidError(errs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(r.Spec.Type)),
-			notSupportCompNames, fmt.Sprintf("not supported the %s operation", r.Spec.Type))
-	}
+	return nil
 }
 
-func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.Client, cluster *Cluster, errs *field.ErrorList) {
+func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.Client, cluster *Cluster) error {
 	type Entity struct {
 		existInSpec      bool
 		storageClassName *string
@@ -418,34 +372,57 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			if !e.existInSpec {
 				continue
 			}
-			if allowExpansion, err := checkStorageClassAllowExpansion(ctx, cli, e.storageClassName); err != nil {
-				continue // ignore the error and take it as not-supported
-			} else {
-				vols[cname][vname] = Entity{e.existInSpec, e.storageClassName, allowExpansion}
+			if e.storageClassName == nil {
+				e.storageClassName = r.getSCNameByPvc(ctx, cli, cname, vname)
 			}
+			allowExpansion, err := r.checkStorageClassAllowExpansion(ctx, cli, e.storageClassName)
+			if err != nil {
+				continue // ignore the error and take it as not-supported
+			}
+			vols[cname][vname] = Entity{e.existInSpec, e.storageClassName, allowExpansion}
 		}
 	}
 
-	for i, v := range maps.Values(vols) {
-		invalid := make([]string, 0)
-		for vct, e := range v {
-			if !e.existInSpec || !e.allowExpansion {
-				invalid = append(invalid, vct)
+	for cname, compVols := range vols {
+		var (
+			notFound     []string
+			notSupport   []string
+			notSupportSc []string
+		)
+		for vct, e := range compVols {
+			if !e.existInSpec {
+				notFound = append(notFound, vct)
+			}
+			if !e.allowExpansion {
+				notSupport = append(notSupport, vct)
+				if e.storageClassName != nil {
+					notSupportSc = append(notSupportSc, *e.storageClassName)
+				}
 			}
 		}
-		if len(invalid) > 0 {
-			message := "not support volume expansion, check the StorageClass whether allow volume expansion."
-			addInvalidError(errs, fmt.Sprintf("spec.volumeExpansion[%d].volumeClaimTemplates[*].name", i), invalid, message)
+		if len(notFound) > 0 {
+			return fmt.Errorf("volumeClaimTemplates: %v not found in component: %s, you can view infos by command: "+
+				"kbcli cluster describe %s -n %s", notFound, cname, cluster.Name, r.Namespace)
+		}
+		if len(notSupport) > 0 {
+			var notSupportScString string
+			if len(notSupportSc) > 0 {
+				notSupportScString = fmt.Sprintf("storageClass: %v of ", notSupportSc)
+			}
+			return fmt.Errorf(notSupportScString+"volumeClaimTemplate: %s not support volume expansion in component: %s, you can view infos by command: "+
+				"kubectl get sc", notSupport, cname)
 		}
 	}
+	return nil
 }
 
 // checkStorageClassAllowExpansion checks whether the specified storage class supports volume expansion.
-func checkStorageClassAllowExpansion(ctx context.Context, cli client.Client, storageClassName *string) (bool, error) {
+func (r *OpsRequest) checkStorageClassAllowExpansion(ctx context.Context,
+	cli client.Client,
+	storageClassName *string) (bool, error) {
 	if storageClassName == nil {
-		return checkDefaultStorageClassAllowExpansion(ctx, cli)
+		return false, nil
 	}
-
 	storageClass := &storagev1.StorageClass{}
 	// take not found error as unsupported
 	if err := cli.Get(ctx, types.NamespacedName{Name: *storageClassName}, storageClass); err != nil && !apierrors.IsNotFound(err) {
@@ -457,24 +434,23 @@ func checkStorageClassAllowExpansion(ctx context.Context, cli client.Client, sto
 	return *storageClass.AllowVolumeExpansion, nil
 }
 
-// checkDefaultStorageClassAllowExpansion checks whether the default storage class supports volume expansion.
-func checkDefaultStorageClassAllowExpansion(ctx context.Context, cli client.Client) (bool, error) {
-	storageClassList := &storagev1.StorageClassList{}
-	if err := cli.List(ctx, storageClassList); err != nil {
-		return false, err
+// getSCNameByPvc gets the storageClassName by pvc.
+func (r *OpsRequest) getSCNameByPvc(ctx context.Context,
+	cli client.Client,
+	compName,
+	vctName string) *string {
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), client.MatchingLabels{
+		"app.kubernetes.io/instance":        r.Spec.ClusterRef,
+		"apps.kubeblocks.io/component-name": compName,
+		"vct.kubeblocks.io/name":            vctName,
+	}, client.Limit(1)); err != nil {
+		return nil
 	}
-	for _, sc := range storageClassList.Items {
-		if sc.Annotations == nil || sc.Annotations[storage.IsDefaultStorageClassAnnotation] != "true" {
-			continue
-		}
-		return sc.AllowVolumeExpansion != nil && *sc.AllowVolumeExpansion, nil
+	if len(pvcList.Items) == 0 {
+		return nil
 	}
-	return false, nil
-}
-
-func lowercaseInitial(opsType OpsType) string {
-	str := string(opsType)
-	return strings.ToLower(str[:1]) + str[1:]
+	return pvcList.Items[0].Spec.StorageClassName
 }
 
 // validateVerticalResourceList checks if k8s resourceList is legal
@@ -487,10 +463,10 @@ func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.
 	return "", nil
 }
 
-func addInvalidError(allErrs *field.ErrorList, fieldPath string, value interface{}, msg string) {
-	*allErrs = append(*allErrs, field.Invalid(field.NewPath(fieldPath), value, msg))
+func notEmptyError(target string) error {
+	return fmt.Errorf(`"%s" can not be empty`, target)
 }
 
-func addNotFoundError(allErrs *field.ErrorList, fieldPath string, value interface{}) {
-	*allErrs = append(*allErrs, field.NotFound(field.NewPath(fieldPath), value))
+func invalidValueError(target string, value string) error {
+	return fmt.Errorf(`invalid value for "%s": %s`, target, value)
 }

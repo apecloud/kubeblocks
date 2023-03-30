@@ -79,10 +79,10 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
        externalTrafficPolicy: Cluster 
        type: LoadBalancer
        selector:
-         app.kubernetes.io/component-name: mysql
+         apps.kubeblocks.io/component-name: mysql
          app.kubernetes.io/instance: ${mysql clustername}
          app.kubernetes.io/managed-by: kubeblocks
-         cs.dbaas.kubeblocks.io/role: leader
+         kubeblocks.io/role: leader
        ports:
            - name: http
              protocol: TCP

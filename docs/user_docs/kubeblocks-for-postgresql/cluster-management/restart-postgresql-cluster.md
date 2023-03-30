@@ -23,7 +23,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    
    Configure the values of `component-names` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
    ```bash
-   kbcli cluster restart NAME --component-names="postgresql" \
+   kbcli cluster restart NAME --component-names="pg-replication" \
    --ttlSecondsAfterSucceed=30
    ```
    - `component-names` describes the component name that needs to be restarted.
@@ -42,7 +42,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
      clusterRef: pg-cluster
      type: Restart 
      restart:
-     - componentName: postgresql
+     - componentName: pg-replication
    EOF
    ```
 2. Validate the restarting.

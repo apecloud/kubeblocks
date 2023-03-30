@@ -193,7 +193,11 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.CPUSets, "cpu", []string{},
 		"Sets addon CPU resource values (--cpu [extraName:]<request>/<limit>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.StorageSets, "storage", []string{},
-		"Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items))")
+		`Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items)). 
+Additional notes: for type=Helm addon and if the value mapped directly to a StatefulSet's volume claim template
+the helm upgrade action will failed, to resolved this you will need to disable and re-enable the addon, also noted
+that storage size can only be expanded by PVC resizing.
+`)
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.ReplicaCountSets, "replicas", []string{},
 		"Sets addon component replica count (--replicas [extraName:]<number>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.StorageClassSets, "storage-class", []string{},

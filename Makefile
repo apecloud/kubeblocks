@@ -357,18 +357,26 @@ fix-license-header: ## Run license header fix.
 
 ##@ Helm Chart Tasks
 
+bump-single-chart-appver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-appver.%:
+ifeq ($(GOOS), darwin)
+	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
+else
+	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
+endif
+
 bump-single-chart-ver.%: chart=$(word 2,$(subst ., ,$@))
 bump-single-chart-ver.%:
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^version:.*/version: $(VERSION)/" deploy/$(chart)/Chart.yaml
-	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
 else
 	sed -i "s/^version:.*/version: $(VERSION)/" deploy/$(chart)/Chart.yaml
-	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
 endif
 
 .PHONY: bump-chart-ver
-bump-chart-ver: bump-single-chart-ver.helm \
+bump-chart-ver: \
+	bump-single-chart-ver.helm \
+	bump-single-chart-appver.helm \
 	bump-single-chart-ver.apecloud-mysql \
 	bump-single-chart-ver.apecloud-mysql-cluster \
 	bump-single-chart-ver.apecloud-mysql-scale \
@@ -380,6 +388,7 @@ bump-chart-ver: bump-single-chart-ver.helm \
 	bump-single-chart-ver.mongodb \
 	bump-single-chart-ver.mongodb-cluster \
 	bump-single-chart-ver.nyancat \
+	bump-single-chart-appver.nyancat \
 	bump-single-chart-ver.postgresql \
 	bump-single-chart-ver.postgresql-cluster \
 	bump-single-chart-ver.postgresql-patroni-ha \

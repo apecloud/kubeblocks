@@ -61,9 +61,9 @@ func UpdateClusterOpsAnnotations(ctx context.Context,
 }
 
 // PatchOpsRequestReconcileAnnotation patches the reconcile annotation to OpsRequest
-func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, opsRequestName string) error {
+func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, namespace string, opsRequestName string) error {
 	opsRequest := &appsv1alpha1.OpsRequest{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: cluster.Namespace}, opsRequest); err != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: namespace}, opsRequest); err != nil {
 		return err
 	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -113,7 +113,7 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 	// mark annotation for operations
 	var notExistOps = map[string]struct{}{}
 	for _, v := range opsRequestSlice {
-		if err = PatchOpsRequestReconcileAnnotation(ctx, cli, cluster, v.Name); err != nil && !apierrors.IsNotFound(err) {
+		if err = PatchOpsRequestReconcileAnnotation(ctx, cli, cluster.Namespace, v.Name); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 		if apierrors.IsNotFound(err) {

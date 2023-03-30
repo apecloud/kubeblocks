@@ -24,7 +24,7 @@ kbcli cluster expose [flags]
 ### Options
 
 ```
-      --component-names strings       Component names to this operations
+      --components strings            Component names to this operations
       --enable string                Enable or disable the expose, values can be true or false
   -h, --help                         help for expose
       --name string                  OpsRequest name. if not specified, it will be randomly generated 

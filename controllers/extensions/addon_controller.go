@@ -201,7 +201,7 @@ func (r *AddonReconciler) Event(object k8sruntime.Object, eventtype, reason, mes
 	if r == nil || r.Recorder == nil {
 		return
 	}
-	r.Event(object, eventtype, reason, message)
+	r.Recorder.Event(object, eventtype, reason, message)
 }
 
 // Eventf is just like Event, but with Sprintf for the message field.
@@ -209,7 +209,7 @@ func (r *AddonReconciler) Eventf(object k8sruntime.Object, eventtype, reason, me
 	if r == nil || r.Recorder == nil {
 		return
 	}
-	r.Eventf(object, eventtype, reason, messageFmt, args...)
+	r.Recorder.Eventf(object, eventtype, reason, messageFmt, args...)
 }
 
 // AnnotatedEventf is just like eventf, but with annotations attached
@@ -217,5 +217,5 @@ func (r *AddonReconciler) AnnotatedEventf(object k8sruntime.Object, annotations 
 	if r == nil || r.Recorder == nil {
 		return
 	}
-	r.AnnotatedEventf(object, annotations, eventtype, reason, messageFmt, args...)
+	r.Recorder.AnnotatedEventf(object, annotations, eventtype, reason, messageFmt, args...)
 }

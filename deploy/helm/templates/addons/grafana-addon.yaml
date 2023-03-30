@@ -50,7 +50,7 @@ spec:
         - key: KubeGitVersion
           operator: Contains
           values:
-            - ack
+            - aliyun
       replicas: 1
       storageClass: alicloud-disk-efficiency
       resources:

@@ -15,13 +15,13 @@ kbcli cluster restart [flags]
   kbcli cluster restart <my-cluster>
   
   # restart specifies the component, separate with commas when <component-name> more than one
-  kbcli cluster restart <my-cluster> --component-names=<component-name>
+  kbcli cluster restart <my-cluster> --components=<component-name>
 ```
 
 ### Options
 
 ```
-      --component-names strings       Component names to this operations
+      --components strings            Component names to this operations
   -h, --help                         help for restart
       --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed

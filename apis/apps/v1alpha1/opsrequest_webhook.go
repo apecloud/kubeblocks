@@ -140,14 +140,6 @@ func (r *OpsRequest) getCluster(ctx context.Context, k8sClient client.Client) (*
 	return cluster, nil
 }
 
-func (r *OpsRequest) getClusterDefinition(ctx context.Context, cli client.Client, cluster *Cluster) (*ClusterDefinition, error) {
-	cd := &ClusterDefinition{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
-		return nil, err
-	}
-	return cd, nil
-}
-
 // Validate validates OpsRequest
 func (r *OpsRequest) Validate(ctx context.Context,
 	k8sClient client.Client,

@@ -5,6 +5,7 @@ sidebar_position: 4
 sidebar_label: Restart
 ---
 
+
 # Restart PostgreSQL cluster
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
 

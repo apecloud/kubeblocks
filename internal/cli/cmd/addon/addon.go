@@ -180,6 +180,7 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
 			util.CheckErr(o.fetchAddonObj())
+			util.CheckErr(o.validate())
 			util.CheckErr(o.complete(o, cmd, args))
 			util.CheckErr(o.Run(cmd))
 		},
@@ -273,6 +274,28 @@ func (o *addonCmdOpts) fetchAddonObj() error {
 	}
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &o.addon); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (o *addonCmdOpts) validate() error {
+	if o.addon.Spec.Installable == nil {
+		return nil
+	}
+	installable := o.addon.Spec.Installable
+	client, err := o.Factory.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+	versionInfo, err := client.Discovery().ServerVersion()
+	if err != nil {
+		return err
+	}
+	viper.Set(constant.CfgKeyServerInfo, *versionInfo)
+	for _, s := range installable.Selectors {
+		if !s.MatchesFromConfig() {
+			return fmt.Errorf("addon %s INSTALLABLE-SELECTOR has no matching requirement", o.Names)
+		}
 	}
 	return nil
 }

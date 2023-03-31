@@ -39,8 +39,8 @@ We would like to extend our appreciation to all contributors who helped make thi
       * Prometheus and Alertmanager
       * AlertManager Webhook Adaptor
       * Grafana
-      * S3 CSI driver
       * Kubeblocks CSI driver
+      * S3 CSI driver
       * Snapshot Controller
       * KubeBlocks private network Load Balancer
       * ApeCloud MySQL ClusterDefinition API

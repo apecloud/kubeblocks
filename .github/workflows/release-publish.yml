@@ -79,13 +79,25 @@ jobs:
             --tag-name ${{ env.TAG_NAME }} \
             --type 1`
           
-          VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
+          if [[ "${{ matrix.os }}" == *"windows"* ]]; then
+            BINARY_EXT=".exe"
+          else
+            BINARY_EXT=""
+          fi
+
+          VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}$CLI_OS_ARCH$BINARY_EXT
+           
+          mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH.$BINARY_EXT ${{ matrix.os }}/${{ env.CLI_NAME }}$BINARY_EXT
           
-          mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH ${{ matrix.os }}/${{ env.CLI_NAME }}
+          if [[ "${{ matrix.os }}" == *"windows"* ]]; then
+            zip -r "${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip" "${{ matrix.os }}"
+            mv ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip bin/
+          else
+            tar -zcvf ${{ env.CLI_BINARY }} ${{ matrix.os }}
+            mv ${{ env.CLI_BINARY }} bin/
+          fi
+        
           
-          tar -zcvf ${{ env.CLI_BINARY }} ${{ matrix.os }}
-          
-          mv ${{ env.CLI_BINARY }} bin/
 
       - name: upload release asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main

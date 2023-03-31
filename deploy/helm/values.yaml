@@ -1558,6 +1558,9 @@ snapshot-controller:
                 values:
                   - "true"
 
+kubeblocks-csi-driver:
+  enabled: false
+
 ## csi-s3 settings
 ## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration
 ##

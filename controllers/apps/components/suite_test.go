@@ -101,18 +101,10 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&StatefulSetReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("stateful-set-controller"),
-	}).SetupWithManager(k8sManager)
+	err = NewStatefulSetReconciler(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&DeploymentReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("deployment-controller"),
-	}).SetupWithManager(k8sManager)
+	err = NewDeploymentReconciler(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)

@@ -16,7 +16,6 @@ spec:
       claimName: backup-host-path-pvc
   schedule: 0 3 * * *
   target:
-    databaseEngine: mysql
     labelsSelector:
       matchLabels:
         app.kubernetes.io/instance: mycluster

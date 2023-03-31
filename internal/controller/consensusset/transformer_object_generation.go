@@ -15,3 +15,13 @@ limitations under the License.
 */
 
 package consensusset
+
+import "github.com/apecloud/kubeblocks/internal/controller/graph"
+
+type objectGenerationTransformer struct {
+
+}
+
+func (t *objectGenerationTransformer) Transform(dag *graph.DAG) error {
+return nil
+}

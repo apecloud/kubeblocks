@@ -94,7 +94,6 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		return class.ChooseComponentClasses(classes, filters)
 	}
 
-	patch := client.MergeFrom(cluster.DeepCopy())
 	for idx, comp := range cluster.Spec.ComponentSpecs {
 		classes := compClasses[comp.ComponentDefRef]
 
@@ -142,9 +141,6 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		}
 		comp.VolumeClaimTemplates = volumes
 		cluster.Spec.ComponentSpecs[idx] = comp
-	}
-	if err = r.cli.Patch(reqCtx.Ctx, cluster, patch); err != nil {
-		return err
 	}
 	return nil
 }

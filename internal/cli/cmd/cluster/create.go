@@ -431,7 +431,6 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 
 	var comps []map[string]interface{}
 	for _, c := range cd.Spec.ComponentDefs {
-
 		sets := map[setKey]string{}
 		if setsMap != nil {
 			sets = setsMap[c.Name]

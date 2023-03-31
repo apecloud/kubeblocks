@@ -152,7 +152,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	requeueDuration = time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS))
 	// TODO: add filter predicate for core API objects
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Cluster{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&appsv1.Deployment{}).
@@ -161,14 +161,16 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
-		Owns(&snapshotv1.VolumeSnapshot{}).
 		Owns(&dataprotectionv1alpha1.BackupPolicy{}).
-		Owns(&dataprotectionv1alpha1.Backup{}).
-		Watches(&source.Kind{Type: &appsv1alpha1.ClassFamily{}},
-			&handler.EnqueueRequestForObject{},
-			builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool { return true })),
-		).
-		Complete(r)
+		Owns(&dataprotectionv1alpha1.Backup{})
+	if viper.GetBool("VOLUMESNAPSHOT") {
+		b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+	}
+	b.Watches(&source.Kind{Type: &appsv1alpha1.ClassFamily{}},
+		&handler.EnqueueRequestForObject{},
+		builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool { return true })),
+	)
+	return b.Complete(r)
 }
 
 // Handle is the event handler for the cluster status event.

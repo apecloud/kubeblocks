@@ -10,7 +10,8 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/kubeblocks-csi-driver-0.1.0/kubeblocks-csi-driver-0.1.0.tgz
+    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/kubeblocks-csi-driver-0.1.0/kubeblocks-csi-driver-0.1.0.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/kubeblocks-csi-driver-0.1.0.tgz
     valuesMapping:
       valueMap:
         replicaCount: controller.replicaCount

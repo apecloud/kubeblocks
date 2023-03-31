@@ -13,23 +13,6 @@
 
 ##@ Sub-commands
 
-## loadbalancer cmd
-
-.PHONY: loadbalancer-go-generate
-loadbalancer-go-generate: ## Run go generate against loadbalancer code.
-ifeq ($(SKIP_GO_GEN), false)
-	$(GO) generate -x ./cmd/loadbalancer/internal/...
-endif
-
-.PHONY: loadbalancer
-loadbalancer: loadbalancer-go-generate test-go-generate build-checks  ## Build loadbalancer binary.
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer ./cmd/loadbalancer
-
-
-.PHONY: clean-loadbalancer
-clean-loadbalancer: ## Clean bin/loadbalancer.
-	rm -f bin/loadbalancer
-
 ## reloader cmd
 
 RELOADER_LD_FLAGS = "-s -w"

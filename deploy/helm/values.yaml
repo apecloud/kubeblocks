@@ -1524,10 +1524,6 @@ grafana:
     appProtocol: ""
 
 
-
-loadbalancer:
-  enabled: false
-
 ### snapshot-controller settings
 ### ref: https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration
 ###

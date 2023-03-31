@@ -92,9 +92,9 @@ const (
 
 // Annotations
 const (
-	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
-	ServiceLBTypeAnnotationValue   = "private-ip"
-	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"
+	ServiceHAVIPTypeAnnotationKey   = "service.kubernetes.io/kubeblocks-havip-type"
+	ServiceHAVIPTypeAnnotationValue = "private-ip"
+	ServiceFloatingIPAnnotationKey  = "service.kubernetes.io/kubeblocks-havip-floating-ip"
 )
 
 // DataProtection API group

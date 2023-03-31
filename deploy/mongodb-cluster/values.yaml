@@ -306,3 +306,6 @@ ingress:
   ##             name: http
   ##
   extraRules: []
+
+enabledLogs:
+  - running

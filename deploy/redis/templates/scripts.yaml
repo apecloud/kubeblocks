@@ -17,8 +17,8 @@ data:
   redis-start.sh: |
     #!/bin/sh
     set -ex
-    cat /etc/conf/redis.conf >> /etc/redis/redis.conf
-    echo "\nreplica-announce-ip $KB_POD_FQDN" >> /etc/redis/redis.conf
+    echo "include /etc/conf/redis.conf" >> /etc/redis/redis.conf
+    echo "replica-announce-ip $KB_POD_FQDN" >> /etc/redis/redis.conf
     exec redis-server /etc/redis/redis.conf
   redis-sentinel-setup.sh: |-
     {{- .Files.Get "scripts/redis-sentinel-setup.sh.tpl" | nindent 4 }}

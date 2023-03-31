@@ -67,8 +67,6 @@ jobs:
         uses: bruceadams/get-release@v1.3.2
 
       - name: make build
-        env:
-          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         run: |
           mkdir -p ${{ matrix.os }}
           
@@ -79,34 +77,32 @@ jobs:
             --tag-name ${{ env.TAG_NAME }} \
             --type 1`
           
-          if [[ "${{ matrix.os }}" == *"windows"* ]]; then
-            BINARY_EXT=".exe"
-          else
-            BINARY_EXT=""
-          fi
+          VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}$CLI_OS_ARCH
 
-          VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}$CLI_OS_ARCH$BINARY_EXT
-           
-          mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH.$BINARY_EXT ${{ matrix.os }}/${{ env.CLI_NAME }}$BINARY_EXT
-          
+          mv bin/${{ env.CLI_NAME }}* ${{ matrix.os }}/
+
           if [[ "${{ matrix.os }}" == *"windows"* ]]; then
-            zip -r "${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip" "${{ matrix.os }}"
-            mv ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip bin/
+            CLI_COMPRESS=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip
+            zip -r ${CLI_COMPRESS} ${{ matrix.os }}   
           else
-            tar -zcvf ${{ env.CLI_BINARY }} ${{ matrix.os }}
-            mv ${{ env.CLI_BINARY }} bin/
-          fi
-        
+            CLI_COMPRESS=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+            tar -zcvf ${CLI_COMPRESS} ${{ matrix.os }}
+          fi      
           
+
+          mv ${CLI_COMPRESS} bin/
+          
+          # - bin
+          #   - kbcli-drawin-amd64-v0.4.0.tar.gz/kbcli-windows-amd64-v0.4.0.zip
 
       - name: upload release asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main
-        env:
-          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+        # env:
+        #   CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.CLI_BINARY }}
-          asset_name: ${{ env.CLI_BINARY }}
+          asset_path: ./bin/kbcli*
+          asset_name: kbcli*
           asset_content_type: application/zip
 
       - name: get release kbcli upload url
@@ -119,12 +115,12 @@ jobs:
 
       - name: upload release kbcli asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main
-        env:
-          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+        # env:
+        #   CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         with:
           upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ./bin/${{ env.CLI_BINARY }}
-          asset_name: ${{ env.CLI_BINARY }}
+          asset_path: ./bin/kbcli*
+          asset_name: kbcli*
           asset_content_type: application/zip
 
       - name: upload gitlab kbcli asset ${{ matrix.os }}

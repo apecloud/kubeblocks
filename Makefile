@@ -250,13 +250,17 @@ CLI_LD_FLAGS ="-s -w \
 
 
 
-bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).$(BINARY_EXT)
+bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH)
 	GOOS=$(word 2,$(subst ., ,$@)) 
 	GOARCH=$(word 3,$(subst ., ,$@))
-	BINARY_EXT=$(word 4,$(subst ., ,$@))
 	CGO_ENABLED=0
+	ifeq ($(GOOS), windows)
+		BINARY_EXT=.exe
+	else
+		BINARY_EXT=""
+	endif	
 	 
-	$(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
+	$(GO) build -ldflags=${CLI_LD_FLAGS} -o  bin/kbcli${BINARY_EXT} cmd/cli/main.go
 	
 
 
@@ -265,7 +269,7 @@ kbcli-fast: OS=$(shell $(GO) env GOOS)
 kbcli-fast: ARCH=$(shell $(GO) env GOARCH)
 kbcli-fast:
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
-	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
+
 
 .PHONY: kbcli
 kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.

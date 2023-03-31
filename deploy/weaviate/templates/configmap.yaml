@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: weaviate-standalone-config-template
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+  {{- include "weaviate.labels" . | nindent 4 }}
+
+data:
+  conf.yaml: |-
+    ---
+    authentication:
+      anonymous_access:
+        enabled: true
+    authorization:
+      admin_list:
+        enabled: false
+    query_defaults:
+      limit: 100
+    debug: false

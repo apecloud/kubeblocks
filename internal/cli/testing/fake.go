@@ -356,7 +356,7 @@ func FakeServices() *corev1.ServiceList {
 			annotations[types.ServiceFloatingIPAnnotationKey] = item.floatingIP
 		}
 		if item.exposed {
-			annotations[types.ServiceLBTypeAnnotationKey] = types.ServiceLBTypeAnnotationValue
+			annotations[types.ServiceHAVIPTypeAnnotationKey] = types.ServiceHAVIPTypeAnnotationValue
 		}
 		svc.ObjectMeta.SetAnnotations(annotations)
 

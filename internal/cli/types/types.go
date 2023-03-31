@@ -93,14 +93,9 @@ const (
 
 // Annotations
 const (
-	ClassLevelLabelKey          = "class.kubeblocks.io/level"
-	ClassProviderLabelKey       = "class.kubeblocks.io/provider"
-	ClassFamilyProviderLabelKey = "classfamily.kubeblocks.io/provider"
-
-	ComponentClassAnnotationKey    = "cluster.kubeblocks.io/component-class"
-	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
-	ServiceLBTypeAnnotationValue   = "private-ip"
-	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"
+	ServiceHAVIPTypeAnnotationKey   = "service.kubernetes.io/kubeblocks-havip-type"
+	ServiceHAVIPTypeAnnotationValue = "private-ip"
+	ServiceFloatingIPAnnotationKey  = "service.kubernetes.io/kubeblocks-havip-floating-ip"
 )
 
 // DataProtection API group

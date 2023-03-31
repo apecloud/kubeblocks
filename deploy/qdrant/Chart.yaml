@@ -1,0 +1,23 @@
+apiVersion: v2
+name: qdrant-standalone
+description: .
+
+type: application
+
+# This is the chart version.
+version: 0.1.0
+
+# This is the version number of qdrant.
+appVersion: "1.1.0"
+
+home: https://qdrant.tech/
+icon: https://qdrant.tech/images/logo_with_text.svg
+
+
+maintainers:
+  - name: ApeCloud
+    url: https://github.com/apecloud/kubeblocks/
+
+
+sources:
+  - https://github.com/apecloud/kubeblocks/

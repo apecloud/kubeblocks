@@ -195,7 +195,7 @@ type Option func(ctx *CfgOpOption)
 func (c *cfgWrapper) MergeFrom(params map[string]interface{}, option CfgOpOption) error {
 	cfg := c.getConfigObject(option)
 	if cfg == nil {
-		return MakeError("not any configuration. option:[%v]", option)
+		return MakeError("not found the config file:[%s]", option.FileName)
 	}
 
 	// TODO support param delete
@@ -302,14 +302,14 @@ func (c *cfgWrapper) Query(jsonpath string, option CfgOpOption) ([]byte, error) 
 
 	cfg := c.getConfigObject(option)
 	if cfg == nil {
-		return nil, MakeError("not any configuration. option:[%v]", option)
+		return nil, MakeError("not found the config file:[%s]", option.FileName)
 	}
 
 	iniContext := option.IniContext
 	if iniContext != nil && len(iniContext.SectionName) > 0 {
 		cfg = cfg.SubConfig(iniContext.SectionName)
 		if cfg == nil {
-			return nil, MakeError("configuration not exist section [%s]", iniContext.SectionName)
+			return nil, MakeError("the section[%s] does not exist in the config file", iniContext.SectionName)
 		}
 	}
 

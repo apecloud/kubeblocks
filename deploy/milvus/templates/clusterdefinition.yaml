@@ -1,0 +1,303 @@
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: milvus-standalone
+  labels:
+    {{- include "milvus.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-milvus)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-milvus)"
+    accesskey: minioadmin
+    secretkey: minioadmin
+  componentDefs:
+    - name: milvus
+      workloadType: Stateful
+      characterType: milvus
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9187
+      logConfigs:
+      configSpecs:
+        - name: milvus-standalone-config-template
+          templateRef: milvus-standalone-config-template
+          volumeName: milvus-config
+          namespace: {{.Release.Namespace}}
+      service:
+        ports:
+          - name: tcp-milvus
+            protocol: TCP
+            port: 19530
+            targetPort: tcp-milvus
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: milvus
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 10
+            readinessProbe:
+              failureThreshold: 2
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /milvus/configs/user.yaml
+                name: milvus-config
+                readOnly: true
+                subPath: user.yaml
+              - mountPath: /milvus/tools
+                name: tools
+            dnsPolicy: ClusterFirst
+            enableServiceLinks: true
+            ports:
+              - name: tcp-milvus
+                containerPort: 19530
+              - name: tcp-metrics
+                containerPort: 9091
+            args:
+              - /milvus/tools/run.sh
+              - milvus
+              - run
+              - standalone
+            env:
+              - name: CACHE_SIZE
+                valueFrom:
+                  resourceFieldRef:
+                    divisor: 1Gi
+                    resource: limits.memory
+              - name: MINIO_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    key: accesskey
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+              - name: MINIO_SECRET_KEY
+                valueFrom:
+                  secretKeyRef:
+                    key: secretkey
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+        initContainers:
+          - name: milvus-init
+            command:
+              - /cp
+              - /run.sh,/merge
+              - /milvus/tools/run.sh,/milvus/tools/merge
+            image: milvusdb/milvus-operator:v0.7.8
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /milvus/tools
+                name: tools
+        serviceAccountName: default
+        terminationGracePeriodSeconds: 300
+        volumes:
+          - emptyDir: {}
+            name: tools
+
+    - name: etcd
+      workloadType: Stateful
+      characterType: etcd
+      probes:
+      logconfigs:
+      configSpecs:
+      scriptsSpecs:
+      podSpec:
+        containers:
+          - name: etcd
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+            livenessProbe:
+              exec:
+                command:
+                  - /opt/bitnami/scripts/etcd/healthcheck.sh
+              failureThreshold: 5
+              initialDelaySeconds: 60
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+            readinessProbe:
+              exec:
+                command:
+                  - /opt/bitnami/scripts/etcd/healthcheck.sh
+              failureThreshold: 5
+              initialDelaySeconds: 60
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /bitnami/etcd
+                name: data
+            dnsPolicy: ClusterFirst
+            ports:
+              - name: client
+                containerPort: 2379
+                protocol: TCP
+              - name: peer
+                containerPort: 2380
+                protocol: TCP
+            env:
+              - name: BITNAMI_DEBUG
+                value: "false"
+              - name: MY_POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: MY_POD_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+              - name: ETCDCTL_API
+                value: "3"
+              - name: ETCD_ON_K8S
+                value: "yes"
+              - name: ETCD_START_FROM_SNAPSHOT
+                value: "no"
+              - name: ETCD_DISASTER_RECOVERY
+                value: "no"
+              - name: ETCD_NAME
+                value: $(MY_POD_NAME)
+              - name: ETCD_DATA_DIR
+                value: /bitnami/etcd/data
+              - name: ETCD_LOG_LEVEL
+                value: info
+              - name: ALLOW_NONE_AUTHENTICATION
+                value: "yes"
+              - name: ETCD_ADVERTISE_CLIENT_URLS
+                value: http://$(MY_POD_NAME).$(KB_CLUSTER_NAME)-etcd-headless.default.svc.cluster.local:2379
+              - name: ETCD_LISTEN_CLIENT_URLS
+                value: http://0.0.0.0:2379
+              - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
+                value: http://$(MY_POD_NAME).$(KB_CLUSTER_NAME)-etcd-headless.default.svc.cluster.local:2380
+              - name: ETCD_LISTEN_PEER_URLS
+                value: http://0.0.0.0:2380
+              - name: ETCD_AUTO_COMPACTION_MODE
+                value: revision
+              - name: ETCD_AUTO_COMPACTION_RETENTION
+                value: "1000"
+              - name: ETCD_QUOTA_BACKEND_BYTES
+                value: "4294967296"
+              - name: ETCD_HEARTBEAT_INTERVAL
+                value: "500"
+              - name: ETCD_ELECTION_TIMEOUT
+                value: "2500"
+
+    - name: minio
+      workloadType: Stateful
+      characterType: minio
+      probes:
+      logconfigs:
+      configSpecs:
+      scriptsSpecs:
+      service:
+        ports:
+          - name: http
+            protocol: TCP
+            port: 9000
+            targetPort: 9000
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        containers:
+          - name: minio
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              fsGroup: 1000
+              runAsGroup: 1000
+              runAsUser: 1000
+            livenessProbe:
+              failureThreshold: 5
+              httpGet:
+                path: /minio/health/live
+                port: 9000
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              successThreshold: 1
+              timeoutSeconds: 5
+            readinessProbe:
+              failureThreshold: 5
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 9000
+              timeoutSeconds: 1
+            startupProbe:
+              failureThreshold: 60
+              periodSeconds: 10
+              successThreshold: 1
+              tcpSocket:
+                port: 9000
+              timeoutSeconds: 5
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            serviceAccountName: "$(KB_CLUSTER_NAME-minio)"
+            volumeMounts:
+              - mountPath: /export
+                name: export
+            volumes:
+              - name: minio-user
+                secret:
+                  defaultMode: 420
+                  secretName: $(CONN_CREDENTIAL_SECRET_NAME)
+            command:
+              - /bin/sh
+              - -ce
+              - /usr/bin/docker-entrypoint.sh minio -S /etc/minio/certs/ server /export
+            env:
+              - name: MINIO_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    key: accesskey
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+              - name: MINIO_SECRET_KEY
+                valueFrom:
+                  secretKeyRef:
+                    key: secretkey
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+

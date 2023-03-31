@@ -205,7 +205,7 @@ jobs:
   check-helm:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') && github.ref_name != 'main' }}
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.0
+    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.2
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"

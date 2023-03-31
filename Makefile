@@ -394,7 +394,11 @@ bump-chart-ver: \
 	bump-single-chart-ver.postgresql-patroni-ha \
 	bump-single-chart-ver.postgresql-patroni-ha-cluster \
 	bump-single-chart-ver.redis \
-	bump-single-chart-ver.redis-cluster
+	bump-single-chart-ver.redis-cluster \
+	bump-single-chart-ver.milvus \
+	bump-single-chart-ver.qdrant \
+	bump-single-chart-ver.qdrant-cluster \
+	bump-single-chart-ver.chatgpt-retrieval-plugin
 bump-chart-ver: ## Bump helm chart version.
 
 LOADBALANCER_CHART_VERSION=

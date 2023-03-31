@@ -1,0 +1,12 @@
+apiVersion: v2
+name: chatgpt-retrieval-plugin
+description: A demo application for ChatGPT plugin.
+
+type: application
+
+
+version: 0.1.0
+
+appVersion: 0.1.0
+
+kubeVersion: '>=1.22.0-0'

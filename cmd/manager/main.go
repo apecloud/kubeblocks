@@ -362,20 +362,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&components.StatefulSetReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("stateful-set-controller"),
-	}).SetupWithManager(mgr); err != nil {
+	if err = components.NewStatefulSetReconciler(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
 		os.Exit(1)
 	}
 
-	if err = (&components.DeploymentReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("deployment-controller"),
-	}).SetupWithManager(mgr); err != nil {
+	if err = components.NewDeploymentReconciler(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
 		os.Exit(1)
 	}

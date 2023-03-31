@@ -61,6 +61,7 @@ const (
 	// kubeblocks.io labels
 	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
 	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
+	KBAppComponentDefRefLabelKey    = "apps.kubeblocks.io/component-def-ref"
 	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
 	AppConfigTypeLabelKey           = "apps.kubeblocks.io/config-type"
 	WorkloadTypeLabelKey            = "apps.kubeblocks.io/workload-type"
@@ -71,6 +72,7 @@ const (
 	ClusterAccountLabelKey          = "account.kubeblocks.io/name"
 	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
 	KBManagedByKey                  = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
+	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey        = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -110,6 +112,9 @@ const (
 
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
+
+	// ClassAnnotationKey is used to specify the class of components
+	ClassAnnotationKey = "cluster.kubeblocks.io/component-class"
 )
 
 const (

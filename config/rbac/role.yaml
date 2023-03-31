@@ -106,6 +106,14 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
+  - classfamilies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
   - clusterdefinitions
   verbs:
   - create

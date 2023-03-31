@@ -1,30 +1,13 @@
 ---
-title: kbcli cluster vscale
+title: kbcli class
 ---
 
-Vertically scale the specified components in the cluster.
-
-```
-kbcli cluster vscale [flags]
-```
-
-### Examples
-
-```
-  # scale the computing resources of specified components, separate with commas when <component-name> more than one
-  kbcli cluster vscale <my-cluster> --components=<component-name> --cpu=500m --memory=500Mi
-```
+Manage classes
 
 ### Options
 
 ```
-      --class string                 Component class
-      --components strings            Component names to this operations
-      --cpu string                   Requested and limited size of component cpu
-  -h, --help                         help for vscale
-      --memory string                Requested and limited size of component memory
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+  -h, --help   help for class
 ```
 
 ### Options inherited from parent commands
@@ -53,7 +36,10 @@ kbcli cluster vscale [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+* [kbcli class create](kbcli_class_create.md)	 - Create a class
+* [kbcli class list](kbcli_class_list.md)	 - List classes
+* [kbcli class template](kbcli_class_template.md)	 - Generate class definition template
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

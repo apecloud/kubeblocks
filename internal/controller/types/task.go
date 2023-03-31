@@ -17,13 +17,13 @@ limitations under the License.
 package types
 
 import (
-	"github.com/apecloud/kubeblocks/internal/generics"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 type ReconcileTask struct {

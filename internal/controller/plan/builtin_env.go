@@ -18,12 +18,18 @@ package plan
 
 import (
 	b64 "encoding/base64"
+	"regexp"
+	"strings"
 
+	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubectl/pkg/util/resource"
 	coreclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -31,6 +37,8 @@ import (
 type envBuildInFunc func(container interface{}, envName string) (string, error)
 
 type envWrapper struct {
+	// prevent circular references.
+	referenceCount int
 	*configTemplateBuilder
 
 	// configmap or secret not yet submitted.
@@ -38,6 +46,8 @@ type envWrapper struct {
 	// cache remoted configmap and secret.
 	cache map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object
 }
+
+const maxReferenceCount = 10
 
 func wrapGetEnvByName(templateBuilder *configTemplateBuilder, localObjects *intctrltypes.ReconcileTask) envBuildInFunc {
 	wrapper := &envWrapper{
@@ -61,60 +71,66 @@ func (w *envWrapper) getEnvByName(container *corev1.Container, envName string) (
 		}
 		switch {
 		case v.ValueFrom == nil:
-			return v.Value, nil
+			return w.checkAndReplaceEnv(v.Value, container)
 		case v.ValueFrom.ConfigMapKeyRef != nil:
-			return w.configMapValue(v.ValueFrom.ConfigMapKeyRef)
+			return w.configMapValue(v.ValueFrom.ConfigMapKeyRef, container)
 		case v.ValueFrom.SecretKeyRef != nil:
-			return w.secretValue(v.ValueFrom.SecretKeyRef)
+			return w.secretValue(v.ValueFrom.SecretKeyRef, container)
 		case v.ValueFrom.FieldRef != nil:
 			return fieldRefValue(v.ValueFrom.FieldRef, w.podSpec)
 		case v.ValueFrom.ResourceFieldRef != nil:
-			return resourceRefValue(v.ValueFrom.ResourceFieldRef, w.podSpec.Containers)
+			return resourceRefValue(v.ValueFrom.ResourceFieldRef, w.podSpec.Containers, container)
 		}
 	}
-	return w.getEnvFromResources(container.EnvFrom, envName)
+	return w.getEnvFromResources(container.EnvFrom, envName, container)
 }
 
-func (w *envWrapper) getEnvFromResources(envSources []corev1.EnvFromSource, envName string) (string, error) {
+func (w *envWrapper) getEnvFromResources(envSources []corev1.EnvFromSource, envName string, container *corev1.Container) (string, error) {
 	for _, source := range envSources {
-		if value, err := w.getEnvFromResource(source, envName); err != nil {
+		if value, err := w.getEnvFromResource(source, envName, container); err != nil {
 			return "", err
 		} else if value != "" {
-			return value, nil
+			return w.checkAndReplaceEnv(value, container)
 		}
 	}
 	return "", nil
 }
 
-func (w *envWrapper) getEnvFromResource(envSource corev1.EnvFromSource, envName string) (string, error) {
-	fromConfigMap := func(ConfigMapRef *corev1.ConfigMapEnvSource) *corev1.ConfigMapKeySelector {
-		return &corev1.ConfigMapKeySelector{
+func (w *envWrapper) getEnvFromResource(envSource corev1.EnvFromSource, envName string, container *corev1.Container) (string, error) {
+	fromConfigMap := func(configmapRef *corev1.ConfigMapEnvSource) (string, error) {
+		return w.configMapValue(&corev1.ConfigMapKeySelector{
 			Key:                  envName,
-			LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapRef.Name},
-		}
+			LocalObjectReference: corev1.LocalObjectReference{Name: configmapRef.Name},
+		}, container)
 	}
-	fromSecret := func(SecretRef *corev1.SecretEnvSource) *corev1.SecretKeySelector {
-		return &corev1.SecretKeySelector{
+	fromSecret := func(secretRef *corev1.SecretEnvSource) (string, error) {
+		return w.secretValue(&corev1.SecretKeySelector{
 			Key:                  envName,
-			LocalObjectReference: corev1.LocalObjectReference{Name: SecretRef.Name},
-		}
+			LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
+		}, container)
 	}
-	if envSource.ConfigMapRef != nil {
-		return w.configMapValue(fromConfigMap(envSource.ConfigMapRef))
+
+	switch {
+	default:
+		return "", nil
+	case envSource.ConfigMapRef != nil:
+		return fromConfigMap(envSource.ConfigMapRef)
+	case envSource.SecretRef != nil:
+		return fromSecret(envSource.SecretRef)
 	}
-	if envSource.SecretRef != nil {
-		return w.secretValue(fromSecret(envSource.SecretRef))
-	}
-	return "", nil
 }
 
-func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector) (string, error) {
+func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector, container *corev1.Container) (string, error) {
 	if w.cli == nil {
 		return "", cfgcore.MakeError("not support secret[%s] value in local mode, cli is nil", secretRef.Name)
 	}
 
+	secretName, err := w.checkAndReplaceEnv(secretRef.Name, container)
+	if err != nil {
+		return "", err
+	}
 	secretKey := coreclient.ObjectKey{
-		Name:      secretRef.Name,
+		Name:      secretName,
 		Namespace: w.namespace,
 	}
 	secret, err := getResourceObject(w, &corev1.Secret{}, secretKey)
@@ -127,13 +143,17 @@ func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector) (string, e
 	return "", nil
 }
 
-func (w *envWrapper) configMapValue(configmapRef *corev1.ConfigMapKeySelector) (string, error) {
+func (w *envWrapper) configMapValue(configmapRef *corev1.ConfigMapKeySelector, container *corev1.Container) (string, error) {
 	if w.cli == nil {
 		return "", cfgcore.MakeError("not support configmap[%s] value in local mode, cli is nil", configmapRef.Name)
 	}
 
+	cmName, err := w.checkAndReplaceEnv(configmapRef.Name, container)
+	if err != nil {
+		return "", err
+	}
 	cmKey := coreclient.ObjectKey{
-		Name:      configmapRef.Name,
+		Name:      cmName,
 		Namespace: w.namespace,
 	}
 	cm, err := getResourceObject(w, &corev1.ConfigMap{}, cmKey)
@@ -154,6 +174,74 @@ func (w *envWrapper) getResourceFromLocal(key coreclient.ObjectKey, gvk schema.G
 		return nil
 	}
 	return w.localObjects.GetLocalResourceWithObjectKey(key, gvk)
+}
+
+var envPlaceHolderRegexp = regexp.MustCompile(`\$\(\w+\)`)
+
+func (w *envWrapper) checkAndReplaceEnv(value string, container *corev1.Container) (string, error) {
+	// env value replace,e.g: $(CONN_CREDENTIAL_SECRET_NAME), $(KB_CLUSTER_COMP_NAME)
+	// - name: KB_POD_FQDN
+	//      value: $(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc
+	//
+	// - name: MYSQL_ROOT_USER
+	//      valueFrom:
+	//        secretKeyRef:
+	//          key: username
+	//          name: $(CONN_CREDENTIAL_SECRET_NAME)
+	// var := "$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc"
+	//
+	// loop reference
+	// - name: LOOP_REF_A
+	//   value: $(LOOP_REF_B)
+	// - name: LOOP_REF_B
+	//   value: $(LOOP_REF_A)
+
+	if strings.IndexByte(value, '$') < 0 {
+		return value, nil
+	}
+	envHolderVec := envPlaceHolderRegexp.FindAllString(value, -1)
+	if len(envHolderVec) == 0 {
+		return value, nil
+	}
+	return w.doEnvReplace(set.NewLinkedHashSetString(envHolderVec...), value, container)
+}
+
+func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValue string, container *corev1.Container) (string, error) {
+	var (
+		clusterName   = w.localObjects.Cluster.Name
+		componentName = w.localObjects.Component.Name
+		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, componentName)
+	)
+
+	builtInEnvMap[constant.ConnCredentialPlaceHolder] = component.GenerateConnCredential(w.localObjects.Cluster.Name)
+	kbInnerEnvReplaceFn := func(envName string, strToReplace string) string {
+		return strings.ReplaceAll(strToReplace, envName, builtInEnvMap[envName])
+	}
+
+	w.referenceCount++
+	if w.referenceCount >= maxReferenceCount {
+		return "", cfgcore.MakeError("too many reference count, maybe there is a loop reference: [%s] more than %d times ", oldValue, w.referenceCount)
+	}
+
+	replacedValue := oldValue
+	for envHolder := range replacedVars.Iter() {
+		if len(envHolder) <= 3 {
+			continue
+		}
+		if _, ok := builtInEnvMap[envHolder]; ok {
+			replacedValue = kbInnerEnvReplaceFn(envHolder, replacedValue)
+			continue
+		}
+		envName := envHolder[2 : len(envHolder)-1]
+		envValue, err := w.getEnvByName(container, envName)
+		if err != nil {
+			w.referenceCount--
+			return envValue, err
+		}
+		replacedValue = strings.ReplaceAll(replacedValue, envHolder, envValue)
+	}
+	w.referenceCount--
+	return replacedValue, nil
 }
 
 func getResourceObject[T generics.Object, PT generics.PObject[T]](w *envWrapper, obj PT, key coreclient.ObjectKey) (PT, error) {
@@ -177,8 +265,20 @@ func decodeString(encoded []byte) (string, error) {
 	return string(decoded), nil
 }
 
-func resourceRefValue(resourceRef *corev1.ResourceFieldSelector, containers []corev1.Container) (string, error) {
-	return "", cfgcore.MakeError("not support resource field ref")
+func resourceRefValue(resourceRef *corev1.ResourceFieldSelector, containers []corev1.Container, curContainer *corev1.Container) (string, error) {
+	if resourceRef.ContainerName == "" {
+		return containerResourceRefValue(resourceRef, curContainer)
+	}
+	for _, v := range containers {
+		if v.Name == resourceRef.ContainerName {
+			return containerResourceRefValue(resourceRef, &v)
+		}
+	}
+	return "", cfgcore.MakeError("not found named[%s] container", resourceRef.ContainerName)
+}
+
+func containerResourceRefValue(fieldSelector *corev1.ResourceFieldSelector, c *corev1.Container) (string, error) {
+	return resource.ExtractContainerResourceValue(fieldSelector, c)
 }
 
 func fieldRefValue(podReference *corev1.ObjectFieldSelector, podSpec *corev1.PodSpec) (string, error) {

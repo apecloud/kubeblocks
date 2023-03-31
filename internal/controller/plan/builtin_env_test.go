@@ -17,7 +17,8 @@ limitations under the License.
 package plan
 
 import (
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"strconv"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -28,6 +29,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	ctrlcomp "github.com/apecloud/kubeblocks/internal/controller/component"
+	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -44,6 +46,7 @@ bootstrap:
 		podSpec     *corev1.PodSpec
 		cfgTemplate []appsv1alpha1.ComponentConfigSpec
 		component   *ctrlcomp.SynthesizedComponent
+		cluster     *appsv1alpha1.Cluster
 
 		mockClient *testutil.K8sClientMockHelper
 	)
@@ -71,6 +74,9 @@ bootstrap:
 					"KB_MYSQL_LEADER":     "my-mysql-0",
 					"KB_MYSQL_N":          "1",
 					"KB_MYSQL_RECREATE":   "false",
+					"LOOP_REFERENCE_A":    "$(LOOP_REFERENCE_B)",
+					"LOOP_REFERENCE_B":    "$(LOOP_REFERENCE_C)",
+					"LOOP_REFERENCE_C":    "$(LOOP_REFERENCE_A)",
 				}},
 			&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -99,6 +105,32 @@ bootstrap:
 							Value: "mysql",
 						},
 						{
+							Name: "MEMORY_SIZE",
+							ValueFrom: &corev1.EnvVarSource{
+								ResourceFieldRef: &corev1.ResourceFieldSelector{
+									ContainerName: "mytest",
+									Resource:      "limits.memory",
+								},
+							},
+						},
+						{
+							Name: "CPU",
+							ValueFrom: &corev1.EnvVarSource{
+								ResourceFieldRef: &corev1.ResourceFieldSelector{
+									Resource: "limits.cpu",
+								},
+							},
+						},
+						{
+							Name: "CPU2",
+							ValueFrom: &corev1.EnvVarSource{
+								ResourceFieldRef: &corev1.ResourceFieldSelector{
+									ContainerName: "not_exist_container",
+									Resource:      "limits.memory",
+								},
+							},
+						},
+						{
 							Name: "MYSQL_USER",
 							ValueFrom: &corev1.EnvVarSource{
 								SecretKeyRef: &corev1.SecretKeySelector{
@@ -114,7 +146,7 @@ bootstrap:
 							ValueFrom: &corev1.EnvVarSource{
 								SecretKeyRef: &corev1.SecretKeySelector{
 									LocalObjectReference: corev1.LocalObjectReference{
-										Name: "my-conn-credential",
+										Name: "$(CONN_CREDENTIAL_SECRET_NAME)",
 									},
 									Key: "password",
 								},
@@ -160,7 +192,14 @@ bootstrap:
 				},
 			},
 		}
-		component = &ctrlcomp.SynthesizedComponent{}
+		component = &ctrlcomp.SynthesizedComponent{
+			Name: "mysql",
+		}
+		cluster = &appsv1alpha1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my",
+			},
+		}
 		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 				Name:        "mysql-config-8.0.2",
@@ -190,7 +229,7 @@ bootstrap:
 				nil, ctx, mockClient.Client(),
 			)
 
-			task := intctrltypes.InitReconcileTask(nil, nil, nil, nil)
+			task := intctrltypes.InitReconcileTask(nil, nil, cluster, component)
 			task.AppendResource(&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "patroni-template-config",
@@ -206,18 +245,34 @@ bootstrap:
 				// MYSQL_USER,MYSQL_PASSWORD from valueFrom secret key
 				// SPILO_CONFIGURATION from valueFrom configmap key
 				// KB_MYSQL_LEADER from envFrom configmap
+				// MEMORY_SIZE, CPU from resourceFieldRef
 				"my":            "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_CLUSTER_NAME\" }}",
 				"mysql":         "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_COMP_NAME\" }}",
 				"root":          "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MYSQL_USER\" }}",
 				"4zrqfl2r":      "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MYSQL_PASSWORD\" }}",
 				patroniTemplate: "{{ getEnvByName ( index $.podSpec.containers 0 ) \"SPILO_CONFIGURATION\" }}",
 				"my-mysql-0":    "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_MYSQL_LEADER\" }}",
+
+				strconv.Itoa(4):                      "{{ getEnvByName ( index $.podSpec.containers 0 ) \"CPU\" }}",
+				strconv.Itoa(8 * 1024 * 1024 * 1024): "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MEMORY_SIZE\" }}",
 			})
 
-			Expect(err).Should(BeNil())
+			Expect(err).Should(Succeed())
 			for key, value := range rendered {
 				Expect(key).Should(BeEquivalentTo(value))
 			}
+
+			_, err = cfgBuilder.render(map[string]string{
+				"error": "{{ getEnvByName ( index $.podSpec.containers 0 ) \"CPU2\" }}",
+			})
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("not found named[not_exist_container] container"))
+
+			_, err = cfgBuilder.render(map[string]string{
+				"error_loop_reference": "{{ getEnvByName ( index $.podSpec.containers 0 ) \"LOOP_REFERENCE_A\" }}",
+			})
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("too many reference count, maybe there is a loop reference"))
 		})
 	})
 })

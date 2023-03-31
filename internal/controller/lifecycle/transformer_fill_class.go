@@ -61,7 +61,8 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		return err
 	}
 
-	matchClassFamilies := func(comp appsv1alpha1.ClusterComponentSpec) *class.ComponentClass {
+	// TODO use this function to get matched class families if class is not specified and component has no classes
+	_ = func(comp appsv1alpha1.ClusterComponentSpec) *class.ComponentClass {
 		var candidates []class.ClassModelWithFamilyName
 		for _, family := range classFamilyList.Items {
 			models := family.FindMatchingModels(&comp.Resources)
@@ -110,37 +111,51 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 			if cls == nil {
 				return fmt.Errorf("can not find matching class for component %s", comp.Name)
 			}
-		case len(classFamilyList.Items) > 0:
-			cls = matchClassFamilies(comp)
-			if cls == nil {
-				return fmt.Errorf("can not find matching class family for component %s", comp.Name)
-			}
+			//case len(classFamilyList.Items) > 0:
+			//	cls = matchClassFamilies(comp)
+			//	if cls == nil {
+			//		return fmt.Errorf("can not find matching class family for component %s", comp.Name)
+			//	}
 		}
 		if cls == nil {
 			// TODO reconsider handling policy for this case
 			continue
 		}
 		componentClassMapping[comp.Name] = cls.Name
-		corev1.ResourceList{
+		requests := corev1.ResourceList{
 			corev1.ResourceCPU:    cls.CPU,
 			corev1.ResourceMemory: cls.Memory,
-		}.DeepCopyInto(&comp.Resources.Requests)
+		}
+		requests.DeepCopyInto(&comp.Resources.Requests)
+		requests.DeepCopyInto(&comp.Resources.Limits)
 		var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
-		for _, disk := range cls.Storage {
-			volume := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
-				Name: disk.Name,
-				Spec: &corev1.PersistentVolumeClaimSpec{
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: disk.Size,
-						},
-					},
-				},
-			}
-			volumes = append(volumes, volume)
+		if len(comp.VolumeClaimTemplates) > 0 {
+			volumes = comp.VolumeClaimTemplates
+		} else {
+			volumes = buildVolumeClaimByClass(cls)
 		}
 		comp.VolumeClaimTemplates = volumes
 		cluster.Spec.ComponentSpecs[idx] = comp
 	}
 	return nil
+}
+
+func buildVolumeClaimByClass(cls *class.ComponentClass) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
+	var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
+	for _, disk := range cls.Storage {
+		volume := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+			Name: disk.Name,
+			Spec: &corev1.PersistentVolumeClaimSpec{
+				// TODO define access mode in class
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: disk.Size,
+					},
+				},
+			},
+		}
+		volumes = append(volumes, volume)
+	}
+	return volumes
 }

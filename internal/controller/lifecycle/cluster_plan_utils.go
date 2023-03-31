@@ -22,19 +22,23 @@ import (
 	"golang.org/x/exp/maps"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // mergeAnnotations keeps the original annotations.
 // if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
-func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
-	if restartAnnotation, ok := originalAnnotations[constant.RestartAnnotationKey]; ok {
-		if targetAnnotations == nil {
-			targetAnnotations = map[string]string{}
-		}
-		targetAnnotations[constant.RestartAnnotationKey] = restartAnnotation
+func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
+	if targetAnnotations == nil {
+		return
 	}
-	return targetAnnotations
+	if *targetAnnotations == nil {
+		*targetAnnotations = map[string]string{}
+	}
+	for k, v := range originalAnnotations {
+		// if the annotation not exist in targetAnnotations, copy it from original.
+		if _, ok := (*targetAnnotations)[k]; !ok {
+			(*targetAnnotations)[k] = v
+		}
+	}
 }
 
 // mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.

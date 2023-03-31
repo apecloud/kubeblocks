@@ -46,5 +46,27 @@ var _ = Describe("cluster plan utils test", func() {
 			expectAnnotations := map[string]string{"k1": "v11"}
 			Expect(mergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
 		})
+
+		It("should merge annotations from original that not exist in target to final result", func() {
+			originalKey := "only-existing-in-original"
+			targetKey := "only-existing-in-target"
+			updatedKey := "updated-in-target"
+			originalAnnotations := map[string]string{
+				originalKey: "true",
+				updatedKey:  "false",
+			}
+			targetAnnotations := map[string]string{
+				targetKey:  "true",
+				updatedKey: "true",
+			}
+			mergeAnnotations(originalAnnotations, &targetAnnotations)
+			Expect(targetAnnotations[targetKey]).ShouldNot(BeEmpty())
+			Expect(targetAnnotations[originalKey]).ShouldNot(BeEmpty())
+			Expect(targetAnnotations[updatedKey]).Should(Equal("true"))
+			By("merging with target being nil")
+			var nilAnnotations map[string]string
+			mergeAnnotations(originalAnnotations, &nilAnnotations)
+			Expect(nilAnnotations).ShouldNot(BeNil())
+		})
 	})
 })

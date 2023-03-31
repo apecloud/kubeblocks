@@ -9,8 +9,8 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Try out basic functions of KubeBlocks on Cloud 
-This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command. 
-With Playground, you can try out KubeBlocks both on your local host and on a cloud environment.
+This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to easily create a demo environment (Playground) with simply one `kbcli` command. 
+With Playground, you can try out KubeBlocks both on your local host and on a cloud environment. And KubeBlocks supports multiple cloud platforms.
 
 ## Preparation
 When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find the script at [Github repository](https://github.com/apecloud/cloud-provider).
@@ -147,7 +147,7 @@ export GOOGLE_PROJECT=<project-name>
 
  Note: Execute ``` export GOOGLE_PROJECT=<project-name>``` to specify project name.
 :::
-The following command deploy a GKE service in available region ```us-central1 ``` on google cloud, and install KubeBlocks.
+The following command deploys a GKE service in available region ```us-central1 ``` on google cloud, and installs KubeBlocks.
 
 ```bash
 kbcli playground init --cloud-provider gcp --region us-central1
@@ -179,8 +179,6 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 </Tabs>
 
 ## Try KubeBlocks with Playground
-
-You can explore KubeBlocks by [Viewing an ApeCloud MySQL cluster](#view-an-apecloud-mysql-cluster), [Accessing an ApeCloud MySQL Cluster](#access-an-apecloud-mysql-cluster), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Overview](./../introduction/introduction.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
 
 KubeBlocks supports the complete life cycle management of a database cluster. Go through the following instruction to try basic features of KubeBlocks. 
 For the full feature set, refer to [KubeBlocks Documentation](./../introduction/introduction.md) for details.

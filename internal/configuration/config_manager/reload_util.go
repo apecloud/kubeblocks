@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"text/template/parse"
 
 	"github.com/spf13/viper"
 
@@ -38,7 +39,30 @@ type regexFilter = func(fileName string) bool
 const (
 	builtInExecFunctionName           = "exec"
 	builtInUpdateVariableFunctionName = "exec_sql"
+	builtInParamsPatchFunctionName    = "patch_params"
 )
+
+type DynamicUpdater = func(updatedParams map[string]string) error
+
+func OnlineUpdateParamsHandle(tplScript string) (DynamicUpdater, error) {
+	tplContent, err := os.ReadFile(tplScript)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkTPLScript(tplScript, string(tplContent)); err != nil {
+		return nil, err
+	}
+	return func(updatedParams map[string]string) error {
+		return wrapGoTemplateRun(tplScript, string(tplContent), updatedParams)
+	}, nil
+}
+
+func checkTPLScript(tplName string, tplContent string) error {
+	tr := parse.New(tplName)
+	tr.Mode = parse.SkipFuncCheck
+	_, err := tr.Parse(tplContent, "", "", make(map[string]*parse.Tree))
+	return err
+}
 
 func wrapGoTemplateRun(tplName string, tplContent string, updatedParams map[string]string) error {
 	var (

@@ -184,6 +184,7 @@ const (
 const (
 	ConfigSidecarName        = "config-manager"
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
+	ConfigManagerLogLevel    = "CONFIG_MANAGER_LOG_LEVEL"
 
 	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"
 	ConfigTemplateType    = "tpl"

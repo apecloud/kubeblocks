@@ -83,9 +83,13 @@ type ReconfigureServiceOptions struct {
 	GrpcPort int
 	PodIP    string
 
+	// EnableRemoteOnlineUpdate enable remote online update
+	RemoteOnlineUpdateEnable bool
+	// EnableContainerRuntime enable container runtime
+	ContainerRuntimeEnable bool
+
 	DebugMode        bool
 	ContainerRuntime cfgutil.CRIType
-	Disable          bool
 	RuntimeEndpoint  string
 }
 
@@ -120,11 +124,12 @@ func NewVolumeWatcherOpts() *VolumeWatcherOpts {
 	return &VolumeWatcherOpts{
 		// for reconfigure options
 		ServiceOpt: ReconfigureServiceOptions{
-			GrpcPort:         configManagerDefaultPort,
-			PodIP:            viper.GetString(configPodIPEnvName),
-			ContainerRuntime: cfgutil.AutoType,
-			DebugMode:        false,
-			Disable:          false,
+			GrpcPort:                 configManagerDefaultPort,
+			PodIP:                    viper.GetString(configPodIPEnvName),
+			ContainerRuntime:         cfgutil.AutoType,
+			DebugMode:                false,
+			ContainerRuntimeEnable:   false,
+			RemoteOnlineUpdateEnable: false,
 		},
 		// for configmap watch
 		NotifyHandType: UnixSignal,
@@ -199,8 +204,13 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		opt.ServiceOpt.RuntimeEndpoint,
 		"the config set cri runtime endpoint.")
 
-	flags.BoolVar(&opt.ServiceOpt.Disable,
-		"disable-runtime",
-		opt.ServiceOpt.Disable,
-		"the config set disable runtime.")
+	flags.BoolVar(&opt.ServiceOpt.ContainerRuntimeEnable,
+		"cri-enable",
+		opt.ServiceOpt.ContainerRuntimeEnable,
+		"the config set enable cri.")
+
+	flags.BoolVar(&opt.ServiceOpt.RemoteOnlineUpdateEnable,
+		"operator-update-enable",
+		opt.ServiceOpt.ContainerRuntimeEnable,
+		"the config set enable operator update parameter.")
 }

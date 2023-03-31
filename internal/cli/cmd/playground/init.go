@@ -163,8 +163,11 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 	}
 
 	// Install database cluster
-	spinner := printer.Spinner(o.Out, "Create cluster %s (ClusterDefinition: %s, ClusterVersion: %s)",
-		kbClusterName, o.clusterDef, o.clusterVersion)
+	clusterInfo := "ClusterDefinition: " + o.clusterDef
+	if o.clusterVersion != "" {
+		clusterInfo += ", ClusterVersion: " + o.clusterVersion
+	}
+	spinner := printer.Spinner(o.Out, "Create cluster %s (%s)", kbClusterName, clusterInfo)
 	defer spinner(false)
 	if err = o.createCluster(); err != nil {
 		return errors.Wrapf(err, "failed to create cluster %s", kbClusterName)
@@ -217,7 +220,11 @@ if it takes a long time, please check the network environment and try again.
 
 	// clone apecloud/cloud-provider repo to local path
 	fmt.Fprintf(o.Out, "Clone cloud provider terraform script to %s...\n", cpPath)
-	if err = util.CloneGitRepo(cp.GitRepoURL, cpPath); err != nil {
+	branchName := "kb-playground"
+	if version.Version != "" && version.Version != "edge" {
+		branchName = fmt.Sprintf("%s-%s", branchName, strings.Split(version.Version, "-")[0])
+	}
+	if err = util.CloneGitRepo(cp.GitRepoURL, branchName, cpPath); err != nil {
 		return err
 	}
 
@@ -293,7 +300,7 @@ func (o *initOptions) installKubeBlocks() error {
 
 func (o *initOptions) createCluster() error {
 	// construct a cluster create options and run
-	options, err := newCreateOptions(o.clusterDef, o.clusterVersion)
+	options, err := o.newCreateOptions()
 	if err != nil {
 		return err
 	}
@@ -308,7 +315,7 @@ func (o *initOptions) createCluster() error {
 	return options.Run(inputs)
 }
 
-func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, error) {
+func (o *initOptions) newCreateOptions() (*cmdcluster.CreateOptions, error) {
 	dynamicClient, err := util.NewFactory().DynamicClient()
 	if err != nil {
 		return nil, err
@@ -326,9 +333,15 @@ func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, err
 			PodAntiAffinity:   "Preferred",
 			Tenancy:           "SharedNode",
 		},
-		ClusterDefRef:     cd,
-		ClusterVersionRef: version,
+		ClusterDefRef:     o.clusterDef,
+		ClusterVersionRef: o.clusterVersion,
 	}
+
+	// if we are running on cloud, create cluster with three replicas
+	if o.cloudProvider != cp.Local {
+		options.Values = append(options.Values, "replicas=3")
+	}
+
 	if err = options.Validate(); err != nil {
 		return nil, err
 	}

@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/cli/cli"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -84,7 +85,7 @@ type addonCmdOpts struct {
 // NewAddonCmd for addon functions
 func NewAddonCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "addon",
+		Use:   "addon COMMAND",
 		Short: "Addon command.",
 	}
 	cmd.AddCommand(
@@ -99,15 +100,16 @@ func NewAddonCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.AddonGVR())
 	cmd := &cobra.Command{
-		Use:               "list ",
+		Use:               "list",
 		Short:             "List addons.",
 		Aliases:           []string{"ls"},
+		Args:              cli.NoArgs,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(addonListRun(o))
 		},
 	}
-	o.AddFlags(cmd)
+	o.AddFlags(cmd, true)
 	return cmd
 }
 
@@ -121,6 +123,7 @@ func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	cmd := &cobra.Command{
 		Use:               "describe ADDON_NAME",
 		Short:             "Describe an addon specification.",
+		Args:              cli.ExactArgs(1),
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
@@ -159,6 +162,7 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd := &cobra.Command{
 		Use:               "enable ADDON_NAME",
 		Short:             "Enable an addon.",
+		Args:              cli.ExactArgs(1),
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Example: templates.Examples(`
     	# Enabled "prometheus" addon
@@ -194,7 +198,11 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.CPUSets, "cpu", []string{},
 		"Sets addon CPU resource values (--cpu [extraName:]<request>/<limit>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.StorageSets, "storage", []string{},
-		"Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items))")
+		`Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items)). 
+Additional notes: for type=Helm addon and if the value mapped directly to a StatefulSet's volume claim template
+the helm upgrade action will failed, to resolved this you will need to disable and re-enable the addon, also noted
+that storage size can only be expanded by PVC resizing.
+`)
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.ReplicaCountSets, "replicas", []string{},
 		"Sets addon component replica count (--replicas [extraName:]<number>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.StorageClassSets, "storage-class", []string{},
@@ -227,6 +235,7 @@ func newDisableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:               "disable ADDON_NAME",
 		Short:             "Disable an addon.",
+		Args:              cli.ExactArgs(1),
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
@@ -240,12 +249,6 @@ func newDisableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 }
 
 func (o *addonCmdOpts) init(args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("missing addon name")
-	}
-	if len(args) > 1 {
-		return fmt.Errorf("only accept enable/disable single addon item")
-	}
 	o.Names = args
 	if o.dynamic == nil {
 		var err error
@@ -366,7 +369,7 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 		autoInstall = o.addon.Spec.Installable.AutoInstall
 	}
 	printer.PrintPairStringToLine("Auto-install", strconv.FormatBool(autoInstall), 0)
-	printer.PrintPairStringToLine("Installable", strings.Join(o.addon.Spec.Installable.GetSelectorsStrings(), ","), 0)
+	printer.PrintPairStringToLine("Auto-install selector", strings.Join(o.addon.Spec.Installable.GetSelectorsStrings(), ","), 0)
 
 	switch o.addon.Status.Phase {
 	case extensionsv1alpha1.AddonEnabled:
@@ -745,7 +748,7 @@ func addonListRun(o *list.ListOptions) error {
 	}
 
 	if err = printer.PrintTable(o.Out, nil, printRows,
-		"NAME", "TYPE", "STATUS", "EXTRAS", "AUTO-INSTALL", "INSTALLABLE-SELECTOR"); err != nil {
+		"NAME", "TYPE", "STATUS", "EXTRAS", "AUTO-INSTALL", "AUTO-INSTALLABLE-SELECTOR"); err != nil {
 		return err
 	}
 	return nil

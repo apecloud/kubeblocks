@@ -313,12 +313,10 @@ endif
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	($(KUSTOMIZE) build config/crd | kubectl replace -f -) || ($(KUSTOMIZE) build config/crd | kubectl create -f -)
-	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl apply -f -
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
-	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.

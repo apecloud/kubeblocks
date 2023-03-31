@@ -218,8 +218,7 @@ func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValu
 		return strings.ReplaceAll(strToReplace, envName, builtInEnvMap[envName])
 	}
 
-	w.referenceCount++
-	if w.referenceCount >= maxReferenceCount {
+	if !w.incAndCheckReferenceCount() {
 		return "", cfgcore.MakeError("too many reference count, maybe there is a loop reference: [%s] more than %d times ", oldValue, w.referenceCount)
 	}
 
@@ -235,13 +234,26 @@ func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValu
 		envName := envHolder[2 : len(envHolder)-1]
 		envValue, err := w.getEnvByName(container, envName)
 		if err != nil {
-			w.referenceCount--
+			w.decReferenceCount()
 			return envValue, err
 		}
 		replacedValue = strings.ReplaceAll(replacedValue, envHolder, envValue)
 	}
-	w.referenceCount--
+	w.decReferenceCount()
 	return replacedValue, nil
+}
+
+func (w *envWrapper) incReferenceCount() {
+	w.referenceCount++
+}
+
+func (w *envWrapper) decReferenceCount() {
+	w.referenceCount--
+}
+
+func (w *envWrapper) incAndCheckReferenceCount() bool {
+	w.incReferenceCount()
+	return w.referenceCount <= maxReferenceCount
 }
 
 func getResourceObject[T generics.Object, PT generics.PObject[T]](w *envWrapper, obj PT, key coreclient.ObjectKey) (PT, error) {

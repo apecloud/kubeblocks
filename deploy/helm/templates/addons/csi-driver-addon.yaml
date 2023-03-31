@@ -10,8 +10,7 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/kubeblocks-csi-driver-{{ default .Chart.AppVersion .Values.appVersionOverride }}/kubeblocks-csi-driver-{{ default .Chart.AppVersion .Values.appVersionOverride }}.tgz
-
+    chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/kubeblocks-csi-driver-0.1.0/kubeblocks-csi-driver-0.1.0.tgz
     valuesMapping:
       resources:
         cpu:

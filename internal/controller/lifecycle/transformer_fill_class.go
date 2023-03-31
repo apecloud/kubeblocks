@@ -100,6 +100,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 
 		var cls *class.ComponentClass
 		className, ok := componentClassMapping[comp.Name]
+		// TODO another case if len(classFamilyList.Items) > 0, use matchClassFamilies to find matching class family:
 		switch {
 		case ok:
 			cls = classes[className]
@@ -111,11 +112,6 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 			if cls == nil {
 				return fmt.Errorf("can not find matching class for component %s", comp.Name)
 			}
-			//case len(classFamilyList.Items) > 0:
-			//	cls = matchClassFamilies(comp)
-			//	if cls == nil {
-			//		return fmt.Errorf("can not find matching class family for component %s", comp.Name)
-			//	}
 		}
 		if cls == nil {
 			// TODO reconsider handling policy for this case

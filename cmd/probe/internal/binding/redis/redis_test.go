@@ -143,6 +143,37 @@ func TestRedisInvokeDelete(t *testing.T) {
 	assert.Equal(t, RespEveSucc, opsResult[RespTypEve])
 }
 
+func TestRedisGetRoles(t *testing.T) {
+	r, mock := mockRedisOps(t)
+	defer r.Close()
+
+	opsResult := OpsResult{}
+	request := &bindings.InvokeRequest{
+		Operation: GetRoleOperation,
+	}
+
+	// mock expectation, set to err
+	mock.ExpectInfo("Replication").SetVal("role:master\r\nconnected_slaves:1")
+	mock.ExpectInfo("Replication").SetVal("role:slave\r\nmaster_port:6379")
+	// invoke request
+	bindingRes, err := r.Invoke(context.TODO(), request)
+	assert.Nil(t, err)
+	assert.NotNil(t, bindingRes)
+	assert.NotNil(t, bindingRes.Data)
+	err = json.Unmarshal(bindingRes.Data, &opsResult)
+	assert.Nil(t, err)
+	assert.Equal(t, RespEveSucc, opsResult[RespTypEve])
+	assert.Equal(t, "master", opsResult["role"])
+
+	// invoke one more time
+	bindingRes, err = r.Invoke(context.TODO(), request)
+	assert.Nil(t, err)
+	err = json.Unmarshal(bindingRes.Data, &opsResult)
+	assert.Nil(t, err)
+	assert.Equal(t, RespEveSucc, opsResult[RespTypEve])
+	assert.Equal(t, "slave", opsResult["role"])
+}
+
 func TestRedisAccounts(t *testing.T) {
 	// prepare
 	r, mock := mockRedisOps(t)
@@ -493,5 +524,6 @@ func mockRedisOps(t *testing.T) (*Redis, redismock.ClientMock) {
 	r.client = client
 	r.ctx, r.cancel = context.WithCancel(context.Background())
 	_ = r.Init(bindings.Metadata{})
+	r.DBPort = 6379
 	return r, mock
 }

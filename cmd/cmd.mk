@@ -81,6 +81,13 @@ probe: test-go-generate build-checks ## Build probe related binaries
 	$(MAKE) bin/probe.${OS}.${ARCH}
 	mv bin/probe.${OS}.${ARCH} bin/probe
 
+.PHONY: probe-fast
+probe-fast: OS=$(shell $(GO) env GOOS)
+probe-fast: ARCH=$(shell $(GO) env GOARCH)
+probe-fast:
+	$(MAKE) bin/probe.${OS}.${ARCH}
+	mv bin/probe.${OS}.${ARCH} bin/probe
+
 .PHONY: clean-probe
 clean-probe: ## Clean bin/probe.
 	rm -f bin/probe

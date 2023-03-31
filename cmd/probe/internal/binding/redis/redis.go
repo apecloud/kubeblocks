@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -66,10 +67,17 @@ func NewRedis(logger logger.Logger) bindings.OutputBinding {
 
 // Init performs metadata parsing and connection creation.
 func (r *Redis) Init(meta bindings.Metadata) (err error) {
-	r.InitIfNeed = r.initIfNeed
+	r.BaseOperations.Init(meta)
+
+	r.Logger.Debug("Initializing Redis binding")
 	r.DBType = "redis"
+	r.InitIfNeed = r.initIfNeed
+	r.BaseOperations.GetRole = r.GetRole
 
 	// register redis operations
+	r.RegisterOperation(GetRoleOperation, r.GetRoleOps)
+	r.RegisterOperation(CheckRoleOperation, r.CheckRoleOps)
+	r.RegisterOperation(CheckRunningOperation, r.CheckRunningOps)
 	r.RegisterOperation(bindings.CreateOperation, r.createOps)
 	r.RegisterOperation(bindings.DeleteOperation, r.deleteOps)
 	r.RegisterOperation(bindings.GetOperation, r.getOps)
@@ -83,6 +91,21 @@ func (r *Redis) Init(meta bindings.Metadata) (err error) {
 	r.RegisterOperation(RevokeUserRoleOp, r.revokeUserRoleOps)
 
 	return nil
+}
+
+func (r *Redis) GetRunningPort() int {
+	// parse port from host
+	if r.clientSettings != nil {
+		host := r.clientSettings.Host
+		if strings.Contains(host, ":") {
+			parts := strings.Split(host, ":")
+			if len(parts) == 2 {
+				port, _ := strconv.Atoi(parts[1])
+				return port
+			}
+		}
+	}
+	return 0
 }
 
 func (r *Redis) initIfNeed() bool {
@@ -116,6 +139,7 @@ func (r *Redis) initDelay() error {
 	if err != nil {
 		return fmt.Errorf("redis binding: error connecting to redis at %s: %s", r.clientSettings.Host, err)
 	}
+	r.DBPort = r.GetRunningPort()
 	return nil
 }
 
@@ -160,7 +184,8 @@ func (r *Redis) query(ctx context.Context, args ...interface{}) (interface{}, er
 
 func (r *Redis) createOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	var (
-		object    = RedisEntry{}
+		object = RedisEntry{}
+
 		cmdRender = func(redis RedisEntry) string {
 			return fmt.Sprintf("SET %s %s", redis.Key, redis.Data)
 		}
@@ -316,7 +341,8 @@ func (r *Redis) describeUserOps(ctx context.Context, req *bindings.InvokeRequest
 
 func (r *Redis) createUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	var (
-		object    = UserInfo{}
+		object = UserInfo{}
+
 		cmdRender = func(user UserInfo) string {
 			return fmt.Sprintf("ACL SETUSER %s >%s", user.UserName, user.Password)
 		}
@@ -439,6 +465,32 @@ func (r *Redis) Close() error {
 	r.cancel()
 
 	return r.client.Close()
+}
+
+func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+	// sql exec timeout need to be less than httpget's timeout which default is 1s.
+	// ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	// defer cancel()
+	ctx1 := ctx
+	section := "Replication"
+
+	var role string
+	result, err := r.client.Info(ctx1, section).Result()
+	if err != nil {
+		r.Logger.Errorf("Role query error: %v", err)
+		return role, err
+	} else {
+		// split the result into lines
+		lines := strings.Split(result, "\r\n")
+		// find the line with role
+		for _, line := range lines {
+			if strings.HasPrefix(line, "role:") {
+				role = strings.Split(line, ":")[1]
+				break
+			}
+		}
+	}
+	return role, nil
 }
 
 func defaultRedisEntryParser(req *bindings.InvokeRequest, object *RedisEntry) error {

@@ -45,6 +45,7 @@ type BaseInternalOps interface {
 	InternalQuery(ctx context.Context, sql string) ([]byte, error)
 	InternalExec(ctx context.Context, sql string) (int64, error)
 	GetLogger() logger.Logger
+	GetRunningPort() int
 }
 
 type BaseOperations struct {

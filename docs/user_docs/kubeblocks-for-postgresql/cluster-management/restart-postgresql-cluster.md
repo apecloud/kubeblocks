@@ -5,6 +5,7 @@ sidebar_position: 4
 sidebar_label: Restart
 ---
 
+
 # Restart PostgreSQL cluster
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
 
@@ -23,7 +24,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    
    Configure the values of `component-names` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
    ```bash
-   kbcli cluster restart NAME --component-names="postgresql" \
+   kbcli cluster restart NAME --component-names="pg-replication" \
    --ttlSecondsAfterSucceed=30
    ```
    - `component-names` describes the component name that needs to be restarted.
@@ -42,7 +43,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
      clusterRef: pg-cluster
      type: Restart 
      restart:
-     - componentName: postgresql
+     - componentName: pg-replication
    EOF
    ```
 2. Validate the restarting.

@@ -58,7 +58,7 @@ func GetRandomStr() string {
 	return seq
 }
 
-func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
+func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1alpha1.Cluster {
 	var replicas int32 = 1
 	return &appsv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
@@ -82,6 +82,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 					},
 				},
 			},
+			Conditions: conditions,
 		},
 		Spec: appsv1alpha1.ClusterSpec{
 			ClusterDefRef:     ClusterDefName,
@@ -338,7 +339,7 @@ func FakeServices() *corev1.ServiceList {
 			annotations[types.ServiceFloatingIPAnnotationKey] = item.floatingIP
 		}
 		if item.exposed {
-			annotations[types.ServiceLBTypeAnnotationKey] = types.ServiceLBTypeAnnotationValue
+			annotations[types.ServiceHAVIPTypeAnnotationKey] = types.ServiceHAVIPTypeAnnotationValue
 		}
 		svc.ObjectMeta.SetAnnotations(annotations)
 

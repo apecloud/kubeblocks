@@ -33,9 +33,12 @@ var _ OpsHandler = verticalScalingHandler{}
 
 func init() {
 	verticalScalingBehaviour := OpsBehaviour{
-		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
-		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.VerticalScalingPhase,
-		OpsHandler:        verticalScalingHandler{},
+		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
+		// TODO: we should add "force" flag for these opsRequest.
+		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
+		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
+		OpsHandler:                         verticalScalingHandler{},
+		ProcessingReasonInClusterCondition: ProcessingReasonVerticalScaling,
 	}
 
 	opsMgr := GetOpsManager()

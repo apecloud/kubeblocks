@@ -17,7 +17,7 @@ spec:
       characterType: postgresql
       customLabelSpecs:
         - key: apps.kubeblocks.postgres.patroni/scope
-          value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)"
+          value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni"
           resources:
             - gvk: "v1/Pod"
               selector:
@@ -136,7 +136,7 @@ spec:
               - name: KUBERNETES_USE_CONFIGMAPS
                 value: "true"
               - name: SCOPE
-                value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)"
+                value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni"
               - name: KUBERNETES_SCOPE_LABEL
                 value: "apps.kubeblocks.postgres.patroni/scope"
               - name: KUBERNETES_ROLE_LABEL

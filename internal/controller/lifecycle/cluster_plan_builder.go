@@ -24,6 +24,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,7 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -40,20 +42,22 @@ import (
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation
 type clusterPlanBuilder struct {
-	ctx      intctrlutil.RequestCtx
-	cli      client.Client
-	req      ctrl.Request
-	recorder record.EventRecorder
-	cluster  *appsv1alpha1.Cluster
-	conMgr   clusterConditionManager2
+	ctx           intctrlutil.RequestCtx
+	cli           client.Client
+	req           ctrl.Request
+	recorder      record.EventRecorder
+	cluster       *appsv1alpha1.Cluster
+	originCluster appsv1alpha1.Cluster
 }
 
 // clusterPlan a graph.Plan implementation for Cluster reconciliation
 type clusterPlan struct {
+	ctx      intctrlutil.RequestCtx
+	cli      client.Client
+	recorder record.EventRecorder
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
 	cluster  *appsv1alpha1.Cluster
-	conMgr   clusterConditionManager2
 }
 
 var _ graph.PlanBuilder = &clusterPlanBuilder{}
@@ -65,19 +69,58 @@ func (c *clusterPlanBuilder) Init() error {
 		return err
 	}
 	c.cluster = cluster
+	c.originCluster = *cluster.DeepCopy()
+	// handles the cluster phase and ops condition first to indicates what the current cluster is doing.
+	c.handleClusterPhase()
+	c.handleLatestOpsRequestProcessingCondition()
 	return nil
 }
 
+// updateClusterPhase handles the cluster phase and ops condition first to indicates what the current cluster is doing.
+func (c *clusterPlanBuilder) handleClusterPhase() {
+	clusterPhase := c.cluster.Status.Phase
+	if isClusterUpdating(*c.cluster) {
+		if clusterPhase == "" {
+			c.cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
+		} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
+			c.cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
+		}
+	}
+}
+
+// updateLatestOpsRequestProcessingCondition handles the latest opsRequest processing condition.
+func (c *clusterPlanBuilder) handleLatestOpsRequestProcessingCondition() {
+	opsRecords, _ := opsutil.GetOpsRequestSliceFromCluster(c.cluster)
+	if len(opsRecords) == 0 {
+		return
+	}
+	ops := opsRecords[0]
+	opsBehaviour, ok := appsv1alpha1.OpsRequestBehaviourMapper[ops.Type]
+	if !ok {
+		return
+	}
+	opsCondition := newOpsRequestProcessingCondition(ops.Name, string(ops.Type), opsBehaviour.ProcessingReasonInClusterCondition)
+	oldCondition := meta.FindStatusCondition(c.cluster.Status.Conditions, opsCondition.Type)
+	if oldCondition == nil {
+		// if this condition not exists, insert it to the first position.
+		opsCondition.LastTransitionTime = metav1.Now()
+		c.cluster.Status.Conditions = append([]metav1.Condition{opsCondition}, c.cluster.Status.Conditions...)
+	} else {
+		meta.SetStatusCondition(&c.cluster.Status.Conditions, opsCondition)
+	}
+}
+
 func (c *clusterPlanBuilder) Validate() error {
-	validateExistence := func(key client.ObjectKey, object client.Object) error {
-		err := c.cli.Get(c.ctx.Ctx, key, object)
+	var err error
+	defer func() {
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				if setErr := c.conMgr.setPreCheckErrorCondition(c.cluster, err); util.IgnoreNoOps(setErr) != nil {
-					return setErr
-				}
-				c.recorder.Eventf(c.cluster, corev1.EventTypeWarning, constant.ReasonNotFoundCR, err.Error())
-			}
+			_ = c.updateClusterStatusWithCondition(newFailedProvisioningStartedCondition(err.Error(), ReasonPreCheckFailed))
+		}
+	}()
+
+	validateExistence := func(key client.ObjectKey, object client.Object) error {
+		err = c.cli.Get(c.ctx.Ctx, key, object)
+		if err != nil {
 			return newRequeueError(requeueDuration, err.Error())
 		}
 		return nil
@@ -85,13 +128,13 @@ func (c *clusterPlanBuilder) Validate() error {
 
 	// validate cd & cv existences
 	cd := &appsv1alpha1.ClusterDefinition{}
-	if err := validateExistence(types.NamespacedName{Name: c.cluster.Spec.ClusterDefRef}, cd); err != nil {
+	if err = validateExistence(types.NamespacedName{Name: c.cluster.Spec.ClusterDefRef}, cd); err != nil {
 		return err
 	}
 	var cv *appsv1alpha1.ClusterVersion
 	if len(c.cluster.Spec.ClusterVersionRef) > 0 {
 		cv = &appsv1alpha1.ClusterVersion{}
-		if err := validateExistence(types.NamespacedName{Name: c.cluster.Spec.ClusterVersionRef}, cv); err != nil {
+		if err = validateExistence(types.NamespacedName{Name: c.cluster.Spec.ClusterVersionRef}, cv); err != nil {
 			return err
 		}
 	}
@@ -99,11 +142,7 @@ func (c *clusterPlanBuilder) Validate() error {
 	// validate cd & cv availability
 	if cd.Status.Phase != appsv1alpha1.AvailablePhase || (cv != nil && cv.Status.Phase != appsv1alpha1.AvailablePhase) {
 		message := fmt.Sprintf("ref resource is unavailable, this problem needs to be solved first. cd: %v, cv: %v", cd, cv)
-		if err := c.conMgr.setReferenceCRUnavailableCondition(c.cluster, message); util.IgnoreNoOps(err) != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-		}
+		err = errors.New(message)
 		return newRequeueError(requeueDuration, message)
 	}
 
@@ -112,21 +151,31 @@ func (c *clusterPlanBuilder) Validate() error {
 	chain := &graph.ValidatorChain{
 		&enableLogsValidator{cluster: c.cluster, clusterDef: cd},
 	}
-	if err := chain.WalkThrough(); err != nil {
-		_ = c.conMgr.setPreCheckErrorCondition(c.cluster, err)
+	if err = chain.WalkThrough(); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
 	return nil
 }
 
+func (c *clusterPlanBuilder) handleProvisionStartedCondition() {
+	// set provisioning cluster condition
+	condition := newProvisioningStartedCondition(c.cluster.Name, c.cluster.Generation)
+	oldCondition := meta.FindStatusCondition(c.cluster.Status.Conditions, condition.Type)
+	if conditionIsChanged(oldCondition, condition) {
+		meta.SetStatusCondition(&c.cluster.Status.Conditions, condition)
+		c.recorder.Event(c.cluster, corev1.EventTypeNormal, condition.Reason, condition.Message)
+	}
+}
+
 // Build only cluster Creation, Update and Deletion supported.
 func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
-	_ = c.conMgr.setProvisioningStartedCondition(c.cluster)
+	// set provisioning cluster condition
+	c.handleProvisionStartedCondition()
 	var err error
 	defer func() {
 		if err != nil {
-			_ = c.conMgr.setApplyResourcesFailedCondition(c.cluster, err)
+			_ = c.updateClusterStatusWithCondition(newFailedApplyResourcesCondition(err.Error()))
 		}
 	}()
 
@@ -140,7 +189,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	// build transformer chain
 	chain := &graph.TransformerChain{
 		// init dag, that is put cluster vertex into dag
-		&initTransformer{cluster: c.cluster},
+		&initTransformer{cluster: c.cluster, originCluster: &c.originCluster},
 		// fix cd&cv labels of cluster
 		&fixClusterLabelsTransformer{},
 		// create cluster connection credential secret object
@@ -156,7 +205,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// handle TerminationPolicyType=DoNotTerminate
 		&doNotTerminateTransformer{},
 		// finally, update cluster status
-		&clusterStatusTransformer{cc: *cr, cli: c.cli, ctx: c.ctx, recorder: c.recorder, conMgr: c.conMgr},
+		newClusterStatusTransformer(c.ctx, c.cli, c.recorder, *cr),
 	}
 
 	// new a DAG and apply chain on it, after that we should get the final Plan
@@ -168,37 +217,70 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	c.ctx.Log.Info(fmt.Sprintf("DAG: %s", dag))
 	// we got the execution plan
 	plan := &clusterPlan{
+		ctx:      c.ctx,
+		cli:      c.cli,
+		recorder: c.recorder,
 		dag:      dag,
 		walkFunc: c.defaultWalkFuncWithLogging,
 		cluster:  c.cluster,
-		conMgr:   c.conMgr,
 	}
 	return plan, nil
+}
+
+func (c *clusterPlanBuilder) updateClusterStatusWithCondition(condition metav1.Condition) error {
+	oldCondition := meta.FindStatusCondition(c.cluster.Status.Conditions, condition.Type)
+	meta.SetStatusCondition(&c.cluster.Status.Conditions, condition)
+	if !reflect.DeepEqual(c.cluster.Status, c.originCluster.Status) {
+		if err := c.cli.Status().Patch(c.ctx.Ctx, c.cluster, client.MergeFrom(c.originCluster.DeepCopy())); err != nil {
+			return err
+		}
+	}
+	// Normal events are only sent once.
+	if !conditionIsChanged(oldCondition, condition) && condition.Status == metav1.ConditionTrue {
+		return nil
+	}
+	eventType := corev1.EventTypeWarning
+	if condition.Status == metav1.ConditionTrue {
+		eventType = corev1.EventTypeNormal
+	}
+	c.recorder.Event(c.cluster, eventType, condition.Reason, condition.Message)
+	return nil
 }
 
 // NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
 // TODO: change ctx to context.Context
 func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request, recorder record.EventRecorder) graph.PlanBuilder {
-	conMgr := clusterConditionManager2{
-		Client:   cli,
-		Recorder: recorder,
-		ctx:      ctx.Ctx,
-	}
 	return &clusterPlanBuilder{
 		ctx:      ctx,
 		cli:      cli,
 		req:      req,
 		recorder: recorder,
-		conMgr:   conMgr,
 	}
 }
 
 func (p *clusterPlan) Execute() error {
 	err := p.dag.WalkReverseTopoOrder(p.walkFunc)
 	if err != nil {
-		_ = p.conMgr.setApplyResourcesFailedCondition(p.cluster, err)
+		if hErr := p.handleDAGWalkError(err); hErr != nil {
+			return hErr
+		}
 	}
 	return err
+}
+
+func (p *clusterPlan) handleDAGWalkError(err error) error {
+	condition := newFailedApplyResourcesCondition(err.Error())
+	meta.SetStatusCondition(&p.cluster.Status.Conditions, condition)
+	p.recorder.Event(p.cluster, corev1.EventTypeWarning, condition.Reason, condition.Message)
+	rootVertex, _ := findRootVertex(p.dag)
+	if rootVertex == nil {
+		return nil
+	}
+	originCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+	if originCluster == nil || reflect.DeepEqual(originCluster.Status, p.cluster.Status) {
+		return nil
+	}
+	return p.cli.Status().Patch(p.ctx.Ctx, p.cluster, client.MergeFrom(originCluster.DeepCopy()))
 }
 
 func (c *clusterPlanBuilder) getClusterRefResources() (*clusterRefResources, error) {
@@ -304,8 +386,18 @@ func (c *clusterPlanBuilder) reconcileObject(node *lifecycleVertex) error {
 			}
 		}
 	case STATUS:
+		if node.immutable {
+			return nil
+		}
 		patch := client.MergeFrom(node.oriObj)
-		return c.cli.Status().Patch(c.ctx.Ctx, node.obj, patch)
+		if err := c.cli.Status().Patch(c.ctx.Ctx, node.obj, patch); err != nil {
+			return err
+		}
+		for _, postHandle := range node.postHandleAfterStatusPatch {
+			if err := postHandle(); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -346,15 +438,7 @@ func (c *clusterPlanBuilder) reconcileCluster(node *lifecycleVertex) (bool, erro
 func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster) error {
 	switch cluster.Spec.TerminationPolicy {
 	case appsv1alpha1.DoNotTerminate:
-		// if cluster.Status.Phase != appsv1alpha1.DeletingClusterPhase {
-		// 	patch := client.MergeFrom(cluster.DeepCopy())
-		// 	cluster.Status.ObservedGeneration = cluster.Generation
-		// 	// cluster.Status.Message = fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
-		// 	if err := r.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
-		// 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
-		// 	}
-		// }
-		// TODO: add warning event
+		c.recorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate", "spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
 		return nil
 	case appsv1alpha1.Delete, appsv1alpha1.WipeOut:
 		if err := c.deletePVCs(cluster); err != nil && !apierrors.IsNotFound(err) {

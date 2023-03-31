@@ -1,0 +1,46 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}
+  labels: {{ include "weaviate.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: weaviate-standalone # ref clusterdefinition.name
+  clusterVersionRef: weaviate-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  affinity:
+    {{- with .Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  componentSpecs:
+    - name: weaviate # user-defined
+      componentDefRef: weaviate # ref clusterdefinition components.name
+      monitor: {{ .Values.monitor.enabled | default false }}
+      replicas: {{ .Values.replicaCount | default 1 }}
+      {{- with  .Values.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.persistence.data.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.persistence.data.size }}
+      {{- end }}
+

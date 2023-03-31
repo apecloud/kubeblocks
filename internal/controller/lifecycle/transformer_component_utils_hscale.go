@@ -430,12 +430,23 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return
 		}
+		if err = controllerutil.SetControllerReference(cluster, backupPolicy, scheme); err != nil {
+			return
+		}
 		backupPolicyName = backupPolicy.Name
 		objs = append(objs, backupPolicy)
 		return
 	}
 
 	createBackup := func(backupPolicyName string) error {
+		backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: backupKey.Namespace, Name: backupPolicyName}, backupPolicy); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		// wait for backupPolicy created
+		if len(backupPolicy.Name) == 0 {
+			return nil
+		}
 		backupList := dataprotectionv1alpha1.BackupList{}
 		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[constant.KBAppComponentLabelKey])
 		if err := cli.List(reqCtx.Ctx, &backupList, ml); err != nil {

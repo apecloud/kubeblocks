@@ -32,6 +32,12 @@ spec:
       serviceAccountName: {{ include "kubeblocks.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers: # only download tools image to local
+        - name: tools
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/true
       containers:
         - name: manager
           args:
@@ -63,8 +69,8 @@ spec:
             {{- end }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.image.pullPolicy }}
-            - name: KUBEBLOCKS_IMAGE
-              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: KUBEBLOCKS_TOOLS_IMAGE
+              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}

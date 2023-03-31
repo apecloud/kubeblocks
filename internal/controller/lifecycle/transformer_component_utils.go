@@ -107,15 +107,10 @@ func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]s
 }
 
 // updateComponentPhaseWithOperation if workload of component changes, should update the component phase.
-// REVIEW: this function need provide return value to determine mutation or not
-// Deprecated:
 func updateComponentPhaseWithOperation(cluster *appsv1alpha1.Cluster, componentName string) {
-	if len(componentName) == 0 {
-		return
-	}
 	componentPhase := appsv1alpha1.SpecReconcilingClusterCompPhase
-	if cluster.Status.Phase == appsv1alpha1.StartingClusterPhase {
-		componentPhase = appsv1alpha1.StartingClusterCompPhase
+	if cluster.Status.Phase == appsv1alpha1.CreatingClusterPhase {
+		componentPhase = appsv1alpha1.CreatingClusterCompPhase
 	}
 	compStatus := cluster.Status.Components[componentName]
 	// synchronous component phase is consistent with cluster phase

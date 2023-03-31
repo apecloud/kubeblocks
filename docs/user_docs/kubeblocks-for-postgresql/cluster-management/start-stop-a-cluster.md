@@ -1,11 +1,11 @@
 ---
-title: Stop/Start a MySQL cluster
-description: How to start/stop a MySQL cluster
+title: Stop/Start a PostgreSQL cluster
+description: How to start/stop a PostgreSQL cluster
 sidebar_position: 5
 sidebar_label: Stop/Start
 ---
 
-# Stop/Start MySQL Cluster
+# Stop/Start PostgreSQL Cluster
 
 You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
 
@@ -20,7 +20,7 @@ kbcli cluster stop <name>
 ***Example***
 
 ```bash
-kbcli cluster stop mysql-cluster
+kbcli cluster stop pg-cluster
 ```
 
 ### Option 2. Create an OpsRequest
@@ -52,7 +52,7 @@ spec:
   clusterVersionRef: postgresql-14.7.0
   terminationPolicy: WipeOut
   components:
-  - name: postgresql
+  - name: pg-replication
     type: postgresql
     monitor: false  
     replicas: 0
@@ -114,7 +114,7 @@ spec:
   clusterVersionRef: postgresql-14.7.0
   terminationPolicy: WipeOut
   components:
-  - name: postgresql
+  - name: pg-replication
     type: postgresql
     monitor: false  
     replicas: 1

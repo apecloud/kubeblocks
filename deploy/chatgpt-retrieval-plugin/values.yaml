@@ -1,0 +1,162 @@
+# Default values for gptplugin.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/chatgpt-retrieval-plugin
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+
+datastore:
+  # in list of (pinecone, weaviate, zilliz, milvus, qdrant, redis)
+  DATASTORE:
+  # Yes	Your secret token to protect the local plugin API
+  BEARER_TOKEN:
+  # Your remote OpenAI API key
+  OPENAI_API_KEY:
+
+  # Required Your Pinecone API key, found in the Pinecone console (https://app.pinecone.io/)
+  PINECONE_API_KEY:
+  # Required Your Pinecone environment, found in the Pinecone console, e.g. us-west1-gcp, us-east-1-aws, etc.
+  PINECONE_ENVIRONMENT:
+  # Required Your chosen Pinecone index name. Note: Index name must consist of lower case alphanumeric characters or '-'
+  PINECONE_INDEX:
+
+  # Optional Your Weaviate instance host address default: http://127.0.0.1
+  WEAVIATE_HOST: http://127.0.0.1
+  # Optional Your Weaviate port number default: 8080
+  WEAVIATE_PORT: 8080
+  # Optional Your chosen Weaviate class/collection name to store your documents	default: OpenAIDocument
+  WEAVIATE_INDEX: OpenAIDocument
+  # Required Your OIDC or WCS username
+  WEAVIATE_USERNAME:
+  # Required Your OIDC or WCS password
+  WEAVIATE_PASSWORD:
+  # Optional Space-separated list of scopes
+  WEAVIATE_SCOPES:
+  # Optional Number of insert/updates per batch operation default: 20
+  WEAVIATE_BATCH_SIZE: 20
+  # Optional If lets the batch process decide the batch size default: False
+  WEAVIATE_BATCH_DYNAMIC: False
+  # Optional Number of retry-on-timeout attempts default: 3
+  WEAVIATE_BATCH_TIMEOUT_RETRIES: 3
+  # Optional The max number of concurrent threads to run batch operations, default: 1
+  WEAVIATE_BATCH_NUM_WORKERS: 1
+
+  # Optional Zilliz collection name. Defaults to a random UUID
+  ZILLIZ_COLLECTION:
+  # Required URI for the Zilliz instance
+  ZILLIZ_URI:
+  # Required Zilliz username
+  ZILLIZ_USER:
+  # Required Zilliz password
+  ZILLIZ_PASSWORD:
+
+  # Optional Milvus collection name, defaults to a random UUID
+  MILVUS_COLLECTION:
+  # Optional Milvus host IP, defaults to localhost
+  MILVUS_HOST: localhost
+  #	Optional Milvus port, defaults to 19530
+  MILVUS_PORT: 19530
+  # Optional Milvus username if RBAC is enabled, default: None
+  MILVUS_USER:
+  # Optional Milvus password if required, defaults: None
+  MILVUS_PASSWORD:
+
+  # Required Qdrant instance URL http://localhost
+  QDRANT_URL: http://localhost
+  # Optional TCP port for Qdrant HTTP communication	6333
+  QDRANT_PORT: 6333
+  # Optional TCP port for Qdrant GRPC communication	6334
+  QDRANT_GRPC_PORT: 6334
+  # Optional Qdrant API key for Qdrant Cloud
+  QDRANT_API_KEY:
+  # Optional Qdrant collection name	document_chunks
+  QDRANT_COLLECTION: document_chunks
+
+  # Optional Redis host url	default: localhost
+  REDIS_HOST: localhost
+  # Optional Redis port	default:6379
+  REDIS_PORT: 6379
+  # Optional Redis password	default:none
+  REDIS_PASSWORD:
+  # Optional Redis vector index name default:index
+  REDIS_INDEX_NAME: index
+  # Optional Redis key prefix for the index	default:doc
+  REDIS_DOC_PREFIX: doc
+  # Optional Vector similarity distance metric default:COSINE
+  REDIS_DISTANCE_METRIC: COSINE
+  # Optional Vector index algorithm type default:FLAT
+  REDIS_INDEX_TYPE: FLAT
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"

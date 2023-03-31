@@ -46,6 +46,11 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 0777
+        - name: postgresql-pre-init-scripts
+          configTplRef: { { include "postgresql.initdb.scriptsCM" . } }
+          namespace: { { .Release.Namespace } }
+          volumeName: custom-init-scripts
+          defaultMode: 0777
       service:
         ports:
           - name: tcp-postgresql
@@ -75,6 +80,10 @@ spec:
                 mountPath: /postgresql/conf
               - name: scripts
                 mountPath: /scripts
+              {{- if .Values.primary.initdb.scripts }}
+              - name: custom-init-scripts
+                mountPath: /docker-entrypoint-preinitdb.d
+              {{- end }}
             ports:
               - name: tcp-postgresql
                 containerPort: 5432

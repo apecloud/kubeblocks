@@ -13,3 +13,18 @@ spec:
   credentialKeyword:
     userKeyword: username
     passwordKeyword: password
+
+  pointInTimeRecovery:
+    timeFormat: 2006-01-02 15:04:05 MST
+    config:
+      init_script.sh: touch /postgresql/data/recovery.signal
+      postgresql.conf: |
+        restore_command='mv /postgresql/pitr/pg_wal/%f %p'
+        recovery_target_time='$KB_RECOVERY_TIME'
+        recovery_target_action='promote'
+    scripts:
+      command:
+        - |
+          mkdir -p /data/pitr;
+          cp -R /log/data/pg_wal /data/pitr/;
+          chmod 777 -R /data/pitr/;

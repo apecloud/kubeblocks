@@ -88,6 +88,22 @@ primary:
   name: primary
   ## configEnabled: true
 
+  ## Initdb configuration
+  ##
+  initdb:
+    ## @param primary.initdb.scripts Dictionary of initdb scripts
+    ## Specify dictionary of scripts to be run at first boot
+    ## e.g:
+    ## scripts:
+    ##   my_init_script.sh: |
+    ##      #!/bin/sh
+    ##      echo "Do something."
+    ##
+    scripts:
+      init_script.sh: |
+        #!/bin/sh
+        echo "running init script."
+
 ## @section Metrics Parameters
 metrics:
   ## @param metrics.image.registry PostgreSQL Prometheus Exporter image registry

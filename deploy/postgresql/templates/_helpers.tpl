@@ -96,3 +96,10 @@ Get the password key.
 {{ index (lookup "apps.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "postgresql").spec.connectionCredential "password"}}
 {{- end }}
 {{- end }}
+
+{{/*
+Get the initialization scripts ConfigMap name.
+*/}}
+{{- define "postgresql.initdb.scriptsCM" -}}
+    {{- printf "%s-init-scripts" (include "postgresql.fullname" .) -}}
+{{- end -}}

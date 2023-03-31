@@ -78,30 +78,30 @@ func (p *PointInTimeRecoveryManager) listCompletedBackups() (backupItems []dpv1a
 
 	backupItems = []dpv1alpha1.Backup{}
 	for _, b := range backups.Items {
-		if b.Status.Phase == dpv1alpha1.BackupCompleted {
+		if b.Status.Phase == dpv1alpha1.BackupCompleted && b.Status.Manifests != nil && b.Status.Manifests.BackupLog != nil {
 			backupItems = append(backupItems, b)
 		}
 	}
 	return backupItems, nil
 }
 
-// getSortedBackups sorted by CompletionTimestamp
+// getSortedBackups sorted by BackupLog.StopTime
 func (p *PointInTimeRecoveryManager) getSortedBackups() ([]dpv1alpha1.Backup, error) {
 	backups, err := p.listCompletedBackups()
 	if err != nil {
 		return backups, err
 	}
 	sort.Slice(backups, func(i, j int) bool {
-		if backups[i].Status.CompletionTimestamp == nil && backups[j].Status.CompletionTimestamp != nil {
+		if backups[i].Status.Manifests.BackupLog.StopTime == nil && backups[j].Status.Manifests.BackupLog.StopTime != nil {
 			return false
 		}
-		if backups[i].Status.CompletionTimestamp != nil && backups[j].Status.CompletionTimestamp == nil {
+		if backups[i].Status.Manifests.BackupLog.StopTime != nil && backups[j].Status.Manifests.BackupLog.StopTime == nil {
 			return true
 		}
-		if backups[i].Status.CompletionTimestamp.Equal(backups[j].Status.CompletionTimestamp) {
+		if backups[i].Status.Manifests.BackupLog.StopTime.Equal(backups[j].Status.Manifests.BackupLog.StopTime) {
 			return backups[i].Name < backups[j].Name
 		}
-		return backups[i].Status.CompletionTimestamp.Before(backups[j].Status.CompletionTimestamp)
+		return backups[i].Status.Manifests.BackupLog.StopTime.Before(backups[j].Status.Manifests.BackupLog.StopTime)
 	})
 	return backups, nil
 }
@@ -113,16 +113,16 @@ func (p *PointInTimeRecoveryManager) getReverseSortedBackups() ([]dpv1alpha1.Bac
 		return backups, err
 	}
 	sort.Slice(backups, func(i, j int) bool {
-		if backups[j].Status.CompletionTimestamp == nil && backups[i].Status.CompletionTimestamp != nil {
+		if backups[j].Status.Manifests.BackupLog.StopTime == nil && backups[i].Status.Manifests.BackupLog.StopTime != nil {
 			return false
 		}
-		if backups[j].Status.CompletionTimestamp != nil && backups[i].Status.CompletionTimestamp == nil {
+		if backups[j].Status.Manifests.BackupLog.StopTime != nil && backups[i].Status.Manifests.BackupLog.StopTime == nil {
 			return true
 		}
-		if backups[j].Status.CompletionTimestamp.Equal(backups[i].Status.CompletionTimestamp) {
+		if backups[j].Status.Manifests.BackupLog.StopTime.Equal(backups[i].Status.Manifests.BackupLog.StopTime) {
 			return backups[j].Name < backups[i].Name
 		}
-		return backups[j].Status.CompletionTimestamp.Before(backups[i].Status.CompletionTimestamp)
+		return backups[j].Status.Manifests.BackupLog.StopTime.Before(backups[i].Status.Manifests.BackupLog.StopTime)
 	})
 
 	return backups, nil
@@ -238,22 +238,22 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupPointI
 
 func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, err error) {
 	objs = make([]client.Object, 0)
-	for _, component := range p.Cluster.Spec.ComponentSpecs {
-		if len(component.VolumeClaimTemplates) == 0 {
+	for _, componentSpec := range p.Cluster.Spec.ComponentSpecs {
+		if len(componentSpec.VolumeClaimTemplates) == 0 {
 			continue
 		}
 
 		sts := &appsv1.StatefulSet{}
 		vct := corev1.PersistentVolumeClaimTemplate{}
-		vct.Name = component.VolumeClaimTemplates[0].Name
-		vct.Spec = *(component.VolumeClaimTemplates[0].Spec)
+		vct.Name = componentSpec.VolumeClaimTemplates[0].Name
+		vct.Spec = *(componentSpec.VolumeClaimTemplates[0].Spec)
 
 		// get data dir pvc name
 		dataPVCList := corev1.PersistentVolumeClaimList{}
 		dataPVCLabels := map[string]string{
-			constant.AppInstanceLabelKey:             p.Cluster.Name,
-			constant.KBAppComponentLabelKey:          component.Name,
-			constant.VolumeClaimTemplateNameLabelKey: "data",
+			constant.AppInstanceLabelKey:    p.Cluster.Name,
+			constant.KBAppComponentLabelKey: componentSpec.Name,
+			constant.VolumeTypeLabelKey:     string(appsv1alpha1.VolumeTypeData),
 		}
 		if err = p.Client.List(p.Ctx, &dataPVCList,
 			client.InNamespace(p.namespace),
@@ -263,54 +263,59 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 		if len(dataPVCList.Items) == 0 {
 			return objs, errors.New("not found data pvc")
 		}
-		dataPVC := dataPVCList.Items[0]
-		if dataPVC.Status.Phase != corev1.ClaimBound {
-			return objs, errors.New("waiting PVC Bound")
-		}
+		for i, dataPVC := range dataPVCList.Items {
+			if dataPVC.Status.Phase != corev1.ClaimBound {
+				return objs, errors.New("waiting PVC Bound")
+			}
 
-		nextBackup, err := p.getNextBackup()
-		if err != nil {
-			return objs, err
-		}
-		pitrPVCName := fmt.Sprintf("pitr-%s-%s-0", p.Cluster.Name, component.Name)
-		pitrPVCKey := types.NamespacedName{
-			Namespace: p.namespace,
-			Name:      pitrPVCName,
-		}
-		pitrPVC, err := builder.BuildPVCFromSnapshot(sts, vct, pitrPVCKey, nextBackup.Name, nil)
-		if err != nil {
-			return objs, err
-		}
-		if pitrPVC.Annotations == nil {
-			pitrPVC.Annotations = map[string]string{}
-		}
-		volumes := []corev1.Volume{
-			{Name: "data", VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.Name}}},
-			{Name: "log", VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pitrPVCName}}},
-		}
-		volumeMounts := []corev1.VolumeMount{
-			{Name: "data", MountPath: "/data"},
-			{Name: "log", MountPath: "/log"},
-		}
+			nextBackup, err := p.getNextBackup()
+			if err != nil {
+				return objs, err
+			}
+			pitrPVCName := fmt.Sprintf("pitr-%s-%s-%d", p.Cluster.Name, componentSpec.Name, i)
+			pitrPVCKey := types.NamespacedName{
+				Namespace: p.namespace,
+				Name:      pitrPVCName,
+			}
+			pitrPVC, err := builder.BuildPVCFromSnapshot(sts, vct, pitrPVCKey, nextBackup.Name, nil)
+			if err != nil {
+				return objs, err
+			}
+			if pitrPVC.Annotations == nil {
+				pitrPVC.Annotations = map[string]string{}
+			}
+			volumes := []corev1.Volume{
+				{Name: "data", VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.Name}}},
+				{Name: "log", VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pitrPVCName}}},
+			}
+			volumeMounts := []corev1.VolumeMount{
+				{Name: "data", MountPath: "/data"},
+				{Name: "log", MountPath: "/log"},
+			}
 
-		recoveryInfo, err := p.getRecoveryInfo()
-		if err != nil {
-			return objs, err
-		}
+			recoveryInfo, err := p.getRecoveryInfo()
+			if err != nil {
+				return objs, err
+			}
 
-		// render the job cue template
-		job, err := builder.BuildPITRJob(p.Cluster, recoveryInfo.Scripts.Image, recoveryInfo.Scripts.Command, volumes, volumeMounts)
-		if err != nil {
-			return objs, err
+			// render the job cue template
+			image := recoveryInfo.Scripts.Image
+			if image == "" {
+				image = constant.KBToolsImage
+			}
+			job, err := builder.BuildPITRJob(p.Cluster, image, recoveryInfo.Scripts.Command, volumes, volumeMounts)
+			if err != nil {
+				return objs, err
+			}
+			if job.Annotations == nil {
+				job.Annotations = map[string]string{}
+			}
+			// collect pvcs and jobs for later deletion
+			objs = append(objs, pitrPVC)
+			objs = append(objs, job)
 		}
-		if job.Annotations == nil {
-			job.Annotations = map[string]string{}
-		}
-		// collect pvcs and jobs for later deletion
-		objs = append(objs, pitrPVC)
-		objs = append(objs, job)
 	}
 	return objs, nil
 }
@@ -483,8 +488,8 @@ func (p *PointInTimeRecoveryManager) DoPrepare(component *component.SynthesizedC
 	}
 	// prepare init container
 	container := corev1.Container{}
-	container.Name = "pitr"
-	container.Image = "registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6"
+	container.Name = "pitr-for-pause"
+	container.Image = constant.KBToolsImage
 	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, container)
 
 	// prepare data pvc

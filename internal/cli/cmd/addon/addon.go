@@ -55,6 +55,7 @@ type addonEnableFlags struct {
 	StorageClassSets []string
 	TolerationsSet   []string
 	SetValues        []string
+	Force            bool
 }
 
 func (r *addonEnableFlags) useDefault() bool {
@@ -176,10 +177,14 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 		# Enabled "prometheus" addon with helm like custom settings
 		kbcli addon enable prometheus --set prometheus.alertmanager.image.tag=v0.24.0
+
+		# Force enabled "csi-s3" addon
+		kbcli addon enable csi-s3 --force
 `),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
 			util.CheckErr(o.fetchAddonObj())
+			util.CheckErr(o.validate())
 			util.CheckErr(o.complete(o, cmd, args))
 			util.CheckErr(o.Run(cmd))
 		},
@@ -198,6 +203,7 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		"Sets addon pod tolerations (--tolerations [extraName:]<toleration JSON list items>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.SetValues, "set", []string{},
 		"set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2), it's only being processed if addon's type is helm.")
+	cmd.Flags().BoolVar(&o.addonEnableFlags.Force, "force", false, "ignoring the installable restrictions and forcefully enabling.")
 
 	o.Options.AddFlags(cmd)
 	return cmd
@@ -273,6 +279,21 @@ func (o *addonCmdOpts) fetchAddonObj() error {
 	}
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &o.addon); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (o *addonCmdOpts) validate() error {
+	if o.addonEnableFlags.Force {
+		return nil
+	}
+	if o.addon.Spec.Installable == nil {
+		return nil
+	}
+	for _, s := range o.addon.Spec.Installable.Selectors {
+		if !s.MatchesFromConfig() {
+			return fmt.Errorf("addon %s INSTALLABLE-SELECTOR has no matching requirement", o.Names)
+		}
 	}
 	return nil
 }

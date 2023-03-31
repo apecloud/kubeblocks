@@ -17,11 +17,23 @@ limitations under the License.
 package addon
 
 import (
+	"net/http"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
+	restfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/cli/patch"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 const (
@@ -62,6 +74,37 @@ var _ = Describe("Manage applications related to KubeBlocks", func() {
 			describeCmd := newDescribeCmd(tf, streams)
 			Expect(describeCmd).ShouldNot(BeNil())
 			Expect(describeCmd.HasSubCommands()).ShouldNot(BeTrue())
+		})
+	})
+
+	When("Validate at enable an addon", func() {
+		It("should return error", func() {
+			o := &addonCmdOpts{
+				Options:          patch.NewOptions(tf, streams, types.AddonGVR()),
+				Factory:          tf,
+				IOStreams:        streams,
+				addonEnableFlags: &addonEnableFlags{},
+				complete:         addonEnableDisableHandler,
+			}
+			addonObj := testing.FakeAddon("addon-test")
+			o.addon = *addonObj
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			httpResp := func(obj runtime.Object) *http.Response {
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
+			}
+			tf.Client = &restfake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Group: "version", Version: ""},
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Client: restfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					urlPrefix := "/version"
+					return map[string]*http.Response{
+						urlPrefix: httpResp(testing.FakeServices()),
+					}[req.URL.Path], nil
+				}),
+			}
+			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
+				scheme.Scheme, addonObj)
+			Expect(o.validate()).Should(HaveOccurred())
 		})
 	})
 

@@ -30,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
@@ -443,4 +444,26 @@ func FakeKBDeploy(version string) *appsv1.Deployment {
 		deploy.Labels["app.kubernetes.io/version"] = version
 	}
 	return deploy
+}
+
+func FakeAddon(name string) *extensionsv1alpha1.Addon {
+	addon := &extensionsv1alpha1.Addon{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.ExtensionsAPIGroup, types.ExtensionsAPIVersion),
+			Kind:       "Addon",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: Namespace,
+		},
+		Spec: extensionsv1alpha1.AddonSpec{
+			Installable: &extensionsv1alpha1.InstallableSpec{
+				Selectors: []extensionsv1alpha1.SelectorRequirement{
+					{Key: extensionsv1alpha1.KubeGitVersion, Operator: extensionsv1alpha1.Contains, Values: []string{"k3s"}},
+				},
+			},
+		},
+	}
+	addon.SetCreationTimestamp(metav1.Now())
+	return addon
 }

@@ -27,6 +27,9 @@ kbcli addon enable ADDON_NAME [flags]
   
   # Enabled "prometheus" addon with helm like custom settings
   kbcli addon enable prometheus --set prometheus.alertmanager.image.tag=v0.24.0
+  
+  # Force enabled "csi-s3" addon
+  kbcli addon enable csi-s3 --force
 ```
 
 ### Options
@@ -35,6 +38,7 @@ kbcli addon enable ADDON_NAME [flags]
       --allow-missing-template-keys    If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
       --cpu stringArray                Sets addon CPU resource values (--cpu [extraName:]<request>/<limit>) (can specify multiple if has extra items))
       --dry-run string[="unchanged"]   Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --force                          ignoring the installable restrictions and forcefully enabling.
   -h, --help                           help for enable
       --memory stringArray             Sets addon memory resource values (--memory [extraName:]<request>/<limit>) (can specify multiple if has extra items))
   -o, --output string                  Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).

@@ -400,8 +400,6 @@ bump-chart-ver: \
 	bump-single-chart-ver.chatgpt-retrieval-plugin
 bump-chart-ver: ## Bump helm chart version.
 
-LOADBALANCER_CHART_VERSION=
-
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
 ## it will pull down the latest charts that satisfy the dependencies, and clean up old dependencies.

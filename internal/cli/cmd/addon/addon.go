@@ -290,17 +290,7 @@ func (o *addonCmdOpts) validate() error {
 	if o.addon.Spec.Installable == nil {
 		return nil
 	}
-	installable := o.addon.Spec.Installable
-	client, err := o.Factory.KubernetesClientSet()
-	if err != nil {
-		return err
-	}
-	versionInfo, err := client.Discovery().ServerVersion()
-	if err != nil {
-		return err
-	}
-	viper.Set(constant.CfgKeyServerInfo, *versionInfo)
-	for _, s := range installable.Selectors {
+	for _, s := range o.addon.Spec.Installable.Selectors {
 		if !s.MatchesFromConfig() {
 			return fmt.Errorf("addon %s INSTALLABLE-SELECTOR has no matching requirement", o.Names)
 		}

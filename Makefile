@@ -95,7 +95,7 @@ endif
 
 ##@ General
 
-# The help target prints out all targets with their descriptions organized
+# The help target printsx out all targets with their descriptions organized
 # beneath their categories. The categories are represented by '##@' and the
 # target descriptions by '##'. The awk commands is responsible for reading the
 # entire set of makefiles included in this invocation, looking for lines of the
@@ -254,12 +254,11 @@ bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH)
 	GOOS=$(word 2,$(subst ., ,$@)) 
 	GOARCH=$(word 3,$(subst ., ,$@))
 	CGO_ENABLED=0
-	ifeq ($(GOOS), windows)
-		BINARY_EXT=.exe
-	else
-		BINARY_EXT=""
-	endif	
-	 
+ifeq ($(GOOS), windows)
+	BINARY_EXT=.exe
+else
+	BINARY_EXT=""
+endif	
 	$(GO) build -ldflags=${CLI_LD_FLAGS} -o  bin/kbcli${BINARY_EXT} cmd/cli/main.go
 	
 

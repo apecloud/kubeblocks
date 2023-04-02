@@ -201,7 +201,7 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		`Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items)). 
 Additional notes for Helm type Addon, that resizing storage will fail if modified value is a storage request size 
 that belongs to StatefulSet's volume claim template, to resolve 'Failed' Addon status possible action is disable and 
-re-enable the addon (More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources).
+re-enable the addon (More info on how-to resize a PVC: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources).
 `)
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.ReplicaCountSets, "replicas", []string{},
 		"Sets addon component replica count (--replicas [extraName:]<number>) (can specify multiple if has extra items))")

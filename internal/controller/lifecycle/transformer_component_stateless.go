@@ -18,6 +18,8 @@ package lifecycle
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +30,26 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+func newStatelessComponent(definition *appsv1alpha1.ClusterDefinition,
+	cluster *appsv1alpha1.Cluster,
+	compDef *appsv1alpha1.ClusterComponentDefinition,
+	compVer *appsv1alpha1.ClusterComponentVersion,
+	compSpec *appsv1alpha1.ClusterComponentSpec,
+	dag *graph.DAG) *statelessComponent {
+	return &statelessComponent{
+		componentBase: componentBase{
+			Definition:      definition,
+			Cluster:         cluster,
+			CompDef:         compDef,
+			CompVer:         compVer,
+			CompSpec:        compSpec,
+			Component:       nil,
+			workloadVertexs: make([]*lifecycleVertex, 0),
+			dag:             dag,
+		},
+	}
+}
 
 type statelessComponent struct {
 	componentBase
@@ -120,11 +142,6 @@ func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	return c.validateObjectsAction()
 }
 
-func (c *statelessComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	// TODO: delete component owned resources
-	return nil
-}
-
 func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	if err := c.init(reqCtx, cli, nil); err != nil {
 		return err
@@ -149,6 +166,11 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	}
 
 	return c.resolveObjectsAction(reqCtx, cli)
+}
+
+func (c *statelessComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	// TODO: delete component owned resources
+	return nil
 }
 
 func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -176,6 +198,10 @@ func (c *statelessComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.C
 		return err
 	}
 	return restartPod(&deploy.Spec.Template)
+}
+
+func (c *statelessComponent) Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return nil // TODO: impl
 }
 
 func (c *statelessComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.Deployment, error) {
@@ -208,11 +234,25 @@ func (c *statelessComponent) updateUnderlyingResources(reqCtx intctrlutil.Reques
 		return err
 	}
 
-	c.updateDeploymentWorkload(deployObj)
+	c.updateWorkload(deployObj)
 
 	if err := c.updateService(reqCtx, cli); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
+	deployObjCopy := deployObj.DeepCopy()
+	deployProto := c.workloadVertexs[0].obj.(*appsv1.Deployment)
+
+	deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations, deployProto.Spec.Template.Annotations)
+	deployObjCopy.Spec = deployProto.Spec
+	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
+		c.workloadVertexs[0].obj = deployObjCopy
+		c.workloadVertexs[0].action = actionPtr(UPDATE)
+		// sync component phase
+		//updateComponentPhaseWithOperation2(c.GetCluster(), c.GetName())
+	}
 }

@@ -18,6 +18,8 @@ package lifecycle
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"reflect"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,6 +34,26 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+func newReplicationComponent(definition *appsv1alpha1.ClusterDefinition,
+	cluster *appsv1alpha1.Cluster,
+	compDef *appsv1alpha1.ClusterComponentDefinition,
+	compVer *appsv1alpha1.ClusterComponentVersion,
+	compSpec *appsv1alpha1.ClusterComponentSpec,
+	dag *graph.DAG) *replicationComponent {
+	return &replicationComponent{
+		componentBase: componentBase{
+			Definition:      definition,
+			Cluster:         cluster,
+			CompDef:         compDef,
+			CompVer:         compVer,
+			CompSpec:        compSpec,
+			Component:       nil,
+			workloadVertexs: make([]*lifecycleVertex, 0),
+			dag:             dag,
+		},
+	}
+}
 
 type replicationComponent struct {
 	componentBase
@@ -222,11 +244,6 @@ func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.
 	return c.validateObjectsAction()
 }
 
-func (c *replicationComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	// TODO: delete component owned resources
-	return nil
-}
-
 func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	if err := c.init(reqCtx, cli, nil); err != nil {
 		return err
@@ -251,6 +268,11 @@ func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.
 	}
 
 	return c.resolveObjectsAction(reqCtx, cli)
+}
+
+func (c *replicationComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	// TODO: delete component owned resources
+	return nil
 }
 
 func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -330,6 +352,10 @@ func (c *replicationComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client
 	return nil
 }
 
+func (c *replicationComponent) Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return nil // TODO: impl
+}
+
 func (c *replicationComponent) runningWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]*appsv1.StatefulSet, error) {
 	stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
@@ -373,7 +399,7 @@ func (c *replicationComponent) updateUnderlyingResources(reqCtx intctrlutil.Requ
 	}
 
 	for i, stsObj := range stsObjList {
-		c.updateStatefulSetWorkload(stsObj, int32(i))
+		c.updateWorkload(stsObj, int32(i))
 	}
 
 	if err := c.updateService(reqCtx, cli); err != nil {
@@ -381,4 +407,23 @@ func (c *replicationComponent) updateUnderlyingResources(reqCtx intctrlutil.Requ
 	}
 
 	return nil
+}
+
+func (c *replicationComponent) updateWorkload(stsObj *appsv1.StatefulSet, idx int32) {
+	stsObjCopy := stsObj.DeepCopy()
+	stsProto := c.workloadVertexs[idx].obj.(*appsv1.StatefulSet)
+
+	// keep the original template annotations.
+	// if annotations exist and are replaced, the statefulSet will be updated.
+	stsProto.Spec.Template.Annotations = mergeAnnotations(stsObjCopy.Spec.Template.Annotations, stsProto.Spec.Template.Annotations)
+	stsObjCopy.Spec.Template = stsProto.Spec.Template
+	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
+	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
+	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
+		c.workloadVertexs[idx].obj = stsObjCopy
+		c.workloadVertexs[idx].action = actionPtr(UPDATE)
+
+		// sync component phase
+		//updateComponentPhaseWithOperation2(c.GetCluster(), c.GetName())
+	}
 }

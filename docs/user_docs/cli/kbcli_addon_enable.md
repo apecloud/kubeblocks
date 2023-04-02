@@ -46,9 +46,9 @@ kbcli addon enable ADDON_NAME [flags]
       --set stringArray                set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2), it's only being processed if addon's type is helm.
       --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
       --storage stringArray            Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items)). 
-                                       Additional notes: for type=Helm addon and if the value mapped directly to a StatefulSet's volume claim template
-                                       the helm upgrade action will failed, to resolved this you will need to disable and re-enable the addon, also noted
-                                       that storage size can only be expanded by PVC resizing.
+                                       Additional notes for Helm type Addon, that resizing storage will fail if modified value is a storage request size 
+                                       that belongs to StatefulSet's volume claim template, to resolve 'Failed' Addon status possible action is disable and 
+                                       re-enable the addon (More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources). 
                                        
       --storage-class stringArray      Sets addon storage class name (--storage-class [extraName:]<storage class name>) (can specify multiple if has extra items))
       --template string                Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].

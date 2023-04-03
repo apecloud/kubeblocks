@@ -21,6 +21,10 @@ spec:
           namespace: {{ .Release.Namespace }}
           defaultMode: 493
       configSpecs:
+        - name: mongodb-config
+          templateRef: mongodb5.0-config-template
+          namespace: {{ .Release.Namespace }}
+          volumeName: mongodb-config
         - name: mongodb-metrics-config
           templateRef: mongodb-metrics-config
           namespace: {{ .Release.Namespace }}
@@ -83,8 +87,10 @@ spec:
                     - /scripts/replicaset-post-start.sh
                     - REPLICASET
             volumeMounts:
-              - mountPath: /data/db
+              - mountPath: /data/mongodb
                 name: data
+              - mountPath: /etc/mongodb
+                name: mongodb-config
               - name: scripts
                 mountPath: /scripts/replicaset-setup.sh
                 subPath: replicaset-setup.sh

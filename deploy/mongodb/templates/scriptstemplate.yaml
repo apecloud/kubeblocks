@@ -20,7 +20,7 @@ data:
     mkdir -p /data/mongodb/log
     PORT=27018
     MODE=$1
-    mongod $MODE --bind_ip_all --port $PORT --replSet $RPL_SET_NAME --logappend --logpath /data/mongodb/log/mongodb.log
+    mongod $MODE --bind_ip_all --port $PORT --replSet $RPL_SET_NAME --logappend --logpath /data/mongodb/log/mongodb.log --config /etc/mongodb/mongodb.conf
   replicaset-post-start.sh: |-
     #!/bin/sh
     # usage: replicaset-post-start.sh type_name is_configsvr

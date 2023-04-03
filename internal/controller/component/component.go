@@ -94,7 +94,7 @@ func BuildComponent(
 	if len(clusterCompSpec.Tolerations) != 0 {
 		tolerations = clusterCompSpec.Tolerations
 	}
-	component.PodSpec.Tolerations = patchBuiltInToleration(tolerations)
+	component.PodSpec.Tolerations = PatchBuiltInToleration(tolerations)
 
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()

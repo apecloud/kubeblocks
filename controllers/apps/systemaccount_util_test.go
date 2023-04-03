@@ -18,7 +18,6 @@ package apps
 
 import (
 	"math/rand"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -230,8 +229,14 @@ func TestRenderJob(t *testing.T) {
 			assert.NotNil(t, job)
 			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			jobToleration := job.Spec.Template.Spec.Tolerations
-			assert.Equal(t, 1, len(jobToleration))
-			assert.True(t, reflect.DeepEqual(toleration[0], jobToleration[0]))
+			assert.Equal(t, 2, len(jobToleration))
+			// make sure the toleration is added to job and contains our built-in toleration
+			tolerationKeys := make([]string, 0)
+			for _, t := range jobToleration {
+				tolerationKeys = append(tolerationKeys, t.Key)
+			}
+			assert.Contains(t, tolerationKeys, constant.KubeBlocksDataNodeTolerationKey)
+			assert.Contains(t, tolerationKeys, toleration[0].Key)
 		case appsv1alpha1.ReferToExisting:
 			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.ConnCredentialPlaceHolder))
 		}

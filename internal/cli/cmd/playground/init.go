@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -156,7 +157,7 @@ func (o *initOptions) local() error {
 	// create a local kubernetes cluster (k3d cluster) to deploy KubeBlocks
 	spinner := printer.Spinner(o.Out, "%-40s", "Create k3d cluster: "+clusterInfo.ClusterName)
 	defer spinner(false)
-	if err = provider.CreateK8sCluster(clusterInfo, true); err != nil {
+	if err = provider.CreateK8sCluster(clusterInfo); err != nil {
 		return errors.Wrap(err, "failed to set up k3d cluster")
 	}
 	spinner(true)
@@ -167,52 +168,6 @@ func (o *initOptions) local() error {
 
 	// install KubeBlocks and create a database cluster
 	return o.installKBAndCluster(clusterInfo.ClusterName)
-}
-
-func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
-	var err error
-
-	// playground always use the default kubeconfig at ~/.kube/config
-	configPath := util.ConfigPath("config")
-	if err = util.SetKubeConfig(configPath); err != nil {
-		return err
-	}
-
-	// create helm config
-	o.helmCfg = helm.NewConfig("", configPath, "", klog.V(1).Enabled())
-
-	// Install KubeBlocks
-	if err = o.installKubeBlocks(); err != nil {
-		return errors.Wrap(err, "failed to install KubeBlocks")
-	}
-
-	// Install database cluster
-	clusterInfo := "ClusterDefinition: " + o.clusterDef
-	if o.clusterVersion != "" {
-		clusterInfo += ", ClusterVersion: " + o.clusterVersion
-	}
-	spinner := printer.Spinner(o.Out, "Create cluster %s (%s)", kbClusterName, clusterInfo)
-	defer spinner(false)
-	if err = o.createCluster(); err != nil {
-		return errors.Wrapf(err, "failed to create cluster %s", kbClusterName)
-	}
-	spinner(true)
-
-	// Print guide information
-	fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n\n")
-	if k8sClusterName != "" {
-		fmt.Fprintf(os.Stdout, "Kubernetes cluster \"%s\" has been created.\n", k8sClusterName)
-	}
-	fmt.Fprintf(os.Stdout, "Cluster \"%s\" has been created.\n", kbClusterName)
-
-	// output elapsed time
-	if !o.startTime.IsZero() {
-		fmt.Fprintf(o.Out, "Elapsed time: %s\n", time.Since(o.startTime).Truncate(time.Second))
-	}
-
-	printGuide()
-
-	return nil
 }
 
 // bootstraps a playground in the remote cloud
@@ -268,11 +223,13 @@ func (o *initOptions) cloud() error {
 		return err
 	}
 
-	if err = provider.CreateK8sCluster(clusterInfo, true); err != nil {
+	// create a kubernetes cluster in the cloud
+	if err = provider.CreateK8sCluster(clusterInfo); err != nil {
 		return err
 	}
 	printer.PrintBlankLine(o.Out)
 
+	// write cluster kubeconfig to local kubeconfig file and switch current context to it
 	if err = o.setKubeConfig(provider); err != nil {
 		return err
 	}
@@ -289,7 +246,8 @@ func (o *initOptions) confirmToContinue() error {
 		fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
 		return cmdutil.ErrExit
 	}
-	fmt.Fprintf(o.Out, "Continue to initialize %s %s cluster %s... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
+	fmt.Fprintf(o.Out, "Continue to initialize %s %s cluster %s... \n",
+		o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
 	return nil
 }
 
@@ -328,14 +286,15 @@ func (o *initOptions) setKubeConfig(provider cp.Interface) error {
 		return errors.New("failed to get kubernetes cluster kubeconfig")
 	}
 	if err = writeClusterInfoToFile(o.stateFilePath, clusterInfo); err != nil {
-		return errors.Wrapf(err, "failed to write kubernetes cluster info to state file %s:\n  %v", o.stateFilePath, clusterInfo)
+		return errors.Wrapf(err, "failed to write kubernetes cluster info to state file %s:\n  %v",
+			o.stateFilePath, clusterInfo)
 	}
 
 	// merge created kubernetes cluster kubeconfig to ~/.kube/config and set it as default
-	configPath := util.ConfigPath("config")
-	spinner := printer.Spinner(o.Out, "Write kubeconfig to %s", configPath)
+	spinner := printer.Spinner(o.Out, "Write kubeconfig to %s", defaultKubeConfigPath)
 	defer spinner(false)
-	if err = kubeConfigWrite(clusterInfo.KubeConfig, configPath, writeKubeConfigOptions{UpdateExisting: true, UpdateCurrentContext: true}); err != nil {
+	if err = kubeConfigWrite(clusterInfo.KubeConfig, defaultKubeConfigPath,
+		writeKubeConfigOptions{UpdateExisting: true, UpdateCurrentContext: true}); err != nil {
 		return errors.Wrapf(err, "failed to write cluster %s kubeconfig", clusterInfo.ClusterName)
 	}
 	spinner(true)
@@ -348,6 +307,58 @@ func (o *initOptions) setKubeConfig(provider cp.Interface) error {
 	}
 	spinner(true)
 
+	return nil
+}
+
+func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
+	var err error
+
+	// when the kubernetes cluster is not ready, the runtime will output the error
+	// message like "couldn't get resource list for", we ignore it
+	runtime.ErrorHandlers[0] = func(err error) {
+		if klog.V(1).Enabled() {
+			klog.ErrorDepth(2, err)
+		}
+	}
+
+	// playground always use the default kubeconfig at ~/.kube/config
+	if err = util.SetKubeConfig(defaultKubeConfigPath); err != nil {
+		return err
+	}
+
+	// create helm config
+	o.helmCfg = helm.NewConfig("", defaultKubeConfigPath, "", klog.V(1).Enabled())
+
+	// Install KubeBlocks
+	if err = o.installKubeBlocks(); err != nil {
+		return errors.Wrap(err, "failed to install KubeBlocks")
+	}
+
+	// Install database cluster
+	clusterInfo := "ClusterDefinition: " + o.clusterDef
+	if o.clusterVersion != "" {
+		clusterInfo += ", ClusterVersion: " + o.clusterVersion
+	}
+	spinner := printer.Spinner(o.Out, "Create cluster %s (%s)", kbClusterName, clusterInfo)
+	defer spinner(false)
+	if err = o.createCluster(); err != nil {
+		return errors.Wrapf(err, "failed to create cluster %s", kbClusterName)
+	}
+	spinner(true)
+
+	// Print guide information
+	fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n\n")
+	if k8sClusterName != "" {
+		fmt.Fprintf(os.Stdout, "Kubernetes cluster \"%s\" has been created.\n", k8sClusterName)
+	}
+	fmt.Fprintf(os.Stdout, "Cluster \"%s\" has been created.\n", kbClusterName)
+
+	// output elapsed time
+	if !o.startTime.IsZero() {
+		fmt.Fprintf(o.Out, "Elapsed time: %s\n", time.Since(o.startTime).Truncate(time.Second))
+	}
+
+	printGuide()
 	return nil
 }
 

@@ -44,7 +44,7 @@ var _ = Describe("playground", func() {
 			clusterVersion: clitesting.ClusterVersionName,
 			IOStreams:      streams,
 			cloudProvider:  defaultCloudProvider,
-			helmCfg:        helm.NewConfig("", util.ConfigPath("config"), "", false),
+			helmCfg:        helm.NewConfig("", util.ConfigPath("config_kb_test"), "", false),
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).Should(HaveOccurred())

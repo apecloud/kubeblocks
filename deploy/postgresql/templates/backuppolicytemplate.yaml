@@ -23,7 +23,8 @@ spec:
         recovery_target_time='$KB_RECOVERY_TIME'
         recovery_target_action='promote'
     scripts:
-      command:
+      command: ["sh", "-c"]
+      args:
         - |
           mkdir -p /data/pitr;
           cp -R /log/data/pg_wal /data/pitr/;

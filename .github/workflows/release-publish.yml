@@ -45,6 +45,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
+        arch: []
     steps:
       - uses: actions/checkout@v3
       - name: install lib
@@ -70,6 +71,7 @@ jobs:
         id: set_binary
         run: |
           if [[ "${{ matrix.os }}" == *"windows"* ]]; then
+            echo  "BINARY_EXT=.exe" >> $GITHUB_OUTPUT
             echo  "CLI_BINARY=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip" >> $GITHUB_OUTPUT
           else
            echo  "CLI_BINARY=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz" >> $GITHUB_OUTPUT
@@ -86,7 +88,7 @@ jobs:
             --tag-name ${{ env.TAG_NAME }} \
             --type 1`
           
-          VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
+          VERSION=$RELEASE_VERSION  make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH${{ steps.set_binary.outputs.BINARY_EXT }}
 
           mv bin/${{ env.CLI_NAME }}* ${{ matrix.os }}/
           

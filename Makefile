@@ -249,26 +249,19 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
 
 
+# BINARY_EXT ?= ""
+# ifeq (${GOOS}, windows)
+# 	BINARY_EXT = .exe
+# endif
 
-bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH)
-	GOOS=$(word 2,$(subst ., ,$@)) 
-	GOARCH=$(word 3,$(subst ., ,$@))
-	CGO_ENABLED=0
-ifeq ($(GOOS), windows)
-	BINARY_EXT=.exe
-else
-	BINARY_EXT=""
-endif	
-	$(GO) build -ldflags=${CLI_LD_FLAGS} -o  bin/kbcli${BINARY_EXT} cmd/cli/main.go
-	
-
+bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
+	GOOS=$(word 2,$(subst ., ,$@))  GOARCH=$(word 3,$(subst ., ,$@)) BINARY_EXT=$(word 4,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_D_FLAGS} -o  bin/kbcli.${BINARY_EXT} cmd/cli/main.go
 
 .PHONY: kbcli-fast
 kbcli-fast: OS=$(shell $(GO) env GOOS)
 kbcli-fast: ARCH=$(shell $(GO) env GOARCH)
 kbcli-fast:
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
-
 
 .PHONY: kbcli
 kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.

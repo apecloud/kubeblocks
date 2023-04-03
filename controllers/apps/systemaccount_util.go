@@ -369,9 +369,16 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 		defaultTTLZero := (int32)(0)
 		job.Spec.TTLSecondsAfterFinished = &defaultTTLZero
 	}
+
 	// add toleration
 	tolerations := cluster.Spec.Tolerations
-	if len(tolerations) > 0 {
-		job.Spec.Template.Spec.Tolerations = cluster.Spec.Tolerations
+	clusterComp := cluster.GetComponentByName(compKey.componentName)
+	if clusterComp != nil {
+		if len(clusterComp.Tolerations) != 0 {
+			tolerations = clusterComp.Tolerations
+		}
 	}
+	// add built-in toleration
+	tolerations = componetutil.PatchBuiltInToleration(tolerations)
+	job.Spec.Template.Spec.Tolerations = tolerations
 }

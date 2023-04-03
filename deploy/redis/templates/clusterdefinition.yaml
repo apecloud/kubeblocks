@@ -236,3 +236,15 @@ spec:
             - |
               set -ex
               /scripts/redis-sentinel-start.sh
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - /scripts/redis-sentinel-ping.sh 5
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - /scripts/redis-sentinel-ping.sh 1

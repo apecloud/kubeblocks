@@ -29,3 +29,21 @@ data:
     {{- .Files.Get "scripts/redis-sentinel-setup.sh.tpl" | nindent 4 }}
   redis-sentinel-start.sh: |-
     {{- .Files.Get "scripts/redis-sentinel-start.sh.tpl" | nindent 4 }}
+  redis-sentinel-ping.sh: |-
+    #!/bin/sh
+    set -ex
+    response=$(
+          timeout -s 3 $1 \
+          redis-cli \
+            -h localhost \
+            -p 26379 \
+            ping
+        )
+    if [ "$?" -eq "124" ]; then
+      echo "Timed out"
+      exit 1
+    fi
+    if [ "$response" != "PONG" ]; then
+      echo "$response"
+      exit 1
+    fi

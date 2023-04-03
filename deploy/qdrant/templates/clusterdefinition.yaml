@@ -89,6 +89,8 @@ spec:
             ports:
               - name: tcp-qdrant
                 containerPort: 6333
+              - name: grpc-qdrant
+                containerPort: 6334
               - name: tcp-metrics
                 containerPort: 9091
             command:

@@ -89,7 +89,7 @@ jobs:
           VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
 
           mv bin/${{ env.CLI_NAME }}* ${{ matrix.os }}/
-          ${{ steps.set_binary.outputs.CLI_BINARY }}
+          
           if [[ "${{ matrix.os }}" == *"windows"* ]]; then
             # CLI_COMPRESS=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip
             zip -r ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}   

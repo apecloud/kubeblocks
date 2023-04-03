@@ -69,7 +69,7 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 		return err
 	}
 
-	clusterCompSpecMap := cluster.GetDefNameMappingComponents()
+	clusterCompSpecMap := cluster.Spec.GetDefNameMappingComponents()
 	clusterCompVerMap := c.cc.cv.GetDefNameMappingComponents()
 	process1stComp := true
 

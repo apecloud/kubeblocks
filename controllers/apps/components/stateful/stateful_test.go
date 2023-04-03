@@ -84,7 +84,7 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test pods number of sts is 0")
 			sts := &stsList.Items[0]
-			clusterComponent := cluster.GetComponentByName(statefulCompName)
+			clusterComponent := cluster.Spec.GetComponentByName(statefulCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			stateful, err := NewStateful(k8sClient, cluster, clusterComponent, *componentDef)
 			Expect(err).Should(Succeed())

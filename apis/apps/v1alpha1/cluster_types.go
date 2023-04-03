@@ -313,10 +313,7 @@ type PersistentVolumeClaimSpec struct {
 }
 
 // ToV1PersistentVolumeClaimSpec converts to corev1.PersistentVolumeClaimSpec.
-func (r *PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
-	if r == nil {
-		return corev1.PersistentVolumeClaimSpec{}
-	}
+func (r PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
 	return corev1.PersistentVolumeClaimSpec{
 		AccessModes:      r.AccessModes,
 		Resources:        r.Resources,
@@ -324,10 +321,9 @@ func (r *PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.Persi
 	}
 }
 
-func (r *PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
-	if r == nil {
-		return nil
-	}
+// GetStorageClassName return PersistentVolumeClaimSpec.StorageClassName if value is assigned, otherwise
+// return preferSC argument.
+func (r PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
 	if r.StorageClassName != nil && *r.StorageClassName != "" {
 		return r.StorageClassName
 	}
@@ -461,10 +457,30 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
+// GetComponentByName gets component by name.
+func (r ClusterSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
+	for _, v := range r.ComponentSpecs {
+		if v.Name == componentName {
+			return &v
+		}
+	}
+	return nil
+}
+
+// GetComponentDefRefName gets the name of referenced component definition.
+func (r ClusterSpec) GetComponentDefRefName(componentName string) string {
+	for _, component := range r.ComponentSpecs {
+		if componentName == component.Name {
+			return component.ComponentDefRef
+		}
+	}
+	return ""
+}
+
 // ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detect invalid values.
-func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
+func (r ClusterSpec) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	message := make([]string, 0)
-	for _, comp := range r.Spec.ComponentSpecs {
+	for _, comp := range r.ComponentSpecs {
 		invalidLogNames := cd.ValidateEnabledLogConfigs(comp.ComponentDefRef, comp.EnabledLogs)
 		if len(invalidLogNames) == 0 {
 			continue
@@ -478,9 +494,9 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 }
 
 // GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentSpec.
-func (r *Cluster) GetDefNameMappingComponents() map[string][]ClusterComponentSpec {
+func (r ClusterSpec) GetDefNameMappingComponents() map[string][]ClusterComponentSpec {
 	m := map[string][]ClusterComponentSpec{}
-	for _, c := range r.Spec.ComponentSpecs {
+	for _, c := range r.ComponentSpecs {
 		v := m[c.ComponentDefRef]
 		v = append(v, c)
 		m[c.ComponentDefRef] = v
@@ -535,36 +551,13 @@ func (m ComponentMessageMap) SetObjectMessage(objectKind, objectName, message st
 	m[messageKey] = message
 }
 
-// GetComponentByName gets component by name.
-func (r *Cluster) GetComponentByName(componentName string) *ClusterComponentSpec {
-	for _, v := range r.Spec.ComponentSpecs {
-		if v.Name == componentName {
-			return &v
-		}
-	}
-	return nil
-}
-
-// GetComponentDefRefName gets the name of referenced component definition.
-func (r *Cluster) GetComponentDefRefName(componentName string) string {
-	for _, component := range r.Spec.ComponentSpecs {
-		if componentName == component.Name {
-			return component.ComponentDefRef
-		}
-	}
-	return ""
-}
-
 // SetComponentStatus does safe operation on ClusterStatus.Components map object update.
-func (r *ClusterStatus) SetComponentStatus(name string, status ClusterComponentStatus) {
-	if r == nil {
-		return
-	}
+func (r ClusterStatus) SetComponentStatus(name string, status ClusterComponentStatus) {
 	r.checkedInitComponentsMap()
 	r.Components[name] = status
 }
 
-func (r *ClusterStatus) checkedInitComponentsMap() {
+func (r ClusterStatus) checkedInitComponentsMap() {
 	if r.Components == nil {
 		r.Components = map[string]ClusterComponentStatus{}
 	}
@@ -625,11 +618,4 @@ func GetComponentTerminalPhases() []ClusterComponentPhase {
 		FailedClusterCompPhase,
 		AbnormalClusterCompPhase,
 	}
-}
-
-func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
-	t := corev1.PersistentVolumeClaimTemplate{}
-	t.ObjectMeta.Name = template.Name
-	t.Spec = template.Spec.ToV1PersistentVolumeClaimSpec()
-	return t
 }

@@ -27,5 +27,5 @@ type enableLogsValidator struct {
 
 func (e *enableLogsValidator) Validate() error {
 	// validate config and send warning event log necessarily
-	return e.cluster.ValidateEnabledLogs(e.clusterDef)
+	return e.cluster.Spec.ValidateEnabledLogs(e.clusterDef)
 }

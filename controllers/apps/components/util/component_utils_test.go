@@ -293,7 +293,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(err).ShouldNot(Succeed())
 
 			By("test GetComponentPhaseWhenPodsNotReady function")
-			consensusComp := cluster.GetComponentByName(consensusCompName)
+			consensusComp := cluster.Spec.GetComponentByName(consensusCompName)
 			checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
 				sts := workload.(*appsv1.StatefulSet)
 				return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)

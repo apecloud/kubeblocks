@@ -1566,7 +1566,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Updating PVC volume size")
 			patch := client.MergeFrom(clusterObj.DeepCopy())
-			componentSpec := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
+			componentSpec := clusterObj.Spec.GetComponentByName(testapps.DefaultRedisCompName)
 			componentSpec.VolumeClaimTemplates[0].Spec = updatedPVCSpec
 			Expect(testCtx.Cli.Patch(ctx, clusterObj, patch)).Should(Succeed())
 

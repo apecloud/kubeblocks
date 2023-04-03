@@ -76,7 +76,7 @@ var _ = Describe("Stateful Component", func() {
 			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(statelessCompName, statelessCompDefRef).SetReplicas(2).Create(&testCtx).GetObject()
 			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
-			clusterComponent := cluster.GetComponentByName(statelessCompName)
+			clusterComponent := cluster.Spec.GetComponentByName(statelessCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			statelessComponent, err := NewStateless(k8sClient, cluster, clusterComponent, *componentDef)
 			Expect(err).Should(Succeed())

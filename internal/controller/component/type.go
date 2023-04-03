@@ -17,7 +17,7 @@ limitations under the License.
 package component
 
 import (
-	v12 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -38,12 +38,12 @@ type SynthesizedComponent struct {
 	Replicas              int32                               `json:"replicas"`
 	WorkloadType          v1alpha1.WorkloadType               `json:"workloadType,omitempty"`
 	ConsensusSpec         *v1alpha1.ConsensusSetSpec          `json:"consensusSpec,omitempty"`
-	PrimaryIndex          *int32                              `json:"primaryIndex,omitempty"`
-	PodSpec               *v12.PodSpec                        `json:"podSpec,omitempty"`
-	Services              []v12.Service                       `json:"services,omitempty"`
-	Probes                *v1alpha1.ClusterDefinitionProbes   `json:"probes,omitempty"`
-	VolumeClaimTemplates  []v12.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	Monitor               *MonitorConfig                      `json:"monitor,omitempty"`
+	PrimaryIndex          *int32                                 `json:"primaryIndex,omitempty"`
+	PodSpec               *corev1.PodSpec                        `json:"podSpec,omitempty"`
+	Services              []corev1.Service                       `json:"services,omitempty"`
+	Probes                *v1alpha1.ClusterDefinitionProbes      `json:"probes,omitempty"`
+	VolumeClaimTemplates  []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	Monitor               *MonitorConfig                         `json:"monitor,omitempty"`
 	EnabledLogs           []string                            `json:"enabledLogs,omitempty"`
 	LogConfigs            []v1alpha1.LogConfig                `json:"logConfigs,omitempty"`
 	ConfigTemplates       []v1alpha1.ComponentConfigSpec      `json:"configTemplates,omitempty"`

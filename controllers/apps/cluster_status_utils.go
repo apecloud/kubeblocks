@@ -240,7 +240,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	// get the component phase by component name and sync to Cluster.status.components
 	patch := client.MergeFrom(cluster.DeepCopy())
 	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
-	clusterComponent := cluster.GetComponentByName(componentName)
+	clusterComponent := cluster.Spec.GetComponentByName(componentName)
 	if clusterComponent == nil {
 		return nil
 	}

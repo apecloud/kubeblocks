@@ -272,7 +272,7 @@ func GetComponentInfoByPod(ctx context.Context,
 	if !ok {
 		return "", nil, errors.New("pod component name label is nil")
 	}
-	compDefName := cluster.GetComponentDefRefName(componentName)
+	compDefName := cluster.Spec.GetComponentDefRefName(componentName)
 	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
 		return componentName, componentDef, err

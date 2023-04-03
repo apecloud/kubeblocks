@@ -106,6 +106,21 @@ const (
 	ResourceAddons       = "addons"
 )
 
+// Migration API group
+const (
+	MigrationAPIGroup          = "datamigration.apecloud.io"
+	MigrationAPIVersion        = "v1alpha1"
+	ResourceMigrationTasks     = "migrationtasks"
+	ResourceMigrationTemplates = "migrationtemplates"
+)
+
+// Crd Api group
+const (
+	CustomResourceDefinitionApiGroup   = "apiextensions.k8s.io"
+	CustomResourceDefinitionApiVersion = "v1"
+	ResourceCustomResourceDefinition   = "customresourcedefinitions"
+)
+
 const (
 	None = "<none>"
 
@@ -256,5 +271,29 @@ func MutatingWebhookConfigurationGVR() schema.GroupVersionResource {
 		Group:    WebhookAPIGroup,
 		Version:  K8sWebhookAPIVersion,
 		Resource: ResourceMutatingWebhookConfigurations,
+	}
+}
+
+func MigrationTaskGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    MigrationAPIGroup,
+		Version:  MigrationAPIVersion,
+		Resource: ResourceMigrationTasks,
+	}
+}
+
+func MigrationTemplateGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    MigrationAPIGroup,
+		Version:  MigrationAPIVersion,
+		Resource: ResourceMigrationTemplates,
+	}
+}
+
+func CustomResourceDefinitionGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    CustomResourceDefinitionApiGroup,
+		Version:  CustomResourceDefinitionApiVersion,
+		Resource: ResourceCustomResourceDefinition,
 	}
 }

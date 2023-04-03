@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -490,7 +491,8 @@ func (p *PointInTimeRecoveryManager) DoPrepare(component *component.SynthesizedC
 	// prepare init container
 	container := corev1.Container{}
 	container.Name = initContainerName
-	container.Image = constant.KBToolsImage
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.Command = []string{"sleep", "infinity"}
 	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, container)
 
 	// prepare data pvc

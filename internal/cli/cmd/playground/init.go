@@ -182,7 +182,7 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 	o.helmCfg = helm.NewConfig("", configPath, "", klog.V(1).Enabled())
 
 	// Install KubeBlocks
-	if err = o.installKubeBlocks(); err != nil {
+	if err = o.installKubeBlocks(k8sClusterName); err != nil {
 		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
 
@@ -351,7 +351,7 @@ func (o *initOptions) setKubeConfig(provider cp.Interface) error {
 	return nil
 }
 
-func (o *initOptions) installKubeBlocks() error {
+func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 	f := util.NewFactory()
 	client, err := f.KubernetesClientSet()
 	if err != nil {
@@ -380,6 +380,10 @@ func (o *initOptions) installKubeBlocks() error {
 			// use hostpath csi driver to support snapshot
 			"snapshot-controller.enabled=true",
 			"csi-hostpath-driver.enabled=true",
+
+			// enable aws loadbalancer controller addon automatically on playground
+			"aws-loadbalancer-controller.enabled=true",
+			fmt.Sprintf("aws-loadbalancer-controller.clusterName=%s", k8sClusterName),
 
 			// disable the persistent volume of prometheus, if not, the prometheus
 			// will dependent the hostpath csi driver ready to create persistent

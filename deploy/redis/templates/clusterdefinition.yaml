@@ -237,14 +237,24 @@ spec:
               set -ex
               /scripts/redis-sentinel-start.sh
           livenessProbe:
+            initialDelaySeconds: {{ .Values.sentinel.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.sentinel.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.sentinel.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.sentinel.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.sentinel.livenessProbe.failureThreshold }}
             exec:
               command:
                 - sh
                 - -c
-                - /scripts/redis-sentinel-ping.sh 5
+                - /scripts/redis-sentinel-ping.sh {{ .Values.sentinel.livenessProbe.timeoutSeconds }}
           readinessProbe:
+            initialDelaySeconds: {{ .Values.sentinel.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.sentinel.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.sentinel.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.sentinel.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.sentinel.readinessProbe.failureThreshold }}
             exec:
               command:
                 - sh
                 - -c
-                - /scripts/redis-sentinel-ping.sh 1
+                - /scripts/redis-sentinel-ping.sh {{ .Values.sentinel.readinessProbe.timeoutSeconds }}

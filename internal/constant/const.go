@@ -61,6 +61,7 @@ const (
 	// kubeblocks.io labels
 	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
 	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
+	KBAppComponentDefRefLabelKey    = "apps.kubeblocks.io/component-def-ref"
 	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
 	AppConfigTypeLabelKey           = "apps.kubeblocks.io/config-type"
 	WorkloadTypeLabelKey            = "apps.kubeblocks.io/workload-type"
@@ -71,6 +72,7 @@ const (
 	ClusterAccountLabelKey          = "account.kubeblocks.io/name"
 	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
 	KBManagedByKey                  = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
+	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey        = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -79,6 +81,7 @@ const (
 	SnapShotForStartAnnotationKey  = "kubeblocks.io/snapshot-for-start"
 	RestoreFromBackUpAnnotationKey = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
 	ClusterSnapshotAnnotationKey   = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	LeaderAnnotationKey            = "cs.apps.kubeblocks.io/leader"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
@@ -109,6 +112,9 @@ const (
 
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
+
+	// ClassAnnotationKey is used to specify the class of components
+	ClassAnnotationKey = "cluster.kubeblocks.io/component-class"
 )
 
 const (
@@ -178,6 +184,7 @@ const (
 const (
 	ConfigSidecarName        = "config-manager"
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
+	ConfigManagerLogLevel    = "CONFIG_MANAGER_LOG_LEVEL"
 
 	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"
 	ConfigTemplateType    = "tpl"

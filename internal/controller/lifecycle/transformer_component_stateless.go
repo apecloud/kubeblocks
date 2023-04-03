@@ -247,7 +247,7 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	deployObjCopy := deployObj.DeepCopy()
 	deployProto := c.workloadVertexs[0].obj.(*appsv1.Deployment)
 
-	deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations, deployProto.Spec.Template.Annotations)
+	mergeAnnotations(deployObj.Spec.Template.Annotations, &deployProto.Spec.Template.Annotations)
 	deployObjCopy.Spec = deployProto.Spec
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
 		c.workloadVertexs[0].obj = deployObjCopy

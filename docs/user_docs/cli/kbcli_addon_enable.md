@@ -27,6 +27,9 @@ kbcli addon enable ADDON_NAME [flags]
   
   # Enabled "prometheus" addon with helm like custom settings
   kbcli addon enable prometheus --set prometheus.alertmanager.image.tag=v0.24.0
+  
+  # Force enabled "csi-s3" addon
+  kbcli addon enable csi-s3 --force
 ```
 
 ### Options
@@ -35,13 +38,18 @@ kbcli addon enable ADDON_NAME [flags]
       --allow-missing-template-keys    If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
       --cpu stringArray                Sets addon CPU resource values (--cpu [extraName:]<request>/<limit>) (can specify multiple if has extra items))
       --dry-run string[="unchanged"]   Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --force                          ignoring the installable restrictions and forcefully enabling.
   -h, --help                           help for enable
       --memory stringArray             Sets addon memory resource values (--memory [extraName:]<request>/<limit>) (can specify multiple if has extra items))
   -o, --output string                  Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
       --replicas stringArray           Sets addon component replica count (--replicas [extraName:]<number>) (can specify multiple if has extra items))
       --set stringArray                set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2), it's only being processed if addon's type is helm.
       --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
-      --storage stringArray            Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items))
+      --storage stringArray            Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items)). 
+                                       Additional notes: for type=Helm addon and if the value mapped directly to a StatefulSet's volume claim template
+                                       the helm upgrade action will failed, to resolved this you will need to disable and re-enable the addon, also noted
+                                       that storage size can only be expanded by PVC resizing.
+                                       
       --storage-class stringArray      Sets addon storage class name (--storage-class [extraName:]<storage class name>) (can specify multiple if has extra items))
       --template string                Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
       --tolerations stringArray        Sets addon pod tolerations (--tolerations [extraName:]<toleration JSON list items>) (can specify multiple if has extra items))

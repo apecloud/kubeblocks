@@ -190,6 +190,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	chain := &graph.TransformerChain{
 		// init dag, that is put cluster vertex into dag
 		&initTransformer{cluster: c.cluster, originCluster: &c.originCluster},
+		// fill class related info
+		&fillClass{cc: *cr, cli: c.cli, ctx: c.ctx},
 		// fix cd&cv labels of cluster
 		&fixClusterLabelsTransformer{},
 		// create cluster connection credential secret object

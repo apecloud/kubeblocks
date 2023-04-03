@@ -15,7 +15,6 @@ spec:
       claimName: backup-host-path-pvc
   schedule: 0 3 * * *
   target:
-    databaseEngine: postgresql
     labelsSelector:
       matchLabels:
         app.kubernetes.io/instance: mycluster

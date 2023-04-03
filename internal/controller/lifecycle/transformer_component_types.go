@@ -586,7 +586,7 @@ func (c *statefulsetComponentBase) updateWorkload(stsObj *appsv1.StatefulSet, id
 
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the statefulSet will be updated.
-	stsProto.Spec.Template.Annotations = mergeAnnotations(stsObjCopy.Spec.Template.Annotations, stsProto.Spec.Template.Annotations)
+	mergeAnnotations(stsObjCopy.Spec.Template.Annotations, &stsProto.Spec.Template.Annotations)
 	stsObjCopy.Spec.Template = stsProto.Spec.Template
 	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
 	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy

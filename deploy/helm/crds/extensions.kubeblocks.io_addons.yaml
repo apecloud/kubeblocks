@@ -150,8 +150,6 @@ spec:
                         multiple selectors are provided that all selectors must evaluate
                         to true.
                       items:
-                        description: SelectorRequirement is the installation selector
-                          requirement.
                         properties:
                           key:
                             description: The selector key, valid values are KubeVersion,
@@ -166,12 +164,10 @@ spec:
                             description: "Represents a key's relationship to a set
                               of values. Valid operators are Contains, NotIn, DoesNotContain,
                               MatchRegex, and DoesNoteMatchRegex. \n Possible enum
-                              values: `\"Contains\"` line contains string (symbol:
-                              \"|=\"） `\"DoesNotContain\"` line does not contain string
-                              (symbol: \"!=\") `\"MatchRegex\"` line contains a match
-                              to the regular expression (symbol: \"|~\"） `\"DoesNotMatchRegex\"`
-                              line does not contain a match to the regular expression
-                              (symbol: \"!~\")"
+                              values: `\"Contains\"` line contains string `\"DoesNotContain\"`
+                              line does not contain string `\"MatchRegex\"` line contains
+                              a match to the regular expression `\"DoesNotMatchRegex\"`
+                              line does not contain a match to the regular expression"
                             enum:
                             - Contains
                             - DoesNotContain
@@ -235,7 +231,7 @@ spec:
                           - name
                           type: object
                         type: array
-                      secretsRefs:
+                      secretRefs:
                         description: Selects a key of a Secrets item list, the value
                           of Secrets can be a JSON or YAML string content, use key
                           name with ".json" or ".yaml" or ".yml" extension name to
@@ -279,11 +275,14 @@ spec:
                         items:
                           properties:
                             jsonMap:
-                              additionalProperties:
-                                type: string
                               description: 'jsonMap define the "key" mapping values,
                                 valid keys are tolerations. Enum values explained:
                                 `"tolerations"` sets toleration mapping key'
+                              properties:
+                                tolerations:
+                                  description: tolerations sets toleration mapping
+                                    key.
+                                  type: string
                               type: object
                             name:
                               description: Name of the item.
@@ -320,14 +319,25 @@ spec:
                                   type: string
                               type: object
                             valueMap:
-                              additionalProperties:
-                                type: string
                               description: 'valueMap define the "key" mapping values,
                                 valid keys are replicaCount, persistentVolumeEnabled,
                                 and storageClass. Enum values explained: `"replicaCount"`
                                 sets replicaCount value mapping key `"persistentVolumeEnabled"`
                                 sets persistent volume enabled mapping key `"storageClass"`
                                 sets storageClass mapping key'
+                              properties:
+                                persistentVolumeEnabled:
+                                  description: persistentVolumeEnabled persistent
+                                    volume enabled mapping key.
+                                  type: string
+                                replicaCount:
+                                  description: replicaCount sets replicaCount value
+                                    mapping key.
+                                  type: string
+                                storageClass:
+                                  description: storageClass sets storageClass mapping
+                                    key.
+                                  type: string
                               type: object
                           required:
                           - name
@@ -337,11 +347,13 @@ spec:
                         - name
                         x-kubernetes-list-type: map
                       jsonMap:
-                        additionalProperties:
-                          type: string
                         description: 'jsonMap define the "key" mapping values, valid
                           keys are tolerations. Enum values explained: `"tolerations"`
                           sets toleration mapping key'
+                        properties:
+                          tolerations:
+                            description: tolerations sets toleration mapping key.
+                            type: string
                         type: object
                       resources:
                         description: resources sets resources related mapping keys.
@@ -373,14 +385,24 @@ spec:
                             type: string
                         type: object
                       valueMap:
-                        additionalProperties:
-                          type: string
                         description: 'valueMap define the "key" mapping values, valid
                           keys are replicaCount, persistentVolumeEnabled, and storageClass.
                           Enum values explained: `"replicaCount"` sets replicaCount
                           value mapping key `"persistentVolumeEnabled"` sets persistent
                           volume enabled mapping key `"storageClass"` sets storageClass
                           mapping key'
+                        properties:
+                          persistentVolumeEnabled:
+                            description: persistentVolumeEnabled persistent volume
+                              enabled mapping key.
+                            type: string
+                          replicaCount:
+                            description: replicaCount sets replicaCount value mapping
+                              key.
+                            type: string
+                          storageClass:
+                            description: storageClass sets storageClass mapping key.
+                            type: string
                         type: object
                     type: object
                 required:
@@ -499,8 +521,6 @@ spec:
                     description: Addon installable selectors. If multiple selectors
                       are provided that all selectors must evaluate to true.
                     items:
-                      description: SelectorRequirement is the installation selector
-                        requirement.
                       properties:
                         key:
                           description: The selector key, valid values are KubeVersion,
@@ -515,11 +535,10 @@ spec:
                           description: "Represents a key's relationship to a set of
                             values. Valid operators are Contains, NotIn, DoesNotContain,
                             MatchRegex, and DoesNoteMatchRegex. \n Possible enum values:
-                            `\"Contains\"` line contains string (symbol: \"|=\"） `\"DoesNotContain\"`
-                            line does not contain string (symbol: \"!=\") `\"MatchRegex\"`
-                            line contains a match to the regular expression (symbol:
-                            \"|~\"） `\"DoesNotMatchRegex\"` line does not contain
-                            a match to the regular expression (symbol: \"!~\")"
+                            `\"Contains\"` line contains string `\"DoesNotContain\"`
+                            line does not contain string `\"MatchRegex\"` line contains
+                            a match to the regular expression `\"DoesNotMatchRegex\"`
+                            line does not contain a match to the regular expression"
                           enum:
                           - Contains
                           - DoesNotContain
@@ -549,6 +568,10 @@ spec:
             - defaultInstallValues
             - type
             type: object
+            x-kubernetes-validations:
+            - message: spec.helm is required when spec.type is Helm, and forbidden
+                otherwise
+              rule: 'has(self.type) && self.type == ''Helm'' ?  has(self.helm) : !has(self.helm)'
           status:
             description: AddonStatus defines the observed state of Addon
             properties:

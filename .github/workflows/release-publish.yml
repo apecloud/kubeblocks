@@ -77,7 +77,7 @@ jobs:
             --tag-name ${{ env.TAG_NAME }} \
             --type 1`
           
-          VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}$CLI_OS_ARCH
+          VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
 
           mv bin/${{ env.CLI_NAME }}* ${{ matrix.os }}/
 
@@ -89,12 +89,8 @@ jobs:
             tar -zcvf ${CLI_COMPRESS} ${{ matrix.os }}
           fi      
           
-
           mv ${CLI_COMPRESS} bin/
           
-          # - bin
-          #   - kbcli-drawin-amd64-v0.4.0.tar.gz/kbcli-windows-amd64-v0.4.0.zip
-
       - name: upload release asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main
         # env:

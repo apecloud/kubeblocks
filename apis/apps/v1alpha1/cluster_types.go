@@ -553,12 +553,12 @@ func (m ComponentMessageMap) SetObjectMessage(objectKind, objectName, message st
 }
 
 // SetComponentStatus does safe operation on ClusterStatus.Components map object update.
-func (r ClusterStatus) SetComponentStatus(name string, status ClusterComponentStatus) {
+func (r *ClusterStatus) SetComponentStatus(name string, status ClusterComponentStatus) {
 	r.checkedInitComponentsMap()
 	r.Components[name] = status
 }
 
-func (r ClusterStatus) checkedInitComponentsMap() {
+func (r *ClusterStatus) checkedInitComponentsMap() {
 	if r.Components == nil {
 		r.Components = map[string]ClusterComponentStatus{}
 	}

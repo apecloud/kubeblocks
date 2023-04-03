@@ -1018,9 +1018,9 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 		"kubectl -n %s patch backup %s --subresource=status --type=merge --patch " +
 		"\"status: { manifests: { $KB_BACKUP_MANIFESTS }}\""
 	args = fmt.Sprintf(args, targetPod.Namespace, targetPod.Name, backupPolicy.Spec.Hooks.ContainerName,
-		backupPolicy.Spec.Hooks.ManifestsCommands, backup.Namespace, backup.Name)
+		strings.Join(backupPolicy.Spec.Hooks.ManifestsCommands, ";"), backup.Namespace, backup.Name)
 	container.Args = []string{args}
-	container.Image = constant.KBToolsImage
+	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	podSpec.Containers = []corev1.Container{container}
 	podSpec.RestartPolicy = corev1.RestartPolicyNever

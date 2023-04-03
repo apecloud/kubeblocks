@@ -5,7 +5,7 @@ description: .
 type: application
 
 # This is the chart version
-version: 0.1.0
+version: 0.5.0-alpha.3
 
 # This is the version number of milvus
 appVersion: "2.2.4"

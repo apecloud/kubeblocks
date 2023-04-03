@@ -74,7 +74,6 @@ func GetFolders(path string) ([]string, error) {
 }
 
 func CheckClusterStatus() bool {
-	WaitTime(400000000)
 	cmd := "kubectl get cluster " + name + " -n " + namespace + " | grep " + name + " | awk '{print $5}'"
 	log.Println(cmd)
 	clusterStatus := ExecCommand(cmd)
@@ -83,7 +82,6 @@ func CheckClusterStatus() bool {
 }
 
 func CheckPodStatus() map[string]bool {
-	WaitTime(400000000)
 	var podStatusResult = make(map[string]bool)
 	cmd := "kubectl get pod -n " + namespace + " -l '" + label + "=" + name + "'| grep " + name + " | awk '{print $1}'"
 	log.Println(cmd)
@@ -278,32 +276,13 @@ func ReplaceClusterVersionRef(fileName string, clusterVersionRef string) {
 	}
 }
 
-func KubernetesEnv() string {
-	cmd := "kbcli version | grep Kubernetes"
-	kubernetes := ExecCommand(cmd)
-	log.Println(kubernetes)
-	return kubernetes
-}
-
-func CheckAddonsInstall(addonName string) string {
-	cmd := "kbcli addon list | grep " + addonName + " | awk '{print $3}'"
-	log.Println(cmd)
-	addonsStatus := ExecCommand(cmd)
-	log.Println(addonsStatus)
-	return StringStrip(addonsStatus)
-}
-
-func OpsAddon(addonOps string, addonName string) string {
-	cmd := "kbcli addon " + addonOps + " " + addonName
-	log.Println(cmd)
-	enableAddon := ExecCommand(cmd)
-	log.Println(enableAddon)
-	addonsStatus := CheckAddonsInstall(addonName)
-	return StringStrip(addonsStatus)
-}
-
 func StringStrip(str string) string {
 	str = strings.ReplaceAll(str, " ", "")
 	str = strings.ReplaceAll(str, "\n", "")
 	return str
+}
+
+func CheckKbcliExists() error {
+	_, err := exec.New().LookPath("kbcli")
+	return err
 }

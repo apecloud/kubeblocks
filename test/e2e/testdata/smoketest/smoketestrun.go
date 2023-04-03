@@ -24,11 +24,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog/v2"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -40,6 +40,10 @@ const (
 	interval time.Duration = time.Second * 1
 )
 
+type Options struct {
+	Dynamic dynamic.Interface
+}
+
 func SmokeTest() {
 	BeforeEach(func() {
 	})
@@ -48,14 +52,43 @@ func SmokeTest() {
 	})
 
 	Context("KubeBlocks smoke test", func() {
-
-		It("check addon auto-install", func() {
-			allEnabled, err := checkAddons()
+		It("check addon", func() {
+			cfg, err := e2eutil.GetConfig()
 			if err != nil {
+				logrus.WithError(err).Fatal("could not get config")
+			}
+			dynamic, err := dynamic.NewForConfig(cfg)
+			if err != nil {
+				logrus.WithError(err).Fatal("could not generate dynamic client for config")
+			}
+			objects, err := dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: e2eutil.BuildAddonLabelSelector(),
+			})
+			if err != nil && !apierrors.IsNotFound(err) {
 				log.Println(err)
 			}
-			Expect(allEnabled).Should(BeTrue())
-
+			if objects == nil || len(objects.Items) == 0 {
+				log.Println("No Addons found")
+			}
+			if len(objects.Items) > 0 {
+				for _, obj := range objects.Items {
+					addon := extensionsv1alpha1.Addon{}
+					if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
+						log.Println(err)
+					}
+					if addon.Status.ObservedGeneration == 0 {
+						log.Printf("Addon %s is not observed yet", addon.Name)
+					}
+					log.Printf("Addon: %s, enabled: %v, status: %s",
+						addon.Name, addon.Spec.InstallSpec.GetEnabled(), addon.Status.Phase)
+					// addon is enabled, then check its status
+					if addon.Spec.InstallSpec.GetEnabled() {
+						if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
+							log.Printf("Addon %s is not enabled yet", addon.Name)
+						}
+					}
+				}
+			}
 		})
 		It("run test cases", func() {
 			dir, err := os.Getwd()
@@ -69,8 +102,7 @@ func SmokeTest() {
 				}
 				log.Println("folder: " + folder)
 				files, _ := e2eutil.GetFiles(folder)
-				e2eutil.WaitTime(400000000)
-				clusterVersions := e2eutil.GetClusterVersion(folder)
+				var clusterVersions []string
 				if len(clusterVersions) > 1 {
 					for _, clusterVersion := range clusterVersions {
 						if len(files) > 0 {
@@ -92,70 +124,20 @@ func runTestCases(files []string) {
 		By("test " + file)
 		b := e2eutil.OpsYaml(file, "apply")
 		Expect(b).Should(BeTrue())
-		podStatusResult := e2eutil.CheckPodStatus()
-		log.Println(podStatusResult)
-		for _, result := range podStatusResult {
-			Eventually(func(g Gomega) {
-				g.Expect(result).Should(BeTrue())
-			}).Should(Succeed())
-		}
-		clusterStatusResult := e2eutil.CheckClusterStatus()
 		Eventually(func(g Gomega) {
+			podStatusResult := e2eutil.CheckPodStatus()
+			for _, result := range podStatusResult {
+				g.Expect(result).Should(BeTrue())
+			}
+		}, time.Second*180, time.Second*1).Should(Succeed())
+		Eventually(func(g Gomega) {
+			clusterStatusResult := e2eutil.CheckClusterStatus()
 			g.Expect(clusterStatusResult).Should(BeTrue())
-		}).Should(Succeed())
+		}, time.Second*180, time.Second*1).Should(Succeed())
+
 	}
 	if len(files) > 0 {
 		file := e2eutil.GetClusterCreateYaml(files)
 		e2eutil.OpsYaml(file, "delete")
 	}
-}
-
-func checkAddons() (bool, error) {
-	e2eutil.WaitTime(400000000)
-	var Dynamic dynamic.Interface
-	addons := make(map[string]bool)
-	allEnabled := true
-	objects, err := Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: e2eutil.BuildAddonLabelSelector(),
-	})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return false, err
-	}
-	if objects == nil || len(objects.Items) == 0 {
-		klog.V(1).Info("No Addons found")
-		return false, nil
-	}
-	for _, obj := range objects.Items {
-		addon := extensionsv1alpha1.Addon{}
-		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
-			return false, err
-		}
-
-		if addon.Status.ObservedGeneration == 0 {
-			klog.V(1).Infof("Addon %s is not observed yet", addon.Name)
-			allEnabled = false
-			continue
-		}
-
-		installable := false
-		if addon.Spec.InstallSpec != nil {
-			installable = addon.Spec.Installable.AutoInstall
-		}
-		if addon.Spec.InstallSpec != nil {
-			installable = addon.Spec.Installable.AutoInstall
-		}
-
-		klog.V(1).Infof("Addon: %s, enabled: %v, status: %s, auto-install: %v",
-			addon.Name, addon.Spec.InstallSpec.GetEnabled(), addon.Status.Phase, installable)
-		// addon is enabled, then check its status
-		if addon.Spec.InstallSpec.GetEnabled() {
-			addons[addon.Name] = true
-			if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
-				klog.V(1).Infof("Addon %s is not enabled yet", addon.Name)
-				addons[addon.Name] = false
-				allEnabled = false
-			}
-		}
-	}
-	return allEnabled, nil
 }

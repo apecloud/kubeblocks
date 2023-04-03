@@ -10,11 +10,11 @@ spec:
     topologyKeys:
       - kubernetes.io/hostname
   componentSpecs:
-    - name: mysql
-      componentDefRef: mysql
+    - name: postgresql
+      componentDefRef: pg-replication
       monitor: false
-      replicas: 3
-      enabledLogs: [ "slow","error" ]
+      replicas: 2
+      enabledLogs:  ["running"]
       volumeClaimTemplates:
         - name: data
           spec:
@@ -23,7 +23,7 @@ spec:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 2Gi
+                storage: 11Gi
             dataSource:
               apiGroup: snapshot.storage.k8s.io
               kind: VolumeSnapshot

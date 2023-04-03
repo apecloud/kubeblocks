@@ -75,9 +75,6 @@ func (r *Redis) Init(meta bindings.Metadata) (err error) {
 	r.BaseOperations.GetRole = r.GetRole
 
 	// register redis operations
-	r.RegisterOperation(GetRoleOperation, r.GetRoleOps)
-	r.RegisterOperation(CheckRoleOperation, r.CheckRoleOps)
-	r.RegisterOperation(CheckRunningOperation, r.CheckRunningOps)
 	r.RegisterOperation(bindings.CreateOperation, r.createOps)
 	r.RegisterOperation(bindings.DeleteOperation, r.deleteOps)
 	r.RegisterOperation(bindings.GetOperation, r.getOps)

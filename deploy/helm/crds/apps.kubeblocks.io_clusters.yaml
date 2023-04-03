@@ -402,16 +402,6 @@ spec:
                                 items:
                                   type: string
                                 type: array
-                              preferStorageClassNames:
-                                description: preferStorageClassNames added support
-                                  specifying storageclasses.storage.k8s.io names,
-                                  in order to adapt multi-cloud deployment, where
-                                  storageclasses are all distinctly different among
-                                  clouds.
-                                items:
-                                  type: string
-                                type: array
-                                x-kubernetes-list-type: set
                               resources:
                                 description: 'resources represents the minimum resources
                                   the volume should have. If RecoverVolumeExpansionFailure

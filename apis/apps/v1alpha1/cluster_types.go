@@ -305,11 +305,12 @@ type PersistentVolumeClaimSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
 	// +optional
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
-	// preferStorageClassNames added support specifying storageclasses.storage.k8s.io names, in order
-	// to adapt multi-cloud deployment, where storageclasses are all distinctly different among clouds.
-	// +listType=set
-	// +optional
-	PreferSCNames []string `json:"preferStorageClassNames,omitempty"`
+	// TODO:
+	// // preferStorageClassNames added support specifying storageclasses.storage.k8s.io names, in order
+	// // to adapt multi-cloud deployment, where storageclasses are all distinctly different among clouds.
+	// // +listType=set
+	// // +optional
+	// PreferSCNames []string `json:"preferStorageClassNames,omitempty"`
 }
 
 // ToV1PersistentVolumeClaimSpec converts to corev1.PersistentVolumeClaimSpec.

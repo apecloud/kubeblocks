@@ -2,8 +2,8 @@ container: {
 	name:            "pitr"
 	image:           string
 	imagePullPolicy: "IfNotPresent"
-	command: ["sh", "-c"]
-	args: [string]
+	command: [...]
+	args: [...]
 	volumeMounts: [...]
 }
 

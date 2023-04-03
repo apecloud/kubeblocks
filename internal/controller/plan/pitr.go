@@ -63,6 +63,7 @@ type PointInTimeRecoveryManager struct {
 const (
 	recoveryFinishedKey = "kubeblocks.io/restore-finished"
 	recoveryTrue        = "true"
+	initContainerName   = "pitr-for-pause"
 )
 
 func (p *PointInTimeRecoveryManager) listCompletedBackups() (backupItems []dpv1alpha1.Backup, err error) {
@@ -238,6 +239,10 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupPointI
 
 func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, err error) {
 	objs = make([]client.Object, 0)
+	recoveryInfo, err := p.getRecoveryInfo()
+	if err != nil {
+		return objs, err
+	}
 	for _, componentSpec := range p.Cluster.Spec.ComponentSpecs {
 		if len(componentSpec.VolumeClaimTemplates) == 0 {
 			continue
@@ -295,17 +300,13 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 				{Name: "log", MountPath: "/log"},
 			}
 
-			recoveryInfo, err := p.getRecoveryInfo()
-			if err != nil {
-				return objs, err
-			}
-
 			// render the job cue template
 			image := recoveryInfo.Scripts.Image
 			if image == "" {
 				image = constant.KBToolsImage
 			}
-			job, err := builder.BuildPITRJob(p.Cluster, image, recoveryInfo.Scripts.Command, volumes, volumeMounts)
+			job, err := builder.BuildPITRJob(p.Cluster, image, recoveryInfo.Scripts.Command,
+				recoveryInfo.Scripts.Args, volumes, volumeMounts)
 			if err != nil {
 				return objs, err
 			}
@@ -488,7 +489,7 @@ func (p *PointInTimeRecoveryManager) DoPrepare(component *component.SynthesizedC
 	}
 	// prepare init container
 	container := corev1.Container{}
-	container.Name = "pitr-for-pause"
+	container.Name = initContainerName
 	container.Image = constant.KBToolsImage
 	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, container)
 
@@ -525,7 +526,7 @@ func (p *PointInTimeRecoveryManager) removeStsInitContainer(
 		initContainers := sts.Spec.Template.Spec.InitContainers
 		updateInitContainers := make([]corev1.Container, 0)
 		for _, c := range initContainers {
-			if c.Name != "pitr" {
+			if c.Name != initContainerName {
 				updateInitContainers = append(updateInitContainers, c)
 			}
 		}
@@ -552,7 +553,7 @@ func (p *PointInTimeRecoveryManager) MergeConfigMap(configMap *corev1.ConfigMap)
 
 	// replace config variables
 	pitrConfigMap := recoveryInfo.Config
-	timeFormat := recoveryInfo.Config["timeFormat"]
+	timeFormat := recoveryInfo.TimeFormat
 	for key, val := range pitrConfigMap {
 		if v, ok := configMap.Data[key]; ok {
 			if configMap.Annotations == nil {

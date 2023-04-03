@@ -18,6 +18,7 @@ package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -189,5 +190,16 @@ func (factory *MockClusterFactory) AddService(serviceName string, serviceType co
 		comps[len(comps)-1] = comp
 	}
 	factory.get().Spec.ComponentSpecs = comps
+	return factory
+}
+
+func (factory *MockClusterFactory) AddRestorePointInTime(restoreTime metav1.Time, sourceCluster string) *MockClusterFactory {
+	restoreFrom := appsv1alpha1.RestoreFromSpec{
+		PointIn: &appsv1alpha1.FromPointInSpec{
+			SourceClusterName: sourceCluster,
+			Time:              &restoreTime,
+		},
+	}
+	factory.get().Spec.RestoreFrom = &restoreFrom
 	return factory
 }

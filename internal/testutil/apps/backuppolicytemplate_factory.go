@@ -92,8 +92,9 @@ func (factory *MockBackupPolicyTemplateFactory) SetLabels(labels map[string]stri
 
 func (factory *MockBackupPolicyTemplateFactory) SetPointInTimeRecovery(scripts *dataprotectionv1alpha1.ScriptSpec, configs map[string]string) *MockBackupPolicyTemplateFactory {
 	pitr := dataprotectionv1alpha1.BackupPointInTimeRecovery{
-		Scripts: scripts,
-		Config:  configs,
+		Scripts:    scripts,
+		Config:     configs,
+		TimeFormat: time.RFC3339,
 	}
 	factory.get().Spec.PointInTimeRecovery = &pitr
 	return factory

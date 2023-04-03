@@ -21,6 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -28,8 +30,9 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -39,10 +42,8 @@ var _ = Describe("PITR Functions", func() {
 	const sourceCluster = "source-cluster"
 
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-pitr-" + randomStr
-		clusterVersionName    = "clusterversion-for-pitr-" + randomStr
-		clusterName           = "cluster-for-pitr-" + randomStr
+		randomStr   = testCtx.GetRandomStr()
+		clusterName = "cluster-for-pitr-" + randomStr
 	)
 
 	cleanEnv := func() {
@@ -54,6 +55,16 @@ var _ = Describe("PITR Functions", func() {
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
 		testapps.ClearClusterResources(&testCtx)
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.CronJobSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
+		//
+		// non-namespaced
+		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -62,16 +73,19 @@ var _ = Describe("PITR Functions", func() {
 
 	Context("Test PITR", func() {
 		const (
-			clusterDefName = "test-clusterdef"
-			mysqlCompType  = "replicasets"
-			mysqlCompName  = "mysql"
-			nginxCompType  = "proxy"
+			clusterDefName     = "test-clusterdef"
+			clusterVersionName = "test-clusterversion"
+			mysqlCompType      = "replicasets"
+			mysqlCompName      = "mysql"
+			nginxCompType      = "proxy"
 		)
 
 		var (
-			clusterDef     *appsv1alpha1.ClusterDefinition
-			clusterVersion *appsv1alpha1.ClusterVersion
-			cluster        *appsv1alpha1.Cluster
+			clusterDef           *appsv1alpha1.ClusterDefinition
+			clusterVersion       *appsv1alpha1.ClusterVersion
+			cluster              *appsv1alpha1.Cluster
+			synthesizedComponent *component.SynthesizedComponent
+			pvc                  *corev1.PersistentVolumeClaim
 		)
 
 		BeforeEach(func() {
@@ -91,11 +105,18 @@ var _ = Describe("PITR Functions", func() {
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddRestorePointInTime(metav1.Time{Time: metav1.Now().Time}, sourceCluster).
+				Create(&testCtx).GetObject()
+
+			By("By mocking a pvc")
+			pvc = testapps.NewPersistentVolumeClaimFactory(
+				testCtx.DefaultNamespace, "data-"+clusterName+"-"+mysqlCompName+"-0", clusterName, mysqlCompName, "data").
+				SetStorage("1Gi").
 				Create(&testCtx).GetObject()
 
 			By("By creating backup policyTemplate: ")
 			backupTplLabels := map[string]string{
-				intctrlutil.ClusterDefLabelKey: clusterDefinitionName,
+				constant.ClusterDefLabelKey: clusterDefName,
 			}
 			_ = testapps.NewBackupPolicyTemplateFactory("backup-policy-template").
 				WithRandomName().SetLabels(backupTplLabels).
@@ -105,12 +126,24 @@ var _ = Describe("PITR Functions", func() {
 				SetCredentialKeyword("username", "password").
 				AddHookPreCommand("touch /data/mysql/.restore;sync").
 				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-				SetPointInTimeRecovery(&dpv1alpha1.ScriptSpec{Image: "111", Args: []string{"111"}}, map[string]string{"111": "222"}).
+				SetPointInTimeRecovery(&dpv1alpha1.ScriptSpec{
+					Command: []string{"sh", "-c"}, Args: []string{"cp /pitr/log /data/log"}},
+					map[string]string{"pg.conf": "recovery-to-time='$KB_RECOVERY_TIME'"}).
 				Create(&testCtx).GetObject()
 
+			clusterCompDefObj := clusterDef.Spec.ComponentDefs[0]
+			synthesizedComponent = &component.SynthesizedComponent{
+				PodSpec:               clusterCompDefObj.PodSpec,
+				Probes:                clusterCompDefObj.Probes,
+				LogConfigs:            clusterCompDefObj.LogConfigs,
+				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
+				VolumeClaimTemplates:  cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
+			}
+
 			By("By creating earlier backup: ")
+			now := metav1.Now()
 			backupLabels := map[string]string{
-				intctrlutil.AppNameLabelKey: sourceCluster,
+				constant.AppInstanceLabelKey: sourceCluster,
 			}
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(backupLabels).
@@ -118,46 +151,85 @@ var _ = Describe("PITR Functions", func() {
 				SetBackupPolicyName("test-fake").
 				SetBackupType(dpv1alpha1.BackupTypeFull).
 				Create(&testCtx).GetObject()
-			now := metav1.Now()
+			earlierStartTime := &metav1.Time{Time: now.Add(-time.Hour * 3)}
+			earlierStopTime := &metav1.Time{Time: now.Add(-time.Hour * 2)}
 			backupStatus := dpv1alpha1.BackupStatus{
 				Phase:               dpv1alpha1.BackupCompleted,
-				StartTimestamp:      &now,
-				CompletionTimestamp: &now,
+				StartTimestamp:      earlierStartTime,
+				CompletionTimestamp: earlierStopTime,
+				Manifests: &dpv1alpha1.ManifestsStatus{
+					BackupLog: &dpv1alpha1.BackupLogStatus{
+						StartTime: earlierStartTime,
+						StopTime:  earlierStopTime,
+					},
+				},
 			}
 			backupStatus.CompletionTimestamp = &metav1.Time{Time: now.Add(-time.Hour * 2)}
 			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backup))
 
 			By("By creating latest backup: ")
+			latestStartTime := &metav1.Time{Time: now.Add(-time.Hour * 3)}
+			latestStopTime := &metav1.Time{Time: now.Add(time.Hour * 2)}
 			backupNext := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(backupLabels).
 				SetTTL(defaultTTL).
 				SetBackupPolicyName("test-fake").
 				SetBackupType(dpv1alpha1.BackupTypeFull).
 				Create(&testCtx).GetObject()
-			backupStatus.CompletionTimestamp = &metav1.Time{Time: now.Add(time.Hour * 2)}
+			backupStatus = dpv1alpha1.BackupStatus{
+				Phase:               dpv1alpha1.BackupCompleted,
+				StartTimestamp:      latestStartTime,
+				CompletionTimestamp: latestStopTime,
+				Manifests: &dpv1alpha1.ManifestsStatus{
+					BackupLog: &dpv1alpha1.BackupLogStatus{
+						StartTime: latestStartTime,
+						StopTime:  latestStopTime,
+					},
+				},
+			}
 			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupNext))
 		})
 
 		It("Test PITR prepare", func() {
-			cluster.SetAnnotations(map[string]string{
-				"restore-from-time":    metav1.Now().Format(time.RFC3339),
-				"restore-from-cluster": sourceCluster,
-			})
+			Expect(DoPITRPrepare(ctx, testCtx.Cli, cluster, synthesizedComponent)).Should(Succeed())
+			Expect(synthesizedComponent.PodSpec.InitContainers).ShouldNot(BeEmpty())
+		})
+		It("Test Merge pitr config", func() {
 			pitrMgr := PointInTimeRecoveryManager{
 				Cluster: cluster,
 				Client:  testCtx.Cli,
 				Ctx:     ctx,
 			}
-			clusterCompDefObj := clusterDef.Spec.ComponentDefs[0]
-			synthesizedComponent := &component.SynthesizedComponent{
-				PodSpec:               clusterCompDefObj.PodSpec,
-				Probes:                clusterCompDefObj.Probes,
-				LogConfigs:            clusterCompDefObj.LogConfigs,
-				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
+			configMap := corev1.ConfigMap{
+				Data: map[string]string{"pg.conf": "key=value"},
 			}
-			Expect(pitrMgr.DoPrepare(synthesizedComponent)).Should(Succeed())
+			Expect(pitrMgr.MergeConfigMap(&configMap)).Should(Succeed())
+			Expect(configMap.Data).ShouldNot(Equal(map[string]string{"pg.conf": "key=value"}))
 		})
-
+		It("Test PITR job run and cleanup", func() {
+			By("when data pvc is pending")
+			shouldRequeue, err := DoPITRIfNeed(ctx, testCtx.Cli, cluster)
+			Expect(err).Should(Succeed())
+			Expect(shouldRequeue).Should(BeTrue())
+			By("when data pvc is bound")
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(fetched *corev1.PersistentVolumeClaim) {
+				fetched.Status.Phase = corev1.ClaimBound
+			})).Should(Succeed())
+			shouldRequeue, err = DoPITRIfNeed(ctx, testCtx.Cli, cluster)
+			Expect(err).Should(Succeed())
+			By("when job is completed")
+			jobKey := types.NamespacedName{Namespace: cluster.Namespace, Name: "pitr-prepare-" + clusterName}
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, jobKey, func(fetched *batchv1.Job) {
+				fetched.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete}}
+			})).Should(Succeed())
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(fetched *appsv1alpha1.Cluster) {
+				fetched.Status.Phase = appsv1alpha1.RunningClusterPhase
+			})).Should(Succeed())
+			shouldRequeue, err = DoPITRIfNeed(ctx, testCtx.Cli, cluster)
+			Expect(err).Should(Succeed())
+			By("cleanup pitr job")
+			Expect(DoPITRCleanup(ctx, testCtx.Cli, cluster)).Should(Succeed())
+		})
 	})
 })
 

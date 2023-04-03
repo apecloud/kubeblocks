@@ -60,6 +60,10 @@ spec:
             protocol: TCP
             port: 6379
             targetPort: redis
+          - name: metrics
+            targetPort: metrics
+            port: 9121
+            nodePort: null
       configSpecs:
         - name: redis-replication-config
           templateRef: redis7-config-template
@@ -119,11 +123,11 @@ spec:
             livenessProbe:
               httpGet:
                 path: /
-                port: 9121
+                port: metrics
             readinessProbe:
               httpGet:
                 path: /
-                port: 9121
+                port: metrics
       systemAccounts:
 # Seems redis-cli has its own mechanism to parse input tokens and there is no elegent way
 # to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.

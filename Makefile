@@ -393,6 +393,8 @@ bump-chart-ver: \
 	bump-single-chart-ver.milvus \
 	bump-single-chart-ver.qdrant \
 	bump-single-chart-ver.qdrant-cluster \
+	bump-single-chart-ver.weaviate \
+	bump-single-chart-ver.weaviate-cluster \
 	bump-single-chart-ver.chatgpt-retrieval-plugin
 bump-chart-ver: ## Bump helm chart version.
 

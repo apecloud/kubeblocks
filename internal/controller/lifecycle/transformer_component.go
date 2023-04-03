@@ -52,7 +52,7 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 		compSpecMap[spec.Name] = &spec
 	}
 	compProto := sets.KeySet(compSpecMap)
-	// TODO: should review that whether it is reasonable to use component status
+	// TODO(refactor): should review that whether it is reasonable to use component status
 	compStatus := sets.KeySet(cluster.Status.Components)
 
 	createSet := compProto.Difference(compStatus)
@@ -89,7 +89,7 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 		if err != nil {
 			return err
 		}
-		// TODO: will replace Update with specified operations(restart, reconfigure, h/v-scaling...) after ops-request forwards to cluster controller
+		// TODO(refactor): will replace Update with specified operations(restart, reconfigure, h/v-scaling...) after ops-request forwards to cluster controller
 		if err := comp.Update(c.ctx, c.cli); err != nil {
 			return err
 		}

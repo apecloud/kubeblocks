@@ -37,7 +37,10 @@ import (
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
-// TODO: status management
+// TODO(refactor):
+//  1. status management
+//  2. component workload
+
 type Component interface {
 	GetName() string
 	GetNamespace() string
@@ -49,12 +52,10 @@ type Component interface {
 	GetCluster() *appsv1alpha1.Cluster
 	GetSynthesizedComponent() *component.SynthesizedComponent
 
-	GetPhase() appsv1alpha1.ClusterComponentPhase
-	GetStatus() appsv1alpha1.ClusterComponentStatus
+	// GetPhase() appsv1alpha1.ClusterComponentPhase
+	// GetStatus() appsv1alpha1.ClusterComponentStatus
 
 	GetMatchingLabels() client.MatchingLabels
-
-	// GetWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error)
 
 	// Exist checks whether the component exists in cluster, we say that a component exists iff the main workloads
 	// exist in cluster, such as stateful set for consensus/replication/stateful and deployment for stateless.
@@ -73,7 +74,7 @@ type Component interface {
 
 	Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 
-	// impl-related
+	// TODO(refactor): impl-related, will replace it with component workload
 	addResource(obj client.Object, action *Action, parent *lifecycleVertex) *lifecycleVertex
 	addWorkload(obj client.Object, action *Action, parent *lifecycleVertex)
 }
@@ -98,7 +99,7 @@ func NewComponent(definition *appsv1alpha1.ClusterDefinition,
 	}
 
 	if compSpec == nil || compDef == nil {
-		// TODO: fix me
+		// TODO(refactor): fix me
 		return nil, fmt.Errorf("NotSupported")
 	}
 
@@ -121,7 +122,7 @@ type componentBase struct {
 	Version    *appsv1alpha1.ClusterVersion
 	Cluster    *appsv1alpha1.Cluster
 
-	// TODO: should remove those members in future.
+	// TODO(refactor): should remove those members in future.
 	CompDef  *appsv1alpha1.ClusterComponentDefinition
 	CompVer  *appsv1alpha1.ClusterComponentVersion
 	CompSpec *appsv1alpha1.ClusterComponentSpec
@@ -129,14 +130,54 @@ type componentBase struct {
 	// built synthesized component
 	Component *component.SynthesizedComponent
 
-	// DAG vertex of main workload object(s)
+	// DAG vertexes of main workload object(s)
 	workloadVertexs []*lifecycleVertex
 
 	dag *graph.DAG
 }
 
-type statefulsetComponentBase struct {
-	componentBase
+func (c *componentBase) GetName() string {
+	return c.CompSpec.Name
+}
+
+func (c *componentBase) GetNamespace() string {
+	return c.Cluster.Namespace
+}
+
+func (c *componentBase) GetClusterName() string {
+	return c.Cluster.Name
+}
+
+func (c *componentBase) GetDefinition() *appsv1alpha1.ClusterDefinition {
+	return c.Definition
+}
+
+func (c *componentBase) GetVersion() *appsv1alpha1.ClusterVersion {
+	return c.Version
+}
+
+func (c *componentBase) GetCluster() *appsv1alpha1.Cluster {
+	return c.Cluster
+}
+
+func (c *componentBase) GetSynthesizedComponent() *component.SynthesizedComponent {
+	return c.Component
+}
+
+// func (c *componentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {
+//	return c.GetStatus().Phase // TODO: impl
+// }
+//
+// func (c *componentBase) GetStatus() appsv1alpha1.ClusterComponentStatus {
+//	return appsv1alpha1.ClusterComponentStatus{} // TODO: impl
+// }
+
+func (c *componentBase) GetMatchingLabels() client.MatchingLabels {
+	return client.MatchingLabels{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppInstanceLabelKey:    c.GetClusterName(),
+		constant.KBAppComponentLabelKey: c.GetName(),
+	}
 }
 
 func (c *componentBase) addResource(obj client.Object, action *Action, parent *lifecycleVertex) *lifecycleVertex {
@@ -171,50 +212,6 @@ func (c *componentBase) deleteResource(obj client.Object, parent *lifecycleVerte
 
 func (c *componentBase) updateResource(obj client.Object, parent *lifecycleVertex) *lifecycleVertex {
 	return c.addResource(obj, actionPtr(UPDATE), parent)
-}
-
-func (c *componentBase) GetName() string {
-	return c.CompSpec.Name
-}
-
-func (c *componentBase) GetNamespace() string {
-	return c.Cluster.Namespace
-}
-
-func (c *componentBase) GetClusterName() string {
-	return c.Cluster.Name
-}
-
-func (c *componentBase) GetDefinition() *appsv1alpha1.ClusterDefinition {
-	return c.Definition
-}
-
-func (c *componentBase) GetVersion() *appsv1alpha1.ClusterVersion {
-	return c.Version
-}
-
-func (c *componentBase) GetCluster() *appsv1alpha1.Cluster {
-	return c.Cluster
-}
-
-func (c *componentBase) GetSynthesizedComponent() *component.SynthesizedComponent {
-	return c.Component
-}
-
-func (c *componentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {
-	return c.GetStatus().Phase // TODO: impl
-}
-
-func (c *componentBase) GetStatus() appsv1alpha1.ClusterComponentStatus {
-	return appsv1alpha1.ClusterComponentStatus{} // TODO: impl
-}
-
-func (c *componentBase) GetMatchingLabels() client.MatchingLabels {
-	return client.MatchingLabels{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppInstanceLabelKey:    c.GetClusterName(),
-		constant.KBAppComponentLabelKey: c.GetName(),
-	}
 }
 
 // validateObjectsAction validates the action of all objects in dag has been determined
@@ -295,6 +292,11 @@ func (c *componentBase) updateService(reqCtx intctrlutil.RequestCtx, cli client.
 	return nil
 }
 
+// As a base class for single stateful-set based component (stateful & consensus)
+type statefulsetComponentBase struct {
+	componentBase
+}
+
 func (c *statefulsetComponentBase) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
 	if stsList, err := listStsOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels()); err != nil {
 		return false, err
@@ -323,8 +325,8 @@ func (c *statefulsetComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, c
 			continue
 		}
 
-		// TODO:
-		//   1. check that cann't decrease the storage size.
+		// TODO(refactor):
+		//   1. check that can't decrease the storage size.
 		//   2. since we can't update the storage size of stateful set, so we can't use it to determine the expansion.
 		if vct.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Resources.Requests[corev1.ResourceStorage] {
 			continue
@@ -383,7 +385,7 @@ func (c *statefulsetComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli cl
 }
 
 func (c *statefulsetComponentBase) Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return nil // TODO: impl
+	return nil // TODO(refactor): impl
 }
 
 func (c *statefulsetComponentBase) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.StatefulSet, error) {
@@ -572,7 +574,7 @@ func (c *statefulsetComponentBase) updateUnderlyingResources(reqCtx intctrlutil.
 		return err
 	}
 
-	// TODO: to workaround that the scaled PVC will be deleted at object action
+	// TODO(refactor): to workaround that the scaled PVC will be deleted at object action
 	if err := c.updatePVC(reqCtx, cli, stsObj); err != nil {
 		return err
 	}
@@ -593,7 +595,6 @@ func (c *statefulsetComponentBase) updateWorkload(stsObj *appsv1.StatefulSet, id
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
 		c.workloadVertexs[idx].obj = stsObjCopy
 		c.workloadVertexs[idx].action = actionPtr(UPDATE)
-
 		// sync component phase
 		//updateComponentPhaseWithOperation2(c.GetCluster(), c.GetName())
 	}

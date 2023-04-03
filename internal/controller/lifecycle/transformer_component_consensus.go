@@ -57,20 +57,20 @@ type consensusComponent struct {
 	statefulsetComponentBase
 }
 
-type consensusComponentBuilder struct {
-	componentBuilderBase
+type consensusComponentWorkloadBuilder struct {
+	componentWorkloadBuilderBase
 	workload *appsv1.StatefulSet
 }
 
-func (b *consensusComponentBuilder) mutableWorkload(_ int32) client.Object {
+func (b *consensusComponentWorkloadBuilder) mutableWorkload(_ int32) client.Object {
 	return b.workload
 }
 
-func (b *consensusComponentBuilder) mutablePodSpec(_ int32) *corev1.PodSpec {
+func (b *consensusComponentWorkloadBuilder) mutableRuntime(_ int32) *corev1.PodSpec {
 	return &b.workload.Spec.Template.Spec
 }
 
-func (b *consensusComponentBuilder) buildService() componentBuilder {
+func (b *consensusComponentWorkloadBuilder) buildService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		svcList, err := builder.BuildSvcListLow(b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
 		if err != nil {
@@ -89,7 +89,7 @@ func (b *consensusComponentBuilder) buildService() componentBuilder {
 	return b.buildWrapper(buildfn)
 }
 
-func (b *consensusComponentBuilder) buildWorkload(_ int32) componentBuilder {
+func (b *consensusComponentWorkloadBuilder) buildWorkload(_ int32) componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		if b.envConfig == nil {
 			return nil, fmt.Errorf("build consensus workload but env config is nil, cluster: %s, component: %s",
@@ -111,7 +111,7 @@ func (b *consensusComponentBuilder) buildWorkload(_ int32) componentBuilder {
 			if err != nil {
 				return nil, err
 			}
-			return []client.Object{pdb}, err // don't return sts here, and it will not add to resource queue now
+			return []client.Object{pdb}, err // don't return sts here
 		}
 		return nil, nil
 	}
@@ -125,8 +125,8 @@ func (c *consensusComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 	c.Component = synthesizedComp
 
-	builder := &consensusComponentBuilder{
-		componentBuilderBase: componentBuilderBase{
+	builder := &consensusComponentWorkloadBuilder{
+		componentWorkloadBuilderBase: componentWorkloadBuilderBase{
 			reqCtx:        reqCtx,
 			client:        cli,
 			comp:          c,
@@ -138,16 +138,15 @@ func (c *consensusComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 	builder.concreteBuilder = builder
 
-	// runtime, config, script, env, volume, service, monitor, probe
-	return builder.buildEnv(). // TODO: workload & scaling related
-					buildWorkload(0). // build workload here since other objects depend on it.
-					buildHeadlessService().
-					buildConfig(0).
-					buildTLSVolume(0).
-					buildVolumeMount(0).
-					buildService().
-					buildTLSCert().
-					complete()
+	return builder.buildEnv().
+		buildWorkload(0).
+		buildHeadlessService().
+		buildConfig(0).
+		buildTLSVolume(0).
+		buildVolumeMount(0).
+		buildService().
+		buildTLSCert().
+		complete()
 }
 
 func (c *consensusComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -197,6 +196,6 @@ func (c *consensusComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 }
 
 func (c *consensusComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	// TODO: delete component owned resources
+	// TODO(refactor): delete component owned resources
 	return nil
 }

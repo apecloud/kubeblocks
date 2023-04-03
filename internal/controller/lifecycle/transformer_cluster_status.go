@@ -102,12 +102,12 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 	case isClusterDeleting(*origCluster):
 		// if cluster is deleting, set root(cluster) vertex.action to DELETE
 		rootVertex.action = actionPtr(DELETE)
-		// TODO: move from object action, check it again
+		// TODO(refactor): move from object action, check it again
 		for _, vertex := range dag.Vertices() {
 			v, _ := vertex.(*lifecycleVertex)
 			v.action = actionPtr(DELETE)
 		}
-		// TODO: delete orphan resources which are not in dag?
+		// TODO(refactor): delete orphan resources which are not in dag?
 	case isClusterUpdating(*origCluster):
 		c.ctx.Log.Info("update cluster status after applying resources ")
 		defer func() {
@@ -132,11 +132,11 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		defer func() {
 			rootVertex.action = actionPtr(STATUS)
 			rootVertex.immutable = reflect.DeepEqual(cluster.Status, origCluster.Status)
-			// TODO: move from object action, check it again
+			// TODO(refactor): move from object action, check it again
 			vertices := findAllNot[*appsv1alpha1.Cluster](dag)
 			for _, vertex := range vertices {
 				v, _ := vertex.(*lifecycleVertex)
-				// TODO: fix me, workaround for h-scaling to update stateful set
+				// TODO(refactor): fix me, workaround for h-scaling to update stateful set
 				if _, ok := v.obj.(*appsv1.StatefulSet); !ok {
 					v.immutable = true
 				}

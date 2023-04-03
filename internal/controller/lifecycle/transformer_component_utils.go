@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,9 +29,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -69,7 +65,7 @@ func restartPod(podTemplate *corev1.PodTemplateSpec) error {
 	}
 
 	// startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
-	startTimestamp := time.Now() // TODO: impl
+	startTimestamp := time.Now() // TODO(refactor): impl
 	restartTimestamp := podTemplate.Annotations[constant.RestartAnnotationKey]
 	// if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.After(res) {
 	if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.Before(res) {
@@ -109,93 +105,6 @@ func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]s
 	}
 	maps.Copy(tmpAnnotations, targetAnnotations)
 	return tmpAnnotations
-}
-
-// updateComponentPhaseWithOperation if workload of component changes, should update the component phase.
-func updateComponentPhaseWithOperation(cluster *appsv1alpha1.Cluster, componentName string) {
-	componentPhase := appsv1alpha1.SpecReconcilingClusterCompPhase
-	if cluster.Status.Phase == appsv1alpha1.CreatingClusterPhase {
-		componentPhase = appsv1alpha1.CreatingClusterCompPhase
-	}
-	compStatus := cluster.Status.Components[componentName]
-	// synchronous component phase is consistent with cluster phase
-	compStatus.Phase = componentPhase
-	cluster.Status.SetComponentStatus(componentName, compStatus)
-}
-
-func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, component component.SynthesizedComponent) error {
-	if !component.TLS {
-		return nil
-	}
-
-	// update volume
-	volumes := podSpec.Volumes
-	volume, err := composeTLSVolume(clusterName, component)
-	if err != nil {
-		return err
-	}
-	volumes = append(volumes, *volume)
-	podSpec.Volumes = volumes
-
-	// update volumeMount
-	for index, container := range podSpec.Containers {
-		volumeMounts := container.VolumeMounts
-		volumeMount := composeTLSVolumeMount()
-		volumeMounts = append(volumeMounts, volumeMount)
-		podSpec.Containers[index].VolumeMounts = volumeMounts
-	}
-
-	return nil
-}
-
-func composeTLSVolume(clusterName string, component component.SynthesizedComponent) (*corev1.Volume, error) {
-	if !component.TLS {
-		return nil, errors.New("can't compose TLS volume when TLS not enabled")
-	}
-	if component.Issuer == nil {
-		return nil, errors.New("issuer shouldn't be nil when TLS enabled")
-	}
-	if component.Issuer.Name == appsv1alpha1.IssuerUserProvided && component.Issuer.SecretRef == nil {
-		return nil, errors.New("secret ref shouldn't be nil when issuer is UserProvided")
-	}
-
-	var secretName, ca, cert, key string
-	switch component.Issuer.Name {
-	case appsv1alpha1.IssuerKubeBlocks:
-		secretName = plan.GenerateTLSSecretName(clusterName, component.Name)
-		ca = builder.CAName
-		cert = builder.CertName
-		key = builder.KeyName
-	case appsv1alpha1.IssuerUserProvided:
-		secretName = component.Issuer.SecretRef.Name
-		ca = component.Issuer.SecretRef.CA
-		cert = component.Issuer.SecretRef.Cert
-		key = component.Issuer.SecretRef.Key
-	}
-	volume := corev1.Volume{
-		Name: builder.VolumeName,
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: secretName,
-				Items: []corev1.KeyToPath{
-					{Key: ca, Path: builder.CAName},
-					{Key: cert, Path: builder.CertName},
-					{Key: key, Path: builder.KeyName},
-				},
-				Optional: func() *bool { o := false; return &o }(),
-			},
-		},
-	}
-
-	return &volume, nil
-}
-
-func composeTLSVolumeMount() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      builder.VolumeName,
-		MountPath: builder.MountPath,
-		ReadOnly:  true,
-	}
 }
 
 func ownedKinds() []client.ObjectList {

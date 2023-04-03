@@ -59,20 +59,20 @@ type replicationComponent struct {
 	componentBase
 }
 
-type replicationComponentBuilder struct {
-	componentBuilderBase
+type replicationComponentWorkloadBuilder struct {
+	componentWorkloadBuilderBase
 	workloads []*appsv1.StatefulSet
 }
 
-func (b *replicationComponentBuilder) mutableWorkload(idx int32) client.Object {
+func (b *replicationComponentWorkloadBuilder) mutableWorkload(idx int32) client.Object {
 	return b.workloads[idx]
 }
 
-func (b *replicationComponentBuilder) mutablePodSpec(idx int32) *corev1.PodSpec {
+func (b *replicationComponentWorkloadBuilder) mutableRuntime(idx int32) *corev1.PodSpec {
 	return &b.workloads[idx].Spec.Template.Spec
 }
 
-func (b *replicationComponentBuilder) buildService() componentBuilder {
+func (b *replicationComponentWorkloadBuilder) buildService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		svcList, err := builder.BuildSvcListLow(b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
 		if err != nil {
@@ -88,7 +88,7 @@ func (b *replicationComponentBuilder) buildService() componentBuilder {
 	return b.buildWrapper(buildfn)
 }
 
-func (b *replicationComponentBuilder) buildWorkload(idx int32) componentBuilder {
+func (b *replicationComponentWorkloadBuilder) buildWorkload(idx int32) componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		component := b.comp.GetSynthesizedComponent()
 		if b.envConfig == nil {
@@ -114,12 +114,12 @@ func (b *replicationComponentBuilder) buildWorkload(idx int32) componentBuilder 
 
 		b.workloads = append(b.workloads, sts)
 
-		return nil, nil // don't return sts here, and it will not add to resource queue now
+		return nil, nil // don't return sts here
 	}
 	return b.buildWrapper(buildfn)
 }
 
-func (b *replicationComponentBuilder) buildVolume(idx int32) componentBuilder {
+func (b *replicationComponentWorkloadBuilder) buildVolume(idx int32) componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		workload := b.mutableWorkload(idx)
 		// if workload == nil {
@@ -165,7 +165,7 @@ func (b *replicationComponentBuilder) buildVolume(idx int32) componentBuilder {
 	return b.buildWrapper(buildfn)
 }
 
-func (b *replicationComponentBuilder) complete() error {
+func (b *replicationComponentWorkloadBuilder) complete() error {
 	if b.error != nil {
 		return b.error
 	}
@@ -187,8 +187,8 @@ func (c *replicationComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	}
 	c.Component = synthesizedComp
 
-	builder := &replicationComponentBuilder{
-		componentBuilderBase: componentBuilderBase{
+	builder := &replicationComponentWorkloadBuilder{
+		componentWorkloadBuilderBase: componentWorkloadBuilderBase{
 			reqCtx:        reqCtx,
 			client:        cli,
 			comp:          c,
@@ -201,14 +201,13 @@ func (c *replicationComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	builder.concreteBuilder = builder
 
 	// env and headless service are component level resources
-	builder.buildEnv(). // TODO: workload & scaling related
-				buildHeadlessService()
+	builder.buildEnv().buildHeadlessService()
 	for i := int32(0); i < synthesizedComp.Replicas; i++ {
-		builder.buildWorkload(i). // build workload here since other objects depend on it.
-						buildVolume(i).
-						buildConfig(i).
-						buildTLSVolume(i).
-						buildVolumeMount(i)
+		builder.buildWorkload(i).
+			buildVolume(i).
+			buildConfig(i).
+			buildTLSVolume(i).
+			buildVolumeMount(i)
 		if builder.error != nil {
 			return builder.error
 		}
@@ -271,7 +270,7 @@ func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.
 }
 
 func (c *replicationComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	// TODO: delete component owned resources
+	// TODO(refactor): delete component owned resources
 	return nil
 }
 
@@ -353,7 +352,7 @@ func (c *replicationComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client
 }
 
 func (c *replicationComponent) Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return nil // TODO: impl
+	return nil // TODO(refactor): impl
 }
 
 func (c *replicationComponent) runningWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]*appsv1.StatefulSet, error) {
@@ -372,7 +371,7 @@ func (c *replicationComponent) runningWorkloads(reqCtx intctrlutil.RequestCtx, c
 // TODO: if sts created in last reconcile-loop not present in cache, hasReplicationSetHScaling return false positive
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
 func (c *replicationComponent) horizontalScaling(stsList []*appsv1.StatefulSet) int {
-	// TODO: should use a more stable status
+	// TODO(refactor): should use a more stable status
 	return int(c.Component.Replicas) - len(stsList)
 }
 
@@ -422,7 +421,6 @@ func (c *replicationComponent) updateWorkload(stsObj *appsv1.StatefulSet, idx in
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
 		c.workloadVertexs[idx].obj = stsObjCopy
 		c.workloadVertexs[idx].action = actionPtr(UPDATE)
-
 		// sync component phase
 		//updateComponentPhaseWithOperation2(c.GetCluster(), c.GetName())
 	}

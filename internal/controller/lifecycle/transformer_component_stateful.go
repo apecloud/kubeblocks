@@ -56,20 +56,20 @@ type statefulComponent struct {
 	statefulsetComponentBase
 }
 
-type statefulComponentBuilder struct {
-	componentBuilderBase
+type statefulComponentWorkloadBuilder struct {
+	componentWorkloadBuilderBase
 	workload *appsv1.StatefulSet
 }
 
-func (b *statefulComponentBuilder) mutableWorkload(_ int32) client.Object {
+func (b *statefulComponentWorkloadBuilder) mutableWorkload(_ int32) client.Object {
 	return b.workload
 }
 
-func (b *statefulComponentBuilder) mutablePodSpec(_ int32) *corev1.PodSpec {
+func (b *statefulComponentWorkloadBuilder) mutableRuntime(_ int32) *corev1.PodSpec {
 	return &b.workload.Spec.Template.Spec
 }
 
-func (b *statefulComponentBuilder) buildWorkload(_ int32) componentBuilder {
+func (b *statefulComponentWorkloadBuilder) buildWorkload(_ int32) componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		if b.envConfig == nil {
 			return nil, fmt.Errorf("build consensus workload but env config is nil, cluster: %s, component: %s",
@@ -83,7 +83,7 @@ func (b *statefulComponentBuilder) buildWorkload(_ int32) componentBuilder {
 
 		b.workload = sts
 
-		return nil, nil // don't return deploy here, and it will not add to resource queue now
+		return nil, nil // don't return deploy here
 	}
 	return b.buildWrapper(buildfn)
 }
@@ -95,8 +95,8 @@ func (c *statefulComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clien
 	}
 	c.Component = synthesizedComp
 
-	builder := &statefulComponentBuilder{
-		componentBuilderBase: componentBuilderBase{
+	builder := &statefulComponentWorkloadBuilder{
+		componentWorkloadBuilderBase: componentWorkloadBuilderBase{
 			reqCtx:        reqCtx,
 			client:        cli,
 			comp:          c,
@@ -108,16 +108,15 @@ func (c *statefulComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clien
 	}
 	builder.concreteBuilder = builder
 
-	// runtime, config, script, env, volume, service, monitor, probe
-	return builder.buildEnv(). // TODO: workload & scaling related
-					buildWorkload(0). // build workload here since other objects depend on it.
-					buildHeadlessService().
-					buildConfig(0).
-					buildTLSVolume(0).
-					buildVolumeMount(0).
-					buildService().
-					buildTLSCert().
-					complete()
+	return builder.buildEnv().
+		buildWorkload(0).
+		buildHeadlessService().
+		buildConfig(0).
+		buildTLSVolume(0).
+		buildVolumeMount(0).
+		buildService().
+		buildTLSCert().
+		complete()
 }
 
 func (c *statefulComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -168,6 +167,6 @@ func (c *statefulComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cli
 }
 
 func (c *statefulComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	// TODO: delete component owned resources
+	// TODO(refactor): delete component owned resources
 	return nil
 }

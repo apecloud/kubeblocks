@@ -121,6 +121,19 @@ func (w *envWrapper) getEnvFromResource(envSource corev1.EnvFromSource, envName 
 }
 
 func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector, container *corev1.Container) (string, error) {
+	secretPlaintext := func(m map[string]string) (string, error) {
+		if v, ok := m[secretRef.Key]; ok {
+			return w.checkAndReplaceEnv(v, container)
+		}
+		return "", nil
+	}
+	secretCiphertext := func(m map[string][]byte) (string, error) {
+		if v, ok := m[secretRef.Key]; ok {
+			return decodeString(v)
+		}
+		return "", nil
+	}
+
 	if w.cli == nil {
 		return "", cfgcore.MakeError("not support secret[%s] value in local mode, cli is nil", secretRef.Name)
 	}
@@ -137,8 +150,11 @@ func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector, container 
 	if err != nil {
 		return "", err
 	}
-	if v, ok := secret.Data[secretRef.Key]; ok {
-		return decodeString(v)
+	if secret.StringData != nil {
+		return secretPlaintext(secret.StringData)
+	}
+	if secret.Data != nil {
+		return secretCiphertext(secret.Data)
 	}
 	return "", nil
 }
@@ -196,7 +212,7 @@ func (w *envWrapper) checkAndReplaceEnv(value string, container *corev1.Containe
 	// - name: LOOP_REF_B
 	//   value: $(LOOP_REF_A)
 
-	if strings.IndexByte(value, '$') < 0 {
+	if len(value) == 0 || strings.IndexByte(value, '$') < 0 {
 		return value, nil
 	}
 	envHolderVec := envPlaceHolderRegexp.FindAllString(value, -1)

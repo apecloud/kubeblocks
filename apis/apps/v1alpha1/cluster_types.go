@@ -630,8 +630,6 @@ func GetComponentTerminalPhases() []ClusterComponentPhase {
 func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
 	t := corev1.PersistentVolumeClaimTemplate{}
 	t.ObjectMeta.Name = template.Name
-	if template.Spec != nil {
-		t.Spec = *template.Spec
-	}
+	t.Spec = template.Spec.ToV1PersistentVolumeClaimSpec()
 	return t
 }

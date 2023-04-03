@@ -56,8 +56,10 @@ spec:
               - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_DEMOTE_STATEMENT)
       service:
         ports:
-          - protocol: TCP
+          - name: redis
+            protocol: TCP
             port: 6379
+            targetPort: redis
       configSpecs:
         - name: redis-replication-config
           templateRef: redis7-config-template
@@ -84,9 +86,6 @@ spec:
         - name: data
           type: data
       podSpec:
-        volumes:
-          - name: redis-conf
-            emptyDir: { }
         containers:
           - name: redis
             ports:
@@ -177,7 +176,9 @@ spec:
       characterType: redis
       service:
         ports:
-          - protocol: TCP
+          - name: redis-sentinel
+            protocol: TCP
+            targetPort: redis-sentinel
             port: 26379
       configSpecs:
         - name: redis-replication-config
@@ -231,6 +232,3 @@ spec:
             - |
               set -ex
               /scripts/redis-sentinel-start.sh
-        volumes:
-          - name: sentinel-conf
-            emptyDir: { }

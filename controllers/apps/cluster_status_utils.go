@@ -245,7 +245,8 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 		return nil
 	}
 	// get the component status by event and check whether the component status needs to be synchronized to the cluster
-	component, err := components.NewComponentByType(cli, cluster, clusterComponent, *componentDef)
+	// TODO(refactor)
+	component, err := components.NewComponentByType(cli, cluster, clusterComponent, *componentDef, nil)
 	if err != nil {
 		return err
 	}

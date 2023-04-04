@@ -18,27 +18,23 @@ package replicationset
 
 import (
 	"context"
-	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ReplicationSet is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec
 type ReplicationSet struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
+	types.ComponentBase
 }
 
 var _ types.Component = &ReplicationSet{}
@@ -100,12 +96,6 @@ func (r *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) 
 	return intctrlutil.PodIsReadyWithLabel(*pod)
 }
 
-// HandleProbeTimeoutWhenPodsReady is the implementation of the type Component interface method,
-// and replicationSet does not need to do role probe detection, so it returns false directly.
-func (r *ReplicationSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
-	return false, nil
-}
-
 // GetPhaseWhenPodsNotReady is the implementation of the type Component interface method,
 // when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
 // if return an empty phase, means the pods of component are ready and skips it.
@@ -165,59 +155,120 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, component
 		componentReplicas, int32(podCount), availableReplicas), nil
 }
 
-// HandleUpdate is the implementation of the type Component interface method, handles replicationSet workload Pod updates.
-func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) error {
-	var componentStsList = &appsv1.StatefulSetList{}
-	var podList []*corev1.Pod
-	sts := util.ConvertToStatefulSet(obj)
-	if err := util.GetObjectListByComponentName(ctx, r.Cli, *r.Cluster, componentStsList,
-		sts.Labels[constant.KBAppComponentLabelKey]); err != nil {
+//// HandleUpdate is the implementation of the type Component interface method, handles replicationSet workload Pod updates.
+//func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) error {
+//	stsList, err := util.ListStsOwnedByComponent(ctx, r.Cli, r.GetNamespace(), r.GetMatchingLabels())
+//	if err != nil {
+//		return err
+//	}
+//
+//	podsToSyncStatus := make([]*corev1.Pod, 0)
+//	for _, sts := range stsList {
+//		if sts.Generation != sts.Status.ObservedGeneration {
+//			continue
+//		}
+//		pod, err := getAndCheckReplicationPodByStatefulSet(ctx, r.Cli, sts)
+//		if err != nil {
+//			return err
+//		}
+//		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
+//		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
+//			// TODO: refactor it
+//			podCopy := pod.DeepCopy()
+//			pod.GetLabels()[constant.RoleLabelKey] = sts.Labels[constant.RoleLabelKey]
+//			components.AddVertex4Patch(r.Dag, pod, podCopy)
+//		} else {
+//			podsToSyncStatus = append(podsToSyncStatus, pod)
+//		}
+//
+//		podsToDelete, err := util.GetPods4Delete(ctx, r.Cli, sts)
+//		if err != nil {
+//			return err
+//		}
+//		for _, podToDelete := range podsToDelete {
+//			components.AddVertex4Delete(r.Dag, podToDelete)
+//		}
+//	}
+//
+//	// sync cluster.status.components.replicationSet.status
+//	return syncReplicationSetClusterStatus(r.Cluster, r.ComponentDef, r.GetName(), podsToSyncStatus)
+//}
+
+func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) error {
+	stsList, err := util.ListStsOwnedByComponent(ctx, r.Cli, r.GetNamespace(), r.GetMatchingLabels())
+	if err != nil {
 		return err
 	}
-	for _, sts := range componentStsList.Items {
+
+	for _, sts := range stsList {
 		if sts.Generation != sts.Status.ObservedGeneration {
 			continue
 		}
-		pod, err := getAndCheckReplicationPodByStatefulSet(ctx, r.Cli, &sts)
+
+		_, err := getAndCheckReplicationPodByStatefulSet(ctx, r.Cli, sts)
+		if err != nil {
+			return err
+		}
+
+		podsToDelete, err := util.GetPods4Delete(ctx, r.Cli, sts)
+		if err != nil {
+			return err
+		}
+		for _, podToDelete := range podsToDelete {
+			types.AddVertex4Delete(r.Dag, podToDelete)
+		}
+	}
+	return nil
+}
+
+func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object) error {
+	stsList, err := util.ListStsOwnedByComponent(ctx, r.Cli, r.GetNamespace(), r.GetMatchingLabels())
+	if err != nil {
+		return err
+	}
+
+	podsToSyncStatus := make([]*corev1.Pod, 0)
+	for _, sts := range stsList {
+		if sts.Generation != sts.Status.ObservedGeneration {
+			continue
+		}
+		pod, err := getAndCheckReplicationPodByStatefulSet(ctx, r.Cli, sts)
 		if err != nil {
 			return err
 		}
 		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
 		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
-			if err := updateObjRoleLabel(ctx, r.Cli, *pod, sts.Labels[constant.RoleLabelKey]); err != nil {
-				return err
-			}
+			// TODO: refactor it
+			podCopy := pod.DeepCopy()
+			pod.GetLabels()[constant.RoleLabelKey] = sts.Labels[constant.RoleLabelKey]
+			types.AddVertex4Patch(r.Dag, pod, podCopy)
 		} else {
-			podList = append(podList, pod)
-		}
-		if err := util.DeleteStsPods(ctx, r.Cli, &sts); err != nil {
-			return err
+			podsToSyncStatus = append(podsToSyncStatus, pod)
 		}
 	}
+
 	// sync cluster.status.components.replicationSet.status
-	clusterDeepCopy := r.Cluster.DeepCopy()
-	if err := syncReplicationSetClusterStatus(ctx, r.Cli, r.Cluster, podList); err != nil {
-		return err
-	}
-	if reflect.DeepEqual(clusterDeepCopy.Status.Components, r.Cluster.Status.Components) {
-		return nil
-	}
-	return r.Cli.Status().Patch(ctx, r.Cluster, client.MergeFrom(clusterDeepCopy))
+	return syncReplicationSetClusterStatus(r.Cluster, r.ComponentDef, r.GetName(), podsToSyncStatus)
 }
 
 // NewReplicationSet creates a new ReplicationSet object.
-func NewReplicationSet(
-	cli client.Client,
+func NewReplicationSet(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (*ReplicationSet, error) {
+	componentDef appsv1alpha1.ClusterComponentDefinition,
+	dag *graph.DAG) (*ReplicationSet, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
-	return &ReplicationSet{
-		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		componentDef: &componentDef,
-	}, nil
+	replication := &ReplicationSet{
+		ComponentBase: types.ComponentBase{
+			Cli:          cli,
+			Cluster:      cluster,
+			Component:    component,
+			ComponentDef: &componentDef,
+			Dag:          dag,
+		},
+	}
+	replication.ConcreteComponent = replication
+	return replication, nil
 }

@@ -93,8 +93,9 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				SetReplicas(1).
 				GetObject()
 
+			// TODO(refactor)
 			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName), nil)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
@@ -105,9 +106,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			Expect(err).Should(Succeed())
 			Expect(synchronizer).ShouldNot(BeNil())
 
-			hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+			hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 			Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-			Expect(hasFailedPod).Should(BeFalse())
 
 			podsAreReady := false
 			Expect(synchronizer.updateComponentsPhase(ctx, false, &podsAreReady, hasFailedAndTimeoutPod)).Should(Succeed())
@@ -146,9 +146,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+				hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimeoutPod).Should(BeTrue())
-				Expect(hasFailedPod).Should(BeTrue())
 
 				isPodReady, err := component.PodsReady(ctx, deployment)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -171,9 +170,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+				hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-				Expect(hasFailedPod).Should(BeFalse())
 
 				isPodReady, err := component.PodsReady(ctx, deployment)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -206,8 +204,9 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				SetReplicas(int32(3)).
 				GetObject()
 
+			// TODO(refactor)
 			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName), nil)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
@@ -218,9 +217,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			Expect(err).Should(Succeed())
 			Expect(synchronizer).ShouldNot(BeNil())
 
-			hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+			hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 			Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-			Expect(hasFailedPod).Should(BeFalse())
 
 			podsAreReady := false
 			Expect(synchronizer.updateComponentsPhase(ctx, false, &podsAreReady, hasFailedAndTimeoutPod)).Should(Succeed())
@@ -270,11 +268,10 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+				hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimeoutPod).Should(BeTrue())
 				// two pod failed message
 				Expect(len(cluster.Status.Components[compName].Message)).Should(Equal(2))
-				Expect(hasFailedPod).Should(BeTrue())
 
 				isPodReady, err := component.PodsReady(ctx, statefulset)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -297,9 +294,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+				hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-				Expect(hasFailedPod).Should(BeFalse())
 
 				isPodReady, err := component.PodsReady(ctx, statefulset)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -332,8 +328,9 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				SetReplicas(int32(3)).
 				Create(&testCtx).GetObject()
 
+			// TODO(refactor)
 			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName), nil)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
@@ -344,9 +341,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			Expect(err).Should(Succeed())
 			Expect(synchronizer).ShouldNot(BeNil())
 
-			hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+			hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 			Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-			Expect(hasFailedPod).Should(BeFalse())
 
 			podsAreReady := false
 			Expect(synchronizer.updateComponentsPhase(ctx, false, &podsAreReady, hasFailedAndTimeoutPod)).Should(Succeed())
@@ -394,9 +390,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+				hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimeoutPod).Should(BeTrue())
-				Expect(hasFailedPod).Should(BeTrue())
 
 				isPodReady, err := component.PodsReady(ctx, statefulset)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -423,9 +418,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+				hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-				Expect(hasFailedPod).Should(BeFalse())
 
 				isPodReady, err := component.PodsReady(ctx, statefulset)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -458,8 +452,9 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				SetReplicas(2).
 				GetObject()
 
+			// TODO(refactor)
 			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName), nil)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
@@ -470,9 +465,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			Expect(err).Should(Succeed())
 			Expect(synchronizer).ShouldNot(BeNil())
 
-			hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+			hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 			Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-			Expect(hasFailedPod).Should(BeFalse())
 
 			podsAreReady := false
 			Expect(synchronizer.updateComponentsPhase(ctx, false, &podsAreReady, hasFailedAndTimeoutPod)).Should(Succeed())
@@ -523,9 +517,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+				hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimeoutPod).Should(BeTrue())
-				Expect(hasFailedPod).Should(BeTrue())
 
 				isPodReady, err := component.PodsReady(ctx, statefulset)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -548,9 +541,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
+				hasFailedAndTimeoutPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-				Expect(hasFailedPod).Should(BeFalse())
 
 				isPodReady, err := component.PodsReady(ctx, statefulset)
 				Expect(err).ShouldNot(HaveOccurred())

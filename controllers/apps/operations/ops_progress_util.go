@@ -200,8 +200,9 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 		return 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of deployment to be synchronized")
 	}
 
+	// TODO(refactor)
 	currComponent, err := stateless.NewStateless(cli, opsRes.Cluster,
-		pgRes.clusterComponent, *pgRes.clusterComponentDef)
+		pgRes.clusterComponent, *pgRes.clusterComponentDef, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -246,8 +247,9 @@ func handleStatefulSetProgress(reqCtx intctrlutil.RequestCtx,
 	podList *corev1.PodList,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
+	// TODO(refactor)
 	currComponent, err := components.NewComponentByType(cli,
-		opsRes.Cluster, pgRes.clusterComponent, *pgRes.clusterComponentDef)
+		opsRes.Cluster, pgRes.clusterComponent, *pgRes.clusterComponentDef, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -450,8 +452,9 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 	podList *corev1.PodList,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
 	var componentName = pgRes.clusterComponent.Name
+	// TODO(refactor)
 	currComponent, err := components.NewComponentByType(cli,
-		opsRes.Cluster, pgRes.clusterComponent, *pgRes.clusterComponentDef)
+		opsRes.Cluster, pgRes.clusterComponent, *pgRes.clusterComponentDef, nil)
 	if err != nil {
 		return 0, err
 	}

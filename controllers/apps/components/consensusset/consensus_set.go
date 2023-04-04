@@ -28,16 +28,13 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type ConsensusSet struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
+	types.ComponentBase
 }
 
 var _ types.Component = &ConsensusSet{}
@@ -95,7 +92,7 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 	if compStatus.PodsReadyTime == nil {
 		return true, nil
 	}
-	if !util.IsProbeTimeout(r.componentDef, compStatus.PodsReadyTime) {
+	if !util.IsProbeTimeout(r.ComponentDef, compStatus.PodsReadyTime) {
 		return true, nil
 	}
 
@@ -111,7 +108,7 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, pod := range podList.Items {
 		role := pod.Labels[constant.RoleLabelKey]
-		if role == r.componentDef.ConsensusSpec.Leader.Name {
+		if role == r.ComponentDef.ConsensusSpec.Leader.Name {
 			isFailed = false
 		}
 		if role == "" {
@@ -137,7 +134,34 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 		recorder.Eventf(cluster, corev1.EventTypeWarning, types.RoleProbeTimeoutReason, "pod role detection timed out in Component: "+r.Component.Name)
 	}
 	// when component status changed, mark OpsRequest to reconcile.
-	return false, opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Cli, cluster)
+	//return false, opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Cli, cluster)
+	return false, nil // TODO(refactor)
+}
+
+func (r *ConsensusSet) handleProbeTimeoutWhenPodsReady2(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
+	var (
+		isAbnormal bool
+		isFailed   = true
+	)
+	for _, pod := range pods {
+		role := pod.Labels[constant.RoleLabelKey]
+		if role == r.ComponentDef.ConsensusSpec.Leader.Name {
+			isFailed = false
+		}
+		if role == "" {
+			isAbnormal = true
+			status.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
+		}
+		// TODO clear up the message of ready pod in component.message.
+	}
+	if isFailed {
+		status.Phase = appsv1alpha1.FailedClusterCompPhase
+	} else if isAbnormal {
+		status.Phase = appsv1alpha1.AbnormalClusterCompPhase
+	}
+	//if recorder != nil {
+	//	recorder.Eventf(r.Cluster, corev1.EventTypeWarning, types.RoleProbeTimeoutReason, "pod role detection timed out in Component: "+r.Component.Name)
+	//}
 }
 
 func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
@@ -158,7 +182,7 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 	var (
 		existLatestRevisionFailedPod bool
 		leaderIsReady                bool
-		consensusSpec                = r.componentDef.ConsensusSpec
+		consensusSpec                = r.ComponentDef.ConsensusSpec
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
@@ -178,63 +202,100 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), nil
 }
 
-func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) error {
-	if r == nil {
+//func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) error {
+//	if r == nil {
+//		return nil
+//	}
+//
+//	stsObj := util.ConvertToStatefulSet(obj)
+//	// get compDefName from stsObj.name
+//	compDefName := r.Cluster.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
+//
+//	// get component from ClusterDefinition by compDefName
+//	component, err := util.GetComponentDefByCluster(ctx, r.Cli, *r.Cluster, compDefName)
+//	if err != nil {
+//		return err
+//	}
+//
+//	if component == nil || component.WorkloadType != appsv1alpha1.Consensus {
+//		return nil
+//	}
+//	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
+//	if err != nil {
+//		return err
+//	}
+//
+//	// update cluster.status.component.consensusSetStatus based on all pods currently exist
+//	componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
+//
+//	// first, get the old status
+//	var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
+//	if v, ok := r.Cluster.Status.Components[componentName]; ok {
+//		oldConsensusSetStatus = v.ConsensusSetStatus
+//	}
+//	// create the initial status
+//	newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
+//		Leader: appsv1alpha1.ConsensusMemberStatus{
+//			Name:       "",
+//			Pod:        util.ComponentStatusDefaultPodName,
+//			AccessMode: appsv1alpha1.None,
+//		},
+//	}
+//	// then, calculate the new status
+//	setConsensusSetStatusRoles(newConsensusSetStatus, component, pods)
+//	// if status changed, do update
+//	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
+//		patch := client.MergeFrom((*r.Cluster).DeepCopy())
+//		if err = util.InitClusterComponentStatusIfNeed(r.Cluster, componentName, *component); err != nil {
+//			return err
+//		}
+//		componentStatus := r.Cluster.Status.Components[componentName]
+//		componentStatus.ConsensusSetStatus = newConsensusSetStatus
+//		r.Cluster.Status.SetComponentStatus(componentName, componentStatus)
+//		if err = r.Cli.Status().Patch(ctx, r.Cluster, patch); err != nil {
+//			return err
+//		}
+//		// add consensus role info to pod env
+//		if err := updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, component, componentName, pods); err != nil {
+//			return err
+//		}
+//	}
+//
+//	// prepare to do pods Deletion, that's the only thing we should do,
+//	// the statefulset reconciler will do the others.
+//	// to simplify the process, we do pods Deletion after statefulset reconcile done,
+//	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
+//	if stsObj.Generation != stsObj.Status.ObservedGeneration {
+//		return nil
+//	}
+//
+//	// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
+//	// only then, we have enough info about the previous pods before delete the current one
+//	if len(pods) != int(*stsObj.Spec.Replicas) {
+//		return nil
+//	}
+//
+//	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
+//
+//	// generate the pods Deletion plan
+//	plan := generateConsensusUpdatePlan(ctx, r.Cli, stsObj, pods, *component)
+//	// execute plan
+//	if _, err := plan.WalkOneStep(); err != nil {
+//		return err
+//	}
+//	return nil
+//}
+
+func (r *ConsensusSet) HandleRestart(ctx context.Context, obj client.Object) error {
+	componentDef := r.GetDefinition()
+	if componentDef == nil || componentDef.WorkloadType != appsv1alpha1.Consensus {
 		return nil
 	}
 
 	stsObj := util.ConvertToStatefulSet(obj)
-	// get compDefName from stsObj.name
-	compDefName := r.Cluster.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
-
-	// get component from ClusterDefinition by compDefName
-	component, err := util.GetComponentDefByCluster(ctx, r.Cli, *r.Cluster, compDefName)
-	if err != nil {
-		return err
-	}
-
-	if component == nil || component.WorkloadType != appsv1alpha1.Consensus {
-		return nil
-	}
 	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
 	if err != nil {
 		return err
-	}
-
-	// update cluster.status.component.consensusSetStatus based on all pods currently exist
-	componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
-
-	// first, get the old status
-	var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
-	if v, ok := r.Cluster.Status.Components[componentName]; ok {
-		oldConsensusSetStatus = v.ConsensusSetStatus
-	}
-	// create the initial status
-	newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
-		Leader: appsv1alpha1.ConsensusMemberStatus{
-			Name:       "",
-			Pod:        util.ComponentStatusDefaultPodName,
-			AccessMode: appsv1alpha1.None,
-		},
-	}
-	// then, calculate the new status
-	setConsensusSetStatusRoles(newConsensusSetStatus, component, pods)
-	// if status changed, do update
-	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
-		patch := client.MergeFrom((*r.Cluster).DeepCopy())
-		if err = util.InitClusterComponentStatusIfNeed(r.Cluster, componentName, component.WorkloadType); err != nil {
-			return err
-		}
-		componentStatus := r.Cluster.Status.Components[componentName]
-		componentStatus.ConsensusSetStatus = newConsensusSetStatus
-		r.Cluster.Status.SetComponentStatus(componentName, componentStatus)
-		if err = r.Cli.Status().Patch(ctx, r.Cluster, patch); err != nil {
-			return err
-		}
-		// add consensus role info to pod env
-		if err := updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, component, componentName, pods); err != nil {
-			return err
-		}
 	}
 
 	// prepare to do pods Deletion, that's the only thing we should do,
@@ -254,25 +315,84 @@ func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) erro
 	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
 
 	// generate the pods Deletion plan
-	plan := generateConsensusUpdatePlan(ctx, r.Cli, stsObj, pods, *component)
+	plan := generateRestartPodPlan(ctx, r.Cli, stsObj, pods, *componentDef, r.Dag)
 	// execute plan
 	if _, err := plan.WalkOneStep(); err != nil {
 		return err
 	}
 	return nil
 }
-func NewConsensusSet(
-	cli client.Client,
+
+func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) error {
+	componentDef := r.GetDefinition()
+	if componentDef == nil || componentDef.WorkloadType != appsv1alpha1.Consensus {
+		return nil
+	}
+
+	stsObj := util.ConvertToStatefulSet(obj)
+	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
+	if err != nil {
+		return err
+	}
+
+	// update cluster.status.component.consensusSetStatus based on all pods currently exist
+	componentName := r.GetName()
+
+	// first, get the old status
+	var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
+	if v, ok := r.Cluster.Status.Components[componentName]; ok {
+		oldConsensusSetStatus = v.ConsensusSetStatus
+	}
+	// create the initial status
+	newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
+		Leader: appsv1alpha1.ConsensusMemberStatus{
+			Name:       "",
+			Pod:        util.ComponentStatusDefaultPodName,
+			AccessMode: appsv1alpha1.None,
+		},
+	}
+	// then, calculate the new status
+	setConsensusSetStatusRoles(newConsensusSetStatus, componentDef, pods)
+	// if status changed, do update
+	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
+		if err = util.InitClusterComponentStatusIfNeed(r.Cluster, componentName, componentDef.WorkloadType); err != nil {
+			return err
+		}
+		componentStatus := r.Cluster.Status.Components[componentName]
+		componentStatus.ConsensusSetStatus = newConsensusSetStatus
+		r.Cluster.Status.SetComponentStatus(componentName, componentStatus)
+
+		// TODO: does the update order between cluster and env configmap matter?
+
+		// add consensus role info to pod env
+		if err := updateConsensusRoleInfo2(ctx, r.Cli, r.Cluster, componentDef, componentName, pods, r.Dag); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *ConsensusSet) GetLatestStatus(ctx context.Context, obj client.Object) (*appsv1alpha1.ClusterComponentStatus, error) {
+	return c.RebuildLatestStatus(ctx, obj, c.handleProbeTimeoutWhenPodsReady2)
+}
+
+func NewConsensusSet(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (*ConsensusSet, error) {
+	componentDef appsv1alpha1.ClusterComponentDefinition,
+	dag *graph.DAG) (*ConsensusSet, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
-	return &ConsensusSet{
-		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		componentDef: &componentDef,
-	}, nil
+	consensus := &ConsensusSet{
+		ComponentBase: types.ComponentBase{
+			Cli:          cli,
+			Cluster:      cluster,
+			Component:    component,
+			ComponentDef: &componentDef,
+			Dag:          dag,
+		},
+	}
+	consensus.ConcreteComponent = consensus
+	return consensus, nil
 }

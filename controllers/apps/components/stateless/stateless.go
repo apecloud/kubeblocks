@@ -25,7 +25,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -43,10 +43,7 @@ import (
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
 type Stateless struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
+	types.ComponentBase
 }
 
 var _ types.Component = &Stateless{}
@@ -76,12 +73,6 @@ func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int3
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
-// HandleProbeTimeoutWhenPodsReady the stateless component has no role detection, empty implementation here.
-func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(ctx context.Context,
-	recorder record.EventRecorder) (bool, error) {
-	return false, nil
-}
-
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
 func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
@@ -100,24 +91,25 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil
 }
 
-func (stateless *Stateless) HandleUpdate(ctx context.Context, obj client.Object) error {
-	return nil
-}
-
-func NewStateless(
-	cli client.Client,
+func NewStateless(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (*Stateless, error) {
+	componentDef appsv1alpha1.ClusterComponentDefinition,
+	dag *graph.DAG) (*Stateless, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
-	return &Stateless{
-		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		componentDef: &componentDef,
-	}, nil
+	stateless := &Stateless{
+		ComponentBase: types.ComponentBase{
+			Cli:          cli,
+			Cluster:      cluster,
+			Component:    component,
+			ComponentDef: &componentDef,
+			Dag:          dag,
+		},
+	}
+	stateless.ConcreteComponent = stateless
+	return stateless, nil
 }
 
 // deploymentIsReady check deployment is ready

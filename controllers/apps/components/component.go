@@ -17,7 +17,7 @@ limitations under the License.
 package components
 
 import (
-	"k8s.io/client-go/tools/record"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -27,58 +27,27 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// componentContext wrapper for handling component status procedure context parameters.
-type componentContext struct {
-	reqCtx        intctrlutil.RequestCtx
-	cli           client.Client
-	recorder      record.EventRecorder
-	component     types.Component
-	obj           client.Object
-	componentSpec *appsv1alpha1.ClusterComponentSpec
-}
-
 // NewComponentByType creates a component object.
-func NewComponentByType(
-	cli client.Client,
+func NewComponentByType(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition,
-) (types.Component, error) {
-	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
+	compSpec *appsv1alpha1.ClusterComponentSpec,
+	compDef appsv1alpha1.ClusterComponentDefinition,
+	dag *graph.DAG) (types.Component, error) {
+	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, compSpec); err != nil {
 		return nil, err
 	}
-	switch componentDef.WorkloadType {
+	switch compDef.WorkloadType {
 	case appsv1alpha1.Consensus:
-		return consensusset.NewConsensusSet(cli, cluster, component, componentDef)
+		return consensusset.NewConsensusSet(cli, cluster, compSpec, compDef, dag)
 	case appsv1alpha1.Replication:
-		return replicationset.NewReplicationSet(cli, cluster, component, componentDef)
+		return replicationset.NewReplicationSet(cli, cluster, compSpec, compDef, dag)
 	case appsv1alpha1.Stateful:
-		return stateful.NewStateful(cli, cluster, component, componentDef)
+		return stateful.NewStateful(cli, cluster, compSpec, compDef, dag)
 	case appsv1alpha1.Stateless:
-		return stateless.NewStateless(cli, cluster, component, componentDef)
+		return stateless.NewStateless(cli, cluster, compSpec, compDef, dag)
 	default:
 		panic("unknown workload type")
-	}
-}
-
-// newComponentContext creates a componentContext object.
-func newComponentContext(
-	reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	recorder record.EventRecorder,
-	component types.Component,
-	obj client.Object,
-	componentSpec *appsv1alpha1.ClusterComponentSpec) componentContext {
-
-	return componentContext{
-		reqCtx:        reqCtx,
-		cli:           cli,
-		recorder:      recorder,
-		component:     component,
-		obj:           obj,
-		componentSpec: componentSpec,
 	}
 }

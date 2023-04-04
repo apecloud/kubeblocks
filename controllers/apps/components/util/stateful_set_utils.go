@@ -70,17 +70,19 @@ func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts 
 	return revisionConsistent, nil
 }
 
-// DeleteStsPods deletes pods of the StatefulSet manually
-func DeleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
+// GetPods4Delete gets all pods for delete
+func GetPods4Delete(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) ([]*corev1.Pod, error) {
 	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
-		return nil
+		return nil, nil
 	}
 
 	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
 	if err != nil {
-		return err
+		return nil, nil
 	}
-	for _, pod := range pods {
+
+	podList := make([]*corev1.Pod, 0)
+	for i, pod := range pods {
 		// do nothing if the pod is terminating
 		if pod.DeletionTimestamp != nil {
 			continue
@@ -89,8 +91,21 @@ func DeleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulS
 		if intctrlutil.GetPodRevision(&pod) == sts.Status.UpdateRevision {
 			continue
 		}
+
+		podList = append(podList, &pods[i])
+	}
+	return podList, nil
+}
+
+// DeleteStsPods deletes pods of the StatefulSet manually
+func DeleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
+	pods, err := GetPods4Delete(ctx, cli, sts)
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods {
 		// delete the pod to trigger associate StatefulSet to re-create it
-		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
+		if err := cli.Delete(ctx, pod); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}

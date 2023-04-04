@@ -18,14 +18,14 @@ package components
 
 import (
 	"context"
+	"github.com/go-logr/logr"
+	"k8s.io/client-go/tools/record"
 	"reflect"
 	"time"
 
-	"github.com/go-logr/logr"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -81,11 +81,11 @@ func (cs *ComponentStatusSynchronizer) Update(ctx context.Context, obj client.Ob
 	if component == nil {
 		return false, nil
 	}
-	// handle the components changes
-	err := component.HandleUpdate(ctx, obj)
-	if err != nil {
-		return false, nil
-	}
+	//// handle the components changes
+	//err := component.HandleUpdate(ctx, obj)
+	//if err != nil {
+	//	return false, nil
+	//}
 
 	isRunning, err := component.IsRunning(ctx, obj)
 	if err != nil {
@@ -106,19 +106,14 @@ func (cs *ComponentStatusSynchronizer) Update(ctx context.Context, obj client.Ob
 	clusterDeepCopy := cluster.DeepCopy()
 	if !isRunning {
 		if podsReady != nil && *podsReady {
-			// check if the role probe timed out when component phase is not Running but all pods of component are ready.
-			if requeueWhenPodsReady, err := component.HandleProbeTimeoutWhenPodsReady(ctx, recorder); err != nil {
-				return false, err
-			} else if requeueWhenPodsReady {
-				wait = true
-			}
+			//// check if the role probe timed out when component phase is not Running but all pods of component are ready.
+			//if requeueWhenPodsReady, err := component.HandleProbeTimeoutWhenPodsReady(ctx, recorder); err != nil {
+			//	return false, err
+			//} else if requeueWhenPodsReady {
+			//	wait = true
+			//}
 		} else {
-			// check whether there is a failed pod of component that has timed out
-			var hasFailedPod bool
-			hasFailedAndTimedOutPod, hasFailedPod = cs.hasFailedAndTimedOutPod()
-			if !hasFailedAndTimedOutPod && hasFailedPod {
-				wait = true
-			}
+			wait = cs.hasFailedAndTimedOutPod()
 		}
 	}
 
@@ -144,7 +139,7 @@ func (cs *ComponentStatusSynchronizer) Update(ctx context.Context, obj client.Ob
 
 // hasFailedAndTimedOutPod returns whether the pod of components is still failed after a PodFailedTimeout period.
 // if return ture, component phase will be set to Failed/Abnormal.
-func (cs *ComponentStatusSynchronizer) hasFailedAndTimedOutPod() (hasFailedAndTimedoutPod bool, hasFailedPod bool) {
+func (cs *ComponentStatusSynchronizer) hasFailedAndTimedOutPod() (hasFailedAndTimedoutPod bool) {
 	// init a new ComponentMessageMap to store the message of failed pods
 	message := appsv1alpha1.ComponentMessageMap{}
 	for _, pod := range cs.podList.Items {
@@ -152,8 +147,6 @@ func (cs *ComponentStatusSynchronizer) hasFailedAndTimedOutPod() (hasFailedAndTi
 		if !isFailed {
 			continue
 		}
-		hasFailedPod = true
-
 		if isTimedOut {
 			hasFailedAndTimedoutPod = true
 			message.SetObjectMessage(pod.Kind, pod.Name, messageStr)

@@ -19,6 +19,7 @@ package components
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -33,8 +34,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -86,16 +87,15 @@ func (r *componentWorkloadReconciler[T, PT, S, PS]) Reconcile(ctx context.Contex
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	handler := func(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
-		compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, pObj, compSpec)
-
+	handler := func(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec,
+		compDef *appsv1alpha1.ClusterComponentDefinition) (ctrl.Result, error) {
 		// patch the current componentSpec workload's custom labels
 		if err := patchWorkloadCustomLabel(reqCtx.Ctx, r.Client, cluster, compSpec); err != nil {
 			reqCtx.Recorder.Event(cluster, corev1.EventTypeWarning, "Component Workload Controller PatchWorkloadCustomLabelFailed", err.Error())
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 
-		if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
+		if requeueAfter, err := handleWorkloadUpdate(reqCtx.Ctx, r.Client, pObj, cluster, compSpec, compDef); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		} else if requeueAfter != 0 {
 			// if the reconcileAction need requeue, do it
@@ -119,35 +119,77 @@ func (r *componentWorkloadReconciler[T, PT, S, PS]) SetupWithManager(mgr ctrl.Ma
 		Complete(r)
 }
 
-// updateComponentStatusInClusterStatus updates cluster.Status.Components if the component status changed
-func updateComponentStatusInClusterStatus(compCtx componentContext,
-	cluster *appsv1alpha1.Cluster) (time.Duration, error) {
-	componentStatusSynchronizer, err := newClusterStatusSynchronizer(compCtx.reqCtx.Ctx, compCtx.cli, cluster,
-		compCtx.componentSpec, compCtx.component)
+// handleWorkloadUpdate updates cluster.Status.Components if the component status changed
+func handleWorkloadUpdate(ctx context.Context, cli client.Client, obj client.Object, cluster *appsv1alpha1.Cluster,
+	compSpec *appsv1alpha1.ClusterComponentSpec, compDef *appsv1alpha1.ClusterComponentDefinition) (time.Duration, error) {
+	// make a copy of cluster before any operations
+	clusterDeepCopy := cluster.DeepCopy()
+
+	dag := graph.NewDAG()
+	component, err := NewComponentByType(cli, cluster, compSpec, *compDef, dag)
 	if err != nil {
 		return 0, err
 	}
-	if componentStatusSynchronizer == nil {
+
+	// patch role labels and update roles in cluster status
+	if err := component.HandleRoleChange(ctx, obj); err != nil {
 		return 0, nil
 	}
 
-	wait, err := componentStatusSynchronizer.Update(compCtx.reqCtx.Ctx, compCtx.obj, &compCtx.reqCtx.Log,
-		compCtx.recorder)
+	if err := component.HandleRestart(ctx, obj); err != nil {
+		return 0, nil
+	}
+
+	// update component status
+	// TODO: wait & requeue
+	newStatus, err := component.GetLatestStatus(ctx, obj)
 	if err != nil {
+		return 0, err
+	} else if newStatus != nil {
+		status := cluster.Status.Components[component.GetName()]
+		status.Phase = newStatus.Phase
+		status.Message = newStatus.Message
+		status.PodsReady = newStatus.PodsReady
+		status.PodsReadyTime = newStatus.PodsReadyTime
+		cluster.Status.Components[component.GetName()] = status
+	}
+
+	// TODO(refactor)
+	//if err = opsutil.MarkRunningOpsRequestAnnotation2(ctx, cli, cluster, dag); err != nil {
+	//	return 0, err
+	//}
+
+	var rootVertex *types.ComponentVertex
+
+	newCompStatus := cluster.Status.Components[component.GetName()]
+	oldCompStatus := clusterDeepCopy.Status.Components[component.GetName()]
+	if !reflect.DeepEqual(cluster.Annotations, clusterDeepCopy.Annotations) {
+		rootVertex = types.AddVertex4Update(dag, cluster)
+	} else if !reflect.DeepEqual(oldCompStatus, newCompStatus) {
+		rootVertex = types.AddVertex4Status(dag, cluster, clusterDeepCopy)
+	} else {
+		rootVertex = types.AddVertex4Noop(dag, cluster) // as a placeholder to pass the dag validation
+	}
+
+	for _, v := range dag.Vertices() {
+		vv, _ := v.(*types.ComponentVertex)
+		if _, ok := vv.Obj.(*appsv1alpha1.Cluster); !ok {
+			dag.Connect(rootVertex, v)
+		}
+	}
+
+	if err := dag.WalkReverseTopoOrder(types.ExecuteComponentVertex); err != nil {
 		return 0, err
 	}
 
-	var requeueAfter time.Duration
-	if wait {
-		requeueAfter = time.Minute
-	}
-	return requeueAfter, opsutil.MarkRunningOpsRequestAnnotation(compCtx.reqCtx.Ctx, compCtx.cli, cluster)
+	// TODO: wait
+	return 0, nil
 }
 
 func workloadCompClusterReconcile(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	operand client.Object,
-	processor func(*appsv1alpha1.Cluster, *appsv1alpha1.ClusterComponentSpec, types.Component) (ctrl.Result, error)) (ctrl.Result, error) {
+	processor func(*appsv1alpha1.Cluster, *appsv1alpha1.ClusterComponentSpec, *appsv1alpha1.ClusterComponentDefinition) (ctrl.Result, error)) (ctrl.Result, error) {
 	var err error
 	var cluster *appsv1alpha1.Cluster
 
@@ -162,19 +204,14 @@ func workloadCompClusterReconcile(reqCtx intctrlutil.RequestCtx,
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	// create a component object
 	componentName := operand.GetLabels()[constant.KBAppComponentLabelKey]
 	componentSpec := cluster.GetComponentByName(componentName)
 	if componentSpec == nil {
 		return intctrlutil.Reconciled()
 	}
 	componentDef := clusterDef.GetComponentDefByName(componentSpec.ComponentDefRef)
-	component, err := NewComponentByType(cli, cluster, componentSpec, *componentDef)
-	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
 
-	return processor(cluster, componentSpec, component)
+	return processor(cluster, componentSpec, componentDef)
 }
 
 // patchWorkloadCustomLabel patches workload custom labels.

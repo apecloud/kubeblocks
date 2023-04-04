@@ -28,8 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -81,9 +83,7 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
 // generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
 func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
 	component appsv1alpha1.ClusterComponentDefinition) *util.Plan {
-	plan := &util.Plan{}
-	plan.Start = &util.Step{}
-	plan.WalkFunc = func(obj interface{}) (bool, error) {
+	restartPod := func(obj interface{}) (bool, error) {
 		pod, ok := obj.(corev1.Pod)
 		if !ok {
 			return false, errors.New("wrong type: obj not Pod")
@@ -107,6 +107,43 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 
 		return true, nil
 	}
+	return generateConsensusUpdatePlanLow(ctx, cli, stsObj, pods, component, restartPod)
+}
+
+// generateRestartPodPlan generates update plan to restart pods based on UpdateStrategy
+func generateRestartPodPlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
+	component appsv1alpha1.ClusterComponentDefinition, dag *graph.DAG) *util.Plan {
+	restartPod := func(obj interface{}) (bool, error) {
+		pod, ok := obj.(corev1.Pod)
+		if !ok {
+			return false, errors.New("wrong type: obj not Pod")
+		}
+
+		// if DeletionTimestamp is not nil, it is terminating.
+		if pod.DeletionTimestamp != nil {
+			return true, nil
+		}
+
+		// if pod is the latest version, we do nothing
+		if intctrlutil.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
+			// wait until ready
+			return !intctrlutil.PodIsReadyWithLabel(pod), nil
+		}
+
+		// delete the pod to trigger associate StatefulSet to re-create it
+		types.AddVertex4Delete(dag, &pod)
+
+		return true, nil
+	}
+	return generateConsensusUpdatePlanLow(ctx, cli, stsObj, pods, component, restartPod)
+}
+
+// generateConsensusUpdatePlanLow generates Update plan based on UpdateStrategy
+func generateConsensusUpdatePlanLow(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
+	component appsv1alpha1.ClusterComponentDefinition, restartPod func(obj any) (bool, error)) *util.Plan {
+	plan := &util.Plan{}
+	plan.Start = &util.Step{}
+	plan.WalkFunc = restartPod
 
 	rolePriorityMap := ComposeRolePriorityMap(component)
 	SortPods(pods, rolePriorityMap)
@@ -454,6 +491,58 @@ func updateConsensusRoleInfo(ctx context.Context,
 		if err := cli.Patch(ctx, &pod, patch); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func updateConsensusRoleInfo2(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	componentDef *appsv1alpha1.ClusterComponentDefinition,
+	componentName string,
+	pods []corev1.Pod,
+	dag *graph.DAG) error {
+	leader := ""
+	followers := ""
+	for _, pod := range pods {
+		role := pod.Labels[constant.RoleLabelKey]
+		// mapping role label to consensus member
+		roleMap := composeConsensusRoleMap(componentDef)
+		memberExt, ok := roleMap[role]
+		if !ok {
+			continue
+		}
+		switch memberExt.consensusRole {
+		case roleLeader:
+			leader = pod.Name
+		case roleFollower:
+			if len(followers) > 0 {
+				followers += ","
+			}
+			followers += pod.Name
+		case roleLearner:
+			// TODO: CT
+		}
+	}
+
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.GetName(),
+		constant.KBAppComponentLabelKey: componentName,
+		constant.AppConfigTypeLabelKey:  "kubeblocks-env",
+	}
+
+	configList := &corev1.ConfigMapList{}
+	if err := cli.List(ctx, configList, ml); err != nil {
+		return err
+	}
+
+	for idx := range configList.Items {
+		config := configList.Items[idx]
+		configDeepCopy := config.DeepCopy()
+		config.Data["KB_"+strings.ToUpper(componentName)+"_LEADER"] = leader
+		config.Data["KB_"+strings.ToUpper(componentName)+"_FOLLOWERS"] = followers
+		types.AddVertex4Patch(dag, &config, configDeepCopy)
 	}
 
 	return nil

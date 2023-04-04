@@ -251,24 +251,20 @@ func SyncReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
 }
 
 // syncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
-func syncReplicationSetClusterStatus(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	podList []*corev1.Pod) error {
+func syncReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
+	compDef *appsv1alpha1.ClusterComponentDefinition, compName string, podList []*corev1.Pod) error {
 	if len(podList) == 0 {
 		return nil
 	}
 
-	componentName, componentDef, err := util.GetComponentInfoByPod(ctx, cli, *cluster, podList[0])
-	if err != nil {
-		return err
+	replicationStatus := cluster.Status.Components[compName].ReplicationSetStatus
+	if replicationStatus == nil {
+		if err := util.InitClusterComponentStatusIfNeed(cluster, compName, compDef.WorkloadType); err != nil {
+			return err
+		}
+		replicationStatus = cluster.Status.Components[compName].ReplicationSetStatus
 	}
-	if componentDef == nil || componentDef.WorkloadType != appsv1alpha1.Replication {
-		return nil
-	}
-
-	// update cluster status
-	return SyncReplicationSetClusterStatus(cluster, componentName, podList)
+	return syncReplicationSetStatus(replicationStatus, podList)
 }
 
 // syncReplicationSetStatus syncs the target pod info in cluster.status.components.

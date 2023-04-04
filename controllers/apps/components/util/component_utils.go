@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -95,6 +96,33 @@ func GetComponentMatchLabels(clusterName, componentName string) map[string]strin
 		constant.KBAppComponentLabelKey: componentName,
 		constant.AppManagedByLabelKey:   constant.AppName,
 	}
+}
+
+func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
+	ctx context.Context, cli client.Client, _ func(T, L), namespace string, labels client.MatchingLabels) ([]PT, error) {
+	var objList L
+	if err := cli.List(ctx, PL(&objList), labels, client.InNamespace(namespace)); err != nil {
+		return nil, err
+	}
+
+	objs := make([]PT, 0)
+	items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
+	for i := range items {
+		objs = append(objs, &items[i])
+	}
+	return objs, nil
+}
+
+func ListStsOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.StatefulSet, error) {
+	return listObjWithLabelsInNamespace(ctx, cli, generics.StatefulSetSignature, namespace, labels)
+}
+
+func ListDeployOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.Deployment, error) {
+	return listObjWithLabelsInNamespace(ctx, cli, generics.DeploymentSignature, namespace, labels)
+}
+
+func ListPodOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
+	return listObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
 }
 
 // GetComponentPodList gets the pod list by cluster and componentName

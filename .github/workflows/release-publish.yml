@@ -67,7 +67,7 @@ jobs:
       id: get_release
       uses: bruceadams/get-release@v1.3.2
 
-    - name: Set CLI_BINARY and add BINARY_EXT if necessary
+    - name: Set CLI_BINARY
       id: set_binary
       run: |
         if [[ "${{ matrix.os }}" == *"windows"* ]]; then

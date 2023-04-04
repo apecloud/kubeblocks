@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/StudioSol/set"
 	"github.com/go-logr/logr"
@@ -37,17 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
-)
-
-const (
-	ConfigReconcileInterval = time.Second * 1
-
-	ReconfigureFirstConfigType = "created"
-	ReconfigureNoChangeType    = "noChange"
-	ReconfigureAutoReloadType  = string(appsv1alpha1.AutoReload)
-	ReconfigureSimpleType      = string(appsv1alpha1.NormalPolicy)
-	ReconfigureParallelType    = string(appsv1alpha1.RestartPolicy)
-	ReconfigureRollingType     = string(appsv1alpha1.RollingPolicy)
 )
 
 type ValidateConfigMap func(configTpl, ns string) (*corev1.ConfigMap, error)

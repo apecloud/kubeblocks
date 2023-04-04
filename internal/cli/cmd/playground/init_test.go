@@ -48,7 +48,7 @@ var _ = Describe("playground", func() {
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).Should(HaveOccurred())
-		Expect(o.installKubeBlocks()).Should(HaveOccurred())
+		Expect(o.installKubeBlocks("test")).Should(HaveOccurred())
 		Expect(o.createCluster()).Should(HaveOccurred())
 	})
 

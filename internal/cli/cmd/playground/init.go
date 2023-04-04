@@ -158,7 +158,7 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 	o.helmCfg = helm.NewConfig("", configPath, "", o.verbose)
 
 	// Install KubeBlocks
-	if err = o.installKubeBlocks(); err != nil {
+	if err = o.installKubeBlocks(k8sClusterName); err != nil {
 		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
 
@@ -266,7 +266,7 @@ func printGuide() {
 	fmt.Fprintf(os.Stdout, guideStr, kbClusterName)
 }
 
-func (o *initOptions) installKubeBlocks() error {
+func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 	f := util.NewFactory()
 	client, err := f.KubernetesClientSet()
 	if err != nil {
@@ -294,6 +294,12 @@ func (o *initOptions) installKubeBlocks() error {
 			"snapshot-controller.enabled=true", "csi-hostpath-driver.enabled=true",
 			"prometheus.server.persistentVolume.enabled=false", "prometheus.server.statefulSet.enabled=false",
 			"prometheus.alertmanager.persistentVolume.enabled=false", "prometheus.alertmanager.statefulSet.enabled=false")
+	} else if o.cloudProvider == cp.AWS {
+		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
+			// enable aws loadbalancer controller addon automatically on playground
+			"aws-loadbalancer-controller.enabled=true",
+			fmt.Sprintf("aws-loadbalancer-controller.clusterName=%s", k8sClusterName),
+		)
 	}
 	return insOpts.Install()
 }

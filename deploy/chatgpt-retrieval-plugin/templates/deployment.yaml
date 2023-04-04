@@ -33,6 +33,13 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            - mountPath: /code/.well-known/ai-plugin.json
+              name: config
+              subPath: ai-plugin.json
+            - mountPath: /code/.well-known/openapi.yaml
+              name: config
+              subPath: openapi.yaml
           ports:
             - name: http
               containerPort: 8080
@@ -134,3 +141,13 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
+      volumes:
+        - name: config
+          configMap:
+            name: gptplugin-config
+            items:
+              - key: ai-plugin.json
+                path: ai-plugin.json
+              - key: openapi.yaml
+                path: openapi.yaml

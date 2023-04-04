@@ -240,7 +240,13 @@ func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.
 			c.Cluster.Name, c.CompSpec.Name)
 	}
 
-	return c.validateObjectsAction()
+	if err := c.validateObjectsAction(); err != nil {
+		return err
+	}
+
+	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
+
+	return nil
 }
 
 func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -421,7 +427,6 @@ func (c *replicationComponent) updateWorkload(stsObj *appsv1.StatefulSet, idx in
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
 		c.workloadVertexs[idx].obj = stsObjCopy
 		c.workloadVertexs[idx].action = actionPtr(UPDATE)
-		// sync component phase
-		//updateComponentPhaseWithOperation2(c.GetCluster(), c.GetName())
+		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase)
 	}
 }

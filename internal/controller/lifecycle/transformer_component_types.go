@@ -52,6 +52,9 @@ type Component interface {
 	GetCluster() *appsv1alpha1.Cluster
 	GetSynthesizedComponent() *component.SynthesizedComponent
 
+	// SetStatusPhase handles the component status phase transition.
+	SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase)
+
 	// GetPhase() appsv1alpha1.ClusterComponentPhase
 	// GetStatus() appsv1alpha1.ClusterComponentStatus
 
@@ -164,13 +167,23 @@ func (c *componentBase) GetSynthesizedComponent() *component.SynthesizedComponen
 	return c.Component
 }
 
-// func (c *componentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {
-//	return c.GetStatus().Phase // TODO: impl
-// }
-//
-// func (c *componentBase) GetStatus() appsv1alpha1.ClusterComponentStatus {
-//	return appsv1alpha1.ClusterComponentStatus{} // TODO: impl
-// }
+func (c *componentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase) {
+	if c.Cluster.Status.Components == nil {
+		c.Cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
+	}
+
+	status, ok := c.Cluster.Status.Components[c.GetName()]
+	if ok && status.Phase == phase {
+		return
+	}
+	// TODO(refactor): define the status phase transition diagram
+	if phase == appsv1alpha1.SpecReconcilingClusterCompPhase && status.Phase != appsv1alpha1.RunningClusterCompPhase {
+		return
+	}
+
+	status.Phase = phase
+	c.Cluster.Status.Components[c.GetName()] = status
+}
 
 func (c *componentBase) GetMatchingLabels() client.MatchingLabels {
 	return client.MatchingLabels{
@@ -212,6 +225,10 @@ func (c *componentBase) deleteResource(obj client.Object, parent *lifecycleVerte
 
 func (c *componentBase) updateResource(obj client.Object, parent *lifecycleVertex) *lifecycleVertex {
 	return c.addResource(obj, actionPtr(UPDATE), parent)
+}
+
+func (c *componentBase) noopResource(obj client.Object, parent *lifecycleVertex) *lifecycleVertex {
+	return c.addResource(obj, actionPtr(NOOP), parent)
 }
 
 // validateObjectsAction validates the action of all objects in dag has been determined
@@ -574,7 +591,7 @@ func (c *statefulsetComponentBase) updateUnderlyingResources(reqCtx intctrlutil.
 		return err
 	}
 
-	// TODO(refactor): to workaround that the scaled PVC will be deleted at object action
+	// to work around that the scaled PVC will be deleted at object action.
 	if err := c.updatePVC(reqCtx, cli, stsObj); err != nil {
 		return err
 	}
@@ -595,12 +612,12 @@ func (c *statefulsetComponentBase) updateWorkload(stsObj *appsv1.StatefulSet, id
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
 		c.workloadVertexs[idx].obj = stsObjCopy
 		c.workloadVertexs[idx].action = actionPtr(UPDATE)
-		// sync component phase
-		//updateComponentPhaseWithOperation2(c.GetCluster(), c.GetName())
+		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase)
 	}
 }
 
 func (c *statefulsetComponentBase) updatePVC(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+	// PVCs which have been added to the dag because of volume expansion.
 	pvcNameSet := sets.New[string]()
 	for _, v := range findAll[*corev1.PersistentVolumeClaim](c.dag) {
 		pvcNameSet.Insert(v.(*lifecycleVertex).obj.GetName())
@@ -624,7 +641,7 @@ func (c *statefulsetComponentBase) updatePVC(reqCtx intctrlutil.RequestCtx, cli 
 				}
 				return err
 			}
-			c.updateResource(pvc, c.workloadVertexs[0]).immutable = true
+			c.noopResource(pvc, c.workloadVertexs[0])
 		}
 	}
 	return nil

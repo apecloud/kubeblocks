@@ -137,7 +137,13 @@ func (c *statefulComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cli
 			c.GetClusterName(), c.GetName())
 	}
 
-	return c.validateObjectsAction()
+	if err := c.validateObjectsAction(); err != nil {
+		return err
+	}
+
+	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
+
+	return nil
 }
 
 func (c *statefulComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {

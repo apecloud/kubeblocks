@@ -149,18 +149,6 @@ func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
 	//	slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
 }
 
-// updateComponentPhaseWithOperation if workload of component changes, should update the component phase.
-func updateComponentPhaseWithOperation(cluster *appsv1alpha1.Cluster, componentName string) {
-	componentPhase := appsv1alpha1.SpecReconcilingClusterCompPhase
-	if cluster.Status.Phase == appsv1alpha1.CreatingClusterPhase {
-		componentPhase = appsv1alpha1.CreatingClusterCompPhase
-	}
-	compStatus := cluster.Status.Components[componentName]
-	// synchronous component phase is consistent with cluster phase
-	compStatus.Phase = componentPhase
-	cluster.Status.SetComponentStatus(componentName, compStatus)
-}
-
 // getClusterBackupSourceMap gets the backup source map from cluster.annotations
 func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string, error) {
 	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]

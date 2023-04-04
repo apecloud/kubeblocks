@@ -84,20 +84,6 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
 
-	updateComponentPhase := func() {
-		vertices := findAllNot[*appsv1alpha1.Cluster](dag)
-		for _, vertex := range vertices {
-			v, _ := vertex.(*lifecycleVertex)
-			if v.immutable || v.action == nil || *v.action != CREATE {
-				continue
-			}
-			switch v.obj.(type) {
-			case *appsv1.StatefulSet, *appsv1.Deployment:
-				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
-			}
-		}
-	}
-
 	switch {
 	case isClusterDeleting(*origCluster):
 		// if cluster is deleting, set root(cluster) vertex.action to DELETE
@@ -105,14 +91,16 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		// TODO(refactor): move from object action, check it again
 		for _, vertex := range dag.Vertices() {
 			v, _ := vertex.(*lifecycleVertex)
-			v.action = actionPtr(DELETE)
+			if *v.action == CREATE {
+				v.action = actionPtr(NOOP)
+			} else {
+				v.action = actionPtr(DELETE)
+			}
 		}
 		// TODO(refactor): delete orphan resources which are not in dag?
 	case isClusterUpdating(*origCluster):
 		c.ctx.Log.Info("update cluster status after applying resources ")
 		defer func() {
-			// update components' phase in cluster.status
-			updateComponentPhase()
 			rootVertex.action = actionPtr(STATUS)
 			rootVertex.immutable = reflect.DeepEqual(cluster.Status, origCluster.Status)
 		}()
@@ -218,7 +206,7 @@ func (c *clusterStatusTransformer) doAnalysisAndUpdateSynchronizer(cluster *apps
 		switch v.Phase {
 		case appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.FailedClusterCompPhase:
 			c.existsAbnormalOrFailed, c.notReadyCompNames[k] = true, struct{}{}
-		case appsv1alpha1.RunningClusterCompPhase:
+		case appsv1alpha1.RunningClusterCompPhase, appsv1alpha1.SpecReconcilingClusterCompPhase:
 			runningCompCount += 1
 		case appsv1alpha1.StoppedClusterCompPhase:
 			stoppedCompCount += 1

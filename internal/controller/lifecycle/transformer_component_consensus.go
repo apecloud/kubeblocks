@@ -166,7 +166,13 @@ func (c *consensusComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 			c.Cluster.Name, c.CompSpec.Name)
 	}
 
-	return c.validateObjectsAction()
+	if err := c.validateObjectsAction(); err != nil {
+		return err
+	}
+
+	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
+
+	return nil
 }
 
 func (c *consensusComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {

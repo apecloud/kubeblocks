@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -346,18 +345,6 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 }
 
 func (c *clusterPlanBuilder) reconcileObject(node *lifecycleVertex) error {
-	updateComponentPhaseIfNeeded := func(orig, curr client.Object) {
-		switch orig.(type) {
-		case *appsv1.StatefulSet, *appsv1.Deployment:
-			componentName := orig.GetLabels()[constant.KBAppComponentLabelKey]
-			origSpec := reflect.ValueOf(orig).Elem().FieldByName("Spec").Interface()
-			newSpec := reflect.ValueOf(curr).Elem().FieldByName("Spec").Interface()
-			if !reflect.DeepEqual(origSpec, newSpec) {
-				// sync component phase
-				updateComponentPhaseWithOperation(c.cluster, componentName)
-			}
-		}
-	}
 	switch *node.action {
 	case CREATE:
 		err := c.cli.Create(c.ctx.Ctx, node.obj)
@@ -372,8 +359,6 @@ func (c *clusterPlanBuilder) reconcileObject(node *lifecycleVertex) error {
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
-		// TODO: find a better comparison way that knows whether fields are updated before calling the Update func
-		updateComponentPhaseIfNeeded(node.oriObj, node.obj)
 	case DELETE:
 		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
 			err := c.cli.Update(c.ctx.Ctx, node.obj)
@@ -400,6 +385,8 @@ func (c *clusterPlanBuilder) reconcileObject(node *lifecycleVertex) error {
 				return err
 			}
 		}
+	case NOOP:
+		// nothing
 	}
 	return nil
 }

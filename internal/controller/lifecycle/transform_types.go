@@ -60,6 +60,7 @@ const (
 	UPDATE = Action("UPDATE")
 	DELETE = Action("DELETE")
 	STATUS = Action("STATUS")
+	NOOP   = Action("NOOP")
 )
 
 // default reconcile requeue after duration

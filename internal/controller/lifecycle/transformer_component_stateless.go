@@ -138,7 +138,13 @@ func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 			c.Cluster.Name, c.CompSpec.Name)
 	}
 
-	return c.validateObjectsAction()
+	if err := c.validateObjectsAction(); err != nil {
+		return err
+	}
+
+	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
+
+	return nil
 }
 
 func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -251,7 +257,6 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
 		c.workloadVertexs[0].obj = deployObjCopy
 		c.workloadVertexs[0].action = actionPtr(UPDATE)
-		// sync component phase
-		//updateComponentPhaseWithOperation2(c.GetCluster(), c.GetName())
+		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase)
 	}
 }

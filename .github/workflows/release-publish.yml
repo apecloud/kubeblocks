@@ -82,6 +82,8 @@ jobs:
      
     - name: make build
       run: |
+        mkdir -p ${{ matrix.os }}
+        
         CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
           --tag-name ${{ matrix.os }} \
           --type 2`

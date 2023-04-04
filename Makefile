@@ -269,7 +269,6 @@ kbcli-doc: generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 
-
 ##@ Operator Controller Manager
 
 .PHONY: manager

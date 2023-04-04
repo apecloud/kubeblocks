@@ -232,6 +232,9 @@ var _ = Describe("builder", func() {
 			// "UUID_B64":      "$(UUID_B64)",
 			// "UUID_STR_B64":  "$(UUID_STR_B64)",
 			// "UUID_HEX":      "$(UUID_HEX)",
+			Expect(credential.Name).Should(Equal(fmt.Sprintf("%s-%s-conn-credential",
+				params.Cluster.Name,
+				params.ClusterDefinition.Spec.ComponentDefs[0].CharacterType)))
 			Expect(credential.StringData).ShouldNot(BeEmpty())
 			Expect(credential.StringData["username"]).Should(Equal("root"))
 

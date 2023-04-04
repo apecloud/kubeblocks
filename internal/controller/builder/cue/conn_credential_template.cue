@@ -17,8 +17,10 @@ clusterdefinition: {
 		name: string
 	}
 	spec: {
-		type: string
 		connectionCredential: {...}
+		componentDefs: [{
+			characterType: string
+		}]
 	}
 }
 cluster: {
@@ -32,7 +34,7 @@ secret: {
 	stringData: clusterdefinition.spec.connectionCredential
 	kind:       "Secret"
 	metadata: {
-		name:      "\(cluster.metadata.name)-conn-credential"
+		name:      "\(cluster.metadata.name)-\(clusterdefinition.spec.componentDefs[0].characterType)-conn-credential"
 		namespace: cluster.metadata.namespace
 		labels: {
 			"app.kubernetes.io/name":       "\(clusterdefinition.metadata.name)"

@@ -62,9 +62,9 @@ spec:
           type: data
       podSpec:
         containers:
-          - name: replica
+          - name: mongodb
             ports:
-              - name: replica
+              - name: mongodb
                 protocol: TCP
                 containerPort: 27018
             command:

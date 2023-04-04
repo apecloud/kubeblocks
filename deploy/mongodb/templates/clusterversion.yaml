@@ -10,7 +10,7 @@ spec:
     - componentDefRef: replicaset
       versionsContext:
         containers:
-          - name: replica
+          - name: mongodb
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     - componentDefRef: mongos

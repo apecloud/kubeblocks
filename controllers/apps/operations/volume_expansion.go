@@ -72,19 +72,16 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 		if volumeExpansionOps, ok = volumeExpansionMap[component.Name]; !ok {
 			continue
 		}
+		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[index]
 		for _, v := range volumeExpansionOps.VolumeClaimTemplates {
 			for i, vct := range component.VolumeClaimTemplates {
 				if vct.Name != v.Name {
 					continue
 				}
-				if vct.Spec == nil {
-					continue
-				}
-				opsRes.Cluster.Spec.ComponentSpecs[index].VolumeClaimTemplates[i].
+				compSpec.VolumeClaimTemplates[i].
 					Spec.Resources.Requests[corev1.ResourceStorage] = v.Storage
 			}
 		}
-
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }

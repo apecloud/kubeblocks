@@ -497,7 +497,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 			},
 			VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
 				Name: "data",
-				Spec: &corev1.PersistentVolumeClaimSpec{
+				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						corev1.ReadWriteOnce,
 					},

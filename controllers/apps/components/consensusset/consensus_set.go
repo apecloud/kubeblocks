@@ -185,7 +185,7 @@ func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) erro
 
 	stsObj := util.ConvertToStatefulSet(obj)
 	// get compDefName from stsObj.name
-	compDefName := r.Cluster.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
+	compDefName := r.Cluster.Spec.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
 
 	// get component from ClusterDefinition by compDefName
 	component, err := util.GetComponentDefByCluster(ctx, r.Cli, *r.Cluster, compDefName)

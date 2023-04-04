@@ -141,7 +141,7 @@ func buildVolumeClaimByClass(cls *class.ComponentClass) []appsv1alpha1.ClusterCo
 	for _, disk := range cls.Storage {
 		volume := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 			Name: disk.Name,
-			Spec: &corev1.PersistentVolumeClaimSpec{
+			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 				// TODO define access mode in class
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 				Resources: corev1.ResourceRequirements{

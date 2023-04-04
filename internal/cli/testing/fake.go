@@ -109,7 +109,7 @@ func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1
 					VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 						{
 							Name: "data",
-							Spec: &corev1.PersistentVolumeClaimSpec{
+							Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 								AccessModes: []corev1.PersistentVolumeAccessMode{
 									corev1.ReadWriteOnce,
 								},
@@ -135,7 +135,7 @@ func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1
 					VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 						{
 							Name: "data",
-							Spec: &corev1.PersistentVolumeClaimSpec{
+							Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 								AccessModes: []corev1.PersistentVolumeAccessMode{
 									corev1.ReadWriteOnce,
 								},

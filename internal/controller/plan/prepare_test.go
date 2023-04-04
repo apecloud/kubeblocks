@@ -128,11 +128,11 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(mysqlCompType).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
 
@@ -184,11 +184,11 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(mysqlCompType).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
 
@@ -237,11 +237,11 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(mysqlCompType).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
 
@@ -301,11 +301,11 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(nginxCompType).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
 
@@ -418,13 +418,13 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(nginxCompType).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(redisCompName, redisCompType).
 				SetReplicas(2).
 				SetPrimaryIndex(0).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
 

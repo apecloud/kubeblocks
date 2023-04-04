@@ -330,7 +330,7 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 	o.helmCfg = helm.NewConfig("", defaultKubeConfigPath, "", klog.V(1).Enabled())
 
 	// Install KubeBlocks
-	if err = o.installKubeBlocks(); err != nil {
+	if err = o.installKubeBlocks(k8sClusterName); err != nil {
 		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
 

@@ -84,7 +84,6 @@ jobs:
     - name: make zip
       if: matrix.os == 'windows-amd64'
       run: |
-        ${{ steps.build.outputs.RELEASE_VERSION }}
         mv bin/${{ env.CLI_NAME }}*  ${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}.exe   
         zip -r -o ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  ${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}
         file ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  # for debug 

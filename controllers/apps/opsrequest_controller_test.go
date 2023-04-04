@@ -279,12 +279,12 @@ var _ = Describe("OpsRequest Controller", func() {
 					clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
 						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot}
 				})()).ShouldNot(HaveOccurred())
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(mysqlCompName, mysqlCompType).
 				SetReplicas(replicas).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -379,12 +379,12 @@ var _ = Describe("OpsRequest Controller", func() {
 				Create(&testCtx).GetObject()
 
 			By("Creating a cluster with replication workloadType.")
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			pvcSpec.StorageClassName = &storageClassName
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).SetPrimaryIndex(0).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).SetPrimaryIndex(0).
 				SetReplicas(testapps.DefaultReplicationReplicas).
 				Create(&testCtx).GetObject()
 			// mock sts ready and create pod

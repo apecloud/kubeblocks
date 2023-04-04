@@ -31,11 +31,9 @@ spec:
       service:
         ports:
           - name: tcp-qdrant
-            protocol: TCP
             port: 6333
             targetPort: tcp-qdrant
           - name: grpc-qdrant
-            protocol: TCP
             port: 6334
             targetPort: grpc-qdrant
       volumeTypes:

@@ -269,7 +269,6 @@ kbcli-doc: generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 
-
 ##@ Operator Controller Manager
 
 .PHONY: manager
@@ -393,6 +392,8 @@ bump-chart-ver: \
 	bump-single-chart-ver.milvus \
 	bump-single-chart-ver.qdrant \
 	bump-single-chart-ver.qdrant-cluster \
+	bump-single-chart-ver.weaviate \
+	bump-single-chart-ver.weaviate-cluster \
 	bump-single-chart-ver.chatgpt-retrieval-plugin
 bump-chart-ver: ## Bump helm chart version.
 

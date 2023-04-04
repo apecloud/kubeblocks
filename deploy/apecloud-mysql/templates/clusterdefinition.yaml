@@ -51,7 +51,7 @@ spec:
             accessMode: Readonly
       service:
         ports:
-          - protocol: TCP
+          - name: mysql
             port: 3306
             targetPort: mysql
       horizontalScalePolicy:

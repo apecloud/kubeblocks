@@ -1,4 +1,3 @@
-
 ## @param terminationPolicy define Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
 ##
 terminationPolicy: Halt
@@ -23,6 +22,15 @@ persistence:
   ## `metadata` volume settings
   ##
   metadata:
+    ## @param persistence.metadata.preferStorageClassNames
+    preferStorageClassNames:
+      - kafka-meta-eks
+      - kafka-meta-aks
+      - kafka-meta-gke
+      - kafka-meta-ack
+      - kafka-meta-tke
+
+    ## @param persistence.data.storageClassName Storage class of backing PVC
     ## @param persistence.data.storageClassName Storage class of backing PVC
     ## If defined, storageClassName: <storageClass>
     ## If set to "-", storageClassName: "", which disables dynamic provisioning
@@ -37,6 +45,14 @@ persistence:
   ## `data` volume settings
   ##
   data:
+    ## @param persistence.data.preferStorageClassNames
+    preferStorageClassNames:
+      - kafka-data-eks
+      - kafka-data-aks
+      - kafka-data-gke
+      - kafka-data-ack
+      - kafka-data-tke
+
     ## @param persistence.data.storageClassName Storage class of backing PVC
     ## If defined, storageClassName: <storageClass>
     ## If set to "-", storageClassName: "", which disables dynamic provisioning
@@ -44,7 +60,8 @@ persistence:
     ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
     ##   GKE, AWS & OpenStack)
     ##
-    storageClassName: 
+    storageClassName:
+
     ## @param persistence.data.size Size of data volume
     ##
     size: 10Gi
@@ -54,6 +71,16 @@ persistence:
     ## @param persistence.log.enabled Enable persistence using Persistent Volume Claims
     ##
     enabled: false
+
+    ## @param persistence.log.preferStorageClassNames
+    preferStorageClassNames:
+      - kafka-eks-standard
+      - kafka-aks-standard
+      - kafka-gke-standard
+      - kafka-ack-standard
+      - kafka-tke-standard
+
+    ## @param persistence.data.storageClassName Storage class of backing PVC
     ## @param persistence.log.storageClassName Storage class of backing PVC
     ## If defined, storageClassName: <storageClass>
     ## If set to "-", storageClassName: "", which disables dynamic provisioning

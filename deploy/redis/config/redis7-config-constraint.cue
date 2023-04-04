@@ -142,5 +142,9 @@
 
 	"zset-max-listpack-value": int | *64
 
+	"protected-mode"?: string & "yes" | "no"
+
+	"enable-debug-command"?: string & "yes" | "no" | "local"
+
 	...
 }

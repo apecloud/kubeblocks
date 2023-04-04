@@ -1651,9 +1651,13 @@ csi-hostpath-driver:
     default: true
 
 aws-loadbalancer-controller:
+  enabled: false
   replicaCount: 1
-  clusterName: ""
-  image:
-    # please specify image registry by region
-    # reference: https://docs.amazonaws.cn/eks/latest/userguide/add-ons-images.html
-    registry: 961992271922.dkr.ecr.cn-northwest-1.amazonaws.com.cn/amazon/aws-load-balancer-controller
+  tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+  serviceAccount:
+    create: true
+    name: kubeblocks-service-account-aws-load-balancer-controller

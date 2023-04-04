@@ -68,6 +68,7 @@ jobs:
       uses: bruceadams/get-release@v1.3.2
 
     - name: make build
+      id: build
       run: |    
         CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
           --tag-name ${{ matrix.os }} \
@@ -77,21 +78,23 @@ jobs:
            --type 1`
 
         VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
+        echo "::set-output name=RELEASE_VERSION::${RELEASE_VERSION}" 
         mkdir -p ${{ matrix.os }}-${RELEASE_VERSION}  
 
     - name: make zip
       if: matrix.os == 'windows-amd64'
       run: |
-        mv bin/${{ env.CLI_NAME }}*  ${{ matrix.os }}-${RELEASE_VERSION}/${{ env.CLI_NAME }}.exe   
-        zip -r -o ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  ${{ matrix.os }}-${RELEASE_VERSION}
+        ${{ steps.build.outputs.RELEASE_VERSION }}
+        mv bin/${{ env.CLI_NAME }}*  ${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}.exe   
+        zip -r -o ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  ${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}
         file ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  # for debug 
         mv ${{ env.CLI_NAME }}-${{ matrix.os }}.zip bin/
     
     - name: make tar
       if: matrix.os != 'windows-amd64'    
       run: |
-        mv bin/${{ env.CLI_NAME }}*  ${{ matrix.os }}-${RELEASE_VERSION}/${{ env.CLI_NAME }}
-        tar -zcvf ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz  ${{ matrix.os }}-${RELEASE_VERSION}
+        mv bin/${{ env.CLI_NAME }}*  ${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}
+        tar -zcvf ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz  ${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}
         mv ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz bin/
 
     - name: upload release asset linux and mac

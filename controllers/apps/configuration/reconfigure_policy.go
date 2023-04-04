@@ -201,7 +201,7 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgco
 		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfgPatch)
 	}
 
-	if enableAdjustPolicy(restart, policy) {
+	if enableAutoDecision(restart, policy) {
 		if dynamicUpdate, err := cfgcore.IsUpdateDynamicParameters(cc, cfgPatch); err != nil {
 			return nil, err
 		} else if dynamicUpdate {
@@ -211,18 +211,30 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgco
 			policy = appsv1alpha1.OperatorSyncUpdate
 		}
 	}
+	if policy == appsv1alpha1.NonePolicy {
+		policy = appsv1alpha1.NormalPolicy
+	}
 	if action, ok := upgradePolicyMap[policy]; ok {
 		return action, nil
 	}
 	return nil, cfgcore.MakeError("not support upgrade policy:[%s]", policy)
 }
 
-func enableAdjustPolicy(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
-	return !restart && policy != appsv1alpha1.AutoReload && policy != appsv1alpha1.OperatorSyncUpdate
+func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
+	return !restart && policy == appsv1alpha1.NonePolicy
 }
 
 func enableSyncReload(policyType appsv1alpha1.UpgradePolicy, options *appsv1alpha1.ReloadOptions) bool {
-	return policyType == appsv1alpha1.AutoReload && options != nil && options.TPLScriptTrigger != nil
+	return policyType == appsv1alpha1.AutoReload && enableSyncTrigger(options)
+}
+
+func enableSyncTrigger(options *appsv1alpha1.ReloadOptions) bool {
+	if options == nil || options.TPLScriptTrigger == nil {
+		return false
+	}
+
+	trigger := options.TPLScriptTrigger
+	return trigger.Sync != nil && *trigger.Sync
 }
 
 func withSucceed(succeedCount int32) func(status *ReturnedStatus) {

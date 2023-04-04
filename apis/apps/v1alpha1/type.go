@@ -340,6 +340,7 @@ const (
 type UpgradePolicy string
 
 const (
+	NonePolicy         UpgradePolicy = "none"
 	NormalPolicy       UpgradePolicy = "simple"
 	RestartPolicy      UpgradePolicy = "parallel"
 	RollingPolicy      UpgradePolicy = "rolling"

@@ -76,9 +76,31 @@ jobs:
         else
          echo  "CLI_BINARY=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz" >> $GITHUB_OUTPUT
         fi
-
+      
+     
+      # mv bin/${{ env.CLI_NAME }}* 
+     
     - name: make build
-      run: "mkdir -p ${{ matrix.os }}\n  #magic___^_^___line\nCLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \\\n  --tag-name ${{ matrix.os }} \\\n  --type 2`\nRELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \\\n  --tag-name ${{ env.TAG_NAME }} \\\n  --type 1`\n  #magic___^_^___line\nVERSION=$RELEASE_VERSION  make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH${{ steps.set_binary.outputs.BINARY_EXT }}\n  #magic___^_^___line\nmv bin/${{ env.CLI_NAME }}* ${{ matrix.os }}/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }}\n  #magic___^_^___line\nif [[ \"${{ matrix.os }}\" == *\"windows\"* ]]; then\n  # CLI_COMPRESS=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip\n  zip -r ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}   \nelse\n  # CLI_COMPRESS=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz\n  tar -zcvf ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}\nfi      \n  #magic___^_^___line\nmv ${{ steps.set_binary.outputs.CLI_BINARY }} bin/\n  #magic___^_^___line\n"
+      run: |
+        CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
+          --tag-name ${{ matrix.os }} \
+          --type 2`
+        RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
+          --tag-name ${{ env.TAG_NAME }} \
+           --type 1`
+          
+        VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
+          
+        mv bin/${{ env.CLI_NAME }}* ${{ matrix.os }}/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }}
+          
+        if [[ "${{ matrix.os }}" == *"windows" ]]; then 
+          zip -r ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}   
+        else  
+          tar -zcvf ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}
+        fi 
+          
+        mv ${{ steps.set_binary.outputs.CLI_BINARY }} bin/
+   
     - name: upload release asset ${{ matrix.os }}
       uses: actions/upload-release-asset@main
       # env:
@@ -100,8 +122,6 @@ jobs:
 
     - name: upload release kbcli asset ${{ matrix.os }}
       uses: actions/upload-release-asset@main
-      # env:
-      #   CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
       with:
         upload_url: ${{ env.UPLOAD_URL }}
         asset_path: ./bin/${{ steps.set_binary.outputs.CLI_BINARY }}
@@ -109,8 +129,6 @@ jobs:
         asset_content_type: application/zip
 
     - name: upload gitlab kbcli asset ${{ matrix.os }}
-      # env:
-      #   CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
       run: |
         bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
           --type 2 \

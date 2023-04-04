@@ -6,7 +6,7 @@ type: application
 
 version: 0.5.0-alpha.3
 
-appVersion: "7.0.5"
+appVersion: "7.0.6"
 
 home: https://redis.io/
 icon: https://bitnami.com/assets/stacks/redis/img/redis-stack-220x234.png

@@ -4,6 +4,8 @@
 
 replicaCount: 2
 
+sentinelReplicaCount: 3
+
 terminationPolicy: Delete
 
 clusterVersionOverride: ""

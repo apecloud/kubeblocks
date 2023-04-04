@@ -56,8 +56,14 @@ spec:
               - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_DEMOTE_STATEMENT)
       service:
         ports:
-          - protocol: TCP
+          - name: redis
+            protocol: TCP
             port: 6379
+            targetPort: redis
+          - name: metrics
+            targetPort: metrics
+            port: 9121
+            nodePort: null
       configSpecs:
         - name: redis-replication-config
           templateRef: redis7-config-template
@@ -86,7 +92,6 @@ spec:
       podSpec:
         containers:
           - name: redis
-            image: redis:7.0.5
             ports:
               - name: redis
                 containerPort: 6379
@@ -97,7 +102,9 @@ spec:
                 mountPath: /etc/conf
               - name: scripts
                 mountPath: /scripts
-            args: [ "/etc/conf/redis.conf" ]
+              - name: redis-conf
+                mountPath: /etc/redis
+            command: ["/scripts/redis-start.sh"]
             lifecycle:
               postStart:
                 exec:
@@ -116,11 +123,11 @@ spec:
             livenessProbe:
               httpGet:
                 path: /
-                port: 9121
+                port: metrics
             readinessProbe:
               httpGet:
                 path: /
-                port: 9121
+                port: metrics
       systemAccounts:
 # Seems redis-cli has its own mechanism to parse input tokens and there is no elegent way
 # to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.
@@ -168,3 +175,86 @@ spec:
               scope: AnyPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) +psync +replconf +ping
+    - name: redis-sentinel
+      workloadType: Stateful
+      characterType: redis
+      service:
+        ports:
+          - name: redis-sentinel
+            protocol: TCP
+            targetPort: redis-sentinel
+            port: 26379
+      configSpecs:
+        - name: redis-replication-config
+          templateRef: redis7-config-template
+          constraintRef: redis7-config-constraints
+          namespace: {{ .Release.Namespace }}
+          volumeName: redis-config
+      scriptSpecs:
+        - name: redis-scripts
+          templateRef: redis-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        initContainers:
+        - name: init-redis-sentinel
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: redis-config
+              mountPath: /etc/conf
+            - name: sentinel-conf
+              mountPath: /etc/sentinel
+            - name: scripts
+              mountPath: /scripts
+          command: [ "/scripts/redis-sentinel-setup.sh" ]
+        containers:
+        - name: redis-sentinel
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 26379
+              name: redis-sentinel
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: redis-config
+              mountPath: /etc/conf
+            - name: sentinel-conf
+              mountPath: /etc/sentinel
+            - name: scripts
+              mountPath: /scripts
+          command:
+            - /bin/bash
+          args:
+            - -c
+            - |
+              set -ex
+              /scripts/redis-sentinel-start.sh
+          livenessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /scripts/redis-sentinel-ping.sh 5
+          readinessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /scripts/redis-sentinel-ping.sh 1

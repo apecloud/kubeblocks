@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: kafka
+  name: {{ include "kafka.name" . }}
   labels:
     {{- include "kafka.labels" . | nindent 4 }}
     {{- if .Values.commonLabels }}
@@ -13,7 +13,7 @@ metadata:
 spec:
   connectionCredential:
     superusers: "User:admin"
-    endpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-ctrl)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-ctrlr)"
     kraftClusterID: "$(UUID_STR_B64)" 
     sslCertPassword: "$(RANDOM_PASSWD)"
 
@@ -37,29 +37,29 @@ spec:
           scrapePort: 5556
       configSpecs:
         - name: kafka-configuration-tpl
-          constraintRef: kafka-cc
+          constraintRef: {{ include "kafka.name" . }}-cc
           templateRef: kafka-configuration-tpl
           volumeName: kafka-config
           namespace: {{ .Release.Namespace }}
         - name: kafka-jmx-configuration-tpl
-          templateRef: kafka-jmx-configuration-tpl
+          templateRef: {{ include "kafka.name" . }}-jmx-configuration-tpl
           volumeName: jmx-config
           namespace: {{ .Release.Namespace }}
       scriptSpecs:
         - name: kafka-scripts-tpl
-          templateRef: kafka-scripts-tpl
+          templateRef: {{ include "kafka.name" . }}-scripts-tpl
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
           defaultMode: 0755
       service:
         ports:
-          - name: kafka-client
-            targetPort: kafka-client
-            port: 9092
-            nodePort: null
           - name: kafka-ctrlr
             targetPort: kafka-ctrlr
             port: 9093
+            nodePort: null
+          - name: kafka-client
+            targetPort: kafka-client
+            port: 9092
             nodePort: null
           - name: metrics
             targetPort: metrics

@@ -22,10 +22,7 @@ spec:
         key: values-kubeblocks-override.yaml
 
       setValues:
-      - serviceAccount.create=true
-      - serviceAccount.name=kubeblocks-service-account-aws-load-balancer-controller
       - clusterName={{ index .Values "aws-loadbalancer-controller" "cluterName " }}
-      - image.repository={{ index .Values "aws-loadbalancer-controller" "image" "registry"}}
 
     valuesMapping:
       valueMap:
@@ -46,7 +43,7 @@ spec:
   - replicas: 1
 
   installable:
-    autoInstall: false
+    autoInstall: {{ index .Values "aws-loadbalancer-controller" "enabled" }}
     selectors:
     - key: KubeGitVersion
       operator: Contains

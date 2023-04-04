@@ -20,7 +20,6 @@ spec:
     valuesMapping:
       valueMap:
         replicaCount: replicaCount
-        namespace: namespace
 
       jsonMap:
         tolerations: tolerations

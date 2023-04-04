@@ -126,5 +126,3 @@ spec:
                 value: "7000"
               - name: CLUSTER_DATA_BIND_PORT
                 value: "7001"
-              - name: CLUSTER_JOIN
-                value: weaviate-headless.default.svc.cluster.local

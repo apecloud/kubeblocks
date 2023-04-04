@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
-  name: kafka-cc
+  name: {{ include "kafka.name" . }}-cc
   labels:
     {{- include "kafka.labels" . | nindent 4 }}
     {{- if .Values.commonLabels }}

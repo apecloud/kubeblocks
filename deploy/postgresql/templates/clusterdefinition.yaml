@@ -16,6 +16,10 @@ spec:
       workloadType: Replication
       characterType: postgresql
       probes:
+        roleChangedProbe:
+          failureThreshold: 2
+          periodSeconds: 1
+          timeoutSeconds: 1
       monitor:
         builtIn: false
         exporterConfig:

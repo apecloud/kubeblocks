@@ -93,7 +93,7 @@ func ReconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		if compStatus.Phase != v.Phase {
 			compStatus.Phase = v.Phase
 		}
-		clusterComponent := opsRes.Cluster.GetComponentByName(k)
+		clusterComponent := opsRes.Cluster.Spec.GetComponentByName(k)
 		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, progressResource{
 			opsMessageKey:       opsMessageKey,
 			clusterComponent:    clusterComponent,

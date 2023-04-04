@@ -301,8 +301,6 @@ ARGUMENTS=
 DEBUG_PORT=2345
 run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
-
-
 ##@ Deployment
 
 ifndef ignore-not-found
@@ -395,6 +393,8 @@ bump-chart-ver: \
 	bump-single-chart-ver.milvus \
 	bump-single-chart-ver.qdrant \
 	bump-single-chart-ver.qdrant-cluster \
+	bump-single-chart-ver.weaviate \
+	bump-single-chart-ver.weaviate-cluster \
 	bump-single-chart-ver.chatgpt-retrieval-plugin
 bump-chart-ver: ## Bump helm chart version.
 
@@ -748,7 +748,7 @@ endif
 .PHONY: render-smoke-testdata-manifests
 render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
-	$(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
 	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
 	$(HELM) template mycluster deploy/redis-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
 

@@ -210,7 +210,7 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 		Create(&testCtx).GetObject()
 
 	By("Creating a cluster")
-	pvcSpec := &corev1.PersistentVolumeClaimSpec{
+	pvcSpec := appsv1alpha1.PersistentVolumeClaimSpec{
 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{

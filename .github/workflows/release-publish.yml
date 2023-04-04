@@ -77,6 +77,7 @@ jobs:
          echo  "CLI_BINARY=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz" >> $GITHUB_OUTPUT
         fi
       
+      
      
       # mv bin/${{ env.CLI_NAME }}* 
      

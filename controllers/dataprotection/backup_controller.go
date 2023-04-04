@@ -1053,9 +1053,9 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 	args := "set -o errexit; set -o nounset;" +
 		"OUTPUT=$(kubectl -n %s exec -it pod/%s -c %s -- %s);" +
 		"kubectl -n %s patch backup %s --subresource=status --type=merge --patch \"%s\";"
-	patchJson := generateJSON("status."+updateInfo.Path, "$OUTPUT")
+	patchJSON := generateJSON("status."+updateInfo.Path, "$OUTPUT")
 	args = fmt.Sprintf(args, targetPod.Namespace, targetPod.Name, updateInfo.ContainerName,
-		updateInfo.Script, backup.Namespace, backup.Name, patchJson)
+		updateInfo.Script, backup.Namespace, backup.Name, patchJSON)
 	container.Args = []string{args}
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))

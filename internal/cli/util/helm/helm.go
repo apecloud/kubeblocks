@@ -384,25 +384,6 @@ func (i *InstallOpts) Upgrade(cfg *Config) error {
 	return nil
 }
 
-func mergeMaps(a, b map[string]interface{}) map[string]interface{} {
-	out := make(map[string]interface{}, len(a))
-	for k, v := range a {
-		out[k] = v
-	}
-	for k, v := range b {
-		if v, ok := v.(map[string]interface{}); ok {
-			if bv, ok := out[k]; ok {
-				if bv, ok := bv.(map[string]interface{}); ok {
-					out[k] = mergeMaps(bv, v)
-					continue
-				}
-			}
-		}
-		out[k] = v
-	}
-	return out
-}
-
 func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	installed, err := i.GetInstalled(cfg)
 	if err != nil {
@@ -445,7 +426,11 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 	// merge current values into vals, so current release's user values can be kept
-	vals = mergeMaps(currentValues, vals)
+	installed.Chart.Values = currentValues
+	vals, err = chartutil.CoalesceValues(installed.Chart, vals)
+	if err != nil {
+		return "", err
+	}
 
 	// Check Chart dependencies to make sure all are present in /charts
 	chartRequested, err := loader.Load(cp)

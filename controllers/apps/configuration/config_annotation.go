@@ -127,7 +127,7 @@ func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
 
 func getUpgradePolicy(cm *corev1.ConfigMap) appsv1alpha1.UpgradePolicy {
 	const (
-		DefaultUpgradePolicy = appsv1alpha1.NormalPolicy
+		DefaultUpgradePolicy = appsv1alpha1.NonePolicy
 	)
 
 	annotations := cm.GetAnnotations()

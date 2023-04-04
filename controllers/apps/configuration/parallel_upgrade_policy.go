@@ -18,10 +18,10 @@ package configuration
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type parallelUpgradePolicy struct {
@@ -32,57 +32,45 @@ func init() {
 }
 
 func (p *parallelUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
-	if finished, err := p.restartPods(params); err != nil {
-		return makeReturnedStatus(ESAndRetryFailed), err
-	} else if !finished {
-		return makeReturnedStatus(ESRetry), nil
+	var funcs RollingUpgradeFuncs
+
+	switch params.WorkloadType() {
+	default:
+		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component workload type[%s]", params.WorkloadType())
+	case appsv1alpha1.Consensus:
+		funcs = GetConsensusRollingUpgradeFuncs()
+	case appsv1alpha1.Stateful:
+		funcs = GetStatefulSetRollingUpgradeFuncs()
+	case appsv1alpha1.Replication:
+		funcs = GetReplicationRollingUpgradeFuncs()
 	}
 
-	return makeReturnedStatus(ESNone), nil
+	pods, err := funcs.GetPodsFunc(params)
+	if err != nil {
+		return makeReturnedStatus(ESAndRetryFailed), err
+	}
+
+	return p.restartPods(params, pods, funcs)
 }
 
 func (p *parallelUpgradePolicy) GetPolicyName() string {
 	return string(appsv1alpha1.RestartPolicy)
 }
 
-func (p *parallelUpgradePolicy) restartPods(params reconfigureParams) (bool, error) {
-	var (
-		funcs         RollingUpgradeFuncs
-		cType         = params.WorkloadType()
-		configKey     = params.getConfigKey()
-		configVersion = params.getTargetVersionHash()
-	)
-
-	updatePodLabelsVersion := func(pod *corev1.Pod, labelKey, labelValue string) error {
-		patch := client.MergeFrom(pod.DeepCopy())
-		if pod.Labels == nil {
-			pod.Labels = make(map[string]string, 1)
-		}
-		pod.Labels[labelKey] = labelValue
-		return params.Client.Patch(params.Ctx.Ctx, pod, patch)
-	}
-
-	switch cType {
-	case appsv1alpha1.Consensus:
-		funcs = GetConsensusRollingUpgradeFuncs()
-	case appsv1alpha1.Stateful:
-		funcs = GetStatefulSetRollingUpgradeFuncs()
-	default:
-		return false, cfgcore.MakeError("not support component workload type[%s]", cType)
-	}
-
-	pods, err := funcs.GetPodsFunc(params)
-	if err != nil {
-		return false, err
-	}
+func (p *parallelUpgradePolicy) restartPods(params reconfigureParams, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+	var configKey = params.getConfigKey()
+	var configVersion = params.getTargetVersionHash()
 
 	for _, pod := range pods {
-		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
-			return false, err
+		if podutil.IsMatchConfigVersion(&pod, configKey, configVersion) {
+			continue
 		}
-		if err := updatePodLabelsVersion(&pod, configKey, configVersion); err != nil {
-			return false, err
+		if err := funcs.RestartContainerFunc(&pod, params.Ctx.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
+			return makeReturnedStatus(ESAndRetryFailed), err
+		}
+		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx.Ctx); err != nil {
+			return makeReturnedStatus(ESAndRetryFailed), err
 		}
 	}
-	return true, nil
+	return makeReturnedStatus(ESNone), nil
 }

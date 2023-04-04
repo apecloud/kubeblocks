@@ -136,6 +136,10 @@ type TPLScriptTrigger struct {
 	// +kubebuilder:default="default"
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
+
+	// Specify synchronize updates parameters to the config manager.
+	// +optional
+	Sync *bool `json:"sync,omitempty"`
 }
 
 type FormatterConfig struct {

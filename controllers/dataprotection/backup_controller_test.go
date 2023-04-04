@@ -17,6 +17,8 @@ limitations under the License.
 package dataprotection
 
 import (
+	"strings"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -212,7 +214,7 @@ var _ = Describe("Backup Controller test", func() {
 
 			It("should success after all jobs complete", func() {
 				backupPolicyKey := types.NamespacedName{Name: backupPolicyName, Namespace: backupKey.Namespace}
-				patchBackupPolicySpecHooksManifests(backupPolicyKey, []string{"true"})
+				patchBackupPolicySpecBackupStatusUpdates(backupPolicyKey)
 
 				preJobKey := types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}
 				postJobKey := types.NamespacedName{Name: backupKey.Name + "-post", Namespace: backupKey.Namespace}
@@ -228,8 +230,8 @@ var _ = Describe("Backup Controller test", func() {
 				patchVolumeSnapshotStatus(backupKey, true)
 				patchK8sJobStatus(postJobKey, batchv1.JobComplete)
 
-				manifestsJobKey := types.NamespacedName{Name: backupKey.Name + "-manifests", Namespace: backupKey.Namespace}
-				patchK8sJobStatus(manifestsJobKey, batchv1.JobComplete)
+				logJobKey := types.NamespacedName{Name: backupKey.Name + "-" + strings.ToLower("manifests.backupLog"), Namespace: backupKey.Namespace}
+				patchK8sJobStatus(logJobKey, batchv1.JobComplete)
 
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
@@ -406,8 +408,21 @@ func patchVolumeSnapshotStatus(key types.NamespacedName, readyToUse bool) {
 	})).Should(Succeed())
 }
 
-func patchBackupPolicySpecHooksManifests(key types.NamespacedName, mainitest []string) {
+func patchBackupPolicySpecBackupStatusUpdates(key types.NamespacedName) {
 	Eventually(testapps.GetAndChangeObj(&testCtx, key, func(fetched *dataprotectionv1alpha1.BackupPolicy) {
-		fetched.Spec.Hooks.ManifestsCommands = mainitest
+		fetched.Spec.BackupStatusUpdates = []dataprotectionv1alpha1.BackupStatusUpdate{
+			{
+				Path:          "manifests.backupLog",
+				ContainerName: "postgresql",
+				Script:        "echo {\"startTime\": \"2023-03-01T00:00:00Z\", \"stopTime\": \"2023-03-01T00:00:00Z\"}",
+				UpdateStage:   dataprotectionv1alpha1.PRE,
+			},
+			{
+				Path:          "manifests.backupTool",
+				ContainerName: "postgresql",
+				Script:        "echo {\"FilePath\": \"/backup/test.file\"}",
+				UpdateStage:   dataprotectionv1alpha1.POST,
+			},
+		}
 	})).Should(Succeed())
 }

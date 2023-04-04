@@ -69,6 +69,10 @@ type BackupPolicySpec struct {
 	// count of backup stop retries on fail.
 	// +optional
 	OnFailAttempted int32 `json:"onFailAttempted,omitempty"`
+
+	// define how to update metadata for backup status.
+	// +optional
+	BackupStatusUpdates []BackupStatusUpdate `json:"backupStatusUpdates,omitempty"`
 }
 
 // TargetCluster TODO (dsj): target cluster need redefined from Cluster API
@@ -113,10 +117,6 @@ type BackupPolicyHook struct {
 	// +optional
 	PostCommands []string `json:"postCommands,omitempty"`
 
-	// the commands to collect backup manifests
-	// +optional
-	ManifestsCommands []string `json:"manifestsCommands,omitempty"`
-
 	// exec command with image
 	// +optional
 	Image string `json:"image,omitempty"`
@@ -124,6 +124,37 @@ type BackupPolicyHook struct {
 	// which container can exec command
 	// +optional
 	ContainerName string `json:"containerName,omitempty"`
+}
+
+// BackupStatusUpdateStage defines the stage of backup status update.
+// +enum
+// +kubebuilder:validation:Enum={pre,post}
+type BackupStatusUpdateStage string
+
+const (
+	PRE  BackupStatusUpdateStage = "pre"
+	POST BackupStatusUpdateStage = "post"
+)
+
+type BackupStatusUpdate struct {
+	// specify the json path of backup object for patch.
+	// example: manifests.backupLog -- means patch the backup jon path of status.manifests.backupLog.
+	// +optional
+	Path string `json:"path,omitempty"`
+
+	// which container name that kubectl can execute.
+	// +optional
+	ContainerName string `json:"containerName,omitempty"`
+
+	// the shell Script commands to collect backup status metadata.
+	// The script must exist in the container of ContainerName and the output format must be set to JSON.
+	// Note that outputting to stderr may cause the result format to not be in JSON.
+	// +optional
+	Script string `json:"script,omitempty"`
+
+	// when to update the backup status, pre: before backup, post: after backup
+	// +optional
+	UpdateStage BackupStatusUpdateStage `json:"updateStage,omitempty"`
 }
 
 // BackupPolicyStatus defines the observed state of BackupPolicy

@@ -49,6 +49,10 @@ type BackupPolicyTemplateSpec struct {
 	// the backupTool gets the credentials according to the user and password keyword defined by secret
 	// +optional
 	CredentialKeyword *BackupPolicyCredentialKeyword `json:"credentialKeyword,omitempty"`
+
+	// define how to update metadata for backup status.
+	// +optional
+	BackupStatusUpdates []BackupStatusUpdate `json:"backupStatusUpdates,omitempty"`
 }
 
 // BackupPolicyCredentialKeyword defined for the target database secret that backup tool can connect.

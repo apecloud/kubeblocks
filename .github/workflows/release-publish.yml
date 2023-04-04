@@ -45,6 +45,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
+
     steps:
     - uses: actions/checkout@v3
     - name: install lib
@@ -77,7 +78,7 @@ jobs:
         fi
 
     - name: make build
-      run: "mkdir -p ${{ matrix.os }}\n  #magic___^_^___line\nCLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \\\n  --tag-name ${{ matrix.os }} \\\n  --type 2`\nRELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \\\n  --tag-name ${{ env.TAG_NAME }} \\\n  --type 1`\n  #magic___^_^___line\nVERSION=$RELEASE_VERSION  make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH${{ steps.set_binary.outputs.BINARY_EXT }}\n  #magic___^_^___line\nmv bin/${{ env.CLI_NAME }}* ${{ matrix.os }}/\n  #magic___^_^___line\nif [[ \"${{ matrix.os }}\" == *\"windows\"* ]]; then\n  # CLI_COMPRESS=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip\n  zip -r ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}   \nelse\n  # CLI_COMPRESS=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz\n  tar -zcvf ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}\nfi      \n  #magic___^_^___line\nmv ${{ steps.set_binary.outputs.CLI_BINARY }} bin/\n  #magic___^_^___line\n"
+      run: "mkdir -p ${{ matrix.os }}\n  #magic___^_^___line\nCLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \\\n  --tag-name ${{ matrix.os }} \\\n  --type 2`\nRELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \\\n  --tag-name ${{ env.TAG_NAME }} \\\n  --type 1`\n  #magic___^_^___line\nVERSION=$RELEASE_VERSION  make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH${{ steps.set_binary.outputs.BINARY_EXT }}\n  #magic___^_^___line\nmv bin/${{ env.CLI_NAME }}* ${{ matrix.os }}/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }}\n  #magic___^_^___line\nif [[ \"${{ matrix.os }}\" == *\"windows\"* ]]; then\n  # CLI_COMPRESS=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip\n  zip -r ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}   \nelse\n  # CLI_COMPRESS=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz\n  tar -zcvf ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}\nfi      \n  #magic___^_^___line\nmv ${{ steps.set_binary.outputs.CLI_BINARY }} bin/\n  #magic___^_^___line\n"
     - name: upload release asset ${{ matrix.os }}
       uses: actions/upload-release-asset@main
       # env:

@@ -255,7 +255,7 @@ CLI_LD_FLAGS ="-s -w \
 # endif
 
 bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
-	GOOS=$(word 2,$(subst ., ,$@))  GOARCH=$(word 3,$(subst ., ,$@)) BINARY_EXT=$(word 4,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_D_FLAGS} -o  bin/kbcli.${BINARY_EXT} cmd/cli/main.go
+	GOOS=$(word 2,$(subst ., ,$@))  GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_D_FLAGS} -o  bin/kbcli cmd/cli/main.go
 
 .PHONY: kbcli-fast
 kbcli-fast: OS=$(shell $(GO) env GOOS)

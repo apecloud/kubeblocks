@@ -72,9 +72,9 @@ jobs:
       run: |
         if [[ "${{ matrix.os }}" == *"windows"* ]]; then
           echo  "BINARY_EXT=.exe" >> $GITHUB_OUTPUT
-          echo  "CLI_BINARY=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip" >> $GITHUB_OUTPUT
+          echo  "CLI_BINARY=${{ env.CLI_NAME }}-${{ matrix.os }}.zip" >> $GITHUB_OUTPUT
         else
-         echo  "CLI_BINARY=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz" >> $GITHUB_OUTPUT
+         echo  "CLI_BINARY=${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz" >> $GITHUB_OUTPUT
         fi
       
       
@@ -96,19 +96,20 @@ jobs:
           
         mv bin/${{ env.CLI_NAME }}* ${{ matrix.os }}/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }}
           
-        if [[ "${{ matrix.os }}" == *"windows" ]]; then 
-          zip -r ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}/   
-        else  
-          tar -zcvf ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}/
-        fi 
+        # if [[ "${{ matrix.os }}" == *"windows" ]]; then 
+        #   zip -r ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}
+        # else  
+        #   tar -zcvf ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}
+        # fi 
           
-        mv ${{ steps.set_binary.outputs.CLI_BINARY }} bin/
+        # mv ${{ steps.set_binary.outputs.CLI_BINARY }} bin/
+        mv ${{ matrix.os }}/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }} bin/
    
     - name: upload release asset ${{ matrix.os }}
       uses: actions/upload-release-asset@main
       with:
         upload_url: ${{ steps.get_release.outputs.upload_url }}
-        asset_path: ./bin/${{ steps.set_binary.outputs.CLI_BINARY }}
+        asset_path: ./bin/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }}
         asset_name: ${{ steps.set_binary.outputs.CLI_BINARY }}
         asset_content_type: application/zip
 
@@ -124,7 +125,7 @@ jobs:
       uses: actions/upload-release-asset@main
       with:
         upload_url: ${{ env.UPLOAD_URL }}
-        asset_path: ./bin/${{ steps.set_binary.outputs.CLI_BINARY }}
+        asset_path: ./bin/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }}
         asset_name: ${{ steps.set_binary.outputs.CLI_BINARY }}
         asset_content_type: application/zip
 
@@ -134,6 +135,6 @@ jobs:
           --type 2 \
           --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
           --tag-name ${{ env.TAG_NAME }} \
-          --asset-path ./bin/${{ steps.set_binary.outputs.CLI_BINARY }} \
+          --asset-path ./bin/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }} \
           --asset-name ${{ steps.set_binary.outputs.CLI_BINARY }} \
           --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}

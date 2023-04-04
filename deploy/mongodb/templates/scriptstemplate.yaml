@@ -17,7 +17,9 @@ data:
 
     RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
     RPL_SET_NAME=${RPL_SET_NAME%-};
+    mkdir -p /data/mongodb/db
     mkdir -p /data/mongodb/log
+    mkdir -p /data/mongodb/tmp
     PORT=27018
     MODE=$1
     mongod $MODE --bind_ip_all --port $PORT --replSet $RPL_SET_NAME --logappend --logpath /data/mongodb/log/mongodb.log --config /etc/mongodb/mongodb.conf

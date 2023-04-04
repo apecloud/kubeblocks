@@ -15,7 +15,7 @@
 
 # where and how to store data.
 storage:
-  dbPath: {{ $mongodb_root }}/data/db
+  dbPath: {{ $mongodb_root }}/db
   journal:
     enabled: true
   directoryPerDB: true
@@ -59,5 +59,5 @@ setParameter:
 
 # security options
 security:
-  authorization: enabled
+  authorization: disabled
   #keyFile: replace_me

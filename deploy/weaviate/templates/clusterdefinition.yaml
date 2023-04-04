@@ -31,7 +31,6 @@ spec:
       service:
         ports:
           - name: tcp-weaviate
-            protocol: TCP
             port: 8080
             targetPort: tcp-weaviate
       volumeTypes:

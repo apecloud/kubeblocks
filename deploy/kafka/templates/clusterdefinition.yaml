@@ -56,20 +56,15 @@ spec:
           - name: kafka-ctrlr
             targetPort: kafka-ctrlr
             port: 9093
-            nodePort: null
           - name: kafka-client
             targetPort: kafka-client
             port: 9092
-            nodePort: null
           - name: metrics
             targetPort: metrics
             port: 5556
-            nodePort: null
-
       podSpec:
         securityContext:
           fsGroup: 1001
-          
         containers:
           - name: kafka
             image: docker.io/bitnami/kafka:3.4.0-debian-11-r8
@@ -245,12 +240,9 @@ spec:
           - name: kafka-ctrlr
             targetPort: kafka-ctrlr
             port: 9093
-            nodePort: null
           - name: metrics
             targetPort: metrics
             port: 5556
-            nodePort: null
-
       podSpec:
         securityContext:
           fsGroup: 1001
@@ -413,12 +405,9 @@ spec:
           - name: kafka-client
             targetPort: kafka-client
             port: 9092
-            nodePort: null
           - name: metrics
             targetPort: metrics
             port: 5556
-            nodePort: null
-
       podSpec:
         securityContext:
           fsGroup: 1001

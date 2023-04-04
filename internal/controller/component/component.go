@@ -106,7 +106,7 @@ func BuildComponent(
 	}
 
 	if clusterCompDefObj.Service != nil {
-		service := corev1.Service{Spec: *clusterCompDefObj.Service}
+		service := corev1.Service{Spec: clusterCompDefObj.Service.ToSVCSpec()}
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 		component.Services = append(component.Services, service)
 
@@ -116,7 +116,7 @@ func BuildComponent(
 					Name:        item.Name,
 					Annotations: item.Annotations,
 				},
-				Spec: *clusterCompDefObj.Service,
+				Spec: service.Spec,
 			}
 			service.Spec.Type = item.ServiceType
 			component.Services = append(component.Services, service)

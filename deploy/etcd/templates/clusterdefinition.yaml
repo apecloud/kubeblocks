@@ -23,18 +23,17 @@ spec:
           failureThreshold: 3
       service:
         ports:
-          - protocol: TCP
+          - name: client
             port: 2379
+            targetPort: client
       podSpec:
         containers:
           - name: etcd
             imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 2379
-                protocol: TCP
                 name: client
               - containerPort: 2380
-                protocol: TCP
                 name: peer
             volumeMounts:
               - name: data

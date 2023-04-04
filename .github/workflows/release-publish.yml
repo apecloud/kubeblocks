@@ -123,7 +123,7 @@ jobs:
     
 
     - name: upload release kbcli asset linux and mac
-      uses: actions/upload-release-asset@1
+      uses: actions/upload-release-asset@main
       if: matrix.os != 'windows-amd64'
       with:
         upload_url: ${{ env.UPLOAD_URL }}
@@ -132,7 +132,7 @@ jobs:
         asset_content_type: application/gzip
 
     - name: upload release kbcli asset windows
-      uses: actions/upload-release-asset@1
+      uses: actions/upload-release-asset@main
       if: matrix.os == 'windows-amd64'
       with:
         upload_url: ${{ env.UPLOAD_URL }}

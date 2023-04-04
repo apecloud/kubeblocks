@@ -79,7 +79,7 @@ jobs:
 
         VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
         echo "::set-output name=RELEASE_VERSION::${RELEASE_VERSION}" 
-        mkdir -p ${{ matrix.os }}-${RELEASE_VERSION}  
+        mkdir -p ${{ env.CLI_NAME }}-${{ matrix.os }}-${RELEASE_VERSION}  
 
     - name: make zip
       if: matrix.os == 'windows-amd64'
@@ -97,7 +97,7 @@ jobs:
         mv ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz bin/
 
     - name: upload release asset linux and mac
-      uses: actions/upload-release-asset@v1
+      uses: actions/upload-release-asset@main
       if: matrix.os != 'windows-amd64'
       with:
         upload_url: ${{ steps.get_release.outputs.upload_url }}
@@ -106,7 +106,7 @@ jobs:
         asset_content_type: application/gzip
     
     - name: upload release asset windows
-      uses: actions/upload-release-asset@v1
+      uses: actions/upload-release-asset@main
       if: matrix.os == 'windows-amd64'
       with:
         upload_url: ${{ steps.get_release.outputs.upload_url }}

@@ -67,7 +67,7 @@ jobs:
       id: get_release
       uses: bruceadams/get-release@v1.3.2
 
-    - name: Set CLI_BINARY
+    - name: Set CLI_BINARY and add BINARY_EXT if necessary
       id: set_binary
       run: |
         if [[ "${{ matrix.os }}" == *"windows"* ]]; then
@@ -75,15 +75,10 @@ jobs:
           echo  "CLI_BINARY=${{ env.CLI_NAME }}-${{ matrix.os }}.zip" >> $GITHUB_OUTPUT
         else
          echo  "CLI_BINARY=${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz" >> $GITHUB_OUTPUT
-        fi
-      
-      
-     
-      # mv bin/${{ env.CLI_NAME }}* 
-     
+        fi     
+
     - name: make build
       run: |
-        mkdir -p ${{ matrix.os }}
         
         CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
           --tag-name ${{ matrix.os }} \
@@ -91,28 +86,40 @@ jobs:
         RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
           --tag-name ${{ env.TAG_NAME }} \
            --type 1`
-          
+        
+        mkdir -p ${{ matrix.os }}-${RELEASE_VERSION}
+
         VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
           
-        mv bin/${{ env.CLI_NAME }}* ${{ matrix.os }}/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }}
+        mv bin/${{ env.CLI_NAME }}*  ${{ matrix.os }}-${RELEASE_VERSION}/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }} # move the binary file and add the suffix 
           
-        # if [[ "${{ matrix.os }}" == *"windows" ]]; then 
-        #   zip -r ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}
-        # else  
-        #   tar -zcvf ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}
-        # fi 
+        if [[ "${{ matrix.os }}" == *"windows" ]]; then 
+          zip -r ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}-${RELEASE_VERSION}
+        else  
+          tar -zcvf ${{ steps.set_binary.outputs.CLI_BINARY }} ${{ matrix.os }}-${RELEASE_VERSION}
+        fi 
           
-        # mv ${{ steps.set_binary.outputs.CLI_BINARY }} bin/
-        mv ${{ matrix.os }}/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }} bin/
+        mv ${{ steps.set_binary.outputs.CLI_BINARY }} bin/
+        
    
     - name: upload release asset ${{ matrix.os }}
       uses: actions/upload-release-asset@main
+      if: matrix.os != 'windows-amd64'
       with:
         upload_url: ${{ steps.get_release.outputs.upload_url }}
-        asset_path: ./bin/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }}
+        asset_path: ./bin/${{ steps.set_binary.outputs.CLI_BINARY }}
+        asset_name: ${{ steps.set_binary.outputs.CLI_BINARY }}
+        asset_content_type: application/gzip
+    
+    - name: upload release asset ${{ matrix.os }}
+      uses: actions/upload-release-asset@main
+      if: matrix.os == 'windows-amd64'
+      with:
+        upload_url: ${{ steps.get_release.outputs.upload_url }}
+        asset_path: ./bin/${{ steps.set_binary.outputs.CLI_BINARY }}
         asset_name: ${{ steps.set_binary.outputs.CLI_BINARY }}
         asset_content_type: application/zip
-
+       
     - name: get release kbcli upload url
       run: |
         echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
@@ -121,11 +128,23 @@ jobs:
           --github-repo ${{ env.CLI_REPO }} \
           --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 
+    
+
     - name: upload release kbcli asset ${{ matrix.os }}
       uses: actions/upload-release-asset@main
+      if: matrix.os != 'windows-amd64'
       with:
         upload_url: ${{ env.UPLOAD_URL }}
-        asset_path: ./bin/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }}
+        asset_path: ./bin/${{ steps.set_binary.outputs.CLI_BINARY }}
+        asset_name: ${{ steps.set_binary.outputs.CLI_BINARY }}
+        asset_content_type: application/gzip
+
+    - name: upload release kbcli asset ${{ matrix.os }}
+      uses: actions/upload-release-asset@main
+      if: matrix.os == 'windows-amd64'
+      with:
+        upload_url: ${{ env.UPLOAD_URL }}
+        asset_path: ./bin/${{ steps.set_binary.outputs.CLI_BINARY }}
         asset_name: ${{ steps.set_binary.outputs.CLI_BINARY }}
         asset_content_type: application/zip
 
@@ -135,6 +154,6 @@ jobs:
           --type 2 \
           --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
           --tag-name ${{ env.TAG_NAME }} \
-          --asset-path ./bin/${{ env.CLI_NAME }}${{ steps.set_binary.outputs.BINARY_EXT }} \
+          --asset-path ./bin/${{ steps.set_binary.outputs.CLI_BINARY }} \
           --asset-name ${{ steps.set_binary.outputs.CLI_BINARY }} \
           --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}

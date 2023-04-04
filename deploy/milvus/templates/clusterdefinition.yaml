@@ -33,7 +33,6 @@ spec:
       service:
         ports:
           - name: tcp-milvus
-            protocol: TCP
             port: 19530
             targetPort: tcp-milvus
       volumeTypes:
@@ -173,10 +172,8 @@ spec:
             ports:
               - name: client
                 containerPort: 2379
-                protocol: TCP
               - name: peer
                 containerPort: 2380
-                protocol: TCP
             env:
               - name: BITNAMI_DEBUG
                 value: "false"
@@ -235,7 +232,6 @@ spec:
       service:
         ports:
           - name: http
-            protocol: TCP
             port: 9000
             targetPort: 9000
       volumeTypes:

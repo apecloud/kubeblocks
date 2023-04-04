@@ -64,8 +64,8 @@ var (
 				Name: DefaultNginxContainerName,
 			}},
 		},
-		Service: &corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{
+		Service: &appsv1alpha1.ServiceSpec{
+			Ports: []appsv1alpha1.ServicePort{{
 				Protocol: corev1.ProtocolTCP,
 				Port:     80,
 			}},
@@ -86,8 +86,8 @@ var (
 
 	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
 	// corresponding to defaultConnectionCredential variable placeholder
-	defaultSvcSpec = corev1.ServiceSpec{
-		Ports: []corev1.ServicePort{
+	defaultSvcSpec = appsv1alpha1.ServiceSpec{
+		Ports: []appsv1alpha1.ServicePort{
 			{
 				Name: "mysql",
 				TargetPort: intstr.IntOrString{
@@ -175,8 +175,8 @@ var (
 		UpdateStrategy: appsv1alpha1.BestEffortParallelStrategy,
 	}
 
-	defaultMySQLService = corev1.ServiceSpec{
-		Ports: []corev1.ServicePort{{
+	defaultMySQLService = appsv1alpha1.ServiceSpec{
+		Ports: []appsv1alpha1.ServicePort{{
 			Protocol: corev1.ProtocolTCP,
 			Port:     3306,
 		}},
@@ -199,8 +199,8 @@ var (
 		},
 	}
 
-	defaultRedisService = corev1.ServiceSpec{
-		Ports: []corev1.ServicePort{{
+	defaultRedisService = appsv1alpha1.ServiceSpec{
+		Ports: []appsv1alpha1.ServicePort{{
 			Protocol: corev1.ProtocolTCP,
 			Port:     6379,
 		}},

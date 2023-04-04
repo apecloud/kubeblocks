@@ -506,50 +506,47 @@ func (r ClusterSpec) GetDefNameMappingComponents() map[string][]ClusterComponent
 }
 
 // GetMessage gets message map deep copy object
-func (in *ClusterComponentStatus) GetMessage() ComponentMessageMap {
+func (r ClusterComponentStatus) GetMessage() ComponentMessageMap {
 	messageMap := map[string]string{}
-	for k, v := range in.Message {
+	for k, v := range r.Message {
 		messageMap[k] = v
 	}
 	return messageMap
 }
 
 // SetMessage override message map object
-func (in *ClusterComponentStatus) SetMessage(messageMap ComponentMessageMap) {
-	if in == nil {
+func (r *ClusterComponentStatus) SetMessage(messageMap ComponentMessageMap) {
+	if r == nil {
 		return
 	}
-	in.Message = messageMap
+	r.Message = messageMap
 }
 
 // SetObjectMessage sets k8s workload message to component status message map
-func (in *ClusterComponentStatus) SetObjectMessage(objectKind, objectName, message string) {
-	if in == nil {
+func (r *ClusterComponentStatus) SetObjectMessage(objectKind, objectName, message string) {
+	if r == nil {
 		return
 	}
-	if in.Message == nil {
-		in.Message = map[string]string{}
+	if r.Message == nil {
+		r.Message = map[string]string{}
 	}
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
-	in.Message[messageKey] = message
+	r.Message[messageKey] = message
 }
 
 // GetObjectMessage gets the k8s workload message in component status message map
-func (in *ClusterComponentStatus) GetObjectMessage(objectKind, objectName string) string {
-	if in == nil {
-		return ""
-	}
+func (r ClusterComponentStatus) GetObjectMessage(objectKind, objectName string) string {
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
-	return in.Message[messageKey]
+	return r.Message[messageKey]
 }
 
 // SetObjectMessage sets k8s workload message to component status message map
-func (m ComponentMessageMap) SetObjectMessage(objectKind, objectName, message string) {
-	if m == nil {
+func (r ComponentMessageMap) SetObjectMessage(objectKind, objectName, message string) {
+	if r == nil {
 		return
 	}
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
-	m[messageKey] = message
+	r[messageKey] = message
 }
 
 // SetComponentStatus does safe operation on ClusterStatus.Components map object update.

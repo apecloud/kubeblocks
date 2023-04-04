@@ -53,7 +53,6 @@ spec:
       service:
         ports:
           - name: tcp-postgresql
-            protocol: TCP
             port: 5432
             targetPort: tcp-postgresql
           - name: http-metrics-postgresql

@@ -106,11 +106,11 @@ var _ = Describe("builder", func() {
 			clusterVersionObj = allFieldsClusterVersionObj(needCreate)
 		}
 
-		pvcSpec := testapps.NewPVC("1Gi")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
 			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
 			GetObject()
@@ -472,7 +472,7 @@ var _ = Describe("builder", func() {
 				ManagerName:   "cfgmgr",
 				CharacterType: "mysql",
 				SecreteName:   "test-secret",
-				Image:         constant.KBImage,
+				Image:         constant.KBToolsImage,
 				Args:          []string{},
 				Envs:          []corev1.EnvVar{},
 				Volumes:       []corev1.VolumeMount{},

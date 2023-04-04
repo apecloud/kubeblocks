@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -87,6 +88,12 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	// get cluster
 	if err = getResource(types.ClusterGVR(), o.Name, o.Namespace, objs.Cluster); err != nil {
 		return nil, err
+	}
+
+	// wrap the cluster phase if the latest ops request is processing
+	latestOpsProcessedCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
+	if latestOpsProcessedCondition != nil && latestOpsProcessedCondition.Status == metav1.ConditionFalse {
+		objs.Cluster.Status.Phase = appsv1alpha1.ClusterPhase(latestOpsProcessedCondition.Reason)
 	}
 
 	// get cluster definition

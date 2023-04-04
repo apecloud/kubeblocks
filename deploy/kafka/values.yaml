@@ -1,17 +1,15 @@
-# Default values for kafka.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
-
+## Common override values:
+##
+## @param clusterVersionOverride
+## @param nameOverride
+## @param fullnameOverride
 clusterVersionOverride: ""
 nameOverride: ""
 fullnameOverride: ""
 
-
 ## @param commonLabels Labels to add to all deployed objects
 ##
 commonLabels: {}
-
 
 ## @param application images
 ##
@@ -31,3 +29,20 @@ images:
 ## @param debugEnabled enables containers' debug logging
 ##
 debugEnabled: true
+
+## @param mountOptions set the storageclass mountOptions attributes
+##
+mountOptions:
+  - noatime
+  - nobarrier
+
+## storageclass parameters settings
+##
+## @param storageClassParameters.metadata.awsEBSVolumeType
+## @param storageClassParameters.metadata.awsEBSEnableBlockExpress
+storageClassParameters:
+  ## storageclass for KRaft metadata
+  ##
+  metadata:
+    awsEBSVolumeType: io2
+    awsEBSEnableBlockExpress: false

@@ -88,11 +88,13 @@ func init() {
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 100)
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault("VOLUMESNAPSHOT", false)
-	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
+	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("PROBE_SERVICE_HTTP_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
+	viper.SetDefault("CONFIG_MANAGER_GRPC_PORT", 9901)
+	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 }
 
@@ -377,6 +379,15 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("deployment-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
+		os.Exit(1)
+	}
+
+	if err = (&components.PodReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("pod-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Pod")
 		os.Exit(1)
 	}
 

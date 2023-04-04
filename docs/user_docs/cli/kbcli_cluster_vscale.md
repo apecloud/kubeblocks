@@ -12,13 +12,14 @@ kbcli cluster vscale [flags]
 
 ```
   # scale the computing resources of specified components, separate with commas when <component-name> more than one
-  kbcli cluster vscale <my-cluster> --component-names=<component-name> --cpu=500m --memory=500Mi
+  kbcli cluster vscale <my-cluster> --components=<component-name> --cpu=500m --memory=500Mi
 ```
 
 ### Options
 
 ```
-      --component-names strings       Component names to this operations
+      --class string                 Component class
+      --components strings            Component names to this operations
       --cpu string                   Requested and limited size of component cpu
   -h, --help                         help for vscale
       --memory string                Requested and limited size of component memory

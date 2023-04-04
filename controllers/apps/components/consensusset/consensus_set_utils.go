@@ -444,6 +444,17 @@ func updateConsensusRoleInfo(ctx context.Context,
 			}
 		}
 	}
+	// patch pods' annotations
+	for _, pod := range pods {
+		patch := client.MergeFrom(pod.DeepCopy())
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		pod.Annotations[constant.LeaderAnnotationKey] = leader
+		if err := cli.Patch(ctx, &pod, patch); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

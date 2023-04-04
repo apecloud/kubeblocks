@@ -1,0 +1,14 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: weaviate-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "weaviate.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: weaviate-standalone
+  componentVersions:
+    - componentDefRef: weaviate
+      versionsContext:
+        containers:
+          - name: weaviate
+            image: {{ .Values.images.weaviate.repository }}:{{ default .Chart.AppVersion .Values.images.weaviate.tag }}

@@ -1,0 +1,141 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  name: classfamilies.apps.kubeblocks.io
+spec:
+  group: apps.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    - all
+    kind: ClassFamily
+    listKind: ClassFamilyList
+    plural: classfamilies
+    shortNames:
+    - cf
+    singular: classfamily
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ClassFamily is the Schema for the classfamilies API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ClassFamilySpec defines the desired state of ClassFamily
+            properties:
+              models:
+                description: Class family models, generally, a model is a specific
+                  constraint for CPU, memory and their relation.
+                items:
+                  properties:
+                    cpu:
+                      description: The constraint for vcpu cores.
+                      properties:
+                        max:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: The maximum count of vcpu cores, [Min, Max]
+                            defines a range for valid vcpu cores, and the value in
+                            this range must be multiple times of Step. It's useful
+                            to define a large number of valid values without defining
+                            them one by one. Please see the documentation for Step
+                            for some examples. If Slots is specified, Max, Min, and
+                            Step are ignored
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        min:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: The minimum count of vcpu cores, [Min, Max]
+                            defines a range for valid vcpu cores, and the value in
+                            this range must be multiple times of Step. It's useful
+                            to define a large number of valid values without defining
+                            them one by one. Please see the documentation for Step
+                            for some examples. If Slots is specified, Max, Min, and
+                            Step are ignored
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        slots:
+                          description: The valid vcpu cores, it's useful if you want
+                            to define valid vcpu cores explicitly. If Slots is specified,
+                            Max, Min, and Step are ignored
+                          items:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          type: array
+                        step:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: 'The minimum granularity of vcpu cores, [Min,
+                            Max] defines a range for valid vcpu cores and the value
+                            in this range must be multiple times of Step. For example:
+                            1. Min is 2, Max is 8, Step is 2, and the valid vcpu core
+                            is {2, 4, 6, 8}. 2. Min is 0.5, Max is 2, Step is 0.5,
+                            and the valid vcpu core is {0.5, 1, 1.5, 2}.'
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                      type: object
+                    memory:
+                      description: The constraint for memory size.
+                      properties:
+                        maxPerCPU:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: 'The maximum size of memory per vcpu core,
+                            [MinPerCPU, MaxPerCPU] defines a range for valid memory
+                            size per vcpu core. It is useful on GCP as the ratio between
+                            the CPU and memory may be a range. If SizePerCPU is specified,
+                            MinPerCPU and MaxPerCPU are ignored. Reference: https://cloud.google.com/compute/docs/general-purpose-machines#custom_machine_types'
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        minPerCPU:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: 'The minimum size of memory per vcpu core,
+                            [MinPerCPU, MaxPerCPU] defines a range for valid memory
+                            size per vcpu core. It is useful on GCP as the ratio between
+                            the CPU and memory may be a range. If SizePerCPU is specified,
+                            MinPerCPU and MaxPerCPU are ignored. Reference: https://cloud.google.com/compute/docs/general-purpose-machines#custom_machine_types'
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        sizePerCPU:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: 'The size of memory per vcpu core. For example:
+                            1Gi, 200Mi. If SizePerCPU is specified, MinPerCPU and
+                            MaxPerCPU are ignore.'
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                      type: object
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true

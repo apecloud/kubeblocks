@@ -132,6 +132,14 @@ func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) recon
 	return result
 }
 
+func getConfigSpecName(configSpec []appsv1alpha1.ComponentConfigSpec) []string {
+	names := make([]string, len(configSpec))
+	for i, spec := range configSpec {
+		names[i] = spec.Name
+	}
+	return names
+}
+
 func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1alpha1.ComponentConfigSpec) *metav1.Condition {
 	if result.configPatch.IsModify {
 		return appsv1alpha1.NewReconfigureRunningCondition(
@@ -176,7 +184,7 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 	}
 
 	// if failed to validate configure, set opsRequest to failed and return
-	failedCondition := appsv1alpha1.NewFailedCondition(resource.OpsRequest, err)
+	failedCondition := appsv1alpha1.NewReconfigureFailedCondition(resource.OpsRequest, err)
 	resource.OpsRequest.SetStatusCondition(*failedCondition)
 	return nil
 }

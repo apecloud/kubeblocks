@@ -22,19 +22,23 @@ import (
 	"golang.org/x/exp/maps"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // mergeAnnotations keeps the original annotations.
 // if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
-func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
-	if restartAnnotation, ok := originalAnnotations[constant.RestartAnnotationKey]; ok {
-		if targetAnnotations == nil {
-			targetAnnotations = map[string]string{}
-		}
-		targetAnnotations[constant.RestartAnnotationKey] = restartAnnotation
+func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
+	if targetAnnotations == nil {
+		return
 	}
-	return targetAnnotations
+	if *targetAnnotations == nil {
+		*targetAnnotations = map[string]string{}
+	}
+	for k, v := range originalAnnotations {
+		// if the annotation not exist in targetAnnotations, copy it from original.
+		if _, ok := (*targetAnnotations)[k]; !ok {
+			(*targetAnnotations)[k] = v
+		}
+	}
 }
 
 // mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
@@ -54,15 +58,10 @@ func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]s
 }
 
 // updateComponentPhaseWithOperation if workload of component changes, should update the component phase.
-// REVIEW: this function need provide return value to determine mutation or not
-// Deprecated:
 func updateComponentPhaseWithOperation(cluster *appsv1alpha1.Cluster, componentName string) {
-	if len(componentName) == 0 {
-		return
-	}
 	componentPhase := appsv1alpha1.SpecReconcilingClusterCompPhase
-	if cluster.Status.Phase == appsv1alpha1.StartingClusterPhase {
-		componentPhase = appsv1alpha1.StartingClusterCompPhase
+	if cluster.Status.Phase == appsv1alpha1.CreatingClusterPhase {
+		componentPhase = appsv1alpha1.CreatingClusterCompPhase
 	}
 	compStatus := cluster.Status.Components[componentName]
 	// synchronous component phase is consistent with cluster phase

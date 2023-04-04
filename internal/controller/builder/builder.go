@@ -350,7 +350,6 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 		"$(UUID_HEX)":          uuidHex,
 		"$(SVC_FQDN)":          fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
 		"$(HEADLESS_SVC_FQDN)": fmt.Sprintf("%s-%s-headless.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
-		"$(POD_NAME_PREFIX)":   fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name),
 	}
 	if len(params.Component.Services) > 0 {
 		for _, p := range params.Component.Services[0].Spec.Ports {

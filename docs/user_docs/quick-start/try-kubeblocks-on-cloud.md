@@ -110,7 +110,7 @@ The initialization lasts about 20 minutes. If the installation fails after a lon
 Make sure you have all the followings prepared.
 * Google cloud account.
 * `kubectl`: to interact with Kubernetes clusters. For installation details, refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
-* `kbcli`: the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. 
+* `kbcli`: the command line tool of KubeBlocks and is used for the interaction with KubeBlocks. 
   
 
 ### Configure GCP environment
@@ -186,7 +186,7 @@ Make sure you have all the followings prepared.
 
 * Tencent cloud account.
 * `kubectl`: to interact with Kubernetes clusters. For installation details, refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
-* `kbcli`: the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. 
+* `kbcli`: the command line tool of KubeBlocks and is used for the interaction with KubeBlocks. 
   
 ### Configure TKE environment
 
@@ -246,7 +246,7 @@ Make sure you have all the followings prepared.
 
 * Alibaba cloud account.
 * `kubectl`: to interact with Kubernetes clusters. For installation details, refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
-* `kbcli`: the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. 
+* `kbcli`: the command line tool of KubeBlocks and is used for the interaction with KubeBlocks. 
   
 ### Configure ACK environment
 
@@ -258,10 +258,10 @@ Make sure you have all the followings prepared.
    This operation grant permissions to access Operation Orchestration Service (OOS) and to access the resources in other cloud products since creating and managing a node pool is required for creating an ACK cluster.
 
    Refer to [Scale a node pool](https://www.alibabacloud.com/help/zh/container-service-for-kubernetes/latest/scale-up-and-down-node-pools) for details.
-4. Create a pair of AccessKey ID and AccessKey secret.
+4. Create a AccessKey ID and the corresponding AccessKey secret.
 
-   1. Go to [Alibaba Cloud Management Console](https://homenew.console.aliyun.com/home/dashboard/ProductAndService). Hover the pointer over your account picture and click **AccessKey Management**.
-   2. Click **Create AccessKey** to create a pair of AccessKey ID and AccessKey secret.
+   1. Go to [Alibaba Cloud Management Console](https://homenew.console.aliyun.com/home/dashboard/ProductAndService). Hover the pointer over your account console and click **AccessKey Management**.
+   2. Click **Create AccessKey** to create the AccessKey ID and the corresponding AccessKey secret.
    3. Add the AccessKey ID and AccessKey secret to the environment variable to configure identity authorization information.
        ```
        export ALICLOUD_ACCESS_KEY="************"

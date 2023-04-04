@@ -547,7 +547,8 @@ func GetHelmChartRepoURL() string {
 	}
 
 	location, _ := getIPLocation()
-	if location == "CN" {
+	// if location is CN, or we can not get location, use GitLab helm chart repo
+	if location == "CN" || location == "" {
 		return types.GitLabHelmChartRepo
 	}
 	return types.KubeBlocksChartURL

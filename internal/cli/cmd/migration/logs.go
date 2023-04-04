@@ -3,11 +3,10 @@ package migration
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/exec"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	migrationv1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/spf13/cobra"
+	"strconv"
+	"strings"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,9 +16,12 @@ import (
 	cmdlogs "k8s.io/kubectl/pkg/cmd/logs"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
-	"strconv"
-	"strings"
-	"time"
+
+	"github.com/apecloud/kubeblocks/internal/cli/exec"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	migrationv1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/spf13/cobra"
 )
 
 type LogsOptions struct {

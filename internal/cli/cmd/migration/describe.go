@@ -3,12 +3,11 @@ package migration
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	v1alpha1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/spf13/cobra"
 	"io"
+	"sort"
+	"strconv"
+	"strings"
+
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -18,9 +17,12 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"sort"
-	"strconv"
-	"strings"
+
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	v1alpha1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -196,10 +198,10 @@ func showInitialization(task *v1alpha1.MigrationTask, template *v1alpha1.Migrati
 		return order1 < order2
 	})
 	cliStepOrder := BuildInitializationStepsOrder(task, template)
+	tbl := newTbl(out, "\nInitialization:", "STEP", "NAMESPACE", "STATUS", "CREATED_TIME", "START-TIME", "FINISHED-TIME")
 	if len(cliStepOrder) != len(jobList.Items) {
 		return
 	}
-	tbl := newTbl(out, "\nInitialization:", "STEP", "NAMESPACE", "STATUS", "CREATED_TIME", "START-TIME", "FINISHED-TIME")
 	for i, job := range jobList.Items {
 		tbl.AddRow(cliStepOrder[i], job.Namespace, getJobStatus(job.Status.Conditions), TimeFormat(&job.CreationTimestamp), TimeFormat(job.Status.StartTime), TimeFormat(job.Status.CompletionTime))
 	}

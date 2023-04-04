@@ -2,16 +2,18 @@ package migration
 
 import (
 	"fmt"
+	"strings"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	migrationv1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/spf13/cobra"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"strings"
 )
 
 var (
@@ -59,12 +61,12 @@ func NewMigrationCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		ResourceNameGVRForCompletion: types.MigrationTaskGVR(),
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.Template, "template", "", "Specify migration template, run \"kbcli migration templates\" to show all available migration templates")
-			cmd.Flags().StringVar(&o.Source, "source", "", "")
-			cmd.Flags().StringVar(&o.Sink, "sink", "", "")
-			cmd.Flags().StringSliceVar(&o.MigrationObject, "migration-object", []string{}, "")
-			cmd.Flags().StringSliceVar(&o.Steps, "steps", []string{}, "")
-			cmd.Flags().StringSliceVar(&o.Tolerations, "tolerations", []string{}, "")
-			cmd.Flags().StringSliceVar(&o.Resources, "resources", []string{}, "")
+			cmd.Flags().StringVar(&o.Source, "source", "", "Set the source database information for migration.such as '{username}:{password}@{connection_address}:{connection_port}/[{database}]'")
+			cmd.Flags().StringVar(&o.Sink, "sink", "", "Set the sink database information for migration.such as '{username}:{password}@{connection_address}:{connection_port}/[{database}]")
+			cmd.Flags().StringSliceVar(&o.MigrationObject, "migration-object", []string{}, "Set the data objects that need to be migrated,such as '\"db1.table1\",\"db2\"'")
+			cmd.Flags().StringSliceVar(&o.Steps, "steps", []string{}, "Set up migration steps,valid values: (precheck, init-struct, init-data, cdc)")
+			cmd.Flags().StringSliceVar(&o.Tolerations, "tolerations", []string{}, "Tolerations for migration, such as '\"key=engineType,value=pg,operator=Equal,effect=NoSchedule\"'")
+			cmd.Flags().StringSliceVar(&o.Resources, "resources", []string{}, "Resources limit for migration, such as '\"cpu=3000m,memory=3Gi\"'\"")
 
 			util.CheckErr(cmd.MarkFlagRequired("template"))
 			util.CheckErr(cmd.MarkFlagRequired("source"))

@@ -3,15 +3,16 @@ package migration
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	migrationv1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"strings"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"strings"
+
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	migrationv1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
 )
 
 const (
@@ -35,6 +36,7 @@ func (e *EndpointModel) BuildFromStr(msgArr *[]string, endpointStr string) error
 		BuildErrorMsg(msgArr, "endpoint string can not be empty")
 		return nil
 	}
+	e.clear()
 	endpointStr = strings.TrimSpace(endpointStr)
 	accountUrlPair := strings.Split(endpointStr, "@")
 	if len(accountUrlPair) != 2 {
@@ -56,6 +58,13 @@ func (e *EndpointModel) BuildFromStr(msgArr *[]string, endpointStr string) error
 		e.Address = accountUrlPair[1]
 	}
 	return nil
+}
+
+func (e *EndpointModel) clear() {
+	e.Address = ""
+	e.Password = ""
+	e.UserName = ""
+	e.Database = ""
 }
 
 // Migration Object
@@ -196,7 +205,8 @@ func TimeFormat(t *metav1.Time) string {
 	if t == nil || t.IsZero() {
 		return "-"
 	}
-	return util.TimeTimeFormat(t.Time)
+	const layout = "Jan 02,2006 15:04:05 UTC-0700"
+	return t.Format(layout)
 }
 
 func BuildErrorMsg(msgArr *[]string, msg string) {

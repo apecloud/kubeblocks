@@ -59,6 +59,7 @@ var _ = Describe("create", func() {
 
 		It("Endpoint with no database", func() {
 			//Expect(c[monitorKey]).ShouldNot(BeTrue())
+			//o2 := &CreateMigrationOptions{}
 			o.Source = "user:123456@127.0.0.1:3306"
 			errMsgArr := make([]string, 0, 3)
 			err = o.SourceEndpointModel.BuildFromStr(&errMsgArr, o.Source)
@@ -121,11 +122,13 @@ var _ = Describe("create", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(o.TolerationModel[v1alpha1.CliStepGlobal.String()]).ShouldNot(BeEmpty())
 			Expect(o.TolerationModel[v1alpha1.CliStepInitData.String()]).ShouldNot(BeEmpty())
+			Expect(len(o.TolerationModel[v1alpha1.CliStepInitData.String()])).Should(Equal(1))
 			Expect(len(o.TolerationModel[v1alpha1.CliStepGlobal.String()])).Should(Equal(2))
+			Expect(len(o.TolerationModel[v1alpha1.CliStepPreCheck.String()])).Should(Equal(0))
 		})
 
 		It("Resources", func() {
-			o.Tolerations = []string{
+			o.Resources = []string{
 				"step=global,cpu=1000m,memory=1Gi",
 				"step=init-data,cpu=2000m,memory=2Gi",
 				"cpu=3000m,memory=3Gi",
@@ -134,6 +137,7 @@ var _ = Describe("create", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(o.ResourceModel[v1alpha1.CliStepGlobal.String()]).ShouldNot(BeEmpty())
 			Expect(o.ResourceModel[v1alpha1.CliStepInitData.String()]).ShouldNot(BeEmpty())
+			Expect(o.ResourceModel[v1alpha1.CliStepPreCheck.String()]).Should(BeEmpty())
 		})
 	})
 

@@ -384,6 +384,25 @@ func (i *InstallOpts) Upgrade(cfg *Config) error {
 	return nil
 }
 
+func mergeMaps(a, b map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(a))
+	for k, v := range a {
+		out[k] = v
+	}
+	for k, v := range b {
+		if v, ok := v.(map[string]interface{}); ok {
+			if bv, ok := out[k]; ok {
+				if bv, ok := bv.(map[string]interface{}); ok {
+					out[k] = mergeMaps(bv, v)
+					continue
+				}
+			}
+		}
+		out[k] = v
+	}
+	return out
+}
+
 func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	installed, err := i.GetInstalled(cfg)
 	if err != nil {
@@ -406,7 +425,9 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	} else {
 		client.Version = installed.Chart.AppVersion()
 	}
-	client.ReuseValues = true
+	// do not use helm's ReuseValues, do it ourselves, helm's default upgrade also set it to false
+	// if ReuseValues set to true, helm will use old values instead of new ones, which will cause nil pointer error if new values added.
+	client.ReuseValues = false
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
 	if err != nil {
@@ -418,6 +439,13 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// get coalesced values of current chart
+	currentValues, err := chartutil.CoalesceValues(installed.Chart, installed.Config)
+	if err != nil {
+		return "", err
+	}
+	// merge current values into vals, so current release's user values can be kept
+	vals = mergeMaps(currentValues, vals)
 
 	// Check Chart dependencies to make sure all are present in /charts
 	chartRequested, err := loader.Load(cp)

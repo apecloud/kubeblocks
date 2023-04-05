@@ -79,7 +79,7 @@ jobs:
 
         VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
         echo "::set-output name=RELEASE_VERSION::${RELEASE_VERSION}" 
-        mkdir -p ${{ env.CLI_NAME }}-${{ matrix.os }}-${RELEASE_VERSION}
+        mkdir -p ${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}
 
     - name: make zip
       if: matrix.os == 'windows-amd64'

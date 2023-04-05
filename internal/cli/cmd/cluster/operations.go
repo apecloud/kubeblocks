@@ -292,7 +292,7 @@ func (o *OperationsOptions) validateTemplateParam(tpls []appsv1alpha1.ComponentC
 func (o *OperationsOptions) validateConfigMapKey(tpl *appsv1alpha1.ComponentConfigSpec, componentName string) error {
 	var (
 		cmObj  = corev1.ConfigMap{}
-		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.VolumeName)
+		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.Name)
 	)
 
 	if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{

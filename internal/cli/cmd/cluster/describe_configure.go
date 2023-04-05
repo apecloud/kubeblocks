@@ -302,7 +302,7 @@ func (r *reconfigureOptions) getReconfigureMeta() ([]types.ConfigTemplateInfo, e
 		tpl, _ := r.findTemplateByName(tplName)
 		// fetch config configmap
 		cmObj := &corev1.ConfigMap{}
-		cmName := cfgcore.GetComponentCfgName(r.clusterName, r.componentName, tpl.VolumeName)
+		cmName := cfgcore.GetComponentCfgName(r.clusterName, r.componentName, tpl.Name)
 		if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
 			Name:      cmName,
 			Namespace: r.namespace,

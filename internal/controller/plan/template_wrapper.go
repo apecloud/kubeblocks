@@ -94,7 +94,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileT
 
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, configSpec := range task.Component.ConfigTemplates {
-		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, configSpec.VolumeName)
+		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, configSpec.Name)
 		if enableRerender, err = wrapper.enableRerenderTemplateSpec(cmName, task); err != nil {
 			return err
 		}
@@ -122,7 +122,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileT
 func (wrapper *renderWrapper) renderScriptTemplate(task *intctrltypes.ReconcileTask) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, templateSpec := range task.Component.ScriptTemplates {
-		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, templateSpec.VolumeName)
+		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, templateSpec.Name)
 		if task.GetLocalResourceWithObjectKey(client.ObjectKey{
 			Name:      cmName,
 			Namespace: wrapper.cluster.Namespace,

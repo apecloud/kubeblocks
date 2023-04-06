@@ -89,9 +89,7 @@ jobs:
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
           mv ${{ env.CLI_FILENAME }}.zip bin/
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.zip" >> $GITHUB_ENV
-          
-          # When we abstract the `asset_content_type`   , the .zip file published by github actions does not open successfully in windows
-          # echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
+          echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
 
       - name: make tar
         if: matrix.os != 'windows-amd64'    
@@ -100,27 +98,16 @@ jobs:
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           mv ${{ env.CLI_FILENAME }}.tar.gz bin/
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
-          # same as "make zip"
-          # echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
+          echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
       
-      - name: upload windows release asset 
-        uses: actions/upload-release-asset@v1
-        if: matrix.os == 'windows-amd64'
+      - name: upload release asset 
+        uses: actions/upload-release-asset@main
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
           asset_path: ./bin/${{ env.ASSET_NAME }}
           asset_name: ${{ env.ASSET_NAME }}
-          asset_content_type: application/zip
-      
-      - name: upload linux_mac release asset
-        if: matrix.os != 'windows-amd64' 
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.ASSET_NAME }}
-          asset_name: ${{ env.ASSET_NAME }}
-          asset_content_type: application/gzip
-      
+          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+       
       - name: get release kbcli upload url
         run: |
           echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
@@ -130,22 +117,12 @@ jobs:
             --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 
       - name: upload release kbcli asset
-        if:  matrix.os == 'windows-amd64'
         uses: actions/upload-release-asset@main
         with:
           upload_url: ${{ env.UPLOAD_URL }}
           asset_path: ./bin/${{ env.ASSET_NAME }}
           asset_name: ${{ env.ASSET_NAME }}
           asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
-
-      - name: upload release kbcli asset
-        if:  matrix.os != 'windows-amd64'
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ./bin/${{ env.ASSET_NAME }}
-          asset_name: ${{ env.ASSET_NAME }}
-          asset_content_type: application/gzip
 
       - name: upload gitlab kbcli asset 
         run: |

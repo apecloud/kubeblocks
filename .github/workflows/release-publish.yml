@@ -99,14 +99,24 @@ jobs:
           mv ${{ env.CLI_FILENAME }}.tar.gz bin/
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
-          
-      - name: upload release asset 
+      
+      - name: upload windows release asset 
+        uses: actions/upload-release-asset@v1
+        if: matrix.os == 'windows-amd64'
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: ./bin/${{ env.ASSET_NAME }}
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: application/zip
+      
+      - name: upload linux_mac release asset
+        if: matrix.os != 'windows-amd64' 
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
           asset_path: ./bin/${{ env.ASSET_NAME }}
           asset_name: ${{ env.ASSET_NAME }}
-          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+          asset_content_type: application/gzip
       
       - name: get release kbcli upload url
         run: |
@@ -116,13 +126,23 @@ jobs:
             --github-repo ${{ env.CLI_REPO }} \
             --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 
-      - name: upload release kbcli asset 
+      - name: upload release kbcli asset
+        if:  matrix.os == 'windows-amd64'
         uses: actions/upload-release-asset@main
         with:
           upload_url: ${{ env.UPLOAD_URL }}
           asset_path: ./bin/${{ env.ASSET_NAME }}
           asset_name: ${{ env.ASSET_NAME }}
           asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+
+      - name: upload release kbcli asset
+        if:  matrix.os != 'windows-amd64'
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ./bin/${{ env.ASSET_NAME }}
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: application/gzip
 
       - name: upload gitlab kbcli asset 
         run: |

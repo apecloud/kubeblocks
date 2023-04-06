@@ -38,6 +38,9 @@ secret: {
 			"app.kubernetes.io/name":       "\(clusterdefinition.metadata.name)"
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
+			if clusterdefinition.spec.type != _|_ {
+			  "kubeblocks.io/character-type": clusterdefinition.spec.type
+			}
 		}
 	}
 }

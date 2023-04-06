@@ -58,7 +58,7 @@ Running a database cluster on the cloud causes fees. Delete the resources create
       metadata:
        name: gp3
        annotations:
-       storageclass.kubernetes.io/is-default-class: "true"
+        storageclass.kubernetes.io/is-default-class: "true"
       allowVolumeExpansion: true
       provisioner: ebs.csi.aws.com
       volumeBindingMode: WaitForFirstConsumer

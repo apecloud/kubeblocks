@@ -12,6 +12,9 @@ env:
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'
   GITLAB_KBCLI_PROJECT_ID: 85948
+  ASSET_NAME: ""
+  ASSET_CONTENT_TYPE: ""
+
 
 jobs:
   create-release-kbcli:
@@ -35,7 +38,7 @@ jobs:
             --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
             --tag-name ${{ env.TAG_NAME }} \
             --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
-
+            
 
   upload-release-assert:
     needs: create-release-kbcli
@@ -81,38 +84,34 @@ jobs:
           mkdir -p ${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}
 
       - name: make zip
+        id: win_zip
         if: matrix.os == 'windows-amd64'
         run: |
           mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}.exe   
           zip -r -o ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}
           file ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  # for debug 
           mv ${{ env.CLI_NAME }}-${{ matrix.os }}.zip bin/
+          echo "::set-env name=ASSET_NAME::${{ env.CLI_NAME }}-${{ matrix.os }}.zip"
+          echo "::set-env name=ASSET_CONTENT_TYPE::application/zip"
       
       - name: make tar
+        id: linux_tar
         if: matrix.os != 'windows-amd64'    
         run: |
           mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}
           tar -zcvf ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}
           mv ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz bin/
-
-      - name: upload release asset linux and mac
+          echo "::set-env name=ASSET_NAME::${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz"
+          echo "::set-env name=ASSET_CONTENT_TYPE::application/gzip"         
+          
+      - name: upload release asset 
         uses: actions/upload-release-asset@v1
-        if: matrix.os != 'windows-amd64'
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
-          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
-          asset_content_type: application/gzip
+          asset_path: ./bin/${{ env.ASSET_NAME }}
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
       
-      - name: upload release asset windows
-        uses: actions/upload-release-asset@v1
-        if: matrix.os == 'windows-amd64'
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.zip
-          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.zip
-          asset_content_type: application/zip
-        
       - name: get release kbcli upload url
         run: |
           echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
@@ -121,44 +120,20 @@ jobs:
             --github-repo ${{ env.CLI_REPO }} \
             --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 
-      
-
-      - name: upload release kbcli asset linux and mac
+      - name: upload release kbcli asset 
         uses: actions/upload-release-asset@main
-        if: matrix.os != 'windows-amd64'
         with:
           upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
-          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
-          asset_content_type: application/gzip
+          asset_path: ./bin/${{ env.ASSET_NAME }}
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
 
-      - name: upload release kbcli asset windows
-        uses: actions/upload-release-asset@main
-        if: matrix.os == 'windows-amd64'
-        with:
-          upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.zip
-          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.zip
-          asset_content_type: application/zip
-
-      - name: upload gitlab kbcli asset linux and mac
-        if: matrix.os != 'windows-amd64' 
+      - name: upload gitlab kbcli asset 
         run: |
           bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
             --type 2 \
             --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
             --tag-name ${{ env.TAG_NAME }} \
-            --asset-path ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz \
-            --asset-name ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz\
-            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
-
-      - name: upload gitlab kbcli asset windows
-        if: matrix.os == 'windows-amd64' 
-        run: |
-          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-            --type 2 \
-            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-            --tag-name ${{ env.TAG_NAME }} \
-            --asset-path ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.zip \
-            --asset-name ${{ env.CLI_NAME }}-${{ matrix.os }}.zip\
+            --asset-path ./bin/${{ env.ASSET_NAME }} \
+            --asset-name ${{ env.ASSET_NAME }}\
             --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}

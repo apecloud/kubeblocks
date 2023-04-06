@@ -1,6 +1,8 @@
 # Manage user accounts
 KubeBlocks offers a variety of services to enhance the usability, availability, and observability of database clusters. Different components require user accounts with different permissions to create connections. 
+
 ***Steps***
+
 - Creating a user account
   ```
   kbcli cluster create-account <clustername> --username <name> --password <pwd> 

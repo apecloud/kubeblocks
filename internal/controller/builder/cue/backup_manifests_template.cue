@@ -42,6 +42,6 @@ job: {
 			spec: podSpec
 		}
 		backOffLimit:            3
-		ttlSecondsAfterFinished: 0
+		ttlSecondsAfterFinished: 10
 	}
 }

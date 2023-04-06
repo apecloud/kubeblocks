@@ -1,12 +1,9 @@
 name: RELEASE-PUBLISH
 
 on:
-    push:
-      branches:
-        - origin/bugfix/fix-windows-support
-  # release:
-  #   types:
-  #     - published
+  release:
+    types:
+      - published
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -85,7 +82,6 @@ jobs:
             --type 1`
           VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
           mkdir -p ${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}
-          
           echo "::set-env name=CLI_DIR::${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}" 
           echo "::set-env name=CLI_FILENAME::${{ env.CLI_NAME }}-${{ matrix.os }}"
 

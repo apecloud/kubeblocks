@@ -44,8 +44,8 @@ import (
 )
 
 // PointInTimeRecoveryManager  pitr manager functions
-// 1. get latestBaseBackup
-// 2. get future backup, if not found, create it
+// 1. get the latest base backup
+// 2. get the next earliest backup
 // 3. add log pvc by datasource volume snapshot
 // 3. update configuration
 // 4. create init container to prepare log
@@ -108,7 +108,7 @@ func (p *PointInTimeRecoveryManager) getSortedBackups() ([]dpv1alpha1.Backup, er
 	return backups, nil
 }
 
-// getSortedBackups sorted by reverse CompletionTimestamp
+// getSortedBackups sorted by reverse StopTime
 func (p *PointInTimeRecoveryManager) getReverseSortedBackups() ([]dpv1alpha1.Backup, error) {
 	backups, err := p.listCompletedBackups()
 	if err != nil {
@@ -130,7 +130,7 @@ func (p *PointInTimeRecoveryManager) getReverseSortedBackups() ([]dpv1alpha1.Bac
 	return backups, nil
 }
 
-// getLatestBaseBackup get the latest baseBackup
+// getLatestBaseBackup gets the latest baseBackup
 func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, error) {
 	// 1. sort backups by completed timestamp
 	backups, err := p.getReverseSortedBackups()
@@ -210,7 +210,7 @@ func (p *PointInTimeRecoveryManager) checkAndInitForCleanup() (need bool, err er
 	return p.basicCheckAndInit()
 }
 
-// checkAndInit check if cluster need to be restored, return value: true: need, false: no need
+// checkAndInit checks if cluster need to be restored, return value: true: need, false: no need
 func (p *PointInTimeRecoveryManager) checkAndInit() (need bool, err error) {
 	if p.Cluster.Annotations[recoveryFinishedKey] == recoveryTrue {
 		return false, nil
@@ -515,7 +515,7 @@ func (p *PointInTimeRecoveryManager) DoPrepare(component *component.SynthesizedC
 	return nil
 }
 
-// removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
+// removeStsInitContainerForRestore removes the statefulSet's init container after recovery job completed.
 func (p *PointInTimeRecoveryManager) removeStsInitContainer(
 	cluster *appsv1alpha1.Cluster,
 	componentName string) error {
@@ -540,7 +540,7 @@ func (p *PointInTimeRecoveryManager) removeStsInitContainer(
 	return nil
 }
 
-// MergeConfigMap to merge from config when recovery to point time from cluster.
+// MergeConfigMap merge configmap with the config to recover from a point in time.
 func (p *PointInTimeRecoveryManager) MergeConfigMap(configMap *corev1.ConfigMap) error {
 	if need, err := p.checkAndInit(); err != nil {
 		return err
@@ -587,7 +587,7 @@ func DoPITRPrepare(ctx context.Context, cli client.Client, cluster *appsv1alpha1
 	return nil
 }
 
-// DoPITRIfNeed check if run restore job and copy data for point in time recovery
+// DoPITRIfNeed checks if run restore job and copy data for point in time recovery
 func DoPITRIfNeed(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
 	pitrMgr := PointInTimeRecoveryManager{
 		Cluster: cluster,

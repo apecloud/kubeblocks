@@ -89,8 +89,10 @@ jobs:
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
           mv ${{ env.CLI_FILENAME }}.zip bin/
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.zip" >> $GITHUB_ENV
-          echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
-      
+          
+          # When we abstract the `asset_content_type`   , the .zip file published by github actions does not open successfully in windows
+          # echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
+
       - name: make tar
         if: matrix.os != 'windows-amd64'    
         run: |
@@ -98,7 +100,8 @@ jobs:
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           mv ${{ env.CLI_FILENAME }}.tar.gz bin/
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
-          echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
+          # same as "make zip"
+          # echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
       
       - name: upload windows release asset 
         uses: actions/upload-release-asset@v1

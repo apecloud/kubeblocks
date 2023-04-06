@@ -63,7 +63,9 @@ func buildTPLScriptArgs(options *appsv1alpha1.TPLScriptTrigger, volumeDirs []cor
 	}
 
 	args := buildConfigManagerCommonArgs(volumeDirs)
-	args = append(args, "--operator-update-enable")
+	if options.Sync != nil && *options.Sync {
+		args = append(args, "--operator-update-enable")
+	}
 	args = append(args, "--tcp", viper.GetString(constant.ConfigManagerGPRCPortEnv))
 	args = append(args, "--notify-type", string(appsv1alpha1.TPLScriptType))
 	args = append(args, "--tpl-config", filepath.Join(scriptVolumePath, configTemplateName))

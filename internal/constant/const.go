@@ -92,6 +92,7 @@ const (
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
+	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
 
 	// CMConfigurationTypeLabelKey configmap is config template type, e.g: "tpl", "instance"
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
@@ -108,7 +109,8 @@ const (
 	// CMInsConfigurationLabelKey configmap is configuration file for component
 	// CMInsConfigurationLabelKey = "config.kubeblocks.io/ins-configure"
 
-	CMInsLastReconfigureMethodLabelKey = "config.kubeblocks.io/last-applied-reconfigure-policy"
+	// CMInsLastReconfigurePhaseKey defines the current phase
+	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
 
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
@@ -189,6 +191,10 @@ const (
 	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"
 	ConfigTemplateType    = "tpl"
 	ConfigInstanceType    = "instance"
+
+	ReconfigureManagerSource  = "manager"
+	ReconfigureUserSource     = "ops"
+	ReconfigureTemplateSource = "external-template"
 )
 
 const (

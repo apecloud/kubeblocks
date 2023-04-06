@@ -54,8 +54,9 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 		client     = param.Client
 		newVersion = param.getTargetVersionHash()
 		configKey  = param.getConfigKey()
-		progress   = cfgcore.NotStarted
-		retStatus  = ESRetry
+
+		retStatus = ESRetry
+		progress  = cfgcore.NotStarted
 	)
 
 	if configKey == "" {

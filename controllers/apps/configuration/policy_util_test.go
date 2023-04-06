@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -106,6 +107,40 @@ func withConfigSpec(configSpecName string, data map[string]string) ParamsOps {
 			Data: data,
 		}
 		params.ConfigSpecName = configSpecName
+	}
+}
+
+func withConfigConstraintSpec(formatter *appsv1alpha1.FormatterConfig) ParamsOps {
+	return func(params *reconfigureParams) {
+		params.ConfigConstraint = &appsv1alpha1.ConfigConstraintSpec{
+			FormatterConfig: formatter,
+		}
+	}
+}
+
+func withConfigPatch(patch map[string]string) ParamsOps {
+	mockEmptyData := func(m map[string]string) map[string]string {
+		r := make(map[string]string, len(patch))
+		for key := range m {
+			r[key] = ""
+		}
+		return r
+	}
+	transKeyPair := func(pts map[string]string) map[string]interface{} {
+		m := make(map[string]interface{}, len(pts))
+		for key, value := range pts {
+			m[key] = value
+		}
+		return m
+	}
+	return func(params *reconfigureParams) {
+		cc := params.ConfigConstraint
+		newConfigData, _ := cfgcore.MergeAndValidateConfigs(*cc, map[string]string{"for_test": ""}, nil, []cfgcore.ParamPairs{{
+			Key:           "for_test",
+			UpdatedParams: transKeyPair(patch),
+		}})
+		configPatch, _, _ := cfgcore.CreateConfigPatch(mockEmptyData(newConfigData), newConfigData, cc.FormatterConfig.Format, nil, false)
+		params.ConfigPatch = configPatch
 	}
 }
 

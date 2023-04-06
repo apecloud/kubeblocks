@@ -149,6 +149,10 @@ spec:
                       scriptConfigMapRef:
                         description: scriptConfigMapRef used to execute for reload.
                         type: string
+                      sync:
+                        description: Specify synchronize updates parameters to the
+                          config manager.
+                        type: boolean
                     required:
                     - scriptConfigMapRef
                     type: object

@@ -93,6 +93,7 @@ func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.
 		cmObj.Annotations = make(map[string]string)
 	}
 	cmObj.Annotations[constant.LastAppliedOpsCRAnnotation] = opsCrName
+	cfgcore.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)
 	return cli.Patch(ctx, cmObj, patch)
 }
 

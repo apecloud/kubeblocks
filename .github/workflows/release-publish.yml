@@ -3,7 +3,7 @@ name: RELEASE-PUBLISH
 on:
   release:
     types:
-    - published
+      - published
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -18,23 +18,23 @@ jobs:
     name: Create Release kbcli
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: create release ${{ env.CLI_NAME }}
-      id: create_release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ env.TAG_NAME }}
-        name: KubeBlocks ${{ env.TAG_NAME }}
-        repository: ${{ env.CLI_REPO }}
-        token: ${{ env.GITHUB_TOKEN }}
-        prerelease: true
-    - name: create gitlab release ${{ env.CLI_NAME }}
-      run: |
-        bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-          --type 1 \
-          --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-          --tag-name ${{ env.TAG_NAME }} \
-          --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
+      - uses: actions/checkout@v3
+      - name: create release ${{ env.CLI_NAME }}
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: KubeBlocks ${{ env.TAG_NAME }}
+          repository: ${{ env.CLI_REPO }}
+          token: ${{ env.GITHUB_TOKEN }}
+          prerelease: true
+      - name: create gitlab release ${{ env.CLI_NAME }}
+        run: |
+          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+            --type 1 \
+            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+            --tag-name ${{ env.TAG_NAME }} \
+            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
 
 
   upload-release-assert:
@@ -45,121 +45,120 @@ jobs:
       fail-fast: false
       matrix:
         os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
-
     steps:
-    - uses: actions/checkout@v3
-    - name: install lib
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends \
-          libbtrfs-dev \
-          libdevmapper-dev
+      - uses: actions/checkout@v3
+      - name: install lib
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev
 
-    - name: Setup Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ env.GO_VERSION }}
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
-    - name: make generate
-      run: make generate
+      - name: make generate
+        run: make generate
 
-    - name: Get release
-      id: get_release
-      uses: bruceadams/get-release@v1.3.2
+      - name: Get release
+        id: get_release
+        uses: bruceadams/get-release@v1.3.2
 
-    - name: make build
-      id: build
-      run: |    
-        CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
-          --tag-name ${{ matrix.os }} \
-          --type 2`
-        RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
-          --tag-name ${{ env.TAG_NAME }} \
-           --type 1`
+      - name: make build
+        id: build
+        run: |    
+          CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
+            --tag-name ${{ matrix.os }} \
+            --type 2`
+          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
+            --tag-name ${{ env.TAG_NAME }} \
+            --type 1`
 
-        VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
-        echo "::set-output name=RELEASE_VERSION::${RELEASE_VERSION}" 
-        mkdir -p ${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}
+          VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
+          echo "::set-output name=RELEASE_VERSION::${RELEASE_VERSION}" 
+          mkdir -p ${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}
 
-    - name: make zip
-      if: matrix.os == 'windows-amd64'
-      run: |
-        mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}.exe   
-        zip -r -o ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}
-        file ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  # for debug 
-        mv ${{ env.CLI_NAME }}-${{ matrix.os }}.zip bin/
-    
-    - name: make tar
-      if: matrix.os != 'windows-amd64'    
-      run: |
-        mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}
-        tar -zcvf ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}
-        mv ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz bin/
+      - name: make zip
+        if: matrix.os == 'windows-amd64'
+        run: |
+          mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}.exe   
+          zip -r -o ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}
+          file ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  # for debug 
+          mv ${{ env.CLI_NAME }}-${{ matrix.os }}.zip bin/
+      
+      - name: make tar
+        if: matrix.os != 'windows-amd64'    
+        run: |
+          mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}
+          tar -zcvf ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}
+          mv ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz bin/
 
-    - name: upload release asset linux and mac
-      uses: actions/upload-release-asset@v1
-      if: matrix.os != 'windows-amd64'
-      with:
-        upload_url: ${{ steps.get_release.outputs.upload_url }}
-        asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
-        asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
-        asset_content_type: application/gzip
-    
-    - name: upload release asset windows
-      uses: actions/upload-release-asset@v1
-      if: matrix.os == 'windows-amd64'
-      with:
-        upload_url: ${{ steps.get_release.outputs.upload_url }}
-        asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.zip
-        asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.zip
-        asset_content_type: application/zip
-       
-    - name: get release kbcli upload url
-      run: |
-        echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
-          --tag-name ${{ env.TAG_NAME }} \
-          --type 3 \
-          --github-repo ${{ env.CLI_REPO }} \
-          --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
+      - name: upload release asset linux and mac
+        uses: actions/upload-release-asset@v1
+        if: matrix.os != 'windows-amd64'
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
+          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
+          asset_content_type: application/gzip
+      
+      - name: upload release asset windows
+        uses: actions/upload-release-asset@v1
+        if: matrix.os == 'windows-amd64'
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.zip
+          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.zip
+          asset_content_type: application/zip
+        
+      - name: get release kbcli upload url
+        run: |
+          echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
+            --tag-name ${{ env.TAG_NAME }} \
+            --type 3 \
+            --github-repo ${{ env.CLI_REPO }} \
+            --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 
-    
+      
 
-    - name: upload release kbcli asset linux and mac
-      uses: actions/upload-release-asset@main
-      if: matrix.os != 'windows-amd64'
-      with:
-        upload_url: ${{ env.UPLOAD_URL }}
-        asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
-        asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
-        asset_content_type: application/gzip
+      - name: upload release kbcli asset linux and mac
+        uses: actions/upload-release-asset@main
+        if: matrix.os != 'windows-amd64'
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
+          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz
+          asset_content_type: application/gzip
 
-    - name: upload release kbcli asset windows
-      uses: actions/upload-release-asset@main
-      if: matrix.os == 'windows-amd64'
-      with:
-        upload_url: ${{ env.UPLOAD_URL }}
-        asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.zip
-        asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.zip
-        asset_content_type: application/zip
+      - name: upload release kbcli asset windows
+        uses: actions/upload-release-asset@main
+        if: matrix.os == 'windows-amd64'
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.zip
+          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}.zip
+          asset_content_type: application/zip
 
-    - name: upload gitlab kbcli asset linux and mac
-      if: matrix.os != 'windows-amd64' 
-      run: |
-        bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-          --type 2 \
-          --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-          --tag-name ${{ env.TAG_NAME }} \
-          --asset-path ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz \
-          --asset-name ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz\
-          --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
+      - name: upload gitlab kbcli asset linux and mac
+        if: matrix.os != 'windows-amd64' 
+        run: |
+          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+            --type 2 \
+            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+            --tag-name ${{ env.TAG_NAME }} \
+            --asset-path ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz \
+            --asset-name ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz\
+            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
 
-    - name: upload gitlab kbcli asset windows
-      if: matrix.os == 'windows-amd64' 
-      run: |
-        bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-          --type 2 \
-          --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-          --tag-name ${{ env.TAG_NAME }} \
-          --asset-path ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.zip \
-          --asset-name ${{ env.CLI_NAME }}-${{ matrix.os }}.zip\
-          --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
+      - name: upload gitlab kbcli asset windows
+        if: matrix.os == 'windows-amd64' 
+        run: |
+          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+            --type 2 \
+            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+            --tag-name ${{ env.TAG_NAME }} \
+            --asset-path ./bin/${{ env.CLI_NAME }}-${{ matrix.os }}.zip \
+            --asset-name ${{ env.CLI_NAME }}-${{ matrix.os }}.zip\
+            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}

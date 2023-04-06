@@ -44,7 +44,7 @@ const (
 
 type DynamicUpdater = func(updatedParams map[string]string) error
 
-func OnlineUpdateParamsHandle(tplScript string) (DynamicUpdater, error) {
+func OnlineUpdateParamsHandle(tplScript string, formatConfig *appsv1alpha1.FormatterConfig) (DynamicUpdater, error) {
 	tplContent, err := os.ReadFile(tplScript)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func OnlineUpdateParamsHandle(tplScript string) (DynamicUpdater, error) {
 		return nil, err
 	}
 	return func(updatedParams map[string]string) error {
-		return wrapGoTemplateRun(tplScript, string(tplContent), updatedParams)
+		return wrapGoTemplateRun(tplScript, string(tplContent), updatedParams, formatConfig)
 	}, nil
 }
 
@@ -64,7 +64,7 @@ func checkTPLScript(tplName string, tplContent string) error {
 	return err
 }
 
-func wrapGoTemplateRun(tplName string, tplContent string, updatedParams map[string]string) error {
+func wrapGoTemplateRun(tplName string, tplContent string, updatedParams map[string]string, formatConfig *appsv1alpha1.FormatterConfig) error {
 	var (
 		err            error
 		commandChannel DynamicParamUpdater
@@ -77,12 +77,12 @@ func wrapGoTemplateRun(tplName string, tplContent string, updatedParams map[stri
 
 	logger.Info(fmt.Sprintf("update global dynamic params: %v", updatedParams))
 	values := gotemplate.ConstructFunctionArgList(updatedParams)
-	engine := gotemplate.NewTplEngine(&values, constructReloadBuiltinFuncs(commandChannel), tplName, nil, nil)
+	engine := gotemplate.NewTplEngine(&values, constructReloadBuiltinFuncs(commandChannel, formatConfig), tplName, nil, nil)
 	_, err = engine.Render(tplContent)
 	return err
 }
 
-func constructReloadBuiltinFuncs(cc DynamicParamUpdater) *gotemplate.BuiltInObjectsFunc {
+func constructReloadBuiltinFuncs(cc DynamicParamUpdater, formatConfig *appsv1alpha1.FormatterConfig) *gotemplate.BuiltInObjectsFunc {
 	return &gotemplate.BuiltInObjectsFunc{
 		builtInExecFunctionName: func(command string, args ...string) (string, error) {
 			execCommand := exec.Command(command, args...)
@@ -94,6 +94,24 @@ func constructReloadBuiltinFuncs(cc DynamicParamUpdater) *gotemplate.BuiltInObje
 			r, err := cc.ExecCommand(sql)
 			logger.V(1).Info(fmt.Sprintf("sql: [%s], result: [%v]", sql, r))
 			return err
+		},
+		builtInParamsPatchFunctionName: func(updatedParams map[string]string, basefile, newfile string) error {
+			logger.V(1).Info(fmt.Sprintf("update params: %v, basefile: %s, newfile: %s", updatedParams, basefile, newfile))
+			if len(updatedParams) == 0 {
+				if basefile == newfile {
+					return nil
+				}
+				return copyFileContents(basefile, newfile)
+			}
+			b, err := os.ReadFile(basefile)
+			if err != nil {
+				return err
+			}
+			newConfig, err := cfgutil.ApplyConfigPatch(b, updatedParams, formatConfig)
+			if err != nil {
+				return err
+			}
+			return os.WriteFile(newfile, []byte(newConfig), os.ModePerm)
 		},
 	}
 }

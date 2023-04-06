@@ -200,14 +200,6 @@ func (o *OperationsOptions) validateReconfiguring() error {
 }
 
 func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConfigSpec) error {
-	transKeyPair := func(pts map[string]string) map[string]interface{} {
-		m := make(map[string]interface{}, len(pts))
-		for key, value := range pts {
-			m[key] = value
-		}
-		return m
-	}
-
 	configConstraintKey := client.ObjectKey{
 		Namespace: "",
 		Name:      tpl.ConfigConstraintRef,
@@ -219,7 +211,7 @@ func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConf
 
 	newConfigData, err := cfgcore.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
 		Key:           o.CfgFile,
-		UpdatedParams: transKeyPair(o.KeyValues),
+		UpdatedParams: cfgcore.FromStringMap(o.KeyValues),
 	}})
 	if err != nil {
 		return err

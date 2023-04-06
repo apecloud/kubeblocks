@@ -295,6 +295,16 @@ func NewCfgOptions(filename string, options ...Option) CfgOpOption {
 	return context
 }
 
+func WithFormatterConfig(formatConfig *appsv1alpha1.FormatterConfig) Option {
+	return func(ctx *CfgOpOption) {
+		if formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
+			ctx.IniContext = &IniContext{
+				SectionName: formatConfig.IniConfig.SectionName,
+			}
+		}
+	}
+}
+
 func (c *cfgWrapper) Query(jsonpath string, option CfgOpOption) ([]byte, error) {
 	if option.AllSearch && c.fileCount > 1 {
 		return c.queryAllCfg(jsonpath, option)

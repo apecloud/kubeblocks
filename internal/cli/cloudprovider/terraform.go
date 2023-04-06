@@ -82,7 +82,7 @@ func tfInitAndApply(workingDir string, init bool, stdout, stderr io.Writer, opts
 	}
 
 	if init {
-		if err = tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
+		if err = tf.Init(ctx, tfexec.Upgrade(false)); err != nil {
 			return err
 		}
 	}

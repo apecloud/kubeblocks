@@ -64,7 +64,7 @@ func (p *awsCloudProvider) Name() string {
 func (p *awsCloudProvider) CreateK8sCluster(name string, init bool) error {
 	p.clusterName = name
 
-	subPaths, err := getSubPaths(p.awsPath, []string{"eks", "lb"})
+	subPaths, err := getSubPaths(p.awsPath, []string{"eks"})
 	if err != nil {
 		return err
 	}
@@ -77,18 +77,12 @@ func (p *awsCloudProvider) CreateK8sCluster(name string, init bool) error {
 
 	// create EKS cluster
 	fmt.Fprintf(p.stdout, "\nInit and apply eks in %s\n", subPaths[0])
-	if err = tfInitAndApply(subPaths[0], init, p.stdout, p.stderr, p.buildApplyOpts()...); err != nil {
-		return err
-	}
-
-	// install load balancer
-	fmt.Fprintf(p.stdout, "\nInit and apply loadbalancer in %s\n", subPaths[1])
-	return tfInitAndApply(subPaths[1], init, p.stdout, p.stderr, tfexec.Var("cluster_name="+p.clusterName))
+	return tfInitAndApply(subPaths[0], init, p.stdout, p.stderr, p.buildApplyOpts()...)
 }
 
 func (p *awsCloudProvider) DeleteK8sCluster(name string) error {
 	p.clusterName = name
-	subPaths, err := getSubPaths(p.awsPath, []string{"eks", "lb"})
+	subPaths, err := getSubPaths(p.awsPath, []string{"eks"})
 	if err != nil {
 		return err
 	}
@@ -99,12 +93,6 @@ func (p *awsCloudProvider) DeleteK8sCluster(name string) error {
 		return err
 	}
 
-	// destroy load balancer
-	fmt.Fprintf(p.stdout, "\nDestroy loadbalancer in %s\n", subPaths[1])
-	if err = tfDestroy(subPaths[1], p.stdout, p.stderr, tfexec.Var("cluster_name="+p.clusterName)); err != nil {
-		fmt.Fprintln(p.stdout, err.Error())
-	}
-
 	// destroy EKS cluster
 	fmt.Fprintf(p.stdout, "\nDestroy eks cluster in %s\n", subPaths[0])
 	return tfDestroy(subPaths[0], p.stdout, p.stderr, p.buildDestroyOpts()...)
@@ -112,7 +100,7 @@ func (p *awsCloudProvider) DeleteK8sCluster(name string) error {
 
 // GetExistedClusters get existed clusters
 func (p *awsCloudProvider) GetExistedClusters() ([]string, error) {
-	subPaths, err := getSubPaths(p.awsPath, []string{"eks", "lb"})
+	subPaths, err := getSubPaths(p.awsPath, []string{"eks"})
 	if err != nil {
 		return nil, err
 	}

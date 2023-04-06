@@ -234,7 +234,6 @@ if it takes a long time, please check the network environment and try again.
 		return err
 	}
 
-	var init bool
 	// check if previous cluster exists
 	clusterName, _ := getExistedCluster(provider, cpPath)
 
@@ -248,12 +247,11 @@ if it takes a long time, please check the network environment and try again.
 		}
 		fmt.Fprintf(o.Out, "Continue to initialize %s %s cluster %s... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
 	} else {
-		init = true
 		clusterName = fmt.Sprintf("%s-%s", k8sClusterName, rand.String(5))
 		fmt.Fprintf(o.Out, "Creating %s %s cluster %s ... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
 	}
 
-	if err = provider.CreateK8sCluster(clusterName, init); err != nil {
+	if err = provider.CreateK8sCluster(clusterName, true); err != nil {
 		return err
 	}
 

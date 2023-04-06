@@ -12,11 +12,6 @@ env:
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'
   GITLAB_KBCLI_PROJECT_ID: 85948
-  CLI_FILENAME: ""
-  CLI_DIR: ""
-  ASSET_NAME: ""
-  ASSET_CONTENT_TYPE: ""
-
 
 jobs:
   create-release-kbcli:
@@ -82,8 +77,9 @@ jobs:
             --type 1`
           VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
           mkdir -p ${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}
-          echo "::set-env name=CLI_DIR::${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}" 
-          echo "::set-env name=CLI_FILENAME::${{ env.CLI_NAME }}-${{ matrix.os }}"
+          echo "CLI_DIR=${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}" >> $GITHUB_ENV
+          echo "CLI_FILENAME=${{ env.CLI_NAME }}-${{ matrix.os }}" >> $GITHUB_ENV
+
 
       - name: make zip
         if: matrix.os == 'windows-amd64'
@@ -92,8 +88,8 @@ jobs:
           zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
           mv ${{ env.CLI_FILENAME }}.zip bin/
-          echo "::set-env name=ASSET_NAME::${{ env.CLI_FILENAME }}.zip"
-          echo "::set-env name=ASSET_CONTENT_TYPE::application/zip"
+          echo "ASSET_NAME=${{ env.CLI_FILENAME }}.zip" >> $GITHUB_ENV
+          echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
       
       - name: make tar
         if: matrix.os != 'windows-amd64'    
@@ -101,8 +97,8 @@ jobs:
           mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_DIR }}/${{ env.CLI_NAME }}
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           mv ${{ env.CLI_FILENAME }}.tar.gz bin/
-          echo "::set-env name=ASSET_NAME::${{ env.CLI_FILENAME }}.tar.gz"
-          echo "::set-env name=ASSET_CONTENT_TYPE::application/gzip"         
+          echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
+          echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
           
       - name: upload release asset 
         uses: actions/upload-release-asset@v1

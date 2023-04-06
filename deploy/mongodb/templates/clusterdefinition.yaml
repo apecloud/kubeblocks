@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
+  type: mongodb
   connectionCredential:
     username: admin
     password: ""

@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
+  type: postgresql
   connectionCredential:
     username: postgres
     password: {{ (include "postgresql.postgresPassword" .) | quote  }}

@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "etcd.labels" . | nindent 4}}
 spec:
+  type: etcd
   componentDefs:
     - name: etcd
       characterType: etcd

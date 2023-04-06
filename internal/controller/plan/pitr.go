@@ -564,7 +564,7 @@ func (p *PointInTimeRecoveryManager) MergeConfigMap(configMap *corev1.ConfigMap)
 			originDataBytes, _ := json.Marshal(map[string]string{key: configMap.Data[key]})
 			configMap.Annotations["original-data"] = string(originDataBytes)
 			restoreTimeStr := p.restoreTime.Time.UTC().Format(timeFormat)
-			pitrConfigMap[key] = strings.Replace(val, "$KB_RECOVERY_TIME", restoreTimeStr, 1)
+			pitrConfigMap[key] = strings.ReplaceAll(val, "$KB_RECOVERY_TIME", restoreTimeStr)
 			// append pitr config map into cluster config
 			configMap.Data[key] = v + "\n" + pitrConfigMap[key]
 		}

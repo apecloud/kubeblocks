@@ -215,7 +215,7 @@ var _ = Describe("PITR Functions", func() {
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(fetched *corev1.PersistentVolumeClaim) {
 				fetched.Status.Phase = corev1.ClaimBound
 			})).Should(Succeed())
-			shouldRequeue, err = DoPITRIfNeed(ctx, testCtx.Cli, cluster)
+			_, err = DoPITRIfNeed(ctx, testCtx.Cli, cluster)
 			Expect(err).Should(Succeed())
 			By("when job is completed")
 			jobKey := types.NamespacedName{Namespace: cluster.Namespace, Name: "pitr-prepare-" + clusterName}
@@ -225,7 +225,7 @@ var _ = Describe("PITR Functions", func() {
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(fetched *appsv1alpha1.Cluster) {
 				fetched.Status.Phase = appsv1alpha1.RunningClusterPhase
 			})).Should(Succeed())
-			shouldRequeue, err = DoPITRIfNeed(ctx, testCtx.Cli, cluster)
+			_, err = DoPITRIfNeed(ctx, testCtx.Cli, cluster)
 			Expect(err).Should(Succeed())
 			By("cleanup pitr job")
 			Expect(DoPITRCleanup(ctx, testCtx.Cli, cluster)).Should(Succeed())

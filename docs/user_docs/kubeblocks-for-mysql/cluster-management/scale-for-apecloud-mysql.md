@@ -45,7 +45,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    ```bash
    kbcli cluster vscale mysql-cluster \
    --component-names="mysql" \
-   --memory="2Gi" --cpu="1" \
+   --memory="4Gi" --cpu="2" \
    ```
    - `--component-names` describes the component name ready for vertical scaling.
    - `--memory` describes the requested and limited size of the component memory.

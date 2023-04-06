@@ -22,7 +22,7 @@ spec:
         key: values-kubeblocks-override.yaml
 
       setValues:
-      - clusterName={{ index .Values "aws-loadbalancer-controller" "cluterName " }}
+      - clusterName={{ index .Values "aws-loadbalancer-controller" "clusterName" }}
 
     valuesMapping:
       valueMap:

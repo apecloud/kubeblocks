@@ -92,10 +92,10 @@ sidebar_label: Create and connect
 
    Change the corresponding parameters in the YAML file.
    ```bash
-   kbcli cluster create mysql-cluster --cluster-definition="apecloud-mysql" --set -<<EOF
+   kbcli cluster create mysql-cluster --cluster-definition="apecloud-mysql" --set-file -<<EOF
    - name: mysql
      replicas: 3
-     type: mysql
+     type: componentDefRef
      volumeClaimTemplates:
      - name: data
        spec:
@@ -118,6 +118,7 @@ sidebar_label: Create and connect
 | `--monitor` | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
 | `--node-labels` | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />```kbcli cluster create --cluster-definition='apecloud-mysql' --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'``` |
 | `--set` | It sets the cluster resource including CPU, memory, replicas, and storage, each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,replicas=3,storage=10Gi`. |
+| `--set-file` | It uses a yaml file, URL, or stdin to set the cluster resource. |
 | `--termination-policy` | It specifies the termination policy of the cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
 
 ## Connect to a MySQL Cluster

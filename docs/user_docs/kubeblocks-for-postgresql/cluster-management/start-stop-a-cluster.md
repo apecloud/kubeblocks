@@ -28,9 +28,10 @@ kbcli cluster stop pg-cluster
 Run the command below to stop a cluster.
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: apps.infracreate.com/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
+  name: pg-cluster
   generate-name: stop-
 spec:
   # cluster ref
@@ -89,9 +90,10 @@ Run the command below to start a cluster.
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: apps.infracreate.com/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
+  name: pg-cluster
   generate-name: start-
 spec:
   # cluster ref

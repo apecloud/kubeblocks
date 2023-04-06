@@ -84,7 +84,6 @@ jobs:
           mkdir -p ${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}
 
       - name: make zip
-        id: win_zip
         if: matrix.os == 'windows-amd64'
         run: |
           mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}.exe   
@@ -95,7 +94,6 @@ jobs:
           echo "::set-env name=ASSET_CONTENT_TYPE::application/zip"
       
       - name: make tar
-        id: linux_tar
         if: matrix.os != 'windows-amd64'    
         run: |
           mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}

@@ -258,6 +258,7 @@ kbcli-fast: OS=$(shell $(GO) env GOOS)
 kbcli-fast: ARCH=$(shell $(GO) env GOARCH)
 kbcli-fast:
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
+	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
 .PHONY: kbcli
 kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.

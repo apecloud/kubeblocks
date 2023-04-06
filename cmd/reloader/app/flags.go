@@ -113,6 +113,8 @@ type VolumeWatcherOpts struct {
 	BackupPath      string
 	FormatterConfig *appsv1alpha1.FormatterConfig
 	TPLScriptPath   string
+	DataType        string
+	DSN             string
 
 	LogLevel       string
 	NotifyHandType NotifyEventType

@@ -18,6 +18,8 @@ package configuration
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
@@ -67,6 +69,21 @@ func (o *syncPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	return sync(params, updatedParameters, pods, funcs)
 }
 
+func matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod, error) {
+	var result []corev1.Pod
+
+	match, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil {
+		return nil, cfgutil.WrapError(err, "failed to convert selector: %v", selector)
+	}
+	for _, pod := range pods {
+		if match.Matches(labels.Set(pod.Labels)) {
+			result = append(result, pod)
+		}
+	}
+	return result, nil
+}
+
 func sync(params reconfigureParams, updatedParameters map[string]string, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
 	var (
 		r        = ESNone
@@ -80,7 +97,20 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		versionHash = params.getTargetVersionHash()
 	)
 
+	if params.ConfigConstraint.Selector != nil {
+		pods, err = matchLabel(pods, params.ConfigConstraint.Selector)
+	}
+	if err != nil {
+		return makeReturnedStatus(ESAndRetryFailed), err
+	}
+	if len(pods) == 0 {
+		params.Ctx.Log.Info("no pods to update, and retry, selector: %v, current all pod: %v", params.ConfigConstraint.Selector)
+		return makeReturnedStatus(ESRetry), nil
+	}
+
+	requireUpdatedCount := int32(len(pods))
 	for _, pod := range pods {
+		params.Ctx.Log.V(1).Info("sync pod: %s", pod.Name)
 		if podutil.IsMatchConfigVersion(&pod, configKey, versionHash) {
 			progress++
 			continue
@@ -99,10 +129,10 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		progress++
 	}
 
-	if total != progress || replicas != total {
+	if requireUpdatedCount != progress || replicas != total {
 		r = ESRetry
 	}
-	return makeReturnedStatus(r, withExpected(replicas), withSucceed(progress)), nil
+	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
 }
 
 func getOnlineUpdateParams(configPatch *cfgutil.ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig) map[string]string {

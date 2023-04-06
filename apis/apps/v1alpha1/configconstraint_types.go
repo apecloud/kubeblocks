@@ -52,6 +52,10 @@ type ConfigConstraintSpec struct {
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 
+	// selector is used to match the label on the pod,
+	// for example, a pod of the primary is match on the patroni cluster.
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+
 	// formatterConfig describes the format of the configuration file, the controller
 	// 1. parses configuration file
 	// 2. analyzes the modified parameters

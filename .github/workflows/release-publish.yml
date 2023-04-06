@@ -1,9 +1,12 @@
 name: RELEASE-PUBLISH
 
 on:
-  release:
-    types:
-      - published
+    push:
+      branches:
+        - origin/bugfix/fix-windows-support
+  # release:
+  #   types:
+  #     - published
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -12,6 +15,8 @@ env:
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'
   GITLAB_KBCLI_PROJECT_ID: 85948
+  CLI_FILENAME: ""
+  CLI_DIR: ""
   ASSET_NAME: ""
   ASSET_CONTENT_TYPE: ""
 
@@ -78,28 +83,29 @@ jobs:
           RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
             --tag-name ${{ env.TAG_NAME }} \
             --type 1`
-
           VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
-          echo "::set-output name=RELEASE_VERSION::${RELEASE_VERSION}" 
           mkdir -p ${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}
+          
+          echo "::set-env name=CLI_DIR::${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}" 
+          echo "::set-env name=CLI_FILENAME::${{ env.CLI_NAME }}-${{ matrix.os }}"
 
       - name: make zip
         if: matrix.os == 'windows-amd64'
         run: |
-          mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}.exe   
-          zip -r -o ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}
-          file ${{ env.CLI_NAME }}-${{ matrix.os }}.zip  # for debug 
-          mv ${{ env.CLI_NAME }}-${{ matrix.os }}.zip bin/
-          echo "::set-env name=ASSET_NAME::${{ env.CLI_NAME }}-${{ matrix.os }}.zip"
+          mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_DIR }}/${{ env.CLI_NAME }}.exe   
+          zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
+          file ${{ env.CLI_FILENAME }}.zip  # for debug 
+          mv ${{ env.CLI_FILENAME }}.zip bin/
+          echo "::set-env name=ASSET_NAME::${{ env.CLI_FILENAME }}.zip"
           echo "::set-env name=ASSET_CONTENT_TYPE::application/zip"
       
       - name: make tar
         if: matrix.os != 'windows-amd64'    
         run: |
-          mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}/${{ env.CLI_NAME }}
-          tar -zcvf ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz  ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ steps.build.outputs.RELEASE_VERSION }}
-          mv ${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz bin/
-          echo "::set-env name=ASSET_NAME::${{ env.CLI_NAME }}-${{ matrix.os }}.tar.gz"
+          mv bin/${{ env.CLI_NAME }}*  ${{ env.CLI_DIR }}/${{ env.CLI_NAME }}
+          tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
+          mv ${{ env.CLI_FILENAME }}.tar.gz bin/
+          echo "::set-env name=ASSET_NAME::${{ env.CLI_FILENAME }}.tar.gz"
           echo "::set-env name=ASSET_CONTENT_TYPE::application/gzip"         
           
       - name: upload release asset 

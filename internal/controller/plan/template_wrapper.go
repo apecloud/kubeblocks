@@ -20,7 +20,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/apecloud/kubeblocks/internal/generics"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 type templateRenderValidator = func(map[string]string) error

@@ -36,12 +36,14 @@ KubeBlocks offers a variety of services to enhance the usability, availability, 
 ```
 kbcli cluster list-accounts  <clustername>  
 ```
-:::Note:
+:::note
+
 For security reasons, ```list-accounts```command does not showw all accounts. Accounts with high previledge such as operational accounts and superuser accounts that meet certain rules are hidden. 
 | Database|Hidden Accounts|
 |---|---|
 |MySQL| root<br>kb* <br>Localhost = ''|
 |postGre|Postgres <br> kb*|
+
 :::
 
 - Deleting a user account

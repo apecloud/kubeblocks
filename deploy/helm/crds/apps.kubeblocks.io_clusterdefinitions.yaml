@@ -8729,8 +8729,8 @@ spec:
                   "$(SVC_PORT_mysql)" in the connection credential value is 3306.'
                 type: object
               type:
-                description: Cluster definition type defines well known database engine
-                  type, e.g. mysql/redis/mongodb
+                description: Cluster definition type defines well known application
+                  cluster type, e.g. mysql/redis/mongodb
                 maxLength: 24
                 pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                 type: string

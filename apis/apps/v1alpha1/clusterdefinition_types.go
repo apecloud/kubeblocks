@@ -27,7 +27,7 @@ import (
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
 type ClusterDefinitionSpec struct {
 
-	// Cluster definition type defines well known database engine type, e.g. mysql/redis/mongodb
+	// Cluster definition type defines well known application cluster type, e.g. mysql/redis/mongodb
 	// +kubebuilder:validation:MaxLength=24
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional

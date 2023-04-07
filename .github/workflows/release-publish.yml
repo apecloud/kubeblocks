@@ -118,8 +118,6 @@ jobs:
 
       - name: upload release kbcli asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main
-        env:
-          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         with:
           upload_url: ${{ env.UPLOAD_URL }}
           asset_path: ./bin/${{ env.ASSET_NAME }}

@@ -1,3 +1,7 @@
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #!/usr/bin/env bash
 
 # kbcli location
@@ -114,7 +118,7 @@ getLatestRelease() {
     ret_val=$latest_release
 }
 
-downloadFile() {
+downloadFile() { # for version >= 0.5
     LATEST_RELEASE_TAG=$1
 
     CLI_ARTIFACT="${CLI_FILENAME}-${OS}-${ARCH}.tar.gz"
@@ -141,17 +145,63 @@ downloadFile() {
     fi
 }
 
-installFile() {
+installFile() { # for version >= 0.5
     LATEST_RELEASE_TAG=$1
-    echo ${LATEST_RELEASE_TAG=$1}
     local tmp_root_kbcli="$CLI_TMP_ROOT/${CLI_FILENAME}-${OS}-${ARCH}-${LATEST_RELEASE_TAG}/$CLI_FILENAME"
-    echo $LATEST_RELEASE_TAG
-    echo "CLI_TMP_ROOT = ${CLI_TMP_ROOT}"
-    echo "ARTIFACT_TMP_FILE = ${ARTIFACT_TMP_FILE}"
-    echo "tmp_root_kbcli = ${tmp_root_kbcli}"
     tar xf "$ARTIFACT_TMP_FILE" -C "$CLI_TMP_ROOT"
 
-    if [[ $? -ne 0 || ! -f "$tmp_root_kbcli"  ]]; then
+    if [[ $? -ne 0 || ! -f "$tmp_root_kbcli" ]]; then
+        echo "Failed to unpack kbcli executable."
+        exit 1
+    fi
+
+    chmod o+x "$tmp_root_kbcli"
+    runAsRoot cp "$tmp_root_kbcli" "$CLI_INSTALL_DIR"
+
+    if [ $? -eq 0 ] && [ -f "$CLI_FILE" ]; then
+        echo "kbcli installed successfully."
+        kbcli version
+        echo -e "Make sure your docker service is running and begin your journey with kbcli:\n"
+        echo -e "\t$CLI_FILENAME playground init"
+        echo -e ""
+    else
+        echo "Failed to install $CLI_FILENAME"
+        exit 1
+    fi
+}
+
+downloadOldFile() { # for verion < 0.5.0
+    LATEST_RELEASE_TAG=$1
+
+    CLI_ARTIFACT="${CLI_FILENAME}-${OS}-${ARCH}-${LATEST_RELEASE_TAG}.tar.gz"
+    DOWNLOAD_BASE="https://github.com/$REPO/releases/download"
+    if [[ "$COUNTRY_CODE" == "CN" || "$COUNTRY_CODE" == "" ]]; then
+        DOWNLOAD_BASE="$GITLAB/$GITLAB_REPO/packages/generic/kubeblocks"
+    fi
+    DOWNLOAD_URL="${DOWNLOAD_BASE}/${LATEST_RELEASE_TAG}/${CLI_ARTIFACT}"
+
+    # Create the temp directory
+    CLI_TMP_ROOT=$(mktemp -dt kbcli-install-XXXXXX)
+    ARTIFACT_TMP_FILE="$CLI_TMP_ROOT/$CLI_ARTIFACT"
+
+    echo "Downloading ..."
+    if [ "$HTTP_REQUEST_CLI" == "curl" ]; then
+        curl -SL --header 'Accept:application/octet-stream' "$DOWNLOAD_URL" -o "$ARTIFACT_TMP_FILE"
+    else
+        wget -q --show-progress -O "$ARTIFACT_TMP_FILE" "$DOWNLOAD_URL"
+    fi
+
+    if [[ $? -ne 0 || ! -f "$ARTIFACT_TMP_FILE" ]]; then
+        echo "Failed to download $CLI_ARTIFACT."
+        exit 1
+    fi
+}
+
+installOldFile() {  # for verion < 0.5.0
+    local tmp_root_kbcli="$CLI_TMP_ROOT/${OS}-${ARCH}/$CLI_FILENAME"
+    tar xf "$ARTIFACT_TMP_FILE" -C "$CLI_TMP_ROOT"
+
+    if [[ $? -ne 0 || ! -f "$tmp_root_kbcli" ]]; then
         echo "Failed to unpack kbcli executable."
         exit 1
     fi
@@ -212,6 +262,14 @@ else
     ret_val=v$1
 fi
 
-downloadFile $ret_val
-installFile $ret_val
+if [[ "$(printf '%s\n' "$ret_val" "v0.5.0" | sort -V | head -n1)" == "v0.5.0" ]]; then
+    # The first element of the sorted result is "v0.5.0", which means that the current version >= "v0.5.0"
+    downloadFile $ret_val
+    installFile $ret_val
+else
+    downloadOldFile $ret_val
+    installOldFile
+fi
+
 cleanup
+installCompleted

@@ -80,7 +80,6 @@ jobs:
           echo "CLI_DIR=${{ env.CLI_NAME }}-${{ matrix.os }}-v${RELEASE_VERSION}" >> $GITHUB_ENV
           echo "CLI_FILENAME=${{ env.CLI_NAME }}-${{ matrix.os }}" >> $GITHUB_ENV
 
-
       - name: make zip
         if: matrix.os == 'windows-amd64'
         run: |
@@ -116,7 +115,7 @@ jobs:
             --github-repo ${{ env.CLI_REPO }} \
             --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 
-      - name: upload release kbcli asset
+      - name: upload release kbcli asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main
         with:
           upload_url: ${{ env.UPLOAD_URL }}
@@ -124,12 +123,12 @@ jobs:
           asset_name: ${{ env.ASSET_NAME }}
           asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
 
-      - name: upload gitlab kbcli asset 
+      - name: upload gitlab kbcli asset ${{ matrix.os }}
         run: |
           bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
             --type 2 \
             --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
             --tag-name ${{ env.TAG_NAME }} \
             --asset-path ./bin/${{ env.ASSET_NAME }} \
-            --asset-name ${{ env.ASSET_NAME }}\
+            --asset-name ${{ env.ASSET_NAME }} \
             --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}

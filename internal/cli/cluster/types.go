@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 type ClusterObjects struct {
@@ -34,6 +35,9 @@ type ClusterObjects struct {
 	Nodes      []*corev1.Node
 	ConfigMaps *corev1.ConfigMapList
 	Events     *corev1.EventList
+
+	BackupPolicies []dpv1alpha1.BackupPolicy
+	Backups        []dpv1alpha1.Backup
 }
 
 type ClusterInfo struct {

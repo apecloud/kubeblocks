@@ -67,35 +67,45 @@ jobs:
         uses: bruceadams/get-release@v1.3.2
 
       - name: make build
-        env:
-          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
-        run: |
-          mkdir -p ${{ matrix.os }}
-          
+        run: |    
           CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
             --tag-name ${{ matrix.os }} \
             --type 2`
           RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
             --tag-name ${{ env.TAG_NAME }} \
-            --type 1`
-          
+            --type 1`    
           VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
-          
-          mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH ${{ matrix.os }}/${{ env.CLI_NAME }}
-          
-          tar -zcvf ${{ env.CLI_BINARY }} ${{ matrix.os }}
-          
-          mv ${{ env.CLI_BINARY }} bin/
+          mkdir -p ${{ matrix.os }}
+          echo "CLI_FILENAME=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}" >> $GITHUB_ENV
+          echo "CLI_DIR=${{ matrix.os }}" >> $GITHUB_ENV
+  
+      - name: make zip
+        if: matrix.os == 'windows-amd64'
+        run: |
+          mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH ${{ matrix.os }}/${{ env.CLI_NAME }}.exe 
+          zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
+          file ${{ env.CLI_FILENAME }}.zip  # for debug 
+          mv ${{ env.CLI_FILENAME }}.zip bin/
+          echo "ASSET_NAME=${{ env.CLI_FILENAME }}.zip" >> $GITHUB_ENV
+          echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
+
+      - name: make tar
+        if: matrix.os != 'windows-amd64'
+        run: |
+          mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH ${{ matrix.os }}/${{ env.CLI_NAME }} 
+          tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
+          file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 
+          mv ${{ env.CLI_FILENAME }}.tar.gz bin/
+          echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
+          echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
 
       - name: upload release asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main
-        env:
-          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.CLI_BINARY }}
-          asset_name: ${{ env.CLI_BINARY }}
-          asset_content_type: application/zip
+          asset_path: ./bin/${{ env.ASSET_NAME }}
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
 
       - name: get release kbcli upload url
         run: |
@@ -111,9 +121,9 @@ jobs:
           CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         with:
           upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ./bin/${{ env.CLI_BINARY }}
-          asset_name: ${{ env.CLI_BINARY }}
-          asset_content_type: application/zip
+          asset_path: ./bin/${{ env.ASSET_NAME }}
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
 
       - name: upload gitlab kbcli asset ${{ matrix.os }}
         env:
@@ -123,6 +133,6 @@ jobs:
             --type 2 \
             --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
             --tag-name ${{ env.TAG_NAME }} \
-            --asset-path ./bin/${{ env.CLI_BINARY }} \
-            --asset-name ${{ env.CLI_BINARY }} \
+            --asset-path ./bin/${{ env.ASSET_NAME }} \
+            --asset-name ${{ env.ASSET_NAME }} \
             --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}

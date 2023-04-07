@@ -116,10 +116,7 @@ func init() {
 }
 
 // ValidateCPU validate if the CPU matches the class family model constraint
-func (m *ClassFamilyModel) ValidateCPU(cpu resource.Quantity) bool {
-	if m == nil {
-		return false
-	}
+func (m ClassFamilyModel) ValidateCPU(cpu resource.Quantity) bool {
 	if m.CPU.Min != nil && m.CPU.Min.Cmp(cpu) > 0 {
 		return false
 	}
@@ -133,11 +130,7 @@ func (m *ClassFamilyModel) ValidateCPU(cpu resource.Quantity) bool {
 }
 
 // ValidateMemory validate if the memory matches the class family model constraint
-func (m *ClassFamilyModel) ValidateMemory(cpu *resource.Quantity, memory *resource.Quantity) bool {
-	if m == nil {
-		return false
-	}
-
+func (m ClassFamilyModel) ValidateMemory(cpu *resource.Quantity, memory *resource.Quantity) bool {
 	if memory == nil {
 		return true
 	}
@@ -159,15 +152,11 @@ func (m *ClassFamilyModel) ValidateMemory(cpu *resource.Quantity, memory *resour
 }
 
 // ValidateResourceRequirements validate if the resource matches the class family model constraints
-func (m *ClassFamilyModel) ValidateResourceRequirements(r *corev1.ResourceRequirements) bool {
+func (m ClassFamilyModel) ValidateResourceRequirements(r *corev1.ResourceRequirements) bool {
 	var (
 		cpu    = r.Requests.Cpu()
 		memory = r.Requests.Memory()
 	)
-
-	if m == nil {
-		return false
-	}
 
 	if cpu.IsZero() && memory.IsZero() {
 		return true

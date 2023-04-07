@@ -14,4 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package consensusset
+package builder
+
+import corev1 "k8s.io/api/core/v1"
+
+type PodBuilder struct {
+	BaseBuilder[corev1.Pod, *corev1.Pod, PodBuilder]
+}
+
+func NewPodBuilder(namespace, name string) *PodBuilder {
+	builder := &PodBuilder{}
+	builder.init(namespace, name, &corev1.Pod{}, builder)
+	return builder
+}
+
+func (builder *PodBuilder) SetSpec(spec corev1.PodSpec) *PodBuilder {
+	builder.get().Spec = spec
+	return builder
+}

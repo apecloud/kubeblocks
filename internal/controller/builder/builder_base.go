@@ -29,12 +29,12 @@ import (
 // TODO: a copy of testutil.apps.base_factory, should make this as a common util both used by builder and testing
 // Manipulate common attributes here to save boilerplate code
 
-type BaseFactory[T intctrlutil.Object, PT intctrlutil.PObject[T], F any] struct {
+type BaseBuilder[T intctrlutil.Object, PT intctrlutil.PObject[T], B any] struct {
 	object          PT
-	concreteFactory *F
+	concreteBuilder *B
 }
 
-func (factory *BaseFactory[T, PT, F]) init(namespace, name string, obj PT, f *F) {
+func (builder *BaseBuilder[T, PT, B]) init(namespace, name string, obj PT, b *B) {
 	obj.SetNamespace(namespace)
 	obj.SetName(name)
 	if obj.GetLabels() == nil {
@@ -43,70 +43,70 @@ func (factory *BaseFactory[T, PT, F]) init(namespace, name string, obj PT, f *F)
 	if obj.GetAnnotations() == nil {
 		obj.SetAnnotations(map[string]string{})
 	}
-	factory.object = obj
-	factory.concreteFactory = f
+	builder.object = obj
+	builder.concreteBuilder = b
 }
 
-func (factory *BaseFactory[T, PT, F]) get() PT {
-	return factory.object
+func (builder *BaseBuilder[T, PT, B]) get() PT {
+	return builder.object
 }
 
-func (factory *BaseFactory[T, PT, F]) SetName(name string) *F {
-	factory.object.SetName(name)
-	return factory.concreteFactory
+func (builder *BaseBuilder[T, PT, B]) SetName(name string) *B {
+	builder.object.SetName(name)
+	return builder.concreteBuilder
 }
 
-func (factory *BaseFactory[T, PT, F]) AddLabels(keysAndValues ...string) *F {
-	factory.AddLabelsInMap(WithMap(keysAndValues...))
-	return factory.concreteFactory
+func (builder *BaseBuilder[T, PT, B]) AddLabels(keysAndValues ...string) *B {
+	builder.AddLabelsInMap(WithMap(keysAndValues...))
+	return builder.concreteBuilder
 }
 
-func (factory *BaseFactory[T, PT, F]) AddLabelsInMap(labels map[string]string) *F {
-	l := factory.object.GetLabels()
+func (builder *BaseBuilder[T, PT, B]) AddLabelsInMap(labels map[string]string) *B {
+	l := builder.object.GetLabels()
 	for k, v := range labels {
 		l[k] = v
 	}
-	factory.object.SetLabels(l)
-	return factory.concreteFactory
+	builder.object.SetLabels(l)
+	return builder.concreteBuilder
 }
 
-func (factory *BaseFactory[T, PT, F]) AddAnnotations(keysAndValues ...string) *F {
-	factory.AddAnnotationsInMap(WithMap(keysAndValues...))
-	return factory.concreteFactory
+func (builder *BaseBuilder[T, PT, B]) AddAnnotations(keysAndValues ...string) *B {
+	builder.AddAnnotationsInMap(WithMap(keysAndValues...))
+	return builder.concreteBuilder
 }
-func (factory *BaseFactory[T, PT, F]) AddAnnotationsInMap(annotations map[string]string) *F {
-	a := factory.object.GetAnnotations()
+func (builder *BaseBuilder[T, PT, B]) AddAnnotationsInMap(annotations map[string]string) *B {
+	a := builder.object.GetAnnotations()
 	for k, v := range annotations {
 		a[k] = v
 	}
-	factory.object.SetAnnotations(a)
-	return factory.concreteFactory
+	builder.object.SetAnnotations(a)
+	return builder.concreteBuilder
 }
 
-func (factory *BaseFactory[T, PT, F]) AddControllerRevisionHashLabel(value string) *F {
-	return factory.AddLabels(appsv1.ControllerRevisionHashLabelKey, value)
+func (builder *BaseBuilder[T, PT, B]) AddControllerRevisionHashLabel(value string) *B {
+	return builder.AddLabels(appsv1.ControllerRevisionHashLabelKey, value)
 }
 
-func (factory *BaseFactory[T, PT, F]) SetOwnerReferences(ownerAPIVersion string, ownerKind string, owner client.Object) *F {
+func (builder *BaseBuilder[T, PT, B]) SetOwnerReferences(ownerAPIVersion string, ownerKind string, owner client.Object) *B {
 	// interface object needs to determine whether the value is nil.
 	// otherwise, nil pointer error may be reported.
 	if owner != nil && !reflect.ValueOf(owner).IsNil() {
 		t := true
-		factory.object.SetOwnerReferences([]metav1.OwnerReference{
+		builder.object.SetOwnerReferences([]metav1.OwnerReference{
 			{APIVersion: ownerAPIVersion, Kind: ownerKind, Controller: &t,
 				BlockOwnerDeletion: &t, Name: owner.GetName(), UID: owner.GetUID()},
 		})
 	}
-	return factory.concreteFactory
+	return builder.concreteBuilder
 }
 
-func (factory *BaseFactory[T, PT, F]) AddFinalizers(finalizers []string) *F {
-	factory.object.SetFinalizers(finalizers)
-	return factory.concreteFactory
+func (builder *BaseBuilder[T, PT, B]) AddFinalizers(finalizers []string) *B {
+	builder.object.SetFinalizers(finalizers)
+	return builder.concreteBuilder
 }
 
-func (factory *BaseFactory[T, PT, F]) GetObject() PT {
-	return factory.object
+func (builder *BaseBuilder[T, PT, B]) GetObject() PT {
+	return builder.object
 }
 
 func WithMap(keysAndValues ...string) map[string]string {

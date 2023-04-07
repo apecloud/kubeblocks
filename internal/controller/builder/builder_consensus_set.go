@@ -20,13 +20,13 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
-type ConsensusSetFactory struct {
-	BaseFactory[workloads.ConsensusSet, *workloads.ConsensusSet, ConsensusSetFactory]
+type ConsensusSetBuilder struct {
+	BaseBuilder[workloads.ConsensusSet, *workloads.ConsensusSet, ConsensusSetBuilder]
 }
 
-func NewConsensusSetFactory(namespace, name string) *ConsensusSetFactory {
-	f := &ConsensusSetFactory{}
-	f.init(namespace, name,
+func NewConsensusSetBuilder(namespace, name string) *ConsensusSetBuilder {
+	builder := &ConsensusSetBuilder{}
+	builder.init(namespace, name,
 		&workloads.ConsensusSet{
 			Spec: workloads.ConsensusSetSpec{
 				Replicas: 1,
@@ -35,13 +35,13 @@ func NewConsensusSetFactory(namespace, name string) *ConsensusSetFactory {
 				},
 				UpdateStrategy: workloads.SerialUpdateStrategy,
 			},
-		}, f)
-	return f
+		}, builder)
+	return builder
 }
 
-func (factory *ConsensusSetFactory) SetReplicas(replicas int32) *ConsensusSetFactory {
-	factory.get().Spec.Replicas = replicas
-	return factory
+func (builder *ConsensusSetBuilder) SetReplicas(replicas int32) *ConsensusSetBuilder {
+	builder.get().Spec.Replicas = replicas
+	return builder
 }
 
 

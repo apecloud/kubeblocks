@@ -32,7 +32,12 @@ type ConsensusSetSpec struct {
 	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
 
-	ServiceName string `json:"serviceName"`
+	// service defines the behavior of a service spec.
+	// provides read-write service
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	Service *corev1.ServiceSpec `json:"service,omitempty"`
 
 	Template corev1.PodTemplateSpec `json:"template"`
 

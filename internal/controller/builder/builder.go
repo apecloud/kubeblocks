@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"strconv"
 	"strings"
 
@@ -254,6 +255,53 @@ func BuildHeadlessSvc(params BuilderParams) (*corev1.Service, error) {
 	return BuildHeadlessSvcLow(params.Cluster, params.Component)
 }
 
+func BuildHeadlessSvcLow2(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.Service, error) {
+
+//	"spec": {
+//		"type":      "ClusterIP"
+//		"clusterIP": "None"
+//		"selector": {
+//			"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
+//			"app.kubernetes.io/managed-by": "kubeblocks"
+//
+//			"apps.kubeblocks.io/component-name": "\(component.name)"
+//		}
+//	ports: [
+//	for _, container in component.podSpec.containers if container.ports != _|_
+//	for _, v in container.ports {
+//	name:       v.name
+//	protocol:   v.protocol
+//	port:       v.containerPort
+//	targetPort: v.name
+//	},
+//]
+//}
+	builder := NewHeadlessServiceBuilder(ns, name).
+		AddLabels(constant.AppNameLabelKey, component.ClusterDefName).
+		AddLabels(constant.AppInstanceLabelKey, cluster.Name).
+		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+		AddLabels(constant.KBAppComponentLabelKey, component.Name).
+		AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
+	if component.Monitor.Enable {
+		builder.AddAnnotations("prometheus.io/path", component.Monitor.ScrapePath).
+			AddAnnotations("prometheus.io/port", strconv.Itoa(int(component.Monitor.ScrapePort))).
+			AddAnnotations("prometheus.io/scheme", "http")
+	}
+	builder.AddSelectors(constant.AppInstanceLabelKey, cluster.Name).
+		AddSelectors(constant.AppManagedByLabelKey, constant.AppName).
+		AddSelectors(constant.KBAppComponentLabelKey, component.Name)
+	for _, container := range component.PodSpec.Containers {
+		for _, port := range container.Ports {
+			servicePort := corev1.ServicePort{
+				Name: port.Name,
+				Protocol: port.Protocol,
+				Port: port.ContainerPort,
+				TargetPort: intstr.FromString(port.Name),
+			}
+			builder.AddPorts(servicePort)
+		}
+	}
+}
 func BuildHeadlessSvcLow(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.Service, error) {
 	const tplFile = "headless_service_template.cue"
 

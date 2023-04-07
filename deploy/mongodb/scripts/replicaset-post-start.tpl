@@ -40,12 +40,12 @@ done
 CONFIGSVR=""
 if [ ""$IS_CONFIGSVR = "true" ]; then CONFIGSVR="configsvr: true,"; fi
 
-is_inited=$(mongosh --quiet --port $PORT --eval "rs.status().ok") 
+is_inited=$(mongosh --quiet --port $PORT --eval "rs.status().ok" || || mongosh --quiet --port $PORT --eval "rs.status().ok" -u root --password $MONGODB_ROOT_PASSWORD) 
 if [ $is_inited -eq 1 ]; then
   exit 0
 fi;
 mongosh --quiet --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", $CONFIGSVR members: [$MEMBERS]})";
 
-(until mongosh --quiet --port 27018 --eval "rs.isMaster().isWritablePrimary"|grep true; do sleep 1; done;
+(until mongosh --quiet --port $PORT --eval "rs.isMaster().isWritablePrimary"|grep true; do sleep 1; done;
 echo "create user";
-mongosh --quiet --port $PORT --eval "db.getSiblingDB('admin').createUser({ user: \"$MONGODB_ROOT_USER\", pwd: \"$MONGODB_ROOT_PASSWORD\", roles: [{role: 'root', db: 'admin'}] })") </dev/null  >/dev/null 2>&1 &
+mongosh --quiet --port $PORT admin --eval "db.createUser({ user: \"$MONGODB_ROOT_USER\", pwd: \"$MONGODB_ROOT_PASSWORD\", roles: [{role: 'root', db: 'admin'}] })") </dev/null  >/dev/null 2>&1 &

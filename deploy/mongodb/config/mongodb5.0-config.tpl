@@ -55,9 +55,9 @@ processManagement:
 
 # set parameter options
 setParameter:
-   enableLocalhostAuthBypass: false
+   enableLocalhostAuthBypass: true
 
 # security options
 security:
-  authorization: disabled
-  #keyFile: replace_me
+  authorization: enabled
+  keyFile: /etc/mongodb/keyfile

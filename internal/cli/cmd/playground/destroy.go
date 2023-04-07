@@ -17,18 +17,30 @@ limitations under the License.
 package playground
 
 import (
+	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
@@ -145,21 +157,205 @@ func (o *destroyOptions) destroyCloud() error {
 
 	o.startTime = time.Now()
 
+	// for cloud provider, we should delete all clusters created by KubeBlocks first,
+	// uninstall KubeBlocks and remove the KubeBlocks namespace, then destroy the
+	// playground cluster, avoid to leave some resources.
+
+	// delete all clusters created by KubeBlocks, MUST BE very cautious, use the right
+	// kubeconfig and context, otherwise, it will delete the wrong cluster.
+	if o.prevCluster.KubeConfig == "" {
+		return fmt.Errorf("no kubeconfig found for kubernetes cluster %s in %s", o.prevCluster.ClusterName, o.stateFilePath)
+	}
+
+	// use a separate kubeconfig file
+	kubeConfigPath := filepath.Join(o.playgroundDir, "kubeconfig")
+	spinner := printer.Spinner(o.Out, fmt.Sprintf("%-50s", "Write kubeconfig to"+kubeConfigPath))
+	defer spinner(false)
+	if err = kubeConfigWrite(o.prevCluster.KubeConfig, kubeConfigPath, writeKubeConfigOptions{
+		UpdateExisting:       true,
+		UpdateCurrentContext: true,
+		OverwriteExisting:    true}); err != nil {
+		return err
+	}
+	spinner(true)
+
+	// use the new kubeconfig file
+	util.SetKubeConfig(kubeConfigPath)
+
+	// delete all clusters created by KubeBlocks
+	if err = o.deleteClusters(); err != nil {
+		return err
+	}
+
+	// uninstall KubeBlocks and remove namespace created by KubeBlocks
+	if err = o.uninstallKubeBlocks(kubeConfigPath); err != nil {
+		return err
+	}
+
+	// destroy playground kubernetes cluster
 	fmt.Fprintf(o.Out, "Destroy %s %s cluster %s...\n",
 		o.prevCluster.CloudProvider, cp.K8sService(o.prevCluster.CloudProvider), o.prevCluster.ClusterName)
 	if err = provider.DeleteK8sCluster(o.prevCluster); err != nil {
 		return err
 	}
 
+	// remove the cluster kubeconfig from the use default kubeconfig
 	if err = o.removeKubeConfig(); err != nil {
 		return err
 	}
 
+	// at last, remove the state file
 	if err = o.removeStateFile(); err != nil {
 		return err
 	}
 
 	fmt.Fprintf(o.Out, "Playground destroy completed in %s.\n", time.Since(o.startTime).Truncate(time.Second))
+	return nil
+}
+
+// delete all clusters created by KubeBlocks
+func (o *destroyOptions) deleteClusters() error {
+	ctx := context.Background()
+
+	// the caller should ensure the kubeconfig is set
+	f := util.NewFactory()
+	dynamic, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	// get all clusters in all namespaces
+	getClusters := func() (*unstructured.UnstructuredList, error) {
+		return dynamic.Resource(types.ClusterGVR()).Namespace(metav1.NamespaceAll).
+			List(context.Background(), metav1.ListOptions{})
+	}
+
+	// get all clusters and check if satisfy the checkFn
+	checkClusters := func(checkFn func(cluster *appsv1alpha1.Cluster) bool) (bool, error) {
+		res := true
+		clusters, err := getClusters()
+		for _, item := range clusters.Items {
+			cluster := &appsv1alpha1.Cluster{}
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, cluster); err != nil {
+				return false, err
+			}
+			if !checkFn(cluster) {
+				res = false
+				break
+			}
+		}
+		return res, nil
+	}
+
+	// delete all clusters
+	deleteClusters := func(clusters *unstructured.UnstructuredList) error {
+		for _, cluster := range clusters.Items {
+			if err = dynamic.Resource(types.ClusterGVR()).Namespace(cluster.GetNamespace()).
+				Delete(ctx, cluster.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	spinner := printer.Spinner(o.Out, fmt.Sprintf("%-50s", "Delete clusters created by KubeBlocks"))
+	defer spinner(false)
+
+	// get all clusters
+	clusters, err := getClusters()
+	if clusters == nil || len(clusters.Items) == 0 {
+		spinner(true)
+		return nil
+	}
+
+	checkWipeOut := false
+	// set all cluster termination policy to WipeOut to delete all resources, otherwise
+	// the cluster will be deleted but the resources will be left
+	for _, item := range clusters.Items {
+		cluster := &appsv1alpha1.Cluster{}
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, cluster); err != nil {
+			return err
+		}
+		if cluster.Spec.TerminationPolicy == appsv1alpha1.WipeOut {
+			continue
+		}
+
+		// terminate policy is not WipeOut, set it to WipeOut
+		klog.V(1).Infof("Set cluster %s termination policy to WipeOut", cluster.Name)
+		if _, err = dynamic.Resource(types.ClusterGVR()).Namespace(cluster.Namespace).Patch(ctx, cluster.Name, apitypes.JSONPatchType,
+			[]byte(fmt.Sprintf("[{\"op\": \"replace\", \"path\": \"/spec/terminationPolicy\", \"value\": %s }]",
+				appsv1alpha1.WipeOut)), metav1.PatchOptions{}); err != nil {
+			return err
+		}
+
+		// set some cluster termination policy to WipeOut, need to check again
+		checkWipeOut = true
+	}
+
+	// check all clusters termination policy is WipeOut
+	if checkWipeOut {
+		if err = wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+			return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
+				if cluster.Spec.TerminationPolicy != appsv1alpha1.WipeOut {
+					klog.V(1).Infof("Cluster %s termination policy is %s", cluster.Name, cluster.Spec.TerminationPolicy)
+				}
+				return cluster.Spec.TerminationPolicy == appsv1alpha1.WipeOut
+			})
+		}); err != nil {
+			return err
+		}
+	}
+
+	// delete all clusters
+	if err = deleteClusters(clusters); err != nil {
+		return err
+	}
+
+	// check and wait all clusters are deleted
+	if err = wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+		return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
+			// always return false if any cluster is not deleted
+			klog.V(1).Infof("Cluster %s is not deleted", cluster.Name)
+			return false
+		})
+	}); err != nil {
+		return err
+	}
+
+	spinner(true)
+	return nil
+}
+
+func (o *destroyOptions) uninstallKubeBlocks(configPath string) error {
+	var err error
+	f := util.NewFactory()
+	uninstall := kubeblocks.UninstallOptions{
+		Factory: f,
+		Options: kubeblocks.Options{
+			IOStreams: o.IOStreams,
+		},
+		AutoApprove:     true,
+		RemoveNamespace: true,
+		Quiet:           true,
+	}
+
+	uninstall.Client, err = f.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+
+	uninstall.Dynamic, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	uninstall.HelmCfg = helm.NewConfig("", configPath, "", klog.V(1).Enabled())
+	if err = uninstall.PreCheck(); err != nil {
+		return err
+	}
+	if err = uninstall.Uninstall(); err != nil {
+		return err
+	}
 	return nil
 }
 

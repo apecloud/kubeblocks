@@ -52,16 +52,16 @@ func cloudProviderRepoDir() (string, error) {
 	return filepath.Join(dir, cpDir), err
 }
 
-func initPlaygroundDir() error {
+func initPlaygroundDir() (string, error) {
 	dir, err := playgroundDir()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if _, err = os.Stat(dir); err != nil && os.IsNotExist(err) {
-		return os.MkdirAll(dir, 0750)
+		err = os.MkdirAll(dir, 0750)
 	}
-	return nil
+	return dir, err
 }
 
 // writeClusterInfoToFile writes the cluster info to a state file
@@ -109,12 +109,4 @@ func readClusterInfoFromFile(path string) (*cp.K8sClusterInfo, error) {
 		return nil, err
 	}
 	return &info, nil
-}
-
-func stateFilePath() (string, error) {
-	dir, err := playgroundDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, stateFileName), nil
 }

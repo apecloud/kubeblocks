@@ -18,6 +18,7 @@ package playground
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
@@ -26,21 +27,19 @@ import (
 type baseOptions struct {
 	startTime     time.Time
 	prevCluster   *cp.K8sClusterInfo
+	playgroundDir string
 	stateFilePath string
 }
 
 func (o *baseOptions) validate() error {
 	var err error
 
-	if err = initPlaygroundDir(); err != nil {
-		return err
-	}
-
-	o.stateFilePath, err = stateFilePath()
+	o.playgroundDir, err = initPlaygroundDir()
 	if err != nil {
 		return err
 	}
 
+	o.stateFilePath = filepath.Join(o.playgroundDir, stateFileName)
 	o.prevCluster, err = readClusterInfoFromFile(o.stateFilePath)
 	if err != nil {
 		return err

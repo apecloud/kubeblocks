@@ -64,7 +64,7 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(opsRequest *appsv1alp
 // Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
 func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
-		volumeExpansionMap = opsRes.OpsRequest.ConvertVolumeExpansionListToMap()
+		volumeExpansionMap = opsRes.OpsRequest.Spec.ToVolumeExpansionListToMap()
 		volumeExpansionOps appsv1alpha1.VolumeExpansion
 		ok                 bool
 	)
@@ -166,17 +166,17 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (ve volumeExpansionOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return opsRequest.GetVolumeExpansionComponentNameMap()
+	return realAffectedComponentMap(opsRequest.Spec.GetVolumeExpansionComponentNameSet())
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
-	componentNameMap := opsRequest.GetComponentNameMap()
+	componentNameMap := opsRequest.GetComponentNameSet()
 	storageMap := ve.getRequestStorageMap(opsRequest)
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-		if _, ok := componentNameMap[v.Name]; !ok {
+		if !componentNameMap.Exists(v.Name) {
 			continue
 		}
 		lastVCTs := make([]appsv1alpha1.OpsRequestVolumeClaimTemplate, 0)

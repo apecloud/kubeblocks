@@ -53,7 +53,7 @@ func (vs verticalScalingHandler) ActionStartedCondition(opsRequest *appsv1alpha1
 // Action modifies cluster component resources according to
 // the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
 func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	verticalScalingMap := opsRes.OpsRequest.ConvertVerticalScalingListToMap()
+	verticalScalingMap := opsRes.OpsRequest.Spec.ToVerticalScalingListToMap()
 	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
 		if verticalScaling, ok := verticalScalingMap[component.Name]; ok {
 			component.Resources = verticalScaling.ResourceRequirements
@@ -71,10 +71,10 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	componentNameMap := opsRes.OpsRequest.GetComponentNameMap()
+	componentNameMap := opsRes.OpsRequest.GetComponentNameSet()
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-		if _, ok := componentNameMap[v.Name]; !ok {
+		if !componentNameMap.Exists(v.Name) {
 			continue
 		}
 		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
@@ -88,7 +88,7 @@ func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.Reques
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (vs verticalScalingHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
 	realChangedMap := realAffectedComponentMap{}
-	vsMap := opsRequest.ConvertVerticalScalingListToMap()
+	vsMap := opsRequest.Spec.ToVerticalScalingListToMap()
 	for k, v := range opsRequest.Status.LastConfiguration.Components {
 		currVs, ok := vsMap[k]
 		if !ok {

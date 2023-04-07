@@ -432,127 +432,128 @@ func init() {
 	SchemeBuilder.Register(&OpsRequest{}, &OpsRequestList{})
 }
 
-// GetComponentNameMap if the operations are within the scope of component, this function should be implemented
-func (r *OpsRequest) GetComponentNameMap() map[string]struct{} {
-	switch r.Spec.Type {
-	case RestartType:
-		return r.GetRestartComponentNameMap()
-	case VerticalScalingType:
-		return r.GetVerticalScalingComponentNameMap()
-	case HorizontalScalingType:
-		return r.GetHorizontalScalingComponentNameMap()
-	case VolumeExpansionType:
-		return r.GetVolumeExpansionComponentNameMap()
-	case UpgradeType:
-		return r.GetUpgradeComponentNameMap()
-	case ReconfiguringType:
-		return r.GetReconfiguringComponentNameMap()
-	case ExposeType:
-		return r.GetExposeComponentNameMap()
-	default:
-		return map[string]struct{}{}
-	}
-}
-
-// GetRestartComponentNameMap gets the component name map with restart operation.
-func (r *OpsRequest) GetRestartComponentNameMap() map[string]struct{} {
-	componentNameMap := make(map[string]struct{})
-	for _, v := range r.Spec.RestartList {
+// GetRestartComponentNameSet gets the component name map with restart operation.
+func (r OpsRequestSpec) GetRestartComponentNameSet() ComponentNameSet {
+	componentNameMap := make(ComponentNameSet)
+	for _, v := range r.RestartList {
 		componentNameMap[v.ComponentName] = struct{}{}
 	}
 	return componentNameMap
 }
 
-// GetVerticalScalingComponentNameMap gets the component name map with vertical scaling operation.
-func (r *OpsRequest) GetVerticalScalingComponentNameMap() map[string]struct{} {
-	componentNameMap := make(map[string]struct{})
-	for _, v := range r.Spec.VerticalScalingList {
+// GetVerticalScalingComponentNameSet gets the component name map with vertical scaling operation.
+func (r OpsRequestSpec) GetVerticalScalingComponentNameSet() ComponentNameSet {
+	componentNameMap := make(ComponentNameSet)
+	for _, v := range r.VerticalScalingList {
 		componentNameMap[v.ComponentName] = struct{}{}
 	}
 	return componentNameMap
 }
 
-// ConvertVerticalScalingListToMap converts OpsRequest.spec.verticalScaling list to map
-func (r *OpsRequest) ConvertVerticalScalingListToMap() map[string]VerticalScaling {
+// ToVerticalScalingListToMap converts OpsRequest.spec.verticalScaling list to map
+func (r OpsRequestSpec) ToVerticalScalingListToMap() map[string]VerticalScaling {
 	verticalScalingMap := make(map[string]VerticalScaling)
-	for _, v := range r.Spec.VerticalScalingList {
+	for _, v := range r.VerticalScalingList {
 		verticalScalingMap[v.ComponentName] = v
 	}
 	return verticalScalingMap
 }
 
-// GetHorizontalScalingComponentNameMap gets the component name map with horizontal scaling operation.
-func (r *OpsRequest) GetHorizontalScalingComponentNameMap() map[string]struct{} {
-	componentNameMap := make(map[string]struct{})
-	for _, v := range r.Spec.HorizontalScalingList {
+// GetHorizontalScalingComponentNameSet gets the component name map with horizontal scaling operation.
+func (r OpsRequestSpec) GetHorizontalScalingComponentNameSet() ComponentNameSet {
+	componentNameMap := make(ComponentNameSet)
+	for _, v := range r.HorizontalScalingList {
 		componentNameMap[v.ComponentName] = struct{}{}
 	}
 	return componentNameMap
 }
 
-// ConvertHorizontalScalingListToMap converts OpsRequest.spec.horizontalScaling list to map
-func (r *OpsRequest) ConvertHorizontalScalingListToMap() map[string]HorizontalScaling {
+// ToHorizontalScalingListToMap converts OpsRequest.spec.horizontalScaling list to map
+func (r OpsRequestSpec) ToHorizontalScalingListToMap() map[string]HorizontalScaling {
 	verticalScalingMap := make(map[string]HorizontalScaling)
-	for _, v := range r.Spec.HorizontalScalingList {
+	for _, v := range r.HorizontalScalingList {
 		verticalScalingMap[v.ComponentName] = v
 	}
 	return verticalScalingMap
 }
 
-// GetVolumeExpansionComponentNameMap gets the component name map with volume expansion operation.
-func (r *OpsRequest) GetVolumeExpansionComponentNameMap() map[string]struct{} {
-	componentNameMap := make(map[string]struct{})
-	for _, v := range r.Spec.VolumeExpansionList {
+// GetVolumeExpansionComponentNameSet gets the component name map with volume expansion operation.
+func (r OpsRequestSpec) GetVolumeExpansionComponentNameSet() ComponentNameSet {
+	componentNameMap := make(ComponentNameSet)
+	for _, v := range r.VolumeExpansionList {
 		componentNameMap[v.ComponentName] = struct{}{}
 	}
 	return componentNameMap
 }
 
-// ConvertVolumeExpansionListToMap converts volumeExpansionList to map
-func (r *OpsRequest) ConvertVolumeExpansionListToMap() map[string]VolumeExpansion {
+// ToVolumeExpansionListToMap converts volumeExpansionList to map
+func (r OpsRequestSpec) ToVolumeExpansionListToMap() map[string]VolumeExpansion {
 	volumeExpansionMap := make(map[string]VolumeExpansion)
-	for _, v := range r.Spec.VolumeExpansionList {
+	for _, v := range r.VolumeExpansionList {
 		volumeExpansionMap[v.ComponentName] = v
 	}
 	return volumeExpansionMap
 }
 
-func (r *OpsRequest) ConvertExposeListToMap() map[string]Expose {
+// ToExposeListToMap build expose map
+func (r OpsRequestSpec) ToExposeListToMap() map[string]Expose {
 	exposeMap := make(map[string]Expose)
-	for _, v := range r.Spec.ExposeList {
+	for _, v := range r.ExposeList {
 		exposeMap[v.ComponentName] = v
 	}
 	return exposeMap
 }
 
-// GetUpgradeComponentNameMap gets the component name map with upgrade operation.
-func (r *OpsRequest) GetUpgradeComponentNameMap() map[string]struct{} {
-	if r.Spec.Upgrade == nil {
+// GetReconfiguringComponentNameSet gets the component name map with reconfiguring operation.
+func (r OpsRequestSpec) GetReconfiguringComponentNameSet() ComponentNameSet {
+	if r.Reconfigure == nil {
 		return nil
 	}
-	componentNameMap := make(map[string]struct{})
+	return ComponentNameSet{
+		r.Reconfigure.ComponentName: {},
+	}
+}
+
+func (r OpsRequestSpec) GetExposeComponentNameSet() ComponentNameSet {
+	componentNameMap := make(ComponentNameSet)
+	for _, v := range r.ExposeList {
+		componentNameMap[v.ComponentName] = struct{}{}
+	}
+	return componentNameMap
+}
+
+// GetUpgradeComponentNameSet gets the component name map with upgrade operation.
+func (r *OpsRequest) GetUpgradeComponentNameSet() ComponentNameSet {
+	if r == nil || r.Spec.Upgrade == nil {
+		return nil
+	}
+	componentNameMap := make(ComponentNameSet)
 	for k := range r.Status.Components {
 		componentNameMap[k] = struct{}{}
 	}
 	return componentNameMap
 }
 
-// GetReconfiguringComponentNameMap gets the component name map with reconfiguring operation.
-func (r *OpsRequest) GetReconfiguringComponentNameMap() map[string]struct{} {
-	if r.Spec.Reconfigure == nil {
+// GetComponentNameSet if the operations are within the scope of component, this function should be implemented
+func (r *OpsRequest) GetComponentNameSet() ComponentNameSet {
+	switch r.Spec.Type {
+	case RestartType:
+		return r.Spec.GetRestartComponentNameSet()
+	case VerticalScalingType:
+		return r.Spec.GetVerticalScalingComponentNameSet()
+	case HorizontalScalingType:
+		return r.Spec.GetHorizontalScalingComponentNameSet()
+	case VolumeExpansionType:
+		return r.Spec.GetVolumeExpansionComponentNameSet()
+	case UpgradeType:
+		return r.GetUpgradeComponentNameSet()
+	case ReconfiguringType:
+		return r.Spec.GetReconfiguringComponentNameSet()
+	case ExposeType:
+		return r.Spec.GetExposeComponentNameSet()
+	default:
 		return nil
 	}
-	return map[string]struct{}{
-		r.Spec.Reconfigure.ComponentName: {},
-	}
-}
-
-func (r *OpsRequest) GetExposeComponentNameMap() map[string]struct{} {
-	componentNameMap := make(map[string]struct{})
-	for _, v := range r.Spec.ExposeList {
-		componentNameMap[v.ComponentName] = struct{}{}
-	}
-	return componentNameMap
 }
 
 func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {

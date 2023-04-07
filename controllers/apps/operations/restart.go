@@ -59,7 +59,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
-	componentNameMap := opsRes.OpsRequest.GetRestartComponentNameMap()
+	componentNameMap := opsRes.OpsRequest.Spec.GetRestartComponentNameSet()
 	if err := restartDeployment(reqCtx, cli, opsRes, componentNameMap); err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (r restartOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return opsRequest.GetRestartComponentNameMap()
+	return realAffectedComponentMap(opsRequest.Spec.GetRestartComponentNameSet())
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes in Cluster.spec.

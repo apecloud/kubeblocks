@@ -25,12 +25,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 func getUpdateParameterList(cfg *ConfigPatchInfo, trimField string) ([]string, error) {
 	params := make([]string, 0)
-	walkFn := func(parent, cur string, v reflect.Value, fn UpdateFn) error {
+	walkFn := func(parent, cur string, v reflect.Value, fn util.UpdateFn) error {
 		if cur != "" {
 			if parent != "" {
 				cur = parent + "." + cur
@@ -49,7 +50,7 @@ func getUpdateParameterList(cfg *ConfigPatchInfo, trimField string) ([]string, e
 		if updatedParams, err = trimNestedField(updatedParams, trimField); err != nil {
 			return nil, err
 		}
-		if err := UnstructuredObjectWalk(updatedParams, walkFn, true); err != nil {
+		if err := util.UnstructuredObjectWalk(updatedParams, walkFn, true); err != nil {
 			return nil, WrapError(err, "failed to walk params: [%s]", diff)
 		}
 	}
@@ -87,7 +88,7 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 	// if ConfigConstraint has StaticParameters, check updated parameter
 	if len(cc.StaticParameters) > 0 {
 		staticParams := set.NewLinkedHashSetString(cc.StaticParameters...)
-		union := Union(staticParams, updateParams)
+		union := util.Union(staticParams, updateParams)
 		if union.Length() > 0 {
 			return false, nil
 		}
@@ -100,7 +101,7 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 	// if ConfigConstraint has DynamicParameter, all updated param in dynamic params
 	if len(cc.DynamicParameters) > 0 {
 		dynamicParams := set.NewLinkedHashSetString(cc.DynamicParameters...)
-		union := Difference(updateParams, dynamicParams)
+		union := util.Difference(updateParams, dynamicParams)
 		return union.Length() == 0, nil
 	}
 

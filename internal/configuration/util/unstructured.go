@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configuration
+package util
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 )
@@ -45,7 +46,7 @@ type unstructuredAccessor struct {
 func (accessor *unstructuredAccessor) Visit(data interface{}) error {
 	v := reflect.ValueOf(data)
 	if !v.IsValid() {
-		return MakeError("invalid data type: %T", data)
+		return fmt.Errorf("invalid data type: %T", data)
 	}
 	return accessor.visitValueType(v, v.Type(), "", "", nil)
 }
@@ -86,7 +87,7 @@ func (accessor *unstructuredAccessor) visitValueType(v reflect.Value, t reflect.
 	case reflect.Pointer:
 		return accessor.visitValueType(v, t.Elem(), parent, cur, updateFn)
 	default:
-		return MakeError("not support type: %s", k)
+		return fmt.Errorf("not support type: %s", k)
 	}
 }
 
@@ -110,7 +111,7 @@ func (accessor *unstructuredAccessor) visitMap(v reflect.Value, t reflect.Type, 
 	switch k := t.Key().Kind(); k {
 	case reflect.String:
 	default:
-		return MakeError("not support key type: %s", k)
+		return fmt.Errorf("not support key type: %s", k)
 	}
 
 	t = t.Elem()
@@ -169,5 +170,5 @@ func joinFieldPath(parent, cur string) string {
 }
 
 func (accessor *unstructuredAccessor) visitStruct(v reflect.Value, parent string) error {
-	return MakeError("not support struct.")
+	return fmt.Errorf("not support struct")
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 func TestGetUpdateParameterList(t *testing.T) {
@@ -52,7 +53,7 @@ func TestGetUpdateParameterList(t *testing.T) {
 	expected := set.NewLinkedHashSetString("a", "f", "c", "xxx.test1", "xxx.test2", "g.msld.cakl", "g.msld.dg", "g.cd")
 	params, err := getUpdateParameterList(newCfgDiffMeta(testData, nil, nil), "")
 	require.Nil(t, err)
-	require.True(t, EqSet(expected,
+	require.True(t, util.EqSet(expected,
 		set.NewLinkedHashSetString(params...)), "param: %v, expected: %v", params, expected.AsSlice())
 }
 

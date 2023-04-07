@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/unstructured"
 )
@@ -285,7 +286,7 @@ func (c *cfgWrapper) Query(jsonpath string, option CfgOpOption) ([]byte, error) 
 		}
 	}
 
-	return retrievalWithJSONPath(cfg.GetAllParameters(), jsonpath)
+	return util.RetrievalWithJSONPath(cfg.GetAllParameters(), jsonpath)
 }
 
 func (c *cfgWrapper) queryAllCfg(jsonpath string, option CfgOpOption) ([]byte, error) {
@@ -294,7 +295,7 @@ func (c *cfgWrapper) queryAllCfg(jsonpath string, option CfgOpOption) ([]byte, e
 	for filename, v := range c.indexer {
 		tops[filename] = v.GetAllParameters()
 	}
-	return retrievalWithJSONPath(tops, jsonpath)
+	return util.RetrievalWithJSONPath(tops, jsonpath)
 }
 
 func (c cfgWrapper) getConfigObject(option CfgOpOption) unstructured.ConfigObject {

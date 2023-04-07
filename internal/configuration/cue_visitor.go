@@ -25,6 +25,8 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/spf13/viper"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 var disableAutoTransfer = viper.GetBool("DISABLE_AUTO_TRANSFER")
@@ -140,7 +142,7 @@ func (c *cueTypeExtractor) hasFieldType(parent string, cur string) (string, bool
 	return "", false
 }
 
-func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn, expand string, trimString bool) error {
+func transNumberOrBoolType(t CueType, obj reflect.Value, fn util.UpdateFn, expand string, trimString bool) error {
 	switch t {
 	case IntType:
 		return processTypeTrans[int](obj, strconv.Atoi, fn, trimString)
@@ -166,7 +168,7 @@ func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn, expand str
 	return nil
 }
 
-func trimStringQuotes(obj reflect.Value, fn UpdateFn) {
+func trimStringQuotes(obj reflect.Value, fn util.UpdateFn) {
 	if obj.Type().Kind() != reflect.String {
 		return
 	}
@@ -181,7 +183,7 @@ func trimStringQuotes(obj reflect.Value, fn UpdateFn) {
 	}
 }
 
-func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn UpdateFn, trimString bool) error {
+func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn util.UpdateFn, trimString bool) error {
 	switch obj.Type().Kind() {
 	case reflect.String:
 		str := obj.String()
@@ -209,8 +211,8 @@ func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Va
 		context: context,
 	}
 	typeTransformer.Visit(tpl)
-	return UnstructuredObjectWalk(typeTransformer.data,
-		func(parent, cur string, obj reflect.Value, fn UpdateFn) error {
+	return util.UnstructuredObjectWalk(typeTransformer.data,
+		func(parent, cur string, obj reflect.Value, fn util.UpdateFn) error {
 			if fn == nil || cur == "" || !obj.IsValid() {
 				return nil
 			}

@@ -16,6 +16,8 @@ limitations under the License.
 
 package configuration
 
+import "github.com/apecloud/kubeblocks/internal/configuration/util"
+
 func CreateMergePatch(oldVersion, newVersion interface{}, option CfgOption) (*ConfigPatchInfo, error) {
 
 	ok, err := compareWithConfig(oldVersion, newVersion, option)
@@ -38,12 +40,12 @@ func CreateMergePatch(oldVersion, newVersion interface{}, option CfgOption) (*Co
 }
 
 func difference(base *cfgWrapper, target *cfgWrapper) (*ConfigPatchInfo, error) {
-	fromOMap := ToSet(base.indexer)
-	fromNMap := ToSet(target.indexer)
+	fromOMap := util.ToSet(base.indexer)
+	fromNMap := util.ToSet(target.indexer)
 
-	addSet := Difference(fromNMap, fromOMap)
-	deleteSet := Difference(fromOMap, fromNMap)
-	updateSet := Difference(fromOMap, deleteSet)
+	addSet := util.Difference(fromNMap, fromOMap)
+	deleteSet := util.Difference(fromOMap, fromNMap)
+	updateSet := util.Difference(fromOMap, deleteSet)
 
 	reconfigureInfo := &ConfigPatchInfo{
 		IsModify:     false,
@@ -69,7 +71,7 @@ func difference(base *cfgWrapper, target *cfgWrapper) (*ConfigPatchInfo, error) 
 		old := base.indexer[elem]
 		new := target.indexer[elem]
 
-		patch, err := jsonPatch(old.GetAllParameters(), new.GetAllParameters())
+		patch, err := util.JSONPatch(old.GetAllParameters(), new.GetAllParameters())
 		if err != nil {
 			return nil, err
 		}

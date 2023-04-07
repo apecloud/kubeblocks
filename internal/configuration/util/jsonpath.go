@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configuration
+package util
 
 import (
 	"encoding/json"
@@ -23,14 +23,13 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 )
 
-func retrievalWithJSONPath(jsonObj interface{}, jsonpath string) ([]byte, error) {
-
-	jsonbytes, err := json.Marshal(&jsonObj)
+func RetrievalWithJSONPath(jsonObj interface{}, jsonpath string) ([]byte, error) {
+	jsonBytes, err := json.Marshal(&jsonObj)
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := jsonslice.Get(jsonbytes, jsonpath)
+	res, err := jsonslice.Get(jsonBytes, jsonpath)
 	if err != nil {
 		return res, err
 	}
@@ -39,11 +38,10 @@ func retrievalWithJSONPath(jsonObj interface{}, jsonpath string) ([]byte, error)
 	if resLen > 2 && res[0] == '"' && res[resLen-1] == '"' {
 		res = res[1 : resLen-1]
 	}
-
 	return res, err
 }
 
-func jsonPatch(originalJSON, modifiedJSON interface{}) ([]byte, error) {
+func JSONPatch(originalJSON, modifiedJSON interface{}) ([]byte, error) {
 	originalBytes, err := json.Marshal(originalJSON)
 	if err != nil {
 		return nil, err
@@ -53,7 +51,5 @@ func jsonPatch(originalJSON, modifiedJSON interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO(zt) It's a hack to do the logic, json object --> bytes, bytes --> json object
 	return jsonpatch.CreateMergePatch(originalBytes, modifiedBytes)
 }

@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcontainer "github.com/apecloud/kubeblocks/internal/configuration/container"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
@@ -126,11 +127,11 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 	}
 
 	logger.V(1).Info(fmt.Sprintf("new version files: %v, old version files: %v", newVersion, oldVersion))
-	oldData, err := cfgutil.FromConfigFiles(oldVersion)
+	oldData, err := util.FromConfigFiles(oldVersion)
 	if err != nil {
 		return nil, err
 	}
-	newData, err := cfgutil.FromConfigFiles(newVersion)
+	newData, err := util.FromConfigFiles(newVersion)
 	if err != nil {
 		return nil, err
 	}

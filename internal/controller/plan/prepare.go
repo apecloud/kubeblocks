@@ -34,6 +34,7 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -355,7 +356,7 @@ func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotat
 	}
 
 	// delete not exist configmap label
-	deletedLabels := cfgcore.MapKeyDifference(existLabels, allTemplateAnnotations)
+	deletedLabels := util.MapKeyDifference(existLabels, allTemplateAnnotations)
 	for l := range deletedLabels.Iter() {
 		delete(annotations, l)
 	}

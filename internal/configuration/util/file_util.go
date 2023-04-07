@@ -14,20 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configuration
+package util
 
-import "golang.org/x/exp/constraints"
+import (
+	"os"
+	"path/filepath"
+)
 
-func Min[T constraints.Ordered](l, r T) T {
-	if l < r {
-		return l
+func FromConfigFiles(files []string) (map[string]string, error) {
+	m := make(map[string]string)
+	for _, file := range files {
+		b, err := os.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		m[filepath.Base(file)] = string(b)
 	}
-	return r
-}
-
-func Max[T constraints.Ordered](l, r T) T {
-	if l < r {
-		return r
-	}
-	return l
+	return m, nil
 }

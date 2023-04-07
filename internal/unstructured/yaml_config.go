@@ -120,13 +120,13 @@ func searchMap(m map[string]any, path []string) any {
 	if len(path) == 1 {
 		return next
 	}
-	switch next.(type) {
+	switch t := next.(type) {
 	default:
 		return nil
 	case map[any]any:
-		return searchMap(cast.ToStringMap(next), path[1:])
+		return searchMap(cast.ToStringMap(t), path[1:])
 	case map[string]any:
-		return searchMap(next.(map[string]any), path[1:])
+		return searchMap(t, path[1:])
 	}
 }
 

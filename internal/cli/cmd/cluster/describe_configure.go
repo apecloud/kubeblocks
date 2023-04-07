@@ -89,31 +89,31 @@ type parameterTemplate struct {
 var (
 	describeReconfigureExample = templates.Examples(`
 		# describe a cluster, e.g. cluster name is mycluster
-		kbcli cluster describe-configure mycluster
+		kbcli cluster describe-config mycluster
 
 		# describe a component, e.g. cluster name is mycluster, component name is mysql
-		kbcli cluster describe-configure mycluster --component-name=mysql
+		kbcli cluster describe-config mycluster --component-name=mysql
 
 		# describe all configuration files. 
-		kbcli cluster describe-configure mycluster --component-name=mysql --show-detail
+		kbcli cluster describe-config mycluster --component-name=mysql --show-detail
 
 		# describe a content of configuration file. 
-		kbcli cluster describe-configure mycluster --component-name=mysql --config-file=my.cnf --show-detail`)
+		kbcli cluster describe-config mycluster --component-name=mysql --config-file=my.cnf --show-detail`)
 	explainReconfigureExample = templates.Examples(`
 		# describe a cluster, e.g. cluster name is mycluster
-		kbcli cluster explain-configure mycluster
+		kbcli cluster explain-config mycluster
 
 		# describe a specified configure template, e.g. cluster name is mycluster
-		kbcli cluster explain-configure mycluster --component-name=mysql --config-specs=mysql-3node-tpl
+		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl
 
 		# describe a specified configure template, e.g. cluster name is mycluster
-		kbcli cluster explain-configure mycluster --component-name=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
+		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
 
 		# describe a specified parameters, e.g. cluster name is mycluster
-		kbcli cluster explain-configure mycluster --component-name=mysql --config-specs=mysql-3node-tpl --param=sql_mode`)
+		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl --param=sql_mode`)
 	diffConfigureExample = templates.Examples(`
 		# compare config files 
-		kbcli cluster diff-configure opsrequest1 opsrequest2`)
+		kbcli cluster diff-config opsrequest1 opsrequest2`)
 )
 
 func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command) {
@@ -565,7 +565,7 @@ func (o *opsRequestDiffOptions) run() error {
 		baseConfigs[tplName] = baseObj
 	}
 
-	printer.PrintTitle("DIFF-CONFIGURE RESULT")
+	printer.PrintTitle("DIFF-CONFIG RESULT")
 	for tplName, diff := range configDiffs {
 		configObjects := baseConfigs[tplName]
 		for _, params := range diff {

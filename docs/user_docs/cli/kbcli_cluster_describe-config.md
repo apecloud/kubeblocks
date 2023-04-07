@@ -12,16 +12,16 @@ kbcli cluster describe-config [flags]
 
 ```
   # describe a cluster, e.g. cluster name is mycluster
-  kbcli cluster describe-configure mycluster
+  kbcli cluster describe-config mycluster
   
   # describe a component, e.g. cluster name is mycluster, component name is mysql
-  kbcli cluster describe-configure mycluster --component-name=mysql
+  kbcli cluster describe-config mycluster --component-name=mysql
   
   # describe all configuration files.
-  kbcli cluster describe-configure mycluster --component-name=mysql --show-detail
+  kbcli cluster describe-config mycluster --component-name=mysql --show-detail
   
   # describe a content of configuration file.
-  kbcli cluster describe-configure mycluster --component-name=mysql --config-file=my.cnf --show-detail
+  kbcli cluster describe-config mycluster --component-name=mysql --config-file=my.cnf --show-detail
 ```
 
 ### Options

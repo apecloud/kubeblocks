@@ -49,17 +49,6 @@ const (
 	AddonDisabling AddonPhase = "Disabling"
 )
 
-// KeyHelmValueKey defines "key" Helm value's key types.
-// +enum
-type KeyHelmValueKey string
-
-const (
-	ReplicaCount KeyHelmValueKey = "replicaCount"
-	PVEnabled    KeyHelmValueKey = "persistentVolumeEnabled"
-	StorageClass KeyHelmValueKey = "storageClass"
-	Tolerations  KeyHelmValueKey = "tolerations"
-)
-
 // AddonSelectorKey are selector requirement key types.
 // +enum
 // +kubebuilder:validation:Enum={KubeGitVersion,KubeVersion}

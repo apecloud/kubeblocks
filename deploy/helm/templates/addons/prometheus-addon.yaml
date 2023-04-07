@@ -72,14 +72,12 @@ spec:
             requests:
               storage: 4Gi
 
+    # for ACK, the smallest storage size is 20Gi, the format of GitVersion is v1.24.6-aliyun.1
     - selectors:
         - key: KubeGitVersion
           operator: Contains
           values:
-            # for ACK, the smallest storage size is 20Gi, the format of GitVersion is v1.24.6-aliyun.1
             - aliyun
-            # for TKE, the smallest storage size is 10Gi, we also use 20Gi storage, the format of GitVersion is v1.24.4-tke.5
-            - tke
       replicas: 1
       storageClass: alicloud-disk-efficiency
       resources:
@@ -95,6 +93,26 @@ spec:
           resources:
             requests:
               storage: 20Gi
+
+    # for TKE, the smallest storage size is 10Gi, the format of GitVersion is v1.24.4-tke.5
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - tke
+      replicas: 1
+      resources:
+        requests:
+          storage: 10Gi
+          memory: 512Mi
+        limits:
+          memory: 4Gi
+      extras:
+        - name: alertmanager
+          replicas: 1
+          resources:
+            requests:
+              storage: 10Gi
 
   installable:
     autoInstall: {{ .Values.prometheus.enabled }}

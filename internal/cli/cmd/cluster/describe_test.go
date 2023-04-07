@@ -48,7 +48,6 @@ var _ = Describe("Expose", func() {
 		cluster = testing.FakeCluster(clusterName, namespace)
 		pods    = testing.FakePods(3, namespace, clusterName)
 	)
-
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)

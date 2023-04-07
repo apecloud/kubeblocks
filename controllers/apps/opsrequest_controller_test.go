@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +34,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -81,6 +83,24 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	// Testcases
 
+	checkLatestOpsIsProcessing := func(clusterKey client.ObjectKey, opsType appsv1alpha1.OpsType) {
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
+			con := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
+			g.Expect(con).ShouldNot(BeNil())
+			g.Expect(con.Status).Should(Equal(metav1.ConditionFalse))
+			g.Expect(con.Reason).Should(Equal(appsv1alpha1.OpsRequestBehaviourMapper[opsType].ProcessingReasonInClusterCondition))
+		})).Should(Succeed())
+	}
+
+	checkLatestOpsHasProcessed := func(clusterKey client.ObjectKey) {
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
+			con := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
+			g.Expect(con).ShouldNot(BeNil())
+			g.Expect(con.Status).Should(Equal(metav1.ConditionTrue))
+			g.Expect(con.Reason).Should(Equal(lifecycle.ReasonOpsRequestProcessed))
+		})).Should(Succeed())
+	}
+
 	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) {
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, namespacedName,
 			func(fetched *appsv1alpha1.Cluster) {
@@ -127,7 +147,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		By("mock pod/sts are available and wait for cluster enter running phase")
 		podName := fmt.Sprintf("%s-%s-0", clusterObj.Name, mysqlCompName)
@@ -167,6 +187,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+		checkLatestOpsIsProcessing(clusterKey, verticalScalingOpsRequest.Spec.Type)
 
 		By("check Cluster and changed component phase is VerticalScaling")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
@@ -180,6 +201,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
+		checkLatestOpsHasProcessed(clusterKey)
 
 		By("patch opsrequest controller to run")
 		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
@@ -257,12 +279,12 @@ var _ = Describe("OpsRequest Controller", func() {
 					clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
 						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot}
 				})()).ShouldNot(HaveOccurred())
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(mysqlCompName, mysqlCompType).
 				SetReplicas(replicas).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -304,9 +326,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(testCtx.CreateObj(testCtx.Ctx, ops)).Should(Succeed())
 
 			By("expect component is Running if don't support volume snapshot during doing h-scale ops")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 			// cluster phase changes to HorizontalScalingPhase first. then, it will be ConditionsError because it does not support snapshot backup after a period of time.
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase)) // HorizontalScalingPhase
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 			By("delete h-scale ops")
@@ -357,12 +379,12 @@ var _ = Describe("OpsRequest Controller", func() {
 				Create(&testCtx).GetObject()
 
 			By("Creating a cluster with replication workloadType.")
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			pvcSpec.StorageClassName = &storageClassName
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).SetPrimaryIndex(0).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).SetPrimaryIndex(0).
 				SetReplicas(testapps.DefaultReplicationReplicas).
 				Create(&testCtx).GetObject()
 			// mock sts ready and create pod
@@ -395,7 +417,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("should be Running before pods are not deleted successfully")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-
+			checkLatestOpsIsProcessing(clusterKey, stopOps.Spec.Type)
 			// mock pod deleted successfully
 			for _, pod := range podList {
 				Expect(testapps.ChangeObj(&testCtx, pod, func() {
@@ -410,6 +432,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				}
 			})).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+			checkLatestOpsHasProcessed(clusterKey)
 
 			By("test start ops")
 			startOpsName := "start-ops" + testCtx.GetRandomStr()

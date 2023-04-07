@@ -1524,10 +1524,6 @@ grafana:
     appProtocol: ""
 
 
-
-loadbalancer:
-  enabled: false
-
 ### snapshot-controller settings
 ### ref: https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration
 ###
@@ -1561,6 +1557,9 @@ snapshot-controller:
                 operator: In
                 values:
                   - "true"
+
+kubeblocks-csi-driver:
+  enabled: false
 
 ## csi-s3 settings
 ## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration
@@ -1652,9 +1651,14 @@ csi-hostpath-driver:
     default: true
 
 aws-loadbalancer-controller:
-  replicaCount: 1
   clusterName: ""
-  image:
-    # please specify image registry by region
-    # reference: https://docs.amazonaws.cn/eks/latest/userguide/add-ons-images.html
-    registry: 961992271922.dkr.ecr.cn-northwest-1.amazonaws.com.cn/amazon/aws-load-balancer-controller
+  enabled: false
+  replicaCount: 1
+  tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+  serviceAccount:
+    create: true
+    name: kubeblocks-service-account-aws-load-balancer-controller

@@ -1,0 +1,130 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ include "kafka.name" . }}-data-eks
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+parameters:
+  # parameters references: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/parameters.md
+  type: st1
+  "csi.storage.k8s.io/fstype": xfs
+provisioner: kubernetes.io/aws-ebs
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+mountOptions: {{ .Values.mountOptions | toYaml }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ include "kafka.name" . }}-data-aks
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+parameters:
+  # parameters references: https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
+  fsType: xfs
+  kind: managed
+  skuName: Standard_LRS
+provisioner: kubernetes.io/azure-disk
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+mountOptions: {{ .Values.mountOptions | toYaml }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ include "kafka.name" . }}-data-gke
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+parameters:
+  # parameters references: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver#createvolume-parameters
+  type: pd-standard
+  # TODO: how-to specify FS type?
+provisioner: kubernetes.io/gce-pd
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+mountOptions: {{ .Values.mountOptions | toYaml }}
+
+---
+## storage classes for meta-data
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ include "kafka.name" . }}-meta-eks
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+parameters:
+  # parameters references: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/parameters.md
+  type: {{ .Values.storageClassParameters.metadata.awsEBSVolumeType }} # io2, io1, gp3, gp2 are all SSD variant
+  blockExpress: {{ .Values.storageClassParameters.metadata.awsEBSEnableBlockExpress | default "false" | quote }} # for io2 only
+  "csi.storage.k8s.io/fstype": xfs
+provisioner: kubernetes.io/aws-ebs
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+mountOptions: {{ .Values.mountOptions | toYaml }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ include "kafka.name" . }}-meta-aks
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+parameters:
+  # parameters references: https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
+  fsType: xfs
+  kind: managed
+  skuName: StandardSSD_LRS # StandardSSD_LRS, UltraSSD_LRS, StandardSSD_ZRS (ZoneRedundantStorage)
+provisioner: kubernetes.io/azure-disk
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+mountOptions: {{ .Values.mountOptions | toYaml }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ include "kafka.name" . }}-meta-gke
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+parameters:
+  # parameters references: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver#createvolume-parameters
+  type: pd-ssd # or pd-extreme
+  # TODO: how-to specify FS type?
+provisioner: kubernetes.io/gce-pd
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+mountOptions: {{ .Values.mountOptions | toYaml }}

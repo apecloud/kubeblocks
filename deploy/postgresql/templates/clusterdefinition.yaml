@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
+  type: postgresql
   connectionCredential:
     username: postgres
     password: {{ (include "postgresql.postgresPassword" .) | quote  }}
@@ -16,6 +17,10 @@ spec:
       workloadType: Replication
       characterType: postgresql
       probes:
+        roleChangedProbe:
+          failureThreshold: 2
+          periodSeconds: 1
+          timeoutSeconds: 1
       monitor:
         builtIn: false
         exporterConfig:
@@ -49,12 +54,8 @@ spec:
       service:
         ports:
           - name: tcp-postgresql
-            protocol: TCP
             port: 5432
             targetPort: tcp-postgresql
-          - name: http-metrics-postgresql
-            port: 9187
-            targetPort: http-metrics
       volumeTypes:
         - name: data
           type: data

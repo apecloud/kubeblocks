@@ -208,7 +208,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 			status, err := parallelPolicy.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("not support component workload type"))
-			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))
+			Expect(status.Status).Should(BeEquivalentTo(ESNotSupport))
 		})
 	})
 })

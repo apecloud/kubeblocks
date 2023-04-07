@@ -1,6 +1,6 @@
 ---
 title: Scale for PostgreSQL
-description: How to scale a MPostgreSQL cluster, horizontal scaling, vertical scaling
+description: How to scale a PostgreSQL cluster, horizontal scaling, vertical scaling
 sidebar_position: 2
 sidebar_label: Scale
 ---
@@ -39,19 +39,18 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
    
    **Option 1.** (**Recommended**) Use kbcli
    
-   Configure the parameters `component-names`, `requests`, and `limits` and run the command.
+   Configure the parameters `--component-names`, `--memory`, and `--cpu` and run the command.
    
    ***Example***
    
    ```bash
    kbcli cluster vscale pg-cluster \
    --component-names="pg-replication" \
-   --requests.memory="2Gi" --requests.cpu="1" \
-   --limits.memory="4Gi" --limits.cpu="2"
+   --memory="4Gi" --cpu="2" \
    ```
-   - `component-names` describes the component name ready for vertical scaling.
-   - `requests` describes the minimum amount of computing resources required. If `requests` is omitted for a container, it uses the `limits` value if `limits` is explicitly specified, otherwise uses an implementation-defined value. For more details, see [Resource Management for Pods and Containers](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/).
-   - `--limits` describes the maximum amount of computing resources allowed. For more details, see [Resource Management for Pods and Containers](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
+   - `--component-names` describes the component name ready for vertical scaling.
+   - `--memory` describes the requested and limited size of the component memory.
+   - `--cpu` describes the requested and limited size of the component CPU.
   
    **Option 2.** Create an OpsRequest
   
@@ -91,9 +90,9 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
    spec:
      clusterDefinitionRef: postgresql-cluster
      clusterVersionRef: postgre-14.7.0
-     components:
+     componentSpecs:
      - name: pg-replication
-       type: postgresql
+       componentDefRef: postgresql
        replicas: 1
        resources: # Change the values of resources.
          requests:

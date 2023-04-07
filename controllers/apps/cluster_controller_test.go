@@ -118,7 +118,7 @@ var _ = Describe("Cluster Controller", func() {
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		for _, compName := range compNames {
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.StartingClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 		}
 	}
 
@@ -365,7 +365,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		// REVIEW: this test flow
 
@@ -384,7 +384,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		// REVIEW: this test flow
 
@@ -440,7 +440,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		replicasSeq := []int32{5, 3, 1, 0, 2, 4}
 		expectedOG := int64(1)
@@ -452,7 +452,7 @@ var _ = Describe("Cluster Controller", func() {
 			By("Checking cluster status and the number of replicas changed")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
 				g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(expectedOG))
-				g.Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StartingClusterPhase))
+				g.Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 			})).Should(Succeed())
 			Eventually(func(g Gomega) {
 				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -646,11 +646,11 @@ var _ = Describe("Cluster Controller", func() {
 		updatedReplicas := int32(3)
 
 		By("Creating a single component cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVC("1Gi")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -669,14 +669,14 @@ var _ = Describe("Cluster Controller", func() {
 		secondMysqlCompName := mysqlCompName + "1"
 
 		By("Creating a multi components cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVC("1Gi")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(initialReplicas).
 			AddComponent(secondMysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -704,14 +704,14 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(testCtx.CreateObj(testCtx.Ctx, storageClass)).Should(Succeed())
 
 		By("Creating a cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVC("1Gi")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		pvcSpec.StorageClassName = &storageClass.Name
 
 		By("Create cluster and waiting for the cluster initialized")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(replicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -733,7 +733,7 @@ var _ = Describe("Cluster Controller", func() {
 					Labels: map[string]string{
 						constant.AppInstanceLabelKey: clusterKey.Name,
 					}},
-				Spec: pvcSpec,
+				Spec: pvcSpec.ToV1PersistentVolumeClaimSpec(),
 			}
 			Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).Should(Succeed())
 			pvc.Status.Phase = corev1.ClaimBound // only bound pvc allows resize
@@ -959,14 +959,7 @@ var _ = Describe("Cluster Controller", func() {
 		const replicas = 3
 
 		By("Mock a cluster obj")
-		pvcSpec := &corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-		}
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
@@ -1106,11 +1099,11 @@ var _ = Describe("Cluster Controller", func() {
 		updatedReplicas := int32(3)
 
 		By("Creating a cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVC("1Gi")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -1438,13 +1431,13 @@ var _ = Describe("Cluster Controller", func() {
 		//     with cluster.phase.phase=creating
 		It("Should success with primary sts and secondary sts", func() {
 			By("Mock a cluster obj with replication componentDefRef.")
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
 				SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 				SetReplicas(testapps.DefaultReplicationReplicas).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -1486,9 +1479,9 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("Should successfully doing volume expansion", func() {
 			storageClassName := "test-storage"
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			pvcSpec.StorageClassName = &storageClassName
-			updatedPVCSpec := testapps.NewPVC("2Gi")
+			updatedPVCSpec := testapps.NewPVCSpec("2Gi")
 			updatedPVCSpec.StorageClassName = &storageClassName
 
 			By("Mock a cluster obj with replication componentDefRef.")
@@ -1497,7 +1490,7 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
 				SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 				SetReplicas(testapps.DefaultReplicationReplicas).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -1573,8 +1566,8 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Updating PVC volume size")
 			patch := client.MergeFrom(clusterObj.DeepCopy())
-			componentSpec := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
-			componentSpec.VolumeClaimTemplates[0].Spec = &updatedPVCSpec
+			componentSpec := clusterObj.Spec.GetComponentByName(testapps.DefaultRedisCompName)
+			componentSpec.VolumeClaimTemplates[0].Spec = updatedPVCSpec
 			Expect(testCtx.Cli.Patch(ctx, clusterObj, patch)).Should(Succeed())
 
 			By("Waiting cluster update reconcile succeed")
@@ -1615,9 +1608,9 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("test when clusterDefinition not found")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, lifecycle.ConditionTypeProvisioningStarted)
+				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 				g.Expect(condition).ShouldNot(BeNil())
-				g.Expect(condition.Reason).Should(BeEquivalentTo(constant.ReasonNotFoundCR))
+				g.Expect(condition.Reason).Should(BeEquivalentTo(lifecycle.ReasonPreCheckFailed))
 			})).Should(Succeed())
 
 			// TODO: removed conditionsError phase need to review correct-ness of following commented off block:
@@ -1653,9 +1646,9 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(func(g Gomega) {
 				updateClusterAnnotation(cluster)
 				g.Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-					condition := meta.FindStatusCondition(cluster.Status.Conditions, lifecycle.ConditionTypeProvisioningStarted)
+					condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 					g.Expect(condition).ShouldNot(BeNil())
-					g.Expect(condition.Reason).Should(BeEquivalentTo(constant.ReasonRefCRUnavailable))
+					g.Expect(condition.Reason).Should(BeEquivalentTo(lifecycle.ReasonPreCheckFailed))
 				})).Should(Succeed())
 			}).Should(Succeed())
 
@@ -1672,7 +1665,7 @@ var _ = Describe("Cluster Controller", func() {
 			updateClusterAnnotation(cluster)
 			By("test preCheckFailed")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-				condition := meta.FindStatusCondition(cluster.Status.Conditions, lifecycle.ConditionTypeProvisioningStarted)
+				condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 				g.Expect(condition != nil && condition.Reason == lifecycle.ReasonPreCheckFailed).Should(BeTrue())
 			})).Should(Succeed())
 
@@ -1682,7 +1675,7 @@ var _ = Describe("Cluster Controller", func() {
 			})()).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.StartingClusterPhase))
+				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 				g.Expect(tmpCluster.Status.ObservedGeneration).ShouldNot(BeZero())
 			})).Should(Succeed())
 
@@ -1693,7 +1686,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, lifecycle.ConditionTypeApplyResources)
+					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, appsv1alpha1.ConditionTypeApplyResources)
 					g.Expect(condition != nil && condition.Reason == lifecycle.ReasonApplyResourcesFailed).Should(BeTrue())
 				})).Should(Succeed())
 		})

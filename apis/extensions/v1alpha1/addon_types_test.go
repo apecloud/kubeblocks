@@ -235,7 +235,7 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 				StorageClass: mappingName(name, sc),
 				PVEnabled:    mappingName(name, pvEnabled),
 			},
-			HelmJSONMap: HelmValueMapType{
+			HelmJSONMap: HelmJSONValueMapType{
 				Tolerations: mappingName(name, tolerations),
 			},
 			ResourcesMapping: &ResourceMappingItem{

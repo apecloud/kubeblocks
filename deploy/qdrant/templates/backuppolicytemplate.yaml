@@ -1,0 +1,15 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: backup-policy-template-qdrant
+  labels:
+    clusterdefinition.kubeblocks.io/name: qdrant-standalone
+    {{- include "qdrant.labels" . | nindent 4 }}
+spec:
+  # which backup tool to perform database backup, only support one tool.
+  backupToolName: volumesnapshot
+  ttl: 168h0m0s
+
+  credentialKeyword:
+    userKeyword: username
+    passwordKeyword: password

@@ -1,0 +1,14 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: qdrant-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "qdrant.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: qdrant-standalone
+  componentVersions:
+    - componentDefRef: qdrant
+      versionsContext:
+        containers:
+          - name: qdrant
+            image: {{ .Values.images.qdrant.repository }}:{{ default .Chart.AppVersion .Values.images.qdrant.tag }}

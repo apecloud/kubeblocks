@@ -85,34 +85,6 @@ else
 endif
 endif
 
-.PHONY: build-loadbalancer-image
-build-loadbalancer-image: generate ## Push docker image with the loadbalancer.
-ifneq ($(BUILDX_ENABLED), true)
-	docker build . -t ${IMG}:${VERSION} -t ${IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer
-else
-ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer $(BUILDX_ARGS)
-else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer $(BUILDX_ARGS)
-endif
-endif
-
-.PHONY: push-loadbalancer-image
-push-loadbalancer-image: generate ## Push docker image with the loadbalancer.
-ifneq ($(BUILDX_ENABLED), true)
-ifeq ($(TAG_LATEST), true)
-	docker push ${IMG}:latest
-else
-	docker push ${IMG}:${VERSION}
-endif
-else
-ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push $(BUILDX_ARGS)
-else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push $(BUILDX_ARGS)
-endif
-endif
-
 .PHONY: build-tools-image
 build-tools-image: generate ## Build tools container image.
 ifneq ($(BUILDX_ENABLED), true)

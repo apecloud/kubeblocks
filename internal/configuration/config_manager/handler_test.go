@@ -17,6 +17,7 @@ limitations under the License.
 package configmanager
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -39,7 +40,7 @@ func init() {
 func TestFindParentPidFromProcessName(t *testing.T) {
 	processName := getProcName()
 	fmt.Printf("current test program name: %s\n", processName)
-	pid, err := findParentPidFromProcessName(processName)
+	pid, err := findPidFromProcessName(processName)
 	require.Nil(t, err)
 	require.Equal(t, PID(os.Getpid()), pid)
 }
@@ -70,7 +71,7 @@ func TestCreateExecHandler(t *testing.T) {
 	require.ErrorContains(t, err, "invalid command")
 	c, err := CreateExecHandler("go 	version")
 	require.Nil(t, err)
-	require.Nil(t, c(fsnotify.Event{}))
+	require.Nil(t, c(context.Background(), fsnotify.Event{}))
 }
 
 func TestCreateTPLScriptHandler(t *testing.T) {
@@ -82,7 +83,7 @@ func TestCreateTPLScriptHandler(t *testing.T) {
 	tplFile := filepath.Join(tmpDir, "test.tpl")
 	require.Nil(t, os.WriteFile(tplFile, []byte("xxx"), fs.ModePerm))
 
-	_, err = CreateTPLScriptHandler(tplFile, []string{filepath.Join(tmpDir, "config")}, "", filepath.Join(tmpDir, "backup"), nil)
+	_, err = CreateTPLScriptHandler(tplFile, []string{filepath.Join(tmpDir, "config")}, "", filepath.Join(tmpDir, "backup"), nil, "", "")
 	require.Nil(t, err)
 }
 

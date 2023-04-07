@@ -105,7 +105,7 @@ func readClusterInfoFromFile(path string) (*cp.K8sClusterInfo, error) {
 	defer f.Close()
 
 	var info cp.K8sClusterInfo
-	if err := json.NewDecoder(f).Decode(&info); err != nil {
+	if err = json.NewDecoder(f).Decode(&info); err != nil {
 		return nil, err
 	}
 	return &info, nil

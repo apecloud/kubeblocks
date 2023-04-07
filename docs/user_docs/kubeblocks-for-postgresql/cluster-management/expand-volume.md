@@ -57,8 +57,8 @@ spec:
   volumeExpansion:
   - componentName: pg-replication
     volumeClaimTemplates:
-  - name: data
-    storage: "2Gi"
+    - name: data
+      storage: "2Gi"
 EOF
 ```
 
@@ -75,9 +75,9 @@ metadata:
 spec:
   clusterDefinitionRef: postgresql
   clusterVersionRef: postgresql-14.7.0
-  components:
+  componentSpecs:
   - name: pg-replication
-    type: postgresql
+    componentDefRef: postgresql
     replicas: 1
     volumeClaimTemplates:
     - name: data
@@ -87,5 +87,5 @@ spec:
         resources:
           requests:
             storage: 1Gi # Change the volume storage size.
-terminationPolicy: Halt
+  terminationPolicy: Halt
 ```

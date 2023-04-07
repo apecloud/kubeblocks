@@ -76,7 +76,7 @@ func TestUnstructuredObjectWalk(t *testing.T) {
   "g" : [ "e1","e2","e3"],
   "x" : [ 20,30] 
 }}`,
-			expected: []string{"c", "d", "f", "x1", "x2", "x3", "x4"},
+			expected: []string{"a.b.z.x1", "a.b.e.c", "a.b.e.d", "a.b.f", "a.b.z.x2", "a.b.z.x4", "a.b.z.x3", "a.g", "a.x"},
 			isStruct: false,
 		},
 	}, {
@@ -109,6 +109,9 @@ func TestUnstructuredObjectWalk(t *testing.T) {
 				if cur == "" && parent != "" {
 					res = append(res, parent)
 				} else if cur != "" {
+					if parent != "" {
+						cur = parent + "." + cur
+					}
 					res = append(res, cur)
 				}
 				return nil
@@ -117,7 +120,7 @@ func TestUnstructuredObjectWalk(t *testing.T) {
 			}
 
 			if !tt.wantErr {
-				require.True(t, Contains(res, tt.args.expected))
+				require.True(t, Contains(res, tt.args.expected), "res: %v, expected: %v", res, tt.args.expected)
 			}
 		})
 	}

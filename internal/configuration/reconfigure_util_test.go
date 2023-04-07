@@ -43,14 +43,17 @@ func TestGetUpdateParameterList(t *testing.T) {
 	],
 	"g": {
 		"cd" : "abcd",
-		"msld" : "cakl"
+		"msld" :  {
+			"cakl": 100,
+			"dg": "abcd"
+		}
 	}}
 `
-	params, err := getUpdateParameterList(newCfgDiffMeta(testData, nil, nil))
+	expected := set.NewLinkedHashSetString("a", "f", "c", "xxx.test1", "xxx.test2", "g.msld.cakl", "g.msld.dg", "g.cd")
+	params, err := getUpdateParameterList(newCfgDiffMeta(testData, nil, nil), "")
 	require.Nil(t, err)
-	require.True(t, EqSet(
-		set.NewLinkedHashSetString("a", "c_1", "c_0", "msld", "cd", "f", "test1", "test2"),
-		set.NewLinkedHashSetString(params...)))
+	require.True(t, EqSet(expected,
+		set.NewLinkedHashSetString(params...)), "param: %v, expected: %v", params, expected.AsSlice())
 }
 
 func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *ConfigPatchInfo {

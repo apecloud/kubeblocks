@@ -126,11 +126,11 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 	}
 
 	logger.V(1).Info(fmt.Sprintf("new version files: %v, old version files: %v", newVersion, oldVersion))
-	oldData, err := fromConfigFiles(oldVersion)
+	oldData, err := cfgutil.FromConfigFiles(oldVersion)
 	if err != nil {
 		return nil, err
 	}
-	newData, err := fromConfigFiles(newVersion)
+	newData, err := cfgutil.FromConfigFiles(newVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -151,18 +151,6 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 		}
 	}
 	return r, nil
-}
-
-func fromConfigFiles(files []string) (map[string]string, error) {
-	m := make(map[string]string)
-	for _, file := range files {
-		b, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
-		m[filepath.Base(file)] = string(b)
-	}
-	return m, nil
 }
 
 func resolveLink(path string) (string, error) {

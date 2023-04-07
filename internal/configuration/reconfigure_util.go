@@ -22,23 +22,31 @@ import (
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-func getUpdateParameterList(cfg *ConfigPatchInfo) ([]string, error) {
+func getUpdateParameterList(cfg *ConfigPatchInfo, trimField string) ([]string, error) {
 	params := make([]string, 0)
 	walkFn := func(parent, cur string, v reflect.Value, fn UpdateFn) error {
 		if cur != "" {
+			if parent != "" {
+				cur = parent + "." + cur
+			}
 			params = append(params, cur)
 		}
 		return nil
 	}
 
 	for _, diff := range cfg.UpdateConfig {
+		var err error
 		var updatedParams any
-		if err := json.Unmarshal(diff, &updatedParams); err != nil {
+		if err = json.Unmarshal(diff, &updatedParams); err != nil {
+			return nil, err
+		}
+		if updatedParams, err = trimNestedField(updatedParams, trimField); err != nil {
 			return nil, err
 		}
 		if err := UnstructuredObjectWalk(updatedParams, walkFn, true); err != nil {
@@ -48,14 +56,29 @@ func getUpdateParameterList(cfg *ConfigPatchInfo) ([]string, error) {
 	return params, nil
 }
 
+func trimNestedField(updatedParams any, trimField string) (any, error) {
+	if trimField == "" {
+		return updatedParams, nil
+	}
+	if m, ok := updatedParams.(map[string]interface{}); ok {
+		trimParams, found, err := unstructured.NestedFieldNoCopy(m, trimField)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			return trimParams, nil
+		}
+	}
+	return updatedParams, nil
+}
+
 // IsUpdateDynamicParameters is used to check whether the changed parameters require a restart
 func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *ConfigPatchInfo) (bool, error) {
-	// TODO(zt) how to process new or delete file
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
 		return false, nil
 	}
 
-	params, err := getUpdateParameterList(cfg)
+	params, err := getUpdateParameterList(cfg, NestedPrefixField(cc.FormatterConfig))
 	if err != nil {
 		return false, err
 	}

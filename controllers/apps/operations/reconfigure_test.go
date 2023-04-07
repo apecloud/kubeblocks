@@ -89,7 +89,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		}
 		var cmObj *corev1.ConfigMap
 		for _, configSpec := range cdComponent.ConfigSpecs {
-			cmInsName := cfgcore.GetComponentCfgName(clusterName, componentName, configSpec.VolumeName)
+			cmInsName := cfgcore.GetComponentCfgName(clusterName, componentName, configSpec.Name)
 			cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
 				&corev1.ConfigMap{},
 				testapps.WithNamespacedName(cmInsName, ns),

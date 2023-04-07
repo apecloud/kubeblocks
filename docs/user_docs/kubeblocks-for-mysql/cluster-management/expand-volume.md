@@ -77,7 +77,7 @@ spec:
   clusterVersionRef: ac-mysql-8.0.30
   componentSpecs:
   - name: mysql
-    type: componentDefRef
+    componentDefRef: mysql
     replicas: 1
     volumeClaimTemplates:
     - name: data

@@ -77,7 +77,7 @@ spec:
   clusterVersionRef: postgresql-14.7.0
   componentSpecs:
   - name: pg-replication
-    type: componentDefRef
+    componentDefRef: postgresql
     replicas: 1
     volumeClaimTemplates:
     - name: data

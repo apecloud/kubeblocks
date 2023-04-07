@@ -34,7 +34,7 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: mysql-cluster
-  generate-name: stop-
+  generateName: stop-
 spec:
   # cluster ref
   clusterRef: mysql-cluster
@@ -54,9 +54,9 @@ spec:
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
   terminationPolicy: WipeOut
-  components:
+  componentSpecs:
   - name: mysql
-    type: mysql
+    componentDefRef: mysql
     monitor: false  
     replicas: 0
     volumeClaimTemplates:
@@ -96,7 +96,7 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: mysql-cluster
-  generate-name: start-
+  generateName: start-
 spec:
   # cluster ref
   clusterRef: mysql-cluster
@@ -117,9 +117,9 @@ spec:
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
   terminationPolicy: WipeOut
-  components:
+  componentSpecs:
   - name: mysql
-    type: mysql
+    componentDefRef: mysql
     monitor: false  
     replicas: 3
     volumeClaimTemplates:

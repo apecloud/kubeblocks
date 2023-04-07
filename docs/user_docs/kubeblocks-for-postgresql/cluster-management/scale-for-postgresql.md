@@ -92,7 +92,7 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
      clusterVersionRef: postgre-14.7.0
      componentSpecs:
      - name: pg-replication
-       type: componentDefRef
+       componentDefRef: postgresql
        replicas: 1
        resources: # Change the values of resources.
          requests:

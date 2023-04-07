@@ -32,7 +32,7 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: pg-cluster
-  generate-name: stop-
+  generateName: stop-
 spec:
   # cluster ref
   clusterRef: pg-cluster
@@ -52,9 +52,9 @@ spec:
   clusterDefinitionRef: postgresql
   clusterVersionRef: postgresql-14.7.0
   terminationPolicy: WipeOut
-  components:
+  componentSpecs:
   - name: pg-replication
-    type: postgresql
+    componentDefRef: postgresql
     monitor: false  
     replicas: 0
     volumeClaimTemplates:
@@ -94,7 +94,7 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: pg-cluster
-  generate-name: start-
+  generateName: start-
 spec:
   # cluster ref
   clusterRef: pg-cluster
@@ -115,9 +115,9 @@ spec:
   clusterDefinitionRef: postgresql
   clusterVersionRef: postgresql-14.7.0
   terminationPolicy: WipeOut
-  components:
+  componentSpecs:
   - name: pg-replication
-    type: postgresql
+    componentDefRef: postgresql
     monitor: false  
     replicas: 1
     volumeClaimTemplates:

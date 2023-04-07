@@ -94,7 +94,7 @@ sidebar_label: Create and connect
    kbcli cluster create pg-cluster --cluster-definition="postgresql" --set-file -<<EOF
    - name: postgresql
      replicas: 1
-     type: componentDefRef
+     componentDefRef: postgresql
      volumeClaimTemplates:
      - name: data
        spec:

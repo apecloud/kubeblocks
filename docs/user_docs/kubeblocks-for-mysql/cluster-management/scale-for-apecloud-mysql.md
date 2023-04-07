@@ -91,7 +91,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
      clusterVersionRef: ac-mysql-8.0.30
      componentSpecs:
      - name: mysql
-       type: componentDefRef
+       componentDefRef: mysql
        replicas: 1
        resources: # Change the values of resources.
          requests:
@@ -207,7 +207,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
      clusterVersionRef: ac-mysql-8.0.30
      componentSpecs:
      - name: mysql
-       type: componentDefRef
+       componentDefRef: mysql
        replicas: 1 # Change the pod amount.
        volumeClaimTemplates:
        - name: data

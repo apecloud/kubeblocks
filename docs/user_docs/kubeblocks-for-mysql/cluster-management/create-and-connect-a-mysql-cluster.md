@@ -95,7 +95,7 @@ sidebar_label: Create and connect
    kbcli cluster create mysql-cluster --cluster-definition="apecloud-mysql" --set-file -<<EOF
    - name: mysql
      replicas: 3
-     type: componentDefRef
+     componentDefRef: mysql
      volumeClaimTemplates:
      - name: data
        spec:

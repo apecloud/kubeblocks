@@ -76,13 +76,14 @@ jobs:
             --type 1`    
           VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
           mkdir -p ${{ matrix.os }}
+          echo "CLI_OS_ARCH=${CLI_OS_ARCH}" >> $GITHUB_ENV
           echo "CLI_FILENAME=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}" >> $GITHUB_ENV
           echo "CLI_DIR=${{ matrix.os }}" >> $GITHUB_ENV
   
       - name: make zip
         if: matrix.os == 'windows-amd64'
         run: |
-          mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH ${{ matrix.os }}/${{ env.CLI_NAME }}.exe 
+          mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }}.exe 
           zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
           mv ${{ env.CLI_FILENAME }}.zip bin/
@@ -92,7 +93,7 @@ jobs:
       - name: make tar
         if: matrix.os != 'windows-amd64'
         run: |
-          mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH ${{ matrix.os }}/${{ env.CLI_NAME }} 
+          mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }} 
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 
           mv ${{ env.CLI_FILENAME }}.tar.gz bin/

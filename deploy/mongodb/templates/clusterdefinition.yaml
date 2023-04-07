@@ -59,7 +59,7 @@ spec:
       service:
         ports:
           - protocol: TCP
-            port: 27018
+            port: 27017
       volumeTypes:
         - name: data
           type: data
@@ -69,7 +69,7 @@ spec:
             ports:
               - name: mongodb
                 protocol: TCP
-                containerPort: 27018
+                containerPort: 27017
             command:
               - /scripts/replicaset-setup.sh
             env:

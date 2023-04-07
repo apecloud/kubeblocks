@@ -59,6 +59,7 @@ metrics:
         direct-connect: true
         global-conn-pool: false
         log-level: info
+        compatible-mode: true
 
     processors:
       batch:
@@ -70,7 +71,7 @@ metrics:
 
     exporters:
       prometheus:
-        endpoint: localhost:9216
+        endpoint: :9216
         const_labels: [ ]
         send_timestamps: false
         metric_expiration: 30s
@@ -83,7 +84,7 @@ metrics:
         logs:
           level: info
         metrics:
-          address: localhost:8888
+          address: :8888
       pipelines:
         metrics:
           receivers: [ apecloudmongodb ]

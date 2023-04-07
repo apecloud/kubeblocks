@@ -348,7 +348,10 @@ func init() {
 }
 
 // GetExtraNames exacter extra items' name.
-func (r Addon) GetExtraNames() []string {
+func (r *Addon) GetExtraNames() []string {
+	if r == nil {
+		return nil
+	}
 	switch r.Spec.Type {
 	case HelmType:
 		if r.Spec.Helm == nil {
@@ -384,7 +387,10 @@ func (r AddonDefaultInstallSpecItem) GetSelectorsStrings() []string {
 }
 
 // GetSelectorsStrings extract selectors to string representations.
-func (r InstallableSpec) GetSelectorsStrings() []string {
+func (r *InstallableSpec) GetSelectorsStrings() []string {
+	if r == nil {
+		return nil
+	}
 	return buildSelectorStrings(r.Selectors)
 }
 
@@ -460,12 +466,18 @@ func (r SelectorRequirement) matchesLine(line string) bool {
 }
 
 // GetEnabled provides Enabled property getter.
-func (r AddonInstallSpec) GetEnabled() bool {
+func (r *AddonInstallSpec) GetEnabled() bool {
+	if r == nil {
+		return false
+	}
 	return r.Enabled
 }
 
 // BuildMergedValues merge values from a AddonInstallSpec and pre-set values.
-func (r HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) HelmInstallValues {
+func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) HelmInstallValues {
+	if r == nil {
+		return HelmInstallValues{}
+	}
 	installValues := r.InstallValues
 	processor := func(installSpecItem AddonInstallSpecItem, valueMapping HelmValuesMappingItem) {
 		if installSpecItem.Replicas != nil && *installSpecItem.Replicas >= 0 {

@@ -298,7 +298,7 @@ func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
 				cfgcore.MakeError("current configSpec not support reconfigure, configSpec: %v", configSpec.Name))
 		}
 		result := updateCfgParams(config, *configSpec, client.ObjectKey{
-			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, configSpec.VolumeName),
+			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, configSpec.Name),
 			Namespace: resource.Cluster.Namespace,
 		}, reqCtx.Ctx, cli, resource.OpsRequest.Name)
 		if result.err != nil {

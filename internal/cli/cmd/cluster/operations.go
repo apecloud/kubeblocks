@@ -100,10 +100,10 @@ func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType appsv
 var (
 	createReconfigureExample = templates.Examples(`
 		# update component params 
-		kbcli cluster configure <cluster-name> --component=<component-name> --template-name=<template-name> --configure-file=<configure-file> --set max_connections=1000,general_log=OFF
+		kbcli cluster configure <cluster-name> --component=<component-name> --config-spec=<config-spec-name> --config-file=<config-file> --set max_connections=1000,general_log=OFF
 
 		# update mysql max_connections, cluster name is mycluster
-		kbcli cluster configure mycluster --component=mysql --template-name=mysql-3node-tpl --configure-file=my.cnf --set max_connections=2000
+		kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=2000
 	`)
 )
 
@@ -284,7 +284,7 @@ func (o *OperationsOptions) validateTemplateParam(tpls []appsv1alpha1.ComponentC
 func (o *OperationsOptions) validateConfigMapKey(tpl *appsv1alpha1.ComponentConfigSpec, componentName string) error {
 	var (
 		cmObj  = corev1.ConfigMap{}
-		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.VolumeName)
+		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.Name)
 	)
 
 	if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
@@ -692,8 +692,8 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-configure'.")
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "component", nil, "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
-		cmd.Flags().StringVar(&o.CfgTemplateName, "template-name", "", "Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --template-name=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
-		cmd.Flags().StringVar(&o.CfgFile, "configure-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --configure-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
+		cmd.Flags().StringVar(&o.CfgTemplateName, "config-spec", "", "Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
+		cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
 	}
 	inputs.Complete = o.fillTemplateArgForReconfiguring
 	return create.BuildCommand(inputs)

@@ -59,10 +59,6 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 		progress  = cfgcore.NotStarted
 	)
 
-	if configKey == "" {
-		return makeReturnedStatus(ESFailed), cfgcore.MakeError("failed to find config meta. configmap : %s", param.ConfigSpecName)
-	}
-
 	for _, sts := range units {
 		if err := restartStsWithRolling(client, param.Ctx, sts, configKey, newVersion); err != nil {
 			param.Ctx.Log.Error(err, "failed to restart statefulSet.", "stsName", sts.GetName())

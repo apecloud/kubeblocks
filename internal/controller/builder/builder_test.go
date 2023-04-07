@@ -223,6 +223,14 @@ var _ = Describe("builder", func() {
 			credential, err := BuildConnCredential(*params)
 			Expect(err).Should(BeNil())
 			Expect(credential).ShouldNot(BeNil())
+			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(BeEmpty())
+			By("setting type")
+			characterType := "test-character-type"
+			params.ClusterDefinition.Spec.Type = characterType
+			credential, err = BuildConnCredential(*params)
+			Expect(err).Should(BeNil())
+			Expect(credential).ShouldNot(BeNil())
+			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(Equal(characterType))
 			// "username":      "root",
 			// "SVC_FQDN":      "$(SVC_FQDN)",
 			// "RANDOM_PASSWD": "$(RANDOM_PASSWD)",

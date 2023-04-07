@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 spec:
+  type: redis
   connectionCredential:
     username: ""
     password: ""

@@ -8728,6 +8728,12 @@ spec:
                   "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and
                   "$(SVC_PORT_mysql)" in the connection credential value is 3306.'
                 type: object
+              type:
+                description: Cluster definition type defines well known application
+                  cluster type, e.g. mysql/redis/mongodb
+                maxLength: 24
+                pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                type: string
             required:
             - componentDefs
             type: object

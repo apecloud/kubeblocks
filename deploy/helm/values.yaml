@@ -1651,6 +1651,7 @@ csi-hostpath-driver:
     default: true
 
 aws-loadbalancer-controller:
+  clusterName: ""
   enabled: false
   replicaCount: 1
   tolerations:

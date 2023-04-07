@@ -172,10 +172,10 @@ func (e ExposeOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsReq
 }
 
 func (e ExposeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error {
-	componentNameMap := opsResource.OpsRequest.GetComponentNameSet()
+	componentNameSet := opsResource.OpsRequest.GetComponentNameSet()
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsResource.Cluster.Spec.ComponentSpecs {
-		if !componentNameMap.Exists(v.Name) {
+		if _, ok := componentNameSet[v.Name]; !ok {
 			continue
 		}
 		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{

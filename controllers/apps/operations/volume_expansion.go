@@ -172,11 +172,11 @@ func (ve volumeExpansionOpsHandler) GetRealAffectedComponentMap(opsRequest *apps
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
-	componentNameMap := opsRequest.GetComponentNameSet()
+	componentNameSet := opsRequest.GetComponentNameSet()
 	storageMap := ve.getRequestStorageMap(opsRequest)
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-		if !componentNameMap.Exists(v.Name) {
+		if _, ok := componentNameSet[v.Name]; !ok {
 			continue
 		}
 		lastVCTs := make([]appsv1alpha1.OpsRequestVolumeClaimTemplate, 0)

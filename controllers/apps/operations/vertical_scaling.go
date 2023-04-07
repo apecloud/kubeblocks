@@ -71,10 +71,10 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	componentNameMap := opsRes.OpsRequest.GetComponentNameSet()
+	componentNameSet := opsRes.OpsRequest.GetComponentNameSet()
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-		if !componentNameMap.Exists(v.Name) {
+		if _, ok := componentNameSet[v.Name]; !ok {
 			continue
 		}
 		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{

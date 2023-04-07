@@ -19,6 +19,7 @@ package playground
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -109,4 +111,29 @@ func readClusterInfoFromFile(path string) (*cp.K8sClusterInfo, error) {
 		return nil, err
 	}
 	return &info, nil
+}
+
+func writeKubeConfigToFile(info *cp.K8sClusterInfo, kubeConfigPath string, out io.Writer) error {
+	if info.KubeConfig == "" {
+		fmt.Fprintf(out, "No kubeconfig found for kubernetes cluster %s", info.ClusterName)
+		return nil
+	}
+
+	// use a separate kubeconfig file, if file exists, delete if first
+	spinner := printer.Spinner(out, fmt.Sprintf("%-50s", "Write kubeconfig to "+kubeConfigPath))
+	defer spinner(false)
+	if err := kubeConfigWrite(info.KubeConfig, kubeConfigPath, writeKubeConfigOptions{
+		UpdateExisting:       true,
+		UpdateCurrentContext: true,
+		OverwriteExisting:    true}); err != nil {
+		return err
+	}
+
+	// use the new kubeconfig file
+	if err := util.SetKubeConfig(kubeConfigPath); err != nil {
+		return err
+	}
+
+	spinner(true)
+	return nil
 }

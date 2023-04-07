@@ -19,7 +19,6 @@ package playground
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -95,8 +94,13 @@ func (o *destroyOptions) destroy() error {
 
 // destroyLocal destroy local k3d cluster that will destroy all resources
 func (o *destroyOptions) destroyLocal() error {
+	// for test
+	if err := o.deleteClustersAndUninstallKB(); err != nil {
+		return err
+	}
+
 	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
-	spinner := printer.Spinner(o.Out, "Delete playground k3d cluster %s", o.prevCluster.ClusterName)
+	spinner := printer.Spinner(o.Out, "%-50s", "Delete playground k3d cluster "+o.prevCluster.ClusterName)
 	defer spinner(false)
 	if err := provider.DeleteK8sCluster(o.prevCluster); err != nil {
 		if !strings.Contains(err.Error(), "no cluster found") &&
@@ -117,36 +121,17 @@ func (o *destroyOptions) destroyLocal() error {
 // namespace that will destroy all resources created by KubeBlocks, avoid to leave
 // some resources
 func (o *destroyOptions) destroyCloud() error {
-	cpPath, err := cloudProviderRepoDir()
-	if err != nil {
-		return err
-	}
-
-	provider, err := cp.New(o.prevCluster.CloudProvider, cpPath, o.Out, o.ErrOut)
-	if err != nil {
-		return err
-	}
+	var err error
 
 	// start to destroy cluster
-	printer.Warning(o.Out, `This action will directly delete the kubernetes cluster, which may
-  result in some residual resources, such as Volume, please confirm and manually
-  clean up related resources after this action.
-
-  In order to minimize resource residue, you can use the following commands
-  to clean up the clusters and uninstall KubeBlocks before this action.
-  
-  # list all clusters created by KubeBlocks
-  kbcli cluster list -A
-
-  # delete clusters
-  kbcli cluster delete <cluster-1> <cluster-2>
-
-  # uninstall KubeBlocks and remove PVC and PV
-  kbcli kubeblocks uninstall --remove-pvcs --remove-pvs
+	printer.Warning(o.Out, `This action will uninstall KubeBlocks and delete the kubernetes cluster,
+  there may be residual resources, please confirm and manually clean up related
+  resources after this action.
 
 `)
 
-	fmt.Fprintf(o.Out, "Do you really want to destroy the kubernetes cluster %s?\n  This is no undo. Only 'yes' will be accepted to confirm.\n\n", o.prevCluster.ClusterName)
+	fmt.Fprintf(o.Out, "Do you really want to destroy the kubernetes cluster %s?\n%s\n\n  This is no undo. Only 'yes' will be accepted to confirm.\n\n",
+		o.prevCluster.ClusterName, o.prevCluster.String())
 
 	// confirm to destroy
 	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
@@ -160,39 +145,23 @@ func (o *destroyOptions) destroyCloud() error {
 	// for cloud provider, we should delete all clusters created by KubeBlocks first,
 	// uninstall KubeBlocks and remove the KubeBlocks namespace, then destroy the
 	// playground cluster, avoid to leave some resources.
-
-	// delete all clusters created by KubeBlocks, MUST BE very cautious, use the right
+	// delete all clusters created by KubeBlocks, MUST BE VERY CAUTIOUS, use the right
 	// kubeconfig and context, otherwise, it will delete the wrong cluster.
-	if o.prevCluster.KubeConfig == "" {
-		return fmt.Errorf("no kubeconfig found for kubernetes cluster %s in %s", o.prevCluster.ClusterName, o.stateFilePath)
-	}
-
-	// use a separate kubeconfig file
-	kubeConfigPath := filepath.Join(o.playgroundDir, "kubeconfig")
-	spinner := printer.Spinner(o.Out, fmt.Sprintf("%-50s", "Write kubeconfig to"+kubeConfigPath))
-	defer spinner(false)
-	if err = kubeConfigWrite(o.prevCluster.KubeConfig, kubeConfigPath, writeKubeConfigOptions{
-		UpdateExisting:       true,
-		UpdateCurrentContext: true,
-		OverwriteExisting:    true}); err != nil {
-		return err
-	}
-	spinner(true)
-
-	// use the new kubeconfig file
-	util.SetKubeConfig(kubeConfigPath)
-
-	// delete all clusters created by KubeBlocks
-	if err = o.deleteClusters(); err != nil {
-		return err
-	}
-
-	// uninstall KubeBlocks and remove namespace created by KubeBlocks
-	if err = o.uninstallKubeBlocks(kubeConfigPath); err != nil {
+	if err = o.deleteClustersAndUninstallKB(); err != nil {
 		return err
 	}
 
 	// destroy playground kubernetes cluster
+	cpPath, err := cloudProviderRepoDir()
+	if err != nil {
+		return err
+	}
+
+	provider, err := cp.New(o.prevCluster.CloudProvider, cpPath, o.Out, o.ErrOut)
+	if err != nil {
+		return err
+	}
+
 	fmt.Fprintf(o.Out, "Destroy %s %s cluster %s...\n",
 		o.prevCluster.CloudProvider, cp.K8sService(o.prevCluster.CloudProvider), o.prevCluster.ClusterName)
 	if err = provider.DeleteK8sCluster(o.prevCluster); err != nil {
@@ -211,6 +180,23 @@ func (o *destroyOptions) destroyCloud() error {
 
 	fmt.Fprintf(o.Out, "Playground destroy completed in %s.\n", time.Since(o.startTime).Truncate(time.Second))
 	return nil
+}
+
+func (o *destroyOptions) deleteClustersAndUninstallKB() error {
+	var err error
+
+	// write kubeconfig content to a temporary file and use it
+	if err = writeKubeConfigToFile(o.prevCluster, o.kubeConfigPath, o.Out); err != nil {
+		return err
+	}
+
+	// delete all clusters created by KubeBlocks
+	if err = o.deleteClusters(); err != nil {
+		return err
+	}
+
+	// uninstall KubeBlocks and remove namespace created by KubeBlocks
+	return o.uninstallKubeBlocks(o.kubeConfigPath)
 }
 
 // delete all clusters created by KubeBlocks
@@ -360,12 +346,28 @@ func (o *destroyOptions) uninstallKubeBlocks(configPath string) error {
 }
 
 func (o *destroyOptions) removeKubeConfig() error {
-	spinner := printer.Spinner(o.Out, "Remove kubeconfig from %s", defaultKubeConfigPath)
+	spinner := printer.Spinner(o.Out, "%-50s", "Remove kubeconfig from "+defaultKubeConfigPath)
 	defer spinner(false)
 	if err := kubeConfigRemove(o.prevCluster.KubeConfig, defaultKubeConfigPath); err != nil {
 		return err
 	}
 	spinner(true)
+
+	clusterContext, err := kubeConfigCurrentContext(o.prevCluster.KubeConfig)
+	if err != nil {
+		return err
+	}
+
+	// check if current context in kubeconfig is deleted, if yes, notify user to set current context
+	currentContext, err := kubeConfigCurrentContextFromFile(defaultKubeConfigPath)
+	if err != nil {
+		return err
+	}
+
+	// current context is deleted, notify user to set current context like kubectl
+	if currentContext == clusterContext {
+		printer.Warning(o.Out, "this removed your active context, use \"kubectl config use-context\" to select a different one\n")
+	}
 	return nil
 }
 

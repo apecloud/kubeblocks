@@ -18,6 +18,7 @@ package playground
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -25,21 +26,29 @@ import (
 )
 
 type baseOptions struct {
-	startTime     time.Time
-	prevCluster   *cp.K8sClusterInfo
-	playgroundDir string
+	startTime time.Time
+	// prevCluster is the previous cluster info
+	prevCluster *cp.K8sClusterInfo
+	// kubeConfigPath is the tmp kubeconfig path that will be used when int and destroy
+	kubeConfigPath string
+	// stateFilePath is the state file path
 	stateFilePath string
 }
 
 func (o *baseOptions) validate() error {
-	var err error
-
-	o.playgroundDir, err = initPlaygroundDir()
+	playgroundDir, err := initPlaygroundDir()
 	if err != nil {
 		return err
 	}
 
-	o.stateFilePath = filepath.Join(o.playgroundDir, stateFileName)
+	o.kubeConfigPath = filepath.Join(playgroundDir, "kubeconfig")
+	if _, err = os.Stat(o.kubeConfigPath); err == nil {
+		if err = os.Remove(o.kubeConfigPath); err != nil {
+			return err
+		}
+	}
+
+	o.stateFilePath = filepath.Join(playgroundDir, stateFileName)
 	o.prevCluster, err = readClusterInfoFromFile(o.stateFilePath)
 	if err != nil {
 		return err

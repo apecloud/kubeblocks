@@ -120,7 +120,6 @@ func initConfig() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(fmt.Sprintf("/etc/%s/", cliName))
 	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s/", cliName))
-	viper.AddConfigPath(".")
 	viper.AutomaticEnv() // read in environment variables that match
 	viper.SetEnvPrefix(cliName)
 

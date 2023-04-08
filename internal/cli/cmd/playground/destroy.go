@@ -19,6 +19,7 @@ package playground
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -226,6 +227,9 @@ func (o *destroyOptions) deleteClusters() error {
 	checkClusters := func(checkFn func(cluster *appsv1alpha1.Cluster) bool) (bool, error) {
 		res := true
 		clusters, err := getClusters()
+		if err != nil {
+			return false, err
+		}
 		for _, item := range clusters.Items {
 			cluster := &appsv1alpha1.Cluster{}
 			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, cluster); err != nil {
@@ -275,7 +279,7 @@ func (o *destroyOptions) deleteClusters() error {
 		// terminate policy is not WipeOut, set it to WipeOut
 		klog.V(1).Infof("Set cluster %s termination policy to WipeOut", cluster.Name)
 		if _, err = dynamic.Resource(types.ClusterGVR()).Namespace(cluster.Namespace).Patch(ctx, cluster.Name, apitypes.JSONPatchType,
-			[]byte(fmt.Sprintf("[{\"op\": \"replace\", \"path\": \"/spec/terminationPolicy\", \"value\": %s }]",
+			[]byte(fmt.Sprintf("[{\"op\": \"replace\", \"path\": \"/spec/terminationPolicy\", \"value\": \"%s\" }]",
 				appsv1alpha1.WipeOut)), metav1.PatchOptions{}); err != nil {
 			return err
 		}
@@ -355,7 +359,12 @@ func (o *destroyOptions) removeKubeConfig() error {
 	spinner := printer.Spinner(o.Out, "%-50s", "Remove kubeconfig from "+defaultKubeConfigPath)
 	defer spinner(false)
 	if err := kubeConfigRemove(o.prevCluster.KubeConfig, defaultKubeConfigPath); err != nil {
-		return err
+		if os.IsNotExist(err) {
+			spinner(true)
+			return nil
+		} else {
+			return err
+		}
 	}
 	spinner(true)
 

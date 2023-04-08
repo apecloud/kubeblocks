@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -168,12 +169,12 @@ func (o *initOptions) local() error {
 		return err
 	}
 
-	// install KubeBlocks and create a database cluster
-	if err = o.installKBAndCluster(clusterInfo); err != nil {
+	if err = o.setKubeConfig(clusterInfo); err != nil {
 		return err
 	}
 
-	return o.setKubeConfig(clusterInfo)
+	// install KubeBlocks and create a database cluster
+	return o.installKBAndCluster(clusterInfo)
 }
 
 // bootstraps a playground in the remote cloud
@@ -241,13 +242,13 @@ func (o *initOptions) cloud() error {
 		return err
 	}
 
-	// install KubeBlocks and create a database cluster
-	if err = o.installKBAndCluster(clusterInfo); err != nil {
+	// write cluster kubeconfig to default kubeconfig file and switch current context to it
+	if err = o.setKubeConfig(clusterInfo); err != nil {
 		return err
 	}
 
-	// write cluster kubeconfig to default kubeconfig file and switch current context to it
-	return o.setKubeConfig(clusterInfo)
+	// install KubeBlocks and create a database cluster
+	return o.installKBAndCluster(clusterInfo)
 }
 
 // confirmToContinue confirms to continue init or not if there is an existed kubernetes cluster
@@ -307,7 +308,7 @@ func (o *initOptions) writeStateFile(provider cp.Interface) (*cp.K8sClusterInfo,
 
 // merge created kubernetes cluster kubeconfig to ~/.kube/config and set it as default
 func (o *initOptions) setKubeConfig(info *cp.K8sClusterInfo) error {
-	spinner := printer.Spinner(o.Out, "%-50s", "Write kubeconfig to "+defaultKubeConfigPath)
+	spinner := printer.Spinner(o.Out, "%-50s", "Merge kubeconfig to "+defaultKubeConfigPath)
 	defer spinner(false)
 
 	// check if the default kubeconfig file exists, if not, create it
@@ -368,7 +369,7 @@ func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	}
 	spinner := printer.Spinner(o.Out, "Create cluster %s (%s)", kbClusterName, clusterInfo)
 	defer spinner(false)
-	if err = o.createCluster(); err != nil {
+	if err = o.createCluster(); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "failed to create cluster %s", kbClusterName)
 	}
 	spinner(true)

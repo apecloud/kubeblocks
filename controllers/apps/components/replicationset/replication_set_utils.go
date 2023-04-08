@@ -137,7 +137,7 @@ func HandleComponentHorizontalScaleIn(ctx context.Context,
 		objs = append(objs, sts)
 	}
 
-	// TODO: review and add it back
+	// TODO(refactor): review and add it back
 	//// reconcile the primary statefulSet after deleting other sts to make component phase is correct.
 	// if component.Replicas != 0 {
 	//	if err := util.MarkPrimaryStsToReconcile(ctx, cli, primarySts); err != nil {

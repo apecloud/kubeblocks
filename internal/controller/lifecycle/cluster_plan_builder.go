@@ -274,7 +274,7 @@ func (p *clusterPlan) handleDAGWalkError(err error) error {
 	condition := newFailedApplyResourcesCondition(err.Error())
 	meta.SetStatusCondition(&p.cluster.Status.Conditions, condition)
 	p.recorder.Event(p.cluster, corev1.EventTypeWarning, condition.Reason, condition.Message)
-	rootVertex, _ := findRootVertex(p.dag)
+	rootVertex, _ := ictrltypes.FindRootVertex(p.dag)
 	if rootVertex == nil {
 		return nil
 	}

@@ -14,89 +14,67 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package lifecycle
+package types
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// TODO(refactor): define a custom workload to encapsulate all the resources.
-//
-//	runtime, config, script, env, volume, service, monitor, probe
-type componentWorkloadBuilder interface {
-	buildEnv() componentWorkloadBuilder
-	buildHeadlessService() componentWorkloadBuilder
-	buildService() componentWorkloadBuilder
-	buildTLSCert() componentWorkloadBuilder
-
-	// workload related
-	buildConfig(idx int32) componentWorkloadBuilder
-	buildWorkload(idx int32) componentWorkloadBuilder
-	buildVolume(idx int32) componentWorkloadBuilder
-	buildVolumeMount(idx int32) componentWorkloadBuilder
-	buildTLSVolume(idx int32) componentWorkloadBuilder
-
-	complete() error
-
-	mutableWorkload(idx int32) client.Object
-	mutableRuntime(idx int32) *corev1.PodSpec
-}
-
-type componentWorkloadBuilderBase struct {
-	reqCtx          intctrlutil.RequestCtx
-	client          client.Client
-	comp            Component
-	defaultAction   *ictrltypes.LifecycleAction
-	concreteBuilder componentWorkloadBuilder
-	error           error
-	envConfig       *corev1.ConfigMap
+type ComponentWorkloadBuilderBase struct {
+	ReqCtx          intctrlutil.RequestCtx
+	Client          client.Client
+	Comp            Component
+	DefaultAction   *ictrltypes.LifecycleAction
+	ConcreteBuilder ComponentWorkloadBuilder
+	Error           error
+	EnvConfig       *corev1.ConfigMap
 }
 
 // TODO(refactor): workload & scaling related
-func (b *componentWorkloadBuilderBase) buildEnv() componentWorkloadBuilder {
+func (b *ComponentWorkloadBuilderBase) BuildEnv() ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		envCfg, err := builder.BuildEnvConfigLow(b.reqCtx, b.client, b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
-		b.envConfig = envCfg
+		envCfg, err := builder.BuildEnvConfigLow(b.ReqCtx, b.Client, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		b.EnvConfig = envCfg
 		return []client.Object{envCfg}, err
 	}
-	return b.buildWrapper(buildfn)
+	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) buildConfig(idx int32) componentWorkloadBuilder {
+func (b *ComponentWorkloadBuilderBase) BuildConfig(idx int32) ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		workload := b.concreteBuilder.mutableWorkload(idx)
+		workload := b.ConcreteBuilder.MutableWorkload(idx)
 		if workload == nil {
 			return nil, fmt.Errorf("build config but workload is nil, cluster: %s, component: %s",
-				b.comp.GetClusterName(), b.comp.GetName())
+				b.Comp.GetClusterName(), b.Comp.GetName())
 		}
 
-		return plan.BuildCfgLow(b.comp.GetVersion(), b.comp.GetCluster(), b.comp.GetSynthesizedComponent(), workload,
-			b.concreteBuilder.mutableRuntime(idx), b.reqCtx.Ctx, b.client)
+		return plan.BuildCfgLow(b.Comp.GetVersion(), b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), workload,
+			b.ConcreteBuilder.MutableRuntime(idx), b.ReqCtx.Ctx, b.Client)
 	}
-	return b.buildWrapper(buildfn)
+	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) buildHeadlessService() componentWorkloadBuilder {
+func (b *ComponentWorkloadBuilderBase) BuildHeadlessService() ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svc, err := builder.BuildHeadlessSvcLow(b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
+		svc, err := builder.BuildHeadlessSvcLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		return []client.Object{svc}, err
 	}
-	return b.buildWrapper(buildfn)
+	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) buildService() componentWorkloadBuilder {
+func (b *ComponentWorkloadBuilderBase) BuildService() ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svcList, err := builder.BuildSvcListLow(b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
+		svcList, err := builder.BuildSvcListLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}
@@ -106,21 +84,21 @@ func (b *componentWorkloadBuilderBase) buildService() componentWorkloadBuilder {
 		}
 		return objs, err
 	}
-	return b.buildWrapper(buildfn)
+	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) buildVolume(_ int32) componentWorkloadBuilder {
-	return b.buildWrapper(nil)
+func (b *ComponentWorkloadBuilderBase) BuildVolume(_ int32) ComponentWorkloadBuilder {
+	return b.BuildWrapper(nil)
 }
 
-func (b *componentWorkloadBuilderBase) buildVolumeMount(idx int32) componentWorkloadBuilder {
+func (b *ComponentWorkloadBuilderBase) BuildVolumeMount(idx int32) ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		if b.concreteBuilder.mutableWorkload(idx) == nil {
+		if b.ConcreteBuilder.MutableWorkload(idx) == nil {
 			return nil, fmt.Errorf("build volume mount but workload is nil, cluster: %s, component: %s",
-				b.comp.GetClusterName(), b.comp.GetName())
+				b.Comp.GetClusterName(), b.Comp.GetName())
 		}
 
-		podSpec := b.concreteBuilder.mutableRuntime(idx)
+		podSpec := b.ConcreteBuilder.MutableRuntime(idx)
 		for _, cc := range []*[]corev1.Container{&podSpec.Containers, &podSpec.InitContainers} {
 			volumes := podSpec.Volumes
 			for _, c := range *cc {
@@ -141,13 +119,13 @@ func (b *componentWorkloadBuilderBase) buildVolumeMount(idx int32) componentWork
 		}
 		return nil, nil
 	}
-	return b.buildWrapper(buildfn)
+	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) buildTLSCert() componentWorkloadBuilder {
+func (b *ComponentWorkloadBuilderBase) BuildTLSCert() ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		cluster := b.comp.GetCluster()
-		component := b.comp.GetSynthesizedComponent()
+		cluster := b.Comp.GetCluster()
+		component := b.Comp.GetSynthesizedComponent()
 		if !component.TLS {
 			return nil, nil
 		}
@@ -158,7 +136,7 @@ func (b *componentWorkloadBuilderBase) buildTLSCert() componentWorkloadBuilder {
 		objs := make([]client.Object, 0)
 		switch component.Issuer.Name {
 		case appsv1alpha1.IssuerUserProvided:
-			if err := plan.CheckTLSSecretRef(b.reqCtx, b.client, cluster.Namespace, component.Issuer.SecretRef); err != nil {
+			if err := plan.CheckTLSSecretRef(b.ReqCtx, b.Client, cluster.Namespace, component.Issuer.SecretRef); err != nil {
 				return nil, err
 			}
 		case appsv1alpha1.IssuerKubeBlocks:
@@ -170,48 +148,48 @@ func (b *componentWorkloadBuilderBase) buildTLSCert() componentWorkloadBuilder {
 		}
 		return objs, nil
 	}
-	return b.buildWrapper(buildfn)
+	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) buildTLSVolume(idx int32) componentWorkloadBuilder {
+func (b *ComponentWorkloadBuilderBase) BuildTLSVolume(idx int32) ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		if b.concreteBuilder.mutableWorkload(idx) == nil {
+		if b.ConcreteBuilder.MutableWorkload(idx) == nil {
 			return nil, fmt.Errorf("build TLS volumes but workload is nil, cluster: %s, component: %s",
-				b.comp.GetClusterName(), b.comp.GetName())
+				b.Comp.GetClusterName(), b.Comp.GetName())
 		}
 		// build secret volume and volume mount
-		podSpec := b.concreteBuilder.mutableRuntime(idx)
-		return nil, updateTLSVolumeAndVolumeMount(podSpec, b.comp.GetClusterName(), *b.comp.GetSynthesizedComponent())
+		podSpec := b.ConcreteBuilder.MutableRuntime(idx)
+		return nil, updateTLSVolumeAndVolumeMount(podSpec, b.Comp.GetClusterName(), *b.Comp.GetSynthesizedComponent())
 	}
-	return b.buildWrapper(buildfn)
+	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) complete() error {
-	if b.error != nil {
-		return b.error
+func (b *ComponentWorkloadBuilderBase) Complete() error {
+	if b.Error != nil {
+		return b.Error
 	}
-	workload := b.concreteBuilder.mutableWorkload(0)
+	workload := b.ConcreteBuilder.MutableWorkload(0)
 	if workload == nil {
 		return fmt.Errorf("fail to create compoennt workloads, cluster: %s, component: %s",
-			b.comp.GetClusterName(), b.comp.GetName())
+			b.Comp.GetClusterName(), b.Comp.GetName())
 	}
-	b.comp.addWorkload(workload, b.defaultAction, nil)
+	b.Comp.AddWorkload(workload, b.DefaultAction, nil)
 	return nil
 }
 
-func (b *componentWorkloadBuilderBase) buildWrapper(buildfn func() ([]client.Object, error)) componentWorkloadBuilder {
-	if b.error != nil || buildfn == nil {
-		return b.concreteBuilder
+func (b *ComponentWorkloadBuilderBase) BuildWrapper(buildfn func() ([]client.Object, error)) ComponentWorkloadBuilder {
+	if b.Error != nil || buildfn == nil {
+		return b.ConcreteBuilder
 	}
 	objs, err := buildfn()
 	if err != nil {
-		b.error = err
+		b.Error = err
 	} else {
 		for _, obj := range objs {
-			b.comp.addResource(obj, b.defaultAction, nil)
+			b.Comp.AddResource(obj, b.DefaultAction, nil)
 		}
 	}
-	return b.concreteBuilder
+	return b.ConcreteBuilder
 }
 
 func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, component component.SynthesizedComponent) error {

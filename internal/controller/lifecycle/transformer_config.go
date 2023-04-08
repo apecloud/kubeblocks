@@ -27,7 +27,7 @@ import (
 type configTransformer struct{}
 
 func (c *configTransformer) Transform(dag *graph.DAG) error {
-	cmVertices := findAll[*corev1.ConfigMap](dag)
+	cmVertices := ictrltypes.FindAll[*corev1.ConfigMap](dag)
 	isConfig := func(cm *corev1.ConfigMap) bool {
 		// TODO: we should find a way to know if cm is a true config
 		// TODO: the main problem is we can't separate script from config,

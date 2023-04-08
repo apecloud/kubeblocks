@@ -177,45 +177,6 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, component
 		componentReplicas, int32(podCount), availableReplicas), nil
 }
 
-//// HandleUpdate is the implementation of the type Component interface method, handles replicationSet workload Pod updates.
-//func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) error {
-//	stsList, err := util.ListStsOwnedByComponent(ctx, r.Cli, r.GetNamespace(), r.GetMatchingLabels())
-//	if err != nil {
-//		return err
-//	}
-//
-//	podsToSyncStatus := make([]*corev1.Pod, 0)
-//	for _, sts := range stsList {
-//		if sts.Generation != sts.Status.ObservedGeneration {
-//			continue
-//		}
-//		pod, err := getAndCheckReplicationPodByStatefulSet(ctx, r.Cli, sts)
-//		if err != nil {
-//			return err
-//		}
-//		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
-//		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
-//			// TODO: refactor it
-//			podCopy := pod.DeepCopy()
-//			pod.GetLabels()[constant.RoleLabelKey] = sts.Labels[constant.RoleLabelKey]
-//			components.AddVertex4Patch(r.Dag, pod, podCopy)
-//		} else {
-//			podsToSyncStatus = append(podsToSyncStatus, pod)
-//		}
-//
-//		podsToDelete, err := util.GetPods4Delete(ctx, r.Cli, sts)
-//		if err != nil {
-//			return err
-//		}
-//		for _, podToDelete := range podsToDelete {
-//			components.AddVertex4Delete(r.Dag, podToDelete)
-//		}
-//	}
-//
-//	// sync cluster.status.components.replicationSet.status
-//	return syncReplicationSetClusterStatus(r.Cluster, r.ComponentDef, r.GetName(), podsToSyncStatus)
-//}
-
 func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
 	stsList, err := util.ListStsOwnedByComponent(ctx, r.Cli, r.GetNamespace(), r.GetMatchingLabels())
 	if err != nil {

@@ -18,9 +18,7 @@ package apps
 
 import (
 	"context"
-	"fmt"
 	"regexp"
-	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -32,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -44,70 +41,6 @@ const EventTimeOut = 30 * time.Second
 // isTargetKindForEvent checks the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
 	return slices.Index([]string{constant.PodKind, constant.DeploymentKind, constant.StatefulSetKind}, event.InvolvedObject.Kind) != -1
-}
-
-// getFinalEventMessageForRecorder gets final event message by event involved object kind for recorded it
-func getFinalEventMessageForRecorder(event *corev1.Event) string {
-	if event.InvolvedObject.Kind == constant.PodKind {
-		return fmt.Sprintf("Pod %s: %s", event.InvolvedObject.Name, event.Message)
-	}
-	return event.Message
-}
-
-// isExistsEventMsg checks whether the event is exists
-func isExistsEventMsg(compStatusMessage map[string]string, event *corev1.Event) bool {
-	if compStatusMessage == nil {
-		return false
-	}
-	messageKey := util.GetComponentStatusMessageKey(event.InvolvedObject.Kind, event.InvolvedObject.Name)
-	if message, ok := compStatusMessage[messageKey]; !ok {
-		return false
-	} else {
-		return strings.Contains(message, event.Message)
-	}
-
-}
-
-// updateComponentStatusMessage updates component status message map
-func updateComponentStatusMessage(cluster *appsv1alpha1.Cluster,
-	compName string,
-	compStatus *appsv1alpha1.ClusterComponentStatus,
-	event *corev1.Event) {
-	var (
-		kind = event.InvolvedObject.Kind
-		name = event.InvolvedObject.Name
-	)
-	message := compStatus.GetObjectMessage(kind, name)
-	// if the event message is not exists in message map, merge them.
-	if !strings.Contains(message, event.Message) {
-		message += event.Message + ";"
-	}
-	compStatus.SetObjectMessage(kind, name, message)
-	cluster.Status.SetComponentStatus(compName, *compStatus)
-}
-
-// needSyncComponentStatusForEvent checks whether the component status needs to be synchronized the cluster status by event
-func needSyncComponentStatusForEvent(cluster *appsv1alpha1.Cluster, componentName string, phase appsv1alpha1.ClusterComponentPhase, event *corev1.Event) bool {
-	if phase == "" {
-		return false
-	}
-	compStatus, ok := cluster.Status.Components[componentName]
-	if !ok {
-		compStatus = appsv1alpha1.ClusterComponentStatus{Phase: phase}
-		updateComponentStatusMessage(cluster, componentName, &compStatus, event)
-		return true
-	}
-	if compStatus.Phase != phase {
-		compStatus.Phase = phase
-		updateComponentStatusMessage(cluster, componentName, &compStatus, event)
-		return true
-	}
-	// check whether it is a new warning event and the component phase is running
-	if !isExistsEventMsg(compStatus.Message, event) && phase != appsv1alpha1.RunningClusterCompPhase {
-		updateComponentStatusMessage(cluster, componentName, &compStatus, event)
-		return true
-	}
-	return false
 }
 
 // getEventInvolvedObject gets event involved object for StatefulSet/Deployment/Pod workload
@@ -175,49 +108,9 @@ func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
 	}
 }
 
-// getClusterAvailabilityEffect whether the component will affect the cluster availability.
-// if the component can affect and be Failed, the cluster will be Failed too.
-func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDefinition) bool {
-	switch componentDef.WorkloadType {
-	case appsv1alpha1.Consensus:
-		return true
-	case appsv1alpha1.Replication:
-		return true
-	default:
-		return componentDef.MaxUnavailable != nil
-	}
-}
-
-// getComponentRelatedInfo gets componentMap, clusterAvailabilityMap and component definition information
-func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition,
-	componentName string) (map[string]string, map[string]bool, *appsv1alpha1.ClusterComponentDefinition) {
-	var (
-		compDefName  string
-		componentMap = map[string]string{}
-		componentDef *appsv1alpha1.ClusterComponentDefinition
-	)
-	for _, v := range cluster.Spec.ComponentSpecs {
-		if v.Name == componentName {
-			compDefName = v.ComponentDefRef
-		}
-		componentMap[v.Name] = v.ComponentDefRef
-	}
-	clusterAvailabilityEffectMap := map[string]bool{}
-	for i, v := range clusterDef.Spec.ComponentDefs {
-		clusterAvailabilityEffectMap[v.Name] = getClusterAvailabilityEffect(&v)
-		if v.Name == compDefName {
-			componentDef = &clusterDef.Spec.ComponentDefs[i]
-		}
-	}
-	return componentMap, clusterAvailabilityEffectMap, componentDef
-}
-
 // handleClusterStatusByEvent handles the cluster status when warning event happened
 func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder record.EventRecorder, event *corev1.Event) error {
 	var (
-		//cluster    = &appsv1alpha1.Cluster{}
-		//clusterDef = &appsv1alpha1.ClusterDefinition{}
-		//phase      appsv1alpha1.ClusterComponentPhase
 		err error
 	)
 	object, err := getEventInvolvedObject(ctx, cli, event)
@@ -225,44 +118,6 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 		return err
 	}
 	return notifyClusterStatusChange(ctx, cli, object)
-	//if object == nil || !intctrlutil.WorkloadFilterPredicate(object) {
-	//	return nil
-	//}
-	//labels := object.GetLabels()
-	//if err = cli.Get(ctx, client.ObjectKey{Name: labels[constant.AppInstanceLabelKey], Namespace: object.GetNamespace()}, cluster); err != nil {
-	//	return err
-	//}
-	//if err = cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-	//	return err
-	//}
-	//componentName := labels[constant.KBAppComponentLabelKey]
-	//// get the component phase by component name and sync to Cluster.status.components
-	//patch := client.MergeFrom(cluster.DeepCopy())
-	//componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
-	//clusterComponent := cluster.GetComponentByName(componentName)
-	//if clusterComponent == nil {
-	//	return nil
-	//}
-	//// get the component status by event and check whether the component status needs to be synchronized to the cluster
-	//// TODO(refactor)
-	//component, err := components.NewComponentByType(cli, cluster, clusterComponent, *componentDef, nil)
-	//if err != nil {
-	//	return err
-	//}
-	//phase, err = component.GetPhaseWhenPodsNotReady(ctx, componentName)
-	//if err != nil {
-	//	return err
-	//}
-	//if !needSyncComponentStatusForEvent(cluster, componentName, phase, event) {
-	//	return nil
-	//}
-	//// handle Cluster.status.phase when some components are not ready.
-	//handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
-	//if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
-	//	return err
-	//}
-	//recorder.Eventf(cluster, corev1.EventTypeWarning, event.Reason, getFinalEventMessageForRecorder(event))
-	//return opsutil.MarkRunningOpsRequestAnnotation(ctx, cli, cluster)
 }
 
 // TODO: Unified cluster event processing
@@ -342,25 +197,6 @@ func handleDeletePVCCronJobEvent(ctx context.Context,
 	}
 	// TODO(refactor): we will lost the event and event.Message
 	return notifyClusterStatusChange(ctx, cli, object)
-	//labels := object.GetLabels()
-	//cluster := appsv1alpha1.Cluster{}
-	//if err = cli.Get(ctx, client.ObjectKey{Name: labels[constant.AppInstanceLabelKey],
-	//	Namespace: object.GetNamespace()}, &cluster); err != nil {
-	//	return err
-	//}
-	//componentName := labels[constant.KBAppComponentLabelKey]
-	//// update component phase to abnormal
-	//if err = updateComponentStatusPhase(cli,
-	//	ctx,
-	//	&cluster,
-	//	componentName,
-	//	appsv1alpha1.AbnormalClusterCompPhase,
-	//	event.Message,
-	//	object); err != nil {
-	//	return err
-	//}
-	//recorder.Eventf(&cluster, corev1.EventTypeWarning, event.Reason, event.Message)
-	//return nil
 }
 
 func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {
@@ -386,23 +222,6 @@ func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name 
 		return client.IgnoreNotFound(err)
 	}
 	return nil
-}
-
-func updateComponentStatusPhase(cli client.Client,
-	ctx context.Context,
-	cluster *appsv1alpha1.Cluster,
-	componentName string,
-	phase appsv1alpha1.ClusterComponentPhase,
-	message string,
-	object client.Object) error {
-	c, ok := cluster.Status.Components[componentName]
-	if ok && c.Phase == phase {
-		return nil
-	}
-	c.SetObjectMessage(object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), message)
-	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.SetComponentStatus(componentName, c)
-	return cli.Status().Patch(ctx, cluster, patch)
 }
 
 // existsOperations checks if the cluster is doing operations

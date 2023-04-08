@@ -46,7 +46,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	dpctrl "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
@@ -327,10 +326,10 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = components.NewStatefulSetReconciler(k8sManager)
+	err = apps.NewStatefulSetReconciler(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = components.NewDeploymentReconciler(k8sManager)
+	err = apps.NewDeploymentReconciler(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&k8score.EventReconciler{

@@ -29,8 +29,8 @@ type secretTransformer struct{}
 
 func (c *secretTransformer) Transform(dag *graph.DAG) error {
 	var secretVertices, noneRootVertices []graph.Vertex
-	secretVertices = findAll[*corev1.Secret](dag)
-	noneRootVertices = findAllNot[*appsv1alpha1.Cluster](dag)
+	secretVertices = ictrltypes.FindAll[*corev1.Secret](dag)
+	noneRootVertices = ictrltypes.FindAllNot[*appsv1alpha1.Cluster](dag)
 	for _, secretVertex := range secretVertices {
 		secret, _ := secretVertex.(*ictrltypes.LifecycleVertex)
 		secret.Immutable = true

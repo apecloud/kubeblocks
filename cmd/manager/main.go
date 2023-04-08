@@ -364,12 +364,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = components.NewStatefulSetReconciler(mgr); err != nil {
+	if err = appscontrollers.NewStatefulSetReconciler(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
 		os.Exit(1)
 	}
 
-	if err = components.NewDeploymentReconciler(mgr); err != nil {
+	if err = appscontrollers.NewDeploymentReconciler(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
 		os.Exit(1)
 	}

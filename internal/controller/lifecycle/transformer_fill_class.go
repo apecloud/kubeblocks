@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/types"
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
@@ -24,7 +25,7 @@ type fillClass struct {
 }
 
 func (r *fillClass) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
+	rootVertex, err := types.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}

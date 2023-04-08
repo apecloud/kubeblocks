@@ -32,7 +32,7 @@ type clusterCredentialTransformer struct {
 }
 
 func (c *clusterCredentialTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
+	rootVertex, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}

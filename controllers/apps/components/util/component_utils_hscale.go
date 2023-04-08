@@ -14,23 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package lifecycle
+package util
 
 import (
 	"context"
 	"fmt"
 	"strings"
 	"time"
-
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/pkg/errors"
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -39,10 +29,18 @@ import (
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // TODO: handle unfinished jobs from previous scale in
-func checkedCreateDeletePVCCronJob(reqCtx intctrlutil.RequestCtx, cli types2.ReadonlyClient,
+func CheckedCreateDeletePVCCronJob(reqCtx intctrlutil.RequestCtx, cli types2.ReadonlyClient,
 	pvcKey types.NamespacedName, stsObj *appsv1.StatefulSet, cluster *appsv1alpha1.Cluster) (client.Object, error) {
 	// hack: delete after 30 minutes
 	utc := time.Now().Add(30 * time.Minute).UTC()
@@ -67,7 +65,7 @@ func checkedCreateDeletePVCCronJob(reqCtx intctrlutil.RequestCtx, cli types2.Rea
 	return nil, nil
 }
 
-func isPVCExists(cli types2.ReadonlyClient, ctx context.Context,
+func IsPVCExists(cli types2.ReadonlyClient, ctx context.Context,
 	pvcKey types.NamespacedName) (bool, error) {
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
@@ -76,7 +74,7 @@ func isPVCExists(cli types2.ReadonlyClient, ctx context.Context,
 	return true, nil
 }
 
-func isAllPVCBound(cli types2.ReadonlyClient,
+func IsAllPVCBound(cli types2.ReadonlyClient,
 	ctx context.Context,
 	stsObj *appsv1.StatefulSet) (bool, error) {
 	if len(stsObj.Spec.VolumeClaimTemplates) == 0 {
@@ -100,13 +98,13 @@ func isAllPVCBound(cli types2.ReadonlyClient,
 }
 
 // check volume snapshot available
-func isSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
+func IsSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
 	vsList := snapshotv1.VolumeSnapshotList{}
 	getVSErr := cli.List(ctx, &vsList)
 	return getVSErr == nil
 }
 
-func deleteSnapshot(cli types2.ReadonlyClient,
+func DeleteSnapshot(cli types2.ReadonlyClient,
 	reqCtx intctrlutil.RequestCtx,
 	snapshotKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
@@ -175,7 +173,7 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 	}
 }
 
-func doBackup(reqCtx intctrlutil.RequestCtx,
+func DoBackup(reqCtx intctrlutil.RequestCtx,
 	cli types2.ReadonlyClient,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
@@ -199,7 +197,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			"scale with backup tool not support yet")
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
-		if !isSnapshotAvailable(cli, reqCtx.Ctx) {
+		if !IsSnapshotAvailable(cli, reqCtx.Ctx) {
 			reqCtx.Recorder.Eventf(cluster,
 				corev1.EventTypeWarning,
 				"HorizontalScaleFailed",
@@ -337,9 +335,9 @@ func doSnapshot(cli types2.ReadonlyClient,
 		if err != nil {
 			return nil, err
 		}
-		if err := controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
-			return nil, err
-		}
+		//if err := controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
+		//	return nil, err
+		//}
 		objs = append(objs, snapshot)
 
 		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
@@ -430,9 +428,9 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return
 		}
-		if err = controllerutil.SetControllerReference(cluster, backupPolicy, scheme); err != nil {
-			return
-		}
+		//if err = controllerutil.SetControllerReference(cluster, backupPolicy, scheme); err != nil {
+		//	return
+		//}
 		backupPolicyName = backupPolicy.Name
 		objs = append(objs, backupPolicy)
 		return
@@ -466,9 +464,9 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return err
 		}
-		if err := controllerutil.SetControllerReference(cluster, backup, scheme); err != nil {
-			return err
-		}
+		//if err := controllerutil.SetControllerReference(cluster, backup, scheme); err != nil {
+		//	return err
+		//}
 		objs = append(objs, backup)
 		return nil
 	}
@@ -495,8 +493,8 @@ func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
 	if err != nil {
 		return nil, err
 	}
-	if err = intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName); err != nil {
-		return nil, err
-	}
+	//if err = intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName); err != nil {
+	//	return nil, err
+	//}
 	return pvc, nil
 }

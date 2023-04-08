@@ -40,15 +40,15 @@ func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
 
 // notifyClusterStatusChange notifies a cluster changes occurred and triggers it to reconcile.
 func notifyClusterStatusChange(ctx context.Context, cli client.Client, obj client.Object) error {
-	var (
-		err     error
-		cluster *appsv1alpha1.Cluster
-	)
 	if obj == nil || !intctrlutil.WorkloadFilterPredicate(obj) {
 		return nil
 	}
-	if cluster, err = util.GetClusterByObject(ctx, cli, obj); err != nil {
-		return err
+	cluster, ok := obj.(*appsv1alpha1.Cluster)
+	if !ok {
+		var err error
+		if cluster, err = util.GetClusterByObject(ctx, cli, obj); err != nil {
+			return err
+		}
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
 	if cluster.Annotations == nil {

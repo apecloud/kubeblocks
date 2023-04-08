@@ -17,13 +17,14 @@ limitations under the License.
 package lifecycle
 
 import (
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // componentTransformer transforms all components to a K8s objects DAG
@@ -32,11 +33,11 @@ import (
 type componentTransformer struct {
 	cc  clusterRefResources
 	cli client.Client
-	ctx intctrlutil.RequestCtx
+	ctx ictrlutil.RequestCtx
 }
 
 func (c *componentTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
+	rootVertex, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
@@ -90,7 +91,7 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 	deleteSet := compStatus.Difference(compProto)
 
 	for compName := range createSet {
-		comp, err := NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
+		comp, err := components.NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
@@ -100,7 +101,7 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 	}
 
 	for compName := range deleteSet {
-		comp, err := NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
+		comp, err := components.NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			if err.Error() != "NotSupported" {
 				return err
@@ -114,7 +115,7 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 	}
 
 	for compName := range updateSet {
-		comp, err := NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
+		comp, err := components.NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
@@ -129,7 +130,7 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 
 func (c *componentTransformer) transform4StatusUpdate(cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		comp, err := NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compSpec.Name, dag)
+		comp, err := components.NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compSpec.Name, dag)
 		if err != nil {
 			return err
 		}

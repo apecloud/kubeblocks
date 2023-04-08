@@ -40,7 +40,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -66,6 +65,9 @@ const (
 	CertName   = "tls.crt"
 	KeyName    = "tls.key"
 	MountPath  = "/etc/pki/tls"
+
+	// TODO(refactor): copied from controllers/apps/components/util, fix me
+	ComponentStatusDefaultPodName = "Unknown"
 )
 
 var (
@@ -530,13 +532,13 @@ func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 		if v, ok := cluster.Status.Components[component.Name]; ok {
 			consensusSetStatus := v.ConsensusSetStatus
 			if consensusSetStatus != nil {
-				if consensusSetStatus.Leader.Pod != componentutil.ComponentStatusDefaultPodName {
+				if consensusSetStatus.Leader.Pod != ComponentStatusDefaultPodName {
 					envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
 				}
 
 				followers := ""
 				for _, follower := range consensusSetStatus.Followers {
-					if follower.Pod == componentutil.ComponentStatusDefaultPodName {
+					if follower.Pod == ComponentStatusDefaultPodName {
 						continue
 					}
 					if len(followers) > 0 {

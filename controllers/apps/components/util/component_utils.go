@@ -20,7 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"golang.org/x/exp/maps"
+	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"strings"
 	"time"
 
@@ -48,7 +55,212 @@ var (
 	ErrReqClusterObj              = errors.New("required arg *appsv1alpha1.Cluster is nil")
 	ErrReqClusterComponentDefObj  = errors.New("required arg *appsv1alpha1.ClusterComponentDefinition is nil")
 	ErrReqClusterComponentSpecObj = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
+
+	// TODO(refactor): fix me
+	dbClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
 )
+
+// TODO(refactor): copied from internal lifecycle, fix me later
+func IsClusterDeleting(cluster appsv1alpha1.Cluster) bool {
+	return !cluster.GetDeletionTimestamp().IsZero()
+}
+
+func IsClusterUpdating(cluster appsv1alpha1.Cluster) bool {
+	return cluster.Status.ObservedGeneration != cluster.Generation
+}
+
+func IsClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
+	return !IsClusterDeleting(cluster) && !IsClusterUpdating(cluster)
+	// return cluster.Status.ObservedGeneration == cluster.Generation &&
+	//	slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
+}
+
+func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
+	ctx context.Context, cli client.Client, _ func(T, L), namespace string, labels client.MatchingLabels) ([]PT, error) {
+	var objList L
+	if err := cli.List(ctx, PL(&objList), labels, client.InNamespace(namespace)); err != nil {
+		return nil, err
+	}
+
+	objs := make([]PT, 0)
+	items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
+	for i := range items {
+		objs = append(objs, &items[i])
+	}
+	return objs, nil
+}
+
+func ListStsOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.StatefulSet, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.StatefulSetSignature, namespace, labels)
+}
+
+func ListDeployOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.Deployment, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.DeploymentSignature, namespace, labels)
+}
+
+func ListPodOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
+}
+
+type gvkName struct {
+	gvk      schema.GroupVersionKind
+	ns, name string
+}
+
+type clusterSnapshot map[gvkName]client.Object
+
+func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkName, error) {
+	gvk, err := apiutil.GVKForObject(object, scheme)
+	if err != nil {
+		return nil, err
+	}
+	return &gvkName{
+		gvk:  gvk,
+		ns:   object.GetNamespace(),
+		name: object.GetName(),
+	}, nil
+}
+
+func isOwnerOf(owner, obj client.Object, scheme *runtime.Scheme) bool {
+	ro, ok := owner.(runtime.Object)
+	if !ok {
+		return false
+	}
+	gvk, err := apiutil.GVKForObject(ro, scheme)
+	if err != nil {
+		return false
+	}
+	ref := metav1.OwnerReference{
+		APIVersion: gvk.GroupVersion().String(),
+		Kind:       gvk.Kind,
+		UID:        owner.GetUID(),
+		Name:       owner.GetName(),
+	}
+	owners := obj.GetOwnerReferences()
+	referSameObject := func(a, b metav1.OwnerReference) bool {
+		aGV, err := schema.ParseGroupVersion(a.APIVersion)
+		if err != nil {
+			return false
+		}
+
+		bGV, err := schema.ParseGroupVersion(b.APIVersion)
+		if err != nil {
+			return false
+		}
+
+		return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
+	}
+	for _, ownerRef := range owners {
+		if referSameObject(ownerRef, ref) {
+			return true
+		}
+	}
+	return false
+}
+
+func ownedKinds() []client.ObjectList {
+	return []client.ObjectList{
+		&appsv1.StatefulSetList{},
+		&appsv1.DeploymentList{},
+		&corev1.ServiceList{},
+		&corev1.SecretList{},
+		&corev1.ConfigMapList{},
+		&corev1.PersistentVolumeClaimList{},
+		&policyv1.PodDisruptionBudgetList{},
+	}
+}
+
+// read all objects owned by component
+func ReadCacheSnapshot(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) (clusterSnapshot, error) {
+	// list what kinds of object cluster owns
+	kinds := ownedKinds()
+	snapshot := make(clusterSnapshot)
+	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
+	inNS := client.InNamespace(cluster.Namespace)
+	for _, list := range kinds {
+		if err := cli.List(reqCtx.Ctx, list, inNS, ml); err != nil {
+			return nil, err
+		}
+		// reflect get list.Items
+		items := reflect.ValueOf(list).Elem().FieldByName("Items")
+		l := items.Len()
+		for i := 0; i < l; i++ {
+			// get the underlying object
+			object := items.Index(i).Addr().Interface().(client.Object)
+			// put to snapshot if owned by our cluster
+			if isOwnerOf(cluster, object, k8sscheme.Scheme) {
+				name, err := getGVKName(object, k8sscheme.Scheme)
+				if err != nil {
+					return nil, err
+				}
+				snapshot[*name] = object
+			}
+		}
+	}
+	return snapshot, nil
+}
+
+func ResolveObjectAction(snapshot clusterSnapshot, vertex *ictrltypes.LifecycleVertex) (*ictrltypes.LifecycleAction, error) {
+	gvk, err := getGVKName(vertex.Obj, k8sscheme.Scheme)
+	if err != nil {
+		return nil, err
+	}
+	if obj, ok := snapshot[*gvk]; ok {
+		vertex.ObjCopy = obj
+		return ictrltypes.ActionUpdatePtr(), nil
+	} else {
+		return ictrltypes.ActionCreatePtr(), nil
+	}
+}
+
+// RestartPod restarts a Pod through updating the pod's annotation
+func RestartPod(podTemplate *corev1.PodTemplateSpec) error {
+	if podTemplate.Annotations == nil {
+		podTemplate.Annotations = map[string]string{}
+	}
+
+	// startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
+	startTimestamp := time.Now() // TODO(refactor): impl
+	restartTimestamp := podTemplate.Annotations[constant.RestartAnnotationKey]
+	// if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.After(res) {
+	if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.Before(res) {
+		podTemplate.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
+	}
+	return nil
+}
+
+// mergeAnnotations keeps the original annotations.
+// if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
+func MergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
+	if targetAnnotations == nil {
+		return
+	}
+	if *targetAnnotations == nil {
+		*targetAnnotations = map[string]string{}
+	}
+	for k, v := range originalAnnotations {
+		// if the annotation not exist in targetAnnotations, copy it from original.
+		if _, ok := (*targetAnnotations)[k]; !ok {
+			(*targetAnnotations)[k] = v
+		}
+	}
+}
+
+// MergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
+// if annotations exist and are replaced, the Service will be updated.
+func MergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
+	if len(originalAnnotations) == 0 {
+		return targetAnnotations
+	}
+	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
+	for k, v := range originalAnnotations {
+		if !strings.HasPrefix(k, "prometheus.io") {
+			tmpAnnotations[k] = v
+		}
+	}
+	maps.Copy(tmpAnnotations, targetAnnotations)
+	return tmpAnnotations
+}
 
 func ComponentRuntimeReqArgsCheck(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
@@ -96,33 +308,6 @@ func GetComponentMatchLabels(clusterName, componentName string) map[string]strin
 		constant.KBAppComponentLabelKey: componentName,
 		constant.AppManagedByLabelKey:   constant.AppName,
 	}
-}
-
-func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
-	ctx context.Context, cli client.Client, _ func(T, L), namespace string, labels client.MatchingLabels) ([]PT, error) {
-	var objList L
-	if err := cli.List(ctx, PL(&objList), labels, client.InNamespace(namespace)); err != nil {
-		return nil, err
-	}
-
-	objs := make([]PT, 0)
-	items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
-	for i := range items {
-		objs = append(objs, &items[i])
-	}
-	return objs, nil
-}
-
-func ListStsOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.StatefulSet, error) {
-	return listObjWithLabelsInNamespace(ctx, cli, generics.StatefulSetSignature, namespace, labels)
-}
-
-func ListDeployOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.Deployment, error) {
-	return listObjWithLabelsInNamespace(ctx, cli, generics.DeploymentSignature, namespace, labels)
-}
-
-func ListPodOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
-	return listObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
 }
 
 // GetComponentPodList gets the pod list by cluster and componentName

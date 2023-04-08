@@ -31,11 +31,11 @@ type ownershipTransformer struct {
 }
 
 func (f *ownershipTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
+	rootVertex, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
-	vertices := findAllNot[*appsv1alpha1.Cluster](dag)
+	vertices := ictrltypes.FindAllNot[*appsv1alpha1.Cluster](dag)
 
 	controllerutil.AddFinalizer(rootVertex.Obj, dbClusterFinalizerName)
 	for _, vertex := range vertices {

@@ -18,8 +18,10 @@ package types
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
 type LifecycleAction string
@@ -126,4 +128,47 @@ func addObject(dag *graph.DAG, obj client.Object, action *LifecycleAction, paren
 		dag.Connect(parent, vertex)
 	}
 	return vertex
+}
+
+func FindMatchedVertex[T interface{}](dag *graph.DAG, objectKey client.ObjectKey) graph.Vertex {
+	for _, vertex := range dag.Vertices() {
+		v, _ := vertex.(*LifecycleVertex)
+		if _, ok := v.Obj.(T); ok {
+			if client.ObjectKeyFromObject(v.Obj) == objectKey {
+				return vertex
+			}
+		}
+	}
+	return nil
+}
+
+func FindAll[T interface{}](dag *graph.DAG) []graph.Vertex {
+	vertices := make([]graph.Vertex, 0)
+	for _, vertex := range dag.Vertices() {
+		v, _ := vertex.(*LifecycleVertex)
+		if _, ok := v.Obj.(T); ok {
+			vertices = append(vertices, vertex)
+		}
+	}
+	return vertices
+}
+
+func FindAllNot[T interface{}](dag *graph.DAG) []graph.Vertex {
+	vertices := make([]graph.Vertex, 0)
+	for _, vertex := range dag.Vertices() {
+		v, _ := vertex.(*LifecycleVertex)
+		if _, ok := v.Obj.(T); !ok {
+			vertices = append(vertices, vertex)
+		}
+	}
+	return vertices
+}
+
+func FindRootVertex(dag *graph.DAG) (*LifecycleVertex, error) {
+	root := dag.Root()
+	if root == nil {
+		return nil, fmt.Errorf("root vertex not found: %v", dag)
+	}
+	rootVertex, _ := root.(*LifecycleVertex)
+	return rootVertex, nil
 }

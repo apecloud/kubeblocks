@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package lifecycle
+package types
 
 import (
+	"encoding/json"
 	"fmt"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	appsv1 "k8s.io/api/apps/v1"
 	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,18 +33,13 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
-// TODO(refactor): copy from components.type, cleanup it
-const (
-	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.
-	PodContainerFailedTimeout = time.Minute
-)
-
-type componentBase struct {
-	client client.Client
+type ComponentBase struct {
+	Client client.Client
 
 	Definition *appsv1alpha1.ClusterDefinition
 	Version    *appsv1alpha1.ClusterVersion
@@ -58,47 +53,46 @@ type componentBase struct {
 	// built synthesized component
 	Component *component.SynthesizedComponent
 
-	componentSet ComponentSet
+	ComponentSet ComponentSet
 
+	Dag *graph.DAG
 	// DAG vertexes of main workload object(s)
-	workloadVertexs []*ictrltypes.LifecycleVertex
-
-	dag *graph.DAG
+	WorkloadVertexs []*ictrltypes.LifecycleVertex
 }
 
-func (c *componentBase) GetClient() client.Client {
-	return c.client
+func (c *ComponentBase) GetClient() client.Client {
+	return c.Client
 }
 
-func (c *componentBase) GetName() string {
+func (c *ComponentBase) GetName() string {
 	return c.CompSpec.Name
 }
 
-func (c *componentBase) GetNamespace() string {
+func (c *ComponentBase) GetNamespace() string {
 	return c.Cluster.Namespace
 }
 
-func (c *componentBase) GetClusterName() string {
+func (c *ComponentBase) GetClusterName() string {
 	return c.Cluster.Name
 }
 
-func (c *componentBase) GetDefinition() *appsv1alpha1.ClusterDefinition {
+func (c *ComponentBase) GetDefinition() *appsv1alpha1.ClusterDefinition {
 	return c.Definition
 }
 
-func (c *componentBase) GetVersion() *appsv1alpha1.ClusterVersion {
+func (c *ComponentBase) GetVersion() *appsv1alpha1.ClusterVersion {
 	return c.Version
 }
 
-func (c *componentBase) GetCluster() *appsv1alpha1.Cluster {
+func (c *ComponentBase) GetCluster() *appsv1alpha1.Cluster {
 	return c.Cluster
 }
 
-func (c *componentBase) GetSynthesizedComponent() *component.SynthesizedComponent {
+func (c *ComponentBase) GetSynthesizedComponent() *component.SynthesizedComponent {
 	return c.Component
 }
 
-func (c *componentBase) GetMatchingLabels() client.MatchingLabels {
+func (c *ComponentBase) GetMatchingLabels() client.MatchingLabels {
 	return client.MatchingLabels{
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.AppInstanceLabelKey:    c.GetClusterName(),
@@ -106,7 +100,7 @@ func (c *componentBase) GetMatchingLabels() client.MatchingLabels {
 	}
 }
 
-func (c *componentBase) addResource(obj client.Object, action *ictrltypes.LifecycleAction,
+func (c *ComponentBase) AddResource(obj client.Object, action *ictrltypes.LifecycleAction,
 	parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
 	if obj == nil {
 		panic("try to add nil object")
@@ -115,37 +109,37 @@ func (c *componentBase) addResource(obj client.Object, action *ictrltypes.Lifecy
 		Obj:    obj,
 		Action: action,
 	}
-	c.dag.AddVertex(vertex)
+	c.Dag.AddVertex(vertex)
 
 	if parent != nil {
-		c.dag.Connect(parent, vertex)
+		c.Dag.Connect(parent, vertex)
 	}
 	return vertex
 }
 
-func (c *componentBase) addWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex) {
-	c.workloadVertexs = append(c.workloadVertexs, c.addResource(obj, action, parent))
+func (c *ComponentBase) AddWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex) {
+	c.WorkloadVertexs = append(c.WorkloadVertexs, c.AddResource(obj, action, parent))
 }
 
-func (c *componentBase) createResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
-	return ictrltypes.LifecycleObjectCreate(c.dag, obj, parent)
+func (c *ComponentBase) CreateResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
+	return ictrltypes.LifecycleObjectCreate(c.Dag, obj, parent)
 }
 
-func (c *componentBase) deleteResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
-	return ictrltypes.LifecycleObjectDelete(c.dag, obj, parent)
+func (c *ComponentBase) DeleteResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
+	return ictrltypes.LifecycleObjectDelete(c.Dag, obj, parent)
 }
 
-func (c *componentBase) updateResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
-	return ictrltypes.LifecycleObjectUpdate(c.dag, obj, parent)
+func (c *ComponentBase) UpdateResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
+	return ictrltypes.LifecycleObjectUpdate(c.Dag, obj, parent)
 }
 
-func (c *componentBase) noopResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
-	return ictrltypes.LifecycleObjectNoop(c.dag, obj, parent)
+func (c *ComponentBase) NoopResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
+	return ictrltypes.LifecycleObjectNoop(c.Dag, obj, parent)
 }
 
-// validateObjectsAction validates the action of all objects in dag has been determined
-func (c *componentBase) validateObjectsAction() error {
-	for _, v := range c.dag.Vertices() {
+// ValidateObjectsAction validates the action of all objects in dag has been determined
+func (c *ComponentBase) ValidateObjectsAction() error {
+	for _, v := range c.Dag.Vertices() {
 		if node, ok := v.(*ictrltypes.LifecycleVertex); !ok {
 			return fmt.Errorf("unexpected vertex type, cluster: %s, component: %s, vertex: %T",
 				c.GetClusterName(), c.GetName(), v)
@@ -158,25 +152,25 @@ func (c *componentBase) validateObjectsAction() error {
 }
 
 // resolveObjectsAction resolves the action of objects in dag to guarantee that all object actions will be determined
-func (c *componentBase) resolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	snapshot, err := readCacheSnapshot(reqCtx, cli, c.GetCluster())
+func (c *ComponentBase) ResolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	snapshot, err := util.ReadCacheSnapshot(reqCtx, cli, c.GetCluster())
 	if err != nil {
 		return err
 	}
-	for _, v := range c.dag.Vertices() {
+	for _, v := range c.Dag.Vertices() {
 		if node, ok := v.(*ictrltypes.LifecycleVertex); !ok {
 			return fmt.Errorf("unexpected vertex type, cluster: %s, component: %s, vertex: %T",
 				c.GetClusterName(), c.GetName(), v)
 		} else if node.Action == nil {
-			if action, err := resolveObjectAction(snapshot, node); err != nil {
+			if action, err := util.ResolveObjectAction(snapshot, node); err != nil {
 				return err
 			} else {
 				node.Action = action
 			}
 		}
 	}
-	if isClusterStatusUpdating(*c.GetCluster()) {
-		for _, vertex := range c.dag.Vertices() {
+	if util.IsClusterStatusUpdating(*c.GetCluster()) {
+		for _, vertex := range c.Dag.Vertices() {
 			v, _ := vertex.(*ictrltypes.LifecycleVertex)
 			// TODO(refactor): fix me, workaround for h-scaling to update stateful set
 			if _, ok := v.Obj.(*appsv1.StatefulSet); !ok {
@@ -184,10 +178,10 @@ func (c *componentBase) resolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli 
 			}
 		}
 	}
-	return c.validateObjectsAction()
+	return c.ValidateObjectsAction()
 }
 
-func (c *componentBase) composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *ComponentBase) ComposeSynthesizedComponent(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, *c.Cluster, *c.Definition, *c.CompDef, *c.CompSpec, c.CompVer)
 	if err != nil {
 		return err
@@ -196,18 +190,18 @@ func (c *componentBase) composeSynthesizedComponent(reqCtx intctrlutil.RequestCt
 	return nil
 }
 
-func (c *componentBase) updateService(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	labels := map[string]string{
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.AppInstanceLabelKey:    c.GetClusterName(),
 		constant.KBAppComponentLabelKey: c.GetName(),
 	}
-	svcObjList, err := listObjWithLabelsInNamespace(reqCtx, cli, generics.ServiceSignature, c.GetNamespace(), labels)
+	svcObjList, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.ServiceSignature, c.GetNamespace(), labels)
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
 
-	svcProtoList := findAll[*corev1.Service](c.dag)
+	svcProtoList := ictrltypes.FindAll[*corev1.Service](c.Dag)
 
 	// create new services or update existed services
 	for _, vertex := range svcProtoList {
@@ -219,7 +213,7 @@ func (c *componentBase) updateService(reqCtx intctrlutil.RequestCtx, cli client.
 		}); pos < 0 {
 			node.Action = ictrltypes.ActionCreatePtr()
 		} else {
-			svcProto.Annotations = mergeServiceAnnotations(svcObjList[pos].Annotations, svcProto.Annotations)
+			svcProto.Annotations = util.MergeServiceAnnotations(svcObjList[pos].Annotations, svcProto.Annotations)
 			node.Action = ictrltypes.ActionUpdatePtr()
 		}
 	}
@@ -231,13 +225,13 @@ func (c *componentBase) updateService(reqCtx intctrlutil.RequestCtx, cli client.
 			svcProto, _ := node.Obj.(*corev1.Service)
 			return svcProto.GetName() == svc.GetName()
 		}); pos < 0 {
-			c.deleteResource(svc, nil)
+			c.DeleteResource(svc, nil)
 		}
 	}
 	return nil
 }
 
-func (c *componentBase) updateStatus(updatefn func(status *appsv1alpha1.ClusterComponentStatus)) {
+func (c *ComponentBase) updateStatus(updatefn func(status *appsv1alpha1.ClusterComponentStatus)) {
 	if updatefn == nil {
 		return
 	}
@@ -254,11 +248,11 @@ func (c *componentBase) updateStatus(updatefn func(status *appsv1alpha1.ClusterC
 	c.Cluster.Status.Components[c.GetName()] = status
 }
 
-func (c *componentBase) setStatusPhase(phase appsv1alpha1.ClusterComponentPhase) {
+func (c *ComponentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase) {
 	c.setStatusPhaseWithMsg(phase, "", "")
 }
 
-func (c *componentBase) setStatusPhaseWithMsg(phase appsv1alpha1.ClusterComponentPhase, msgKey, msg string) {
+func (c *ComponentBase) setStatusPhaseWithMsg(phase appsv1alpha1.ClusterComponentPhase, msgKey, msg string) {
 	c.updateStatus(func(status *appsv1alpha1.ClusterComponentStatus) {
 		if status.Phase == phase {
 			return
@@ -279,7 +273,7 @@ func (c *componentBase) setStatusPhaseWithMsg(phase appsv1alpha1.ClusterComponen
 	})
 }
 
-func (c *componentBase) syncComponentStatusForEvent(phase appsv1alpha1.ClusterComponentPhase, event *corev1.Event) {
+func (c *ComponentBase) syncComponentStatusForEvent(phase appsv1alpha1.ClusterComponentPhase, event *corev1.Event) {
 	if phase == "" {
 		return
 	}
@@ -297,7 +291,7 @@ func (c *componentBase) syncComponentStatusForEvent(phase appsv1alpha1.ClusterCo
 	})
 }
 
-func (c *componentBase) phase() appsv1alpha1.ClusterComponentPhase {
+func (c *ComponentBase) phase() appsv1alpha1.ClusterComponentPhase {
 	if c.Cluster.Status.Components == nil {
 		return ""
 	}
@@ -307,7 +301,7 @@ func (c *componentBase) phase() appsv1alpha1.ClusterComponentPhase {
 	return c.Cluster.Status.Components[c.GetName()].Phase
 }
 
-func (c *componentBase) status(reqCtx intctrlutil.RequestCtx, cli client.Client, objs []client.Object) error {
+func (c *ComponentBase) StatusImpl(reqCtx intctrlutil.RequestCtx, cli client.Client, objs []client.Object) error {
 	///// ClusterStatusHandler.handleDeletePVCCronJobEvent
 	checkPVCDeletionJobFail := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
 		return false, nil
@@ -322,7 +316,7 @@ func (c *componentBase) status(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	}
 
 	/////// ClusterStatusHandler.handleClusterStatusByEvent
-	//phase, err := c.componentSet.GetPhaseWhenPodsNotReady(reqCtx.Ctx, c.GetName())
+	//phase, err := c.ComponentSet.GetPhaseWhenPodsNotReady(ReqCtx.Ctx, c.GetName())
 	//if err != nil {
 	//	return err
 	//}
@@ -333,20 +327,20 @@ func (c *componentBase) status(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	for _, obj := range objs {
 		///// WorkloadController.handleWorkloadUpdate
 		// patch role labels and update roles in component status
-		if vertexes, err := c.componentSet.HandleRoleChange(reqCtx.Ctx, obj); err != nil {
+		if vertexes, err := c.ComponentSet.HandleRoleChange(reqCtx.Ctx, obj); err != nil {
 			return err
 		} else if vertexes != nil {
 			for v := range vertexes {
-				c.dag.AddVertex(v)
+				c.Dag.AddVertex(v)
 			}
 		}
 
 		// restart pod if needed
-		if vertexes, err := c.componentSet.HandleRestart(reqCtx.Ctx, obj); err != nil {
+		if vertexes, err := c.ComponentSet.HandleRestart(reqCtx.Ctx, obj); err != nil {
 			return err
 		} else if vertexes != nil {
 			for v := range vertexes {
-				c.dag.AddVertex(v)
+				c.Dag.AddVertex(v)
 			}
 		}
 
@@ -368,20 +362,20 @@ func (c *componentBase) status(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	return nil
 }
 
-func (c *componentBase) rebuildLatestStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) (*appsv1alpha1.ClusterComponentStatus, error) {
+func (c *ComponentBase) rebuildLatestStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) (*appsv1alpha1.ClusterComponentStatus, error) {
 	pods, err := util.ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
 
-	isRunning, err := c.componentSet.IsRunning(reqCtx.Ctx, obj)
+	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, obj)
 	if err != nil {
 		return nil, err
 	}
 
 	var podsReady *bool
 	if c.Component.Replicas > 0 {
-		podsReadyForComponent, err := c.componentSet.PodsReady(reqCtx.Ctx, obj)
+		podsReadyForComponent, err := c.ComponentSet.PodsReady(reqCtx.Ctx, obj)
 		if err != nil {
 			return nil, err
 		}
@@ -398,7 +392,7 @@ func (c *componentBase) rebuildLatestStatus(reqCtx intctrlutil.RequestCtx, cli c
 		if podsReady != nil && *podsReady {
 			// check if the role probe timed out when component phase is not Running but all pods of component are ready.
 			// TODO(refactor): wait = true
-			c.componentSet.HandleProbeTimeoutWhenPodsReady(pstatus, pods)
+			c.ComponentSet.HandleProbeTimeoutWhenPodsReady(pstatus, pods)
 		} else {
 			hasTimedOutPod, pstatus.Message, err = hasFailedAndTimedOutPod(pods)
 			if err != nil {
@@ -417,7 +411,7 @@ func (c *componentBase) rebuildLatestStatus(reqCtx intctrlutil.RequestCtx, cli c
 }
 
 // updateComponentsPhase updates the component status Phase etc. into the cluster.Status.Components map.
-func (c *componentBase) rebuildComponentStatus(reqCtx intctrlutil.RequestCtx,
+func (c *ComponentBase) rebuildComponentStatus(reqCtx intctrlutil.RequestCtx,
 	running bool,
 	podsAreReady *bool,
 	hasFailedPodTimedOut bool,
@@ -426,7 +420,7 @@ func (c *componentBase) rebuildComponentStatus(reqCtx intctrlutil.RequestCtx,
 		// if no operation is running in cluster or failed pod timed out,
 		// means the component is Failed or Abnormal.
 		if slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), c.Cluster.Status.Phase) || hasFailedPodTimedOut {
-			if phase, err := c.componentSet.GetPhaseWhenPodsNotReady(reqCtx.Ctx, c.GetName()); err != nil {
+			if phase, err := c.ComponentSet.GetPhaseWhenPodsNotReady(reqCtx.Ctx, c.GetName()); err != nil {
 				return err
 			} else if phase != "" {
 				status.Phase = phase
@@ -456,7 +450,7 @@ func (c *componentBase) rebuildComponentStatus(reqCtx intctrlutil.RequestCtx,
 // handleRestoreGarbageBeforeRunning handles the garbage for restore before cluster phase changes to Running.
 // @return ErrNoOps if no operation
 // Deprecated: to be removed by PITR feature.
-func (c *componentBase) handleGarbageOfRestoreBeforeRunning() error {
+func (c *ComponentBase) HandleGarbageOfRestoreBeforeRunning() error {
 	clusterBackupResourceMap, err := getClusterBackupSourceMap(c.GetCluster())
 	if err != nil {
 		return err
@@ -479,9 +473,9 @@ func (c *componentBase) handleGarbageOfRestoreBeforeRunning() error {
 }
 
 // removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
-func (c *componentBase) removeStsInitContainerForRestore(backupName string) error {
+func (c *ComponentBase) removeStsInitContainerForRestore(backupName string) error {
 	doRemoveInitContainers := false
-	for _, vertex := range c.workloadVertexs {
+	for _, vertex := range c.WorkloadVertexs {
 		sts := vertex.Obj.(*appsv1.StatefulSet)
 		initContainers := sts.Spec.Template.Spec.InitContainers
 		restoreInitContainerName := component.GetRestoredInitContainerName(backupName)
@@ -501,7 +495,7 @@ func (c *componentBase) removeStsInitContainerForRestore(backupName string) erro
 	}
 	if doRemoveInitContainers {
 		// if need to remove init container, reset component to Creating.
-		c.setStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
+		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
 	}
 	return nil
 }
@@ -591,4 +585,15 @@ func isExistsEventMsg(compStatusMessage map[string]string, event *corev1.Event) 
 		return strings.Contains(message, event.Message)
 	}
 
+}
+
+// getClusterBackupSourceMap gets the backup source map from cluster.annotations
+func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string, error) {
+	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	if len(compBackupMapString) == 0 {
+		return nil, nil
+	}
+	compBackupMap := map[string]string{}
+	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
+	return compBackupMap, err
 }

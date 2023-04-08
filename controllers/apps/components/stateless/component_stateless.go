@@ -14,13 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package lifecycle
+package stateless
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"reflect"
 	"strings"
 
@@ -29,11 +27,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func newStatelessComponent(cli client.Client,
+func NewStatelessComponent(cli client.Client,
 	definition *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ClusterComponentDefinition,
@@ -41,84 +41,56 @@ func newStatelessComponent(cli client.Client,
 	compSpec *appsv1alpha1.ClusterComponentSpec,
 	dag *graph.DAG) *statelessComponent {
 	return &statelessComponent{
-		componentBase: componentBase{
-			client:     cli,
+		ComponentBase: types.ComponentBase{
+			Client:     cli,
 			Definition: definition,
 			Cluster:    cluster,
 			CompDef:    compDef,
 			CompVer:    compVer,
 			CompSpec:   compSpec,
 			Component:  nil,
-			componentSet: &stateless.Stateless{
+			ComponentSet: &Stateless{
 				Cli:          cli,
 				Cluster:      cluster,
 				Component:    compSpec,
 				ComponentDef: compDef,
 			},
-			workloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
-			dag:             dag,
+			Dag:             dag,
+			WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
 		},
 	}
 }
 
 type statelessComponent struct {
-	componentBase
-}
-
-type statelessComponentWorkloadBuilder struct {
-	componentWorkloadBuilderBase
-	workload *appsv1.Deployment
-}
-
-func (b *statelessComponentWorkloadBuilder) mutableWorkload(_ int32) client.Object {
-	return b.workload
-}
-
-func (b *statelessComponentWorkloadBuilder) mutableRuntime(_ int32) *corev1.PodSpec {
-	return &b.workload.Spec.Template.Spec
-}
-
-func (b *statelessComponentWorkloadBuilder) buildWorkload(_ int32) componentWorkloadBuilder {
-	buildfn := func() ([]client.Object, error) {
-		deploy, err := builder.BuildDeployLow(b.reqCtx, b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
-		if err != nil {
-			return nil, err
-		}
-
-		b.workload = deploy
-
-		return nil, nil // don't return deployment here
-	}
-	return b.buildWrapper(buildfn)
+	types.ComponentBase
 }
 
 func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, action *ictrltypes.LifecycleAction) error {
-	if err := c.composeSynthesizedComponent(reqCtx, cli); err != nil {
+	if err := c.ComposeSynthesizedComponent(reqCtx, cli); err != nil {
 		return err
 	}
-
 	builder := &statelessComponentWorkloadBuilder{
-		componentWorkloadBuilderBase: componentWorkloadBuilderBase{
-			reqCtx:        reqCtx,
-			client:        cli,
-			comp:          c,
-			defaultAction: action,
-			error:         nil,
-			envConfig:     nil,
+		ComponentWorkloadBuilderBase: types.ComponentWorkloadBuilderBase{
+			ReqCtx:        reqCtx,
+			Client:        cli,
+			Comp:          c,
+			DefaultAction: action,
+			Error:         nil,
+			EnvConfig:     nil,
 		},
 		workload: nil,
 	}
-	builder.concreteBuilder = builder
+	builder.ConcreteBuilder = builder
 
-	return builder.buildEnv().
-		buildWorkload(0).
-		buildHeadlessService().
-		buildConfig(0).
-		buildTLSVolume(0).
-		buildVolumeMount(0).
-		buildService().
-		buildTLSCert().
-		complete()
+	return builder.BuildEnv().
+		BuildWorkload(0).
+		BuildHeadlessService().
+		BuildConfig(0).
+		BuildTLSVolume(0).
+		BuildVolumeMount(0).
+		BuildService().
+		BuildTLSCert().
+		Complete()
 }
 
 func (c *statelessComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -126,7 +98,7 @@ func (c *statelessComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *statelessComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
-	if stsList, err := listDeployOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels()); err != nil {
+	if stsList, err := util.ListDeployOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels()); err != nil {
 		return false, err
 	} else {
 		return len(stsList) > 0, nil // component.replica can not be zero
@@ -146,11 +118,11 @@ func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 			c.Cluster.Name, c.CompSpec.Name)
 	}
 
-	if err := c.validateObjectsAction(); err != nil {
+	if err := c.ValidateObjectsAction(); err != nil {
 		return err
 	}
 
-	c.setStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
+	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
 
 	return nil
 }
@@ -178,7 +150,7 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
-	return c.resolveObjectsAction(reqCtx, cli)
+	return c.ResolveObjectsAction(reqCtx, cli)
 }
 
 func (c *statelessComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -187,7 +159,7 @@ func (c *statelessComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Cl
 }
 
 func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.composeSynthesizedComponent(reqCtx, cli); err != nil {
+	if err := c.ComposeSynthesizedComponent(reqCtx, cli); err != nil {
 		return err
 	}
 	deploy, err := c.runningWorkload(reqCtx, cli)
@@ -198,7 +170,7 @@ func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		}
 		return err
 	}
-	return c.status(reqCtx, cli, []client.Object{deploy})
+	return c.StatusImpl(reqCtx, cli, []client.Object{deploy})
 }
 
 func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -225,7 +197,7 @@ func (c *statelessComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.C
 	if err != nil {
 		return err
 	}
-	return restartPod(&deploy.Spec.Template)
+	return util.RestartPod(&deploy.Spec.Template)
 }
 
 func (c *statelessComponent) Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -233,7 +205,7 @@ func (c *statelessComponent) Snapshot(reqCtx intctrlutil.RequestCtx, cli client.
 }
 
 func (c *statelessComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.Deployment, error) {
-	deployList, err := listDeployOwnedByComponent(reqCtx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	deployList, err := util.ListDeployOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +236,7 @@ func (c *statelessComponent) updateUnderlyingResources(reqCtx intctrlutil.Reques
 
 	c.updateWorkload(deployObj)
 
-	if err := c.updateService(reqCtx, cli); err != nil {
+	if err := c.UpdateService(reqCtx, cli); err != nil {
 		return err
 	}
 
@@ -273,13 +245,13 @@ func (c *statelessComponent) updateUnderlyingResources(reqCtx intctrlutil.Reques
 
 func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	deployObjCopy := deployObj.DeepCopy()
-	deployProto := c.workloadVertexs[0].Obj.(*appsv1.Deployment)
+	deployProto := c.WorkloadVertexs[0].Obj.(*appsv1.Deployment)
 
-	mergeAnnotations(deployObj.Spec.Template.Annotations, &deployProto.Spec.Template.Annotations)
+	util.MergeAnnotations(deployObj.Spec.Template.Annotations, &deployProto.Spec.Template.Annotations)
 	deployObjCopy.Spec = deployProto.Spec
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
-		c.workloadVertexs[0].Obj = deployObjCopy
-		c.workloadVertexs[0].Action = ictrltypes.ActionUpdatePtr()
-		c.setStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase)
+		c.WorkloadVertexs[0].Obj = deployObjCopy
+		c.WorkloadVertexs[0].Action = ictrltypes.ActionUpdatePtr()
+		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase)
 	}
 }

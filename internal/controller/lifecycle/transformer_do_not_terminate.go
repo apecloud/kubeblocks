@@ -25,7 +25,7 @@ import (
 type doNotTerminateTransformer struct{}
 
 func (d *doNotTerminateTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
+	rootVertex, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func (d *doNotTerminateTransformer) Transform(dag *graph.DAG) error {
 	if cluster.Spec.TerminationPolicy != appsv1alpha1.DoNotTerminate {
 		return nil
 	}
-	vertices := findAllNot[*appsv1alpha1.Cluster](dag)
+	vertices := ictrltypes.FindAllNot[*appsv1alpha1.Cluster](dag)
 	for _, vertex := range vertices {
 		v, _ := vertex.(*ictrltypes.LifecycleVertex)
 		v.Immutable = true

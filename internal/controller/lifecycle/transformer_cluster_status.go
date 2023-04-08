@@ -75,7 +75,7 @@ func newClusterStatusTransformer(ctx intctrlutil.RequestCtx,
 	}
 }
 func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
+	rootVertex, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
@@ -119,10 +119,6 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 			rootVertex.Action = ictrltypes.ActionPtr(ictrltypes.STATUS)
 			rootVertex.Immutable = reflect.DeepEqual(cluster.Status, origCluster.Status)
 		}()
-		//// checks if the controller is handling the garbage of restore.
-		//if err := c.handleGarbageOfRestoreBeforeRunning(cluster); err != nil {
-		//	return err
-		//}
 		// reconcile the phase and conditions of the Cluster.status
 		if err := c.reconcileClusterStatus(cluster, rootVertex); err != nil {
 			return err
@@ -309,82 +305,6 @@ func (c *clusterStatusTransformer) cleanupAnnotationsAfterRunning(cluster *appsv
 	}
 	delete(cluster.Annotations, constant.RestoreFromBackUpAnnotationKey)
 }
-
-//
-//// REVIEW: this handling is rather hackish, call for refactor.
-//// handleRestoreGarbageBeforeRunning handles the garbage for restore before cluster phase changes to Running.
-//// @return ErrNoOps if no operation
-//// Deprecated: to be removed by PITR feature.
-//func (c *clusterStatusTransformer) handleGarbageOfRestoreBeforeRunning(cluster *appsv1alpha1.Cluster) error {
-//	clusterBackupResourceMap, err := getClusterBackupSourceMap(cluster)
-//	if err != nil {
-//		return err
-//	}
-//	if clusterBackupResourceMap == nil {
-//		return nil
-//	}
-//	// check if all components are running.
-//	for _, v := range cluster.Status.Components {
-//		if v.Phase != appsv1alpha1.RunningClusterCompPhase {
-//			return nil
-//		}
-//	}
-//	// remove the garbage for restore if the cluster restores from backup.
-//	return c.removeGarbageWithRestore(cluster, clusterBackupResourceMap)
-//}
-//
-//// REVIEW: this handling is rather hackish, call for refactor.
-//// removeGarbageWithRestore removes the garbage for restore when all components are Running.
-//// @return ErrNoOps if no operation
-//// Deprecated:
-//func (c *clusterStatusTransformer) removeGarbageWithRestore(
-//	cluster *appsv1alpha1.Cluster,
-//	clusterBackupResourceMap map[string]string) error {
-//	var (
-//		err error
-//	)
-//	for k, v := range clusterBackupResourceMap {
-//		// remove the init container for restore
-//		if _, err = c.removeStsInitContainerForRestore(cluster, k, v); err != nil {
-//			return err
-//		}
-//	}
-//	return nil
-//}
-//
-//// removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
-//func (c *clusterStatusTransformer) removeStsInitContainerForRestore(
-//	cluster *appsv1alpha1.Cluster,
-//	componentName,
-//	backupName string) (bool, error) {
-//	// get the sts list of component
-//	stsList := &appsv1.StatefulSetList{}
-//	if err := util.GetObjectListByComponentName(c.ctx.Ctx, c.cli, *cluster, stsList, componentName); err != nil {
-//		return false, err
-//	}
-//	var doRemoveInitContainers bool
-//	for _, sts := range stsList.Items {
-//		initContainers := sts.Spec.Template.Spec.InitContainers
-//		restoreInitContainerName := component.GetRestoredInitContainerName(backupName)
-//		restoreInitContainerIndex, _ := intctrlutil.GetContainerByName(initContainers, restoreInitContainerName)
-//		if restoreInitContainerIndex == -1 {
-//			continue
-//		}
-//		doRemoveInitContainers = true
-//		initContainers = append(initContainers[:restoreInitContainerIndex], initContainers[restoreInitContainerIndex+1:]...)
-//		sts.Spec.Template.Spec.InitContainers = initContainers
-//		if err := c.cli.Update(c.ctx.Ctx, &sts); err != nil {
-//			return false, err
-//		}
-//	}
-//	if doRemoveInitContainers {
-//		// if need to remove init container, reset component to Creating.
-//		compStatus := cluster.Status.Components[componentName]
-//		compStatus.Phase = appsv1alpha1.CreatingClusterCompPhase
-//		cluster.Status.Components[componentName] = compStatus
-//	}
-//	return doRemoveInitContainers, nil
-//}
 
 // handleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.
 // REVIEW: seem duplicated handling

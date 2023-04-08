@@ -18,7 +18,7 @@ package operations
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -348,7 +348,7 @@ func podIsFailedDuringOperation(
 // podProcessedSuccessful checks if the pod has been processed successfully:
 // 1. the pod is recreated after OpsRequest.status.startTime and pod is available.
 // 2. the component is running and pod is available.
-func podProcessedSuccessful(componentImpl lifecycle.ComponentSet,
+func podProcessedSuccessful(componentImpl types.ComponentSet,
 	opsStartTime metav1.Time,
 	pod *corev1.Pod,
 	minReadySeconds int32,

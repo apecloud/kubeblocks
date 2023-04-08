@@ -22,7 +22,7 @@ kbcli class create [NAME] [flags]
 
 ```
       --class-family string         Specify class family
-      --cluster-definition string   Specify cluster definition, run "kbcli cluster-definition list" to show all available cluster definition
+      --cluster-definition string   Specify cluster definition, run "kbcli clusterdefinition list" to show all available cluster definition
       --cpu string                  Specify component cpu cores
       --file string                 Specify file path which contains YAML definition of class
   -h, --help                        help for create

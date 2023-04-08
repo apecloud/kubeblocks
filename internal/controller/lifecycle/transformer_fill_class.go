@@ -86,10 +86,10 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 
 	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*class.ComponentClass) *class.ComponentClass {
 		filters := class.Filters(make(map[string]resource.Quantity))
-		if comp.Resources.Requests.Cpu() != nil {
+		if !comp.Resources.Requests.Cpu().IsZero() {
 			filters[corev1.ResourceCPU.String()] = *comp.Resources.Requests.Cpu()
 		}
-		if comp.Resources.Requests.Memory() != nil {
+		if !comp.Resources.Requests.Memory().IsZero() {
 			filters[corev1.ResourceMemory.String()] = *comp.Resources.Requests.Memory()
 		}
 		return class.ChooseComponentClasses(classes, filters)

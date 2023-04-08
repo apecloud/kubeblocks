@@ -83,7 +83,7 @@ func (m ByModelList) Swap(i, j int) {
 	m[i], m[j] = m[j], m[i]
 }
 
-type ComponentClass struct {
+type ComponentClassInstance struct {
 	Name    string            `json:"name,omitempty"`
 	CPU     resource.Quantity `json:"cpu,omitempty"`
 	Memory  resource.Quantity `json:"memory,omitempty"`
@@ -91,9 +91,19 @@ type ComponentClass struct {
 	Family  string            `json:"-"`
 }
 
+type Disk struct {
+	Name  string            `json:"name,omitempty"`
+	Size  resource.Quantity `json:"size,omitempty"`
+	Class string            `json:"class,omitempty"`
+}
+
+func (d Disk) String() string {
+	return fmt.Sprintf("%s=%s", d.Name, d.Size.String())
+}
+
 var _ sort.Interface = ByClassCPUAndMemory{}
 
-type ByClassCPUAndMemory []*ComponentClass
+type ByClassCPUAndMemory []*ComponentClassInstance
 
 func (b ByClassCPUAndMemory) Len() int {
 	return len(b)
@@ -123,46 +133,4 @@ func (f Filters) String() string {
 		result = append(result, fmt.Sprintf("%s=%v", k, v.Value()))
 	}
 	return strings.Join(result, ",")
-}
-
-type Disk struct {
-	Name  string            `json:"name,omitempty"`
-	Size  resource.Quantity `json:"size,omitempty"`
-	Class string            `json:"class,omitempty"`
-}
-
-func (d Disk) String() string {
-	return fmt.Sprintf("%s=%s", d.Name, d.Size.String())
-}
-
-type ProviderComponentClassDef struct {
-	Provider string   `json:"provider,omitempty"`
-	Args     []string `json:"args,omitempty"`
-}
-
-type DiskDef struct {
-	Name  string `json:"name,omitempty"`
-	Size  string `json:"size,omitempty"`
-	Class string `json:"class,omitempty"`
-}
-
-type ComponentClassDef struct {
-	Name     string                      `json:"name,omitempty"`
-	CPU      string                      `json:"cpu,omitempty"`
-	Memory   string                      `json:"memory,omitempty"`
-	Storage  []DiskDef                   `json:"storage,omitempty"`
-	Args     []string                    `json:"args,omitempty"`
-	Variants []ProviderComponentClassDef `json:"variants,omitempty"`
-}
-
-type ComponentClassSeriesDef struct {
-	Name    string              `json:"name,omitempty"`
-	Classes []ComponentClassDef `json:"classes,omitempty"`
-}
-
-type ComponentClassFamilyDef struct {
-	Family   string                    `json:"family"`
-	Template string                    `json:"template,omitempty"`
-	Vars     []string                  `json:"vars,omitempty"`
-	Series   []ComponentClassSeriesDef `json:"series,omitempty"`
 }

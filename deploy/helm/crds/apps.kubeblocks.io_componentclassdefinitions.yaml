@@ -1,0 +1,122 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  name: componentclassdefinitions.apps.kubeblocks.io
+spec:
+  group: apps.kubeblocks.io
+  names:
+    kind: ComponentClassDefinition
+    listKind: ComponentClassDefinitionList
+    plural: componentclassdefinitions
+    singular: componentclassdefinition
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ComponentClassDefinition is the Schema for the componentclassdefinitions
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ComponentClassDefinitionSpec defines the desired state of
+              ComponentClassDefinition
+            properties:
+              groups:
+                description: The class definition groups
+                items:
+                  properties:
+                    classConstraintRef:
+                      description: ClassConstraintRef reference to the class constraint
+                        object
+                      type: string
+                    series:
+                      description: Class Series
+                      items:
+                        properties:
+                          classes:
+                            items:
+                              properties:
+                                args:
+                                  description: class variables
+                                  items:
+                                    type: string
+                                  type: array
+                                cpu:
+                                  description: the CPU of the class
+                                  type: string
+                                memory:
+                                  description: the memory of the class
+                                  type: string
+                                name:
+                                  description: class name
+                                  type: string
+                                storage:
+                                  description: the storage of the class
+                                  items:
+                                    properties:
+                                      class:
+                                        type: string
+                                      name:
+                                        type: string
+                                      size:
+                                        type: string
+                                    type: object
+                                  type: array
+                                variants:
+                                  description: the variants of the class in different
+                                    clouds.
+                                  items:
+                                    properties:
+                                      args:
+                                        description: cloud provider specific variables
+                                        items:
+                                          type: string
+                                        type: array
+                                      provider:
+                                        description: cloud provider name
+                                        type: string
+                                    type: object
+                                  type: array
+                              type: object
+                            type: array
+                          name:
+                            description: class name generator, following golang template
+                            type: string
+                        type: object
+                      type: array
+                    template:
+                      description: Template for the class definition
+                      type: string
+                    vars:
+                      description: Template variables
+                      items:
+                        type: string
+                      type: array
+                  type: object
+                type: array
+            type: object
+          status:
+            description: ComponentClassDefinitionStatus defines the observed state
+              of ComponentClassDefinition
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

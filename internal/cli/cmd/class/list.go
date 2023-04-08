@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -35,7 +35,7 @@ import (
 type ListOptions struct {
 	ClusterDefRef string
 	Factory       cmdutil.Factory
-	client        *kubernetes.Clientset
+	dynamic       dynamic.Interface
 	genericclioptions.IOStreams
 }
 
@@ -62,23 +62,20 @@ func NewListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 
 func (o *ListOptions) complete(f cmdutil.Factory) error {
 	var err error
-	o.client, err = f.KubernetesClientSet()
-	if err != nil {
-		return err
-	}
+	o.dynamic, err = f.DynamicClient()
 	return err
 }
 
 func (o *ListOptions) run() error {
-	componentClasses, err := class.GetClasses(o.client, o.ClusterDefRef)
+	componentClasses, err := class.GetClasses(o.dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
-	familyClassMap := make(map[string]map[string][]*class.ComponentClass)
+	familyClassMap := make(map[string]map[string][]*class.ComponentClassInstance)
 	for compName, items := range componentClasses {
 		for _, item := range items {
 			if _, ok := familyClassMap[item.Family]; !ok {
-				familyClassMap[item.Family] = make(map[string][]*class.ComponentClass)
+				familyClassMap[item.Family] = make(map[string][]*class.ComponentClassInstance)
 			}
 			familyClassMap[item.Family][compName] = append(familyClassMap[item.Family][compName], item)
 		}
@@ -97,7 +94,7 @@ func (o *ListOptions) run() error {
 	return nil
 }
 
-func (o *ListOptions) printClassFamily(family string, compName string, classes []*class.ComponentClass) {
+func (o *ListOptions) printClassFamily(family string, compName string, classes []*class.ComponentClassInstance) {
 	tbl := printer.NewTablePrinter(o.Out)
 	_, _ = fmt.Fprintf(o.Out, "\nFamily %s:\n", family)
 	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY", "STORAGE")

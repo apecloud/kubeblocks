@@ -18,19 +18,12 @@ package class
 
 import (
 	"bytes"
-	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
-	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -40,7 +33,6 @@ import (
 var _ = Describe("create", func() {
 	var (
 		o       *CreateOptions
-		cd      *appsv1alpha1.ClusterDefinition
 		out     *bytes.Buffer
 		tf      *cmdtesting.TestFactory
 		streams genericclioptions.IOStreams
@@ -53,42 +45,15 @@ var _ = Describe("create", func() {
 	}
 
 	BeforeEach(func() {
-		cd = testing.FakeClusterDef()
-
 		streams, _, out, _ = genericclioptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
-
-		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		httpResp := func(obj runtime.Object) *http.Response {
-			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
-		}
-		cms := testing.FakeComponentClassDef(cd, classDef)
-
-		resources := map[string]runtime.Object{
-			"/api/v1/configmaps": cms,
-		}
-
-		tf.UnstructuredClient = &clientfake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Group: "core", Version: "v1"},
-			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				if req.Method == "POST" {
-					return httpResp(&corev1.ConfigMap{}), nil
-				}
-				resource, ok := resources[req.URL.Path]
-				if !ok {
-					return nil, errors.NewNotFound(schema.GroupResource{}, req.URL.Path)
-				}
-				return httpResp(resource), nil
-			}),
-		}
-		tf.Client = tf.UnstructuredClient
-		tf.FakeDynamicClient = testing.FakeDynamicClient(&generalClassFamily, &memoryOptimizedClassFamily, cd)
+		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
+		tf.FakeDynamicClient = testing.FakeDynamicClient(&classDef, &generalClassFamily, &memoryOptimizedClassFamily)
 
 		o = &CreateOptions{
 			Factory:       tf,
 			IOStreams:     streams,
-			ClusterDefRef: cd.Name,
+			ClusterDefRef: "apecloud-mysql",
 			ComponentType: testing.ComponentDefName,
 		}
 		Expect(o.complete(tf)).ShouldNot(HaveOccurred())

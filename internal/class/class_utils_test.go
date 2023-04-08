@@ -30,15 +30,15 @@ var _ = Describe("utils", func() {
 		cpuMin  = 1
 		cpuMax  = 64
 		scales  = []int{4, 8, 16}
-		classes map[string]*ComponentClass
+		classes map[string]*ComponentClassInstance
 	)
 
-	genComponentClasses := func(cpuMin int, cpuMax int, scales []int) map[string]*ComponentClass {
-		results := make(map[string]*ComponentClass)
+	genComponentClasses := func(cpuMin int, cpuMax int, scales []int) map[string]*ComponentClassInstance {
+		results := make(map[string]*ComponentClassInstance)
 		for cpu := cpuMin; cpu <= cpuMax; cpu++ {
 			for _, scale := range scales {
 				name := fmt.Sprintf("cpu-%d-scale-%d", cpu, scale)
-				results[name] = &ComponentClass{
+				results[name] = &ComponentClassInstance{
 					Name:   name,
 					CPU:    resource.MustParse(fmt.Sprintf("%d", cpu)),
 					Memory: resource.MustParse(fmt.Sprintf("%dGi", cpu*scale)),

@@ -22,23 +22,78 @@ import (
 
 // ComponentClassDefinitionSpec defines the desired state of ComponentClassDefinition
 type ComponentClassDefinitionSpec struct {
+	// The class definition groups
+	// +optional
 	Groups []ComponentClassGroup `json:"groups,omitempty"`
 }
 
 type ComponentClassGroup struct {
-	ClassConstraintRef string                 `json:"classConstraintRef,omitempty"`
-	Template           string                 `json:"template,omitempty"`
-	Vars               []string               `json:"vars,omitempty"`
-	Series             []ComponentClassSeries `json:"series,omitempty"`
+	// ClassConstraintRef reference to the class constraint object
+	// +required
+	ClassConstraintRef string `json:"classConstraintRef,omitempty"`
+
+	// Template for the class definition
+	// +optional
+	Template string `json:"template,omitempty"`
+
+	// Template variables
+	// +optional
+	Vars []string `json:"vars,omitempty"`
+
+	// Class Series
+	// +optional
+	Series []ComponentClassSeries `json:"series,omitempty"`
 }
 
 type ComponentClassSeries struct {
-	Name    string           `json:"name,omitempty"`
+	// class name generator, following golang template
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// +optional
 	Classes []ComponentClass `json:"classes,omitempty"`
 }
 
 type ComponentClass struct {
+	// class name
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// class variables
+	// +optional
 	Args []string `json:"args,omitempty"`
+
+	// the CPU of the class
+	// +optional
+	CPU string `json:"cpu,omitempty"`
+
+	// the memory of the class
+	// +optional
+	Memory string `json:"memory,omitempty"`
+
+	// the storage of the class
+	// +optional
+	Storage []DiskDef `json:"storage,omitempty"`
+
+	// the variants of the class in different clouds.
+	// +optional
+	Variants []ProviderComponentClassDef `json:"variants,omitempty"`
+}
+
+type ProviderComponentClassDef struct {
+	// cloud provider name
+	// +required
+	Provider string `json:"provider,omitempty"`
+
+	// cloud provider specific variables
+	// +optional
+	Args []string `json:"args,omitempty"`
+}
+
+type DiskDef struct {
+	Name  string `json:"name,omitempty"`
+	Size  string `json:"size,omitempty"`
+	Class string `json:"class,omitempty"`
 }
 
 // ComponentClassDefinitionStatus defines the observed state of ComponentClassDefinition

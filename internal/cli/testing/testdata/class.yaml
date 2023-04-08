@@ -1,61 +1,70 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ComponentClassDefinition
+metadata:
+  name: kb.classes.default.apecloud-mysql.mysql
+  labels:
+    class.kubeblocks.io/provider: kubeblocks
+    apps.kubeblocks.io/component-def-ref: mysql
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+spec:
+  groups:
+  - # class family name, such as general, memory-optimized, cpu-optimized etc.
+    classConstraintRef: kb-class-family-general
+    # class schema template, you can set default resource values here
+    template: |
+      cpu: "{{ or .cpu 1 }}"
+      memory: "{{ or .memory 4 }}Gi"
+      storage:
+      - name: data
+        size: "{{ or .dataStorageSize 10 }}Gi"
+      - name: log
+        size: "{{ or .logStorageSize 1 }}Gi"
+    # class schema template variables
+    vars: [ cpu, memory, dataStorageSize, logStorageSize ]
+    series:
+    - # class name generator, you can reference variables in class schema template
+      # it's also ok to define static class name in following class definitions
+      name: "general-{{ .cpu }}c{{ .memory }}g"
 
-- # class family name, such as general, memory-optimized, cpu-optimized etc.
-  family: kb-class-family-general
-  # class schema template, you can set default resource values here
-  template: |
-    cpu: "{{ or .cpu 1 }}"
-    memory: "{{ or .memory 4 }}Gi"
-    storage:
-    - name: data
-      size: "{{ or .dataStorageSize 10 }}Gi"
-    - name: log
-      size: "{{ or .logStorageSize 1 }}Gi"
-  # class schema template variables
-  vars: [cpu, memory, dataStorageSize, logStorageSize]
-  series:
-  - # class name generator, you can reference variables in class schema template
-    # it's also ok to define static class name in following class definitions
-    name: "general-{{ .cpu }}c{{ .memory }}g"
+      # class definitions, we support two kinds of class definitions:
+      # 1. define arguments for class schema variables, class schema will be dynamically generated
+      # 2. statically define complete class schema
+      classes:
+      - args: [ 1, 1, 100, 10 ]
+      - args: [ 2, 2, 100, 10 ]
+      - args: [ 2, 4, 100, 10 ]
+      - args: [ 2, 8, 100, 10 ]
+      - args: [ 4, 16, 100, 10 ]
+      - args: [ 8, 32, 100, 10 ]
+      - args: [ 16, 64, 200, 10 ]
+      - args: [ 32, 128, 200, 10 ]
+      - args: [ 64, 256, 200, 10 ]
+      - args: [ 128, 512, 200, 10 ]
 
-    # class definitions, we support two kinds of class definitions:
-    # 1. define arguments for class schema variables, class schema will be dynamically generated
-    # 2. statically define complete class schema
-    classes:
-    - args: [1, 1, 100, 10]
-    - args: [2, 2, 100, 10]
-    - args: [2, 4, 100, 10]
-    - args: [2, 8, 100, 10]
-    - args: [4, 16, 100, 10]
-    - args: [8, 32, 100, 10]
-    - args: [16, 64, 200, 10]
-    - args: [32, 128, 200, 10]
-    - args: [64, 256, 200, 10]
-    - args: [128, 512, 200, 10]
-
-- family: kb-class-family-memory-optimized
-  template: |
-    cpu: "{{ or .cpu 1 }}"
-    memory: "{{ or .memory 8 }}Gi"
-    storage:
-    - name: data
-      size: "{{ or .dataStorageSize 10 }}Gi"
-    - name: log
-      size: "{{ or .logStorageSize 1 }}Gi"
-  vars: [cpu, memory, dataStorageSize, logStorageSize]
-  series:
-  - name: "mo-{{ .cpu }}c{{ .memory }}g"
-    classes:
-    - args: [2, 16, 100, 10]
-    - args: [4, 32, 100, 10]
-    - args: [8, 64, 100, 10]
-    - args: [12, 96, 100, 10]
-    - args: [24, 192, 200, 10]
-    - args: [48, 384, 200, 10]
-    - args: [2, 32, 100, 10]
-    - args: [4, 64, 100, 10]
-    - args: [8, 128, 100, 10]
-    - args: [16, 256, 100, 10]
-    - args: [32, 512, 200, 10]
-    - args: [48, 768, 200, 10]
-    - args: [64, 1024, 200, 10]
-    - args: [128, 2048, 200, 10]
+  - classConstraintRef: kb-class-family-memory-optimized
+    template: |
+      cpu: "{{ or .cpu 1 }}"
+      memory: "{{ or .memory 8 }}Gi"
+      storage:
+      - name: data
+        size: "{{ or .dataStorageSize 10 }}Gi"
+      - name: log
+        size: "{{ or .logStorageSize 1 }}Gi"
+    vars: [ cpu, memory, dataStorageSize, logStorageSize ]
+    series:
+    - name: "mo-{{ .cpu }}c{{ .memory }}g"
+      classes:
+      - args: [ 2, 16, 100, 10 ]
+      - args: [ 4, 32, 100, 10 ]
+      - args: [ 8, 64, 100, 10 ]
+      - args: [ 12, 96, 100, 10 ]
+      - args: [ 24, 192, 200, 10 ]
+      - args: [ 48, 384, 200, 10 ]
+      - args: [ 2, 32, 100, 10 ]
+      - args: [ 4, 64, 100, 10 ]
+      - args: [ 8, 128, 100, 10 ]
+      - args: [ 16, 256, 100, 10 ]
+      - args: [ 32, 512, 200, 10 ]
+      - args: [ 48, 768, 200, 10 ]
+      - args: [ 64, 1024, 200, 10 ]
+      - args: [ 128, 2048, 200, 10 ]

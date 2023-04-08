@@ -1,3 +1,19 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package lifecycle
 
 import (
@@ -36,7 +52,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	var (
 		value                 = cluster.GetAnnotations()[constant.ClassAnnotationKey]
 		componentClassMapping = make(map[string]string)
-		cmList                corev1.ConfigMapList
+		classDefinitionList   appsv1alpha1.ComponentClassDefinitionList
 	)
 	if value != "" {
 		if err := json.Unmarshal([]byte(value), &componentClassMapping); err != nil {
@@ -48,10 +64,10 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefinition.Name},
 		client.HasLabels{constant.ClassProviderLabelKey},
 	}
-	if err := r.cli.List(reqCtx.Ctx, &cmList, cmLabels...); err != nil {
+	if err := r.cli.List(reqCtx.Ctx, &classDefinitionList, cmLabels...); err != nil {
 		return err
 	}
-	compClasses, err := class.ParseClasses(&cmList)
+	compClasses, err := class.ParseClasses(classDefinitionList)
 	if err != nil {
 		return err
 	}
@@ -62,7 +78,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	}
 
 	// TODO use this function to get matched class families if class is not specified and component has no classes
-	_ = func(comp appsv1alpha1.ClusterComponentSpec) *class.ComponentClass {
+	_ = func(comp appsv1alpha1.ClusterComponentSpec) *class.ComponentClassInstance {
 		var candidates []class.ClassModelWithFamilyName
 		for _, family := range classFamilyList.Items {
 			models := family.FindMatchingModels(&comp.Resources)
@@ -76,7 +92,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		sort.Sort(class.ByModelList(candidates))
 		candidate := candidates[0]
 		cpu, memory := class.GetMinCPUAndMemory(candidate.Model)
-		cls := &class.ComponentClass{
+		cls := &class.ComponentClassInstance{
 			Name:   fmt.Sprintf("%s-%vc%vg", candidate.Family, cpu.AsDec().String(), memory.AsDec().String()),
 			CPU:    *cpu,
 			Memory: *memory,
@@ -84,7 +100,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		return cls
 	}
 
-	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*class.ComponentClass) *class.ComponentClass {
+	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*class.ComponentClassInstance) *class.ComponentClassInstance {
 		filters := class.Filters(make(map[string]resource.Quantity))
 		if comp.Resources.Requests.Cpu() != nil {
 			filters[corev1.ResourceCPU.String()] = *comp.Resources.Requests.Cpu()
@@ -98,7 +114,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	for idx, comp := range cluster.Spec.ComponentSpecs {
 		classes := compClasses[comp.ComponentDefRef]
 
-		var cls *class.ComponentClass
+		var cls *class.ComponentClassInstance
 		className, ok := componentClassMapping[comp.Name]
 		// TODO another case if len(classFamilyList.Items) > 0, use matchClassFamilies to find matching class family:
 		switch {
@@ -136,7 +152,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	return nil
 }
 
-func buildVolumeClaimByClass(cls *class.ComponentClass) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
+func buildVolumeClaimByClass(cls *class.ComponentClassInstance) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
 	var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
 	for _, disk := range cls.Storage {
 		volume := appsv1alpha1.ClusterComponentVolumeClaimTemplate{

@@ -73,6 +73,7 @@ const (
 	ResourceOpsRequests              = "opsrequests"
 	ResourceConfigConstraintVersions = "configconstraints"
 	ResourceClassFamily              = "classfamilies"
+	ResourceComponentClassDefinition = "componentclassdefinitions"
 	KindCluster                      = "Cluster"
 	KindClusterDef                   = "ClusterDefinition"
 	KindClusterVersion               = "ClusterVersion"
@@ -97,7 +98,6 @@ const (
 	ServiceHAVIPTypeAnnotationValue = "private-ip"
 	ServiceFloatingIPAnnotationKey  = "service.kubernetes.io/kubeblocks-havip-floating-ip"
 
-	ClassLevelLabelKey          = "class.kubeblocks.io/level"
 	ClassProviderLabelKey       = "class.kubeblocks.io/provider"
 	ClassFamilyProviderLabelKey = "classfamily.kubeblocks.io/provider"
 	ComponentClassAnnotationKey = "cluster.kubeblocks.io/component-class"
@@ -204,6 +204,10 @@ func AddonGVR() schema.GroupVersionResource {
 
 func ClassFamilyGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceClassFamily}
+}
+
+func ComponentClassDefinitionGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceComponentClassDefinition}
 }
 
 func CRDGVR() schema.GroupVersionResource {

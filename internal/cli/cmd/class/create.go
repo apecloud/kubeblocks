@@ -28,12 +28,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -44,7 +46,6 @@ type CreateOptions struct {
 	genericclioptions.IOStreams
 
 	Factory       cmdutil.Factory
-	client        kubernetes.Interface
 	dynamic       dynamic.Interface
 	ClusterDefRef string
 	ClassFamily   string
@@ -116,24 +117,19 @@ func (o *CreateOptions) validate(args []string) error {
 
 func (o *CreateOptions) complete(f cmdutil.Factory) error {
 	var err error
-	if o.client, err = f.KubernetesClientSet(); err != nil {
-		return err
-	}
-	if o.dynamic, err = f.DynamicClient(); err != nil {
-		return err
-	}
-	return nil
+	o.dynamic, err = f.DynamicClient()
+	return err
 }
 
 func (o *CreateOptions) run() error {
-	componentClasses, err := class.GetClasses(o.client, o.ClusterDefRef)
+	componentClasses, err := class.GetClasses(o.dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
 
 	classes, ok := componentClasses[o.ComponentType]
 	if !ok {
-		classes = make(map[string]*class.ComponentClass)
+		classes = make(map[string]*class.ComponentClassInstance)
 	}
 
 	families, err := class.GetClassFamilies(o.dynamic)
@@ -142,12 +138,8 @@ func (o *CreateOptions) run() error {
 	}
 
 	var (
-		// new class definition version key
-		cmK = class.BuildClassDefinitionVersion()
-		// new class definition version value
-		cmV string
-		// newly created class names
-		classNames []string
+		classNames           []string
+		componentClassGroups []v1alpha1.ComponentClassGroup
 	)
 
 	if o.File != "" {
@@ -155,7 +147,13 @@ func (o *CreateOptions) run() error {
 		if err != nil {
 			return err
 		}
-		newClasses, err := class.ParseComponentClasses(map[string]string{cmK: string(data)})
+		if err := yaml.Unmarshal(data, &componentClassGroups); err != nil {
+			return err
+		}
+		classDefinition := v1alpha1.ComponentClassDefinition{
+			Spec: v1alpha1.ComponentClassDefinitionSpec{Groups: componentClassGroups},
+		}
+		newClasses, err := class.ParseComponentClasses(classDefinition)
 		if err != nil {
 			return err
 		}
@@ -168,7 +166,6 @@ func (o *CreateOptions) run() error {
 			}
 			classNames = append(classNames, name)
 		}
-		cmV = string(data)
 	} else {
 		if _, ok = classes[o.ClassName]; ok {
 			return fmt.Errorf("class name conflicted %s", o.ClassName)
@@ -176,44 +173,63 @@ func (o *CreateOptions) run() error {
 		if _, ok = families[o.ClassFamily]; !ok {
 			return fmt.Errorf("family %s is not found", o.ClassFamily)
 		}
-		def, err := o.buildClassFamilyDef()
+		cls, err := o.buildClass()
 		if err != nil {
 			return err
 		}
-		data, err := yaml.Marshal([]*class.ComponentClassFamilyDef{def})
-		if err != nil {
-			return err
+		componentClassGroups = []v1alpha1.ComponentClassGroup{
+			{
+				ClassConstraintRef: o.ClassFamily,
+				Series: []v1alpha1.ComponentClassSeries{
+					{
+						Classes: []v1alpha1.ComponentClass{*cls},
+					},
+				},
+			},
 		}
-		cmV = string(data)
 		classNames = append(classNames, o.ClassName)
 	}
 
-	cmName := class.GetCustomClassConfigMapName(o.ClusterDefRef, o.ComponentType)
-	cm, err := o.client.CoreV1().ConfigMaps(CustomClassNamespace).Get(context.TODO(), cmName, metav1.GetOptions{})
+	cmName := class.GetCustomClassObjectName(o.ClusterDefRef, o.ComponentType)
+	obj, err := o.dynamic.Resource(types.ComponentClassDefinitionGVR()).Get(context.TODO(), cmName, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
+	var classDefinition v1alpha1.ComponentClassDefinition
 	if err == nil {
-		cm.Data[cmK] = cmV
-		if _, err = o.client.CoreV1().ConfigMaps(cm.GetNamespace()).Update(context.TODO(), cm, metav1.UpdateOptions{}); err != nil {
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &classDefinition); err != nil {
+			return err
+		}
+		classDefinition.Spec.Groups = append(classDefinition.Spec.Groups, componentClassGroups...)
+		unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&classDefinition)
+		if err != nil {
+			return err
+		}
+		if _, err = o.dynamic.Resource(types.ComponentClassDefinitionGVR()).Update(
+			context.Background(), &unstructured.Unstructured{Object: unstructuredMap}, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
 	} else {
-		cm = &corev1.ConfigMap{
+		classDefinition = v1alpha1.ComponentClassDefinition{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      class.GetCustomClassConfigMapName(o.ClusterDefRef, o.ComponentType),
-				Namespace: CustomClassNamespace,
+				Name: class.GetCustomClassObjectName(o.ClusterDefRef, o.ComponentType),
 				Labels: map[string]string{
 					constant.ClusterDefLabelKey:           o.ClusterDefRef,
 					types.ClassProviderLabelKey:           "user",
-					types.ClassLevelLabelKey:              "component",
 					constant.KBAppComponentDefRefLabelKey: o.ComponentType,
 				},
 			},
-			Data: map[string]string{cmK: cmV},
+			Spec: v1alpha1.ComponentClassDefinitionSpec{
+				Groups: componentClassGroups,
+			},
 		}
-		if _, err = o.client.CoreV1().ConfigMaps(CustomClassNamespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
+		unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&classDefinition)
+		if err != nil {
+			return err
+		}
+		if _, err = o.dynamic.Resource(types.ComponentClassDefinitionGVR()).Create(
+			context.Background(), &unstructured.Unstructured{Object: unstructuredMap}, metav1.CreateOptions{}); err != nil {
 			return err
 		}
 	}
@@ -221,11 +237,11 @@ func (o *CreateOptions) run() error {
 	return nil
 }
 
-func (o *CreateOptions) buildClassFamilyDef() (*class.ComponentClassFamilyDef, error) {
-	clsDef := class.ComponentClassDef{Name: o.ClassName, CPU: o.CPU, Memory: o.Memory}
+func (o *CreateOptions) buildClass() (*v1alpha1.ComponentClass, error) {
+	cls := v1alpha1.ComponentClass{Name: o.ClassName, CPU: o.CPU, Memory: o.Memory}
 	for _, disk := range o.Storage {
 		kvs := strings.Split(disk, ",")
-		def := class.DiskDef{}
+		diskDef := v1alpha1.DiskDef{}
 		for _, kv := range kvs {
 			parts := strings.Split(kv, "=")
 			if len(parts) != 2 {
@@ -233,27 +249,23 @@ func (o *CreateOptions) buildClassFamilyDef() (*class.ComponentClassFamilyDef, e
 			}
 			switch parts[0] {
 			case "name":
-				def.Name = parts[1]
+				diskDef.Name = parts[1]
 			case "size":
-				def.Size = parts[1]
+				diskDef.Size = parts[1]
 			case "class":
-				def.Class = parts[1]
+				diskDef.Class = parts[1]
 			default:
 				return nil, fmt.Errorf("invalid storage disk: %s", disk)
 			}
 		}
 		// validate disk size
-		if _, err := resource.ParseQuantity(def.Size); err != nil {
+		if _, err := resource.ParseQuantity(diskDef.Size); err != nil {
 			return nil, fmt.Errorf("invalid disk size: %s", disk)
 		}
-		if def.Name == "" {
+		if diskDef.Name == "" {
 			return nil, fmt.Errorf("invalid disk name: %s", disk)
 		}
-		clsDef.Storage = append(clsDef.Storage, def)
+		cls.Storage = append(cls.Storage, diskDef)
 	}
-	def := &class.ComponentClassFamilyDef{
-		Family: o.ClassFamily,
-		Series: []class.ComponentClassSeriesDef{{Classes: []class.ComponentClassDef{clsDef}}},
-	}
-	return def, nil
+	return &cls, nil
 }

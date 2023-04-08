@@ -1,33 +1,33 @@
-- family: kb-class-family-general
-  template: |
-    cpu: "{{ or .cpu 1 }}"
-    memory: "{{ or .memory 4 }}Gi"
-    storage:
-    - name: data
-      size: "{{ or .dataStorageSize 10 }}Gi"
-    - name: log
-      size: "{{ or .logStorageSize 1 }}Gi"
-  vars: [cpu, memory, dataStorageSize, logStorageSize]
-  series:
-  - name: "custom-{{ .cpu }}c{{ .memory }}g"
-    classes:
-    - args: [1, 1, 100, 10]
-    - name: custom-200c400g
-      cpu: 200
-      memory: 400Gi
+  - classConstraintRef: kb-class-family-general
+    template: |
+      cpu: "{{ or .cpu 1 }}"
+      memory: "{{ or .memory 4 }}Gi"
+      storage:
+      - name: data
+        size: "{{ or .dataStorageSize 10 }}Gi"
+      - name: log
+        size: "{{ or .logStorageSize 1 }}Gi"
+    vars: [cpu, memory, dataStorageSize, logStorageSize]
+    series:
+    - name: "custom-{{ .cpu }}c{{ .memory }}g"
+      classes:
+      - args: [1, 1, 100, 10]
+      - name: custom-200c400g
+        cpu: 200
+        memory: 400Gi
 
-- family: kb-class-family-memory-optimized
-  template: |
-    cpu: "{{ or .cpu 1 }}"
-    memory: "{{ or .memory 4 }}Gi"
-    storage:
-    - name: data
-      size: "{{ or .dataStorageSize 10 }}Gi"
-    - name: log
-      size: "{{ or .logStorageSize 1 }}Gi"
-  vars: [cpu, memory, dataStorageSize, logStorageSize]
-  series:
-  - name: "custom-{{ .cpu }}c{{ .memory }}g"
-    classes:
-    - args: [1, 32, 100, 10]
-    - args: [2, 64, 100, 10]
+  - classConstraintRef: kb-class-family-memory-optimized
+    template: |
+      cpu: "{{ or .cpu 1 }}"
+      memory: "{{ or .memory 4 }}Gi"
+      storage:
+      - name: data
+        size: "{{ or .dataStorageSize 10 }}Gi"
+      - name: log
+        size: "{{ or .logStorageSize 1 }}Gi"
+    vars: [cpu, memory, dataStorageSize, logStorageSize]
+    series:
+    - name: "custom-{{ .cpu }}c{{ .memory }}g"
+      classes:
+      - args: [1, 32, 100, 10]
+      - args: [2, 64, 100, 10]

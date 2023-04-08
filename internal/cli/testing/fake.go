@@ -260,7 +260,6 @@ func FakeComponentClassDef(clusterDef *appsv1alpha1.ClusterDefinition, def []byt
 	cm := &corev1.ConfigMap{}
 	cm.Name = fmt.Sprintf("fake-kubeblocks-classes-%s", ComponentName)
 	cm.SetLabels(map[string]string{
-		types.ClassLevelLabelKey:              "component",
 		constant.KBAppComponentDefRefLabelKey: ComponentDefName,
 		types.ClassProviderLabelKey:           "kubeblocks",
 		constant.ClusterDefLabelKey:           clusterDef.Name,

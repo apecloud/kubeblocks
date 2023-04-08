@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -38,9 +39,7 @@ const (
 )
 
 var (
-	classDef                   []byte
-	generalFamilyDef           []byte
-	memoryOptimizedFamilyDef   []byte
+	classDef                   appsv1alpha1.ComponentClassDefinition
 	generalClassFamily         appsv1alpha1.ClassFamily
 	memoryOptimizedClassFamily appsv1alpha1.ClassFamily
 )
@@ -48,15 +47,17 @@ var (
 var _ = BeforeSuite(func() {
 	var err error
 
-	classDef, err = os.ReadFile(testDefaultClassDefsPath)
+	classDefBytes, err := os.ReadFile(testDefaultClassDefsPath)
+	Expect(err).ShouldNot(HaveOccurred())
+	err = yaml.Unmarshal(classDefBytes, &classDef)
 	Expect(err).ShouldNot(HaveOccurred())
 
-	generalFamilyDef, err = os.ReadFile(testGeneralClassFamilyPath)
+	generalFamilyDef, err := os.ReadFile(testGeneralClassFamilyPath)
 	Expect(err).ShouldNot(HaveOccurred())
 	err = yaml.Unmarshal(generalFamilyDef, &generalClassFamily)
 	Expect(err).ShouldNot(HaveOccurred())
 
-	memoryOptimizedFamilyDef, err = os.ReadFile(testMemoryOptimizedClassFamilyPath)
+	memoryOptimizedFamilyDef, err := os.ReadFile(testMemoryOptimizedClassFamilyPath)
 	Expect(err).ShouldNot(HaveOccurred())
 	err = yaml.Unmarshal(memoryOptimizedFamilyDef, &memoryOptimizedClassFamily)
 	Expect(err).ShouldNot(HaveOccurred())

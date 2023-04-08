@@ -185,8 +185,14 @@ func (o *destroyOptions) destroyCloud() error {
 func (o *destroyOptions) deleteClustersAndUninstallKB() error {
 	var err error
 
+	if o.prevCluster.KubeConfig == "" {
+		fmt.Fprintf(o.Out, "No kubeconfig found for kubernetes cluster %s in %s \n",
+			o.prevCluster.ClusterName, o.stateFilePath)
+		return nil
+	}
+
 	// write kubeconfig content to a temporary file and use it
-	if err = writeKubeConfigToFile(o.prevCluster, o.kubeConfigPath, o.Out); err != nil {
+	if err = writeAndUseKubeConfig(o.prevCluster.KubeConfig, o.kubeConfigPath, o.Out); err != nil {
 		return err
 	}
 

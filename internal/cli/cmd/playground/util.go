@@ -66,8 +66,8 @@ func initPlaygroundDir() (string, error) {
 	return dir, err
 }
 
-// writeClusterInfoToFile writes the cluster info to a state file
-func writeClusterInfoToFile(path string, info *cp.K8sClusterInfo) error {
+// writeClusterInfo writes the cluster info to a state file
+func writeClusterInfo(path string, info *cp.K8sClusterInfo) error {
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
 	if err != nil {
 		return err
@@ -113,16 +113,10 @@ func readClusterInfoFromFile(path string) (*cp.K8sClusterInfo, error) {
 	return &info, nil
 }
 
-func writeKubeConfigToFile(info *cp.K8sClusterInfo, kubeConfigPath string, out io.Writer) error {
-	if info.KubeConfig == "" {
-		fmt.Fprintf(out, "No kubeconfig found for kubernetes cluster %s", info.ClusterName)
-		return nil
-	}
-
-	// use a separate kubeconfig file, if file exists, delete if first
+func writeAndUseKubeConfig(kubeConfig string, kubeConfigPath string, out io.Writer) error {
 	spinner := printer.Spinner(out, fmt.Sprintf("%-50s", "Write kubeconfig to "+kubeConfigPath))
 	defer spinner(false)
-	if err := kubeConfigWrite(info.KubeConfig, kubeConfigPath, writeKubeConfigOptions{
+	if err := kubeConfigWrite(kubeConfig, kubeConfigPath, writeKubeConfigOptions{
 		UpdateExisting:       true,
 		UpdateCurrentContext: true,
 		OverwriteExisting:    true}); err != nil {

@@ -151,7 +151,7 @@ func (o *initOptions) local() error {
 		}
 	}
 
-	if err = writeClusterInfoToFile(o.stateFilePath, clusterInfo); err != nil {
+	if err = writeClusterInfo(o.stateFilePath, clusterInfo); err != nil {
 		return errors.Wrapf(err, "failed to write kubernetes cluster info to state file %s:\n  %v", o.stateFilePath, clusterInfo)
 	}
 
@@ -204,7 +204,7 @@ func (o *initOptions) cloud() error {
 		}
 
 		fmt.Fprintf(o.Out, "\nWrite cluster info to state file %s\n", o.stateFilePath)
-		if err := writeClusterInfoToFile(o.stateFilePath, clusterInfo); err != nil {
+		if err := writeClusterInfo(o.stateFilePath, clusterInfo); err != nil {
 			return errors.Wrapf(err, "failed to write kubernetes cluster info to state file %s:\n  %v", o.stateFilePath, clusterInfo)
 		}
 
@@ -298,7 +298,7 @@ func (o *initOptions) writeStateFile(provider cp.Interface) (*cp.K8sClusterInfo,
 	if clusterInfo.KubeConfig == "" {
 		return nil, errors.New("failed to get kubernetes cluster kubeconfig")
 	}
-	if err = writeClusterInfoToFile(o.stateFilePath, clusterInfo); err != nil {
+	if err = writeClusterInfo(o.stateFilePath, clusterInfo); err != nil {
 		return nil, errors.Wrapf(err, "failed to write kubernetes cluster info to state file %s:\n  %v",
 			o.stateFilePath, clusterInfo)
 	}
@@ -349,7 +349,7 @@ func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	}
 
 	// write kubeconfig content to a temporary file and use it
-	if err = writeKubeConfigToFile(info, o.kubeConfigPath, o.Out); err != nil {
+	if err = writeAndUseKubeConfig(info.KubeConfig, o.kubeConfigPath, o.Out); err != nil {
 		return err
 	}
 

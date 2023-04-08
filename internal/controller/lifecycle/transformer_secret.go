@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -31,12 +32,12 @@ func (c *secretTransformer) Transform(dag *graph.DAG) error {
 	secretVertices = findAll[*corev1.Secret](dag)
 	noneRootVertices = findAllNot[*appsv1alpha1.Cluster](dag)
 	for _, secretVertex := range secretVertices {
-		secret, _ := secretVertex.(*lifecycleVertex)
-		secret.immutable = true
+		secret, _ := secretVertex.(*ictrltypes.LifecycleVertex)
+		secret.Immutable = true
 		for _, vertex := range noneRootVertices {
-			v, _ := vertex.(*lifecycleVertex)
+			v, _ := vertex.(*ictrltypes.LifecycleVertex)
 			// connect all none secret vertices to all secret vertices
-			if _, ok := v.obj.(*corev1.Secret); !ok {
+			if _, ok := v.Obj.(*corev1.Secret); !ok {
 				dag.Connect(vertex, secretVertex)
 			}
 		}

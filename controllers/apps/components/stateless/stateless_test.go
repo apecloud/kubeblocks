@@ -79,7 +79,7 @@ var _ = Describe("Stateful Component", func() {
 			clusterComponent := cluster.GetComponentByName(statelessCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			// TODO(refactor)
-			statelessComponent, err := NewStateless(k8sClient, cluster, clusterComponent, *componentDef, nil)
+			statelessComponent, err := NewStateless(k8sClient, cluster, clusterComponent, *componentDef)
 			Expect(err).Should(Succeed())
 			By("test pods number of deploy is 0 ")
 			phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)

@@ -17,8 +17,19 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+// default reconcile requeue after duration
+var requeueDuration = time.Millisecond * 100
 
 func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
 	return map[string]string{
@@ -27,5 +38,22 @@ func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
 	}
 }
 
-// default reconcile requeue after duration
-var requeueDuration = time.Millisecond * 100
+// notifyClusterStatusChange notifies a cluster changes occurred and triggers it to reconcile.
+func notifyClusterStatusChange(ctx context.Context, cli client.Client, obj client.Object) error {
+	var (
+		err     error
+		cluster *appsv1alpha1.Cluster
+	)
+	if obj == nil || !intctrlutil.WorkloadFilterPredicate(obj) {
+		return nil
+	}
+	if cluster, err = util.GetClusterByObject(ctx, cli, obj); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	cluster.Annotations[constant.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+	return cli.Patch(ctx, cluster, patch)
+}

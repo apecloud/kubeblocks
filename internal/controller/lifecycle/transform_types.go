@@ -53,15 +53,8 @@ const (
 	clusterVersionLabelKey = "clusterversion.kubeblocks.io/name"
 )
 
-type Action string
-
-const (
-	CREATE = Action("CREATE")
-	UPDATE = Action("UPDATE")
-	DELETE = Action("DELETE")
-	STATUS = Action("STATUS")
-	NOOP   = Action("NOOP")
-)
+type lifecycleVertex struct {
+}
 
 // default reconcile requeue after duration
 var requeueDuration = time.Millisecond * 100
@@ -74,33 +67,6 @@ type gvkName struct {
 type clusterRefResources struct {
 	cd appsv1alpha1.ClusterDefinition
 	cv appsv1alpha1.ClusterVersion
-}
-
-// lifecycleVertex describes expected object spec and how to reach it
-// obj always represents the expected part: new object in Create/Update action and old object in Delete action
-// oriObj is set in Update action
-// all transformers doing their object manipulation works on obj.spec
-// the root vertex(i.e. the cluster vertex) will be treated specially:
-// as all its meta, spec and status can be updated in one reconciliation loop
-// Update is ignored when immutable=true
-// orphan object will be force deleted when action is DELETE
-type lifecycleVertex struct {
-	obj       client.Object
-	oriObj    client.Object
-	immutable bool
-	isOrphan  bool
-	action    *Action
-	// postHandleAfterStatusPatch is called after the object status has changed
-	postHandleAfterStatusPatch []func() error
-}
-
-func (v lifecycleVertex) String() string {
-	if v.action == nil {
-		return fmt.Sprintf("{obj:%T, name: %s, immutable: %v, orphan: %v, action: nil}",
-			v.obj, v.obj.GetName(), v.immutable, v.isOrphan)
-	}
-	return fmt.Sprintf("{obj:%T, name: %s, immutable: %v, orphan: %v, action: %v}",
-		v.obj, v.obj.GetName(), v.immutable, v.isOrphan, *v.action)
 }
 
 type clusterSnapshot map[gvkName]client.Object

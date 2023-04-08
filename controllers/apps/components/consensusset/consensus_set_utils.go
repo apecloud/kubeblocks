@@ -18,6 +18,7 @@ package consensusset
 
 import (
 	"context"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"sort"
 	"strings"
 
@@ -28,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -112,7 +112,7 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 
 // generateRestartPodPlan generates update plan to restart pods based on UpdateStrategy
 func generateRestartPodPlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
-	component appsv1alpha1.ClusterComponentDefinition, dag *graph.DAG) *util.Plan {
+	component appsv1alpha1.ClusterComponentDefinition, podsToDelete []*corev1.Pod) *util.Plan {
 	restartPod := func(obj interface{}) (bool, error) {
 		pod, ok := obj.(corev1.Pod)
 		if !ok {
@@ -131,7 +131,7 @@ func generateRestartPodPlan(ctx context.Context, cli client.Client, stsObj *apps
 		}
 
 		// delete the pod to trigger associate StatefulSet to re-create it
-		types.AddVertex4Delete(dag, &pod)
+		podsToDelete = append(podsToDelete, &pod)
 
 		return true, nil
 	}
@@ -502,7 +502,7 @@ func updateConsensusRoleInfo2(ctx context.Context,
 	componentDef *appsv1alpha1.ClusterComponentDefinition,
 	componentName string,
 	pods []corev1.Pod,
-	dag *graph.DAG) error {
+	vertexes []graph.Vertex) error {
 	leader := ""
 	followers := ""
 	for _, pod := range pods {
@@ -542,7 +542,11 @@ func updateConsensusRoleInfo2(ctx context.Context,
 		configDeepCopy := config.DeepCopy()
 		config.Data["KB_"+strings.ToUpper(componentName)+"_LEADER"] = leader
 		config.Data["KB_"+strings.ToUpper(componentName)+"_FOLLOWERS"] = followers
-		types.AddVertex4Patch(dag, &config, configDeepCopy)
+		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+			Obj:     &config,
+			ObjCopy: configDeepCopy,
+			Action:  ictrltypes.ActionPatchPtr(),
+		})
 	}
 
 	return nil

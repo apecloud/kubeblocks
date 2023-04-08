@@ -13,7 +13,7 @@ func (f *fixClusterLabelsTransformer) Transform(dag *graph.DAG) error {
 	if err != nil {
 		return err
 	}
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+	cluster, _ := rootVertex.Obj.(*appsv1alpha1.Cluster)
 	labels := cluster.Labels
 	if labels == nil {
 		labels = map[string]string{}

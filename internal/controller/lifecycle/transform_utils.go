@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"encoding/json"
 	"fmt"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,9 +35,9 @@ import (
 
 func FindMatchedVertex[T interface{}](dag *graph.DAG, objectKey client.ObjectKey) graph.Vertex {
 	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*lifecycleVertex)
-		if _, ok := v.obj.(T); ok {
-			if client.ObjectKeyFromObject(v.obj) == objectKey {
+		v, _ := vertex.(*ictrltypes.LifecycleVertex)
+		if _, ok := v.Obj.(T); ok {
+			if client.ObjectKeyFromObject(v.Obj) == objectKey {
 				return vertex
 			}
 		}
@@ -47,8 +48,8 @@ func FindMatchedVertex[T interface{}](dag *graph.DAG, objectKey client.ObjectKey
 func findAll[T interface{}](dag *graph.DAG) []graph.Vertex {
 	vertices := make([]graph.Vertex, 0)
 	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*lifecycleVertex)
-		if _, ok := v.obj.(T); ok {
+		v, _ := vertex.(*ictrltypes.LifecycleVertex)
+		if _, ok := v.Obj.(T); ok {
 			vertices = append(vertices, vertex)
 		}
 	}
@@ -58,20 +59,20 @@ func findAll[T interface{}](dag *graph.DAG) []graph.Vertex {
 func findAllNot[T interface{}](dag *graph.DAG) []graph.Vertex {
 	vertices := make([]graph.Vertex, 0)
 	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*lifecycleVertex)
-		if _, ok := v.obj.(T); !ok {
+		v, _ := vertex.(*ictrltypes.LifecycleVertex)
+		if _, ok := v.Obj.(T); !ok {
 			vertices = append(vertices, vertex)
 		}
 	}
 	return vertices
 }
 
-func findRootVertex(dag *graph.DAG) (*lifecycleVertex, error) {
+func findRootVertex(dag *graph.DAG) (*ictrltypes.LifecycleVertex, error) {
 	root := dag.Root()
 	if root == nil {
 		return nil, fmt.Errorf("root vertex not found: %v", dag)
 	}
-	rootVertex, _ := root.(*lifecycleVertex)
+	rootVertex, _ := root.(*ictrltypes.LifecycleVertex)
 	return rootVertex, nil
 }
 
@@ -122,10 +123,6 @@ func isOwnerOf(owner, obj client.Object, scheme *runtime.Scheme) bool {
 		}
 	}
 	return false
-}
-
-func actionPtr(action Action) *Action {
-	return &action
 }
 
 func newRequeueError(after time.Duration, reason string) error {

@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -36,10 +37,10 @@ func (f *ownershipTransformer) Transform(dag *graph.DAG) error {
 	}
 	vertices := findAllNot[*appsv1alpha1.Cluster](dag)
 
-	controllerutil.AddFinalizer(rootVertex.obj, dbClusterFinalizerName)
+	controllerutil.AddFinalizer(rootVertex.Obj, dbClusterFinalizerName)
 	for _, vertex := range vertices {
-		v, _ := vertex.(*lifecycleVertex)
-		if err := intctrlutil.SetOwnership(rootVertex.obj, v.obj, scheme, dbClusterFinalizerName); err != nil {
+		v, _ := vertex.(*ictrltypes.LifecycleVertex)
+		if err := intctrlutil.SetOwnership(rootVertex.Obj, v.Obj, scheme, dbClusterFinalizerName); err != nil {
 			return err
 		}
 	}

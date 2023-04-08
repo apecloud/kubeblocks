@@ -19,6 +19,7 @@ package lifecycle
 import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 type doNotTerminateTransformer struct{}
@@ -28,7 +29,7 @@ func (d *doNotTerminateTransformer) Transform(dag *graph.DAG) error {
 	if err != nil {
 		return err
 	}
-	cluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+	cluster, _ := rootVertex.ObjCopy.(*appsv1alpha1.Cluster)
 
 	if cluster.DeletionTimestamp.IsZero() {
 		return nil
@@ -38,8 +39,8 @@ func (d *doNotTerminateTransformer) Transform(dag *graph.DAG) error {
 	}
 	vertices := findAllNot[*appsv1alpha1.Cluster](dag)
 	for _, vertex := range vertices {
-		v, _ := vertex.(*lifecycleVertex)
-		v.immutable = true
+		v, _ := vertex.(*ictrltypes.LifecycleVertex)
+		v.Immutable = true
 	}
 	return nil
 }

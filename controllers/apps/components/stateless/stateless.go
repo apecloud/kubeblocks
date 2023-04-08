@@ -18,6 +18,7 @@ package stateless
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"math"
 	"strings"
 	"time"
@@ -30,10 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -43,10 +42,13 @@ import (
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
 type Stateless struct {
-	types.ComponentBase
+	Cli          client.Client
+	Cluster      *appsv1alpha1.Cluster
+	Component    *appsv1alpha1.ClusterComponentSpec
+	ComponentDef *appsv1alpha1.ClusterComponentDefinition
 }
 
-var _ types.Component = &Stateless{}
+//var _ types.Component = &Stateless{}
 
 func (stateless *Stateless) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if stateless == nil {
@@ -73,6 +75,9 @@ func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int3
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
+func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
+}
+
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
 func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
@@ -91,24 +96,27 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil
 }
 
+func (stateless *Stateless) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
+func (stateless *Stateless) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
 func NewStateless(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition,
-	dag *graph.DAG) (*Stateless, error) {
+	componentDef appsv1alpha1.ClusterComponentDefinition) (*Stateless, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
 	stateless := &Stateless{
-		ComponentBase: types.ComponentBase{
-			Cli:          cli,
-			Cluster:      cluster,
-			Component:    component,
-			ComponentDef: &componentDef,
-			Dag:          dag,
-		},
+		Cli:          cli,
+		Cluster:      cluster,
+		Component:    component,
+		ComponentDef: &componentDef,
 	}
-	stateless.ConcreteComponent = stateless
 	return stateless, nil
 }
 

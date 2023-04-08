@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,14 +40,43 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 	if err != nil {
 		return err
 	}
-	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+	origCluster, _ := rootVertex.ObjCopy.(*appsv1alpha1.Cluster)
+	cluster, _ := rootVertex.Obj.(*appsv1alpha1.Cluster)
 
 	// return fast when cluster is deleting
 	if isClusterDeleting(*origCluster) {
 		return nil
 	}
 
+	dag4Component := graph.NewDAG()
+
+	//if isClusterUpdating(*cluster) {
+	err = c.transform4SpecUpdate(cluster, dag4Component)
+	if err != nil {
+		return err
+	}
+
+	// status existed components
+	err = c.transform4StatusUpdate(cluster, dag4Component)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range dag4Component.Vertices() {
+		node, ok := v.(*ictrltypes.LifecycleVertex)
+		if !ok {
+			panic("runtime error, unexpected lifecycle vertex type")
+		}
+		if node.Obj == nil {
+			panic("runtime error, nil vertex object")
+		}
+	}
+	dag.Merge(dag4Component)
+
+	return nil
+}
+
+func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
 	compSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
 	for _, spec := range cluster.Spec.ComponentSpecs {
 		compSpecMap[spec.Name] = &spec
@@ -59,9 +89,8 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 	updateSet := compProto.Intersection(compStatus)
 	deleteSet := compStatus.Difference(compProto)
 
-	dag4Component := graph.NewDAG()
 	for compName := range createSet {
-		comp, err := NewComponent(&c.cc.cd, &c.cc.cv, cluster, compName, dag4Component)
+		comp, err := NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
@@ -71,7 +100,7 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 	}
 
 	for compName := range deleteSet {
-		comp, err := NewComponent(&c.cc.cd, &c.cc.cv, cluster, compName, dag4Component)
+		comp, err := NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			if err.Error() != "NotSupported" {
 				return err
@@ -85,7 +114,7 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 	}
 
 	for compName := range updateSet {
-		comp, err := NewComponent(&c.cc.cd, &c.cc.cv, cluster, compName, dag4Component)
+		comp, err := NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
@@ -95,17 +124,18 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 		}
 	}
 
-	for _, v := range dag4Component.Vertices() {
-		node, ok := v.(*lifecycleVertex)
-		if !ok {
-			panic("runtime error, unexpected lifecycle vertex type")
+	return nil
+}
+
+func (c *componentTransformer) transform4StatusUpdate(cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		comp, err := NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compSpec.Name, dag)
+		if err != nil {
+			return err
 		}
-		if node.obj == nil {
-			panic("runtime error, nil vertex object")
+		if err := comp.Status(c.ctx, c.cli); err != nil {
+			return err
 		}
 	}
-
-	dag.Merge(dag4Component)
-
 	return nil
 }

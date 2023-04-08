@@ -19,6 +19,7 @@ package lifecycle
 import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 type initTransformer struct {
@@ -28,7 +29,7 @@ type initTransformer struct {
 
 func (i *initTransformer) Transform(dag *graph.DAG) error {
 	// put the cluster object first, it will be root vertex of DAG
-	rootVertex := &lifecycleVertex{obj: i.cluster, oriObj: i.originCluster}
+	rootVertex := &ictrltypes.LifecycleVertex{Obj: i.cluster, ObjCopy: i.originCluster}
 	dag.AddVertex(rootVertex)
 	return nil
 }

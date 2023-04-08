@@ -36,6 +36,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -277,7 +278,7 @@ func (p *clusterPlan) handleDAGWalkError(err error) error {
 	if rootVertex == nil {
 		return nil
 	}
-	originCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+	originCluster, _ := rootVertex.ObjCopy.(*appsv1alpha1.Cluster)
 	if originCluster == nil || reflect.DeepEqual(originCluster.Status, p.cluster.Status) {
 		return nil
 	}
@@ -309,32 +310,32 @@ func (c *clusterPlanBuilder) getClusterRefResources() (*clusterRefResources, err
 }
 
 func (c *clusterPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) error {
-	node, ok := vertex.(*lifecycleVertex)
+	node, ok := vertex.(*ictrltypes.LifecycleVertex)
 	err := c.defaultWalkFunc(vertex)
 	if err != nil {
-		//fmt.Printf("walking object %s error: %s\n", node, err.Error())
+		//fmt.Printf("plan - walking object %s error: %s\n", node, err.Error())
 		if !ok {
 			c.ctx.Log.Error(err, "")
-		} else if node.action == nil {
+		} else if node.Action == nil {
 			c.ctx.Log.Error(err, "%T", node)
 		} else {
-			c.ctx.Log.Error(err, "%s %T error", *node.action, node.obj)
+			c.ctx.Log.Error(err, "%s %T error", *node.Action, node.Obj)
 		}
 	}
 	return err
 }
 
 func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
-	node, ok := vertex.(*lifecycleVertex)
+	node, ok := vertex.(*ictrltypes.LifecycleVertex)
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", vertex)
 	}
-	if node.action == nil {
+	if node.Action == nil {
 		return errors.New("node action can't be nil")
 	}
 
 	// cluster object has more business to do, handle them here
-	if _, ok := node.obj.(*appsv1alpha1.Cluster); ok {
+	if _, ok := node.Obj.(*appsv1alpha1.Cluster); ok {
 		if done, err := c.reconcileCluster(node); err != nil {
 			return err
 		} else if done {
@@ -344,59 +345,59 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	return c.reconcileObject(node)
 }
 
-func (c *clusterPlanBuilder) reconcileObject(node *lifecycleVertex) error {
-	switch *node.action {
-	case CREATE:
-		err := c.cli.Create(c.ctx.Ctx, node.obj)
+func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) error {
+	switch *node.Action {
+	case ictrltypes.CREATE:
+		err := c.cli.Create(c.ctx.Ctx, node.Obj)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
-	case UPDATE:
-		if node.immutable {
+	case ictrltypes.UPDATE:
+		if node.Immutable {
 			return nil
 		}
-		err := c.cli.Update(c.ctx.Ctx, node.obj)
+		err := c.cli.Update(c.ctx.Ctx, node.Obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
-	case DELETE:
-		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
-			err := c.cli.Update(c.ctx.Ctx, node.obj)
+	case ictrltypes.DELETE:
+		if controllerutil.RemoveFinalizer(node.Obj, dbClusterFinalizerName) {
+			err := c.cli.Update(c.ctx.Ctx, node.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 		}
-		if node.isOrphan {
-			err := c.cli.Delete(c.ctx.Ctx, node.obj)
+		if node.Orphan {
+			err := c.cli.Delete(c.ctx.Ctx, node.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 		}
-	case STATUS:
-		if node.immutable {
+	case ictrltypes.STATUS:
+		if node.Immutable {
 			return nil
 		}
-		patch := client.MergeFrom(node.oriObj)
-		if err := c.cli.Status().Patch(c.ctx.Ctx, node.obj, patch); err != nil {
+		patch := client.MergeFrom(node.ObjCopy)
+		if err := c.cli.Status().Patch(c.ctx.Ctx, node.Obj, patch); err != nil {
 			return err
 		}
-		for _, postHandle := range node.postHandleAfterStatusPatch {
+		for _, postHandle := range node.PostHandleAfterStatusPatch {
 			if err := postHandle(); err != nil {
 				return err
 			}
 		}
-	case NOOP:
+	case ictrltypes.NOOP:
 		// nothing
 	}
 	return nil
 }
 
-func (c *clusterPlanBuilder) reconcileCluster(node *lifecycleVertex) (bool, error) {
-	cluster := node.obj.(*appsv1alpha1.Cluster).DeepCopy()
-	origCluster := node.oriObj.(*appsv1alpha1.Cluster)
-	switch *node.action {
+func (c *clusterPlanBuilder) reconcileCluster(node *ictrltypes.LifecycleVertex) (bool, error) {
+	cluster := node.Obj.(*appsv1alpha1.Cluster).DeepCopy()
+	origCluster := node.ObjCopy.(*appsv1alpha1.Cluster)
+	switch *node.Action {
 	// cluster.meta and cluster.spec might change
-	case CREATE, UPDATE, STATUS:
+	case ictrltypes.CREATE, ictrltypes.UPDATE, ictrltypes.STATUS:
 		if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
 			!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
 			// TODO: we should Update instead of Patch cluster object,
@@ -413,7 +414,7 @@ func (c *clusterPlanBuilder) reconcileCluster(node *lifecycleVertex) (bool, erro
 				return false, err
 			}
 		}
-	case DELETE:
+	case ictrltypes.DELETE:
 		if err := c.handleClusterDeletion(cluster); err != nil {
 			return false, err
 		}

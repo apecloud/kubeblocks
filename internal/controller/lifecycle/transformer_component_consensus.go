@@ -18,7 +18,9 @@ package lifecycle
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensusset"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,11 +29,11 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func newConsensusComponent(definition *appsv1alpha1.ClusterDefinition,
+func newConsensusComponent(cli client.Client,
+	definition *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ClusterComponentDefinition,
 	compVer *appsv1alpha1.ClusterComponentVersion,
@@ -40,13 +42,20 @@ func newConsensusComponent(definition *appsv1alpha1.ClusterDefinition,
 	return &consensusComponent{
 		statefulsetComponentBase: statefulsetComponentBase{
 			componentBase: componentBase{
-				Definition:      definition,
-				Cluster:         cluster,
-				CompDef:         compDef,
-				CompVer:         compVer,
-				CompSpec:        compSpec,
-				Component:       nil,
-				workloadVertexs: make([]*lifecycleVertex, 0),
+				client:     cli,
+				Definition: definition,
+				Cluster:    cluster,
+				CompDef:    compDef,
+				CompVer:    compVer,
+				CompSpec:   compSpec,
+				Component:  nil,
+				componentSet: &consensusset.ConsensusSet{
+					Cli:          cli,
+					Cluster:      cluster,
+					Component:    compSpec,
+					ComponentDef: compDef,
+				},
+				workloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
 				dag:             dag,
 			},
 		},
@@ -118,13 +127,8 @@ func (b *consensusComponentWorkloadBuilder) buildWorkload(_ int32) componentWork
 	return b.buildWrapper(buildfn)
 }
 
-func (c *consensusComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, action *Action) error {
-	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, *c.Cluster, *c.Definition, *c.CompDef, *c.CompSpec, c.CompVer)
-	if err != nil {
-		return err
-	}
-	c.Component = synthesizedComp
-
+func (c *consensusComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	action *ictrltypes.LifecycleAction) componentWorkloadBuilder {
 	builder := &consensusComponentWorkloadBuilder{
 		componentWorkloadBuilderBase: componentWorkloadBuilderBase{
 			reqCtx:        reqCtx,
@@ -137,16 +141,7 @@ func (c *consensusComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		workload: nil,
 	}
 	builder.concreteBuilder = builder
-
-	return builder.buildEnv().
-		buildWorkload(0).
-		buildHeadlessService().
-		buildConfig(0).
-		buildTLSVolume(0).
-		buildVolumeMount(0).
-		buildService().
-		buildTLSCert().
-		complete()
+	return builder
 }
 
 func (c *consensusComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -154,54 +149,9 @@ func (c *consensusComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *consensusComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli, actionPtr(CREATE)); err != nil {
-		return err
-	}
-
-	if exist, err := c.Exist(reqCtx, cli); err != nil || exist {
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("component to be created is already exist, cluster: %s, component: %s",
-			c.Cluster.Name, c.CompSpec.Name)
-	}
-
-	if err := c.validateObjectsAction(); err != nil {
-		return err
-	}
-
-	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
-
-	return nil
+	return c.create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *consensusComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli, nil); err != nil {
-		return err
-	}
-
-	if err := c.Restart(reqCtx, cli); err != nil {
-		return err
-	}
-
-	// cluster.spec.componentSpecs[*].volumeClaimTemplates[*].spec.resources.requests[corev1.ResourceStorage]
-	if err := c.ExpandVolume(reqCtx, cli); err != nil {
-		return err
-	}
-
-	// cluster.spec.componentSpecs[*].replicas
-	if err := c.HorizontalScale(reqCtx, cli); err != nil {
-		return err
-	}
-
-	if err := c.updateUnderlyingResources(reqCtx, cli); err != nil {
-		return err
-	}
-
-	return c.resolveObjectsAction(reqCtx, cli)
-}
-
-func (c *consensusComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	// TODO(refactor): delete component owned resources
-	return nil
+	return c.update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"reflect"
 	"strings"
 	"time"
@@ -149,15 +150,15 @@ func readCacheSnapshot(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 	return snapshot, nil
 }
 
-func resolveObjectAction(snapshot clusterSnapshot, vertex *lifecycleVertex) (*Action, error) {
-	gvk, err := getGVKName(vertex.obj, scheme)
+func resolveObjectAction(snapshot clusterSnapshot, vertex *ictrltypes.LifecycleVertex) (*ictrltypes.LifecycleAction, error) {
+	gvk, err := getGVKName(vertex.Obj, scheme)
 	if err != nil {
 		return nil, err
 	}
 	if obj, ok := snapshot[*gvk]; ok {
-		vertex.oriObj = obj
-		return actionPtr(UPDATE), nil
+		vertex.ObjCopy = obj
+		return ictrltypes.ActionUpdatePtr(), nil
 	} else {
-		return actionPtr(CREATE), nil
+		return ictrltypes.ActionCreatePtr(), nil
 	}
 }

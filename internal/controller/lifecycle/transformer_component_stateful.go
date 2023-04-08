@@ -18,19 +18,20 @@ package lifecycle
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func newStatefulComponent(definition *appsv1alpha1.ClusterDefinition,
+func newStatefulComponent(cli client.Client,
+	definition *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ClusterComponentDefinition,
 	compVer *appsv1alpha1.ClusterComponentVersion,
@@ -39,13 +40,20 @@ func newStatefulComponent(definition *appsv1alpha1.ClusterDefinition,
 	return &statefulComponent{
 		statefulsetComponentBase: statefulsetComponentBase{
 			componentBase: componentBase{
-				Definition:      definition,
-				Cluster:         cluster,
-				CompDef:         compDef,
-				CompVer:         compVer,
-				CompSpec:        compSpec,
-				Component:       nil,
-				workloadVertexs: make([]*lifecycleVertex, 0),
+				client:     cli,
+				Definition: definition,
+				Cluster:    cluster,
+				CompDef:    compDef,
+				CompVer:    compVer,
+				CompSpec:   compSpec,
+				Component:  nil,
+				componentSet: &stateful.Stateful{
+					Cli:          cli,
+					Cluster:      cluster,
+					Component:    compSpec,
+					ComponentDef: compDef,
+				},
+				workloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
 				dag:             dag,
 			},
 		},
@@ -88,13 +96,8 @@ func (b *statefulComponentWorkloadBuilder) buildWorkload(_ int32) componentWorkl
 	return b.buildWrapper(buildfn)
 }
 
-func (c *statefulComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, action *Action) error {
-	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, *c.Cluster, *c.Definition, *c.CompDef, *c.CompSpec, c.CompVer)
-	if err != nil {
-		return err
-	}
-	c.Component = synthesizedComp
-
+func (c *statefulComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	action *ictrltypes.LifecycleAction) componentWorkloadBuilder {
 	builder := &statefulComponentWorkloadBuilder{
 		componentWorkloadBuilderBase: componentWorkloadBuilderBase{
 			reqCtx:        reqCtx,
@@ -107,16 +110,7 @@ func (c *statefulComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clien
 		workload: nil,
 	}
 	builder.concreteBuilder = builder
-
-	return builder.buildEnv().
-		buildWorkload(0).
-		buildHeadlessService().
-		buildConfig(0).
-		buildTLSVolume(0).
-		buildVolumeMount(0).
-		buildService().
-		buildTLSCert().
-		complete()
+	return builder
 }
 
 func (c *statefulComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -124,55 +118,9 @@ func (c *statefulComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *statefulComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli, actionPtr(CREATE)); err != nil {
-		return err
-	}
-
-	// do a double check
-	if exist, err := c.Exist(reqCtx, cli); err != nil || exist {
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("component to be created is already exist, cluster: %s, component: %s",
-			c.GetClusterName(), c.GetName())
-	}
-
-	if err := c.validateObjectsAction(); err != nil {
-		return err
-	}
-
-	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
-
-	return nil
+	return c.create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *statefulComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli, nil); err != nil {
-		return err
-	}
-
-	if err := c.Restart(reqCtx, cli); err != nil {
-		return err
-	}
-
-	// cluster.spec.componentSpecs[*].volumeClaimTemplates[*].spec.resources.requests[corev1.ResourceStorage]
-	if err := c.ExpandVolume(reqCtx, cli); err != nil {
-		return err
-	}
-
-	// cluster.spec.componentSpecs[*].replicas
-	if err := c.HorizontalScale(reqCtx, cli); err != nil {
-		return err
-	}
-
-	if err := c.updateUnderlyingResources(reqCtx, cli); err != nil {
-		return err
-	}
-
-	return c.resolveObjectsAction(reqCtx, cli)
-}
-
-func (c *statefulComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	// TODO(refactor): delete component owned resources
-	return nil
+	return c.update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }

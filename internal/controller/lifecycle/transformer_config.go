@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -34,10 +35,10 @@ func (c *configTransformer) Transform(dag *graph.DAG) error {
 		return false
 	}
 	for _, vertex := range cmVertices {
-		v, _ := vertex.(*lifecycleVertex)
-		cm, _ := v.obj.(*corev1.ConfigMap)
+		v, _ := vertex.(*ictrltypes.LifecycleVertex)
+		cm, _ := v.Obj.(*corev1.ConfigMap)
 		if isConfig(cm) {
-			v.immutable = true
+			v.Immutable = true
 		}
 	}
 	return nil

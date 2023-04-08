@@ -18,8 +18,6 @@ package components
 
 import (
 	"context"
-	"fmt"
-	"reflect"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -32,10 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -83,7 +79,6 @@ func (r *componentWorkloadReconciler[T, PT, S, PS]) Reconcile(ctx context.Contex
 	var obj T
 	pObj := PT(&obj)
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, pObj); err != nil {
-		fmt.Printf("reconcile get object error: %s\n", err.Error())
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -95,12 +90,15 @@ func (r *componentWorkloadReconciler[T, PT, S, PS]) Reconcile(ctx context.Contex
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 
-		if requeueAfter, err := handleWorkloadUpdate(reqCtx.Ctx, r.Client, pObj, cluster, compSpec, compDef); err != nil {
+		if err := notifyClusterStatusChange(reqCtx.Ctx, r.Client, cluster); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		} else if requeueAfter != 0 {
-			// if the reconcileAction need requeue, do it
-			return intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, "")
 		}
+		//if requeueAfter, err := handleWorkloadUpdate(reqCtx.Ctx, r.Client, pObj, cluster, compSpec, compDef); err != nil {
+		//	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		//} else if requeueAfter != 0 {
+		//	// if the reconcileAction need requeue, do it
+		//	return intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, "")
+		//}
 		return intctrlutil.Reconciled()
 	}
 	return workloadCompClusterReconcile(reqCtx, r.Client, pObj, handler)
@@ -119,72 +117,82 @@ func (r *componentWorkloadReconciler[T, PT, S, PS]) SetupWithManager(mgr ctrl.Ma
 		Complete(r)
 }
 
-// handleWorkloadUpdate updates cluster.Status.Components if the component status changed
-func handleWorkloadUpdate(ctx context.Context, cli client.Client, obj client.Object, cluster *appsv1alpha1.Cluster,
-	compSpec *appsv1alpha1.ClusterComponentSpec, compDef *appsv1alpha1.ClusterComponentDefinition) (time.Duration, error) {
-	// make a copy of cluster before any operations
-	clusterDeepCopy := cluster.DeepCopy()
-
-	dag := graph.NewDAG()
-	component, err := NewComponentByType(cli, cluster, compSpec, *compDef, dag)
-	if err != nil {
-		return 0, err
+// notifyClusterStatusChange notifies a cluster changes occurred and triggers it to reconcile.
+func notifyClusterStatusChange(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
+	patch := client.MergeFrom(cluster.DeepCopy())
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
 	}
-
-	// patch role labels and update roles in cluster status
-	if err := component.HandleRoleChange(ctx, obj); err != nil {
-		return 0, nil
-	}
-
-	if err := component.HandleRestart(ctx, obj); err != nil {
-		return 0, nil
-	}
-
-	// update component status
-	// TODO: wait & requeue
-	newStatus, err := component.GetLatestStatus(ctx, obj)
-	if err != nil {
-		return 0, err
-	} else if newStatus != nil {
-		status := cluster.Status.Components[component.GetName()]
-		status.Phase = newStatus.Phase
-		status.Message = newStatus.Message
-		status.PodsReady = newStatus.PodsReady
-		status.PodsReadyTime = newStatus.PodsReadyTime
-		cluster.Status.Components[component.GetName()] = status
-	}
-
-	// TODO(refactor)
-	//if err = opsutil.MarkRunningOpsRequestAnnotation2(ctx, cli, cluster, dag); err != nil {
-	//	return 0, err
-	//}
-
-	var rootVertex *types.ComponentVertex
-
-	newCompStatus := cluster.Status.Components[component.GetName()]
-	oldCompStatus := clusterDeepCopy.Status.Components[component.GetName()]
-	if !reflect.DeepEqual(cluster.Annotations, clusterDeepCopy.Annotations) {
-		rootVertex = types.AddVertex4Update(dag, cluster)
-	} else if !reflect.DeepEqual(oldCompStatus, newCompStatus) {
-		rootVertex = types.AddVertex4Status(dag, cluster, clusterDeepCopy)
-	} else {
-		rootVertex = types.AddVertex4Noop(dag, cluster) // as a placeholder to pass the dag validation
-	}
-
-	for _, v := range dag.Vertices() {
-		vv, _ := v.(*types.ComponentVertex)
-		if _, ok := vv.Obj.(*appsv1alpha1.Cluster); !ok {
-			dag.Connect(rootVertex, v)
-		}
-	}
-
-	if err := dag.WalkReverseTopoOrder(types.ExecuteComponentVertex); err != nil {
-		return 0, err
-	}
-
-	// TODO: wait
-	return 0, nil
+	cluster.Annotations[constant.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+	return cli.Patch(ctx, cluster, patch)
 }
+
+//// handleWorkloadUpdate updates cluster.Status.Components if the component status changed
+//func handleWorkloadUpdate(ctx context.Context, cli client.Client, obj client.Object, cluster *appsv1alpha1.Cluster,
+//	compSpec *appsv1alpha1.ClusterComponentSpec, compDef *appsv1alpha1.ClusterComponentDefinition) (time.Duration, error) {
+//	// make a copy of cluster before any operations
+//	clusterDeepCopy := cluster.DeepCopy()
+//
+//	dag := graph.NewDAG()
+//	component, err := NewComponentByType(cli, cluster, compSpec, *compDef, dag)
+//	if err != nil {
+//		return 0, err
+//	}
+//
+//	// patch role labels and update roles in cluster status
+//	if err := component.HandleRoleChange(ctx, obj); err != nil {
+//		return 0, err
+//	}
+//
+//	if err := component.HandleRestart(ctx, obj); err != nil {
+//		return 0, err
+//	}
+//
+//	// update component status
+//	// TODO: wait & requeue
+//	newStatus, err := component.GetLatestStatus(ctx, obj)
+//	if err != nil {
+//		return 0, err
+//	} else if newStatus != nil {
+//		status := cluster.Status.Components[component.GetName()]
+//		status.Phase = newStatus.Phase
+//		status.Message = newStatus.Message
+//		status.PodsReady = newStatus.PodsReady
+//		status.PodsReadyTime = newStatus.PodsReadyTime
+//		cluster.Status.Components[component.GetName()] = status
+//	}
+//
+//	// TODO(refactor)
+//	//if err = opsutil.MarkRunningOpsRequestAnnotation2(ctx, cli, cluster, dag); err != nil {
+//	//	return 0, err
+//	//}
+//
+//	var rootVertex *types.ComponentVertex
+//
+//	newCompStatus := cluster.Status.Components[component.GetName()]
+//	oldCompStatus := clusterDeepCopy.Status.Components[component.GetName()]
+//	if !reflect.DeepEqual(cluster.Annotations, clusterDeepCopy.Annotations) {
+//		rootVertex = types.AddVertex4Update(dag, cluster)
+//	} else if !reflect.DeepEqual(oldCompStatus, newCompStatus) {
+//		rootVertex = types.AddVertex4Status(dag, cluster, clusterDeepCopy)
+//	} else {
+//		rootVertex = types.AddVertex4Noop(dag, cluster) // as a placeholder to pass the dag validation
+//	}
+//
+//	for _, v := range dag.Vertices() {
+//		vv, _ := v.(*types.ComponentVertex)
+//		if _, ok := vv.Obj.(*appsv1alpha1.Cluster); !ok {
+//			dag.Connect(rootVertex, v)
+//		}
+//	}
+//
+//	if err := dag.WalkReverseTopoOrder(types.ExecuteComponentVertex); err != nil {
+//		return 0, err
+//	}
+//
+//	// TODO: wait
+//	return 0, nil
+//}
 
 func workloadCompClusterReconcile(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,

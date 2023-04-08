@@ -18,6 +18,7 @@ package components
 
 import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -25,7 +26,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 )
 
@@ -34,19 +34,19 @@ func NewComponentByType(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	compSpec *appsv1alpha1.ClusterComponentSpec,
 	compDef appsv1alpha1.ClusterComponentDefinition,
-	dag *graph.DAG) (types.Component, error) {
+	dag *graph.DAG) (lifecycle.ComponentSet, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, compSpec); err != nil {
 		return nil, err
 	}
 	switch compDef.WorkloadType {
 	case appsv1alpha1.Consensus:
-		return consensusset.NewConsensusSet(cli, cluster, compSpec, compDef, dag)
+		return consensusset.NewConsensusSet(cli, cluster, compSpec, compDef)
 	case appsv1alpha1.Replication:
-		return replicationset.NewReplicationSet(cli, cluster, compSpec, compDef, dag)
+		return replicationset.NewReplicationSet(cli, cluster, compSpec, compDef)
 	case appsv1alpha1.Stateful:
-		return stateful.NewStateful(cli, cluster, compSpec, compDef, dag)
+		return stateful.NewStateful(cli, cluster, compSpec, compDef)
 	case appsv1alpha1.Stateless:
-		return stateless.NewStateless(cli, cluster, compSpec, compDef, dag)
+		return stateless.NewStateless(cli, cluster, compSpec, compDef)
 	default:
 		panic("unknown workload type")
 	}

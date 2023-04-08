@@ -19,11 +19,11 @@ package lifecycle
 import (
 	corev1 "k8s.io/api/core/v1"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 // clusterCredentialTransformer creates the connection credential secret
@@ -37,7 +37,7 @@ func (c *clusterCredentialTransformer) Transform(dag *graph.DAG) error {
 		return err
 	}
 
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+	cluster, _ := rootVertex.Obj.(*appsv1alpha1.Cluster)
 	if isClusterDeleting(*cluster) {
 		return nil
 	}
@@ -60,9 +60,7 @@ func (c *clusterCredentialTransformer) Transform(dag *graph.DAG) error {
 	}
 
 	if secret != nil {
-		vertex := &lifecycleVertex{obj: secret, action: actionPtr(CREATE)}
-		dag.AddVertex(vertex)
-		dag.Connect(rootVertex, vertex)
+		ictrltypes.LifecycleObjectCreate(dag, secret, rootVertex)
 	}
 	return nil
 }

@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"fmt"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,7 +56,7 @@ type componentWorkloadBuilderBase struct {
 	reqCtx          intctrlutil.RequestCtx
 	client          client.Client
 	comp            Component
-	defaultAction   *Action
+	defaultAction   *ictrltypes.LifecycleAction
 	concreteBuilder componentWorkloadBuilder
 	error           error
 	envConfig       *corev1.ConfigMap

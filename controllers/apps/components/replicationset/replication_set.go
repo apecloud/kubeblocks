@@ -18,6 +18,8 @@ package replicationset
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -25,19 +27,36 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ReplicationSet is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec
 type ReplicationSet struct {
-	types.ComponentBase
+	Cli          client.Client
+	Cluster      *appsv1alpha1.Cluster
+	Component    *appsv1alpha1.ClusterComponentSpec
+	ComponentDef *appsv1alpha1.ClusterComponentDefinition
 }
 
-var _ types.Component = &ReplicationSet{}
+//var _ types.Component = &ReplicationSet{}
+
+func (c *ReplicationSet) GetName() string {
+	return c.Component.Name
+}
+
+func (c *ReplicationSet) GetNamespace() string {
+	return c.Cluster.GetNamespace()
+}
+
+func (c *ReplicationSet) GetMatchingLabels() client.MatchingLabels {
+	return util.GetComponentMatchLabels(c.GetNamespace(), c.GetName())
+}
+
+func (c *ReplicationSet) GetDefinition() *appsv1alpha1.ClusterComponentDefinition {
+	return c.ComponentDef
+}
 
 // IsRunning is the implementation of the type Component interface method,
 // which is used to check whether the replicationSet component is running normally.
@@ -94,6 +113,9 @@ func (r *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) 
 		return false
 	}
 	return intctrlutil.PodIsReadyWithLabel(*pod)
+}
+
+func (r *ReplicationSet) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
 }
 
 // GetPhaseWhenPodsNotReady is the implementation of the type Component interface method,
@@ -194,12 +216,13 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, component
 //	return syncReplicationSetClusterStatus(r.Cluster, r.ComponentDef, r.GetName(), podsToSyncStatus)
 //}
 
-func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) error {
+func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
 	stsList, err := util.ListStsOwnedByComponent(ctx, r.Cli, r.GetNamespace(), r.GetMatchingLabels())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	vertexes := make([]graph.Vertex, 0)
 	for _, sts := range stsList {
 		if sts.Generation != sts.Status.ObservedGeneration {
 			continue
@@ -207,26 +230,31 @@ func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) e
 
 		_, err := getAndCheckReplicationPodByStatefulSet(ctx, r.Cli, sts)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		podsToDelete, err := util.GetPods4Delete(ctx, r.Cli, sts)
+		pods, err := util.GetPods4Delete(ctx, r.Cli, sts)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		for _, podToDelete := range podsToDelete {
-			types.AddVertex4Delete(r.Dag, podToDelete)
+		for _, pod := range pods {
+			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+				Obj:    pod,
+				Action: ictrltypes.ActionDeletePtr(),
+				Orphan: true,
+			})
 		}
 	}
-	return nil
+	return vertexes, nil
 }
 
-func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object) error {
+func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
 	stsList, err := util.ListStsOwnedByComponent(ctx, r.Cli, r.GetNamespace(), r.GetMatchingLabels())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	vertexes := make([]graph.Vertex, 0)
 	podsToSyncStatus := make([]*corev1.Pod, 0)
 	for _, sts := range stsList {
 		if sts.Generation != sts.Status.ObservedGeneration {
@@ -234,41 +262,43 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 		}
 		pod, err := getAndCheckReplicationPodByStatefulSet(ctx, r.Cli, sts)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
 		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
-			// TODO: refactor it
 			podCopy := pod.DeepCopy()
 			pod.GetLabels()[constant.RoleLabelKey] = sts.Labels[constant.RoleLabelKey]
-			types.AddVertex4Patch(r.Dag, pod, podCopy)
+			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+				Obj:     pod,
+				ObjCopy: podCopy,
+				Action:  ictrltypes.ActionPatchPtr(),
+			})
 		} else {
 			podsToSyncStatus = append(podsToSyncStatus, pod)
 		}
 	}
 
 	// sync cluster.status.components.replicationSet.status
-	return syncReplicationSetClusterStatus(r.Cluster, r.ComponentDef, r.GetName(), podsToSyncStatus)
+	if err := syncReplicationSetClusterStatus(r.Cluster, r.GetDefinition(), r.GetName(), podsToSyncStatus); err != nil {
+		return nil, err
+	}
+
+	return vertexes, nil
 }
 
 // NewReplicationSet creates a new ReplicationSet object.
 func NewReplicationSet(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition,
-	dag *graph.DAG) (*ReplicationSet, error) {
+	componentDef appsv1alpha1.ClusterComponentDefinition) (*ReplicationSet, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
 	replication := &ReplicationSet{
-		ComponentBase: types.ComponentBase{
-			Cli:          cli,
-			Cluster:      cluster,
-			Component:    component,
-			ComponentDef: &componentDef,
-			Dag:          dag,
-		},
+		Cli:          cli,
+		Cluster:      cluster,
+		Component:    component,
+		ComponentDef: &componentDef,
 	}
-	replication.ConcreteComponent = replication
 	return replication, nil
 }

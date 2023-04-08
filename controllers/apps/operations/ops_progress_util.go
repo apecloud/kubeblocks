@@ -18,6 +18,7 @@ package operations
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -29,7 +30,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -200,9 +200,8 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 		return 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of deployment to be synchronized")
 	}
 
-	// TODO(refactor)
 	currComponent, err := stateless.NewStateless(cli, opsRes.Cluster,
-		pgRes.clusterComponent, *pgRes.clusterComponentDef, nil)
+		pgRes.clusterComponent, *pgRes.clusterComponentDef)
 	if err != nil {
 		return 0, err
 	}
@@ -349,7 +348,7 @@ func podIsFailedDuringOperation(
 // podProcessedSuccessful checks if the pod has been processed successfully:
 // 1. the pod is recreated after OpsRequest.status.startTime and pod is available.
 // 2. the component is running and pod is available.
-func podProcessedSuccessful(componentImpl types.Component,
+func podProcessedSuccessful(componentImpl lifecycle.ComponentSet,
 	opsStartTime metav1.Time,
 	pod *corev1.Pod,
 	minReadySeconds int32,

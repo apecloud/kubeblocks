@@ -28,7 +28,7 @@ func (r *fillClass) Transform(dag *graph.DAG) error {
 	if err != nil {
 		return err
 	}
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+	cluster, _ := rootVertex.Obj.(*appsv1alpha1.Cluster)
 	return r.fillClass(r.ctx, cluster, r.cc.cd)
 }
 

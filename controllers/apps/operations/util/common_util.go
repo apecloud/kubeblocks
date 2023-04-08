@@ -19,8 +19,6 @@ package util
 import (
 	"context"
 	"encoding/json"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -77,24 +75,25 @@ func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, 
 	return cli.Patch(ctx, opsRequest, patch)
 }
 
-// PatchOpsRequestReconcileAnnotation2 patches the reconcile annotation to OpsRequest
-func PatchOpsRequestReconcileAnnotation2(ctx context.Context, cli client.Client, namespace string, opsRequestName string, dag *graph.DAG) error {
-	opsRequest := &appsv1alpha1.OpsRequest{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: namespace}, opsRequest); err != nil {
-		return err
-	}
-
-	opsRequestDeepCopy := opsRequest.DeepCopy()
-	if opsRequest.Annotations == nil {
-		opsRequest.Annotations = map[string]string{}
-	}
-	// because many changes may be triggered within one second, if the accuracy is only seconds, the event may be lost.
-	// so use nanoseconds to record the time.
-	opsRequest.Annotations[intctrlutil.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-
-	components.AddVertex4Patch(dag, opsRequest, opsRequestDeepCopy)
-	return nil
-}
+//
+//// PatchOpsRequestReconcileAnnotation2 patches the reconcile annotation to OpsRequest
+//func PatchOpsRequestReconcileAnnotation2(ctx context.Context, cli client.Client, namespace string, opsRequestName string, dag *graph.DAG) error {
+//	opsRequest := &appsv1alpha1.OpsRequest{}
+//	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: namespace}, opsRequest); err != nil {
+//		return err
+//	}
+//
+//	opsRequestDeepCopy := opsRequest.DeepCopy()
+//	if opsRequest.Annotations == nil {
+//		opsRequest.Annotations = map[string]string{}
+//	}
+//	// because many changes may be triggered within one second, if the accuracy is only seconds, the event may be lost.
+//	// so use nanoseconds to record the time.
+//	opsRequest.Annotations[intctrlutil.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+//
+//	types.AddVertex4Patch(dag, opsRequest, opsRequestDeepCopy)
+//	return nil
+//}
 
 // GetOpsRequestSliceFromCluster gets OpsRequest slice from cluster annotations.
 // this records what OpsRequests are running in cluster
@@ -146,34 +145,35 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 	return nil
 }
 
-// MarkRunningOpsRequestAnnotation2 marks reconcile annotation to the OpsRequest which is running in the cluster.
-// then the related OpsRequest can reconcile.
-// Note: if the client-go fetches the Cluster resources from cache,
-// it should record the Cluster.ResourceVersion to check if the Cluster object from client-go is the latest in OpsRequest controller.
-// @return could return ErrNoOps
-func MarkRunningOpsRequestAnnotation2(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
-	var (
-		opsRequestSlice []appsv1alpha1.OpsRecorder
-		err             error
-	)
-	if opsRequestSlice, err = GetOpsRequestSliceFromCluster(cluster); err != nil {
-		return err
-	}
-	// mark annotation for operations
-	var notExistOps = map[string]struct{}{}
-	for _, v := range opsRequestSlice {
-		if err = PatchOpsRequestReconcileAnnotation2(ctx, cli, cluster.Namespace, v.Name, dag); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		if apierrors.IsNotFound(err) {
-			notExistOps[v.Name] = struct{}{}
-		}
-	}
-	if len(notExistOps) != 0 {
-		return RemoveClusterInvalidOpsRequestAnnotation2(ctx, cli, cluster, opsRequestSlice, notExistOps)
-	}
-	return nil
-}
+//
+//// MarkRunningOpsRequestAnnotation2 marks reconcile annotation to the OpsRequest which is running in the cluster.
+//// then the related OpsRequest can reconcile.
+//// Note: if the client-go fetches the Cluster resources from cache,
+//// it should record the Cluster.ResourceVersion to check if the Cluster object from client-go is the latest in OpsRequest controller.
+//// @return could return ErrNoOps
+//func MarkRunningOpsRequestAnnotation2(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
+//	var (
+//		opsRequestSlice []appsv1alpha1.OpsRecorder
+//		err             error
+//	)
+//	if opsRequestSlice, err = GetOpsRequestSliceFromCluster(cluster); err != nil {
+//		return err
+//	}
+//	// mark annotation for operations
+//	var notExistOps = map[string]struct{}{}
+//	for _, v := range opsRequestSlice {
+//		if err = PatchOpsRequestReconcileAnnotation2(ctx, cli, cluster.Namespace, v.Name, dag); err != nil && !apierrors.IsNotFound(err) {
+//			return err
+//		}
+//		if apierrors.IsNotFound(err) {
+//			notExistOps[v.Name] = struct{}{}
+//		}
+//	}
+//	if len(notExistOps) != 0 {
+//		return RemoveClusterInvalidOpsRequestAnnotation2(ctx, cli, cluster, opsRequestSlice, notExistOps)
+//	}
+//	return nil
+//}
 
 // RemoveClusterInvalidOpsRequestAnnotation deletes the OpsRequest annotation in cluster when the OpsRequest not existing.
 func RemoveClusterInvalidOpsRequestAnnotation(
@@ -193,20 +193,21 @@ func RemoveClusterInvalidOpsRequestAnnotation(
 	return PatchClusterOpsAnnotations(ctx, cli, cluster, newOpsRequestSlice)
 }
 
-// RemoveClusterInvalidOpsRequestAnnotation2 deletes the OpsRequest annotation in cluster when the OpsRequest not existing.
-func RemoveClusterInvalidOpsRequestAnnotation2(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	opsRequestSlice []appsv1alpha1.OpsRecorder,
-	notExistOps map[string]struct{}) error {
-	// delete the OpsRequest annotation in cluster when the OpsRequest not existing.
-	newOpsRequestSlice := make([]appsv1alpha1.OpsRecorder, 0, len(opsRequestSlice))
-	for _, v := range opsRequestSlice {
-		if _, ok := notExistOps[v.Name]; ok {
-			continue
-		}
-		newOpsRequestSlice = append(newOpsRequestSlice, v)
-	}
-	setOpsRequestToCluster(cluster, opsRequestSlice)
-	return nil
-}
+//
+//// RemoveClusterInvalidOpsRequestAnnotation2 deletes the OpsRequest annotation in cluster when the OpsRequest not existing.
+//func RemoveClusterInvalidOpsRequestAnnotation2(ctx context.Context,
+//	cli client.Client,
+//	cluster *appsv1alpha1.Cluster,
+//	opsRequestSlice []appsv1alpha1.OpsRecorder,
+//	notExistOps map[string]struct{}) error {
+//	// delete the OpsRequest annotation in cluster when the OpsRequest not existing.
+//	newOpsRequestSlice := make([]appsv1alpha1.OpsRecorder, 0, len(opsRequestSlice))
+//	for _, v := range opsRequestSlice {
+//		if _, ok := notExistOps[v.Name]; ok {
+//			continue
+//		}
+//		newOpsRequestSlice = append(newOpsRequestSlice, v)
+//	}
+//	setOpsRequestToCluster(cluster, opsRequestSlice)
+//	return nil
+//}

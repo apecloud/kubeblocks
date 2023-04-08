@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"fmt"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"reflect"
 	"strings"
 
@@ -31,11 +32,11 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func newReplicationComponent(definition *appsv1alpha1.ClusterDefinition,
+func newReplicationComponent(cli client.Client,
+	definition *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ClusterComponentDefinition,
 	compVer *appsv1alpha1.ClusterComponentVersion,
@@ -43,13 +44,20 @@ func newReplicationComponent(definition *appsv1alpha1.ClusterDefinition,
 	dag *graph.DAG) *replicationComponent {
 	return &replicationComponent{
 		componentBase: componentBase{
-			Definition:      definition,
-			Cluster:         cluster,
-			CompDef:         compDef,
-			CompVer:         compVer,
-			CompSpec:        compSpec,
-			Component:       nil,
-			workloadVertexs: make([]*lifecycleVertex, 0),
+			client:     cli,
+			Definition: definition,
+			Cluster:    cluster,
+			CompDef:    compDef,
+			CompVer:    compVer,
+			CompSpec:   compSpec,
+			Component:  nil,
+			componentSet: &replicationset.ReplicationSet{
+				Cli:          cli,
+				Cluster:      cluster,
+				Component:    compSpec,
+				ComponentDef: compDef,
+			},
+			workloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
 			dag:             dag,
 		},
 	}
@@ -180,12 +188,10 @@ func (b *replicationComponentWorkloadBuilder) complete() error {
 	return nil
 }
 
-func (c *replicationComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, action *Action) error {
-	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, *c.Cluster, *c.Definition, *c.CompDef, *c.CompSpec, c.CompVer)
-	if err != nil {
+func (c *replicationComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, action *ictrltypes.LifecycleAction) error {
+	if err := c.composeSynthesizedComponent(reqCtx, cli); err != nil {
 		return err
 	}
-	c.Component = synthesizedComp
 
 	builder := &replicationComponentWorkloadBuilder{
 		componentWorkloadBuilderBase: componentWorkloadBuilderBase{
@@ -202,7 +208,7 @@ func (c *replicationComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Cl
 
 	// env and headless service are component level resources
 	builder.buildEnv().buildHeadlessService()
-	for i := int32(0); i < synthesizedComp.Replicas; i++ {
+	for i := int32(0); i < c.Component.Replicas; i++ {
 		builder.buildWorkload(i).
 			buildVolume(i).
 			buildConfig(i).
@@ -228,7 +234,7 @@ func (c *replicationComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.C
 }
 
 func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli, actionPtr(CREATE)); err != nil {
+	if err := c.init(reqCtx, cli, ictrltypes.ActionCreatePtr()); err != nil {
 		return err
 	}
 
@@ -244,7 +250,7 @@ func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.
 		return err
 	}
 
-	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
+	c.setStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
 
 	return nil
 }
@@ -280,6 +286,28 @@ func (c *replicationComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.
 	return nil
 }
 
+func (c *replicationComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	if err := c.composeSynthesizedComponent(reqCtx, cli); err != nil {
+		return err
+	}
+	workloads, err := c.runningWorkloads(reqCtx, cli)
+	if err != nil {
+		// TODO(refactor): fix me
+		if strings.Contains(err.Error(), "no workload found for the component") {
+			return nil
+		}
+		return err
+	}
+	objs := make([]client.Object, 0)
+	for _, w := range workloads {
+		objs = append(objs, w)
+	}
+	if err = c.status(reqCtx, cli, objs); err != nil {
+		return err
+	}
+	return c.handleGarbageOfRestoreBeforeRunning()
+}
+
 func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	workloads, err := c.runningWorkloads(reqCtx, cli)
 	if err != nil {
@@ -308,7 +336,7 @@ func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli c
 				return fmt.Errorf("cann't find PVC object when to update it, cluster: %s, component: %s, pvc: %s",
 					c.Cluster.Name, c.Component.Name, key)
 			} else {
-				vertex.(*lifecycleVertex).action = actionPtr(UPDATE)
+				vertex.(*ictrltypes.LifecycleVertex).Action = ictrltypes.ActionUpdatePtr()
 			}
 		}
 	}
@@ -367,7 +395,7 @@ func (c *replicationComponent) runningWorkloads(reqCtx intctrlutil.RequestCtx, c
 		return nil, err
 	}
 	if len(stsList) == 0 {
-		return nil, fmt.Errorf("no workload found for the replication component, cluster: %s, component: %s",
+		return nil, fmt.Errorf("no workload found for the component, cluster: %s, component: %s",
 			c.Cluster.Name, c.Component.Name)
 	}
 	return stsList, nil
@@ -416,7 +444,7 @@ func (c *replicationComponent) updateUnderlyingResources(reqCtx intctrlutil.Requ
 
 func (c *replicationComponent) updateWorkload(stsObj *appsv1.StatefulSet, idx int32) {
 	stsObjCopy := stsObj.DeepCopy()
-	stsProto := c.workloadVertexs[idx].obj.(*appsv1.StatefulSet)
+	stsProto := c.workloadVertexs[idx].Obj.(*appsv1.StatefulSet)
 
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the statefulSet will be updated.
@@ -425,8 +453,8 @@ func (c *replicationComponent) updateWorkload(stsObj *appsv1.StatefulSet, idx in
 	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
 	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
-		c.workloadVertexs[idx].obj = stsObjCopy
-		c.workloadVertexs[idx].action = actionPtr(UPDATE)
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase)
+		c.workloadVertexs[idx].Obj = stsObjCopy
+		c.workloadVertexs[idx].Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
+		c.setStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase)
 	}
 }

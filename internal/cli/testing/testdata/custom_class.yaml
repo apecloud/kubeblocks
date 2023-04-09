@@ -11,7 +11,7 @@
     series:
     - name: "custom-{{ .cpu }}c{{ .memory }}g"
       classes:
-      - args: [1, 1, 100, 10]
+      - args: ["1", "1", "100", "10"]
       - name: custom-200c400g
         cpu: 200
         memory: 400Gi
@@ -29,5 +29,5 @@
     series:
     - name: "custom-{{ .cpu }}c{{ .memory }}g"
       classes:
-      - args: [1, 32, 100, 10]
-      - args: [2, 64, 100, 10]
+      - args: ["1", "32", "100", "10"]
+      - args: ["2", "64", "100", "10"]

@@ -35,14 +35,14 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-// GetCustomClassObjectName Returns the name of the ConfigMap containing the custom classes
+// GetCustomClassObjectName Returns the name of the ComponentClassDefinition object containing the custom classes
 func GetCustomClassObjectName(cdName string, componentName string) string {
 	return fmt.Sprintf("kb.classes.custom.%s.%s", cdName, componentName)
 }
 
 // ChooseComponentClasses Choose the classes to be used for a given component with some constraints
-func ChooseComponentClasses(classes map[string]*ComponentClassInstance, filters map[string]resource.Quantity) *ComponentClassInstance {
-	var candidates []*ComponentClassInstance
+func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance, filters map[string]resource.Quantity) *v1alpha1.ComponentClassInstance {
+	var candidates []*v1alpha1.ComponentClassInstance
 	for _, cls := range classes {
 		cpu, ok := filters[corev1.ResourceCPU.String()]
 		if ok && !cpu.Equal(cls.CPU) {
@@ -83,8 +83,8 @@ func GetClassFamilies(dynamic dynamic.Interface) (map[string]*v1alpha1.ClassFami
 	return result, nil
 }
 
-// GetClasses Get all classes, including kubeblocks default classes and user custom classes
-func GetClasses(client dynamic.Interface, cdName string) (map[string]map[string]*ComponentClassInstance, error) {
+// ListClassesByClusterDefinition Get all classes, including kubeblocks default classes and user custom classes
+func ListClassesByClusterDefinition(client dynamic.Interface, cdName string) (map[string]map[string]*v1alpha1.ComponentClassInstance, error) {
 	selector := fmt.Sprintf("%s=%s,%s", constant.ClusterDefLabelKey, cdName, types.ClassProviderLabelKey)
 	objs, err := client.Resource(types.ComponentClassDefinitionGVR()).Namespace("").List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector,
@@ -96,12 +96,12 @@ func GetClasses(client dynamic.Interface, cdName string) (map[string]map[string]
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &classDefinitionList); err != nil {
 		return nil, err
 	}
-	return ParseClasses(classDefinitionList)
+	return GetClasses(classDefinitionList)
 }
 
-func ParseClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string]map[string]*ComponentClassInstance, error) {
+func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string]map[string]*v1alpha1.ComponentClassInstance, error) {
 	var (
-		componentClasses = make(map[string]map[string]*ComponentClassInstance)
+		componentClasses = make(map[string]map[string]*v1alpha1.ComponentClassInstance)
 	)
 	for _, classDefinition := range classDefinitionList.Items {
 		if _, ok := classDefinition.GetLabels()[types.ClassProviderLabelKey]; !ok {
@@ -111,9 +111,9 @@ func ParseClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (ma
 		if componentType == "" {
 			return nil, fmt.Errorf("failed to find component type")
 		}
-		classes, err := ParseComponentClasses(classDefinition)
-		if err != nil {
-			return nil, err
+		classes := make(map[string]*v1alpha1.ComponentClassInstance)
+		for _, item := range classDefinition.Status.Classes {
+			classes[item.Name] = &item
 		}
 		if _, ok := componentClasses[componentType]; !ok {
 			componentClasses[componentType] = classes
@@ -131,7 +131,7 @@ func ParseClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (ma
 }
 
 // ParseComponentClasses parse ComponentClassDefinition to component classes
-func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (map[string]*ComponentClassInstance, error) {
+func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (map[string]*v1alpha1.ComponentClassInstance, error) {
 	genClass := func(nameTpl string, bodyTpl string, vars []string, args []string) (v1alpha1.ComponentClass, error) {
 		var result v1alpha1.ComponentClass
 		values := make(map[string]interface{})
@@ -155,7 +155,7 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 		return result, nil
 	}
 
-	parser := func(group v1alpha1.ComponentClassGroup, series v1alpha1.ComponentClassSeries, class v1alpha1.ComponentClass) (*ComponentClassInstance, error) {
+	parser := func(group v1alpha1.ComponentClassGroup, series v1alpha1.ComponentClassSeries, class v1alpha1.ComponentClass) (*v1alpha1.ComponentClassInstance, error) {
 		if len(class.Args) > 0 {
 			cls, err := genClass(series.Name, group.Template, group.Vars, class.Args)
 			if err != nil {
@@ -169,14 +169,14 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 			class.Memory = cls.Memory
 			class.Storage = cls.Storage
 		}
-		result := &ComponentClassInstance{
-			Name:   class.Name,
-			Family: group.ClassConstraintRef,
-			CPU:    resource.MustParse(class.CPU),
-			Memory: resource.MustParse(class.Memory),
+		result := &v1alpha1.ComponentClassInstance{
+			Name:               class.Name,
+			ClassConstraintRef: group.ClassConstraintRef,
+			CPU:                resource.MustParse(class.CPU),
+			Memory:             resource.MustParse(class.Memory),
 		}
 		for _, disk := range class.Storage {
-			result.Storage = append(result.Storage, &Disk{
+			result.Storage = append(result.Storage, &v1alpha1.Disk{
 				Name:  disk.Name,
 				Class: disk.Class,
 				Size:  resource.MustParse(disk.Size),
@@ -185,7 +185,7 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 		return result, nil
 	}
 
-	result := make(map[string]*ComponentClassInstance)
+	result := make(map[string]*v1alpha1.ComponentClassInstance)
 	for _, group := range classDefinition.Spec.Groups {
 		for _, series := range group.Series {
 			for _, class := range series.Classes {

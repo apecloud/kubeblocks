@@ -27,6 +27,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -67,17 +68,17 @@ func (o *ListOptions) complete(f cmdutil.Factory) error {
 }
 
 func (o *ListOptions) run() error {
-	componentClasses, err := class.GetClasses(o.dynamic, o.ClusterDefRef)
+	componentClasses, err := class.ListClassesByClusterDefinition(o.dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
-	familyClassMap := make(map[string]map[string][]*class.ComponentClassInstance)
+	familyClassMap := make(map[string]map[string][]*appsv1alpha1.ComponentClassInstance)
 	for compName, items := range componentClasses {
 		for _, item := range items {
-			if _, ok := familyClassMap[item.Family]; !ok {
-				familyClassMap[item.Family] = make(map[string][]*class.ComponentClassInstance)
+			if _, ok := familyClassMap[item.ClassConstraintRef]; !ok {
+				familyClassMap[item.ClassConstraintRef] = make(map[string][]*appsv1alpha1.ComponentClassInstance)
 			}
-			familyClassMap[item.Family][compName] = append(familyClassMap[item.Family][compName], item)
+			familyClassMap[item.ClassConstraintRef][compName] = append(familyClassMap[item.ClassConstraintRef][compName], item)
 		}
 	}
 	var familyNames []string
@@ -94,7 +95,7 @@ func (o *ListOptions) run() error {
 	return nil
 }
 
-func (o *ListOptions) printClassFamily(family string, compName string, classes []*class.ComponentClassInstance) {
+func (o *ListOptions) printClassFamily(family string, compName string, classes []*appsv1alpha1.ComponentClassInstance) {
 	tbl := printer.NewTablePrinter(o.Out)
 	_, _ = fmt.Fprintf(o.Out, "\nFamily %s:\n", family)
 	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY", "STORAGE")

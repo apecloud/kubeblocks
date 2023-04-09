@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 var _ = Describe("utils", func() {
@@ -30,15 +32,15 @@ var _ = Describe("utils", func() {
 		cpuMin  = 1
 		cpuMax  = 64
 		scales  = []int{4, 8, 16}
-		classes map[string]*ComponentClassInstance
+		classes map[string]*v1alpha1.ComponentClassInstance
 	)
 
-	genComponentClasses := func(cpuMin int, cpuMax int, scales []int) map[string]*ComponentClassInstance {
-		results := make(map[string]*ComponentClassInstance)
+	genComponentClasses := func(cpuMin int, cpuMax int, scales []int) map[string]*v1alpha1.ComponentClassInstance {
+		results := make(map[string]*v1alpha1.ComponentClassInstance)
 		for cpu := cpuMin; cpu <= cpuMax; cpu++ {
 			for _, scale := range scales {
 				name := fmt.Sprintf("cpu-%d-scale-%d", cpu, scale)
-				results[name] = &ComponentClassInstance{
+				results[name] = &v1alpha1.ComponentClassInstance{
 					Name:   name,
 					CPU:    resource.MustParse(fmt.Sprintf("%d", cpu)),
 					Memory: resource.MustParse(fmt.Sprintf("%dGi", cpu*scale)),

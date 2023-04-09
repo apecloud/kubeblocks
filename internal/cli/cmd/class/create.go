@@ -122,14 +122,14 @@ func (o *CreateOptions) complete(f cmdutil.Factory) error {
 }
 
 func (o *CreateOptions) run() error {
-	componentClasses, err := class.GetClasses(o.dynamic, o.ClusterDefRef)
+	componentClasses, err := class.ListClassesByClusterDefinition(o.dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
 
 	classes, ok := componentClasses[o.ComponentType]
 	if !ok {
-		classes = make(map[string]*class.ComponentClassInstance)
+		classes = make(map[string]*v1alpha1.ComponentClassInstance)
 	}
 
 	families, err := class.GetClassFamilies(o.dynamic)
@@ -158,8 +158,8 @@ func (o *CreateOptions) run() error {
 			return err
 		}
 		for name, cls := range newClasses {
-			if _, ok = families[cls.Family]; !ok {
-				return fmt.Errorf("family %s is not found", cls.Family)
+			if _, ok = families[cls.ClassConstraintRef]; !ok {
+				return fmt.Errorf("family %s is not found", cls.ClassConstraintRef)
 			}
 			if _, ok = classes[name]; ok {
 				return fmt.Errorf("class name conflicted %s", name)
@@ -190,8 +190,8 @@ func (o *CreateOptions) run() error {
 		classNames = append(classNames, o.ClassName)
 	}
 
-	cmName := class.GetCustomClassObjectName(o.ClusterDefRef, o.ComponentType)
-	obj, err := o.dynamic.Resource(types.ComponentClassDefinitionGVR()).Get(context.TODO(), cmName, metav1.GetOptions{})
+	objName := class.GetCustomClassObjectName(o.ClusterDefRef, o.ComponentType)
+	obj, err := o.dynamic.Resource(types.ComponentClassDefinitionGVR()).Get(context.TODO(), objName, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}

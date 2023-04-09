@@ -1,0 +1,75 @@
+package apps
+
+import (
+	"context"
+
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentclassdefinitions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentclassdefinitions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentclassdefinitions/finalizers,verbs=update
+
+type ClassReconciler struct {
+	client.Client
+	Scheme   *k8sruntime.Scheme
+	Recorder record.EventRecorder
+}
+
+func (r *ClassReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("classDefinition", req.NamespacedName),
+		Recorder: r.Recorder,
+	}
+
+	classDefinition := &appsv1alpha1.ComponentClassDefinition{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, classDefinition); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, classDefinition, dbClusterFinalizerName, func() (*ctrl.Result, error) {
+		// TODO validate if existing cluster reference classes being deleted
+		return nil, nil
+	})
+	if res != nil {
+		return *res, err
+	}
+
+	if classDefinition.Status.ObservedGeneration == classDefinition.Generation {
+		return intctrlutil.Reconciled()
+	}
+
+	classInstances, err := class.ParseComponentClasses(*classDefinition)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "parse component classes failed")
+	}
+
+	patch := client.MergeFrom(classDefinition.DeepCopy())
+	var classList []appsv1alpha1.ComponentClassInstance
+	for _, v := range classInstances {
+		classList = append(classList, *v)
+	}
+	classDefinition.Status.Classes = classList
+	classDefinition.Status.ObservedGeneration = classDefinition.Generation
+	if err = r.Client.Status().Patch(ctx, classDefinition, patch); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "patch component class status failed")
+	}
+
+	return intctrlutil.Reconciled()
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *ClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).For(&appsv1alpha1.ComponentClassDefinition{}).Complete(r)
+}

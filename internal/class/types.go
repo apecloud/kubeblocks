@@ -55,6 +55,8 @@ type ClassModelWithFamilyName struct {
 	Model  appsv1alpha1.ClassFamilyModel
 }
 
+var _ sort.Interface = ByModelList{}
+
 type ByModelList []ClassModelWithFamilyName
 
 func (m ByModelList) Len() int {
@@ -83,27 +85,9 @@ func (m ByModelList) Swap(i, j int) {
 	m[i], m[j] = m[j], m[i]
 }
 
-type ComponentClassInstance struct {
-	Name    string            `json:"name,omitempty"`
-	CPU     resource.Quantity `json:"cpu,omitempty"`
-	Memory  resource.Quantity `json:"memory,omitempty"`
-	Storage []*Disk           `json:"storage,omitempty"`
-	Family  string            `json:"-"`
-}
-
-type Disk struct {
-	Name  string            `json:"name,omitempty"`
-	Size  resource.Quantity `json:"size,omitempty"`
-	Class string            `json:"class,omitempty"`
-}
-
-func (d Disk) String() string {
-	return fmt.Sprintf("%s=%s", d.Name, d.Size.String())
-}
-
 var _ sort.Interface = ByClassCPUAndMemory{}
 
-type ByClassCPUAndMemory []*ComponentClassInstance
+type ByClassCPUAndMemory []*appsv1alpha1.ComponentClassInstance
 
 func (b ByClassCPUAndMemory) Len() int {
 	return len(b)

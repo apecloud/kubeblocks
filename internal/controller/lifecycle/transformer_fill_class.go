@@ -60,14 +60,14 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		}
 	}
 
-	cmLabels := []client.ListOption{
+	ml := []client.ListOption{
 		client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefinition.Name},
 		client.HasLabels{constant.ClassProviderLabelKey},
 	}
-	if err := r.cli.List(reqCtx.Ctx, &classDefinitionList, cmLabels...); err != nil {
+	if err := r.cli.List(reqCtx.Ctx, &classDefinitionList, ml...); err != nil {
 		return err
 	}
-	compClasses, err := class.ParseClasses(classDefinitionList)
+	compClasses, err := class.GetClasses(classDefinitionList)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	}
 
 	// TODO use this function to get matched class families if class is not specified and component has no classes
-	_ = func(comp appsv1alpha1.ClusterComponentSpec) *class.ComponentClassInstance {
+	_ = func(comp appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.ComponentClassInstance {
 		var candidates []class.ClassModelWithFamilyName
 		for _, family := range classFamilyList.Items {
 			models := family.FindMatchingModels(&comp.Resources)
@@ -92,7 +92,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		sort.Sort(class.ByModelList(candidates))
 		candidate := candidates[0]
 		cpu, memory := class.GetMinCPUAndMemory(candidate.Model)
-		cls := &class.ComponentClassInstance{
+		cls := &appsv1alpha1.ComponentClassInstance{
 			Name:   fmt.Sprintf("%s-%vc%vg", candidate.Family, cpu.AsDec().String(), memory.AsDec().String()),
 			CPU:    *cpu,
 			Memory: *memory,
@@ -100,7 +100,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		return cls
 	}
 
-	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*class.ComponentClassInstance) *class.ComponentClassInstance {
+	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*appsv1alpha1.ComponentClassInstance) *appsv1alpha1.ComponentClassInstance {
 		filters := class.Filters(make(map[string]resource.Quantity))
 		if comp.Resources.Requests.Cpu() != nil {
 			filters[corev1.ResourceCPU.String()] = *comp.Resources.Requests.Cpu()
@@ -114,7 +114,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	for idx, comp := range cluster.Spec.ComponentSpecs {
 		classes := compClasses[comp.ComponentDefRef]
 
-		var cls *class.ComponentClassInstance
+		var cls *appsv1alpha1.ComponentClassInstance
 		className, ok := componentClassMapping[comp.Name]
 		// TODO another case if len(classFamilyList.Items) > 0, use matchClassFamilies to find matching class family:
 		switch {
@@ -152,7 +152,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	return nil
 }
 
-func buildVolumeClaimByClass(cls *class.ComponentClassInstance) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
+func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
 	var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
 	for _, disk := range cls.Storage {
 		volume := appsv1alpha1.ClusterComponentVolumeClaimTemplate{

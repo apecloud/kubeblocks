@@ -56,10 +56,10 @@ spec:
 `
 
 func TestClassFamily_ByClassCPUAndMemory(t *testing.T) {
-	buildClass := func(cpu string, memory string) *ComponentClassInstance {
-		return &ComponentClassInstance{CPU: resource.MustParse(cpu), Memory: resource.MustParse(memory)}
+	buildClass := func(cpu string, memory string) *appsv1alpha1.ComponentClassInstance {
+		return &appsv1alpha1.ComponentClassInstance{CPU: resource.MustParse(cpu), Memory: resource.MustParse(memory)}
 	}
-	classes := []*ComponentClassInstance{
+	classes := []*appsv1alpha1.ComponentClassInstance{
 		buildClass("1", "2Gi"),
 		buildClass("1", "1Gi"),
 		buildClass("2", "0.5Gi"),

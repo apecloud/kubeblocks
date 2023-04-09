@@ -176,7 +176,7 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 			Memory:             resource.MustParse(class.Memory),
 		}
 		for _, disk := range class.Storage {
-			result.Storage = append(result.Storage, &v1alpha1.Disk{
+			result.Storage = append(result.Storage, v1alpha1.Disk{
 				Name:  disk.Name,
 				Class: disk.Class,
 				Size:  resource.MustParse(disk.Size),

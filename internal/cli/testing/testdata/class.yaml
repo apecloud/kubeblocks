@@ -68,4 +68,14 @@ spec:
       - args: [ "48", "768", "200", "10" ]
       - args: [ "64", "1024", "200", "10" ]
       - args: [ "128", "2048", "200", "10" ]
- 
+status:
+  classes:
+  - name: general-1c1g
+    classConstraintRef: kb-class-family-general
+    cpu: 1
+    memory: 1Gi
+    storage:
+    - name: data
+      size: 100Gi
+    - name: log
+      size: 10Gi

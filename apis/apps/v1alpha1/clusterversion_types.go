@@ -136,10 +136,10 @@ func init() {
 }
 
 // GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentVersion.
-func (r *ClusterVersion) GetDefNameMappingComponents() map[string]*ClusterComponentVersion {
+func (r ClusterVersionSpec) GetDefNameMappingComponents() map[string]*ClusterComponentVersion {
 	m := map[string]*ClusterComponentVersion{}
-	for i, c := range r.Spec.ComponentVersions {
-		m[c.ComponentDefRef] = &r.Spec.ComponentVersions[i]
+	for i, c := range r.ComponentVersions {
+		m[c.ComponentDefRef] = &r.ComponentVersions[i]
 	}
 	return m
 }

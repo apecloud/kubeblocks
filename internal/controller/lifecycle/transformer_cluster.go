@@ -70,7 +70,7 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	}
 
 	clusterCompSpecMap := cluster.Spec.GetDefNameMappingComponents()
-	clusterCompVerMap := c.cc.cv.GetDefNameMappingComponents()
+	clusterCompVerMap := c.cc.cv.Spec.GetDefNameMappingComponents()
 	process1stComp := true
 
 	// TODO: should move credential secrets creation from system_account_controller & here into credential_transformer,

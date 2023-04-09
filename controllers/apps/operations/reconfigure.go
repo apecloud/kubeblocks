@@ -58,7 +58,7 @@ func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx,
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (r *reconfigureAction) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return opsRequest.GetReconfiguringComponentNameMap()
+	return realAffectedComponentMap(opsRequest.Spec.GetReconfiguringComponentNameSet())
 }
 
 func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.OpsPhase, cfgError error) error {

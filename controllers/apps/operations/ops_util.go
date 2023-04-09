@@ -68,7 +68,7 @@ func ReconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		completedProgressCount   int32
 		checkAllClusterComponent bool
 	)
-	componentNameMap := opsRequest.GetComponentNameMap()
+	componentNameMap := opsRequest.GetComponentNameSet()
 	// if no specified components, we should check the all components phase of cluster.
 	if len(componentNameMap) == 0 {
 		checkAllClusterComponent = true

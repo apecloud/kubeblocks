@@ -94,6 +94,11 @@ func (w *configWrapper) ValidateRequiredParam() error {
 	if _, ok := cmObj.Data[w.configKey]; !ok {
 		return makeNotFoundConfigFileErr(w.configKey, w.configSpecName, cfgcore.ToSet(cmObj.Data).AsSlice())
 	}
+
+	// TODO support all config file update.
+	if !cfgcore.CheckConfigTemplateReconfigureKey(w.configSpec, w.configKey) {
+		return makeNotSupportConfigFileUpdateErr(w.configKey, w.configSpec)
+	}
 	return nil
 }
 
@@ -140,7 +145,7 @@ func (w *configWrapper) fillConfigSpec() error {
 	}
 
 	if w.configSpecName != "" {
-		if foundConfigSpec(configSpecs, w.configSpecName) != nil {
+		if foundConfigSpec(configSpecs, w.configSpecName) == nil {
 			return makeConfigSpecNotExistErr(w.clusterName, w.componentName, w.configSpecName)
 		}
 		return nil
@@ -205,7 +210,7 @@ func (w *configWrapper) filterForReconfiguring(data map[string]string) []string 
 	return keys
 }
 
-func newConfigWrapper(baseOptions create.BaseOptions, clusterName, componentName string, params map[string]string) (*configWrapper, error) {
+func newConfigWrapper(baseOptions create.BaseOptions, clusterName, componentName, configSpec, configKey string, params map[string]string) (*configWrapper, error) {
 	var (
 		err           error
 		clusterObj    *appsv1alpha1.Cluster
@@ -224,8 +229,11 @@ func newConfigWrapper(baseOptions create.BaseOptions, clusterName, componentName
 		clusterObj:    clusterObj,
 		clusterDefObj: clusterDefObj,
 		clusterName:   clusterName,
-		componentName: componentName,
-		updatedParams: params,
+
+		componentName:  componentName,
+		configSpecName: configSpec,
+		configKey:      configKey,
+		updatedParams:  params,
 	}
 
 	if w.clusterObj.Spec.ClusterVersionRef == "" {

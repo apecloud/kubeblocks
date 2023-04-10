@@ -16,7 +16,10 @@ limitations under the License.
 
 package cluster
 
-import cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+import (
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+)
 
 var (
 	clusterNotExistErrMessage          = "cluster[name=%s] is not exist. Please check that <cluster name> is spelled correctly."
@@ -32,7 +35,8 @@ var (
 
 	notFoundConfigSpecErrorMessage = "not find config spec[%s], component[name=%s] in the cluster[name=%s]"
 
-	notFoundConfigFileErrorMessage = "not find config file, file[name=%s] in the configspec[name=%s], all configfiles: %v"
+	notFoundConfigFileErrorMessage   = "not find config file, file[name=%s] in the configspec[name=%s], all configfiles: %v"
+	notSupportFileUpdateErrorMessage = "not support file[%s] update, current support files: %v"
 
 	notCueSchemaPrompt            = "The config template not define cue schema and parameter explain info cannot be generated."
 	cue2openAPISchemaFailedPrompt = "The cue schema may not satisfy the conversion constraints of openAPISchema and parameter explain info cannot be generated."
@@ -58,6 +62,10 @@ func makeNotFoundTemplateErr(clusterName, component string) error {
 
 func makeNotFoundConfigFileErr(configFile, configSpec string, all []string) error {
 	return cfgcore.MakeError(notFoundConfigFileErrorMessage, configFile, configSpec, all)
+}
+
+func makeNotSupportConfigFileUpdateErr(configFile string, configSpec appsv1alpha1.ComponentConfigSpec) error {
+	return cfgcore.MakeError(notSupportFileUpdateErrorMessage, configFile, configSpec.Keys)
 }
 
 func makeMissingClusterNameErr() error {

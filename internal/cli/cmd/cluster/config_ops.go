@@ -70,7 +70,7 @@ func (o *configOpsOptions) Complete() error {
 		o.KeyValues = kvs
 	}
 
-	wrapper, err := newConfigWrapper(o.BaseOptions, o.Name, o.ComponentName, o.KeyValues)
+	wrapper, err := newConfigWrapper(o.BaseOptions, o.Name, o.ComponentName, o.CfgTemplateName, o.CfgFile, o.KeyValues)
 	if err != nil {
 		return err
 	}

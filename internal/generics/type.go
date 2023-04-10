@@ -92,5 +92,5 @@ var RestoreJobSignature = func(_ dataprotectionv1alpha1.RestoreJob, _ dataprotec
 }
 var AddonSignature = func(_ extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList) {
 }
-var ClassFamilySignature = func(_ appsv1alpha1.ClassFamily, _ appsv1alpha1.ClassFamilyList) {}
+var ComponentResourceConstraintSignature = func(_ appsv1alpha1.ComponentResourceConstraint, _ appsv1alpha1.ComponentResourceConstraintList) {}
 var ComponentClassDefinitionSignature = func(_ appsv1alpha1.ComponentClassDefinition, _ appsv1alpha1.ComponentClassDefinitionList) {}

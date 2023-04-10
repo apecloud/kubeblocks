@@ -55,6 +55,6 @@ var _ = Describe("list", func() {
 		cmd.Run(cmd, []string{})
 		Expect(out.String()).To(ContainSubstring("general-1c1g"))
 		Expect(out.String()).To(ContainSubstring("mysql"))
-		Expect(out.String()).To(ContainSubstring(generalClassFamily.Name))
+		Expect(out.String()).To(ContainSubstring(generalResourceConstraint.Name))
 	})
 })

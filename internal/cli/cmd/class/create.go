@@ -48,7 +48,7 @@ type CreateOptions struct {
 	Factory       cmdutil.Factory
 	dynamic       dynamic.Interface
 	ClusterDefRef string
-	ClassFamily   string
+	Constraint    string
 	ComponentType string
 	ClassName     string
 	CPU           string
@@ -59,7 +59,7 @@ type CreateOptions struct {
 
 var classCreateExamples = templates.Examples(`
     # Create a class following class family kubeblocks-general-classes for component mysql in cluster definition apecloud-mysql, which have 1 cpu core, 2Gi memory and storage is 10Gi
-    kbcli class create custom-1c2g --cluster-definition apecloud-mysql --type mysql --class-family kubeblocks-general-classes --cpu 1 --memory 2Gi --storage name=data,size=10Gi
+    kbcli class create custom-1c2g --cluster-definition apecloud-mysql --type mysql --constraint kubeblocks-general-classes --cpu 1 --memory 2Gi --storage name=data,size=10Gi
 
     # Create classes for component mysql in cluster definition apecloud-mysql, where classes is defined in file
     kbcli class create --cluster-definition apecloud-mysql --type mysql --file ./classes.yaml
@@ -82,7 +82,7 @@ func NewCreateCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	cmd.Flags().StringVar(&o.ComponentType, "type", "", "Specify component type")
 	util.CheckErr(cmd.MarkFlagRequired("type"))
 
-	cmd.Flags().StringVar(&o.ClassFamily, "class-family", "", "Specify class family")
+	cmd.Flags().StringVar(&o.Constraint, "constraint", "", "Specify resource constraint")
 	cmd.Flags().StringVar(&o.CPU, corev1.ResourceCPU.String(), "", "Specify component cpu cores")
 	cmd.Flags().StringVar(&o.Memory, corev1.ResourceMemory.String(), "", "Specify component memory size")
 	cmd.Flags().StringArrayVar(&o.Storage, corev1.ResourceStorage.String(), []string{}, "Specify component storage disks")
@@ -132,7 +132,7 @@ func (o *CreateOptions) run() error {
 		classes = make(map[string]*v1alpha1.ComponentClassInstance)
 	}
 
-	families, err := class.GetClassFamilies(o.dynamic)
+	families, err := class.GetResourceConstraints(o.dynamic)
 	if err != nil {
 		return err
 	}
@@ -170,8 +170,8 @@ func (o *CreateOptions) run() error {
 		if _, ok = classes[o.ClassName]; ok {
 			return fmt.Errorf("class name conflicted %s", o.ClassName)
 		}
-		if _, ok = families[o.ClassFamily]; !ok {
-			return fmt.Errorf("family %s is not found", o.ClassFamily)
+		if _, ok = families[o.Constraint]; !ok {
+			return fmt.Errorf("family %s is not found", o.Constraint)
 		}
 		cls, err := o.buildClass()
 		if err != nil {
@@ -179,7 +179,7 @@ func (o *CreateOptions) run() error {
 		}
 		componentClassGroups = []v1alpha1.ComponentClassGroup{
 			{
-				ClassConstraintRef: o.ClassFamily,
+				ClassConstraintRef: o.Constraint,
 				Series: []v1alpha1.ComponentClassSeries{
 					{
 						Classes: []v1alpha1.ComponentClass{*cls},

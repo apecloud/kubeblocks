@@ -36,18 +36,16 @@ import (
 )
 
 const (
-	ClusterName                = "fake-cluster-name"
-	Namespace                  = "fake-namespace"
-	ClusterVersionName         = "fake-cluster-version"
-	ClusterDefName             = "fake-cluster-definition"
-	ComponentName              = "fake-component-name"
-	ComponentDefName           = "fake-component-type"
-	NodeName                   = "fake-node-name"
-	SecretName                 = "fake-secret-conn-credential"
-	StorageClassName           = "fake-storage-class"
-	PVCName                    = "fake-pvc"
-	GeneralClassFamily         = "kb-class-family-general"
-	MemoryOptimizedClassFamily = "kb-class-family-memory-optimized"
+	ClusterName        = "fake-cluster-name"
+	Namespace          = "fake-namespace"
+	ClusterVersionName = "fake-cluster-version"
+	ClusterDefName     = "fake-cluster-definition"
+	ComponentName      = "fake-component-name"
+	ComponentDefName   = "fake-component-type"
+	NodeName           = "fake-node-name"
+	SecretName         = "fake-secret-conn-credential"
+	StorageClassName   = "fake-storage-class"
+	PVCName            = "fake-pvc"
 
 	KubeBlocksRepoName  = "fake-kubeblocks-repo"
 	KubeBlocksChartName = "fake-kubeblocks"

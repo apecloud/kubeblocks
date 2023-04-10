@@ -28,7 +28,7 @@ import (
 
 const ComponentClassTemplate = `
 - # class family name, such as general, memory-optimized, cpu-optimized etc.
-  family: kb-class-family-general
+  family: kb-resource-constraint-general
   # class schema template, you can set default resource values here
   template: |
     cpu: "{{ or .cpu 1 }}"

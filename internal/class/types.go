@@ -27,7 +27,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func GetMinCPUAndMemory(model appsv1alpha1.ClassFamilyModel) (*resource.Quantity, *resource.Quantity) {
+func GetMinCPUAndMemory(model appsv1alpha1.ResourceConstraint) (*resource.Quantity, *resource.Quantity) {
 	var (
 		minCPU    resource.Quantity
 		minMemory resource.Quantity
@@ -50,22 +50,22 @@ func GetMinCPUAndMemory(model appsv1alpha1.ClassFamilyModel) (*resource.Quantity
 	return &minCPU, &minMemory
 }
 
-type ClassModelWithFamilyName struct {
-	Family string
-	Model  appsv1alpha1.ClassFamilyModel
+type ConstraintWithName struct {
+	Name       string
+	Constraint appsv1alpha1.ResourceConstraint
 }
 
-var _ sort.Interface = ByModelList{}
+var _ sort.Interface = ByConstraintList{}
 
-type ByModelList []ClassModelWithFamilyName
+type ByConstraintList []ConstraintWithName
 
-func (m ByModelList) Len() int {
+func (m ByConstraintList) Len() int {
 	return len(m)
 }
 
-func (m ByModelList) Less(i, j int) bool {
-	cpu1, mem1 := GetMinCPUAndMemory(m[i].Model)
-	cpu2, mem2 := GetMinCPUAndMemory(m[j].Model)
+func (m ByConstraintList) Less(i, j int) bool {
+	cpu1, mem1 := GetMinCPUAndMemory(m[i].Constraint)
+	cpu2, mem2 := GetMinCPUAndMemory(m[j].Constraint)
 	switch cpu1.Cmp(*cpu2) {
 	case 1:
 		return false
@@ -81,7 +81,7 @@ func (m ByModelList) Less(i, j int) bool {
 	return false
 }
 
-func (m ByModelList) Swap(i, j int) {
+func (m ByConstraintList) Swap(i, j int) {
 	m[i], m[j] = m[j], m[i]
 }
 

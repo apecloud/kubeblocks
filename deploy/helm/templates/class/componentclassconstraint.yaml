@@ -1,11 +1,11 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
-kind: ClassFamily
+kind: ComponentResourceConstraint
 metadata:
-  name: kb-class-family-general
+  name: kb-resource-constraint-general
   labels:
-    classfamily.kubeblocks.io/provider: kubeblocks
+    resourceconstraint.kubeblocks.io/provider: kubeblocks
 spec:
-  models:
+  constraints:
   - cpu:
       min: "0.5"
       max: 2
@@ -25,13 +25,13 @@ spec:
 ---
 
 apiVersion: apps.kubeblocks.io/v1alpha1
-kind: ClassFamily
+kind: ComponentResourceConstraint
 metadata:
-  name: kb-class-family-memory-optimized
+  name: kb-resource-constraint-memory-optimized
   labels:
-    classfamily.kubeblocks.io/provider: kubeblocks
+    resourceconstraint.kubeblocks.io/provider: kubeblocks
 spec:
-  models:
+  constraints:
   - cpu:
       slots: [2, 4, 8, 12, 24, 48]
     memory:

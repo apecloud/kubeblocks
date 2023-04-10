@@ -61,21 +61,21 @@ func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance,
 	return candidates[0]
 }
 
-func GetClassFamilies(dynamic dynamic.Interface) (map[string]*v1alpha1.ClassFamily, error) {
-	objs, err := dynamic.Resource(types.ClassFamilyGVR()).List(context.TODO(), metav1.ListOptions{
-		//LabelSelector: types.ClassFamilyProviderLabelKey,
+func GetResourceConstraints(dynamic dynamic.Interface) (map[string]*v1alpha1.ComponentResourceConstraint, error) {
+	objs, err := dynamic.Resource(types.ComponentResourceConstraintGVR()).List(context.TODO(), metav1.ListOptions{
+		//LabelSelector: types.ResourceConstraintProviderLabelKey,
 	})
 	if err != nil {
 		return nil, err
 	}
-	var classFamilyList v1alpha1.ClassFamilyList
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &classFamilyList); err != nil {
+	var constraintsList v1alpha1.ComponentResourceConstraintList
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &constraintsList); err != nil {
 		return nil, err
 	}
 
-	result := make(map[string]*v1alpha1.ClassFamily)
-	for _, cf := range classFamilyList.Items {
-		if _, ok := cf.GetLabels()[types.ClassFamilyProviderLabelKey]; !ok {
+	result := make(map[string]*v1alpha1.ComponentResourceConstraint)
+	for _, cf := range constraintsList.Items {
+		if _, ok := cf.GetLabels()[types.ResourceConstraintProviderLabelKey]; !ok {
 			continue
 		}
 		result[cf.GetName()] = &cf

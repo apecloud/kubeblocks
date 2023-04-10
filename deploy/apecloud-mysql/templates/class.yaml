@@ -8,7 +8,7 @@ metadata:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
 spec:
   groups:
-  - classConstraintRef: kb-class-family-general
+  - classConstraintRef: kb-resource-constraint-general
     template: |
       cpu: {{ printf "{{ or .cpu 1 }}" }}
       memory: {{ printf "{{ or .memory 4 }}Gi" }}
@@ -33,7 +33,7 @@ spec:
       - args: [ "64", "256", "20", "1" ]
       - args: [ "128", "512", "20", "1" ]
 
-  - classConstraintRef: kb-class-family-memory-optimized
+  - classConstraintRef: kb-resource-constraint-memory-optimized
     template: |
       cpu: {{ printf "{{ or .cpu 1 }}" }}
       memory: {{ printf "{{ or .memory 8 }}Gi" }}

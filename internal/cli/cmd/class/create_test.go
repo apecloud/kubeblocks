@@ -48,7 +48,7 @@ var _ = Describe("create", func() {
 		streams, _, out, _ = genericclioptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
-		tf.FakeDynamicClient = testing.FakeDynamicClient(&classDef, &generalClassFamily, &memoryOptimizedClassFamily)
+		tf.FakeDynamicClient = testing.FakeDynamicClient(&classDef, &generalResourceConstraint, &memoryOptimizedResourceConstraint)
 
 		o = &CreateOptions{
 			Factory:       tf,
@@ -71,7 +71,7 @@ var _ = Describe("create", func() {
 	Context("with resource arguments", func() {
 
 		It("should fail if required arguments is missing", func() {
-			o.ClassFamily = generalClassFamily.Name
+			o.Constraint = generalResourceConstraint.Name
 			fillResources(o, "", "48Gi", nil)
 			Expect(o.validate([]string{"general-12c48g"})).Should(HaveOccurred())
 			fillResources(o, "12", "", nil)
@@ -81,7 +81,7 @@ var _ = Describe("create", func() {
 		})
 
 		It("should succeed with required arguments", func() {
-			o.ClassFamily = generalClassFamily.Name
+			o.Constraint = generalResourceConstraint.Name
 			fillResources(o, "12", "48Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
 			Expect(o.validate([]string{"general-12c48g"})).ShouldNot(HaveOccurred())
 			Expect(o.run()).ShouldNot(HaveOccurred())

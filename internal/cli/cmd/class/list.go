@@ -72,32 +72,32 @@ func (o *ListOptions) run() error {
 	if err != nil {
 		return err
 	}
-	familyClassMap := make(map[string]map[string][]*appsv1alpha1.ComponentClassInstance)
+	constraintClassMap := make(map[string]map[string][]*appsv1alpha1.ComponentClassInstance)
 	for compName, items := range componentClasses {
 		for _, item := range items {
-			if _, ok := familyClassMap[item.ClassConstraintRef]; !ok {
-				familyClassMap[item.ClassConstraintRef] = make(map[string][]*appsv1alpha1.ComponentClassInstance)
+			if _, ok := constraintClassMap[item.ClassConstraintRef]; !ok {
+				constraintClassMap[item.ClassConstraintRef] = make(map[string][]*appsv1alpha1.ComponentClassInstance)
 			}
-			familyClassMap[item.ClassConstraintRef][compName] = append(familyClassMap[item.ClassConstraintRef][compName], item)
+			constraintClassMap[item.ClassConstraintRef][compName] = append(constraintClassMap[item.ClassConstraintRef][compName], item)
 		}
 	}
-	var familyNames []string
-	for name := range familyClassMap {
-		familyNames = append(familyNames, name)
+	var constraintNames []string
+	for name := range constraintClassMap {
+		constraintNames = append(constraintNames, name)
 	}
-	sort.Strings(familyNames)
-	for _, family := range familyNames {
-		for compName, classes := range familyClassMap[family] {
-			o.printClassFamily(family, compName, classes)
+	sort.Strings(constraintNames)
+	for _, constraintName := range constraintNames {
+		for compName, classes := range constraintClassMap[constraintName] {
+			o.printClass(constraintName, compName, classes)
 		}
 		_, _ = fmt.Fprint(o.Out, "\n")
 	}
 	return nil
 }
 
-func (o *ListOptions) printClassFamily(family string, compName string, classes []*appsv1alpha1.ComponentClassInstance) {
+func (o *ListOptions) printClass(constraintName string, compName string, classes []*appsv1alpha1.ComponentClassInstance) {
 	tbl := printer.NewTablePrinter(o.Out)
-	_, _ = fmt.Fprintf(o.Out, "\nFamily %s:\n", family)
+	_, _ = fmt.Fprintf(o.Out, "\nConstraint %s:\n", constraintName)
 	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY", "STORAGE")
 	sort.Sort(class.ByClassCPUAndMemory(classes))
 	for _, class := range classes {

@@ -94,8 +94,8 @@ import (
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;delete;deletecollection
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
 
-// classfamily get list
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=classfamilies,verbs=get;list;watch
+// componentresourceconstraint get list
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentresourceconstraints,verbs=get;list;watch
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
@@ -166,7 +166,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
 	}
-	b.Watches(&source.Kind{Type: &appsv1alpha1.ClassFamily{}},
+	b.Watches(&source.Kind{Type: &appsv1alpha1.ComponentResourceConstraint{}},
 		&handler.EnqueueRequestForObject{},
 		builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool { return true })),
 	)

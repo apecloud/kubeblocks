@@ -9,7 +9,7 @@ metadata:
 spec:
   groups:
   - # class family name, such as general, memory-optimized, cpu-optimized etc.
-    classConstraintRef: kb-class-family-general
+    classConstraintRef: kb-resource-constraint-general
     # class schema template, you can set default resource values here
     template: |
       cpu: "{{ or .cpu 1 }}"
@@ -41,7 +41,7 @@ spec:
       - args: [ "64", "256", "200", "10" ]
       - args: [ "128", "512", "200", "10" ]
 
-  - classConstraintRef: kb-class-family-memory-optimized
+  - classConstraintRef: kb-resource-constraint-memory-optimized
     template: |
       cpu: "{{ or .cpu 1 }}"
       memory: "{{ or .memory 8 }}Gi"
@@ -71,7 +71,7 @@ spec:
 status:
   classes:
   - name: general-1c1g
-    classConstraintRef: kb-class-family-general
+    classConstraintRef: kb-resource-constraint-general
     cpu: 1
     memory: 1Gi
     storage:

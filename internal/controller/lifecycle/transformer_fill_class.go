@@ -72,28 +72,28 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		return err
 	}
 
-	var classFamilyList appsv1alpha1.ClassFamilyList
-	if err = r.cli.List(reqCtx.Ctx, &classFamilyList); err != nil {
+	var constraintList appsv1alpha1.ComponentResourceConstraintList
+	if err = r.cli.List(reqCtx.Ctx, &constraintList); err != nil {
 		return err
 	}
 
-	// TODO use this function to get matched class families if class is not specified and component has no classes
+	// TODO use this function to get matched resource constraints if class is not specified and component has no classes
 	_ = func(comp appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.ComponentClassInstance {
-		var candidates []class.ClassModelWithFamilyName
-		for _, family := range classFamilyList.Items {
-			models := family.FindMatchingModels(&comp.Resources)
-			for _, model := range models {
-				candidates = append(candidates, class.ClassModelWithFamilyName{Family: family.Name, Model: model})
+		var candidates []class.ConstraintWithName
+		for _, item := range constraintList.Items {
+			constraints := item.FindMatchingConstraints(&comp.Resources)
+			for _, constraint := range constraints {
+				candidates = append(candidates, class.ConstraintWithName{Name: item.Name, Constraint: constraint})
 			}
 		}
 		if len(candidates) == 0 {
 			return nil
 		}
-		sort.Sort(class.ByModelList(candidates))
+		sort.Sort(class.ByConstraintList(candidates))
 		candidate := candidates[0]
-		cpu, memory := class.GetMinCPUAndMemory(candidate.Model)
+		cpu, memory := class.GetMinCPUAndMemory(candidate.Constraint)
 		cls := &appsv1alpha1.ComponentClassInstance{
-			Name:   fmt.Sprintf("%s-%vc%vg", candidate.Family, cpu.AsDec().String(), memory.AsDec().String()),
+			Name:   fmt.Sprintf("%s-%vc%vg", candidate.Name, cpu.AsDec().String(), memory.AsDec().String()),
 			CPU:    *cpu,
 			Memory: *memory,
 		}
@@ -116,7 +116,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 
 		var cls *appsv1alpha1.ComponentClassInstance
 		className, ok := componentClassMapping[comp.Name]
-		// TODO another case if len(classFamilyList.Items) > 0, use matchClassFamilies to find matching class family:
+		// TODO another case if len(constraintList.Items) > 0, use matchClassFamilies to find matching class family:
 		switch {
 		case ok:
 			cls = classes[className]

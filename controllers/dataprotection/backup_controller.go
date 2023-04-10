@@ -504,9 +504,6 @@ func (r *BackupReconciler) createUpdatesJobs(reqCtx intctrlutil.RequestCtx,
 		reqCtx.Log.V(1).Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
 		return err
 	}
-	if len(backupPolicy.Spec.BackupStatusUpdates) == 0 {
-		return errors.New("not support metadata collection because of empty backupStatusUpdates")
-	}
 	for _, update := range backupPolicy.Spec.BackupStatusUpdates {
 		if update.UpdateStage != stage {
 			continue
@@ -996,20 +993,8 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 
-	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
-		if err = json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
-			return podSpec, err
-		}
-	}
-	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
-		if err = json.Unmarshal([]byte(cmAffinity), &podSpec.Affinity); err != nil {
-			return podSpec, err
-		}
-	}
-	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
-		if err = json.Unmarshal([]byte(cmNodeSelector), &podSpec.NodeSelector); err != nil {
-			return podSpec, err
-		}
+	if err = addTolerations(&podSpec); err != nil {
+		return podSpec, err
 	}
 
 	return podSpec, nil
@@ -1022,6 +1007,25 @@ func generateJSON(path string, value string) string {
 		jsonString = fmt.Sprintf(`{\"%s\":%s}`, segments[i], jsonString)
 	}
 	return jsonString
+}
+
+func addTolerations(podSpec *corev1.PodSpec) (err error) {
+	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
+		if err = json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
+			return err
+		}
+	}
+	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
+		if err = json.Unmarshal([]byte(cmAffinity), &podSpec.Affinity); err != nil {
+			return err
+		}
+	}
+	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
+		if err = json.Unmarshal([]byte(cmNodeSelector), &podSpec.NodeSelector); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *BackupReconciler) buildMetadataCollectionPodSpec(
@@ -1063,20 +1067,8 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 
-	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
-		if err = json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
-			return podSpec, err
-		}
-	}
-	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
-		if err = json.Unmarshal([]byte(cmAffinity), &podSpec.Affinity); err != nil {
-			return podSpec, err
-		}
-	}
-	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
-		if err = json.Unmarshal([]byte(cmNodeSelector), &podSpec.NodeSelector); err != nil {
-			return podSpec, err
-		}
+	if err = addTolerations(&podSpec); err != nil {
+		return podSpec, err
 	}
 
 	return podSpec, nil

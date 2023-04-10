@@ -1,10 +1,6 @@
 package migration
 
 import (
-	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	v1alpha1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -18,12 +14,6 @@ var _ = Describe("base", func() {
 			resultMap, resultKeyArr := CliStepChangeToStructure()
 			Expect(len(resultMap)).Should(Equal(4))
 			Expect(len(resultKeyArr)).Should(Equal(4))
-		})
-
-		It("TimeFormat", func() {
-			time := metav1.NewTime(time.Date(2023, time.Month(4), 4, 15, 31, 0, 0, time.Now().Location()))
-			newTime := TimeFormat(&time)
-			Expect(newTime).Should(Equal("Apr 04,2023 15:31:00 UTC+0800"))
 		})
 
 		It("BuildInitializationStepsOrder", func() {

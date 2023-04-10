@@ -157,20 +157,20 @@ cue-fmt: cuetool ## Run cue fmt against code.
 	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fmt
 	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fix
 
-.PHONY: fast-lint
-fast-lint: golangci staticcheck vet  # [INTERNAL] fast lint
+.PHONY: lint-fast
+lint-fast: golangci staticcheck vet  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
 lint: test-go-generate generate ## Run golangci-lint against code.
-	$(MAKE) fast-lint
+	$(MAKE) lint-fast
 
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code.
 	$(STATICCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports fast-lint ## Run build checks.
+build-checks: generate fmt vet goimports lint-fast ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -267,7 +267,6 @@ clean-kbcli: ## Clean bin/kbcli*.
 .PHONY: doc
 kbcli-doc: generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
-
 
 
 ##@ Operator Controller Manager

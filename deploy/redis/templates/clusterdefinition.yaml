@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 spec:
+  type: redis
   connectionCredential:
     username: ""
     password: ""
@@ -57,13 +58,10 @@ spec:
       service:
         ports:
           - name: redis
-            protocol: TCP
             port: 6379
             targetPort: redis
           - name: metrics
             targetPort: metrics
-            port: 9121
-            nodePort: null
       configSpecs:
         - name: redis-replication-config
           templateRef: redis7-config-template
@@ -119,7 +117,6 @@ spec:
             ports:
               - name: metrics
                 containerPort: 9121
-                protocol: TCP
             livenessProbe:
               httpGet:
                 path: /
@@ -181,7 +178,6 @@ spec:
       service:
         ports:
           - name: redis-sentinel
-            protocol: TCP
             targetPort: redis-sentinel
             port: 26379
       configSpecs:
@@ -219,7 +215,6 @@ spec:
           ports:
             - containerPort: 26379
               name: redis-sentinel
-              protocol: TCP
           volumeMounts:
             - name: data
               mountPath: /data

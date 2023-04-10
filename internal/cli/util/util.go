@@ -521,7 +521,7 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 }
 
 func getIPLocation() (string, error) {
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", "https://ifconfig.io/country_code", nil)
 	if err != nil {
 		return "", err
@@ -547,7 +547,8 @@ func GetHelmChartRepoURL() string {
 	}
 
 	location, _ := getIPLocation()
-	if location == "CN" {
+	// if location is CN, or we can not get location, use GitLab helm chart repo
+	if location == "CN" || location == "" {
 		return types.GitLabHelmChartRepo
 	}
 	return types.KubeBlocksChartURL

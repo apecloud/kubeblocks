@@ -313,7 +313,7 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	// New ConfigTemplateBuilder
 	templateBuilder := newTemplateBuilder(clusterName, namespaceName, task.Cluster, task.ClusterVersion, ctx, cli)
 	// Prepare built-in objects and built-in functions
-	if err := templateBuilder.injectBuiltInObjectsAndFunctions(podSpec, task.Component.ConfigTemplates, task.Component); err != nil {
+	if err := templateBuilder.injectBuiltInObjectsAndFunctions(podSpec, task.Component.ConfigTemplates, task.Component, task); err != nil {
 		return nil, err
 	}
 
@@ -372,25 +372,25 @@ func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []ap
 	var (
 		err error
 
-		volumeDirs          []corev1.VolumeMount
-		configManagerParams *cfgcm.ConfigManagerParams
+		volumeDirs  []corev1.VolumeMount
+		buildParams *cfgcm.CfgManagerBuildParams
 	)
 
 	if volumeDirs = getUsingVolumesByCfgTemplates(podSpec, cfgTemplates); len(volumeDirs) == 0 {
 		return nil
 	}
-	if configManagerParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, params); err != nil {
+	if buildParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, params); err != nil {
 		return err
 	}
-	if configManagerParams == nil {
+	if buildParams == nil {
 		return nil
 	}
 
-	container, err := builder.BuildCfgManagerContainer(configManagerParams)
+	container, err := builder.BuildCfgManagerContainer(buildParams)
 	if err != nil {
 		return err
 	}
-	updateTPLScriptVolume(podSpec, configManagerParams)
+	updateTPLScriptVolume(podSpec, buildParams)
 
 	// Add sidecar to podTemplate
 	podSpec.Containers = append(podSpec.Containers, *container)
@@ -400,7 +400,7 @@ func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []ap
 	return nil
 }
 
-func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.ConfigManagerParams) {
+func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.CfgManagerBuildParams) {
 	scriptVolume := configManager.ScriptVolume
 	if scriptVolume == nil {
 		return
@@ -451,8 +451,14 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	return volumeDirs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
-	configManagerParams := &cfgcm.ConfigManagerParams{
+func buildConfigManagerParams(cli client.Client, ctx context.Context, configSpec []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.CfgManagerBuildParams, error) {
+	var (
+		err             error
+		reloadOptions   *appsv1alpha1.ReloadOptions
+		formatterConfig *appsv1alpha1.FormatterConfig
+	)
+
+	configManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:   constant.ConfigSidecarName,
 		CharacterType: params.Component.CharacterType,
 		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
@@ -461,15 +467,13 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplat
 		Cluster:       params.Cluster,
 	}
 
-	var err error
-	var reloadOptions *appsv1alpha1.ReloadOptions
-	if reloadOptions, err = cfgutil.GetReloadOptions(cli, ctx, cfgTemplates); err != nil {
+	if reloadOptions, formatterConfig, err = cfgutil.GetReloadOptions(cli, ctx, configSpec); err != nil {
 		return nil, err
 	}
-	if reloadOptions == nil {
+	if reloadOptions == nil || formatterConfig == nil {
 		return nil, nil
 	}
-	if err = cfgcm.BuildConfigManagerContainerArgs(reloadOptions, volumeDirs, cli, ctx, configManagerParams); err != nil {
+	if err = cfgcm.BuildConfigManagerContainerArgs(reloadOptions, volumeDirs, cli, ctx, configManagerParams, formatterConfig); err != nil {
 		return nil, err
 	}
 	return configManagerParams, nil

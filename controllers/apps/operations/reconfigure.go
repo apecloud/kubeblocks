@@ -58,7 +58,7 @@ func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx,
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (r *reconfigureAction) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return opsRequest.GetReconfiguringComponentNameMap()
+	return realAffectedComponentMap(opsRequest.Spec.GetReconfiguringComponentNameSet())
 }
 
 func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.OpsPhase, cfgError error) error {
@@ -298,7 +298,7 @@ func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
 				cfgcore.MakeError("current configSpec not support reconfigure, configSpec: %v", configSpec.Name))
 		}
 		result := updateCfgParams(config, *configSpec, client.ObjectKey{
-			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, configSpec.VolumeName),
+			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, configSpec.Name),
 			Namespace: resource.Cluster.Namespace,
 		}, reqCtx.Ctx, cli, resource.OpsRequest.Name)
 		if result.err != nil {

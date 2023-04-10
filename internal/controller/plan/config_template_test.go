@@ -180,7 +180,7 @@ single_thread_memory = 294912
 				nil, nil, nil)
 
 			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(
-				podSpec, cfgTemplate, component)).Should(BeNil())
+				podSpec, cfgTemplate, component, nil)).Should(BeNil())
 
 			cfgBuilder.componentValues.Resource = &ResourceDefinition{
 				MemorySize: 8 * 1024 * 1024 * 1024,
@@ -208,7 +208,7 @@ single_thread_memory = 294912
 				nil, nil, nil,
 			)
 
-			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component)).Should(BeNil())
+			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil)).Should(BeNil())
 
 			rendered, err := cfgBuilder.render(map[string]string{
 				"a":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"log\" }}",
@@ -269,7 +269,7 @@ single_thread_memory = 294912
 				nil, nil, nil,
 			)
 
-			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component)).Should(BeNil())
+			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil)).Should(BeNil())
 
 			tests := []struct {
 				name     string

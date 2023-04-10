@@ -25,7 +25,7 @@ var (
 	missingUpdatedParametersErrMessage = "missing updated parameters, using --help."
 
 	multiComponentsErrorMessage     = "when multi component exist, must specify which component to use. Please using --component-name"
-	multiConfigTemplateErrorMessage = "when multi config template exist, must specify which config template to use. Please using --template-name"
+	multiConfigTemplateErrorMessage = "when multi config template exist, must specify which config template to use. Please using --config-spec"
 
 	notFoundValidConfigTemplateErrorMessage = "not find valid config template, component[name=%s] in the cluster[name=%s]"
 

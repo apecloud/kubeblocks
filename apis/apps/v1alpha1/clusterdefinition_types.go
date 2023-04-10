@@ -27,6 +27,12 @@ import (
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
 type ClusterDefinitionSpec struct {
 
+	// Cluster definition type defines well known application cluster type, e.g. mysql/redis/mongodb
+	// +kubebuilder:validation:MaxLength=24
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
+	// +optional
+	Type string `json:"type,omitempty"`
+
 	// componentDefs provides cluster components definitions.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
@@ -354,10 +360,8 @@ type ClusterComponentDefinition struct {
 
 	// service defines the behavior of a service spec.
 	// provide read-write service when WorkloadType is Consensus.
-	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Service *corev1.ServiceSpec `json:"service,omitempty"`
+	Service *ServiceSpec `json:"service,omitempty"`
 
 	// consensusSpec defines consensus related spec if workloadType is Consensus, required if workloadType is Consensus.
 	// +optional
@@ -396,6 +400,80 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=key
 	// +optional
 	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
+}
+
+type ServiceSpec struct {
+	// The list of ports that are exposed by this service.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+	// +patchMergeKey=port
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=port
+	// +listMapKey=protocol
+	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
+}
+
+func (r *ServiceSpec) toSVCPorts() []corev1.ServicePort {
+	ports := make([]corev1.ServicePort, 0, len(r.Ports))
+	for _, p := range r.Ports {
+		ports = append(ports, p.toSVCPort())
+	}
+	return ports
+}
+
+func (r ServiceSpec) ToSVCSpec() corev1.ServiceSpec {
+	return corev1.ServiceSpec{
+		Ports: r.toSVCPorts(),
+	}
+}
+
+type ServicePort struct {
+	// The name of this port within the service. This must be a DNS_LABEL.
+	// All ports within a ServiceSpec must have unique names. When considering
+	// the endpoints for a Service, this must match the 'name' field in the
+	// EndpointPort.
+	// +kubebuilder:validation:Required
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+
+	// The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
+	// Default is TCP.
+	// +kubebuilder:validation:Enum={TCP,UDP,SCTP}
+	// +default="TCP"
+	// +optional
+	Protocol corev1.Protocol `json:"protocol,omitempty" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
+
+	// The application protocol for this port.
+	// This field follows standard Kubernetes label syntax.
+	// Un-prefixed names are reserved for IANA standard service names (as per
+	// RFC-6335 and https://www.iana.org/assignments/service-names).
+	// Non-standard protocols should use prefixed names such as
+	// mycompany.com/my-custom-protocol.
+	// +optional
+	AppProtocol *string `json:"appProtocol,omitempty" protobuf:"bytes,6,opt,name=appProtocol"`
+
+	// The port that will be exposed by this service.
+	Port int32 `json:"port" protobuf:"varint,3,opt,name=port"`
+
+	// Number or name of the port to access on the pods targeted by the service.
+	// Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
+	// If this is a string, it will be looked up as a named port in the
+	// target Pod's container ports. If this is not specified, the value
+	// of the 'port' field is used (an identity map).
+	// This field is ignored for services with clusterIP=None, and should be
+	// omitted or set equal to the 'port' field.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+	// +optional
+	TargetPort intstr.IntOrString `json:"targetPort,omitempty" protobuf:"bytes,4,opt,name=targetPort"`
+}
+
+func (r *ServicePort) toSVCPort() corev1.ServicePort {
+	return corev1.ServicePort{
+		Name:        r.Name,
+		Protocol:    r.Protocol,
+		AppProtocol: r.AppProtocol,
+		Port:        r.Port,
+		TargetPort:  r.TargetPort,
+	}
 }
 
 type HorizontalScalePolicy struct {
@@ -454,7 +532,6 @@ type ClusterDefinitionProbe struct {
 }
 
 type ClusterDefinitionProbes struct {
-
 	// Probe for DB running check.
 	// +optional
 	RunningProbe *ClusterDefinitionProbe `json:"runningProbe,omitempty"`

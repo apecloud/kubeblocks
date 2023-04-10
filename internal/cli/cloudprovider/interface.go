@@ -28,7 +28,7 @@ type Interface interface {
 	Name() string
 
 	// CreateK8sCluster creates a kubernetes cluster
-	CreateK8sCluster(clusterInfo *K8sClusterInfo, init bool) error
+	CreateK8sCluster(clusterInfo *K8sClusterInfo) error
 
 	// DeleteK8sCluster deletes the created kubernetes cluster
 	DeleteK8sCluster(clusterInfo *K8sClusterInfo) error

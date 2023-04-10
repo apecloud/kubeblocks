@@ -61,8 +61,7 @@ type describeOpsOptions struct {
 }
 
 type opsObject interface {
-	appsv1alpha1.VerticalScaling | appsv1alpha1.HorizontalScaling |
-		appsv1alpha1.OpsRequestVolumeClaimTemplate | appsv1alpha1.VolumeExpansion
+	appsv1alpha1.VerticalScaling | appsv1alpha1.HorizontalScaling | appsv1alpha1.OpsRequestVolumeClaimTemplate | appsv1alpha1.VolumeExpansion
 }
 
 func newDescribeOpsOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *describeOpsOptions {
@@ -343,7 +342,7 @@ func (o *describeOpsOptions) getReconfiguringCommand(spec appsv1alpha1.OpsReques
 	commandArgs = append(commandArgs, "configure")
 	commandArgs = append(commandArgs, spec.ClusterRef)
 	commandArgs = append(commandArgs, fmt.Sprintf("--component-names=%s", componentName))
-	commandArgs = append(commandArgs, fmt.Sprintf("--template-name=%s", configuration.Name))
+	commandArgs = append(commandArgs, fmt.Sprintf("--config-spec=%s", configuration.Name))
 
 	config := configuration.Keys[0]
 	commandArgs = append(commandArgs, fmt.Sprintf("--config-file=%s", config.Key))

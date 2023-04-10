@@ -202,20 +202,6 @@ func getPVCByName(args []interface{}, volumeName string) (interface{}, error) {
 	return nil, nil
 }
 
-// getEnvByName for general built-in
-func getEnvByName(args interface{}, envName string) (string, error) {
-	container, err := fromJSONObject[corev1.Container](args)
-	if err != nil {
-		return "", err
-	}
-	for _, v := range container.Env {
-		if v.Name == envName {
-			return v.Value, nil
-		}
-	}
-	return "", nil
-}
-
 // getContainerMemory for general built-in
 func getContainerMemory(args interface{}) (int64, error) {
 	container, err := fromJSONObject[corev1.Container](args)

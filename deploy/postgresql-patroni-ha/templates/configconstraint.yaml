@@ -7,9 +7,9 @@ metadata:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
   reloadOptions:
-    unixSignalTrigger:
-      signal: SIGHUP
-      processName: postgres
+    tplScriptTrigger:
+      scriptConfigMapRef: patroni-reload-script
+      namespace: {{ .Release.Namespace }}
 
   # top level mysql configuration type
   cfgSchemaTopLevelName: PGParameter
@@ -31,16 +31,17 @@ spec:
     {{- end }}
   {{- end}}
 
-  ## reload parameters
-  ## dynamicParameters
-  {{- if hasKey $cc "dynamicParameters" }}
-  dynamicParameters:
-   {{- $params := get $cc "dynamicParameters" }}
+  ## define immutable parameter list, this feature is not currently supported.
+  {{- if hasKey $cc "immutableParameters" }}
+  immutableParameters:
+   {{- $params := get $cc "immutableParameters" }}
    {{- range $params }}
     - {{ . }}
    {{- end }}
- {{- end}}
+  {{- end}}
 
-  # configuration file format
+
+
+    # configuration file format
   formatterConfig:
     format: properties

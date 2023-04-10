@@ -54,13 +54,10 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 		client     = param.Client
 		newVersion = param.getTargetVersionHash()
 		configKey  = param.getConfigKey()
-		progress   = cfgcore.NotStarted
-		retStatus  = ESRetry
-	)
 
-	if configKey == "" {
-		return makeReturnedStatus(ESFailed), cfgcore.MakeError("failed to find config meta. configmap : %s", param.ConfigSpecName)
-	}
+		retStatus = ESRetry
+		progress  = cfgcore.NotStarted
+	)
 
 	for _, sts := range units {
 		if err := restartStsWithRolling(client, param.Ctx, sts, configKey, newVersion); err != nil {

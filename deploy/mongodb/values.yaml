@@ -35,15 +35,15 @@ logConfigs:
 metrics:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
-    repository: apecloud/apecloud-otel-collector
-    tag: 0.0.2-alpha
+    repository: apecloud/agamotto
+    tag: 0.0.4
     pullPolicy: IfNotPresent
   config:
     extensions:
       memory_ballast:
         size_mib: 512
       health_check:
-        endpoint: localhost:13133
+        endpoint: 0.0.0.0:13133
         path: /health/status
         check_collector_pipeline:
           enabled: true
@@ -52,8 +52,8 @@ metrics:
 
     receivers:
       apecloudmongodb:
-        # uri: mongodb://${env:MONGODB_ROOT_USER}:${env:MONGODB_ROOT_PASSWORD}@127.0.0.1:27018/admin?ssl=false&authSource=admin
-        uri: mongodb://127.0.0.1:27018
+        uri: mongodb://${env:MONGODB_ROOT_USER}:${env:MONGODB_ROOT_PASSWORD}@127.0.0.1:27018/admin?ssl=false&authSource=admin
+        # uri: mongodb://127.0.0.1:27018
         collect-all: true
         collection_interval: 15s
         direct-connect: true
@@ -63,7 +63,7 @@ metrics:
 
     processors:
       batch:
-        timeout: 10s
+        timeout: 5s
       memory_limiter:
         limit_mib: 1024
         spike_limit_mib: 256
@@ -71,7 +71,7 @@ metrics:
 
     exporters:
       prometheus:
-        endpoint: :9216
+        endpoint: 0.0.0.0:9216
         const_labels: [ ]
         send_timestamps: false
         metric_expiration: 30s
@@ -84,11 +84,11 @@ metrics:
         logs:
           level: info
         metrics:
-          address: :8888
+          address: 0.0.0.0:8888
       pipelines:
         metrics:
-          receivers: [ apecloudmongodb ]
-          processors: [ memory_limiter ]
-          exporters: [ prometheus ]
+          receivers: [apecloudmongodb]
+          processors: [memory_limiter]
+          exporters: [prometheus]
 
-      extensions: [ memory_ballast, health_check ]
+      extensions: [memory_ballast, health_check]

@@ -123,7 +123,7 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
             command:
-              - "/bin/ape-collector"
+              - "/bin/agamotto"
               - "--config=/opt/conf/metrics-config.yaml"
             ports:
               - name: http-metrics

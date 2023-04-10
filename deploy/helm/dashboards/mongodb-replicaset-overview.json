@@ -26,7 +26,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 7359,
   "graphTooltip": 1,
-  "id": 11,
+  "id": 10,
   "links": [
     {
       "asDropdown": false,
@@ -920,7 +920,7 @@
       "error": false,
       "fieldConfig": {
         "defaults": {
-          "unit": "ms"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -974,7 +974,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max by(namespace, app_kubernetes_io_instance, pod) (mongodb_rs_members_optimeDate{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", member_state=\"PRIMARY\"} - on(pod) group_right mongodb_rs_members_optimeDate{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", member_state=\"SECONDARY\"} * on (pod) group_left mongodb_mongod_replset_my_name{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "expr": "max by(namespace, app_kubernetes_io_instance, pod) (mongodb_mongod_replset_member_replication_lag{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
           "hide": false,
           "interval": "",
           "intervalFactor": 1,
@@ -1008,7 +1008,7 @@
       ],
       "yaxes": [
         {
-          "format": "ms",
+          "format": "s",
           "label": "",
           "logBase": 1,
           "min": 0,
@@ -5519,12 +5519,12 @@
       {
         "allValue": ".+",
         "current": {
-          "selected": false,
+          "selected": true,
           "text": [
-            "default"
+            "All"
           ],
           "value": [
-            "default"
+            "$__all"
           ]
         },
         "datasource": {
@@ -5551,7 +5551,7 @@
       {
         "allValue": ".+",
         "current": {
-          "selected": false,
+          "selected": true,
           "text": [
             "All"
           ],
@@ -5583,7 +5583,7 @@
       {
         "allValue": ".+",
         "current": {
-          "selected": false,
+          "selected": true,
           "text": [
             "All"
           ],
@@ -5615,7 +5615,7 @@
       {
         "allValue": ".+",
         "current": {
-          "selected": false,
+          "selected": true,
           "text": [
             "All"
           ],

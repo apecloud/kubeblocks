@@ -22,7 +22,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"text/template/parse"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
@@ -44,8 +43,8 @@ func SetLogger(zapLogger *zap.Logger) {
 	logger = logger.WithName("configmap_volume_watcher")
 }
 
-// findParentPidFromProcessName get parent pid
-func findParentPidFromProcessName(processName string) (PID, error) {
+// findPidFromProcessName get parent pid
+func findPidFromProcessName(processName string) (PID, error) {
 	allProcess, err := process.Processes()
 	if err != nil {
 		return InvalidPID, err
@@ -88,7 +87,7 @@ func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string) (Watch
 		return nil, err
 	}
 	return func(event fsnotify.Event) error {
-		pid, err := findParentPidFromProcessName(processName)
+		pid, err := findPidFromProcessName(processName)
 		if err != nil {
 			return err
 		}
@@ -159,11 +158,4 @@ func CreateTPLScriptHandler(tplScripts string, dirs []string, fileRegex string, 
 		}
 		return backupLastConfigFiles(currFiles, backupPath)
 	}, nil
-}
-
-func checkTPLScript(tplName string, tplContent string) error {
-	tr := parse.New(tplName)
-	tr.Mode = parse.SkipFuncCheck
-	_, err := tr.Parse(tplContent, "", "", make(map[string]*parse.Tree))
-	return err
 }

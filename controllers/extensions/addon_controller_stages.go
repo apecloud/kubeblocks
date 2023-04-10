@@ -801,7 +801,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 					Containers: []corev1.Container{
 						{
 							Name:            strings.ToLower(string(addon.Spec.Type)),
-							Image:           viper.GetString("KUBEBLOCKS_IMAGE"),
+							Image:           viper.GetString(constant.KBToolsImage),
 							ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgAddonJobImgPullPolicy)),
 							// TODO: need have image that is capable of following settings, current settings
 							// may expose potential security risk, as this pod is using cluster-admin clusterrole.

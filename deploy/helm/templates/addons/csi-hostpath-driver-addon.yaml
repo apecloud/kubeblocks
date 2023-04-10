@@ -30,7 +30,7 @@ spec:
         operator: DoesNotContain
         values:
           - eks
-          - ack
+          - aliyun
           - gke
           - tke
           - aks

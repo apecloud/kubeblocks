@@ -41,7 +41,7 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-apps-kubeblocks-io-v1alpha1-cluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-apps-kubeblocks-io-v1alpha1-cluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &Cluster{}
 
@@ -151,9 +151,6 @@ func getLastComponentByName(lastCluster *Cluster, componentName string) *Cluster
 // setVolumeClaimStorageSizeZero set the volumeClaimTemplates storage size to zero. then we can diff last/current volumeClaimTemplates.
 func setVolumeClaimStorageSizeZero(volumeClaimTemplates []ClusterComponentVolumeClaimTemplate) {
 	for i := range volumeClaimTemplates {
-		if volumeClaimTemplates[i].Spec == nil {
-			continue
-		}
 		volumeClaimTemplates[i].Spec.Resources = corev1.ResourceRequirements{}
 	}
 }

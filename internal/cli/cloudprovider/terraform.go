@@ -77,17 +77,15 @@ func initTerraform() error {
 	return nil
 }
 
-func tfInitAndApply(workingDir string, init bool, stdout, stderr io.Writer, opts ...tfexec.ApplyOption) error {
+func tfInitAndApply(workingDir string, stdout, stderr io.Writer, opts ...tfexec.ApplyOption) error {
 	ctx := context.Background()
 	tf, err := newTerraform(workingDir, stdout, stderr)
 	if err != nil {
 		return err
 	}
 
-	if init {
-		if err = tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
-			return err
-		}
+	if err = tf.Init(ctx, tfexec.Upgrade(false)); err != nil {
+		return err
 	}
 
 	if err = tf.Apply(ctx, opts...); err != nil {
@@ -96,12 +94,17 @@ func tfInitAndApply(workingDir string, init bool, stdout, stderr io.Writer, opts
 	return nil
 }
 
-func tfDestroy(workingDir string, stdout, stderr io.Writer, opts ...tfexec.DestroyOption) error {
+func tfInitAndDestroy(workingDir string, stdout, stderr io.Writer, opts ...tfexec.DestroyOption) error {
 	ctx := context.Background()
 	tf, err := newTerraform(workingDir, stdout, stderr)
 	if err != nil {
 		return err
 	}
+
+	if err = tf.Init(ctx, tfexec.Upgrade(false)); err != nil {
+		return err
+	}
+
 	return tf.Destroy(ctx, opts...)
 }
 
@@ -116,25 +119,29 @@ func newTerraform(workingDir string, stdout, stderr io.Writer) (*tfexec.Terrafor
 	return tf, nil
 }
 
-func getOutputValue(key outputKey, tfPath string) (string, error) {
+func getOutputValues(tfPath string, keys ...outputKey) ([]string, error) {
 	stateFile := filepath.Join(tfPath, tfStateFileName)
 	content, err := os.ReadFile(stateFile)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return "", err
+		return nil, err
 	}
 
 	var state map[string]interface{}
 	if err = json.Unmarshal(content, &state); err != nil {
-		return "", err
+		return nil, err
 	}
 	outputs, ok := state["outputs"].(map[string]interface{})
 	if !ok {
-		return "", nil
+		return nil, nil
 	}
 
-	value, ok := outputs[string(key)].(map[string]interface{})
-	if !ok {
-		return "", nil
+	vals := make([]string, len(keys))
+	for i, k := range keys {
+		v, ok := outputs[string(k)].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		vals[i] = v["value"].(string)
 	}
-	return value["value"].(string), nil
+	return vals, nil
 }

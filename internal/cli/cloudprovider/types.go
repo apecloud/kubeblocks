@@ -17,7 +17,10 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"fmt"
 	"strings"
+
+	"github.com/hashicorp/terraform-exec/tfexec"
 )
 
 type outputKey string
@@ -25,8 +28,8 @@ type outputKey string
 // terraform output keys
 const (
 	clusterNameKey outputKey = "cluster_name"
-	contextNameKey outputKey = "context_name"
 	regionKey      outputKey = "region"
+	kubeConfigKey  outputKey = "kube_config"
 )
 
 const (
@@ -37,23 +40,25 @@ const (
 const (
 	Local        = "local"
 	AWS          = "aws"
-	AlibabaCloud = "alibaba-cloud"
+	AliCloud     = "alicloud"
 	Azure        = "azure"
 	GCP          = "gcp"
+	TencentCloud = "tencentcloud"
 )
 
 var (
 	cloudProviderK8sServiceMap = map[string]string{
 		Local:        "k3s",
 		AWS:          "eks",
-		AlibabaCloud: "ack",
+		AliCloud:     "ack",
 		Azure:        "aks",
 		GCP:          "gke",
+		TencentCloud: "tke",
 	}
 )
 
 func CloudProviders() []string {
-	return []string{Local, AWS, Azure, GCP, AlibabaCloud}
+	return []string{Local, AWS, Azure, GCP, AliCloud, TencentCloud}
 }
 
 func K8sService(provider string) string {
@@ -64,10 +69,9 @@ func K8sService(provider string) string {
 // be serialized to a state file
 type K8sClusterInfo struct {
 	ClusterName   string `json:"cluster_name"`
-	ContextName   string `json:"context_name"`
-	KubeConfig    string `json:"kubeconfig"`
 	CloudProvider string `json:"cloud_provider"`
 	Region        string `json:"region,omitempty"`
+	KubeConfig    string `json:"kube_config,omitempty"`
 }
 
 // IsValid check if kubernetes cluster info is valid
@@ -81,11 +85,19 @@ func (c *K8sClusterInfo) IsValid() bool {
 func (c *K8sClusterInfo) String() string {
 	fields := []string{"  cloud provider: " + c.CloudProvider,
 		"cluster name: " + c.ClusterName,
-		"context name: " + c.ContextName,
-		"kubeconfig: " + c.KubeConfig,
 	}
 	if c.CloudProvider != Local {
 		fields = append(fields, "region: "+c.Region)
 	}
 	return strings.Join(fields, "\n  ")
+}
+
+func (c *K8sClusterInfo) buildApplyOpts() []tfexec.ApplyOption {
+	return []tfexec.ApplyOption{tfexec.Var(fmt.Sprintf("%s=%s", clusterNameKey, c.ClusterName)),
+		tfexec.Var(fmt.Sprintf("%s=%s", regionKey, c.Region))}
+}
+
+func (c *K8sClusterInfo) buildDestroyOpts() []tfexec.DestroyOption {
+	return []tfexec.DestroyOption{tfexec.Var(fmt.Sprintf("%s=%s", clusterNameKey, c.ClusterName)),
+		tfexec.Var(fmt.Sprintf("%s=%s", regionKey, c.Region))}
 }

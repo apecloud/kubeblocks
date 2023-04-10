@@ -111,22 +111,16 @@ spec:
             ports:
               - name: http
                 containerPort: 8123
-                # protocol: TCP
               - name: tcp
                 containerPort: 9000
-                # protocol: TCP
               - name: tcp-postgresql
                 containerPort: 9005
-                # protocol: TCP
               - name: tcp-mysql
                 containerPort: 9004
-                # protocol: TCP
               - name: http-intersrv
                 containerPort: 9009
-                # protocol: TCP
               - name: http-metrics
                 containerPort: 8001
-                # protocol: TCP
             livenessProbe:
               failureThreshold: 3
               initialDelaySeconds: 10
@@ -175,13 +169,9 @@ spec:
           - name: tcp
             targetPort: tcp
             port: 2181
-            protocol: TCP
-            nodePort: null
           - name: http-metrics
             targetPort: http-metrics
             port: 8001
-            protocol: TCP
-            nodePort: null
       podSpec:
         securityContext:
           fsGroup: 1001
@@ -213,13 +203,10 @@ spec:
             ports:
               - name: tcp
                 containerPort: 2181
-                # protocol: TCP
               - name: raft
                 containerPort: 9444
-                # protocol: TCP
               - name: http-metrics
                 containerPort: 8001
-                # protocol: TCP
             # livenessProbe:
             #   failureThreshold: 6
             #   initialDelaySeconds: 30
@@ -360,16 +347,12 @@ spec:
             ports:
               - name: client
                 containerPort: 2181
-                # protocol: TCP
               - name: follower
                 containerPort: 2888
-                # protocol: TCP
               - name: election
                 containerPort: 3888
-                # protocol: TCP
               - name: metrics
                 containerPort: 9141
-                # protocol: TCP
             livenessProbe:
               failureThreshold: 6
               initialDelaySeconds: 30

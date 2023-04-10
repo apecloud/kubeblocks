@@ -44,7 +44,7 @@ func main() {
 	}()
 
 	viper.AutomaticEnv()
-	cmd := app.NewConfigReloadCommand(ctx, filepath.Base(os.Args[0]))
+	cmd := app.NewConfigManagerCommand(ctx, filepath.Base(os.Args[0]))
 	if err := cmd.Execute(); err != nil && errors.Cause(err) != context.Canceled {
 		fmt.Println(err)
 		os.Exit(-1)

@@ -1,0 +1,25 @@
+# Default values for qdrant.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+
+clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
+
+## @param commonLabels Labels to add to all deployed objects
+##
+commonLabels: {}
+
+## @param application images
+##
+images:
+  pullPolicy: IfNotPresent
+  qdrant:
+    repository: docker.io/qdrant/qdrant
+    tag: latest
+
+## @param debugEnabled enables containers' debug logging
+##
+debugEnabled: true

@@ -11,6 +11,9 @@ spec:
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-monogdb)"
+    headlessEndpoint: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
+    headlessHost: "$(POD_NAME_PREFIX)-0.$(HEADLESS_SVC_FQDN)"
+    headlessPort: "$(SVC_PORT_tcp-monogdb)"
   componentDefs:
     - name: replicaset
       characterType: mongodb
@@ -21,6 +24,11 @@ spec:
           namespace: {{ .Release.Namespace }}
           defaultMode: 493
       configSpecs:
+        - name: mongodb-config
+          templateRef: mongodb5.0-config-template
+          namespace: {{ .Release.Namespace }}
+          volumeName: mongodb-config
+          defaultMode: 256
         - name: mongodb-metrics-config
           templateRef: mongodb-metrics-config
           namespace: {{ .Release.Namespace }}
@@ -52,17 +60,17 @@ spec:
       service:
         ports:
           - protocol: TCP
-            port: 27018
+            port: 27017
       volumeTypes:
         - name: data
           type: data
       podSpec:
         containers:
-          - name: replica
+          - name: mongodb
             ports:
-              - name: replica
+              - name: mongodb
                 protocol: TCP
-                containerPort: 27018
+                containerPort: 27017
             command:
               - /scripts/replicaset-setup.sh
             env:
@@ -83,8 +91,14 @@ spec:
                     - /scripts/replicaset-post-start.sh
                     - REPLICASET
             volumeMounts:
-              - mountPath: /data/db
+              - mountPath: /data/mongodb
                 name: data
+              - mountPath: /etc/mongodb/mongodb.conf
+                name: mongodb-config
+                subPath: mongodb.conf
+              - mountPath: /etc/mongodb/keyfile
+                name: mongodb-config
+                subPath: keyfile
               - name: scripts
                 mountPath: /scripts/replicaset-setup.sh
                 subPath: replicaset-setup.sh
@@ -127,14 +141,14 @@ spec:
       workloadType: Stateless
       service:
         ports:
-          - protocol: TCP
+          - name: mongos
             port: 27017
+            targetPort: mongos
       podSpec:
         containers:
           - name: mongos
             ports:
-              - protocol: TCP
-                name: mongos
+              - name: mongos
                 containerPort: 27017
             command:
               - /scripts/mongos-setup.sh
@@ -165,14 +179,14 @@ spec:
           failureThreshold: 3
       service:
         ports:
-          - protocol: TCP
+          - name: configsvr
             port: 27018
+            targetPort: configsvr
       podSpec:
         containers:
           - name: configsvr
             ports:
               - name: configsvr
-                protocol: TCP
                 containerPort: 27018
             command:
               - /scripts/replicaset-setup.sh
@@ -214,14 +228,14 @@ spec:
           failureThreshold: 3
       service:
         ports:
-          - protocol: TCP
+          - name: shard
             port: 27018
+            targetPort: shard
       podSpec:
         containers:
           - name: shard
             ports:
               - name: shard
-                protocol: TCP
                 containerPort: 27018
             command:
               - /scripts/replicaset-setup.sh

@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -45,6 +46,10 @@ type ReconfigureRequestReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
+
+const (
+	ConfigReconcileInterval = time.Second * 1
+)
 
 var ConfigurationRequiredLabels = []string{
 	constant.AppNameLabelKey,
@@ -160,7 +165,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	// Not any parameters updated
 	if !configPatch.IsModify {
-		return r.updateConfigCMStatus(reqCtx, config, ReconfigureNoChangeType)
+		return r.updateConfigCMStatus(reqCtx, config, cfgcore.ReconfigureNoChangeType)
 	}
 
 	reqCtx.Log.V(1).Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
@@ -177,7 +182,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// Find ClusterComponentSpec from cluster cr
-	clusterComponent := cluster.GetComponentByName(componentName)
+	clusterComponent := cluster.Spec.GetComponentByName(componentName)
 	// Assumption: It is required that the cluster must have a component.
 	if clusterComponent == nil {
 		reqCtx.Log.Info("not found component.")

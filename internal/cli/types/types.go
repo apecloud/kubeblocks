@@ -21,6 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -71,6 +72,7 @@ const (
 	ResourceClusterVersions          = "clusterversions"
 	ResourceOpsRequests              = "opsrequests"
 	ResourceConfigConstraintVersions = "configconstraints"
+	ResourceClassFamily              = "classfamilies"
 	KindCluster                      = "Cluster"
 	KindClusterDef                   = "ClusterDefinition"
 	KindClusterVersion               = "ClusterVersion"
@@ -81,11 +83,24 @@ const (
 	KindOps                          = "OpsRequest"
 )
 
+// K8S rbac API group
+const (
+	RBACAPIGroup        = rbacv1.GroupName
+	RBACAPIVersion      = "v1"
+	ClusterRoles        = "clusterroles"
+	ClusterRoleBindings = "clusterrolebindings"
+)
+
 // Annotations
 const (
-	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
-	ServiceLBTypeAnnotationValue   = "private-ip"
-	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"
+	ServiceHAVIPTypeAnnotationKey   = "service.kubernetes.io/kubeblocks-havip-type"
+	ServiceHAVIPTypeAnnotationValue = "private-ip"
+	ServiceFloatingIPAnnotationKey  = "service.kubernetes.io/kubeblocks-havip-floating-ip"
+
+	ClassLevelLabelKey          = "class.kubeblocks.io/level"
+	ClassProviderLabelKey       = "class.kubeblocks.io/provider"
+	ClassFamilyProviderLabelKey = "classfamily.kubeblocks.io/provider"
+	ComponentClassAnnotationKey = "cluster.kubeblocks.io/component-class"
 )
 
 // DataProtection API group
@@ -187,6 +202,10 @@ func AddonGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: ExtensionsAPIGroup, Version: ExtensionsAPIVersion, Resource: ResourceAddons}
 }
 
+func ClassFamilyGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceClassFamily}
+}
+
 func CRDGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{
 		Group:    "apiextensions.k8s.io",
@@ -257,4 +276,11 @@ func MutatingWebhookConfigurationGVR() schema.GroupVersionResource {
 		Version:  K8sWebhookAPIVersion,
 		Resource: ResourceMutatingWebhookConfigurations,
 	}
+}
+
+func ClusterRoleGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: ClusterRoles}
+}
+func ClusterRoleBindingGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: ClusterRoleBindings}
 }

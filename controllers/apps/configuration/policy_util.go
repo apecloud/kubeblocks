@@ -36,40 +36,55 @@ type createReconfigureClient func(addr string) (cfgproto.ReconfigureClient, erro
 
 type GetPodsFunc func(params reconfigureParams) ([]corev1.Pod, error)
 
-type RestartContainerFunc func(pod *corev1.Pod, containerName []string, createConnFn createReconfigureClient) error
+type RestartContainerFunc func(pod *corev1.Pod, ctx context.Context, containerName []string, createConnFn createReconfigureClient) error
+type OnlineUpdatePodFunc func(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, updatedParams map[string]string) error
 
 type RollingUpgradeFuncs struct {
 	GetPodsFunc          GetPodsFunc
 	RestartContainerFunc RestartContainerFunc
+	OnlineUpdatePodFunc  OnlineUpdatePodFunc
 }
 
 func GetConsensusRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
 		GetPodsFunc:          getConsensusPods,
-		RestartContainerFunc: commonStopContainer,
+		RestartContainerFunc: commonStopContainerWithPod,
+		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
 	}
 }
 
 func GetStatefulSetRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
 		GetPodsFunc:          getStatefulSetPods,
-		RestartContainerFunc: commonStopContainer,
+		RestartContainerFunc: commonStopContainerWithPod,
+		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
 	}
 }
 
 func GetReplicationRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
 		GetPodsFunc:          getReplicationSetPods,
-		RestartContainerFunc: commonStopContainer,
+		RestartContainerFunc: commonStopContainerWithPod,
+		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
 	}
 }
 
-func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
-	var (
-		ctx     = params.Ctx
-		cluster = params.Cluster
-	)
+func GetDeploymentRollingUpgradeFuncs() RollingUpgradeFuncs {
+	return RollingUpgradeFuncs{
+		GetPodsFunc:          getDeploymentRollingPods,
+		RestartContainerFunc: commonStopContainerWithPod,
+		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
+	}
+}
 
+func getDeploymentRollingPods(params reconfigureParams) ([]corev1.Pod, error) {
+	// util.GetComponentPodList support deployment
+	return getReplicationSetPods(params)
+}
+
+func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
+	var ctx = params.Ctx
+	var cluster = params.Cluster
 	podList, err := util.GetComponentPodList(ctx.Ctx, params.Client, *cluster, params.ClusterComponent.Name)
 	if err != nil {
 		return nil, err
@@ -149,7 +164,29 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	return r, nil
 }
 
-func commonStopContainer(pod *corev1.Pod, containerNames []string, createClient createReconfigureClient) error {
+// TODO commonOnlineUpdateWithPod migrate to sql command pipeline
+func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, updatedParams map[string]string) error {
+	client, err := createClient(generateManagerSidecarAddr(pod))
+	if err != nil {
+		return err
+	}
+
+	response, err := client.OnlineUpgradeParams(ctx, &cfgproto.OnlineUpgradeParamsRequest{
+		ConfigSpec: configSpec,
+		Params:     updatedParams,
+	})
+	if err != nil {
+		return err
+	}
+
+	errMessage := response.GetErrMessage()
+	if errMessage != "" {
+		return cfgcore.MakeError(errMessage)
+	}
+	return nil
+}
+
+func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerNames []string, createClient createReconfigureClient) error {
 	containerIDs := make([]string, 0, len(containerNames))
 	for _, name := range containerNames {
 		containerID := intctrlutil.GetContainerID(pod, name)
@@ -165,7 +202,7 @@ func commonStopContainer(pod *corev1.Pod, containerNames []string, createClient 
 		return err
 	}
 
-	response, err := client.StopContainer(context.Background(), &cfgproto.StopContainerRequest{
+	response, err := client.StopContainer(ctx, &cfgproto.StopContainerRequest{
 		ContainerIDs: containerIDs,
 	})
 	if err != nil {

@@ -138,6 +138,10 @@ var _ = AfterSuite(func() {
 })
 
 var _ = Describe("e2e test", func() {
+	var _ = Describe("KubeBlocks playground init", PlaygroundInit)
+
+	var _ = Describe("KubeBlocks uninstall", UninstallKubeblocks)
+
 	var _ = Describe("Check healthy Kubernetes cluster status", EnvCheckTest)
 
 	var _ = Describe("KubeBlocks operator installation", InstallationTest)
@@ -148,5 +152,5 @@ var _ = Describe("e2e test", func() {
 
 	var _ = Describe("Check environment has been cleaned", EnvGotCleanedTest)
 
-	var _ = Describe("KubeBlocks playground test", PlaygroundTest)
+	var _ = Describe("KubeBlocks playground destroy", PlaygroundDestroy)
 })

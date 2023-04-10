@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
@@ -61,6 +63,10 @@ func buildTPLScriptArgs(options *appsv1alpha1.TPLScriptTrigger, volumeDirs []cor
 	}
 
 	args := buildConfigManagerCommonArgs(volumeDirs)
+	if options.Sync != nil && *options.Sync {
+		args = append(args, "--operator-update-enable")
+	}
+	args = append(args, "--tcp", viper.GetString(constant.ConfigManagerGPRCPortEnv))
 	args = append(args, "--notify-type", string(appsv1alpha1.TPLScriptType))
 	args = append(args, "--tpl-config", filepath.Join(scriptVolumePath, configTemplateName))
 	manager.Args = args
@@ -142,6 +148,7 @@ func buildConfigManagerCommonArgs(volumeDirs []corev1.VolumeMount) []string {
 	args := make([]string, 0)
 	// set grpc port
 	// args = append(args, "--tcp", viper.GetString(cfgutil.ConfigManagerGPRCPortEnv))
+	args = append(args, "--log-level", viper.GetString(constant.ConfigManagerLogLevel))
 	for _, volume := range volumeDirs {
 		args = append(args, "--volume-dir", volume.MountPath)
 	}

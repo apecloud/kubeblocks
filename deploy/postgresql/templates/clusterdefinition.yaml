@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: postgresql-ha
+  name: postgresql
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
@@ -13,7 +13,7 @@ spec:
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-postgresql)"
   componentDefs:
-    - name: postgresql-ha
+    - name: postgresql
       workloadType: Replication
       characterType: postgresql
       customLabelSpecs:
@@ -42,16 +42,16 @@ spec:
           filePathPattern: {{ $pattern }}
         {{- end }}
       configSpecs:
-        - name: postgresql-ha-configuration
-          templateRef: postgresql-ha-configuration
+        - name: postgresql-configuration
+          templateRef: postgresql-configuration
           constraintRef: postgresql14-ha-cc
           keys:
             - postgresql.conf
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-config
           defaultMode: 0777
-        - name: postgresql-ha-custom-metrics
-          templateRef: postgresql-ha-custom-metrics
+        - name: postgresql-custom-metrics
+          templateRef: postgresql-custom-metrics
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-custom-metrics
           defaultMode: 0777

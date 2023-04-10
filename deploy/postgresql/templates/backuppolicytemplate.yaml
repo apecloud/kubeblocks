@@ -1,9 +1,9 @@
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: backup-policy-template-postgresql-ha
+  name: backup-policy-template-postgresql
   labels:
-    clusterdefinition.kubeblocks.io/name: postgresql-ha
+    clusterdefinition.kubeblocks.io/name: postgresql
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
   # which backup tool to perform database backup, only support one tool.

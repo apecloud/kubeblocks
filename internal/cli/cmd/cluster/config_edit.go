@@ -103,19 +103,17 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		return nil
 	}
 
-	fmt.Fprintf(o.IOStreams.Out, "\nconfig patch: %s\n", string(configPatch.UpdateConfig[o.CfgFile]))
+	fmt.Fprintf(o.IOStreams.Out, "config patch: %s\n\n", string(configPatch.UpdateConfig[o.CfgFile]))
 
 	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(&configConstraint.Spec, configPatch)
 	if err != nil {
 		return nil
 	}
-	if dynamicUpdated {
-		return nil
+	if !dynamicUpdated {
+		if err := o.confirmReconfigureWithRestart(); err != nil {
+			return err
+		}
 	}
-	if err := o.confirmReconfigureWithRestart(); err != nil {
-		return err
-	}
-
 	return fn(configPatch, &configConstraint.Spec)
 }
 

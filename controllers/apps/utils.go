@@ -18,8 +18,11 @@ package apps
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -38,11 +41,12 @@ func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
 	}
 }
 
-// notifyClusterStatusChange notifies a cluster changes occurred and triggers it to reconcile.
-func notifyClusterStatusChange(ctx context.Context, cli client.Client, obj client.Object) error {
+// notifyClusterStatusChange notifies cluster changes occurred and triggers it to reconcile.
+func notifyClusterStatusChange(ctx context.Context, cli client.Client, recorder record.EventRecorder, obj client.Object, event *corev1.Event) error {
 	if obj == nil || !intctrlutil.WorkloadFilterPredicate(obj) {
 		return nil
 	}
+
 	cluster, ok := obj.(*appsv1alpha1.Cluster)
 	if !ok {
 		var err error
@@ -50,10 +54,26 @@ func notifyClusterStatusChange(ctx context.Context, cli client.Client, obj clien
 			return err
 		}
 	}
+
 	patch := client.MergeFrom(cluster.DeepCopy())
 	if cluster.Annotations == nil {
 		cluster.Annotations = map[string]string{}
 	}
 	cluster.Annotations[constant.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-	return cli.Patch(ctx, cluster, patch)
+	if err := cli.Patch(ctx, cluster, patch); err != nil {
+		return err
+	}
+
+	if event != nil {
+		recorder.Eventf(cluster, corev1.EventTypeWarning, event.Reason, getFinalEventMessageForRecorder(event))
+	}
+	return nil
+}
+
+// getFinalEventMessageForRecorder gets final event message by event involved object kind for recorded it
+func getFinalEventMessageForRecorder(event *corev1.Event) string {
+	if event.InvolvedObject.Kind == constant.PodKind {
+		return fmt.Sprintf("Pod %s: %s", event.InvolvedObject.Name, event.Message)
+	}
+	return event.Message
 }

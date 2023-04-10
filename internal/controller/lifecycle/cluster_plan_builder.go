@@ -313,13 +313,14 @@ func (c *clusterPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) err
 	node, ok := vertex.(*ictrltypes.LifecycleVertex)
 	err := c.defaultWalkFunc(vertex)
 	if err != nil {
-		//fmt.Printf("plan - walking object %s error: %s\n", node, err.Error())
 		if !ok {
 			c.ctx.Log.Error(err, "")
-		} else if node.Action == nil {
-			c.ctx.Log.Error(err, "%T", node)
 		} else {
-			c.ctx.Log.Error(err, "%s %T error", *node.Action, node.Obj)
+			if node.Action == nil {
+				c.ctx.Log.Error(err, "%T", node)
+			} else {
+				c.ctx.Log.Error(err, "%s %T error", *node.Action, node.Obj)
+			}
 		}
 	}
 	return err

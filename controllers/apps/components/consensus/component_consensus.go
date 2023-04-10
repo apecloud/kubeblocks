@@ -21,50 +21,51 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/consensusset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func NewConsensusComponent(cli client.Client,
-	definition *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ClusterComponentDefinition,
-	compVer *appsv1alpha1.ClusterComponentVersion,
-	compSpec *appsv1alpha1.ClusterComponentSpec,
+	clusterVersion *appsv1alpha1.ClusterVersion,
+	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *consensusComponent {
-	return &consensusComponent{
-		StatefulsetComponentBase: types.StatefulsetComponentBase{
-			ComponentBase: types.ComponentBase{
-				Client:     cli,
-				Definition: definition,
-				Cluster:    cluster,
-				CompDef:    compDef,
-				CompVer:    compVer,
-				CompSpec:   compSpec,
-				Component:  nil,
+	comp := &consensusComponent{
+		StatefulsetComponentBase: internal.StatefulsetComponentBase{
+			ComponentBase: internal.ComponentBase{
+				Client:         cli,
+				Cluster:        cluster,
+				ClusterVersion: clusterVersion,
+				Component:      synthesizedComponent,
 				ComponentSet: &consensusset.ConsensusSet{
-					Cli:          cli,
-					Cluster:      cluster,
-					Component:    compSpec,
-					ComponentDef: compDef,
+					Cli:           cli,
+					Cluster:       cluster,
+					ComponentSpec: nil,
+					ComponentDef:  nil,
 				},
 				Dag:             dag,
 				WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
 			},
 		},
 	}
+	comp.ComponentSet.SetComponent(comp)
+	return comp
 }
 
 type consensusComponent struct {
-	types.StatefulsetComponentBase
+	internal.StatefulsetComponentBase
 }
 
+var _ types.Component = &consensusComponent{}
+
 func (c *consensusComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	action *ictrltypes.LifecycleAction) types.ComponentWorkloadBuilder {
+	action *ictrltypes.LifecycleAction) internal.ComponentWorkloadBuilder {
 	builder := &consensusComponentWorkloadBuilder{
-		ComponentWorkloadBuilderBase: types.ComponentWorkloadBuilderBase{
+		ComponentWorkloadBuilderBase: internal.ComponentWorkloadBuilderBase{
 			ReqCtx:        reqCtx,
 			Client:        cli,
 			Comp:          c,

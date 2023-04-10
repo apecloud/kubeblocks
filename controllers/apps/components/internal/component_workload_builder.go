@@ -14,25 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package types
+package internal
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // TODO(refactor): define a custom workload to encapsulate all the resources.
-//
-//	runtime, config, script, env, volume, service, monitor, probe
+
 type ComponentWorkloadBuilder interface {
+	//	runtime, config, script, env, volume, service, monitor, probe
 	BuildEnv() ComponentWorkloadBuilder
 	BuildHeadlessService() ComponentWorkloadBuilder
 	BuildService() ComponentWorkloadBuilder
 	BuildTLSCert() ComponentWorkloadBuilder
 
 	// workload related
-	BuildConfig(idx int32) ComponentWorkloadBuilder
 	BuildWorkload(idx int32) ComponentWorkloadBuilder
+	BuildConfig(idx int32) ComponentWorkloadBuilder
 	BuildVolume(idx int32) ComponentWorkloadBuilder
 	BuildVolumeMount(idx int32) ComponentWorkloadBuilder
 	BuildTLSVolume(idx int32) ComponentWorkloadBuilder
@@ -40,5 +39,4 @@ type ComponentWorkloadBuilder interface {
 	Complete() error
 
 	MutableWorkload(idx int32) client.Object
-	MutableRuntime(idx int32) *corev1.PodSpec
 }

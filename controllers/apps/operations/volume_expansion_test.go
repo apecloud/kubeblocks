@@ -237,21 +237,21 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 	testDeleteRunningVolumeExpansion := func(clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource) {
 		//// init resources for volume expansion
-		//newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, 2)
-		//Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+		// newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, 2)
+		// Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
 		//	clusterObject.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
-		//})).ShouldNot(HaveOccurred())
-		//Expect(k8sClient.Delete(ctx, newOps)).Should(Succeed())
-		//Eventually(func() error {
+		// })).ShouldNot(HaveOccurred())
+		// Expect(k8sClient.Delete(ctx, newOps)).Should(Succeed())
+		// Eventually(func() error {
 		//	return k8sClient.Get(ctx, client.ObjectKey{Name: newOps.Name, Namespace: testCtx.DefaultNamespace}, &appsv1alpha1.OpsRequest{})
-		//}).Should(Satisfy(apierrors.IsNotFound))
+		// }).Should(Satisfy(apierrors.IsNotFound))
 		//
-		//By("test handle the invalid volumeExpansion OpsRequest")
-		//pvc := &corev1.PersistentVolumeClaim{}
-		//Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
-		//Expect(handleVolumeExpansionWithPVC(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, pvc)).Should(Succeed())
+		// By("test handle the invalid volumeExpansion OpsRequest")
+		// pvc := &corev1.PersistentVolumeClaim{}
+		// Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
+		// Expect(handleVolumeExpansionWithPVC(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, pvc)).Should(Succeed())
 		//
-		//Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObject))).Should(Equal(appsv1alpha1.RunningClusterPhase))
+		// Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObject))).Should(Equal(appsv1alpha1.RunningClusterPhase))
 	}
 
 	Context("Test VolumeExpansion", func() {

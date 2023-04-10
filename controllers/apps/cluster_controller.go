@@ -37,7 +37,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -104,15 +103,6 @@ type ClusterReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// ClusterStatusEventHandler is the event handler for the cluster status event
-type ClusterStatusEventHandler struct{}
-
-var _ k8score.EventHandler = &ClusterStatusEventHandler{}
-
-func init() {
-	k8score.EventHandlerMap["cluster-status-handler"] = &ClusterStatusEventHandler{}
-}
-
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
@@ -171,24 +161,4 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool { return true })),
 	)
 	return b.Complete(r)
-}
-
-// Handle is the event handler for the cluster status event.
-func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
-		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
-	}
-
-	// parse probe event message when field path is probe-role-changed-check
-	message := k8score.ParseProbeEventMessage(reqCtx, event)
-	if message == nil {
-		reqCtx.Log.Info("parse probe event message failed", "message", event.Message)
-		return nil
-	}
-
-	// if probe message event is checkRoleFailed, it means the cluster is abnormal, need to handle the cluster status
-	if message.Event == k8score.ProbeEventCheckRoleFailed {
-		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
-	}
-	return nil
 }

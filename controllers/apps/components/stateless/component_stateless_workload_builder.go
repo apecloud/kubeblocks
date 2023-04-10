@@ -18,15 +18,14 @@ package stateless
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 type statelessComponentWorkloadBuilder struct {
-	types.ComponentWorkloadBuilderBase
+	internal.ComponentWorkloadBuilderBase
 	workload *appsv1.Deployment
 }
 
@@ -34,11 +33,7 @@ func (b *statelessComponentWorkloadBuilder) MutableWorkload(_ int32) client.Obje
 	return b.workload
 }
 
-func (b *statelessComponentWorkloadBuilder) MutableRuntime(_ int32) *corev1.PodSpec {
-	return &b.workload.Spec.Template.Spec
-}
-
-func (b *statelessComponentWorkloadBuilder) BuildWorkload(_ int32) types.ComponentWorkloadBuilder {
+func (b *statelessComponentWorkloadBuilder) BuildWorkload(_ int32) internal.ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		deploy, err := builder.BuildDeployLow(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {

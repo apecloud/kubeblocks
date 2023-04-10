@@ -72,35 +72,10 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		notExistOps := map[string]struct{}{
 			*opsRequestName: {},
 		}
-		if err = opsutil.RemoveClusterInvalidOpsRequestAnnotation(reqCtx.Ctx, cli, cluster,
-			opsRequestSlice, notExistOps); err != nil {
-			return err
-		}
-		// TODO(refactor): should delete this
-		//return handleClusterVolumeExpandingPhase(reqCtx.Ctx, cli, cluster)
-		return nil
+		return opsutil.RemoveClusterInvalidOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, opsRequestSlice, notExistOps)
 	}
 	return err
 }
-
-//// handleClusterVolumeExpandingPhase this function will reconcile the cluster status phase when the OpsRequest is deleted.
-//func handleClusterVolumeExpandingPhase(ctx context.Context,
-//	cli client.Client,
-//	cluster *appsv1alpha1.Cluster) error {
-//	if cluster.Status.Phase != appsv1alpha1.SpecReconcilingClusterPhase {
-//		return nil
-//	}
-//	patch := client.MergeFrom(cluster.DeepCopy())
-//	for k, v := range cluster.Status.Components {
-//		if v.Phase == appsv1alpha1.SpecReconcilingClusterCompPhase {
-//			v.Phase = appsv1alpha1.RunningClusterCompPhase
-//			cluster.Status.SetComponentStatus(k, v)
-//		}
-//	}
-//	// REVIEW: a single component status affect cluser level status?
-//	cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
-//	return cli.Status().Patch(ctx, cluster, patch)
-//}
 
 // Handle the warning events on pvcs. if the events are resize failed events, update the OpsRequest.status.
 func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Client,

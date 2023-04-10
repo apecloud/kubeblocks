@@ -18,8 +18,6 @@ package replication
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"reflect"
 	"strings"
 
@@ -29,51 +27,52 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func NewReplicationComponent(cli client.Client,
-	definition *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ClusterComponentDefinition,
-	compVer *appsv1alpha1.ClusterComponentVersion,
-	compSpec *appsv1alpha1.ClusterComponentSpec,
+	clusterVersion *appsv1alpha1.ClusterVersion,
+	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *replicationComponent {
-	return &replicationComponent{
-		ComponentBase: types.ComponentBase{
-			Client:     cli,
-			Definition: definition,
-			Cluster:    cluster,
-			CompDef:    compDef,
-			CompVer:    compVer,
-			CompSpec:   compSpec,
-			Component:  nil,
+	comp := &replicationComponent{
+		ComponentBase: internal.ComponentBase{
+			Client:         cli,
+			Cluster:        cluster,
+			ClusterVersion: clusterVersion,
+			Component:      synthesizedComponent,
 			ComponentSet: &replicationset.ReplicationSet{
-				Cli:          cli,
-				Cluster:      cluster,
-				Component:    compSpec,
-				ComponentDef: compDef,
+				Cli:           cli,
+				Cluster:       cluster,
+				ComponentSpec: nil,
+				ComponentDef:  nil,
 			},
 			Dag:             dag,
 			WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
 		},
 	}
+	comp.ComponentSet.SetComponent(comp)
+	return comp
 }
 
 type replicationComponent struct {
-	types.ComponentBase
+	internal.ComponentBase
+	RunningWorkloads []*appsv1.StatefulSet
 }
 
-func (c *replicationComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, action *ictrltypes.LifecycleAction) error {
-	if err := c.ComposeSynthesizedComponent(reqCtx, cli); err != nil {
-		return err
-	}
+var _ types.Component = &replicationComponent{}
 
+func (c *replicationComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	action *ictrltypes.LifecycleAction) internal.ComponentWorkloadBuilder {
 	builder := &replicationComponentWorkloadBuilder{
-		ComponentWorkloadBuilderBase: types.ComponentWorkloadBuilderBase{
+		ComponentWorkloadBuilderBase: internal.ComponentWorkloadBuilderBase{
 			ReqCtx:        reqCtx,
 			Client:        cli,
 			Comp:          c,
@@ -84,20 +83,44 @@ func (c *replicationComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		workloads: make([]*appsv1.StatefulSet, 0),
 	}
 	builder.ConcreteBuilder = builder
+	return builder
+}
 
-	// env and headless service are component level resources
-	builder.BuildEnv().BuildHeadlessService()
-	for i := int32(0); i < c.Component.Replicas; i++ {
-		builder.BuildWorkload(i).
-			BuildVolume(i).
-			BuildConfig(i).
-			BuildTLSVolume(i).
-			BuildVolumeMount(i)
-		if builder.Error != nil {
-			return builder.Error
+func (c *replicationComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder internal.ComponentWorkloadBuilder, load bool) error {
+	var err error
+	if builder != nil {
+		// env and headless service are component level resources
+		builder.BuildEnv().BuildHeadlessService()
+		for i := int32(0); i < c.Component.Replicas; i++ {
+			builder.BuildWorkload(i).
+				BuildVolume(i).
+				BuildConfig(i).
+				BuildTLSVolume(i).
+				BuildVolumeMount(i)
+		}
+		if err = builder.BuildService().BuildTLSCert().Complete(); err != nil {
+			return err
 		}
 	}
-	return builder.BuildService().BuildTLSCert().Complete()
+	if load {
+		c.RunningWorkloads, err = c.loadRunningWorkloads(reqCtx, cli)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *replicationComponent) loadRunningWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]*appsv1.StatefulSet, error) {
+	stsList, err := util.ListStsOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	if err != nil {
+		return nil, err
+	}
+	if len(stsList) == 0 {
+		return nil, fmt.Errorf("no workload found for the component, cluster: %s, component: %s",
+			c.GetClusterName(), c.GetName())
+	}
+	return stsList, nil
 }
 
 func (c *replicationComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -113,7 +136,7 @@ func (c *replicationComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.C
 }
 
 func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli, ictrltypes.ActionCreatePtr()); err != nil {
+	if err := c.init(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()), false); err != nil {
 		return err
 	}
 
@@ -122,7 +145,7 @@ func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.
 			return err
 		}
 		return fmt.Errorf("component to be created is already exist, cluster: %s, component: %s",
-			c.Cluster.Name, c.CompSpec.Name)
+			c.GetClusterName(), c.GetName())
 	}
 
 	if err := c.ValidateObjectsAction(); err != nil {
@@ -135,11 +158,15 @@ func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.
 }
 
 func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli, nil); err != nil {
+	if err := c.init(reqCtx, cli, c.newBuilder(reqCtx, cli, nil), true); err != nil {
 		return err
 	}
 
 	if err := c.Restart(reqCtx, cli); err != nil {
+		return err
+	}
+
+	if err := c.Reconfigure(reqCtx, cli); err != nil {
 		return err
 	}
 
@@ -153,7 +180,7 @@ func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.
 		return err
 	}
 
-	if err := c.updateUnderlyingResources(reqCtx, cli); err != nil {
+	if err := c.updateUnderlyingResources(reqCtx, cli, c.RunningWorkloads); err != nil {
 		return err
 	}
 
@@ -166,11 +193,7 @@ func (c *replicationComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.
 }
 
 func (c *replicationComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.ComposeSynthesizedComponent(reqCtx, cli); err != nil {
-		return err
-	}
-	workloads, err := c.runningWorkloads(reqCtx, cli)
-	if err != nil {
+	if err := c.init(reqCtx, cli, nil, true); err != nil {
 		// TODO(refactor): fix me
 		if strings.Contains(err.Error(), "no workload found for the component") {
 			return nil
@@ -178,22 +201,18 @@ func (c *replicationComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.
 		return err
 	}
 	objs := make([]client.Object, 0)
-	for _, w := range workloads {
+	for _, w := range c.RunningWorkloads {
 		objs = append(objs, w)
 	}
-	if err = c.StatusImpl(reqCtx, cli, objs); err != nil {
+	if err := c.StatusImpl(reqCtx, cli, objs); err != nil {
 		return err
 	}
 	return c.HandleGarbageOfRestoreBeforeRunning()
 }
 
 func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	workloads, err := c.runningWorkloads(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-
-	for _, sts := range workloads {
+	var err error
+	for _, sts := range c.RunningWorkloads {
 		for _, vct := range c.Component.VolumeClaimTemplates {
 			pvc := &corev1.PersistentVolumeClaim{}
 			key := client.ObjectKey{
@@ -213,7 +232,7 @@ func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli c
 
 			if vertex := ictrltypes.FindMatchedVertex[*corev1.PersistentVolumeClaim](c.Dag, key); vertex == nil {
 				return fmt.Errorf("cann't find PVC object when to update it, cluster: %s, component: %s, pvc: %s",
-					c.Cluster.Name, c.Component.Name, key)
+					c.GetClusterName(), c.GetName(), key)
 			} else {
 				vertex.(*ictrltypes.LifecycleVertex).Action = ictrltypes.ActionUpdatePtr()
 			}
@@ -223,20 +242,16 @@ func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli c
 }
 
 func (c *replicationComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	stsList, err := util.ListStsOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
-	if err != nil {
-		return err
-	}
-
-	ret := c.horizontalScaling(stsList)
+	ret := c.horizontalScaling(c.RunningWorkloads)
 	if ret == 0 {
 		return nil
-	} else if ret < 0 {
-		if err := c.scaleIn(reqCtx, cli, stsList); err != nil {
+	}
+	if ret < 0 {
+		if err := c.scaleIn(reqCtx, cli, c.RunningWorkloads); err != nil {
 			return err
 		}
 	} else {
-		if err := c.scaleOut(reqCtx, cli); err != nil {
+		if err := c.scaleOut(reqCtx, cli, c.RunningWorkloads); err != nil {
 			return err
 		}
 	}
@@ -251,12 +266,7 @@ func (c *replicationComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cl
 }
 
 func (c *replicationComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	stsList, err := c.runningWorkloads(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-
-	for _, sts := range stsList {
+	for _, sts := range c.RunningWorkloads {
 		if err := util.RestartPod(&sts.Spec.Template); err != nil {
 			return err
 		}
@@ -264,20 +274,8 @@ func (c *replicationComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client
 	return nil
 }
 
-func (c *replicationComponent) Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return nil // TODO(refactor): impl
-}
-
-func (c *replicationComponent) runningWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]*appsv1.StatefulSet, error) {
-	stsList, err := util.ListStsOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
-	if err != nil {
-		return nil, err
-	}
-	if len(stsList) == 0 {
-		return nil, fmt.Errorf("no workload found for the component, cluster: %s, component: %s",
-			c.Cluster.Name, c.Component.Name)
-	}
-	return stsList, nil
+func (c *replicationComponent) Reconfigure(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return nil // TODO(impl)
 }
 
 // TODO: fix stale cache problem
@@ -300,16 +298,11 @@ func (c *replicationComponent) scaleIn(reqCtx intctrlutil.RequestCtx, cli client
 	return nil
 }
 
-func (c *replicationComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *replicationComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsList []*appsv1.StatefulSet) error {
 	return nil
 }
 
-func (c *replicationComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	stsObjList, err := c.runningWorkloads(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-
+func (c *replicationComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObjList []*appsv1.StatefulSet) error {
 	for i, stsObj := range stsObjList {
 		c.updateWorkload(stsObj, int32(i))
 	}

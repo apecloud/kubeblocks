@@ -20,50 +20,50 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func NewStatefulComponent(cli client.Client,
-	definition *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ClusterComponentDefinition,
-	compVer *appsv1alpha1.ClusterComponentVersion,
-	compSpec *appsv1alpha1.ClusterComponentSpec,
+	clusterVersion *appsv1alpha1.ClusterVersion,
+	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *statefulComponent {
-	return &statefulComponent{
-		StatefulsetComponentBase: types.StatefulsetComponentBase{
-			ComponentBase: types.ComponentBase{
-				Client:     cli,
-				Definition: definition,
-				Cluster:    cluster,
-				CompDef:    compDef,
-				CompVer:    compVer,
-				CompSpec:   compSpec,
-				Component:  nil,
+	comp := &statefulComponent{
+		StatefulsetComponentBase: internal.StatefulsetComponentBase{
+			ComponentBase: internal.ComponentBase{
+				Client:         cli,
+				Cluster:        cluster,
+				ClusterVersion: clusterVersion,
+				Component:      synthesizedComponent,
 				ComponentSet: &Stateful{
-					Cli:          cli,
-					Cluster:      cluster,
-					Component:    compSpec,
-					ComponentDef: compDef,
+					Cli:           cli,
+					Cluster:       cluster,
+					ComponentSpec: nil,
 				},
 				Dag:             dag,
 				WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
 			},
 		},
 	}
+	comp.ComponentSet.SetComponent(comp)
+	return comp
 }
 
 type statefulComponent struct {
-	types.StatefulsetComponentBase
+	internal.StatefulsetComponentBase
 }
 
+var _ types.Component = &statefulComponent{}
+
 func (c *statefulComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	action *ictrltypes.LifecycleAction) types.ComponentWorkloadBuilder {
+	action *ictrltypes.LifecycleAction) internal.ComponentWorkloadBuilder {
 	builder := &statefulComponentWorkloadBuilder{
-		ComponentWorkloadBuilderBase: types.ComponentWorkloadBuilderBase{
+		ComponentWorkloadBuilderBase: internal.ComponentWorkloadBuilderBase{
 			ReqCtx:        reqCtx,
 			Client:        cli,
 			Comp:          c,

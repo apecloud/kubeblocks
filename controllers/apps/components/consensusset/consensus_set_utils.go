@@ -18,20 +18,19 @@ package consensusset
 
 import (
 	"context"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -80,39 +79,39 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
 	})
 }
 
-// generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
-func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
-	component appsv1alpha1.ClusterComponentDefinition) *util.Plan {
-	restartPod := func(obj interface{}) (bool, error) {
-		pod, ok := obj.(corev1.Pod)
-		if !ok {
-			return false, errors.New("wrong type: obj not Pod")
-		}
-
-		// if DeletionTimestamp is not nil, it is terminating.
-		if pod.DeletionTimestamp != nil {
-			return true, nil
-		}
-
-		// if pod is the latest version, we do nothing
-		if intctrlutil.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
-			// wait until ready
-			return !intctrlutil.PodIsReadyWithLabel(pod), nil
-		}
-
-		// delete the pod to trigger associate StatefulSet to re-create it
-		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
-			return false, err
-		}
-
-		return true, nil
-	}
-	return generateConsensusUpdatePlanLow(ctx, cli, stsObj, pods, component, restartPod)
-}
+//// generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
+// func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
+//	consensusSpec *appsv1alpha1.ConsensusSetSpec) *util.Plan {
+//	restartPod := func(obj interface{}) (bool, error) {
+//		pod, ok := obj.(corev1.Pod)
+//		if !ok {
+//			return false, errors.New("wrong type: obj not Pod")
+//		}
+//
+//		// if DeletionTimestamp is not nil, it is terminating.
+//		if pod.DeletionTimestamp != nil {
+//			return true, nil
+//		}
+//
+//		// if pod is the latest version, we do nothing
+//		if intctrlutil.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
+//			// wait until ready
+//			return !intctrlutil.PodIsReadyWithLabel(pod), nil
+//		}
+//
+//		// delete the pod to trigger associate StatefulSet to re-create it
+//		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
+//			return false, err
+//		}
+//
+//		return true, nil
+//	}
+//	return generateConsensusUpdatePlanLow(ctx, cli, stsObj, pods, consensusSpec, restartPod)
+// }
 
 // generateRestartPodPlan generates update plan to restart pods based on UpdateStrategy
 func generateRestartPodPlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
-	component appsv1alpha1.ClusterComponentDefinition, podsToDelete []*corev1.Pod) *util.Plan {
+	consensusSpec *appsv1alpha1.ConsensusSetSpec, podsToDelete []*corev1.Pod) *util.Plan {
 	restartPod := func(obj interface{}) (bool, error) {
 		pod, ok := obj.(corev1.Pod)
 		if !ok {
@@ -135,21 +134,21 @@ func generateRestartPodPlan(ctx context.Context, cli client.Client, stsObj *apps
 
 		return true, nil
 	}
-	return generateConsensusUpdatePlanLow(ctx, cli, stsObj, pods, component, restartPod)
+	return generateConsensusUpdatePlanLow(ctx, cli, stsObj, pods, consensusSpec, restartPod)
 }
 
 // generateConsensusUpdatePlanLow generates Update plan based on UpdateStrategy
 func generateConsensusUpdatePlanLow(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
-	component appsv1alpha1.ClusterComponentDefinition, restartPod func(obj any) (bool, error)) *util.Plan {
+	consensusSpec *appsv1alpha1.ConsensusSetSpec, restartPod func(obj any) (bool, error)) *util.Plan {
 	plan := &util.Plan{}
 	plan.Start = &util.Step{}
 	plan.WalkFunc = restartPod
 
-	rolePriorityMap := ComposeRolePriorityMap(component)
+	rolePriorityMap := ComposeRolePriorityMap(consensusSpec)
 	SortPods(pods, rolePriorityMap)
 
 	// generate plan by UpdateStrategy
-	switch component.ConsensusSpec.UpdateStrategy {
+	switch consensusSpec.UpdateStrategy {
 	case appsv1alpha1.SerialStrategy:
 		generateConsensusSerialPlan(plan, pods)
 	case appsv1alpha1.ParallelStrategy:
@@ -239,18 +238,19 @@ func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
 }
 
 // ComposeRolePriorityMap generates a priority map based on roles.
-func ComposeRolePriorityMap(component appsv1alpha1.ClusterComponentDefinition) map[string]int {
-	if component.ConsensusSpec == nil {
-		component.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{Leader: appsv1alpha1.DefaultLeader}
+// TODO(refactor): why the function changes the component definition?
+func ComposeRolePriorityMap(consensusSpec *appsv1alpha1.ConsensusSetSpec) map[string]int {
+	if consensusSpec == nil {
+		consensusSpec = &appsv1alpha1.ConsensusSetSpec{Leader: appsv1alpha1.DefaultLeader}
 	}
 
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[""] = emptyPriority
-	rolePriorityMap[component.ConsensusSpec.Leader.Name] = leaderPriority
-	if component.ConsensusSpec.Learner != nil {
-		rolePriorityMap[component.ConsensusSpec.Learner.Name] = learnerPriority
+	rolePriorityMap[consensusSpec.Leader.Name] = leaderPriority
+	if consensusSpec.Learner != nil {
+		rolePriorityMap[consensusSpec.Learner.Name] = learnerPriority
 	}
-	for _, follower := range component.ConsensusSpec.Followers {
+	for _, follower := range consensusSpec.Followers {
 		switch follower.AccessMode {
 		case appsv1alpha1.None:
 			rolePriorityMap[follower.Name] = followerNonePriority
@@ -269,11 +269,18 @@ func UpdateConsensusSetRoleLabel(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	componentDef *appsv1alpha1.ClusterComponentDefinition,
 	pod *corev1.Pod, role string) error {
-	ctx := reqCtx.Ctx
 	if componentDef == nil {
 		return nil
 	}
-	roleMap := composeConsensusRoleMap(componentDef)
+	return updateConsensusSetRoleLabel(cli, reqCtx, componentDef.ConsensusSpec, pod, role)
+}
+
+func updateConsensusSetRoleLabel(cli client.Client,
+	reqCtx intctrlutil.RequestCtx,
+	consensusSpec *appsv1alpha1.ConsensusSetSpec,
+	pod *corev1.Pod, role string) error {
+	ctx := reqCtx.Ctx
+	roleMap := composeConsensusRoleMap(consensusSpec)
 	// role not defined in CR, ignore it
 	if _, ok := roleMap[role]; !ok {
 		return nil
@@ -304,25 +311,25 @@ func putConsensusMemberExt(roleMap map[string]consensusMemberExt, name string, r
 	roleMap[name] = memberExt
 }
 
-func composeConsensusRoleMap(componentDef *appsv1alpha1.ClusterComponentDefinition) map[string]consensusMemberExt {
+func composeConsensusRoleMap(consensusSpec *appsv1alpha1.ConsensusSetSpec) map[string]consensusMemberExt {
 	roleMap := make(map[string]consensusMemberExt, 0)
 	putConsensusMemberExt(roleMap,
-		componentDef.ConsensusSpec.Leader.Name,
+		consensusSpec.Leader.Name,
 		roleLeader,
-		componentDef.ConsensusSpec.Leader.AccessMode)
+		consensusSpec.Leader.AccessMode)
 
-	for _, follower := range componentDef.ConsensusSpec.Followers {
+	for _, follower := range consensusSpec.Followers {
 		putConsensusMemberExt(roleMap,
 			follower.Name,
 			roleFollower,
 			follower.AccessMode)
 	}
 
-	if componentDef.ConsensusSpec.Learner != nil {
+	if consensusSpec.Learner != nil {
 		putConsensusMemberExt(roleMap,
-			componentDef.ConsensusSpec.Learner.Name,
+			consensusSpec.Learner.Name,
 			roleLearner,
-			componentDef.ConsensusSpec.Learner.AccessMode)
+			consensusSpec.Learner.AccessMode)
 	}
 
 	return roleMap
@@ -394,7 +401,7 @@ func resetConsensusSetStatusRole(consensusSetStatus *appsv1alpha1.ConsensusSetSt
 
 func setConsensusSetStatusRoles(
 	consensusSetStatus *appsv1alpha1.ConsensusSetStatus,
-	componentDef *appsv1alpha1.ClusterComponentDefinition,
+	consensusSpec *appsv1alpha1.ConsensusSetSpec,
 	pods []corev1.Pod) {
 	for _, pod := range pods {
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
@@ -402,16 +409,16 @@ func setConsensusSetStatusRoles(
 		}
 
 		role := pod.Labels[constant.RoleLabelKey]
-		_ = setConsensusSetStatusRole(consensusSetStatus, componentDef, role, pod.Name)
+		_ = setConsensusSetStatusRole(consensusSetStatus, consensusSpec, role, pod.Name)
 	}
 }
 
 func setConsensusSetStatusRole(
 	consensusSetStatus *appsv1alpha1.ConsensusSetStatus,
-	componentDef *appsv1alpha1.ClusterComponentDefinition,
+	consensusSpec *appsv1alpha1.ConsensusSetSpec,
 	role, podName string) bool {
 	// mapping role label to consensus member
-	roleMap := composeConsensusRoleMap(componentDef)
+	roleMap := composeConsensusRoleMap(consensusSpec)
 	memberExt, ok := roleMap[role]
 	if !ok {
 		return false
@@ -431,75 +438,75 @@ func setConsensusSetStatusRole(
 	return needUpdate
 }
 
-func updateConsensusRoleInfo(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	componentDef *appsv1alpha1.ClusterComponentDefinition,
-	componentName string,
-	pods []corev1.Pod) error {
-	leader := ""
-	followers := ""
-	for _, pod := range pods {
-		role := pod.Labels[constant.RoleLabelKey]
-		// mapping role label to consensus member
-		roleMap := composeConsensusRoleMap(componentDef)
-		memberExt, ok := roleMap[role]
-		if !ok {
-			continue
-		}
-		switch memberExt.consensusRole {
-		case roleLeader:
-			leader = pod.Name
-		case roleFollower:
-			if len(followers) > 0 {
-				followers += ","
-			}
-			followers += pod.Name
-		case roleLearner:
-			// TODO: CT
-		}
-	}
-
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey:    cluster.GetName(),
-		constant.KBAppComponentLabelKey: componentName,
-		constant.AppConfigTypeLabelKey:  "kubeblocks-env",
-	}
-
-	configList := &corev1.ConfigMapList{}
-	if err := cli.List(ctx, configList, ml); err != nil {
-		return err
-	}
-
-	if len(configList.Items) > 0 {
-		for _, config := range configList.Items {
-			patch := client.MergeFrom(config.DeepCopy())
-			config.Data["KB_"+strings.ToUpper(componentName)+"_LEADER"] = leader
-			config.Data["KB_"+strings.ToUpper(componentName)+"_FOLLOWERS"] = followers
-			if err := cli.Patch(ctx, &config, patch); err != nil {
-				return err
-			}
-		}
-	}
-	// patch pods' annotations
-	for _, pod := range pods {
-		patch := client.MergeFrom(pod.DeepCopy())
-		if pod.Annotations == nil {
-			pod.Annotations = map[string]string{}
-		}
-		pod.Annotations[constant.LeaderAnnotationKey] = leader
-		if err := cli.Patch(ctx, &pod, patch); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
+// func updateConsensusRoleInfo(ctx context.Context,
+//	cli client.Client,
+//	cluster *appsv1alpha1.Cluster,
+//	consensusSpec *appsv1alpha1.ConsensusSetSpec,
+//	componentName string,
+//	pods []corev1.Pod) error {
+//	leader := ""
+//	followers := ""
+//	for _, pod := range pods {
+//		role := pod.Labels[constant.RoleLabelKey]
+//		// mapping role label to consensus member
+//		roleMap := composeConsensusRoleMap(consensusSpec)
+//		memberExt, ok := roleMap[role]
+//		if !ok {
+//			continue
+//		}
+//		switch memberExt.consensusRole {
+//		case roleLeader:
+//			leader = pod.Name
+//		case roleFollower:
+//			if len(followers) > 0 {
+//				followers += ","
+//			}
+//			followers += pod.Name
+//		case roleLearner:
+//			// TODO: CT
+//		}
+//	}
+//
+//	ml := client.MatchingLabels{
+//		constant.AppInstanceLabelKey:    cluster.GetName(),
+//		constant.KBAppComponentLabelKey: componentName,
+//		constant.AppConfigTypeLabelKey:  "kubeblocks-env",
+//	}
+//
+//	configList := &corev1.ConfigMapList{}
+//	if err := cli.List(ctx, configList, ml); err != nil {
+//		return err
+//	}
+//
+//	if len(configList.Items) > 0 {
+//		for _, config := range configList.Items {
+//			patch := client.MergeFrom(config.DeepCopy())
+//			config.Data["KB_"+strings.ToUpper(componentName)+"_LEADER"] = leader
+//			config.Data["KB_"+strings.ToUpper(componentName)+"_FOLLOWERS"] = followers
+//			if err := cli.Patch(ctx, &config, patch); err != nil {
+//				return err
+//			}
+//		}
+//	}
+//	// patch pods' annotations
+//	for _, pod := range pods {
+//		patch := client.MergeFrom(pod.DeepCopy())
+//		if pod.Annotations == nil {
+//			pod.Annotations = map[string]string{}
+//		}
+//		pod.Annotations[constant.LeaderAnnotationKey] = leader
+//		if err := cli.Patch(ctx, &pod, patch); err != nil {
+//			return err
+//		}
+//	}
+//
+//	return nil
+// }
 
 func updateConsensusRoleInfo2(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	componentDef *appsv1alpha1.ClusterComponentDefinition,
+	consensusSpec *appsv1alpha1.ConsensusSetSpec,
 	componentName string,
 	pods []corev1.Pod,
 	vertexes []graph.Vertex) error {
@@ -508,7 +515,7 @@ func updateConsensusRoleInfo2(ctx context.Context,
 	for _, pod := range pods {
 		role := pod.Labels[constant.RoleLabelKey]
 		// mapping role label to consensus member
-		roleMap := composeConsensusRoleMap(componentDef)
+		roleMap := composeConsensusRoleMap(consensusSpec)
 		memberExt, ok := roleMap[role]
 		if !ok {
 			continue

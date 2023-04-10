@@ -16,7 +16,4 @@ limitations under the License.
 
 package types
 
-// TODO(refactor): define a custom workload to encapsulate all the resources.
-//
-//	runtime, config, script, env, volume, service, monitor, probe
 type ComponentWorkload interface{}

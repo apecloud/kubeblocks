@@ -141,20 +141,6 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		event.InvolvedObject.Name = objectName
 	}
 
-	testHandleClusterPhaseWhenCompsNotReady := func(clusterObj *appsv1alpha1.Cluster,
-		compPhase appsv1alpha1.ClusterComponentPhase,
-		expectClusterPhase appsv1alpha1.ClusterPhase,
-	) {
-		// mock Stateful component is Abnormal
-		clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-			statefulMySQLCompName: {
-				Phase: compPhase,
-			},
-		}
-		handleClusterPhaseWhenCompsNotReady(clusterObj, nil, nil)
-		Expect(clusterObj.Status.Phase).Should(Equal(expectClusterPhase))
-	}
-
 	Context("test cluster Failed/Abnormal phase", func() {
 		It("test cluster Failed/Abnormal phase", func() {
 			By("create cluster related resources")
@@ -278,15 +264,6 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.AbnormalClusterPhase))
 				})).Should(Succeed())
-
-			By("test the cluster phase when cluster only contains a component of Stateful workload, and the component is Failed or Abnormal")
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(statefulMySQLCompName, statefulMySQLCompType).SetReplicas(3).GetObject()
-			// mock Stateful component is Failed and expect cluster phase is FailedPhase
-			testHandleClusterPhaseWhenCompsNotReady(clusterObj, appsv1alpha1.FailedClusterCompPhase, appsv1alpha1.FailedClusterPhase)
-
-			// mock Stateful component is Abnormal and expect cluster phase is Abnormal
-			testHandleClusterPhaseWhenCompsNotReady(clusterObj, appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.AbnormalClusterPhase)
 		})
 
 		It("test the consistency of status.components and spec.components", func() {
@@ -343,8 +320,6 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 					_, isExist := tmpCluster.Status.Components[modifyConsensusName]
 					g.Expect(isExist).Should(BeTrue())
 				})
-
 		})
 	})
-
 })

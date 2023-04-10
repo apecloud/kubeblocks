@@ -51,7 +51,7 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 
 	dag4Component := graph.NewDAG()
 
-	//if isClusterUpdating(*cluster) {
+	// create new components or update existed components
 	err = c.transform4SpecUpdate(cluster, dag4Component)
 	if err != nil {
 		return err
@@ -91,7 +91,7 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 	deleteSet := compStatus.Difference(compProto)
 
 	for compName := range createSet {
-		comp, err := components.NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
+		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
@@ -101,7 +101,7 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 	}
 
 	for compName := range deleteSet {
-		comp, err := components.NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
+		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			if err.Error() != "NotSupported" {
 				return err
@@ -115,7 +115,7 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 	}
 
 	for compName := range updateSet {
-		comp, err := components.NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
+		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
@@ -130,7 +130,7 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 
 func (c *componentTransformer) transform4StatusUpdate(cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		comp, err := components.NewComponent(c.cli, &c.cc.cd, &c.cc.cv, cluster, compSpec.Name, dag)
+		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compSpec.Name, dag)
 		if err != nil {
 			return err
 		}

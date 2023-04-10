@@ -18,7 +18,6 @@ package lifecycle
 
 import (
 	"fmt"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"reflect"
 
 	"golang.org/x/exp/slices"
@@ -32,6 +31,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 

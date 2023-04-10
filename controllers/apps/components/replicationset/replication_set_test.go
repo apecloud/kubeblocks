@@ -25,7 +25,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -138,7 +140,7 @@ var _ = Describe("Replication Component", func() {
 			compDefName := clusterObj.GetComponentDefRefName(testapps.DefaultRedisCompName)
 			componentDef := clusterDefObj.GetComponentDefByName(compDefName)
 			component := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
-			replicationComponent, err := NewReplicationSet(k8sClient, clusterObj, component, *componentDef)
+			replicationComponent, err := newReplicationSet(k8sClient, clusterObj, component, *componentDef)
 			Expect(err).Should(Succeed())
 			var podList []*corev1.Pod
 			for _, availableReplica := range []int32{0, 1} {
@@ -172,10 +174,10 @@ var _ = Describe("Replication Component", func() {
 				}
 			}
 
-			// TODO(refactor)
-			//By("Testing handle probe timed out")
-			//requeue, _ := replicationComponent.HandleProbeTimeoutWhenPodsReady(ctx, nil)
-			//Expect(requeue == false).Should(BeTrue())
+			// TODO(refactor): probe timed-out pod
+			// By("Testing handle probe timed out")
+			// requeue, _ := replicationComponent.HandleProbeTimeoutWhenPodsReady(ctx, nil)
+			// Expect(requeue == false).Should(BeTrue())
 
 			By("Testing pod is available")
 			primaryPod := podList[0]
@@ -207,21 +209,22 @@ var _ = Describe("Replication Component", func() {
 						Should(ContainSubstring("empty label for pod, please check"))
 				})).Should(Succeed())
 
-			// TODO(refactor)
-			//By("Checking if the pod is not updated when statefulset is not updated")
-			//Expect(replicationComponent.HandleUpdate(ctx, primarySts)).To(Succeed())
-			//primaryStsPodList, err := util.GetPodListByStatefulSet(ctx, k8sClient, primarySts)
-			//Expect(err).To(Succeed())
-			//Expect(len(primaryStsPodList)).To(Equal(1))
-			//Expect(util.IsStsAndPodsRevisionConsistent(ctx, k8sClient, primarySts)).Should(BeTrue())
-			//
-			//By("Checking if the pod is deleted when statefulset is updated")
-			//status.UpdateRevision = "new-mock-revision"
-			//testk8s.PatchStatefulSetStatus(&testCtx, primarySts.Name, status)
-			//Expect(replicationComponent.HandleUpdate(ctx, primarySts)).To(Succeed())
-			//primaryStsPodList, err = util.GetPodListByStatefulSet(ctx, k8sClient, primarySts)
-			//Expect(err).To(Succeed())
-			//Expect(len(primaryStsPodList)).To(Equal(0))
+			By("Checking if the pod is not updated when statefulset is not updated")
+			vertexes, err := replicationComponent.HandleRestart(ctx, primarySts)
+			Expect(err).To(Succeed())
+			Expect(len(vertexes) == 0).To(BeTrue())
+			primaryStsPodList, err := util.GetPodListByStatefulSet(ctx, k8sClient, primarySts)
+			Expect(err).To(Succeed())
+			Expect(len(primaryStsPodList)).To(Equal(1))
+			Expect(util.IsStsAndPodsRevisionConsistent(ctx, k8sClient, primarySts)).Should(BeTrue())
+
+			By("Checking if the pod is deleted when statefulset is updated")
+			status.UpdateRevision = "new-mock-revision"
+			testk8s.PatchStatefulSetStatus(&testCtx, primarySts.Name, status)
+			vertexes, err = replicationComponent.HandleRestart(ctx, primarySts)
+			Expect(err).To(Succeed())
+			Expect(len(vertexes) == 1).To(BeTrue())
+			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.DELETE).To(BeTrue())
 		})
 	})
 })

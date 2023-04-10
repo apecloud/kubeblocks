@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package types
+package internal
 
 import (
 	"fmt"
@@ -35,9 +35,58 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// As a base class for single stateful-set based component (stateful & consensus)
+// StatefulsetComponentBase as a base class for single stateful-set based component (stateful & consensus)
 type StatefulsetComponentBase struct {
 	ComponentBase
+	runningWorkload *appsv1.StatefulSet
+}
+
+func (c *StatefulsetComponentBase) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder, load bool) error {
+	var err error
+	if builder != nil {
+		if err = builder.BuildEnv().
+			BuildWorkload(0).
+			BuildHeadlessService().
+			BuildConfig(0).
+			BuildTLSVolume(0).
+			BuildVolumeMount(0).
+			BuildService().
+			BuildTLSCert().
+			Complete(); err != nil {
+			return err
+		}
+	}
+	if load {
+		c.runningWorkload, err = c.loadRunningWorkload(reqCtx, cli)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *StatefulsetComponentBase) loadRunningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.StatefulSet, error) {
+	stsList, err := util.ListStsOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	if err != nil {
+		return nil, err
+	}
+
+	cnt := len(stsList)
+	if cnt == 0 {
+		return nil, fmt.Errorf("no workload found for the component, cluster: %s, component: %s",
+			c.GetClusterName(), c.GetName())
+	} else if cnt > 1 {
+		return nil, fmt.Errorf("more than one workloads found for the component, cluster: %s, component: %s, cnt: %d",
+			c.GetClusterName(), c.GetName(), cnt)
+	}
+
+	sts := stsList[0]
+	if sts.Spec.Replicas == nil {
+		return nil, fmt.Errorf("running workload for the component has no replica, cluster: %s, component: %s",
+			c.GetClusterName(), c.GetName())
+	}
+
+	return sts, nil
 }
 
 func (c *StatefulsetComponentBase) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
@@ -48,23 +97,8 @@ func (c *StatefulsetComponentBase) Exist(reqCtx intctrlutil.RequestCtx, cli clie
 	}
 }
 
-func (c *StatefulsetComponentBase) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
-	if err := c.ComposeSynthesizedComponent(reqCtx, cli); err != nil {
-		return err
-	}
-	return builder.BuildEnv().
-		BuildWorkload(0).
-		BuildHeadlessService().
-		BuildConfig(0).
-		BuildTLSVolume(0).
-		BuildVolumeMount(0).
-		BuildService().
-		BuildTLSCert().
-		Complete()
-}
-
 func (c *StatefulsetComponentBase) CreateImpl(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
-	if err := c.init(reqCtx, cli, builder); err != nil {
+	if err := c.init(reqCtx, cli, builder, false); err != nil {
 		return err
 	}
 
@@ -73,7 +107,7 @@ func (c *StatefulsetComponentBase) CreateImpl(reqCtx intctrlutil.RequestCtx, cli
 			return err
 		}
 		return fmt.Errorf("component to be created is already exist, cluster: %s, component: %s",
-			c.Cluster.Name, c.CompSpec.Name)
+			c.GetClusterName(), c.GetName())
 	}
 
 	if err := c.ValidateObjectsAction(); err != nil {
@@ -86,11 +120,15 @@ func (c *StatefulsetComponentBase) CreateImpl(reqCtx intctrlutil.RequestCtx, cli
 }
 
 func (c *StatefulsetComponentBase) UpdateImpl(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
-	if err := c.init(reqCtx, cli, builder); err != nil {
+	if err := c.init(reqCtx, cli, builder, true); err != nil {
 		return err
 	}
 
 	if err := c.Restart(reqCtx, cli); err != nil {
+		return err
+	}
+
+	if err := c.Reconfigure(reqCtx, cli); err != nil {
 		return err
 	}
 
@@ -104,7 +142,7 @@ func (c *StatefulsetComponentBase) UpdateImpl(reqCtx intctrlutil.RequestCtx, cli
 		return err
 	}
 
-	if err := c.updateUnderlyingResources(reqCtx, cli); err != nil {
+	if err := c.updateUnderlyingResources(reqCtx, cli, c.runningWorkload); err != nil {
 		return err
 	}
 
@@ -112,30 +150,21 @@ func (c *StatefulsetComponentBase) UpdateImpl(reqCtx intctrlutil.RequestCtx, cli
 }
 
 func (c *StatefulsetComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.ComposeSynthesizedComponent(reqCtx, cli); err != nil {
-		return err
-	}
-	sts, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
+	if err := c.init(reqCtx, cli, nil, true); err != nil {
 		// TODO(refactor): fix me
 		if strings.Contains(err.Error(), "no workload found for the component") {
 			return nil
 		}
 		return err
 	}
-	if err = c.StatusImpl(reqCtx, cli, []client.Object{sts}); err != nil {
+	if err := c.StatusImpl(reqCtx, cli, []client.Object{c.runningWorkload}); err != nil {
 		return err
 	}
 	return c.HandleGarbageOfRestoreBeforeRunning()
 }
 
 func (c *StatefulsetComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	stsObj, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-
-	for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
 		var vctProto *corev1.PersistentVolumeClaimSpec
 		for _, v := range c.Component.VolumeClaimTemplates {
 			if v.Name == vct.Name {
@@ -156,11 +185,11 @@ func (c *StatefulsetComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, c
 			continue
 		}
 
-		for i := *stsObj.Spec.Replicas - 1; i >= 0; i-- {
+		for i := *c.runningWorkload.Spec.Replicas - 1; i >= 0; i-- {
 			pvc := &corev1.PersistentVolumeClaim{}
 			pvcKey := types.NamespacedName{
-				Namespace: stsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+				Namespace: c.runningWorkload.Namespace,
+				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, c.runningWorkload.Name, i),
 			}
 			if err := cli.Get(reqCtx.Ctx, pvcKey, pvc); err != nil {
 				return err
@@ -173,20 +202,16 @@ func (c *StatefulsetComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, c
 }
 
 func (c *StatefulsetComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	sts, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-
-	ret := c.horizontalScaling(sts)
+	ret := c.horizontalScaling(c.runningWorkload)
 	if ret == 0 {
 		return nil
-	} else if ret < 0 {
-		if err := c.scaleIn(reqCtx, cli, sts); err != nil {
+	}
+	if ret < 0 {
+		if err := c.scaleIn(reqCtx, cli, c.runningWorkload); err != nil {
 			return err
 		}
 	} else {
-		if err := c.scaleOut(reqCtx, cli, sts); err != nil {
+		if err := c.scaleOut(reqCtx, cli, c.runningWorkload); err != nil {
 			return err
 		}
 	}
@@ -201,61 +226,32 @@ func (c *StatefulsetComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx
 }
 
 func (c *StatefulsetComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	sts, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-	return util.RestartPod(&sts.Spec.Template)
+	return util.RestartPod(&c.runningWorkload.Spec.Template)
 }
 
-func (c *StatefulsetComponentBase) Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return nil // TODO(refactor): impl
-}
-
-func (c *StatefulsetComponentBase) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.StatefulSet, error) {
-	stsList, err := util.ListStsOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
-	if err != nil {
-		return nil, err
-	}
-
-	cnt := len(stsList)
-	if cnt == 0 {
-		return nil, fmt.Errorf("no workload found for the component, cluster: %s, component: %s",
-			c.Cluster.Name, c.CompSpec.Name)
-	} else if cnt > 1 {
-		return nil, fmt.Errorf("more than one workloads found for the component, cluster: %s, component: %s, cnt: %d",
-			c.Cluster.Name, c.CompSpec.Name, cnt)
-	}
-
-	sts := stsList[0]
-	if sts.Spec.Replicas == nil {
-		return nil, fmt.Errorf("running workload for the component has no replica, cluster: %s, component: %s",
-			c.Cluster.Name, c.CompSpec.Name)
-	}
-
-	return sts, nil
+func (c *StatefulsetComponentBase) Reconfigure(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return nil // TODO(impl)
 }
 
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
-func (c *StatefulsetComponentBase) horizontalScaling(sts *appsv1.StatefulSet) int {
-	return int(c.Component.Replicas - *sts.Spec.Replicas)
+func (c *StatefulsetComponentBase) horizontalScaling(stsObj *appsv1.StatefulSet) int {
+	return int(c.Component.Replicas - *stsObj.Spec.Replicas)
 }
 
 func (c *StatefulsetComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	// if scale in to 0, do not delete pvc
-	// TODO: why check the volume claims of current stateful set?
-	if c.CompSpec.Replicas == 0 || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
+	if c.Component.Replicas == 0 || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
 		return nil // TODO: should reject to scale-in to zero explicitly
 	}
 
-	for i := c.CompSpec.Replicas; i < *stsObj.Spec.Replicas; i++ {
+	for i := c.Component.Replicas; i < *stsObj.Spec.Replicas; i++ {
 		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
 				Namespace: stsObj.Namespace,
 				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 			}
 			// create cronjob to delete pvc after 30 minutes
-			if obj, err := util.CheckedCreateDeletePVCCronJob(reqCtx, cli, pvcKey, stsObj, c.Cluster); err != nil {
+			if obj, err := checkedCreateDeletePVCCronJob(reqCtx, cli, pvcKey, stsObj, c.Cluster); err != nil {
 				return err
 			} else if obj != nil {
 				c.CreateResource(obj, nil)
@@ -278,7 +274,7 @@ func (c *StatefulsetComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli c
 	horizontalScalePolicy := c.Component.HorizontalScalePolicy
 
 	cleanCronJobs := func() error {
-		for i := *stsObj.Spec.Replicas; i < c.CompSpec.Replicas; i++ {
+		for i := *stsObj.Spec.Replicas; i < c.Component.Replicas; i++ {
 			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 				pvcKey := types.NamespacedName{
 					Namespace: key.Namespace,
@@ -298,14 +294,14 @@ func (c *StatefulsetComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli c
 	}
 
 	checkAllPVCsExist := func() (bool, error) {
-		for i := *stsObj.Spec.Replicas; i < c.CompSpec.Replicas; i++ {
+		for i := *stsObj.Spec.Replicas; i < c.Component.Replicas; i++ {
 			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 				pvcKey := types.NamespacedName{
 					Namespace: key.Namespace,
 					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 				}
 				// check pvc existence
-				pvcExists, err := util.IsPVCExists(cli, reqCtx.Ctx, pvcKey)
+				pvcExists, err := isPVCExists(cli, reqCtx.Ctx, pvcKey)
 				if err != nil {
 					return true, err
 				}
@@ -320,20 +316,20 @@ func (c *StatefulsetComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli c
 	checkAllPVCBoundIfNeeded := func() (bool, error) {
 		if horizontalScalePolicy == nil ||
 			horizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-			!util.IsSnapshotAvailable(cli, reqCtx.Ctx) {
+			!isSnapshotAvailable(cli, reqCtx.Ctx) {
 			return true, nil
 		}
-		return util.IsAllPVCBound(cli, reqCtx.Ctx, stsObj)
+		return isAllPVCBound(cli, reqCtx.Ctx, stsObj)
 	}
 
 	cleanBackupResourcesIfNeeded := func() error {
 		if horizontalScalePolicy == nil ||
 			horizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-			!util.IsSnapshotAvailable(cli, reqCtx.Ctx) {
+			!isSnapshotAvailable(cli, reqCtx.Ctx) {
 			return nil
 		}
 		// if all pvc bounded, clean backup resources
-		objs, err := util.DeleteSnapshot(cli, reqCtx, snapshotKey, c.Cluster, c.CompSpec.Name)
+		objs, err := deleteSnapshot(cli, reqCtx, snapshotKey, c.GetCluster(), c.GetName())
 		if err != nil {
 			return err
 		}
@@ -354,7 +350,7 @@ func (c *StatefulsetComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli c
 	if !allPVCsExist {
 		// do backup according to component's horizontal scale policy
 		stsProto := c.WorkloadVertexs[0].Obj.(*appsv1.StatefulSet)
-		objs, err := util.DoBackup(reqCtx, cli, c.Cluster, c.Component, snapshotKey, stsProto, stsObj)
+		objs, err := doBackup(reqCtx, cli, c.Cluster, c.Component, snapshotKey, stsProto, stsObj)
 		if err != nil {
 			return err
 		}
@@ -386,12 +382,7 @@ func (c *StatefulsetComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli c
 	return nil
 }
 
-func (c *StatefulsetComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	stsObj, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-
+func (c *StatefulsetComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	c.updateWorkload(stsObj, 0)
 
 	if err := c.UpdateService(reqCtx, cli); err != nil {

@@ -252,14 +252,14 @@ func SyncReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
 
 // syncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
 func syncReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ClusterComponentDefinition, compName string, podList []*corev1.Pod) error {
+	workloadType appsv1alpha1.WorkloadType, compName string, podList []*corev1.Pod) error {
 	if len(podList) == 0 {
 		return nil
 	}
 
 	replicationStatus := cluster.Status.Components[compName].ReplicationSetStatus
 	if replicationStatus == nil {
-		if err := util.InitClusterComponentStatusIfNeed(cluster, compName, compDef.WorkloadType); err != nil {
+		if err := util.InitClusterComponentStatusIfNeed(cluster, compName, workloadType); err != nil {
 			return err
 		}
 		replicationStatus = cluster.Status.Components[compName].ReplicationSetStatus

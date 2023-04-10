@@ -89,7 +89,7 @@ func (r *componentWorkloadReconciler[T, PT, S, PS]) Reconcile(ctx context.Contex
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 
-		if err := notifyClusterStatusChange(reqCtx.Ctx, r.Client, cluster); err != nil {
+		if err := notifyClusterStatusChange(reqCtx.Ctx, r.Client, r.Recorder, cluster, nil); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()

@@ -18,7 +18,6 @@ package stateless
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"reflect"
 	"strings"
 
@@ -27,50 +26,50 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func NewStatelessComponent(cli client.Client,
-	definition *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ClusterComponentDefinition,
-	compVer *appsv1alpha1.ClusterComponentVersion,
-	compSpec *appsv1alpha1.ClusterComponentSpec,
+	clusterVersion *appsv1alpha1.ClusterVersion,
+	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *statelessComponent {
-	return &statelessComponent{
-		ComponentBase: types.ComponentBase{
-			Client:     cli,
-			Definition: definition,
-			Cluster:    cluster,
-			CompDef:    compDef,
-			CompVer:    compVer,
-			CompSpec:   compSpec,
-			Component:  nil,
+	comp := &statelessComponent{
+		ComponentBase: internal.ComponentBase{
+			Client:         cli,
+			Cluster:        cluster,
+			ClusterVersion: clusterVersion,
+			Component:      synthesizedComponent,
 			ComponentSet: &Stateless{
-				Cli:          cli,
-				Cluster:      cluster,
-				Component:    compSpec,
-				ComponentDef: compDef,
+				Cli:           cli,
+				Cluster:       cluster,
+				ComponentSpec: nil,
 			},
 			Dag:             dag,
 			WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
 		},
 	}
+	comp.ComponentSet.SetComponent(comp)
+	return comp
 }
 
 type statelessComponent struct {
-	types.ComponentBase
+	internal.ComponentBase
+	runningWorkload *appsv1.Deployment
 }
 
-func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, action *ictrltypes.LifecycleAction) error {
-	if err := c.ComposeSynthesizedComponent(reqCtx, cli); err != nil {
-		return err
-	}
+var _ types.Component = &statelessComponent{}
+
+func (c *statelessComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	action *ictrltypes.LifecycleAction) internal.ComponentWorkloadBuilder {
 	builder := &statelessComponentWorkloadBuilder{
-		ComponentWorkloadBuilderBase: types.ComponentWorkloadBuilderBase{
+		ComponentWorkloadBuilderBase: internal.ComponentWorkloadBuilderBase{
 			ReqCtx:        reqCtx,
 			Client:        cli,
 			Comp:          c,
@@ -81,16 +80,55 @@ func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		workload: nil,
 	}
 	builder.ConcreteBuilder = builder
+	return builder
+}
 
-	return builder.BuildEnv().
-		BuildWorkload(0).
-		BuildHeadlessService().
-		BuildConfig(0).
-		BuildTLSVolume(0).
-		BuildVolumeMount(0).
-		BuildService().
-		BuildTLSCert().
-		Complete()
+func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder internal.ComponentWorkloadBuilder, load bool) error {
+	var err error
+	if builder != nil {
+		if err = builder.BuildEnv().
+			BuildWorkload(0).
+			BuildHeadlessService().
+			BuildConfig(0).
+			BuildTLSVolume(0).
+			BuildVolumeMount(0).
+			BuildService().
+			BuildTLSCert().
+			Complete(); err != nil {
+			return err
+		}
+	}
+	if load {
+		c.runningWorkload, err = c.loadRunningWorkload(reqCtx, cli)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *statelessComponent) loadRunningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.Deployment, error) {
+	deployList, err := util.ListDeployOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	if err != nil {
+		return nil, err
+	}
+
+	cnt := len(deployList)
+	if cnt == 0 {
+		return nil, fmt.Errorf("no workload found for the component, cluster: %s, component: %s",
+			c.GetClusterName(), c.GetName())
+	} else if cnt > 1 {
+		return nil, fmt.Errorf("more than one workloads found for the stateless component, cluster: %s, component: %s, cnt: %d",
+			c.GetClusterName(), c.GetName(), cnt)
+	}
+
+	deploy := deployList[0]
+	if deploy.Spec.Replicas == nil {
+		return nil, fmt.Errorf("running workload for the stateless component has no replica, cluster: %s, component: %s",
+			c.GetClusterName(), c.GetName())
+	}
+
+	return deploy, nil
 }
 
 func (c *statelessComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -106,7 +144,7 @@ func (c *statelessComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Cli
 }
 
 func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli, ictrltypes.ActionCreatePtr()); err != nil {
+	if err := c.init(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()), false); err != nil {
 		return err
 	}
 
@@ -115,7 +153,7 @@ func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 			return err
 		}
 		return fmt.Errorf("component to be created is already exist, cluster: %s, component: %s",
-			c.Cluster.Name, c.CompSpec.Name)
+			c.GetClusterName(), c.GetName())
 	}
 
 	if err := c.ValidateObjectsAction(); err != nil {
@@ -128,11 +166,15 @@ func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 }
 
 func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli, nil); err != nil {
+	if err := c.init(reqCtx, cli, c.newBuilder(reqCtx, cli, nil), true); err != nil {
 		return err
 	}
 
 	if err := c.Restart(reqCtx, cli); err != nil {
+		return err
+	}
+
+	if err := c.Reconfigure(reqCtx, cli); err != nil {
 		return err
 	}
 
@@ -146,7 +188,7 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
-	if err := c.updateUnderlyingResources(reqCtx, cli); err != nil {
+	if err := c.updateUnderlyingResources(reqCtx, cli, c.runningWorkload); err != nil {
 		return err
 	}
 
@@ -159,18 +201,14 @@ func (c *statelessComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Cl
 }
 
 func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.ComposeSynthesizedComponent(reqCtx, cli); err != nil {
-		return err
-	}
-	deploy, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
+	if err := c.init(reqCtx, cli, nil, true); err != nil {
 		// TODO(refactor): fix me
 		if strings.Contains(err.Error(), "no workload found for the component") {
 			return nil
 		}
 		return err
 	}
-	return c.StatusImpl(reqCtx, cli, []client.Object{deploy})
+	return c.StatusImpl(reqCtx, cli, []client.Object{c.runningWorkload})
 }
 
 func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -178,62 +216,25 @@ func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli cli
 }
 
 func (c *statelessComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	deploy, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-	if *deploy.Spec.Replicas != c.Component.Replicas {
+	if *c.runningWorkload.Spec.Replicas != c.Component.Replicas {
 		reqCtx.Recorder.Eventf(c.Cluster,
 			corev1.EventTypeNormal,
 			"HorizontalScale",
 			"start horizontal scale component %s of cluster %s from %d to %d",
-			c.GetName(), c.GetClusterName(), *deploy.Spec.Replicas, c.Component.Replicas)
+			c.GetName(), c.GetClusterName(), *c.runningWorkload.Spec.Replicas, c.Component.Replicas)
 	}
 	return nil
 }
 
 func (c *statelessComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	deploy, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-	return util.RestartPod(&deploy.Spec.Template)
+	return util.RestartPod(&c.runningWorkload.Spec.Template)
 }
 
-func (c *statelessComponent) Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return nil // TODO: impl
+func (c *statelessComponent) Reconfigure(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return nil // TODO(impl)
 }
 
-func (c *statelessComponent) runningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.Deployment, error) {
-	deployList, err := util.ListDeployOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
-	if err != nil {
-		return nil, err
-	}
-
-	cnt := len(deployList)
-	if cnt == 0 {
-		return nil, fmt.Errorf("no workload found for the component, cluster: %s, component: %s",
-			c.Cluster.Name, c.CompSpec.Name)
-	} else if cnt > 1 {
-		return nil, fmt.Errorf("more than one workloads found for the stateless component, cluster: %s, component: %s, cnt: %d",
-			c.Cluster.Name, c.CompSpec.Name, cnt)
-	}
-
-	deploy := deployList[0]
-	if deploy.Spec.Replicas == nil {
-		return nil, fmt.Errorf("running workload for the stateless component has no replica, cluster: %s, component: %s",
-			c.Cluster.Name, c.CompSpec.Name)
-	}
-
-	return deploy, nil
-}
-
-func (c *statelessComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	deployObj, err := c.runningWorkload(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-
+func (c *statelessComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, deployObj *appsv1.Deployment) error {
 	c.updateWorkload(deployObj)
 
 	if err := c.UpdateService(reqCtx, cli); err != nil {

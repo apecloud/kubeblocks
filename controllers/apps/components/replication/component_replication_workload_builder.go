@@ -18,21 +18,21 @@ package replication
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type replicationComponentWorkloadBuilder struct {
-	types.ComponentWorkloadBuilderBase
+	internal.ComponentWorkloadBuilderBase
 	workloads []*appsv1.StatefulSet
 }
 
@@ -40,11 +40,7 @@ func (b *replicationComponentWorkloadBuilder) MutableWorkload(idx int32) client.
 	return b.workloads[idx]
 }
 
-func (b *replicationComponentWorkloadBuilder) MutableRuntime(idx int32) *corev1.PodSpec {
-	return &b.workloads[idx].Spec.Template.Spec
-}
-
-func (b *replicationComponentWorkloadBuilder) BuildService() types.ComponentWorkloadBuilder {
+func (b *replicationComponentWorkloadBuilder) BuildService() internal.ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		svcList, err := builder.BuildSvcListLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
@@ -60,7 +56,7 @@ func (b *replicationComponentWorkloadBuilder) BuildService() types.ComponentWork
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *replicationComponentWorkloadBuilder) BuildWorkload(idx int32) types.ComponentWorkloadBuilder {
+func (b *replicationComponentWorkloadBuilder) BuildWorkload(idx int32) internal.ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		component := b.Comp.GetSynthesizedComponent()
 		if b.EnvConfig == nil {
@@ -91,7 +87,7 @@ func (b *replicationComponentWorkloadBuilder) BuildWorkload(idx int32) types.Com
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *replicationComponentWorkloadBuilder) BuildVolume(idx int32) types.ComponentWorkloadBuilder {
+func (b *replicationComponentWorkloadBuilder) BuildVolume(idx int32) internal.ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		workload := b.MutableWorkload(idx)
 		// if workload == nil {

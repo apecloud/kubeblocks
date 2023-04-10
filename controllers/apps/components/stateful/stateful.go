@@ -18,28 +18,38 @@ package stateful
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type Stateful struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	ComponentDef *appsv1alpha1.ClusterComponentDefinition
+	Cli           client.Client
+	Cluster       *appsv1alpha1.Cluster
+	Component     types.Component
+	ComponentSpec *appsv1alpha1.ClusterComponentSpec
 }
 
-//var _ types.Component = &Stateful{}
+var _ types.ComponentSet = &Stateful{}
+
+func (stateful *Stateful) getReplicas() int32 {
+	if stateful.Component != nil {
+		return stateful.Component.GetReplicas()
+	}
+	return stateful.ComponentSpec.Replicas
+}
+
+func (stateful *Stateful) SetComponent(comp types.Component) {
+	stateful.Component = comp
+}
 
 func (stateful *Stateful) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
@@ -50,7 +60,8 @@ func (stateful *Stateful) IsRunning(ctx context.Context, obj client.Object) (boo
 	if err != nil {
 		return false, err
 	}
-	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &stateful.Component.Replicas), nil
+	targetReplicas := stateful.getReplicas()
+	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &targetReplicas), nil
 }
 
 func (stateful *Stateful) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
@@ -58,14 +69,11 @@ func (stateful *Stateful) PodsReady(ctx context.Context, obj client.Object) (boo
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	return util.StatefulSetPodsAreReady(sts, stateful.Component.Replicas), nil
+	return util.StatefulSetPodsAreReady(sts, stateful.getReplicas()), nil
 }
 
 func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	if pod == nil {
-		return false
-	}
-	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
+	return util.PodIsAvailable(appsv1alpha1.Stateful, pod, minReadySeconds)
 }
 
 func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
@@ -84,7 +92,7 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componen
 		return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
 	}
 	stsObj := stsList.Items[0]
-	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, stateful.Component.Replicas,
+	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, stateful.getReplicas(),
 		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil
 }
 
@@ -92,22 +100,19 @@ func (stateful *Stateful) HandleRestart(context.Context, client.Object) ([]graph
 	return nil, nil
 }
 
-func (ststatefulateless *Stateful) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
+func (stateful *Stateful) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
 	return nil, nil
 }
 
-func NewStateful(cli client.Client,
+func newStateful(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (*Stateful, error) {
-	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
-		return nil, err
-	}
+	_ appsv1alpha1.ClusterComponentDefinition) (*Stateful, error) {
 	stateful := &Stateful{
-		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		ComponentDef: &componentDef,
+		Cli:           cli,
+		Cluster:       cluster,
+		Component:     nil,
+		ComponentSpec: component,
 	}
 	return stateful, nil
 }

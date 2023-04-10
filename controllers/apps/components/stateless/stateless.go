@@ -18,21 +18,20 @@ package stateless
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"math"
 	"strings"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
-	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -42,13 +41,24 @@ import (
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
 type Stateless struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	ComponentDef *appsv1alpha1.ClusterComponentDefinition
+	Cli           client.Client
+	Cluster       *appsv1alpha1.Cluster
+	Component     types.Component
+	ComponentSpec *appsv1alpha1.ClusterComponentSpec
 }
 
-//var _ types.Component = &Stateless{}
+var _ types.ComponentSet = &Stateless{}
+
+func (stateless *Stateless) getReplicas() int32 {
+	if stateless.Component != nil {
+		return stateless.Component.GetReplicas()
+	}
+	return stateless.ComponentSpec.Replicas
+}
+
+func (stateless *Stateless) SetComponent(comp types.Component) {
+	stateless.Component = comp
+}
 
 func (stateless *Stateless) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if stateless == nil {
@@ -65,14 +75,12 @@ func (stateless *Stateless) PodsReady(ctx context.Context, obj client.Object) (b
 	if !ok {
 		return false, nil
 	}
-	return deploymentIsReady(deploy, &stateless.Component.Replicas), nil
+	targetReplicas := stateless.getReplicas()
+	return deploymentIsReady(deploy, &targetReplicas), nil
 }
 
 func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	if stateless == nil || pod == nil {
-		return false
-	}
-	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
+	return util.PodIsAvailable(appsv1alpha1.Stateless, pod, minReadySeconds)
 }
 
 func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
@@ -92,7 +100,7 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 		return !intctrlutil.PodIsReady(pod) && belongToNewReplicaSet(d, pod)
 	}
 	deploy := &deployList.Items[0]
-	return util.GetComponentPhaseWhenPodsNotReady(podList, deploy, stateless.Component.Replicas,
+	return util.GetComponentPhaseWhenPodsNotReady(podList, deploy, stateless.getReplicas(),
 		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil
 }
 
@@ -104,18 +112,15 @@ func (stateless *Stateless) HandleRoleChange(context.Context, client.Object) ([]
 	return nil, nil
 }
 
-func NewStateless(cli client.Client,
+func newStateless(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (*Stateless, error) {
-	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
-		return nil, err
-	}
+	_ appsv1alpha1.ClusterComponentDefinition) (*Stateless, error) {
 	stateless := &Stateless{
-		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		ComponentDef: &componentDef,
+		Cli:           cli,
+		Cluster:       cluster,
+		Component:     nil,
+		ComponentSpec: component,
 	}
 	return stateless, nil
 }

@@ -201,16 +201,6 @@ var _ = Describe("Consensus Component", func() {
 			clusterComp := GetClusterComponentSpecByName(*cluster, consensusCompName)
 			Expect(clusterComp).ShouldNot(BeNil())
 
-			By("test ComponentRuntimeReqArgsCheck function")
-			err = ComponentRuntimeReqArgsCheck(k8sClient, cluster, clusterComp)
-			Expect(err).Should(Succeed())
-			By("test ComponentRuntimeReqArgsCheck function when cluster nil")
-			err = ComponentRuntimeReqArgsCheck(k8sClient, nil, clusterComp)
-			Expect(err).ShouldNot(Succeed())
-			By("test ComponentRuntimeReqArgsCheck function when clusterComp nil")
-			err = ComponentRuntimeReqArgsCheck(k8sClient, cluster, nil)
-			Expect(err).ShouldNot(Succeed())
-
 			By("test UpdateObjLabel function")
 			stsObj := stsList.Items[0]
 			err = UpdateObjLabel(ctx, k8sClient, stsObj, "test", "test")

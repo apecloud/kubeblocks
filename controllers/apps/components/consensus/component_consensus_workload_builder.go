@@ -18,17 +18,17 @@ package consensus
 
 import (
 	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 type consensusComponentWorkloadBuilder struct {
-	types.ComponentWorkloadBuilderBase
+	internal.ComponentWorkloadBuilderBase
 	workload *appsv1.StatefulSet
 }
 
@@ -36,11 +36,7 @@ func (b *consensusComponentWorkloadBuilder) MutableWorkload(_ int32) client.Obje
 	return b.workload
 }
 
-func (b *consensusComponentWorkloadBuilder) MutableRuntime(_ int32) *corev1.PodSpec {
-	return &b.workload.Spec.Template.Spec
-}
-
-func (b *consensusComponentWorkloadBuilder) BuildService() types.ComponentWorkloadBuilder {
+func (b *consensusComponentWorkloadBuilder) BuildService() internal.ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		svcList, err := builder.BuildSvcListLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
@@ -59,7 +55,7 @@ func (b *consensusComponentWorkloadBuilder) BuildService() types.ComponentWorklo
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *consensusComponentWorkloadBuilder) BuildWorkload(_ int32) types.ComponentWorkloadBuilder {
+func (b *consensusComponentWorkloadBuilder) BuildWorkload(_ int32) internal.ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		if b.EnvConfig == nil {
 			return nil, fmt.Errorf("build consensus workload but env config is nil, cluster: %s, component: %s",

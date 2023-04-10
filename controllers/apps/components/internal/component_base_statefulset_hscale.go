@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package internal
 
 import (
 	"context"
@@ -40,7 +40,7 @@ import (
 )
 
 // TODO: handle unfinished jobs from previous scale in
-func CheckedCreateDeletePVCCronJob(reqCtx intctrlutil.RequestCtx, cli types2.ReadonlyClient,
+func checkedCreateDeletePVCCronJob(reqCtx intctrlutil.RequestCtx, cli types2.ReadonlyClient,
 	pvcKey types.NamespacedName, stsObj *appsv1.StatefulSet, cluster *appsv1alpha1.Cluster) (client.Object, error) {
 	// hack: delete after 30 minutes
 	utc := time.Now().Add(30 * time.Minute).UTC()
@@ -65,7 +65,7 @@ func CheckedCreateDeletePVCCronJob(reqCtx intctrlutil.RequestCtx, cli types2.Rea
 	return nil, nil
 }
 
-func IsPVCExists(cli types2.ReadonlyClient, ctx context.Context,
+func isPVCExists(cli types2.ReadonlyClient, ctx context.Context,
 	pvcKey types.NamespacedName) (bool, error) {
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
@@ -74,7 +74,7 @@ func IsPVCExists(cli types2.ReadonlyClient, ctx context.Context,
 	return true, nil
 }
 
-func IsAllPVCBound(cli types2.ReadonlyClient,
+func isAllPVCBound(cli types2.ReadonlyClient,
 	ctx context.Context,
 	stsObj *appsv1.StatefulSet) (bool, error) {
 	if len(stsObj.Spec.VolumeClaimTemplates) == 0 {
@@ -98,13 +98,13 @@ func IsAllPVCBound(cli types2.ReadonlyClient,
 }
 
 // check volume snapshot available
-func IsSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
+func isSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
 	vsList := snapshotv1.VolumeSnapshotList{}
 	getVSErr := cli.List(ctx, &vsList)
 	return getVSErr == nil
 }
 
-func DeleteSnapshot(cli types2.ReadonlyClient,
+func deleteSnapshot(cli types2.ReadonlyClient,
 	reqCtx intctrlutil.RequestCtx,
 	snapshotKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
@@ -173,7 +173,7 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 	}
 }
 
-func DoBackup(reqCtx intctrlutil.RequestCtx,
+func doBackup(reqCtx intctrlutil.RequestCtx,
 	cli types2.ReadonlyClient,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
@@ -197,7 +197,7 @@ func DoBackup(reqCtx intctrlutil.RequestCtx,
 			"scale with backup tool not support yet")
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
-		if !IsSnapshotAvailable(cli, reqCtx.Ctx) {
+		if !isSnapshotAvailable(cli, reqCtx.Ctx) {
 			reqCtx.Recorder.Eventf(cluster,
 				corev1.EventTypeWarning,
 				"HorizontalScaleFailed",
@@ -335,9 +335,6 @@ func doSnapshot(cli types2.ReadonlyClient,
 		if err != nil {
 			return nil, err
 		}
-		//if err := controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
-		//	return nil, err
-		//}
 		objs = append(objs, snapshot)
 
 		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
@@ -398,7 +395,7 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 			vsName = vs.Name
 			break
 		}
-		return createPVCFromSnapshot(vct, cluster, stsObj, pvcKey, vsName, component)
+		return createPVCFromSnapshot(vct, stsObj, pvcKey, vsName, component)
 	}
 	return nil, nil
 }
@@ -428,9 +425,6 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return
 		}
-		//if err = controllerutil.SetControllerReference(cluster, backupPolicy, scheme); err != nil {
-		//	return
-		//}
 		backupPolicyName = backupPolicy.Name
 		objs = append(objs, backupPolicy)
 		return
@@ -464,9 +458,6 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return err
 		}
-		//if err := controllerutil.SetControllerReference(cluster, backup, scheme); err != nil {
-		//	return err
-		//}
 		objs = append(objs, backup)
 		return nil
 	}
@@ -484,7 +475,6 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 }
 
 func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
-	cluster *appsv1alpha1.Cluster,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string,
@@ -493,8 +483,5 @@ func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
 	if err != nil {
 		return nil, err
 	}
-	//if err = intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName); err != nil {
-	//	return nil, err
-	//}
 	return pvc, nil
 }

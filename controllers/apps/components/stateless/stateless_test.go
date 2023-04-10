@@ -78,8 +78,7 @@ var _ = Describe("Stateful Component", func() {
 			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
 			clusterComponent := cluster.GetComponentByName(statelessCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-			// TODO(refactor)
-			statelessComponent, err := NewStateless(k8sClient, cluster, clusterComponent, *componentDef)
+			statelessComponent, err := newStateless(k8sClient, cluster, clusterComponent, *componentDef)
 			Expect(err).Should(Succeed())
 			By("test pods number of deploy is 0 ")
 			phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
@@ -138,10 +137,10 @@ var _ = Describe("Stateful Component", func() {
 			isRunning, _ = statelessComponent.IsRunning(ctx, deploy)
 			Expect(isRunning == true).Should(BeTrue())
 
-			// TODO(refactor)
-			//By("test handle probe timed out")
-			//requeue, _ := statelessComponent.HandleProbeTimeoutWhenPodsReady(ctx, nil)
-			//Expect(requeue == false).Should(BeTrue())
+			// TODO(refactor): probe timed-out pod
+			// By("test handle probe timed out")
+			// requeue, _ := statelessComponent.HandleProbeTimeoutWhenPodsReady(ctx, nil)
+			// Expect(requeue == false).Should(BeTrue())
 
 			By("test pod is not ready and not controlled by new ReplicaSet of deployment")
 			Expect(testapps.ChangeObjStatus(&testCtx, deploy, func() {

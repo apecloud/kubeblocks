@@ -18,16 +18,16 @@ package stateful
 
 import (
 	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 type statefulComponentWorkloadBuilder struct {
-	types.ComponentWorkloadBuilderBase
+	internal.ComponentWorkloadBuilderBase
 	workload *appsv1.StatefulSet
 }
 
@@ -35,11 +35,7 @@ func (b *statefulComponentWorkloadBuilder) MutableWorkload(_ int32) client.Objec
 	return b.workload
 }
 
-func (b *statefulComponentWorkloadBuilder) MutableRuntime(_ int32) *corev1.PodSpec {
-	return &b.workload.Spec.Template.Spec
-}
-
-func (b *statefulComponentWorkloadBuilder) BuildWorkload(_ int32) types.ComponentWorkloadBuilder {
+func (b *statefulComponentWorkloadBuilder) BuildWorkload(_ int32) internal.ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		if b.EnvConfig == nil {
 			return nil, fmt.Errorf("build consensus workload but env config is nil, cluster: %s, component: %s",

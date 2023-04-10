@@ -41,20 +41,26 @@ const (
 // TODO(refactor):
 //  1. status management
 //  2. component workload
+
 type Component interface {
 	GetName() string
 	GetNamespace() string
 	GetClusterName() string
 	GetWorkloadType() appsv1alpha1.WorkloadType
 
-	GetDefinition() *appsv1alpha1.ClusterDefinition
-	GetVersion() *appsv1alpha1.ClusterVersion
+	// GetDefinition() *appsv1alpha1.ClusterDefinition
+	// GetVersion() *appsv1alpha1.ClusterVersion
 	GetCluster() *appsv1alpha1.Cluster
+	GetClusterVersion() *appsv1alpha1.ClusterVersion
 	GetSynthesizedComponent() *component.SynthesizedComponent
 
 	GetMatchingLabels() client.MatchingLabels
 
-	// GetPhase() appsv1alpha1.ClusterComponentPhase
+	GetReplicas() int32
+
+	GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec
+
+	GetPhase() appsv1alpha1.ClusterComponentPhase
 	// GetStatus() appsv1alpha1.ClusterComponentStatus
 
 	// Exist checks whether the component exists in cluster, we say that a component exists iff the main workloads
@@ -72,15 +78,18 @@ type Component interface {
 
 	Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 
-	Snapshot(reqCtx intctrlutil.RequestCtx, cli client.Client) error
+	Reconfigure(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 
 	// TODO(refactor): impl-related, will replace it with component workload
 	AddResource(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex
 	AddWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex)
 }
 
-// /// TODO(refactor): copied from controllers/apps/components/types/Component, should replica it with ComponentWorkload and *Set implementation
+// TODO(refactor): copied from controllers/apps/components/types/Component, should replica it with ComponentWorkload and *Set implementation
+
 type ComponentSet interface {
+	SetComponent(component Component)
+
 	// IsRunning when relevant k8s workloads changes, it checks whether the component is running.
 	// you can also reconcile the pods of component till the component is Running here.
 	IsRunning(ctx context.Context, obj client.Object) (bool, error)
@@ -96,11 +105,10 @@ type ComponentSet interface {
 	// if the component is ConsensusSet,it will be available when the pod is ready and labeled with its role.
 	PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool
 
-	//// HandleProbeTimeoutWhenPodsReady if the component has no role probe, return false directly. otherwise,
-	//// we should handle the component phase when the role probe timeout and return a bool.
-	//// if return true, means probe is not timing out and need to requeue after an interval time to handle probe timeout again.
-	//// else return false, means probe has timed out and needs to update the component phase to Failed or Abnormal.
-	//HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error)
+	// HandleProbeTimeoutWhenPodsReady if the component has no role probe, return false directly. otherwise,
+	// we should handle the component phase when the role probe timeout and return a bool.
+	// if return true, means probe is not timing out and need to requeue after an interval time to handle probe timeout again.
+	// else return false, means probe has timed out and needs to update the component phase to Failed or Abnormal.
 	HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod)
 
 	// GetPhaseWhenPodsNotReady when the pods of component are not ready, calculate the component phase is Failed or Abnormal.

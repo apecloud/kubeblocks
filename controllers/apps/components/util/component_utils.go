@@ -20,29 +20,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"golang.org/x/exp/maps"
-	policyv1 "k8s.io/api/policy/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"strings"
 	"time"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	componentutil "github.com/apecloud/kubeblocks/internal/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
@@ -55,12 +51,10 @@ var (
 	ErrReqClusterObj              = errors.New("required arg *appsv1alpha1.Cluster is nil")
 	ErrReqClusterComponentDefObj  = errors.New("required arg *appsv1alpha1.ClusterComponentDefinition is nil")
 	ErrReqClusterComponentSpecObj = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
-
-	// TODO(refactor): fix me
-	dbClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
 )
 
-// TODO(refactor): copied from internal lifecycle, fix me later
+// TODO(refactor): should define this somewhere
+
 func IsClusterDeleting(cluster appsv1alpha1.Cluster) bool {
 	return !cluster.GetDeletionTimestamp().IsZero()
 }
@@ -102,114 +96,17 @@ func ListPodOwnedByComponent(ctx context.Context, cli client.Client, namespace s
 	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
 }
 
-type gvkName struct {
-	gvk      schema.GroupVersionKind
-	ns, name string
-}
-
-type clusterSnapshot map[gvkName]client.Object
-
-func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkName, error) {
-	gvk, err := apiutil.GVKForObject(object, scheme)
-	if err != nil {
-		return nil, err
-	}
-	return &gvkName{
-		gvk:  gvk,
-		ns:   object.GetNamespace(),
-		name: object.GetName(),
-	}, nil
-}
-
-func isOwnerOf(owner, obj client.Object, scheme *runtime.Scheme) bool {
-	ro, ok := owner.(runtime.Object)
-	if !ok {
+func PodIsAvailable(workloadType appsv1alpha1.WorkloadType, pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
 		return false
 	}
-	gvk, err := apiutil.GVKForObject(ro, scheme)
-	if err != nil {
-		return false
-	}
-	ref := metav1.OwnerReference{
-		APIVersion: gvk.GroupVersion().String(),
-		Kind:       gvk.Kind,
-		UID:        owner.GetUID(),
-		Name:       owner.GetName(),
-	}
-	owners := obj.GetOwnerReferences()
-	referSameObject := func(a, b metav1.OwnerReference) bool {
-		aGV, err := schema.ParseGroupVersion(a.APIVersion)
-		if err != nil {
-			return false
-		}
-
-		bGV, err := schema.ParseGroupVersion(b.APIVersion)
-		if err != nil {
-			return false
-		}
-
-		return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
-	}
-	for _, ownerRef := range owners {
-		if referSameObject(ownerRef, ref) {
-			return true
-		}
-	}
-	return false
-}
-
-func ownedKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&appsv1.StatefulSetList{},
-		&appsv1.DeploymentList{},
-		&corev1.ServiceList{},
-		&corev1.SecretList{},
-		&corev1.ConfigMapList{},
-		&corev1.PersistentVolumeClaimList{},
-		&policyv1.PodDisruptionBudgetList{},
-	}
-}
-
-// read all objects owned by component
-func ReadCacheSnapshot(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) (clusterSnapshot, error) {
-	// list what kinds of object cluster owns
-	kinds := ownedKinds()
-	snapshot := make(clusterSnapshot)
-	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
-	inNS := client.InNamespace(cluster.Namespace)
-	for _, list := range kinds {
-		if err := cli.List(reqCtx.Ctx, list, inNS, ml); err != nil {
-			return nil, err
-		}
-		// reflect get list.Items
-		items := reflect.ValueOf(list).Elem().FieldByName("Items")
-		l := items.Len()
-		for i := 0; i < l; i++ {
-			// get the underlying object
-			object := items.Index(i).Addr().Interface().(client.Object)
-			// put to snapshot if owned by our cluster
-			if isOwnerOf(cluster, object, k8sscheme.Scheme) {
-				name, err := getGVKName(object, k8sscheme.Scheme)
-				if err != nil {
-					return nil, err
-				}
-				snapshot[*name] = object
-			}
-		}
-	}
-	return snapshot, nil
-}
-
-func ResolveObjectAction(snapshot clusterSnapshot, vertex *ictrltypes.LifecycleVertex) (*ictrltypes.LifecycleAction, error) {
-	gvk, err := getGVKName(vertex.Obj, k8sscheme.Scheme)
-	if err != nil {
-		return nil, err
-	}
-	if obj, ok := snapshot[*gvk]; ok {
-		vertex.ObjCopy = obj
-		return ictrltypes.ActionUpdatePtr(), nil
-	} else {
-		return ictrltypes.ActionCreatePtr(), nil
+	switch workloadType {
+	case appsv1alpha1.Consensus, appsv1alpha1.Replication:
+		return intctrlutil.PodIsReadyWithLabel(*pod)
+	case appsv1alpha1.Stateful, appsv1alpha1.Stateless:
+		return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
+	default:
+		panic("unknown workload type")
 	}
 }
 
@@ -229,7 +126,7 @@ func RestartPod(podTemplate *corev1.PodTemplateSpec) error {
 	return nil
 }
 
-// mergeAnnotations keeps the original annotations.
+// MergeAnnotations keeps the original annotations.
 // if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
 func MergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
 	if targetAnnotations == nil {
@@ -260,21 +157,6 @@ func MergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]s
 	}
 	maps.Copy(tmpAnnotations, targetAnnotations)
 	return tmpAnnotations
-}
-
-func ComponentRuntimeReqArgsCheck(cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec) error {
-	if cli == nil {
-		return ErrReqCtrlClient
-	}
-	if cluster == nil {
-		return ErrReqCtrlClient
-	}
-	if component == nil {
-		return ErrReqClusterComponentSpecObj
-	}
-	return nil
 }
 
 // GetClusterByObject gets cluster by related k8s workloads.

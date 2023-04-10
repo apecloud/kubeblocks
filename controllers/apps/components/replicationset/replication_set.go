@@ -18,8 +18,6 @@ package replicationset
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,35 +25,59 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ReplicationSet is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec
 type ReplicationSet struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	ComponentDef *appsv1alpha1.ClusterComponentDefinition
+	Cli           client.Client
+	Cluster       *appsv1alpha1.Cluster
+	Component     types.Component
+	ComponentSpec *appsv1alpha1.ClusterComponentSpec
+	ComponentDef  *appsv1alpha1.ClusterComponentDefinition
 }
 
-//var _ types.Component = &ReplicationSet{}
+var _ types.ComponentSet = &ReplicationSet{}
 
-func (c *ReplicationSet) GetName() string {
-	return c.Component.Name
+func (r *ReplicationSet) getName() string {
+	if r.Component != nil {
+		return r.Component.GetName()
+	}
+	return r.ComponentSpec.Name
 }
 
-func (c *ReplicationSet) GetNamespace() string {
-	return c.Cluster.GetNamespace()
+func (r *ReplicationSet) getNamespace() string {
+	return r.Cluster.GetNamespace()
 }
 
-func (c *ReplicationSet) GetMatchingLabels() client.MatchingLabels {
-	return util.GetComponentMatchLabels(c.GetNamespace(), c.GetName())
+func (r *ReplicationSet) getMatchingLabels() client.MatchingLabels {
+	if r.Component != nil {
+		return r.Component.GetMatchingLabels()
+	}
+	return util.GetComponentMatchLabels(r.Cluster.GetName(), r.getName())
 }
 
-func (c *ReplicationSet) GetDefinition() *appsv1alpha1.ClusterComponentDefinition {
-	return c.ComponentDef
+func (r *ReplicationSet) getWorkloadType() appsv1alpha1.WorkloadType {
+	if r.Component != nil {
+		return r.Component.GetWorkloadType()
+	}
+	return r.ComponentDef.WorkloadType
+}
+
+func (r *ReplicationSet) getReplicas() int32 {
+	if r.Component != nil {
+		return r.Component.GetReplicas()
+	}
+	return r.ComponentSpec.Replicas
+}
+
+func (r *ReplicationSet) SetComponent(comp types.Component) {
+	r.Component = comp
 }
 
 // IsRunning is the implementation of the type Component interface method,
@@ -80,7 +102,7 @@ func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool
 			return false, nil
 		}
 	}
-	if availableReplicas < r.Component.Replicas {
+	if availableReplicas < r.getReplicas() {
 		componentStatusIsRunning = false
 	}
 	return componentStatusIsRunning, nil
@@ -100,7 +122,7 @@ func (r *ReplicationSet) PodsReady(ctx context.Context, obj client.Object) (bool
 	for _, stsObj := range componentStsList.Items {
 		availableReplicas += stsObj.Status.AvailableReplicas
 	}
-	if availableReplicas < r.Component.Replicas {
+	if availableReplicas < r.getReplicas() {
 		podsReady = false
 	}
 	return podsReady, nil
@@ -109,10 +131,7 @@ func (r *ReplicationSet) PodsReady(ctx context.Context, obj client.Object) (bool
 // PodIsAvailable is the implementation of the type Component interface method,
 // Check whether the status of a Pod of the replicationSet is ready, including the role label on the Pod
 func (r *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	if pod == nil {
-		return false
-	}
-	return intctrlutil.PodIsReadyWithLabel(*pod)
+	return util.PodIsAvailable(appsv1alpha1.Replication, pod, minReadySeconds)
 }
 
 func (r *ReplicationSet) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
@@ -127,7 +146,7 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, component
 	if err != nil || len(componentStsList.Items) == 0 {
 		return "", err
 	}
-	podCount, componentReplicas := len(podList.Items), r.Component.Replicas
+	podCount, componentReplicas := len(podList.Items), r.getReplicas()
 	if podCount == 0 {
 		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
 	}
@@ -178,12 +197,13 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, component
 }
 
 func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	stsList, err := util.ListStsOwnedByComponent(ctx, r.Cli, r.GetNamespace(), r.GetMatchingLabels())
+	stsList, err := util.ListStsOwnedByComponent(ctx, r.Cli, r.getNamespace(), r.getMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
 
 	vertexes := make([]graph.Vertex, 0)
+	// TODO(refactor): why not use the sts obj passed in, but to obtain and check all statefulset belong to the component?
 	for _, sts := range stsList {
 		if sts.Generation != sts.Status.ObservedGeneration {
 			continue
@@ -210,7 +230,7 @@ func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) (
 }
 
 func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	stsList, err := util.ListStsOwnedByComponent(ctx, r.Cli, r.GetNamespace(), r.GetMatchingLabels())
+	stsList, err := util.ListStsOwnedByComponent(ctx, r.Cli, r.getNamespace(), r.getMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
@@ -240,26 +260,23 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 	}
 
 	// sync cluster.status.components.replicationSet.status
-	if err := syncReplicationSetClusterStatus(r.Cluster, r.GetDefinition(), r.GetName(), podsToSyncStatus); err != nil {
+	if err := syncReplicationSetClusterStatus(r.Cluster, r.getWorkloadType(), r.getName(), podsToSyncStatus); err != nil {
 		return nil, err
 	}
 
 	return vertexes, nil
 }
 
-// NewReplicationSet creates a new ReplicationSet object.
-func NewReplicationSet(cli client.Client,
+func newReplicationSet(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
 	componentDef appsv1alpha1.ClusterComponentDefinition) (*ReplicationSet, error) {
-	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
-		return nil, err
-	}
 	replication := &ReplicationSet{
-		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		ComponentDef: &componentDef,
+		Cli:           cli,
+		Cluster:       cluster,
+		Component:     nil,
+		ComponentSpec: component,
+		ComponentDef:  &componentDef,
 	}
 	return replication, nil
 }

@@ -75,9 +75,8 @@ func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, 
 	return cli.Patch(ctx, opsRequest, patch)
 }
 
-//
 //// PatchOpsRequestReconcileAnnotation2 patches the reconcile annotation to OpsRequest
-//func PatchOpsRequestReconcileAnnotation2(ctx context.Context, cli client.Client, namespace string, opsRequestName string, dag *graph.DAG) error {
+// func PatchOpsRequestReconcileAnnotation2(ctx context.Context, cli client.Client, namespace string, opsRequestName string, dag *graph.DAG) error {
 //	opsRequest := &appsv1alpha1.OpsRequest{}
 //	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: namespace}, opsRequest); err != nil {
 //		return err
@@ -93,7 +92,7 @@ func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, 
 //
 //	types.AddVertex4Patch(dag, opsRequest, opsRequestDeepCopy)
 //	return nil
-//}
+// }
 
 // GetOpsRequestSliceFromCluster gets OpsRequest slice from cluster annotations.
 // this records what OpsRequests are running in cluster
@@ -145,13 +144,12 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 	return nil
 }
 
-//
 //// MarkRunningOpsRequestAnnotation2 marks reconcile annotation to the OpsRequest which is running in the cluster.
 //// then the related OpsRequest can reconcile.
 //// Note: if the client-go fetches the Cluster resources from cache,
 //// it should record the Cluster.ResourceVersion to check if the Cluster object from client-go is the latest in OpsRequest controller.
 //// @return could return ErrNoOps
-//func MarkRunningOpsRequestAnnotation2(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
+// func MarkRunningOpsRequestAnnotation2(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
 //	var (
 //		opsRequestSlice []appsv1alpha1.OpsRecorder
 //		err             error
@@ -173,7 +171,7 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 //		return RemoveClusterInvalidOpsRequestAnnotation2(ctx, cli, cluster, opsRequestSlice, notExistOps)
 //	}
 //	return nil
-//}
+// }
 
 // RemoveClusterInvalidOpsRequestAnnotation deletes the OpsRequest annotation in cluster when the OpsRequest not existing.
 func RemoveClusterInvalidOpsRequestAnnotation(
@@ -193,9 +191,8 @@ func RemoveClusterInvalidOpsRequestAnnotation(
 	return PatchClusterOpsAnnotations(ctx, cli, cluster, newOpsRequestSlice)
 }
 
-//
 //// RemoveClusterInvalidOpsRequestAnnotation2 deletes the OpsRequest annotation in cluster when the OpsRequest not existing.
-//func RemoveClusterInvalidOpsRequestAnnotation2(ctx context.Context,
+// func RemoveClusterInvalidOpsRequestAnnotation2(ctx context.Context,
 //	cli client.Client,
 //	cluster *appsv1alpha1.Cluster,
 //	opsRequestSlice []appsv1alpha1.OpsRecorder,
@@ -210,4 +207,4 @@ func RemoveClusterInvalidOpsRequestAnnotation(
 //	}
 //	setOpsRequestToCluster(cluster, opsRequestSlice)
 //	return nil
-//}
+// }

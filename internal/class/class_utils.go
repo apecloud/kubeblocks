@@ -71,8 +71,9 @@ func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[
 			return nil, fmt.Errorf("failed to find component type")
 		}
 		classes := make(map[string]*v1alpha1.ComponentClassInstance)
-		for _, item := range classDefinition.Status.Classes {
-			classes[item.Name] = &item
+		for idx := range classDefinition.Status.Classes {
+			cls := classDefinition.Status.Classes[idx]
+			classes[cls.Name] = &cls
 		}
 		if _, ok := componentClasses[componentType]; !ok {
 			componentClasses[componentType] = classes

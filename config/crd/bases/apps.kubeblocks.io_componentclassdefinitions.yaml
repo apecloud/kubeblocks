@@ -47,9 +47,9 @@ spec:
                 items:
                   properties:
                     resourceConstraintRef:
-                      description: ClassConstraintRef reference to the class constraint
-                        object name, indicates that the series defined below all conform
-                        to the constraint.
+                      description: ResourceConstraintRef reference to the resource
+                        constraint object name, indicates that the series defined
+                        below all conform to the constraint.
                       type: string
                     series:
                       description: Series is a series of class definitions.
@@ -147,8 +147,6 @@ spec:
               classes:
                 items:
                   properties:
-                    resourceConstraintRef:
-                      type: string
                     cpu:
                       anyOf:
                       - type: integer
@@ -165,6 +163,8 @@ spec:
                       x-kubernetes-int-or-string: true
                     name:
                       description: class name
+                      type: string
+                    resourceConstraintRef:
                       type: string
                     storage:
                       description: the storage of the class

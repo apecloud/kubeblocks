@@ -13,7 +13,7 @@ resources:
 - bases/dataprotection.kubeblocks.io_restorejobs.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicytemplates.yaml
 - bases/extensions.kubeblocks.io_addons.yaml
-- bases/apps.kubeblocks.io_componentresourceconstraintsyaml
+- bases/apps.kubeblocks.io_componentresourceconstraints.yaml
 - bases/apps.kubeblocks.io_componentclassdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
@@ -34,7 +34,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_hostpreflights.yaml
 #- patches/webhook_in_preflights.yaml
 #- patches/webhook_in_addons.yaml
-#- patches/webhook_in_componentresourceconstraintsyaml
+#- patches/webhook_in_componentresourceconstraints.yaml
 #- patches/webhook_in_componentclassdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
@@ -54,7 +54,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_hostpreflights.yaml
 #- patches/cainjection_in_preflights.yaml
 #- patches/cainjection_in_addonspecs.yaml
-#- patches/cainjection_in_componentresourceconstraintsyaml
+#- patches/cainjection_in_componentresourceconstraints.yaml
 #- patches/cainjection_in_componentclassdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 

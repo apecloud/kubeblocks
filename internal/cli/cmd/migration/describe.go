@@ -187,7 +187,7 @@ func showTemplateSummary(template *v1alpha1.MigrationTemplate, out io.Writer) {
 }
 
 func showInitialization(task *v1alpha1.MigrationTask, template *v1alpha1.MigrationTemplate, jobList *batchv1.JobList, out io.Writer) {
-	if len(jobList.Items) <= 0 {
+	if len(jobList.Items) == 0 {
 		return
 	}
 	sort.SliceStable(jobList.Items, func(i, j int) bool {
@@ -209,7 +209,7 @@ func showInitialization(task *v1alpha1.MigrationTask, template *v1alpha1.Migrati
 }
 
 func showCdc(pods *v1.PodList, out io.Writer) {
-	if len(pods.Items) <= 0 {
+	if len(pods.Items) == 0 {
 		return
 	}
 	tbl := newTbl(out, "\nCdc:", "NAMESPACE", "STATUS", "CREATED_TIME", "START-TIME")
@@ -223,7 +223,7 @@ func showCdc(pods *v1.PodList, out io.Writer) {
 }
 
 func showCdcMetrics(task *v1alpha1.MigrationTask, out io.Writer) {
-	if task.Status.Cdc.Metrics == nil || len(task.Status.Cdc.Metrics) <= 0 {
+	if task.Status.Cdc.Metrics == nil || len(task.Status.Cdc.Metrics) == 0 {
 		return
 	}
 	arr := make([]string, 0)
@@ -238,7 +238,7 @@ func showCdcMetrics(task *v1alpha1.MigrationTask, out io.Writer) {
 }
 
 func getJobStatus(conditions []batchv1.JobCondition) string {
-	if len(conditions) <= 0 {
+	if len(conditions) == 0 {
 		return "-"
 	} else {
 		return string(conditions[len(conditions)-1].Type)

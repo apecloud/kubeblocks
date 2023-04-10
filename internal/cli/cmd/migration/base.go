@@ -88,7 +88,7 @@ type TableObjectExpress struct {
 }
 
 func (m *MigrationObjectModel) BuildFromStrs(errMsgArr *[]string, objStrs []string) error {
-	if len(objStrs) <= 0 {
+	if len(objStrs) == 0 {
 		BuildErrorMsg(errMsgArr, "migration object can not be empty")
 		return nil
 	}

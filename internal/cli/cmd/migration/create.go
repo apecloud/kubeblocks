@@ -26,6 +26,11 @@ var (
 	}
 )
 
+const (
+	StringBoolTrue  = "true"
+	StringBoolFalse = "false"
+)
+
 type CreateMigrationOptions struct {
 	Template             string                   `json:"template"`
 	TaskType             string                   `json:"taskType,omitempty"`
@@ -133,7 +138,7 @@ func (o *CreateMigrationOptions) Validate() error {
 func (o *CreateMigrationOptions) BuildWithSteps(errMsgArr *[]string) error {
 	taskType := InitializationAndCdc.String()
 	validStepMap, validStepKey := CliStepChangeToStructure()
-	enableCdc, enablePreCheck, enableInitStruct, enableInitData := "true", "true", "true", "true"
+	enableCdc, enablePreCheck, enableInitStruct, enableInitData := StringBoolTrue, StringBoolTrue, StringBoolTrue, StringBoolTrue
 	if len(o.Steps) > 0 {
 		for _, step := range o.Steps {
 			stepArr := strings.Split(step, "=")
@@ -147,7 +152,7 @@ func (o *CreateMigrationOptions) BuildWithSteps(errMsgArr *[]string) error {
 				BuildErrorMsg(errMsgArr, fmt.Sprintf("[%s] in steps settings is invalid, the name should be one of: (%s)", step, validStepKey))
 				return nil
 			}
-			if enable != "true" && enable != "false" {
+			if enable != StringBoolTrue && enable != StringBoolFalse {
 				BuildErrorMsg(errMsgArr, fmt.Sprintf("[%s] in steps settings is invalid, the value should be one of: (true false)", step))
 				return nil
 			}
@@ -162,24 +167,25 @@ func (o *CreateMigrationOptions) BuildWithSteps(errMsgArr *[]string) error {
 				enableInitData = enable
 			}
 		}
-		if (enablePreCheck == "true" || enableInitStruct == "true" || enableInitData == "true") && enableCdc == "true" {
+		switch enableInitData == StringBoolTrue {
+		case true && enableCdc == StringBoolTrue:
 			taskType = InitializationAndCdc.String()
-		} else if enablePreCheck == "true" || enableInitStruct == "true" || enableInitData == "true" {
+		case true && enableCdc == StringBoolFalse:
 			taskType = Initialization.String()
-		} else {
-			BuildErrorMsg(errMsgArr, "steps cannot all be set to false")
+		default:
+			BuildErrorMsg(errMsgArr, "step init-data is needed")
 			return nil
 		}
 	}
 	o.TaskType = taskType
 	o.StepsModel = []string{}
-	if enablePreCheck == "true" {
+	if enablePreCheck == StringBoolTrue {
 		o.StepsModel = append(o.StepsModel, migrationv1.StepPreCheck.String())
 	}
-	if enableInitStruct == "true" {
+	if enableInitStruct == StringBoolTrue {
 		o.StepsModel = append(o.StepsModel, migrationv1.StepStructPreFullLoad.String())
 	}
-	if enableInitData == "true" {
+	if enableInitData == StringBoolTrue {
 		o.StepsModel = append(o.StepsModel, migrationv1.StepFullLoad.String())
 	}
 	return nil

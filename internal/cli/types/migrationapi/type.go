@@ -17,11 +17,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	//"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
+	"strings"
+
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"strings"
 )
 
 // DBTypeEnum defines the MigrationTemplate CR .spec.Source.DbType or .spec.Sink.DbType

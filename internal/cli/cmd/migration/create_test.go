@@ -35,7 +35,6 @@ var _ = Describe("create", func() {
 		_ = app.AddToScheme(scheme.Scheme)
 
 		tf.Client = tf.UnstructuredClient
-		//tf.FakeDynamicClient = testing.FakeDynamicClient(cluster, testing.FakeClusterDef(), testing.FakeClusterVersion())
 	})
 
 	Context("Input params validate", func() {
@@ -58,8 +57,6 @@ var _ = Describe("create", func() {
 		})
 
 		It("Endpoint with no database", func() {
-			//Expect(c[monitorKey]).ShouldNot(BeTrue())
-			//o2 := &CreateMigrationOptions{}
 			o.Source = "user:123456@127.0.0.1:3306"
 			errMsgArr := make([]string, 0, 3)
 			err = o.SourceEndpointModel.BuildFromStr(&errMsgArr, o.Source)

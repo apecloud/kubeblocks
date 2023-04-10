@@ -1,11 +1,11 @@
 package migration
 
 import (
-	v1alpha1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	v1alpha1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

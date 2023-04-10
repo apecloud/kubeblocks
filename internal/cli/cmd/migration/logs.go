@@ -183,7 +183,7 @@ func (o *LogsOptions) runLogs() error {
 }
 
 func (o *LogsOptions) getPodByStep(taskObj *migrationv1.MigrationObjects, step string) *corev1.Pod {
-	if taskObj == nil || len(taskObj.Pods.Items) <= 0 {
+	if taskObj == nil || len(taskObj.Pods.Items) == 0 {
 		return nil
 	}
 	switch step {

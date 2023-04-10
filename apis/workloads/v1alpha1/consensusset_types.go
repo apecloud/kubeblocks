@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -40,6 +41,15 @@ type ConsensusSetSpec struct {
 	Service *corev1.ServiceSpec `json:"service,omitempty"`
 
 	Template corev1.PodTemplateSpec `json:"template"`
+
+	// volumeClaimTemplates is a list of claims that pods are allowed to reference.
+	// The ConsensusSet controller is responsible for mapping network identities to
+	// claims in a way that maintains the identity of a pod. Every claim in
+	// this list must have at least one matching (by name) volumeMount in one
+	// container in the template. A claim in this list takes precedence over
+	// any volumes in the template, with the same name.
+	// +optional
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 
 	// Leader, one single leader.
 	// +kubebuilder:validation:Required
@@ -70,7 +80,7 @@ type ConsensusSetSpec struct {
 
 // ConsensusSetStatus defines the observed state of ConsensusSet
 type ConsensusSetStatus struct {
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	apps.StatefulSetStatus
 
 	// leader status.
 	// +kubebuilder:validation:Required

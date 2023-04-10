@@ -118,14 +118,14 @@ func HandleComponentHorizontalScaleIn(ctx context.Context,
 			return nil, err
 		}
 		// check if the current primary statefulSet ordinal is larger than target replicas number of component when the target number is not 0.
-		if int32(util.GetOrdinalSts(sts)) >= component.Replicas && stsIsPrimary && component.Replicas != 0 {
+		if int32(intctrlutil.GetOrdinalSts(sts)) >= component.Replicas && stsIsPrimary && component.Replicas != 0 {
 			return nil, fmt.Errorf("current primary statefulset ordinal is larger than target number replicas, can not be reduce, please switchover first")
 		}
 		dos = append(dos, sts.DeepCopy())
 	}
 
 	// sort the statefulSets by their ordinals desc
-	sort.Sort(util.DescendingOrdinalSts(dos))
+	sort.Sort(intctrlutil.DescendingOrdinalSts(dos))
 
 	deleteCnt := int32(len(stsList)) - component.Replicas
 	if err := RemoveReplicationSetClusterStatus(cli, ctx, cluster, dos[:deleteCnt], component.Replicas); err != nil {
@@ -195,14 +195,14 @@ func doHorizontalScaleDown(ctx context.Context,
 				return err
 			}
 			// check if the current primary statefulSet ordinal is larger than target replicas number of component when the target number is not 0.
-			if int32(util.GetOrdinalSts(&sts)) >= partition && stsIsPrimary && componentReplicas != 0 {
+			if int32(intctrlutil.GetOrdinalSts(&sts)) >= partition && stsIsPrimary && componentReplicas != 0 {
 				return fmt.Errorf("current primary statefulset ordinal is larger than target number replicas, can not be reduce, please switchover first")
 			}
 			dos = append(dos, sts.DeepCopy())
 		}
 
 		// sort the statefulSets by their ordinals desc
-		sort.Sort(util.DescendingOrdinalSts(dos))
+		sort.Sort(intctrlutil.DescendingOrdinalSts(dos))
 
 		if err = RemoveReplicationSetClusterStatus(cli, ctx, cluster, dos[:stsToDelCount], componentReplicas); err != nil {
 			return err
@@ -224,7 +224,7 @@ func doHorizontalScaleDown(ctx context.Context,
 		}
 		// reconcile the primary statefulSet after deleting other sts to make component phase is correct.
 		if componentReplicas != 0 {
-			if err = util.MarkPrimaryStsToReconcile(ctx, cli, primarySts); err != nil {
+			if err = intctrlutil.MarkPrimaryStsToReconcile(ctx, cli, primarySts); err != nil {
 				return client.IgnoreNotFound(err)
 			}
 		}
@@ -319,7 +319,7 @@ func RemoveReplicationSetClusterStatus(cli client.Client,
 	}
 	var allPodList []corev1.Pod
 	for _, stsObj := range stsList {
-		podList, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
+		podList, err := intctrlutil.GetPodListByStatefulSet(ctx, cli, stsObj)
 		if err != nil {
 			return err
 		}
@@ -456,7 +456,7 @@ func filterReplicationWorkload(ctx context.Context,
 
 // getAndCheckReplicationPodByStatefulSet checks the number of replication statefulSet equal 1 and returns it.
 func getAndCheckReplicationPodByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) (*corev1.Pod, error) {
-	podList, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
+	podList, err := intctrlutil.GetPodListByStatefulSet(ctx, cli, stsObj)
 	if err != nil {
 		return nil, err
 	}

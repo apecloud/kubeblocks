@@ -46,12 +46,12 @@ func (r *ConsensusSet) IsRunning(ctx context.Context, obj client.Object) (bool, 
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
+	sts := intctrlutil.ConvertToStatefulSet(obj)
+	isRevisionConsistent, err := intctrlutil.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
-	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, sts)
+	pods, err := intctrlutil.GetPodListByStatefulSet(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
@@ -61,15 +61,15 @@ func (r *ConsensusSet) IsRunning(ctx context.Context, obj client.Object) (bool, 
 		}
 	}
 
-	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
+	return intctrlutil.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
 }
 
 func (r *ConsensusSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.ConvertToStatefulSet(obj)
-	return util.StatefulSetPodsAreReady(sts, r.Component.Replicas), nil
+	sts := intctrlutil.ConvertToStatefulSet(obj)
+	return intctrlutil.StatefulSetPodsAreReady(sts, r.Component.Replicas), nil
 }
 
 func (r *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
@@ -183,7 +183,7 @@ func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) erro
 		return nil
 	}
 
-	stsObj := util.ConvertToStatefulSet(obj)
+	stsObj := intctrlutil.ConvertToStatefulSet(obj)
 	// get compDefName from stsObj.name
 	compDefName := r.Cluster.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
 
@@ -196,7 +196,7 @@ func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) erro
 	if component == nil || component.WorkloadType != appsv1alpha1.Consensus {
 		return nil
 	}
-	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
+	pods, err := intctrlutil.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
 	if err != nil {
 		return err
 	}

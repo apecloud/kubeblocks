@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -493,6 +492,6 @@ func CheckPrimaryIndexChanged(ctx context.Context,
 		return specPrimaryIndex != 0, 0, nil
 	}
 
-	currentPrimaryIndex := int32(util.GetOrdinalSts(primarySts))
+	currentPrimaryIndex := int32(intctrlutil.GetOrdinalSts(primarySts))
 	return specPrimaryIndex != currentPrimaryIndex, currentPrimaryIndex, nil
 }

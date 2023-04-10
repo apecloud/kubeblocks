@@ -81,7 +81,7 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.ComponentUnits {
-		pods, err := util.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
+		pods, err := intctrlutil.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +112,7 @@ func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	stsObj := &params.ComponentUnits[0]
-	pods, err := util.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+	pods, err := intctrlutil.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	stsObj := &params.ComponentUnits[0]
-	pods, err := util.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+	pods, err := intctrlutil.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
 	if err != nil {
 		return nil, err
 	}

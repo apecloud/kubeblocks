@@ -25,8 +25,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -209,16 +209,16 @@ var _ = Describe("Replication Component", func() {
 
 			By("Checking if the pod is not updated when statefulset is not updated")
 			Expect(replicationComponent.HandleUpdate(ctx, primarySts)).To(Succeed())
-			primaryStsPodList, err := util.GetPodListByStatefulSet(ctx, k8sClient, primarySts)
+			primaryStsPodList, err := controllerutil.GetPodListByStatefulSet(ctx, k8sClient, primarySts)
 			Expect(err).To(Succeed())
 			Expect(len(primaryStsPodList)).To(Equal(1))
-			Expect(util.IsStsAndPodsRevisionConsistent(ctx, k8sClient, primarySts)).Should(BeTrue())
+			Expect(controllerutil.IsStsAndPodsRevisionConsistent(ctx, k8sClient, primarySts)).Should(BeTrue())
 
 			By("Checking if the pod is deleted when statefulset is updated")
 			status.UpdateRevision = "new-mock-revision"
 			testk8s.PatchStatefulSetStatus(&testCtx, primarySts.Name, status)
 			Expect(replicationComponent.HandleUpdate(ctx, primarySts)).To(Succeed())
-			primaryStsPodList, err = util.GetPodListByStatefulSet(ctx, k8sClient, primarySts)
+			primaryStsPodList, err = controllerutil.GetPodListByStatefulSet(ctx, k8sClient, primarySts)
 			Expect(err).To(Succeed())
 			Expect(len(primaryStsPodList)).To(Equal(0))
 		})

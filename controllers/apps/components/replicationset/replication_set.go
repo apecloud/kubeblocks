@@ -48,18 +48,18 @@ var _ types.Component = &ReplicationSet{}
 func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	var componentStsList = &appsv1.StatefulSetList{}
 	var componentStatusIsRunning = true
-	sts := util.ConvertToStatefulSet(obj)
+	sts := intctrlutil.ConvertToStatefulSet(obj)
 	if err := util.GetObjectListByComponentName(ctx, r.Cli, *r.Cluster,
 		componentStsList, sts.Labels[constant.KBAppComponentLabelKey]); err != nil {
 		return false, err
 	}
 	var availableReplicas int32
 	for _, stsObj := range componentStsList.Items {
-		isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
+		isRevisionConsistent, err := intctrlutil.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 		if err != nil {
 			return false, err
 		}
-		stsIsReady := util.StatefulSetOfComponentIsReady(&stsObj, isRevisionConsistent, nil)
+		stsIsReady := intctrlutil.StatefulSetOfComponentIsReady(&stsObj, isRevisionConsistent, nil)
 		availableReplicas += stsObj.Status.AvailableReplicas
 		if !stsIsReady {
 			return false, nil
@@ -76,7 +76,7 @@ func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool
 func (r *ReplicationSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	var podsReady = true
 	var componentStsList = &appsv1.StatefulSetList{}
-	sts := util.ConvertToStatefulSet(obj)
+	sts := intctrlutil.ConvertToStatefulSet(obj)
 	if err := util.GetObjectListByComponentName(ctx, r.Cli, *r.Cluster, componentStsList,
 		sts.Labels[constant.KBAppComponentLabelKey]); err != nil {
 		return false, err
@@ -169,7 +169,7 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, component
 func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) error {
 	var componentStsList = &appsv1.StatefulSetList{}
 	var podList []*corev1.Pod
-	sts := util.ConvertToStatefulSet(obj)
+	sts := intctrlutil.ConvertToStatefulSet(obj)
 	if err := util.GetObjectListByComponentName(ctx, r.Cli, *r.Cluster, componentStsList,
 		sts.Labels[constant.KBAppComponentLabelKey]); err != nil {
 		return err
@@ -190,7 +190,7 @@ func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) er
 		} else {
 			podList = append(podList, pod)
 		}
-		if err := util.DeleteStsPods(ctx, r.Cli, &sts); err != nil {
+		if err := intctrlutil.DeleteStsPods(ctx, r.Cli, &sts); err != nil {
 			return err
 		}
 	}

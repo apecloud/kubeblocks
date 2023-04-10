@@ -46,6 +46,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -919,7 +920,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	mockRoleChangedEvent := func(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
-		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := controllerutil.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 
 		events := make([]corev1.Event, 0)
@@ -945,7 +946,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	getStsPodsName := func(sts *appsv1.StatefulSet) []string {
-		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := controllerutil.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 
 		names := make([]string, 0)
@@ -1006,7 +1007,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking pods' role are changed accordingly")
 		Eventually(func(g Gomega) {
-			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := controllerutil.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// should have 3 pods
 			g.Expect(pods).Should(HaveLen(3))

@@ -20,6 +20,7 @@ import (
 	"context"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,6 +37,10 @@ type consensusSetPlanBuilder struct {
 }
 
 const consensusSetFinalizerName = "cs.workloads.kubeblocks.io/finalizer"
+
+func init() {
+	model.AddScheme(workloads.AddToScheme)
+}
 
 func (p *consensusSetPlanBuilder) Init() error {
 	csSet := &workloads.ConsensusSet{}
@@ -54,6 +59,8 @@ func (p *consensusSetPlanBuilder) Build() (graph.Plan, error) {
 	chain := &graph.TransformerChain{
 		// add root vertex
 		&initTransformer{ConsensusSet: p.ConsensusSet},
+		// generate objects and actions
+		&objectGenerationTransformer{ctx: p.Context, cli: p.Client},
 	}
 
 	dag := graph.NewDAG()

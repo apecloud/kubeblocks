@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -80,9 +81,9 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
 
 // generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
 func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
-	component appsv1alpha1.ClusterComponentDefinition) *util.Plan {
-	plan := &util.Plan{}
-	plan.Start = &util.Step{}
+	component appsv1alpha1.ClusterComponentDefinition) *consensusset.Plan {
+	plan := &consensusset.Plan{}
+	plan.Start = &consensusset.Step{}
 	plan.WalkFunc = func(obj interface{}) (bool, error) {
 		pod, ok := obj.(corev1.Pod)
 		if !ok {
@@ -125,14 +126,14 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 }
 
 // unknown & empty & learner & 1/2 followers -> 1/2 followers -> leader
-func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+func generateConsensusBestEffortParallelPlan(plan *consensusset.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
 	start := plan.Start
 	// append unknown, empty and learner
 	index := 0
 	for _, pod := range pods {
 		role := pod.Labels[constant.RoleLabelKey]
 		if rolePriorityMap[role] <= learnerPriority {
-			nextStep := &util.Step{}
+			nextStep := &consensusset.Step{}
 			nextStep.Obj = pod
 			start.NextSteps = append(start.NextSteps, nextStep)
 			index++
@@ -151,7 +152,7 @@ func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod,
 	}
 	end := followerCount / 2
 	for i := 0; i < end; i++ {
-		nextStep := &util.Step{}
+		nextStep := &consensusset.Step{}
 		nextStep.Obj = podList[i]
 		start.NextSteps = append(start.NextSteps, nextStep)
 	}
@@ -163,7 +164,7 @@ func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod,
 	podList = podList[end:]
 	end = followerCount - end
 	for i := 0; i < end; i++ {
-		nextStep := &util.Step{}
+		nextStep := &consensusset.Step{}
 		nextStep.Obj = podList[i]
 		start.NextSteps = append(start.NextSteps, nextStep)
 	}
@@ -174,27 +175,27 @@ func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod,
 	// append leader
 	podList = podList[end:]
 	for _, pod := range podList {
-		nextStep := &util.Step{}
+		nextStep := &consensusset.Step{}
 		nextStep.Obj = pod
 		start.NextSteps = append(start.NextSteps, nextStep)
 	}
 }
 
 // unknown & empty & leader & followers & learner
-func generateConsensusParallelPlan(plan *util.Plan, pods []corev1.Pod) {
+func generateConsensusParallelPlan(plan *consensusset.Plan, pods []corev1.Pod) {
 	start := plan.Start
 	for _, pod := range pods {
-		nextStep := &util.Step{}
+		nextStep := &consensusset.Step{}
 		nextStep.Obj = pod
 		start.NextSteps = append(start.NextSteps, nextStep)
 	}
 }
 
 // unknown -> empty -> learner -> followers(none->readonly->readwrite) -> leader
-func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
+func generateConsensusSerialPlan(plan *consensusset.Plan, pods []corev1.Pod) {
 	start := plan.Start
 	for _, pod := range pods {
-		nextStep := &util.Step{}
+		nextStep := &consensusset.Step{}
 		nextStep.Obj = pod
 		start.NextSteps = append(start.NextSteps, nextStep)
 		start = nextStep

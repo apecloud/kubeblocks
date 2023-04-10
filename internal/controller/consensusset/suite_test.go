@@ -16,8 +16,30 @@ limitations under the License.
 
 package consensusset
 
-const (
-	ConsensusSetKind = "ConsensusSet"
+import (
+	"testing"
 
-	DefaultPodName = "Unknown"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
+
+// These tests use Ginkgo (BDD-style Go testing framework). Refer to
+// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
+
+func init() {
+}
+
+func TestAPIs(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	RunSpecs(t, "ConsensusSet Suite")
+}
+
+var _ = BeforeSuite(func() {
+	go func() {
+		defer GinkgoRecover()
+	}()
+})
+
+var _ = AfterSuite(func() {
+})

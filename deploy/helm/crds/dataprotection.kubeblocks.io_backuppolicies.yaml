@@ -112,11 +112,6 @@ spec:
                   image:
                     description: exec command with image
                     type: string
-                  manifestsCommands:
-                    description: the commands to collect backup manifests
-                    items:
-                      type: string
-                    type: array
                   postCommands:
                     description: post backup to perform commands
                     items:

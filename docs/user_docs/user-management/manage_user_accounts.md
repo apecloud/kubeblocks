@@ -3,7 +3,7 @@ KubeBlocks offers a variety of services to enhance the usability, availability, 
 
 ***Steps***
 
-- Creating a user account
+- Create a user account
   ```
   kbcli cluster create-account <clustername> --username <name> --password <pwd> 
   ```
@@ -24,11 +24,11 @@ KubeBlocks offers a variety of services to enhance the usability, availability, 
     |ReadWrite|GRANT SELECT, INSERT, DELETE ON . TO <username>|GRANT pg_write_all_data TO <username>|-@ALL +@Write +@READ allkeys|
     |ReadOnly|GRANT SELECT, SHOW VIEW ON . TO <username>|GRANT pg_read_all_data TO <username>| -@ALL +@READ allkeys|
 
-  - Check user account role level
+  - Check role level of a user account
   ```
   kbcli cluster describe-account <clustername> --username <name>
   ```
-  - Revoke role from user account 
+  - Revoke role from a user account 
   ```
   kbcli cluster revoke-role <clustername> --username <name> --rolename <rname> 
   ```
@@ -46,7 +46,7 @@ For security reasons, ```list-accounts```command does not showw all accounts. Ac
 
 :::
 
-- Deleting a user account
+- Delete a user account
   ```
   kbcli cluster delete-account <clustername> --username <name> 
   ```

@@ -228,20 +228,30 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 	if err != nil {
 		return nil
 	}
+
+	getComponentType := func(name string) string {
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			if comp.Name == name {
+				return comp.ComponentDefRef
+			}
+		}
+		return ""
+	}
 	// validate resources is legal and get component name slice
 	componentNames := make([]string, len(verticalScalingList))
 	for i, v := range verticalScalingList {
 		componentNames[i] = v.ComponentName
 
-		classes := compClasses[v.ComponentName]
 		if invalidValue, err := validateVerticalResourceList(v.Requests); err != nil {
 			return invalidValueError(invalidValue, err.Error())
 		}
 		if invalidValue, err := validateVerticalResourceList(v.Limits); err != nil {
 			return invalidValueError(invalidValue, err.Error())
 		}
-		if err := validateMatchingClass(classes, v.ResourceRequirements); err != nil {
-			return invalidValueError("", err.Error())
+		if classes, ok := compClasses[getComponentType(v.ComponentName)]; ok {
+			if err = validateMatchingClass(classes, v.ResourceRequirements); err != nil {
+				return invalidValueError("", err.Error())
+			}
 		}
 		if invalidValue, err := compareRequestsAndLimits(v.ResourceRequirements); err != nil {
 			return invalidValueError(invalidValue, err.Error())

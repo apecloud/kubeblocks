@@ -41,8 +41,7 @@ done
 CONFIGSVR=""
 if [ ""$IS_CONFIGSVR = "true" ]; then CONFIGSVR="configsvr: true,"; fi
 
-sleep 10
-is_inited=$(mongosh --quiet --port $PORT --eval "try { rs.status().ok } catch (e) { 0 }" || mongosh --quiet --port $PORT --eval "rs.status().ok" -u root --password $MONGODB_ROOT_PASSWORD) 
+until is_inited=$(mongosh --quiet --port $PORT --eval "rs.status().ok" -u root --password $MONGODB_ROOT_PASSWORD || mongosh --quiet --port $PORT --eval "try { rs.status().ok } catch (e) { 0 }") ; do sleep 1; done
 if [ $is_inited -eq 1 ]; then
   exit 0
 fi;

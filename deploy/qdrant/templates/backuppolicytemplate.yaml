@@ -14,7 +14,7 @@ spec:
       baseBackup:
         type: snapshot
         enable: false
-        cronExpression: "0 2 * * 1"
+        cronExpression: "0 18 * * 0"
     snapshot:
       target:
         connectionCredentialKeyword:

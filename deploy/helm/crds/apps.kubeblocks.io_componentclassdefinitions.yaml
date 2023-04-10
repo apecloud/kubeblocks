@@ -46,7 +46,7 @@ spec:
                   series that conform to the same constraint.
                 items:
                   properties:
-                    classConstraintRef:
+                    resourceConstraintRef:
                       description: ClassConstraintRef reference to the class constraint
                         object name, indicates that the series defined below all conform
                         to the constraint.
@@ -147,7 +147,7 @@ spec:
               classes:
                 items:
                   properties:
-                    classConstraintRef:
+                    resourceConstraintRef:
                       type: string
                     cpu:
                       anyOf:

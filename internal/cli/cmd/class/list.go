@@ -75,10 +75,10 @@ func (o *ListOptions) run() error {
 	constraintClassMap := make(map[string]map[string][]*appsv1alpha1.ComponentClassInstance)
 	for compName, items := range componentClasses {
 		for _, item := range items {
-			if _, ok := constraintClassMap[item.ClassConstraintRef]; !ok {
-				constraintClassMap[item.ClassConstraintRef] = make(map[string][]*appsv1alpha1.ComponentClassInstance)
+			if _, ok := constraintClassMap[item.ResourceConstraintRef]; !ok {
+				constraintClassMap[item.ResourceConstraintRef] = make(map[string][]*appsv1alpha1.ComponentClassInstance)
 			}
-			constraintClassMap[item.ClassConstraintRef][compName] = append(constraintClassMap[item.ClassConstraintRef][compName], item)
+			constraintClassMap[item.ResourceConstraintRef][compName] = append(constraintClassMap[item.ResourceConstraintRef][compName], item)
 		}
 	}
 	var constraintNames []string

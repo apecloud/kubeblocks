@@ -166,10 +166,10 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 			class.Storage = cls.Storage
 		}
 		result := &v1alpha1.ComponentClassInstance{
-			Name:               class.Name,
-			ClassConstraintRef: group.ClassConstraintRef,
-			CPU:                resource.MustParse(class.CPU),
-			Memory:             resource.MustParse(class.Memory),
+			Name:                  class.Name,
+			ResourceConstraintRef: group.ResourceConstraintRef,
+			CPU:                   resource.MustParse(class.CPU),
+			Memory:                resource.MustParse(class.Memory),
 		}
 		for _, disk := range class.Storage {
 			result.Storage = append(result.Storage, v1alpha1.Disk{

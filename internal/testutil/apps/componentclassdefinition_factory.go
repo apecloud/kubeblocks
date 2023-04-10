@@ -41,7 +41,7 @@ func NewComponentClassDefinitionFactory(name, clusterDefinitionRef, componentTyp
 		Spec: appsv1alpha1.ComponentClassDefinitionSpec{
 			Groups: []appsv1alpha1.ComponentClassGroup{
 				{
-					ClassConstraintRef: "kube-resource-constraint-general",
+					ResourceConstraintRef: "kube-resource-constraint-general",
 					Template: `
 cpu: "{{ or .cpu 1 }}"
 memory: "{{ or .memory 4 }}Gi"

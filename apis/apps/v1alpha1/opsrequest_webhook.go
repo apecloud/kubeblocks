@@ -511,10 +511,10 @@ func getClasses(clusterDef string) (map[string]map[string]*ComponentClassInstanc
 
 func validateMatchingClass(classes map[string]*ComponentClassInstance, resource corev1.ResourceRequirements) error {
 	if cls := chooseComponentClasses(classes, resource.Requests); cls == nil {
-		return fmt.Errorf("can not find matching class")
+		return fmt.Errorf("can not find matching class with specified requests")
 	}
 	if cls := chooseComponentClasses(classes, resource.Limits); cls == nil {
-		return fmt.Errorf("can not find matching class")
+		return fmt.Errorf("can not find matching class with specified limits")
 	}
 	return nil
 }

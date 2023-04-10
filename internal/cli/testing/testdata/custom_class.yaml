@@ -1,4 +1,4 @@
-  - classConstraintRef: kb-resource-constraint-general
+  - resourceConstraintRef: kb-resource-constraint-general
     template: |
       cpu: "{{ or .cpu 1 }}"
       memory: "{{ or .memory 4 }}Gi"
@@ -16,7 +16,7 @@
         cpu: 200
         memory: 400Gi
 
-  - classConstraintRef: kb-resource-constraint-memory-optimized
+  - resourceConstraintRef: kb-resource-constraint-memory-optimized
     template: |
       cpu: "{{ or .cpu 1 }}"
       memory: "{{ or .memory 4 }}Gi"

@@ -31,24 +31,24 @@ type ComponentClassDefinitionSpec struct {
 }
 
 type ComponentClassGroup struct {
-	// ClassConstraintRef reference to the class constraint object name, indicates that the series defined below
+	// ResourceConstraintRef reference to the resource constraint object name, indicates that the series defined below
 	// all conform to the constraint.
 	// +required
-	ClassConstraintRef string `json:"classConstraintRef,omitempty"`
+	ResourceConstraintRef string `json:"resourceConstraintRef,omitempty"`
 
 	// Template is a class definition template that uses the Go template syntax and allows for variable declaration.
 	// When defining a class in Series, specifying the variable's value is sufficient, as the complete class
 	// definition will be generated through rendering the template.
 	//
 	// For example:
-	// template: |
-	//  cpu: "{{ or .cpu 1 }}"
-	//  memory: "{{ or .memory 4 }}Gi"
-	//  storage:
-	//  - name: data
-	//    size: "{{ or .dataStorageSize 10 }}Gi"
-	//  - name: log
-	//    size: "{{ or .logStorageSize 1 }}Gi"
+	//	template: |
+	//	  cpu: "{{ or .cpu 1 }}"
+	//	  memory: "{{ or .memory 4 }}Gi"
+	//	  storage:
+	//	  - name: data
+	//	    size: "{{ or .dataStorageSize 10 }}Gi"
+	//	  - name: log
+	//	    size: "{{ or .logStorageSize 1 }}Gi"
 	//
 	// +optional
 	Template string `json:"template,omitempty"`
@@ -156,7 +156,7 @@ type ComponentClassInstance struct {
 	// +optional
 	Storage []Disk `json:"storage,omitempty"`
 
-	ClassConstraintRef string `json:"classConstraintRef,omitempty"`
+	ResourceConstraintRef string `json:"resourceConstraintRef,omitempty"`
 }
 
 type Disk struct {

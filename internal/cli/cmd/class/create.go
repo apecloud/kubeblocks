@@ -158,8 +158,8 @@ func (o *CreateOptions) run() error {
 			return err
 		}
 		for name, cls := range newClasses {
-			if _, ok = constraints[cls.ClassConstraintRef]; !ok {
-				return fmt.Errorf("resource constraint %s is not found", cls.ClassConstraintRef)
+			if _, ok = constraints[cls.ResourceConstraintRef]; !ok {
+				return fmt.Errorf("resource constraint %s is not found", cls.ResourceConstraintRef)
 			}
 			if _, ok = classes[name]; ok {
 				return fmt.Errorf("class name conflicted %s", name)
@@ -179,7 +179,7 @@ func (o *CreateOptions) run() error {
 		}
 		componentClassGroups = []v1alpha1.ComponentClassGroup{
 			{
-				ClassConstraintRef: o.Constraint,
+				ResourceConstraintRef: o.Constraint,
 				Series: []v1alpha1.ComponentClassSeries{
 					{
 						Classes: []v1alpha1.ComponentClass{*cls},

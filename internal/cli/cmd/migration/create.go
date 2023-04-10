@@ -64,9 +64,9 @@ func NewMigrationCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 			cmd.Flags().StringVar(&o.Source, "source", "", "Set the source database information for migration.such as '{username}:{password}@{connection_address}:{connection_port}/[{database}]'")
 			cmd.Flags().StringVar(&o.Sink, "sink", "", "Set the sink database information for migration.such as '{username}:{password}@{connection_address}:{connection_port}/[{database}]")
 			cmd.Flags().StringSliceVar(&o.MigrationObject, "migration-object", []string{}, "Set the data objects that need to be migrated,such as '\"db1.table1\",\"db2\"'")
-			cmd.Flags().StringSliceVar(&o.Steps, "steps", []string{}, "Set up migration steps,valid values: (precheck, init-struct, init-data, cdc)")
+			cmd.Flags().StringSliceVar(&o.Steps, "steps", []string{}, "Set up migration steps,such as: precheck=true,init-struct=true,init-data=true,cdc=true")
 			cmd.Flags().StringSliceVar(&o.Tolerations, "tolerations", []string{}, "Tolerations for migration, such as '\"key=engineType,value=pg,operator=Equal,effect=NoSchedule\"'")
-			cmd.Flags().StringSliceVar(&o.Resources, "resources", []string{}, "Resources limit for migration, such as '\"cpu=3000m,memory=3Gi\"'\"")
+			cmd.Flags().StringSliceVar(&o.Resources, "resources", []string{}, "Resources limit for migration, such as '\"cpu=3000m,memory=3Gi\"'")
 
 			util.CheckErr(cmd.MarkFlagRequired("template"))
 			util.CheckErr(cmd.MarkFlagRequired("source"))

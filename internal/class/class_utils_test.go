@@ -22,6 +22,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -58,13 +60,13 @@ var _ = Describe("utils", func() {
 		// Add any teardown steps that needs to be executed after each test
 	})
 
-	buildFilters := func(cpu string, memory string) map[string]resource.Quantity {
-		result := make(map[string]resource.Quantity)
+	buildFilters := func(cpu string, memory string) map[corev1.ResourceName]resource.Quantity {
+		result := make(map[corev1.ResourceName]resource.Quantity)
 		if cpu != "" {
-			result["cpu"] = resource.MustParse(cpu)
+			result[corev1.ResourceCPU] = resource.MustParse(cpu)
 		}
 		if memory != "" {
-			result["memory"] = resource.MustParse(memory)
+			result[corev1.ResourceMemory] = resource.MustParse(memory)
 		}
 		return result
 	}

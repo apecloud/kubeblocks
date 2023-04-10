@@ -224,15 +224,24 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 		return notEmptyError("spec.verticalScaling")
 	}
 
+	compClasses, err := getClasses(cluster.Spec.ClusterDefRef)
+	if err != nil {
+		return nil
+	}
 	// validate resources is legal and get component name slice
 	componentNames := make([]string, len(verticalScalingList))
 	for i, v := range verticalScalingList {
 		componentNames[i] = v.ComponentName
+
+		classes := compClasses[v.ComponentName]
 		if invalidValue, err := validateVerticalResourceList(v.Requests); err != nil {
 			return invalidValueError(invalidValue, err.Error())
 		}
 		if invalidValue, err := validateVerticalResourceList(v.Limits); err != nil {
 			return invalidValueError(invalidValue, err.Error())
+		}
+		if err := validateMatchingClass(classes, v.ResourceRequirements); err != nil {
+			return invalidValueError("", err.Error())
 		}
 		if invalidValue, err := compareRequestsAndLimits(v.ResourceRequirements); err != nil {
 			return invalidValueError(invalidValue, err.Error())
@@ -452,7 +461,52 @@ func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.
 			return string(k), fmt.Errorf("resource key is not cpu or memory or hugepages- ")
 		}
 	}
+
 	return "", nil
+}
+
+func getClasses(clusterDef string) (map[string]map[string]*ComponentClassInstance, error) {
+	ml := []client.ListOption{
+		client.MatchingLabels{"clusterdefinition.kubeblocks.io/name": clusterDef},
+	}
+	var classDefinitionList ComponentClassDefinitionList
+	if err := webhookMgr.client.List(context.Background(), &classDefinitionList, ml...); err != nil {
+		return nil, err
+	}
+	var (
+		componentClasses = make(map[string]map[string]*ComponentClassInstance)
+	)
+	for _, classDefinition := range classDefinitionList.Items {
+		componentType := classDefinition.GetLabels()["apps.kubeblocks.io/component-def-ref"]
+		if componentType == "" {
+			return nil, fmt.Errorf("failed to find component type")
+		}
+		classes := make(map[string]*ComponentClassInstance)
+		for _, item := range classDefinition.Status.Classes {
+			classes[item.Name] = &item
+		}
+		if _, ok := componentClasses[componentType]; !ok {
+			componentClasses[componentType] = classes
+		} else {
+			for k, v := range classes {
+				if _, exists := componentClasses[componentType][k]; exists {
+					return nil, fmt.Errorf("duplicate component class %s", k)
+				}
+				componentClasses[componentType][k] = v
+			}
+		}
+	}
+	return componentClasses, nil
+}
+
+func validateMatchingClass(classes map[string]*ComponentClassInstance, resource corev1.ResourceRequirements) error {
+	if cls := chooseComponentClasses(classes, resource.Requests); cls == nil {
+		return fmt.Errorf("can not find matching class")
+	}
+	if cls := chooseComponentClasses(classes, resource.Limits); cls == nil {
+		return fmt.Errorf("can not find matching class")
+	}
+	return nil
 }
 
 func notEmptyError(target string) error {

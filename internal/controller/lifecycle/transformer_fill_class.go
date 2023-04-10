@@ -62,7 +62,6 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 
 	ml := []client.ListOption{
 		client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefinition.Name},
-		client.HasLabels{constant.ClassProviderLabelKey},
 	}
 	if err := r.cli.List(reqCtx.Ctx, &classDefinitionList, ml...); err != nil {
 		return err
@@ -101,12 +100,12 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	}
 
 	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*appsv1alpha1.ComponentClassInstance) *appsv1alpha1.ComponentClassInstance {
-		filters := class.Filters(make(map[string]resource.Quantity))
+		filters := make(map[corev1.ResourceName]resource.Quantity)
 		if !comp.Resources.Requests.Cpu().IsZero() {
-			filters[corev1.ResourceCPU.String()] = *comp.Resources.Requests.Cpu()
+			filters[corev1.ResourceCPU] = *comp.Resources.Requests.Cpu()
 		}
 		if !comp.Resources.Requests.Memory().IsZero() {
-			filters[corev1.ResourceMemory.String()] = *comp.Resources.Requests.Memory()
+			filters[corev1.ResourceMemory] = *comp.Resources.Requests.Memory()
 		}
 		return class.ChooseComponentClasses(classes, filters)
 	}

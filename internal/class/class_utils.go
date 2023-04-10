@@ -41,14 +41,14 @@ func GetCustomClassObjectName(cdName string, componentName string) string {
 }
 
 // ChooseComponentClasses Choose the classes to be used for a given component with some constraints
-func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance, filters map[string]resource.Quantity) *v1alpha1.ComponentClassInstance {
+func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance, filters map[corev1.ResourceName]resource.Quantity) *v1alpha1.ComponentClassInstance {
 	var candidates []*v1alpha1.ComponentClassInstance
 	for _, cls := range classes {
-		cpu, ok := filters[corev1.ResourceCPU.String()]
+		cpu, ok := filters[corev1.ResourceCPU]
 		if ok && !cpu.Equal(cls.CPU) {
 			continue
 		}
-		memory, ok := filters[corev1.ResourceMemory.String()]
+		memory, ok := filters[corev1.ResourceMemory]
 		if ok && !memory.Equal(cls.Memory) {
 			continue
 		}
@@ -61,6 +61,33 @@ func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance,
 	return candidates[0]
 }
 
+func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string]map[string]*v1alpha1.ComponentClassInstance, error) {
+	var (
+		componentClasses = make(map[string]map[string]*v1alpha1.ComponentClassInstance)
+	)
+	for _, classDefinition := range classDefinitionList.Items {
+		componentType := classDefinition.GetLabels()["apps.kubeblocks.io/component-def-ref"]
+		if componentType == "" {
+			return nil, fmt.Errorf("failed to find component type")
+		}
+		classes := make(map[string]*v1alpha1.ComponentClassInstance)
+		for _, item := range classDefinition.Status.Classes {
+			classes[item.Name] = &item
+		}
+		if _, ok := componentClasses[componentType]; !ok {
+			componentClasses[componentType] = classes
+		} else {
+			for k, v := range classes {
+				if _, exists := componentClasses[componentType][k]; exists {
+					return nil, fmt.Errorf("duplicate component class %s", k)
+				}
+				componentClasses[componentType][k] = v
+			}
+		}
+	}
+
+	return componentClasses, nil
+}
 func GetResourceConstraints(dynamic dynamic.Interface) (map[string]*v1alpha1.ComponentResourceConstraint, error) {
 	objs, err := dynamic.Resource(types.ComponentResourceConstraintGVR()).List(context.TODO(), metav1.ListOptions{
 		//LabelSelector: types.ResourceConstraintProviderLabelKey,
@@ -97,37 +124,6 @@ func ListClassesByClusterDefinition(client dynamic.Interface, cdName string) (ma
 		return nil, err
 	}
 	return GetClasses(classDefinitionList)
-}
-
-func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string]map[string]*v1alpha1.ComponentClassInstance, error) {
-	var (
-		componentClasses = make(map[string]map[string]*v1alpha1.ComponentClassInstance)
-	)
-	for _, classDefinition := range classDefinitionList.Items {
-		if _, ok := classDefinition.GetLabels()[types.ClassProviderLabelKey]; !ok {
-			continue
-		}
-		componentType := classDefinition.GetLabels()[constant.KBAppComponentDefRefLabelKey]
-		if componentType == "" {
-			return nil, fmt.Errorf("failed to find component type")
-		}
-		classes := make(map[string]*v1alpha1.ComponentClassInstance)
-		for _, item := range classDefinition.Status.Classes {
-			classes[item.Name] = &item
-		}
-		if _, ok := componentClasses[componentType]; !ok {
-			componentClasses[componentType] = classes
-		} else {
-			for k, v := range classes {
-				if _, exists := componentClasses[componentType][k]; exists {
-					return nil, fmt.Errorf("duplicate component class %s", k)
-				}
-				componentClasses[componentType][k] = v
-			}
-		}
-	}
-
-	return componentClasses, nil
 }
 
 // ParseComponentClasses parse ComponentClassDefinition to component classes

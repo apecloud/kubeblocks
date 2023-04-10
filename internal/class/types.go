@@ -17,9 +17,7 @@ limitations under the License.
 package class
 
 import (
-	"fmt"
 	"sort"
-	"strings"
 
 	"gopkg.in/inf.v0"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -107,14 +105,4 @@ func (b ByClassCPUAndMemory) Less(i, j int) bool {
 
 func (b ByClassCPUAndMemory) Swap(i, j int) {
 	b[i], b[j] = b[j], b[i]
-}
-
-type Filters map[string]resource.Quantity
-
-func (f Filters) String() string {
-	var result []string
-	for k, v := range f {
-		result = append(result, fmt.Sprintf("%s=%v", k, v.Value()))
-	}
-	return strings.Join(result, ",")
 }

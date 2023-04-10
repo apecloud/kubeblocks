@@ -240,9 +240,9 @@ func (r *backupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolic
 	// build the target secret.
 	if len(bp.Target.Account) > 0 {
 		basePolicy.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{
-			Name:            fmt.Sprintf("%s-%s-%s", clusterName, component.Name, bp.Target.Account),
-			PasswordKeyword: constant.AccountPasswdForSecret,
-			UserKeyword:     constant.AccountNameForSecret,
+			Name:        fmt.Sprintf("%s-%s-%s", clusterName, component.Name, bp.Target.Account),
+			PasswordKey: constant.AccountPasswdForSecret,
+			UsernameKey: constant.AccountNameForSecret,
 		}
 	} else {
 		basePolicy.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{
@@ -250,10 +250,10 @@ func (r *backupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolic
 		}
 		connectionCredentialKeyword := bp.Target.ConnectionCredentialKeyword
 		if connectionCredentialKeyword.PasswordKey != nil {
-			basePolicy.Target.Secret.PasswordKeyword = *connectionCredentialKeyword.PasswordKey
+			basePolicy.Target.Secret.PasswordKey = *connectionCredentialKeyword.PasswordKey
 		}
 		if connectionCredentialKeyword.UsernameKey != nil {
-			basePolicy.Target.Secret.UserKeyword = *connectionCredentialKeyword.UsernameKey
+			basePolicy.Target.Secret.UsernameKey = *connectionCredentialKeyword.UsernameKey
 		}
 	}
 	return basePolicy

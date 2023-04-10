@@ -54,7 +54,7 @@ spec:
                 items:
                   properties:
                     componentDefRef:
-                      description: componentDefRef reference componentDef defined
+                      description: componentDefRef references componentDef defined
                         in ClusterDefinition spec.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
@@ -295,7 +295,7 @@ spec:
                       description: ttl is a time string in days and ending with the
                         'd' or 'D' character to describe how long the Backup should
                         be retained.
-                      pattern: ^\d+[d|D]$
+                      pattern: ^\d+[d|D|h|H]$
                       type: string
                   required:
                   - componentDefRef
@@ -306,7 +306,7 @@ spec:
                 - componentDefRef
                 x-kubernetes-list-type: map
               clusterDefinitionRef:
-                description: clusterDefinitionRef referenced ClusterDefinition name,
+                description: clusterDefinitionRef references ClusterDefinition name,
                   this is an immutable attribute.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string

@@ -1712,14 +1712,14 @@ spec:
                             description: the secret name
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
-                          passwordKeyword:
+                          passwordKey:
                             default: password
-                            description: passwordKeyword the map keyword of the password
-                              in the connection credential secret
+                            description: passwordKey the map key of the password in
+                              the connection credential secret
                             type: string
-                          userKeyword:
+                          usernameKey:
                             default: username
-                            description: userKeyword the map keyword of the user in
+                            description: usernameKey the map keyword of the user in
                               the connection credential secret
                             type: string
                         required:
@@ -3394,14 +3394,14 @@ spec:
                             description: the secret name
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
-                          passwordKeyword:
+                          passwordKey:
                             default: password
-                            description: passwordKeyword the map keyword of the password
-                              in the connection credential secret
+                            description: passwordKey the map key of the password in
+                              the connection credential secret
                             type: string
-                          userKeyword:
+                          usernameKey:
                             default: username
-                            description: userKeyword the map keyword of the user in
+                            description: usernameKey the map keyword of the user in
                               the connection credential secret
                             type: string
                         required:
@@ -3549,14 +3549,14 @@ spec:
                             description: the secret name
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
-                          passwordKeyword:
+                          passwordKey:
                             default: password
-                            description: passwordKeyword the map keyword of the password
-                              in the connection credential secret
+                            description: passwordKey the map key of the password in
+                              the connection credential secret
                             type: string
-                          userKeyword:
+                          usernameKey:
                             default: username
-                            description: userKeyword the map keyword of the user in
+                            description: usernameKey the map keyword of the user in
                               the connection credential secret
                             type: string
                         required:
@@ -3572,7 +3572,7 @@ spec:
                 description: ttl is a time string in days and ending with the 'd'
                   or 'D' character to describe how long the Backup should be retained.
                   if not set,
-                pattern: ^\d+[d|D]$
+                pattern: ^\d+[d|D|h|H]$
                 type: string
             type: object
           status:

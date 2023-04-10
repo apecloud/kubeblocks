@@ -22,7 +22,7 @@ import (
 
 // BackupPolicyTemplateSpec defines the desired state of BackupPolicyTemplate
 type BackupPolicyTemplateSpec struct {
-	// clusterDefinitionRef referenced ClusterDefinition name, this is an immutable attribute.
+	// clusterDefinitionRef references ClusterDefinition name, this is an immutable attribute.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ClusterDefRef string `json:"clusterDefinitionRef"`
@@ -38,7 +38,7 @@ type BackupPolicyTemplateSpec struct {
 }
 
 type BackupPolicy struct {
-	// componentDefRef reference componentDef defined in ClusterDefinition spec.
+	// componentDefRef references componentDef defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
@@ -46,7 +46,7 @@ type BackupPolicy struct {
 
 	// ttl is a time string in days and ending with the 'd' or 'D' character to describe how long
 	// the Backup should be retained.
-	// +kubebuilder:validation:Pattern:=`^\d+[d|D]$`
+	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
 	// +optional
 	TTL *string `json:"ttl,omitempty"`
 

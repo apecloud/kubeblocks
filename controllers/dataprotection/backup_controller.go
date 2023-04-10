@@ -913,7 +913,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: commonPolicy.Target.Secret.Name,
 					},
-					Key: commonPolicy.Target.Secret.UserKeyword,
+					Key: commonPolicy.Target.Secret.UsernameKey,
 				},
 			},
 		}
@@ -925,7 +925,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: commonPolicy.Target.Secret.Name,
 					},
-					Key: commonPolicy.Target.Secret.PasswordKeyword,
+					Key: commonPolicy.Target.Secret.PasswordKey,
 				},
 			},
 		}

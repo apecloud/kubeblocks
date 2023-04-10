@@ -29,7 +29,7 @@ import (
 type BackupPolicySpec struct {
 	// ttl is a time string in days and ending with the 'd' or 'D' character to describe how long
 	// the Backup should be retained. if not set,
-	// +kubebuilder:validation:Pattern:=`^\d+[d|D]$`
+	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
 	// +optional
 	TTL *string `json:"ttl,omitempty"`
 
@@ -141,15 +141,15 @@ type BackupPolicySecret struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// userKeyword the map keyword of the user in the connection credential secret
+	// usernameKey the map keyword of the user in the connection credential secret
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=username
-	UserKeyword string `json:"userKeyword,omitempty"`
+	UsernameKey string `json:"usernameKey,omitempty"`
 
-	// passwordKeyword the map keyword of the password in the connection credential secret
+	// passwordKey the map key of the password in the connection credential secret
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=password
-	PasswordKeyword string `json:"passwordKeyword,omitempty"`
+	PasswordKey string `json:"passwordKey,omitempty"`
 }
 
 // BackupPolicyHook defines for the database execute commands before and after backup.
@@ -272,7 +272,11 @@ func ToDuration(ttl *string) time.Duration {
 	if ttl == nil {
 		return time.Duration(0)
 	}
-	t := strings.ReplaceAll(*ttl, "D", "")
-	days, _ := strconv.Atoi(strings.ReplaceAll(t, "d", ""))
-	return time.Hour * 24 * time.Duration(days)
+	ttlLower := strings.ToLower(*ttl)
+	if strings.HasSuffix(ttlLower, "d") {
+		days, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "d", ""))
+		return time.Hour * 24 * time.Duration(days)
+	}
+	hours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
+	return time.Hour * time.Duration(hours)
 }

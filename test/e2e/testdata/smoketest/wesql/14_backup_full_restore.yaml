@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: snapshot-mycluster
   annotations:
-    kubeblocks.io/restore-from-backup: "{\"wesql\":\"backup-policy-mycluster-full\"}"
+    kubeblocks.io/restore-from-backup: "{\"mysql\":\"backup-full-mycluster\"}"
 spec:
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
@@ -26,7 +26,3 @@ spec:
             resources:
               requests:
                 storage: 2Gi
-            dataSource:
-              apiGroup: snapshot.storage.k8s.io
-              kind: VolumeSnapshot
-              name: backup-full-mycluster

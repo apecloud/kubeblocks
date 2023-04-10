@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: redis-7.0.5-latest
+  name: redis-7.0.6-latest
 spec:
   clusterDefinitionRef: redis
   componentVersions:

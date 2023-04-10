@@ -6,10 +6,7 @@ spec:
   clusterRef: mycluster
   type: VerticalScaling
   verticalScaling:
-    - componentName: mysql
+    - componentName: replicaset
       requests:
-        memory: "500Mi"
-        cpu: "0.5"
-      limits:
-        memory: "1000Mi"
-        cpu: "1"
+        cpu: "500m"
+        memory: 500Mi

@@ -149,13 +149,13 @@ type TargetInstance struct {
 	// +optional
 	Account string `json:"account,omitempty"`
 
-	// connectionCredentialKeyword defines connection credential keyword in secret
+	// connectionCredentialKey defines connection credential key in secret
 	// which created by spec.ConnectionCredential of the ClusterDefinition.
 	// it will be ignored when "account" is set.
-	ConnectionCredentialKeyword ConnectionCredentialKeyword `json:"connectionCredentialKeyword,omitempty"`
+	ConnectionCredentialKey ConnectionCredentialKey `json:"connectionCredentialKey,omitempty"`
 }
 
-type ConnectionCredentialKeyword struct {
+type ConnectionCredentialKey struct {
 	// the key of password in the ConnectionCredential secret.
 	// if not set, the default key is "password".
 	// +optional

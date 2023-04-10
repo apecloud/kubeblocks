@@ -118,9 +118,9 @@ spec:
                                 the ClusterDefinition will be used. it will be transformed
                                 to a secret for BackupPolicy's target secret.
                               type: string
-                            connectionCredentialKeyword:
-                              description: connectionCredentialKeyword defines connection
-                                credential keyword in secret which created by spec.ConnectionCredential
+                            connectionCredentialKey:
+                              description: connectionCredentialKey defines connection
+                                credential key in secret which created by spec.ConnectionCredential
                                 of the ClusterDefinition. it will be ignored when
                                 "account" is set.
                               properties:
@@ -206,9 +206,9 @@ spec:
                                 the ClusterDefinition will be used. it will be transformed
                                 to a secret for BackupPolicy's target secret.
                               type: string
-                            connectionCredentialKeyword:
-                              description: connectionCredentialKeyword defines connection
-                                credential keyword in secret which created by spec.ConnectionCredential
+                            connectionCredentialKey:
+                              description: connectionCredentialKey defines connection
+                                credential key in secret which created by spec.ConnectionCredential
                                 of the ClusterDefinition. it will be ignored when
                                 "account" is set.
                               properties:
@@ -349,9 +349,9 @@ spec:
                                 the ClusterDefinition will be used. it will be transformed
                                 to a secret for BackupPolicy's target secret.
                               type: string
-                            connectionCredentialKeyword:
-                              description: connectionCredentialKeyword defines connection
-                                credential keyword in secret which created by spec.ConnectionCredential
+                            connectionCredentialKey:
+                              description: connectionCredentialKey defines connection
+                                credential key in secret which created by spec.ConnectionCredential
                                 of the ClusterDefinition. it will be ignored when
                                 "account" is set.
                               properties:

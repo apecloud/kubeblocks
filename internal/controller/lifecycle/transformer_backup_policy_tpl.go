@@ -260,12 +260,12 @@ func (r *backupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolic
 		basePolicy.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{
 			Name: fmt.Sprintf("%s-conn-credential", clusterName),
 		}
-		connectionCredentialKeyword := bp.Target.ConnectionCredentialKeyword
-		if connectionCredentialKeyword.PasswordKey != nil {
-			basePolicy.Target.Secret.PasswordKey = *connectionCredentialKeyword.PasswordKey
+		connectionCredentialKey := bp.Target.ConnectionCredentialKey
+		if connectionCredentialKey.PasswordKey != nil {
+			basePolicy.Target.Secret.PasswordKey = *connectionCredentialKey.PasswordKey
 		}
-		if connectionCredentialKeyword.UsernameKey != nil {
-			basePolicy.Target.Secret.UsernameKey = *connectionCredentialKeyword.UsernameKey
+		if connectionCredentialKey.UsernameKey != nil {
+			basePolicy.Target.Secret.UsernameKey = *connectionCredentialKey.UsernameKey
 		}
 	}
 	return basePolicy

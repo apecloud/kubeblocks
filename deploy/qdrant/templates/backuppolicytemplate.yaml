@@ -17,6 +17,6 @@ spec:
         cronExpression: "0 18 * * 0"
     snapshot:
       target:
-        connectionCredentialKeyword:
+        connectionCredentialKey:
           passwordKey: password
           usernameKey: username

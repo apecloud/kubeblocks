@@ -26,7 +26,7 @@ spec:
           script: /scripts/backup-log-collector.sh
           updateStage: pre
       target:
-        connectionCredentialKeyword:
+        connectionCredentialKey:
           passwordKey: password
           usernameKey: username
     full:

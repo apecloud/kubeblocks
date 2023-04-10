@@ -644,3 +644,12 @@ func GetK8SProvider(client kubernetes.Interface) (K8sProvider, error) {
 func BuildAddonReleaseName(addon string) string {
 	return fmt.Sprintf("%s-%s", types.AddonReleasePrefix, addon)
 }
+
+// CombineLabels combines labels into a string
+func CombineLabels(labels map[string]string) string {
+	var labelStr string
+	for k, v := range labels {
+		labelStr += fmt.Sprintf("%s=%s,", k, v)
+	}
+	return strings.TrimSuffix(labelStr, ",")
+}

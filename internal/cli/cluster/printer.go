@@ -35,26 +35,39 @@ const (
 	PrintEvents     PrintType = "events"
 )
 
+type PrinterOptions struct {
+	ShowLabels bool
+}
+
 type tblInfo struct {
 	header     []interface{}
-	addRow     func(tbl *printer.TablePrinter, objs *ClusterObjects)
+	addRow     func(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions)
 	getOptions GetOptions
 }
 
 var mapTblInfo = map[PrintType]tblInfo{
 	PrintClusters: {
 		header: []interface{}{"NAME", "NAMESPACE", "CLUSTER-DEFINITION", "VERSION", "TERMINATION-POLICY", "STATUS", "CREATED-TIME"},
-		addRow: func(tbl *printer.TablePrinter, objs *ClusterObjects) {
+		addRow: func(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions) {
 			c := objs.GetClusterInfo()
-			tbl.AddRow(c.Name, c.Namespace, c.ClusterDefinition, c.ClusterVersion, c.TerminationPolicy, c.Status, c.CreatedTime)
+			info := []interface{}{c.Name, c.Namespace, c.ClusterDefinition, c.ClusterVersion, c.TerminationPolicy, c.Status, c.CreatedTime}
+			if opt.ShowLabels {
+				info = append(info, c.Labels)
+			}
+
+			tbl.AddRow(info...)
 		},
 		getOptions: GetOptions{},
 	},
 	PrintWide: {
 		header: []interface{}{"NAME", "NAMESPACE", "CLUSTER-DEFINITION", "VERSION", "TERMINATION-POLICY", "STATUS", "INTERNAL-ENDPOINTS", "EXTERNAL-ENDPOINTS", "CREATED-TIME"},
-		addRow: func(tbl *printer.TablePrinter, objs *ClusterObjects) {
+		addRow: func(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions) {
 			c := objs.GetClusterInfo()
-			tbl.AddRow(c.Name, c.Namespace, c.ClusterDefinition, c.ClusterVersion, c.TerminationPolicy, c.Status, c.InternalEP, c.ExternalEP, c.CreatedTime)
+			info := []interface{}{c.Name, c.Namespace, c.ClusterDefinition, c.ClusterVersion, c.TerminationPolicy, c.Status, c.InternalEP, c.ExternalEP, c.CreatedTime}
+			if opt.ShowLabels {
+				info = append(info, c.Labels)
+			}
+			tbl.AddRow(info...)
 		},
 		getOptions: GetOptions{WithClusterDef: true, WithService: true, WithPod: true},
 	},
@@ -78,18 +91,29 @@ var mapTblInfo = map[PrintType]tblInfo{
 // Printer prints cluster info
 type Printer struct {
 	tbl *printer.TablePrinter
+	opt *PrinterOptions
 	tblInfo
 }
 
-func NewPrinter(out io.Writer, printType PrintType) *Printer {
+func NewPrinter(out io.Writer, printType PrintType, opt *PrinterOptions) *Printer {
 	p := &Printer{tbl: printer.NewTablePrinter(out)}
 	p.tblInfo = mapTblInfo[printType]
+
+	if opt == nil {
+		opt = &PrinterOptions{}
+	}
+	p.opt = opt
+
+	if opt.ShowLabels {
+		p.tblInfo.header = append(p.tblInfo.header, "LABELS")
+	}
+
 	p.tbl.SetHeader(p.tblInfo.header...)
 	return p
 }
 
 func (p *Printer) AddRow(objs *ClusterObjects) {
-	p.addRow(p.tbl, objs)
+	p.addRow(p.tbl, objs, p.opt)
 }
 
 func (p *Printer) Print() {
@@ -100,14 +124,14 @@ func (p *Printer) GetterOptions() GetOptions {
 	return p.getOptions
 }
 
-func AddComponentRow(tbl *printer.TablePrinter, objs *ClusterObjects) {
+func AddComponentRow(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions) {
 	components := objs.GetComponentInfo()
 	for _, c := range components {
 		tbl.AddRow(c.Name, c.NameSpace, c.Cluster, c.Type, c.Image)
 	}
 }
 
-func AddInstanceRow(tbl *printer.TablePrinter, objs *ClusterObjects) {
+func AddInstanceRow(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions) {
 	instances := objs.GetInstanceInfo()
 	for _, instance := range instances {
 		tbl.AddRow(instance.Name, instance.Namespace, instance.Cluster, instance.Component,
@@ -117,7 +141,7 @@ func AddInstanceRow(tbl *printer.TablePrinter, objs *ClusterObjects) {
 	}
 }
 
-func AddEventRow(tbl *printer.TablePrinter, objs *ClusterObjects) {
+func AddEventRow(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions) {
 	events := util.SortEventsByLastTimestamp(objs.Events, "")
 	for _, event := range *events {
 		e := event.(*corev1.Event)

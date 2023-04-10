@@ -52,8 +52,8 @@ metrics:
 
     receivers:
       apecloudmongodb:
-        uri: mongodb://${env:MONGODB_ROOT_USER}:${env:MONGODB_ROOT_PASSWORD}@127.0.0.1:27018/admin?ssl=false&authSource=admin
-        # uri: mongodb://127.0.0.1:27018
+        uri: mongodb://${env:MONGODB_ROOT_USER}:${env:MONGODB_ROOT_PASSWORD}@127.0.0.1:27017/admin?ssl=false&authSource=admin
+        # uri: mongodb://127.0.0.1:27017
         collect-all: true
         collection_interval: 15s
         direct-connect: true

@@ -58,8 +58,8 @@ type CreateOptions struct {
 }
 
 var classCreateExamples = templates.Examples(`
-    # Create a class following class family kubeblocks-general-classes for component mysql in cluster definition apecloud-mysql, which have 1 cpu core, 2Gi memory and storage is 10Gi
-    kbcli class create custom-1c2g --cluster-definition apecloud-mysql --type mysql --constraint kubeblocks-general-classes --cpu 1 --memory 2Gi --storage name=data,size=10Gi
+    # Create a class following constraint kb-resource-constraint-general for component mysql in cluster definition apecloud-mysql, which have 1 cpu core, 2Gi memory and storage is 10Gi
+    kbcli class create custom-1c2g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 2Gi --storage name=data,size=10Gi
 
     # Create classes for component mysql in cluster definition apecloud-mysql, where classes is defined in file
     kbcli class create --cluster-definition apecloud-mysql --type mysql --file ./classes.yaml
@@ -132,7 +132,7 @@ func (o *CreateOptions) run() error {
 		classes = make(map[string]*v1alpha1.ComponentClassInstance)
 	}
 
-	families, err := class.GetResourceConstraints(o.dynamic)
+	constraints, err := class.GetResourceConstraints(o.dynamic)
 	if err != nil {
 		return err
 	}
@@ -158,8 +158,8 @@ func (o *CreateOptions) run() error {
 			return err
 		}
 		for name, cls := range newClasses {
-			if _, ok = families[cls.ClassConstraintRef]; !ok {
-				return fmt.Errorf("family %s is not found", cls.ClassConstraintRef)
+			if _, ok = constraints[cls.ClassConstraintRef]; !ok {
+				return fmt.Errorf("resource constraint %s is not found", cls.ClassConstraintRef)
 			}
 			if _, ok = classes[name]; ok {
 				return fmt.Errorf("class name conflicted %s", name)
@@ -170,8 +170,8 @@ func (o *CreateOptions) run() error {
 		if _, ok = classes[o.ClassName]; ok {
 			return fmt.Errorf("class name conflicted %s", o.ClassName)
 		}
-		if _, ok = families[o.Constraint]; !ok {
-			return fmt.Errorf("family %s is not found", o.Constraint)
+		if _, ok = constraints[o.Constraint]; !ok {
+			return fmt.Errorf("resource constraint %s is not found", o.Constraint)
 		}
 		cls, err := o.buildClass()
 		if err != nil {

@@ -116,7 +116,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 
 		var cls *appsv1alpha1.ComponentClassInstance
 		className, ok := componentClassMapping[comp.Name]
-		// TODO another case if len(constraintList.Items) > 0, use matchClassFamilies to find matching class family:
+		// TODO another case if len(constraintList.Items) > 0, use matchClassFamilies to find matching resource constraint:
 		switch {
 		case ok:
 			cls = classes[className]

@@ -8,7 +8,7 @@ metadata:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
 spec:
   groups:
-  - # class family name, such as general, memory-optimized, cpu-optimized etc.
+  - # resource constraint name, such as general, memory-optimized, cpu-optimized etc.
     classConstraintRef: kb-resource-constraint-general
     # class schema template, you can set default resource values here
     template: |

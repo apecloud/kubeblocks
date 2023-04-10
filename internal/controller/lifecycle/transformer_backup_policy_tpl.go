@@ -230,6 +230,18 @@ func (r *backupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolic
 		BackupsHistoryLimit: bp.BackupsHistoryLimit,
 		OnFailAttempted:     bp.OnFailAttempted,
 	}
+	if len(bp.BackupStatusUpdates) != 0 {
+		backupStatusUpdates := make([]dataprotectionv1alpha1.BackupStatusUpdate, len(bp.BackupStatusUpdates))
+		for i, v := range bp.BackupStatusUpdates {
+			backupStatusUpdates[i] = dataprotectionv1alpha1.BackupStatusUpdate{
+				Path:          v.Path,
+				ContainerName: v.ContainerName,
+				Script:        v.Script,
+				UpdateStage:   dataprotectionv1alpha1.BackupStatusUpdateStage(v.UpdateStage),
+			}
+		}
+		basePolicy.BackupStatusUpdates = backupStatusUpdates
+	}
 	switch workloadType {
 	case appsv1alpha1.Replication, appsv1alpha1.Consensus:
 		if len(bp.Target.Role) > 0 && component.Replicas > 1 {

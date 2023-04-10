@@ -148,9 +148,6 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 			return err
 		}
 	}
-	if len(backupPolicy.Spec.BackupStatusUpdates) == 0 {
-		backupPolicy.Spec.BackupStatusUpdates = template.Spec.BackupStatusUpdates
-	}
 	return nil
 }
 

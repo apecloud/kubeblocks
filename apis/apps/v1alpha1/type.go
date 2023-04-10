@@ -447,6 +447,11 @@ const (
 // +kubebuilder:validation:Enum={full,snapshot}
 type BaseBackupType string
 
+// BackupStatusUpdateStage defines the stage of backup status update.
+// +enum
+// +kubebuilder:validation:Enum={pre,post}
+type BackupStatusUpdateStage string
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

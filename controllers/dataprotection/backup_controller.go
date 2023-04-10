@@ -231,10 +231,12 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		if !isOK {
 			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 		}
-		if err = r.createUpdatesJobs(reqCtx, backup, dataprotectionv1alpha1.PRE); err != nil {
+		if err = r.createUpdatesJobs(reqCtx, backup, backupPolicy.Spec.Snapshot, dataprotectionv1alpha1.PRE); err != nil {
 			r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPreUpdatesJob", err.Error())
 		}
 		if err = r.createVolumeSnapshot(reqCtx, backup, backupPolicy.Spec.Snapshot); err != nil {
+			return r.updateStatusIfFailed(reqCtx, backup, err)
+		}
 
 		key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backup.Name}
 		isOK, err = r.ensureVolumeSnapshotReady(reqCtx, key)
@@ -256,7 +258,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		}
 
 		// Failure MetadataCollectionJob does not affect the backup status.
-		if err = r.createUpdatesJobs(reqCtx, backup, dataprotectionv1alpha1.POST); err != nil {
+		if err = r.createUpdatesJobs(reqCtx, backup, backupPolicy.Spec.Snapshot, dataprotectionv1alpha1.POST); err != nil {
 			r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPostUpdatesJob", err.Error())
 		}
 
@@ -521,7 +523,9 @@ func (r *BackupReconciler) ensureVolumeSnapshotReady(reqCtx intctrlutil.RequestC
 }
 
 func (r *BackupReconciler) createUpdatesJobs(reqCtx intctrlutil.RequestCtx,
-	backup *dataprotectionv1alpha1.Backup, stage dataprotectionv1alpha1.BackupStatusUpdateStage) error {
+	backup *dataprotectionv1alpha1.Backup,
+	snapshotPolicy *dataprotectionv1alpha1.SnapshotPolicy,
+	stage dataprotectionv1alpha1.BackupStatusUpdateStage) error {
 	// get backup policy
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
 	backupPolicyNameSpaceName := types.NamespacedName{
@@ -532,11 +536,11 @@ func (r *BackupReconciler) createUpdatesJobs(reqCtx intctrlutil.RequestCtx,
 		reqCtx.Log.V(1).Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
 		return err
 	}
-	for _, update := range backupPolicy.Spec.BackupStatusUpdates {
+	for _, update := range snapshotPolicy.BackupStatusUpdates {
 		if update.UpdateStage != stage {
 			continue
 		}
-		if err := r.createMetadataCollectionJob(reqCtx, backup, update); err != nil {
+		if err := r.createMetadataCollectionJob(reqCtx, backup, snapshotPolicy.BasePolicy, update); err != nil {
 			return err
 		}
 	}
@@ -544,7 +548,9 @@ func (r *BackupReconciler) createUpdatesJobs(reqCtx intctrlutil.RequestCtx,
 }
 
 func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.RequestCtx,
-	backup *dataprotectionv1alpha1.Backup, updateInfo dataprotectionv1alpha1.BackupStatusUpdate) error {
+	backup *dataprotectionv1alpha1.Backup,
+	basePolicy dataprotectionv1alpha1.BasePolicy,
+	updateInfo dataprotectionv1alpha1.BackupStatusUpdate) error {
 	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-" + strings.ToLower(updateInfo.Path)}
 	job := &batchv1.Job{}
@@ -556,7 +562,7 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	}
 
 	// build job and create
-	jobPodSpec, err := r.buildMetadataCollectionPodSpec(reqCtx, backup, updateInfo)
+	jobPodSpec, err := r.buildMetadataCollectionPodSpec(reqCtx, backup, basePolicy, updateInfo)
 	if err != nil {
 		return err
 	}
@@ -1022,22 +1028,10 @@ func addTolerations(podSpec *corev1.PodSpec) (err error) {
 func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
+	basePolicy dataprotectionv1alpha1.BasePolicy,
 	updateInfo dataprotectionv1alpha1.BackupStatusUpdate) (corev1.PodSpec, error) {
 	podSpec := corev1.PodSpec{}
-	logger := reqCtx.Log
-
-	// get backup policy
-	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
-	backupPolicyNameSpaceName := types.NamespacedName{
-		Namespace: reqCtx.Req.Namespace,
-		Name:      backup.Spec.BackupPolicyName,
-	}
-
-	if err := r.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
-		logger.Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
-		return podSpec, err
-	}
-	targetPod, err := r.getTargetPod(reqCtx, backup, backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
+	targetPod, err := r.getTargetPod(reqCtx, backup, basePolicy.Target.LabelsSelector.MatchLabels)
 	if err != nil {
 		return podSpec, err
 	}

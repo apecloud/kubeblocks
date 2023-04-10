@@ -408,7 +408,7 @@ func patchVolumeSnapshotStatus(key types.NamespacedName, readyToUse bool) {
 
 func patchBackupPolicySpecBackupStatusUpdates(key types.NamespacedName) {
 	Eventually(testapps.GetAndChangeObj(&testCtx, key, func(fetched *dataprotectionv1alpha1.BackupPolicy) {
-		fetched.Spec.BackupStatusUpdates = []dataprotectionv1alpha1.BackupStatusUpdate{
+		fetched.Spec.Snapshot.BackupStatusUpdates = []dataprotectionv1alpha1.BackupStatusUpdate{
 			{
 				Path:          "manifests.backupLog",
 				ContainerName: "postgresql",

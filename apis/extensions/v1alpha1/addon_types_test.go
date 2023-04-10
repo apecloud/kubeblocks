@@ -41,9 +41,7 @@ func TestSelectorRequirementString(t *testing.T) {
 
 func TestSelectorRequirementNoOperator(t *testing.T) {
 	g := NewGomegaWithT(t)
-	var r *SelectorRequirement
-	g.Expect(r.MatchesFromConfig()).Should(BeFalse())
-	r = &SelectorRequirement{
+	r := SelectorRequirement{
 		Key: KubeGitVersion,
 	}
 	g.Expect(r.MatchesFromConfig()).Should(BeFalse())
@@ -235,7 +233,7 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 				StorageClass: mappingName(name, sc),
 				PVEnabled:    mappingName(name, pvEnabled),
 			},
-			HelmJSONMap: HelmValueMapType{
+			HelmJSONMap: HelmJSONValueMapType{
 				Tolerations: mappingName(name, tolerations),
 			},
 			ResourcesMapping: &ResourceMappingItem{
@@ -346,9 +344,7 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 
 func TestAddonSpecMisc(t *testing.T) {
 	g := NewGomegaWithT(t)
-	var addonSpec *AddonSpec
-	g.Expect(addonSpec.GetSortedDefaultInstallValues()).Should(BeNil())
-	addonSpec = &AddonSpec{}
+	addonSpec := AddonSpec{}
 	g.Expect(addonSpec.InstallSpec.GetEnabled()).Should(BeFalse())
 	g.Expect(addonSpec.Helm.BuildMergedValues(nil)).Should(BeEquivalentTo(HelmInstallValues{}))
 	addonSpec.InstallSpec = &AddonInstallSpec{

@@ -77,8 +77,8 @@ func (factory *MockClusterDefFactory) AddServicePort(port int32) *MockClusterDef
 	if comp == nil {
 		return nil
 	}
-	comp.Service = &corev1.ServiceSpec{
-		Ports: []corev1.ServicePort{{
+	comp.Service = &appsv1alpha1.ServiceSpec{
+		Ports: []appsv1alpha1.ServicePort{{
 			Protocol: corev1.ProtocolTCP,
 			Port:     port,
 		}},
@@ -160,7 +160,7 @@ func (factory *MockClusterDefFactory) AddHorizontalScalePolicy(policy appsv1alph
 }
 
 func (factory *MockClusterDefFactory) SetConnectionCredential(
-	connectionCredential map[string]string, svc *corev1.ServiceSpec) *MockClusterDefFactory {
+	connectionCredential map[string]string, svc *appsv1alpha1.ServiceSpec) *MockClusterDefFactory {
 	factory.get().Spec.ConnectionCredential = connectionCredential
 	factory.SetServiceSpec(svc)
 	return factory
@@ -182,7 +182,7 @@ func (factory *MockClusterDefFactory) getLastCompDef() *appsv1alpha1.ClusterComp
 	return &comps[l-1]
 }
 
-func (factory *MockClusterDefFactory) SetServiceSpec(svc *corev1.ServiceSpec) *MockClusterDefFactory {
+func (factory *MockClusterDefFactory) SetServiceSpec(svc *appsv1alpha1.ServiceSpec) *MockClusterDefFactory {
 	comp := factory.get1stCompDef()
 	if comp == nil {
 		return factory

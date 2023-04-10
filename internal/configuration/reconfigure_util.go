@@ -21,8 +21,10 @@ import (
 	"reflect"
 
 	"github.com/StudioSol/set"
+	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 func getUpdateParameterList(cfg *ConfigPatchInfo) ([]string, error) {
@@ -82,4 +84,37 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 	// if the updated parameter is not in list of DynamicParameter and in list of StaticParameter,
 	// restart is the default behavior.
 	return false, nil
+}
+
+// IsParametersUpdateFromManager is used to check whether the parameters are updated from manager
+func IsParametersUpdateFromManager(cm *corev1.ConfigMap) bool {
+	annotation := cm.ObjectMeta.Annotations
+	if annotation == nil {
+		return false
+	}
+	v := annotation[constant.KBParameterUpdateSourceAnnotationKey]
+	return v == constant.ReconfigureManagerSource
+}
+
+// IsNotUserReconfigureOperation is used to check whether the parameters are updated from operation
+func IsNotUserReconfigureOperation(cm *corev1.ConfigMap) bool {
+	labels := cm.GetLabels()
+	if labels == nil {
+		return true
+	}
+	lastReconfigurePhase := labels[constant.CMInsLastReconfigurePhaseKey]
+	return lastReconfigurePhase == "" || ReconfigureCreatedPhase == lastReconfigurePhase
+}
+
+// SetParametersUpdateSource is used to set the parameters update source
+// manager: parameter only updated from manager
+// external-template: parameter only updated from template
+// ops: parameter has updated from operation
+func SetParametersUpdateSource(cm *corev1.ConfigMap, source string) {
+	annotation := cm.GetAnnotations()
+	if annotation == nil {
+		annotation = make(map[string]string)
+	}
+	annotation[constant.KBParameterUpdateSourceAnnotationKey] = source
+	cm.SetAnnotations(annotation)
 }

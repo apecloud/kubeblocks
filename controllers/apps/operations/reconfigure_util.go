@@ -93,6 +93,7 @@ func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.
 		cmObj.Annotations = make(map[string]string)
 	}
 	cmObj.Annotations[constant.LastAppliedOpsCRAnnotation] = opsCrName
+	cfgcore.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)
 	return cli.Patch(ctx, cmObj, patch)
 }
 
@@ -130,6 +131,14 @@ func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) recon
 		o(&result)
 	}
 	return result
+}
+
+func getConfigSpecName(configSpec []appsv1alpha1.ComponentConfigSpec) []string {
+	names := make([]string, len(configSpec))
+	for i, spec := range configSpec {
+		names[i] = spec.Name
+	}
+	return names
 }
 
 func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1alpha1.ComponentConfigSpec) *metav1.Condition {
@@ -176,7 +185,7 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 	}
 
 	// if failed to validate configure, set opsRequest to failed and return
-	failedCondition := appsv1alpha1.NewFailedCondition(resource.OpsRequest, err)
+	failedCondition := appsv1alpha1.NewReconfigureFailedCondition(resource.OpsRequest, err)
 	resource.OpsRequest.SetStatusCondition(*failedCondition)
 	return nil
 }

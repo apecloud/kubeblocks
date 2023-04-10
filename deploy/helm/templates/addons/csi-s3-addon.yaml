@@ -31,7 +31,7 @@ spec:
         operator: Contains
         values:
           - eks
-          - ack
+          - aliyun
           - gke
           - tke
           - aks

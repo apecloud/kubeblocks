@@ -12,6 +12,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -27,6 +28,30 @@ rules:
   - apps
   resources:
   - deployments/status
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - pods/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - pods/status
   verbs:
   - get
 - apiGroups:
@@ -60,6 +85,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -77,6 +103,14 @@ rules:
   - statefulsets/status
   verbs:
   - get
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - classfamilies
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - apps.kubeblocks.io
   resources:
@@ -293,6 +327,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -397,6 +432,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -415,6 +451,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -597,6 +634,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch

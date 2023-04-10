@@ -29,9 +29,9 @@ backup_policy: {
 	apiVersion: "dataprotection.kubeblocks.io/v1alpha1"
 	kind:       "BackupPolicy"
 	metadata: {
-		//             name:      backup_key.Name
-		generateName: "\(backup_key.Name)-"
-		namespace:    backup_key.Namespace
+		name: backup_key.Name
+		//          generateName: "\(backup_key.Name)-"
+		namespace: backup_key.Namespace
 		labels: {
 			"apps.kubeblocks.io/managed-by": "cluster"
 			for k, v in sts.metadata.labels {

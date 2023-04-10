@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -45,8 +46,10 @@ var _ = Describe("list", func() {
 	)
 
 	const (
-		namespace   = "test"
-		clusterName = "test"
+		namespace             = "test"
+		clusterName           = "test"
+		clusterName1          = "test1"
+		verticalScalingReason = "VerticalScaling"
 	)
 
 	BeforeEach(func() {
@@ -56,6 +59,11 @@ var _ = Describe("list", func() {
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		cluster := testing.FakeCluster(clusterName, namespace)
+		clusterWithCondition := testing.FakeCluster(clusterName1, namespace, metav1.Condition{
+			Type:   appsv1alpha1.ConditionTypeLatestOpsRequestProcessed,
+			Status: metav1.ConditionFalse,
+			Reason: verticalScalingReason,
+		})
 		pods := testing.FakePods(3, namespace, clusterName)
 		httpResp := func(obj runtime.Object) *http.Response {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
@@ -67,20 +75,21 @@ var _ = Describe("list", func() {
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				urlPrefix := "/api/v1/namespaces/" + namespace
 				return map[string]*http.Response{
-					"/namespaces/" + namespace + "/clusters":      httpResp(&appsv1alpha1.ClusterList{Items: []appsv1alpha1.Cluster{*cluster}}),
-					"/namespaces/" + namespace + "/clusters/test": httpResp(cluster),
-					"/namespaces/" + namespace + "/secrets":       httpResp(testing.FakeSecrets(namespace, clusterName)),
-					"/api/v1/nodes/" + testing.NodeName:           httpResp(testing.FakeNode()),
-					urlPrefix + "/services":                       httpResp(&corev1.ServiceList{}),
-					urlPrefix + "/secrets":                        httpResp(testing.FakeSecrets(namespace, clusterName)),
-					urlPrefix + "/pods":                           httpResp(pods),
-					urlPrefix + "/events":                         httpResp(testing.FakeEvents()),
+					"/namespaces/" + namespace + "/clusters":                 httpResp(&appsv1alpha1.ClusterList{Items: []appsv1alpha1.Cluster{*cluster}}),
+					"/namespaces/" + namespace + "/clusters/" + clusterName:  httpResp(cluster),
+					"/namespaces/" + namespace + "/clusters/" + clusterName1: httpResp(clusterWithCondition),
+					"/namespaces/" + namespace + "/secrets":                  httpResp(testing.FakeSecrets(namespace, clusterName)),
+					"/api/v1/nodes/" + testing.NodeName:                      httpResp(testing.FakeNode()),
+					urlPrefix + "/services":                                  httpResp(&corev1.ServiceList{}),
+					urlPrefix + "/secrets":                                   httpResp(testing.FakeSecrets(namespace, clusterName)),
+					urlPrefix + "/pods":                                      httpResp(pods),
+					urlPrefix + "/events":                                    httpResp(testing.FakeEvents()),
 				}[req.URL.Path], nil
 			}),
 		}
 
 		tf.Client = tf.UnstructuredClient
-		tf.FakeDynamicClient = testing.FakeDynamicClient(cluster, testing.FakeClusterDef(), testing.FakeClusterVersion())
+		tf.FakeDynamicClient = testing.FakeDynamicClient(cluster, clusterWithCondition, testing.FakeClusterDef(), testing.FakeClusterVersion())
 	})
 
 	AfterEach(func() {
@@ -91,8 +100,11 @@ var _ = Describe("list", func() {
 		cmd := NewListCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
-		cmd.Run(cmd, []string{"test"})
+		cmd.Run(cmd, []string{clusterName})
 		Expect(out.String()).Should(ContainSubstring(testing.ClusterDefName))
+
+		cmd.Run(cmd, []string{clusterName1})
+		Expect(out.String()).Should(ContainSubstring(verticalScalingReason))
 	})
 
 	It("list instances", func() {

@@ -72,7 +72,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
 		// mgr namespaced
 		inMgrNS := client.InNamespace(mgrNamespace)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inMgrNS, ml)
@@ -430,7 +430,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("Secrets missing, the backup policy should never be `ConfigAvailable`")
 				Consistently(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Status.Phase).NotTo(Equal(dpv1alpha1.ConfigAvailable))
-				})).Should(Succeed())
+				}), time.Millisecond*100).Should(Succeed())
 			})
 
 			It("creating a backupPolicy uses default secret", func() {

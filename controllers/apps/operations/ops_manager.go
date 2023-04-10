@@ -36,8 +36,9 @@ var (
 func (opsMgr *OpsManager) RegisterOps(opsType appsv1alpha1.OpsType, opsBehaviour OpsBehaviour) {
 	opsManager.OpsMap[opsType] = opsBehaviour
 	appsv1alpha1.OpsRequestBehaviourMapper[opsType] = appsv1alpha1.OpsRequestBehaviour{
-		FromClusterPhases: opsBehaviour.FromClusterPhases,
-		ToClusterPhase:    opsBehaviour.ToClusterPhase,
+		FromClusterPhases:                  opsBehaviour.FromClusterPhases,
+		ToClusterPhase:                     opsBehaviour.ToClusterPhase,
+		ProcessingReasonInClusterCondition: opsBehaviour.ProcessingReasonInClusterCondition,
 	}
 }
 
@@ -81,7 +82,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 
 	// patch cluster.status after updating cluster.spec.
 	// because cluster controller probably reconciles status.phase to Running if cluster is not updated.
-	return nil, patchClusterStatus(reqCtx, cli, opsRes, opsBehaviour)
+	return nil, patchClusterStatusAndRecordEvent(reqCtx, cli, opsRes, opsBehaviour)
 }
 
 // Reconcile entry function when OpsRequest.status.phase is Running.

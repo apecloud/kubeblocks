@@ -58,6 +58,7 @@ kbcli [flags]
 * [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
 * [kbcli backup-config](kbcli_backup-config.md)	 - KubeBlocks backup config.
 * [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
+* [kbcli class](kbcli_class.md)	 - Manage classes
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
 * [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
 * [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command.

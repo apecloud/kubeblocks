@@ -12,21 +12,21 @@ kbcli cluster configure [flags]
 
 ```
   # update component params
-  kbcli cluster configure <cluster-name> --component-name=<component-name> --template-name=<template-name> --configure-file=<configure-file> --set max_connections=1000,general_log=OFF
+  kbcli cluster configure <cluster-name> --component=<component-name> --config-spec=<config-spec-name> --config-file=<config-file> --set max_connections=1000,general_log=OFF
   
   # update mysql max_connections, cluster name is mycluster
-  kbcli cluster configure mycluster --component-name=mysql --template-name=mysql-3node-tpl --configure-file=my.cnf --set max_connections=2000
+  kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=2000
 ```
 
 ### Options
 
 ```
-      --component-name strings       Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.
-      --configure-file string        Specify the name of the configuration file to be updated (e.g. for mysql: --configure-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.
+      --component strings            Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.
+      --config-file string           Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.
+      --config-spec string           Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.
   -h, --help                         help for configure
       --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --set strings                  Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-configure'.
-      --template-name string         Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --template-name=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
 

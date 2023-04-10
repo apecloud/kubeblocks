@@ -36,6 +36,15 @@ Run a benchmark.
 * [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
 
 
+## [class](kbcli_class.md)
+
+Manage classes
+
+* [kbcli class create](kbcli_class_create.md)	 - Create a class
+* [kbcli class list](kbcli_class_list.md)	 - List classes
+* [kbcli class template](kbcli_class_template.md)	 - Generate class definition template
+
+
 ## [cluster](kbcli_cluster.md)
 
 Cluster command.

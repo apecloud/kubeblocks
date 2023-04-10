@@ -21,10 +21,14 @@ spec:
   physical:
     restoreCommands:
       - |
-        #!/bin/sh
         set -e
+        mkdir -p ${DATA_DIR}
+        res=`ls -A ${DATA_DIR}`
+        if [ ! -z ${res} ]; then
+          echo "${DATA_DIR} is not empty! Please make sure that the directory is empty before restoring the backup."
+          exit 1
+        fi
         mkdir -p ${DATA_DIR} && mkdir -p ${DATA_DIR}/../arch
-        rm -rf ${DATA_DIR}/../arch/* && rm -rf ${DATA_DIR}/*
         cd ${BACKUP_DIR}/${BACKUP_NAME}
         tar -xvf base.tar.gz -C ${DATA_DIR}/
         tar -xvf pg_wal.tar.gz -C ${DATA_DIR}/../arch

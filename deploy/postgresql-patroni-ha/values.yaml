@@ -12,9 +12,9 @@
 ## @param image.debug Specify if debug values should be set
 ##
 image:
-  ## repository: https://hub.docker.com/r/lrengineering/spilo-postgres
-  repository: lrengineering/spilo-postgres
-  tag: 14-2.1-p6
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/spilo
+  tag: 15.2.0
   digest: ""
   ## Specify a imagePullPolicy
   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
@@ -67,7 +67,7 @@ audit:
 ##
 postgresqlSharedPreloadLibraries: "pg_stat_statements, auto_explain"
 ## Start PostgreSQL pod(s) without limitations on shm memory.
-## By default docker and containerd (and possibly other container runtimes) limit `/dev/shm` to `64M`
+## By default, docker and containerd (and possibly other container runtimes) limit `/dev/shm` to `64M`
 ##
 shmVolume:
   ## @param shmVolume.enabled Enable emptyDir volume for /dev/shm for PostgreSQL pod(s)

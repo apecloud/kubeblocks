@@ -190,7 +190,7 @@ func GetExternalAddr(svc *corev1.Service) string {
 			return ingress.IP
 		}
 	}
-	if svc.GetAnnotations()[types.ServiceLBTypeAnnotationKey] != types.ServiceLBTypeAnnotationValue {
+	if svc.GetAnnotations()[types.ServiceHAVIPTypeAnnotationKey] != types.ServiceHAVIPTypeAnnotationValue {
 		return ""
 	}
 	return svc.GetAnnotations()[types.ServiceFloatingIPAnnotationKey]

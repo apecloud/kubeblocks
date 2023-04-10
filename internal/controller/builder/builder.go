@@ -538,6 +538,7 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 func BuildBackupPolicy(sts *appsv1.StatefulSet,
 	template *dataprotectionv1alpha1.BackupPolicyTemplate,
 	backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
+	backupKey.Name = backupKey.Name + "-" + randomString(6)
 	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
 	if err := buildFromCUE("backup_policy_template.cue", map[string]any{
 		"sts":        sts,
@@ -659,7 +660,7 @@ func BuildConfigMapWithTemplate(
 	return &cm, nil
 }
 
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.ConfigManagerParams) (*corev1.Container, error) {
+func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams) (*corev1.Container, error) {
 	const tplFile = "config_manager_sidecar.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {

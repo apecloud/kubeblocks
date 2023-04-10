@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -62,6 +63,7 @@ type OperationsOptions struct {
 	// VerticalScaling options
 	CPU    string `json:"cpu"`
 	Memory string `json:"memory"`
+	Class  string `json:"class"`
 
 	// HorizontalScaling options
 	Replicas int `json:"replicas"`
@@ -98,10 +100,10 @@ func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType appsv
 var (
 	createReconfigureExample = templates.Examples(`
 		# update component params 
-		kbcli cluster configure <cluster-name> --component-name=<component-name> --template-name=<template-name> --configure-file=<configure-file> --set max_connections=1000,general_log=OFF
+		kbcli cluster configure <cluster-name> --component=<component-name> --config-spec=<config-spec-name> --config-file=<config-file> --set max_connections=1000,general_log=OFF
 
 		# update mysql max_connections, cluster name is mycluster
-		kbcli cluster configure mycluster --component-name=mysql --template-name=mysql-3node-tpl --configure-file=my.cnf --set max_connections=2000
+		kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=2000
 	`)
 )
 
@@ -110,11 +112,11 @@ func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
 	if o.HasComponentNamesFlag {
-		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-names", nil, " Component names to this operations")
+		cmd.Flags().StringSliceVar(&o.ComponentNames, "components", nil, " Component names to this operations")
 	}
 }
 
-// CompleteRestartOps when restart a cluster and component-names is null, it means restarting all components of the cluster.
+// CompleteRestartOps when restart a cluster and components is null, it means restarting all components of the cluster.
 // we should set all component names to ComponentNames flag.
 func (o *OperationsOptions) CompleteRestartOps() error {
 	if o.Name == "" {
@@ -123,20 +125,32 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 	if len(o.ComponentNames) != 0 {
 		return nil
 	}
-	unstructuredObj, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	clusterObj, err := cluster.GetClusterByName(o.Dynamic, o.Name, o.Namespace)
 	if err != nil {
 		return err
 	}
-	cluster := appsv1alpha1.Cluster{}
-	err = runtime.DefaultUnstructuredConverter.
-		FromUnstructured(unstructuredObj.UnstructuredContent(), &cluster)
-	if err != nil {
-		return err
-	}
-	componentSpecs := cluster.Spec.ComponentSpecs
+	componentSpecs := clusterObj.Spec.ComponentSpecs
 	o.ComponentNames = make([]string, len(componentSpecs))
 	for i := range componentSpecs {
 		o.ComponentNames[i] = componentSpecs[i].Name
+	}
+	return nil
+}
+
+// CompleteComponentsFlag when components flag is null and the cluster only has one component, should auto complete it.
+func (o *OperationsOptions) CompleteComponentsFlag() error {
+	if o.Name == "" {
+		return makeMissingClusterNameErr()
+	}
+	if len(o.ComponentNames) != 0 {
+		return nil
+	}
+	clusterObj, err := cluster.GetClusterByName(o.Dynamic, o.Name, o.Namespace)
+	if err != nil {
+		return err
+	}
+	if len(clusterObj.Spec.ComponentSpecs) == 1 {
+		o.ComponentNames = []string{clusterObj.Spec.ComponentSpecs[0].Name}
 	}
 	return nil
 }
@@ -150,7 +164,7 @@ func (o *OperationsOptions) validateUpgrade() error {
 
 func (o *OperationsOptions) validateVolumeExpansion() error {
 	if len(o.VCTNames) == 0 {
-		return fmt.Errorf("missing volume-claim-template-names")
+		return fmt.Errorf("missing volume-claim-templates")
 	}
 	if len(o.Storage) == 0 {
 		return fmt.Errorf("missing storage")
@@ -186,14 +200,6 @@ func (o *OperationsOptions) validateReconfiguring() error {
 }
 
 func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConfigSpec) error {
-	transKeyPair := func(pts map[string]string) map[string]interface{} {
-		m := make(map[string]interface{}, len(pts))
-		for key, value := range pts {
-			m[key] = value
-		}
-		return m
-	}
-
 	configConstraintKey := client.ObjectKey{
 		Namespace: "",
 		Name:      tpl.ConfigConstraintRef,
@@ -205,7 +211,7 @@ func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConf
 
 	newConfigData, err := cfgcore.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
 		Key:           o.CfgFile,
-		UpdatedParams: transKeyPair(o.KeyValues),
+		UpdatedParams: cfgcore.FromStringMap(o.KeyValues),
 	}})
 	if err != nil {
 		return err
@@ -278,7 +284,7 @@ func (o *OperationsOptions) validateTemplateParam(tpls []appsv1alpha1.ComponentC
 func (o *OperationsOptions) validateConfigMapKey(tpl *appsv1alpha1.ComponentConfigSpec, componentName string) error {
 	var (
 		cmObj  = corev1.ConfigMap{}
-		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.VolumeName)
+		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.Name)
 	)
 
 	if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
@@ -339,7 +345,7 @@ func (o *OperationsOptions) Validate() error {
 
 	// common validate for componentOps
 	if o.HasComponentNamesFlag && len(o.ComponentNames) == 0 {
-		return fmt.Errorf("missing component-names")
+		return fmt.Errorf(`missing components, please specify the "--components" flag for multi-components cluster`)
 	}
 
 	switch o.OpsType {
@@ -532,7 +538,7 @@ func (o *OperationsOptions) fillExpose() error {
 		if len(cluster.Spec.ComponentSpecs) == 1 {
 			o.ComponentNames = append(o.ComponentNames, cluster.Spec.ComponentSpecs[0].Name)
 		} else {
-			return fmt.Errorf("please specify --component-names")
+			return fmt.Errorf("please specify --components")
 		}
 	}
 
@@ -574,7 +580,7 @@ var restartExample = templates.Examples(`
 		kbcli cluster restart <my-cluster>
 
 		# restart specifies the component, separate with commas when <component-name> more than one
-		kbcli cluster restart <my-cluster> --component-names=<component-name>
+		kbcli cluster restart <my-cluster> --components=<component-name>
 `)
 
 // NewRestartCmd creates a restart command
@@ -612,7 +618,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 var verticalScalingExample = templates.Examples(`
 		# scale the computing resources of specified components, separate with commas when <component-name> more than one
-		kbcli cluster vscale <my-cluster> --component-names=<component-name> --cpu=500m --memory=500Mi 
+		kbcli cluster vscale <my-cluster> --components=<component-name> --cpu=500m --memory=500Mi 
 `)
 
 // NewVerticalScalingCmd creates a vertical scaling command
@@ -622,17 +628,19 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	inputs.Use = "vscale"
 	inputs.Short = "Vertically scale the specified components in the cluster."
 	inputs.Example = verticalScalingExample
+	inputs.Complete = o.CompleteComponentsFlag
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringVar(&o.CPU, "cpu", "", "Requested and limited size of component cpu")
 		cmd.Flags().StringVar(&o.Memory, "memory", "", "Requested and limited size of component memory")
+		cmd.Flags().StringVar(&o.Class, "class", "", "Component class")
 	}
 	return create.BuildCommand(inputs)
 }
 
 var horizontalScalingExample = templates.Examples(`
 		# expand storage resources of specified components, separate with commas when <component-name> more than one
-		kbcli cluster hscale <my-cluster> --component-names=<component-name> --replicas=3
+		kbcli cluster hscale <my-cluster> --components=<component-name> --replicas=3
 `)
 
 // NewHorizontalScalingCmd creates a horizontal scaling command
@@ -642,6 +650,7 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 	inputs.Use = "hscale"
 	inputs.Short = "Horizontally scale the specified components in the cluster."
 	inputs.Example = horizontalScalingExample
+	inputs.Complete = o.CompleteComponentsFlag
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().IntVar(&o.Replicas, "replicas", o.Replicas, "Replicas with the specified components")
@@ -652,8 +661,8 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 
 var volumeExpansionExample = templates.Examples(`
 		# restart specifies the component, separate with commas when <component-name> more than one
-		kbcli cluster volume-expand <my-cluster> --component-names=<component-name> \ 
-  		--volume-claim-template-names=data --storage=10Gi
+		kbcli cluster volume-expand <my-cluster> --components=<component-name> \ 
+  		--volume-claim-templates=data --storage=10Gi
 `)
 
 // NewVolumeExpansionCmd creates a vertical scaling command
@@ -663,9 +672,10 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	inputs.Use = "volume-expand"
 	inputs.Short = "Expand volume with the specified components and volumeClaimTemplates in the cluster."
 	inputs.Example = volumeExpansionExample
+	inputs.Complete = o.CompleteComponentsFlag
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().StringSliceVar(&o.VCTNames, "volume-claim-template-names", nil, "VolumeClaimTemplate names in components (required)")
+		cmd.Flags().StringSliceVarP(&o.VCTNames, "volume-claim-templates", "t", nil, "VolumeClaimTemplate names in components (required)")
 		cmd.Flags().StringVar(&o.Storage, "storage", "", "Volume storage size (required)")
 	}
 	return create.BuildCommand(inputs)
@@ -681,9 +691,9 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-configure'.")
-		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-name", nil, "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
-		cmd.Flags().StringVar(&o.CfgTemplateName, "template-name", "", "Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --template-name=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
-		cmd.Flags().StringVar(&o.CfgFile, "configure-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --configure-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
+		cmd.Flags().StringSliceVar(&o.ComponentNames, "component", nil, "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
+		cmd.Flags().StringVar(&o.CfgTemplateName, "config-spec", "", "Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
+		cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
 	}
 	inputs.Complete = o.fillTemplateArgForReconfiguring
 	return create.BuildCommand(inputs)

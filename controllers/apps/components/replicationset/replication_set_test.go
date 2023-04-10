@@ -136,9 +136,9 @@ var _ = Describe("Replication Component", func() {
 				Expect(sts.Spec.VolumeClaimTemplates).Should(BeEmpty())
 			}
 
-			compDefName := clusterObj.GetComponentDefRefName(testapps.DefaultRedisCompName)
+			compDefName := clusterObj.Spec.GetComponentDefRefName(testapps.DefaultRedisCompName)
 			componentDef := clusterDefObj.GetComponentDefByName(compDefName)
-			component := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
+			component := clusterObj.Spec.GetComponentByName(testapps.DefaultRedisCompName)
 			replicationComponent, err := NewReplicationSet(k8sClient, clusterObj, component, *componentDef)
 			Expect(err).Should(Succeed())
 			var podList []*corev1.Pod

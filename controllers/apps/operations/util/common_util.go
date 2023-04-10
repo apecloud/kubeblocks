@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -61,9 +60,9 @@ func UpdateClusterOpsAnnotations(ctx context.Context,
 }
 
 // PatchOpsRequestReconcileAnnotation patches the reconcile annotation to OpsRequest
-func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, opsRequestName string) error {
+func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, namespace string, opsRequestName string) error {
 	opsRequest := &appsv1alpha1.OpsRequest{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: cluster.Namespace}, opsRequest); err != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: namespace}, opsRequest); err != nil {
 		return err
 	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -71,7 +70,7 @@ func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, 
 		opsRequest.Annotations = map[string]string{}
 	}
 	// because many changes may be triggered within one second, if the accuracy is only seconds, the event may be lost.
-	// so we used RFC3339Nano format.
+	// so use nanoseconds to record the time.
 	opsRequest.Annotations[intctrlutil.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
 	return cli.Patch(ctx, opsRequest, patch)
 }
@@ -113,7 +112,7 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 	// mark annotation for operations
 	var notExistOps = map[string]struct{}{}
 	for _, v := range opsRequestSlice {
-		if err = PatchOpsRequestReconcileAnnotation(ctx, cli, cluster, v.Name); err != nil && !apierrors.IsNotFound(err) {
+		if err = PatchOpsRequestReconcileAnnotation(ctx, cli, cluster.Namespace, v.Name); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 		if apierrors.IsNotFound(err) {
@@ -123,7 +122,7 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 	if len(notExistOps) != 0 {
 		return RemoveClusterInvalidOpsRequestAnnotation(ctx, cli, cluster, opsRequestSlice, notExistOps)
 	}
-	return componentutil.ErrNoOps
+	return nil
 }
 
 // RemoveClusterInvalidOpsRequestAnnotation deletes the OpsRequest annotation in cluster when the OpsRequest not existing.

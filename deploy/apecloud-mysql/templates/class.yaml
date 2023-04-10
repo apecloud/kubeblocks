@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kb.classes.default.apecloud-mysql.mysql
+  labels:
+    class.kubeblocks.io/level: component
+    class.kubeblocks.io/provider: kubeblocks
+    apps.kubeblocks.io/component-def-ref: mysql
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+data:
+  families-20230223162700: |
+    - family: kb-class-family-general
+      template: |
+        cpu: {{ printf "{{ or .cpu 1 }}" }}
+        memory: {{ printf "{{ or .memory 4 }}Gi" }}
+        storage:
+        - name: data
+          size: {{ printf "{{ or .dataStorageSize 10 }}Gi" }}
+        - name: log
+          size: {{ printf "{{ or .logStorageSize 1 }}Gi" }}
+      vars: [cpu, memory, dataStorageSize, logStorageSize]
+      series:
+      - name: {{ printf "general-{{ .cpu }}c{{ .memory }}g" }}
+        classes:
+        - args: [1, 1, 100, 10]
+        - args: [2, 2, 100, 10]
+        - args: [2, 4, 100, 10]
+        - args: [2, 8, 100, 10]
+        - args: [4, 16, 100, 10]
+        - args: [8, 32, 100, 10]
+        - args: [16, 64, 200, 10]
+        - args: [32, 128, 200, 10]
+        - args: [64, 256, 200, 10]
+        - args: [128, 512, 200, 10]
+
+    - family: kb-class-family-memory-optimized
+      template: |
+        cpu: {{ printf "{{ or .cpu 1 }}" }}
+        memory: {{ printf "{{ or .memory 8 }}Gi" }}
+        storage:
+        - name: data
+          size: {{ printf "{{ or .dataStorageSize 10 }}Gi" }}
+        - name: log
+          size: {{ printf "{{ or .logStorageSize 1 }}Gi" }}
+      vars: [cpu, memory, dataStorageSize, logStorageSize]
+      series:
+      - name: {{ printf "mo-{{ .cpu }}c{{ .memory }}g" }}
+        classes:
+        # 1:8
+        - args: [2, 16, 100, 10]
+        - args: [4, 32, 100, 10]
+        - args: [8, 64, 100, 10]
+        - args: [12, 96, 100, 10]
+        - args: [24, 192, 200, 10]
+        - args: [48, 384, 200, 10]
+        # 1:16
+        - args: [2, 32, 100, 10]
+        - args: [4, 64, 100, 10]
+        - args: [8, 128, 100, 10]
+        - args: [16, 256, 100, 10]
+        - args: [32, 512, 200, 10]
+        - args: [48, 768, 200, 10]
+        - args: [64, 1024, 200, 10]

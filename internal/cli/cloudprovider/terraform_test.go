@@ -23,18 +23,21 @@ import (
 
 var _ = Describe("aws cloud provider", func() {
 	const (
-		tfPath              = "../testing/testdata"
+		tfPath              = "./testdata/aws/eks"
 		expectedClusterName = "kb-playground-test"
-		expectedContextName = "arn-kb-playground-test"
 	)
 
 	It("get cluster name from state file", func() {
-		name, err := getOutputValue(clusterNameKey, tfPath)
+		By("get cluster name from state file")
+		vals, err := getOutputValues(tfPath, clusterNameKey)
 		Expect(err).Should(Succeed())
-		Expect(name).Should(Equal(expectedClusterName))
+		Expect(vals).Should(HaveLen(1))
+		Expect(vals).Should(ContainElement(expectedClusterName))
 
-		contextName, err := getOutputValue(contextNameKey, tfPath)
+		By("get unknown key from state file")
+		vals, err = getOutputValues(tfPath, "unknownKey")
 		Expect(err).Should(Succeed())
-		Expect(contextName).Should(Equal(expectedContextName))
+		Expect(vals).ShouldNot(BeEmpty())
+		Expect(vals).Should(ContainElement(""))
 	})
 })

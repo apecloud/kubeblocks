@@ -20,7 +20,6 @@ INSTALL_OH_MYS=${6:-"true"}
 ADD_NON_FREE_PACKAGES=${7:-"false"}
 SCRIPT_DIR="$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)"
 MARKER_FILE="/usr/local/etc/vscode-dev-containers/common"
-# GITHUB_PROXY=${GITHUB_PROXY:-"https://github.91chi.fun/"}
 
 if [ "$(id -u)" -ne 0 ]; then
     echo -e 'Script must be run as root. Use sudo, su, or add "USER root" to your Dockerfile before running this script.'

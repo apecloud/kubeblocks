@@ -138,7 +138,7 @@ const (
 
 type BackupStatusUpdate struct {
 	// specify the json path of backup object for patch.
-	// example: manifests.backupLog -- means patch the backup jon path of status.manifests.backupLog.
+	// example: manifests.backupLog -- means patch the backup json path of status.manifests.backupLog.
 	// +optional
 	Path string `json:"path,omitempty"`
 

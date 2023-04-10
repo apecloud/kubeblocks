@@ -65,7 +65,7 @@ spec:
                       type: string
                     path:
                       description: 'specify the json path of backup object for patch.
-                        example: manifests.backupLog -- means patch the backup jon
+                        example: manifests.backupLog -- means patch the backup json
                         path of status.manifests.backupLog.'
                       type: string
                     script:

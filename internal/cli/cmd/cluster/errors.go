@@ -26,8 +26,13 @@ var (
 
 	multiComponentsErrorMessage     = "when multi component exist, must specify which component to use. Please using --component-name"
 	multiConfigTemplateErrorMessage = "when multi config template exist, must specify which config template to use. Please using --config-spec"
+	multiConfigFileErrorMessage     = "when multi config files exist, must specify which config file to update. Please using --config-file"
 
 	notFoundValidConfigTemplateErrorMessage = "not find valid config template, component[name=%s] in the cluster[name=%s]"
+
+	notFoundConfigSpecErrorMessage = "not find config spec[%s], component[name=%s] in the cluster[name=%s]"
+
+	notFoundConfigFileErrorMessage = "not find config file, file[name=%s] in the configspec[name=%s], all configfiles: %v"
 
 	notCueSchemaPrompt            = "The config template not define cue schema and parameter explain info cannot be generated."
 	cue2openAPISchemaFailedPrompt = "The cue schema may not satisfy the conversion constraints of openAPISchema and parameter explain info cannot be generated."
@@ -42,8 +47,16 @@ func makeComponentNotExistErr(clusterName, component string) error {
 	return cfgcore.MakeError(componentNotExistErrMessage, clusterName, component)
 }
 
+func makeConfigSpecNotExistErr(clusterName, component, configSpec string) error {
+	return cfgcore.MakeError(notFoundConfigSpecErrorMessage, configSpec, component, clusterName)
+}
+
 func makeNotFoundTemplateErr(clusterName, component string) error {
 	return cfgcore.MakeError(notFoundValidConfigTemplateErrorMessage, clusterName, component)
+}
+
+func makeNotFoundConfigFileErr(configFile, configSpec string, all []string) error {
+	return cfgcore.MakeError(notFoundConfigFileErrorMessage, configFile, configSpec, all)
 }
 
 func makeMissingClusterNameErr() error {

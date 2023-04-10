@@ -217,7 +217,7 @@ func (r *reconfigureOptions) syncClusterComponent() error {
 		return nil
 	}
 
-	componentNames, err := util.GetComponentsFromClusterCR(client.ObjectKey{
+	componentNames, err := util.GetComponentsFromClusterName(client.ObjectKey{
 		Namespace: r.namespace,
 		Name:      r.clusterName,
 	}, r.dynamic)

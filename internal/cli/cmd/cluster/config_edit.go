@@ -1,0 +1,173 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cluster
+
+import (
+	"fmt"
+
+	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util/editor"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"k8s.io/kubectl/pkg/util/templates"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+)
+
+type editConfigOptions struct {
+	configOpsOptions
+
+	// config file replace
+	replaceFile bool
+}
+
+var editConfigExample = templates.Examples(`
+		# edit config for component 
+		kbcli cluster edit-config <cluster-name> [--component=<component-name>] [--config-spec=<config-spec-name>] [--config-file=<config-file>] 
+
+		# update mysql max_connections, cluster name is mycluster
+		kbcli cluster edit-config mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf 
+	`)
+
+func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error) error {
+	wrapper := o.wrapper
+	cfgEditContext := newConfigContext(o.BaseOptions, o.Name, wrapper.ComponentName(), wrapper.ConfigSpecName(), wrapper.ConfigFile())
+	if err := cfgEditContext.prepare(); err != nil {
+		return err
+	}
+
+	editor := editor.NewDefaultEditor([]string{
+		"KUBE_EDITOR",
+		"EDITOR",
+	})
+	if err := cfgEditContext.editConfig(editor); err != nil {
+		return err
+	}
+
+	diff, err := cfgEditContext.getUnifiedDiffString()
+	if err != nil {
+		return err
+	}
+	if diff == "" {
+		fmt.Println("Edit cancelled, no changes made.")
+		return nil
+	}
+
+	displayDiffWithColor(o.IOStreams.Out, diff)
+
+	oldVersion := map[string]string{
+		o.CfgFile: cfgEditContext.getOriginal(),
+	}
+	newVersion := map[string]string{
+		o.CfgFile: cfgEditContext.getEdited(),
+	}
+
+	configSpec := wrapper.ConfigSpec()
+	configConstraintKey := client.ObjectKey{
+		Namespace: "",
+		Name:      configSpec.ConfigConstraintRef,
+	}
+	configConstraint := appsv1alpha1.ConfigConstraint{}
+	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), configConstraintKey, o.Dynamic, &configConstraint); err != nil {
+		return err
+	}
+	formatterConfig := configConstraint.Spec.FormatterConfig
+	if formatterConfig == nil {
+		return cfgcore.MakeError("config spec[%s] not support reconfigure!", wrapper.ConfigSpecName())
+	}
+	configPatch, _, err := cfgcore.CreateConfigPatch(oldVersion, newVersion, formatterConfig.Format, configSpec.Keys, false)
+	if err != nil {
+		return err
+	}
+	if !configPatch.IsModify {
+		fmt.Println("no parameters changes made.")
+		return nil
+	}
+
+	fmt.Fprintf(o.IOStreams.Out, "\nconfig patch: %s\n", string(configPatch.UpdateConfig[o.CfgFile]))
+
+	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(&configConstraint.Spec, configPatch)
+	if err != nil {
+		return nil
+	}
+	if dynamicUpdated {
+		return nil
+	}
+	if err := o.confirmReconfigureWithRestart(); err != nil {
+		return err
+	}
+
+	return fn(configPatch, &configConstraint.Spec)
+}
+
+// NewEditConfigureCmd shows the difference between two configuration version.
+func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	editOptions := &editConfigOptions{
+		configOpsOptions: configOpsOptions{
+			editMode:          true,
+			OperationsOptions: newBaseOperationsOptions(streams, appsv1alpha1.ReconfiguringType, false),
+		}}
+	inputs := buildOperationsInputs(f, editOptions.OperationsOptions)
+	inputs.Use = "edit-config"
+	inputs.Short = "Edit config file for component."
+	inputs.Example = editConfigExample
+	inputs.BuildFlags = func(cmd *cobra.Command) {
+		editOptions.buildReconfigureCommonFlags(cmd)
+		cmd.Flags().BoolVar(&editOptions.replaceFile, "replace", false, "Specify whether to replace the config file. Default to false.")
+	}
+	inputs.Complete = editOptions.Complete
+	inputs.Validate = editOptions.Validate
+
+	cmd := &cobra.Command{
+		Use:     inputs.Use,
+		Short:   inputs.Short,
+		Example: inputs.Example,
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
+			util.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
+			util.CheckErr(editOptions.Run(func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error {
+				// generate patch for config
+				formatterConfig := cc.FormatterConfig
+				params := cfgcore.GenerateVisualizedParamsList(info, formatterConfig, nil)
+				editOptions.KeyValues = fromKeyValuesToMap(params, editOptions.CfgFile)
+				return inputs.BaseOptionsObj.Run(inputs)
+			}))
+		},
+	}
+	if inputs.BuildFlags != nil {
+		inputs.BuildFlags(cmd)
+	}
+	return cmd
+}
+
+func fromKeyValuesToMap(params []cfgcore.VisualizedParam, file string) map[string]string {
+	result := make(map[string]string)
+	for _, param := range params {
+		if param.Key != file {
+			continue
+		}
+		for _, kv := range param.Parameters {
+			result[kv.Key] = kv.Value
+		}
+	}
+	return result
+}

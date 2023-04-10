@@ -29,17 +29,13 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-func NewFakeOperationsOptions(ns, cName string, opsType appsv1alpha1.OpsType, objs ...runtime.Object) (*cmdtesting.TestFactory, *OperationsOptions) {
+func NewFakeOperationsOptions(ns, cName string, opsType appsv1alpha1.OpsType, objs ...runtime.Object) (*cmdtesting.TestFactory, *create.BaseOptions) {
 	streams, _, _, _ := genericclioptions.NewTestIOStreams()
 	tf := cmdtesting.NewTestFactory().WithNamespace(ns)
-	o := &OperationsOptions{
-		BaseOptions: create.BaseOptions{
-			IOStreams: streams,
-			Name:      cName,
-			Namespace: ns,
-		},
-		TTLSecondsAfterSucceed: 30,
-		OpsType:                opsType,
+	baseOptions := &create.BaseOptions{
+		IOStreams: streams,
+		Name:      cName,
+		Namespace: ns,
 	}
 
 	err := appsv1alpha1.AddToScheme(scheme.Scheme)
@@ -57,6 +53,6 @@ func NewFakeOperationsOptions(ns, cName string, opsType appsv1alpha1.OpsType, ob
 		types.RestoreJobGVR():       types.KindRestoreJob + "List",
 		types.OpsGVR():              types.KindOps + "List",
 	}
-	o.Dynamic = dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, listMapping, objs...)
-	return tf, o
+	baseOptions.Dynamic = dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, listMapping, objs...)
+	return tf, baseOptions
 }

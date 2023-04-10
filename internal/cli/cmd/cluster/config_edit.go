@@ -18,12 +18,17 @@ package cluster
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -99,22 +104,48 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		return err
 	}
 	if !configPatch.IsModify {
-		fmt.Println("no parameters changes made.")
+		fmt.Println("No parameters changes made.")
 		return nil
 	}
 
-	fmt.Fprintf(o.IOStreams.Out, "config patch: %s\n\n", string(configPatch.UpdateConfig[o.CfgFile]))
+	fmt.Fprintf(o.Out, "Config patch(updated parameters): \n%s\n\n", string(configPatch.UpdateConfig[o.CfgFile]))
 
 	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(&configConstraint.Spec, configPatch)
 	if err != nil {
 		return nil
 	}
+
+	confirmPrompt := confirmApplyReconfigurePrompt
 	if !dynamicUpdated {
-		if err := o.confirmReconfigureWithRestart(); err != nil {
-			return err
-		}
+		confirmPrompt = restartConfirmPrompt
+	}
+	yes, err := o.confirmReconfigure(confirmPrompt)
+	if err != nil {
+		return err
+	}
+	if !yes {
+		return nil
 	}
 	return fn(configPatch, &configConstraint.Spec)
+}
+
+func (o *editConfigOptions) confirmReconfigure(promptStr string) (bool, error) {
+	const yesStr = "yes"
+	const noStr = "no"
+
+	confirmStr := []string{yesStr, noStr}
+	printer.Warning(o.Out, promptStr)
+	input, err := prompt.NewPrompt("Please type [yes/No] to confirm:",
+		func(input string) error {
+			if !slices.Contains(confirmStr, strings.ToLower(input)) {
+				return fmt.Errorf("typed \"%s\" does not match \"%s\"", input, confirmStr)
+			}
+			return nil
+		}, o.In).Run()
+	if err != nil {
+		return false, err
+	}
+	return strings.ToLower(input) == yesStr, nil
 }
 
 // NewEditConfigureCmd shows the difference between two configuration version.

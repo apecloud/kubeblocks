@@ -92,7 +92,7 @@ type MemoryConstraint struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:categories={kubeblocks,all},scope=Cluster,shortName=cf
+// +kubebuilder:resource:categories={kubeblocks,all},scope=Cluster,shortName=crc
 
 // ComponentResourceConstraint is the Schema for the componentresourceconstraints API
 type ComponentResourceConstraint struct {

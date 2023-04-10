@@ -75,6 +75,7 @@ const (
 	ResourceComponentResourceConstraint = "componentresourceconstraints"
 	ResourceComponentClassDefinition    = "componentclassdefinitions"
 	KindCluster                         = "Cluster"
+	KindComponentClassDefinition        = "ComponentClassDefinition"
 	KindClusterDef                      = "ClusterDefinition"
 	KindClusterVersion                  = "ClusterVersion"
 	KindConfigConstraint                = "ConfigConstraint"

@@ -211,7 +211,12 @@ func (o *CreateOptions) run() error {
 			return err
 		}
 	} else {
+		gvr := types.ComponentClassDefinitionGVR()
 		classDefinition = v1alpha1.ComponentClassDefinition{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       types.KindComponentClassDefinition,
+				APIVersion: gvr.Group + "/" + gvr.Version,
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: class.GetCustomClassObjectName(o.ClusterDefRef, o.ComponentType),
 				Labels: map[string]string{
@@ -233,7 +238,7 @@ func (o *CreateOptions) run() error {
 			return err
 		}
 	}
-	_, _ = fmt.Fprintf(o.Out, "Successfully created class [%s].", strings.Join(classNames, ","))
+	_, _ = fmt.Fprintf(o.Out, "Successfully created class [%s].\n", strings.Join(classNames, ","))
 	return nil
 }
 

@@ -24,8 +24,8 @@ import (
 // MigrationTemplateSpec defines the desired state of MigrationTemplate
 type MigrationTemplateSpec struct {
 	TaskType       []TaskTypeEnum      `json:"taskType,omitempty"`
-	Source         DbTypeSupport       `json:"source"`
-	Sink           DbTypeSupport       `json:"target"`
+	Source         DBTypeSupport       `json:"source"`
+	Sink           DBTypeSupport       `json:"target"`
 	Initialization InitializationModel `json:"initialization,omitempty"`
 	Cdc            CdcModel            `json:"cdc,omitempty"`
 	// +optional
@@ -34,9 +34,9 @@ type MigrationTemplateSpec struct {
 	Decorator string `json:"decorator,omitempty"`
 }
 
-type DbTypeSupport struct {
-	DbType    DbTypeEnum `json:"dbType"`
-	DbVersion string     `json:"dbVersion"`
+type DBTypeSupport struct {
+	DBType    DBTypeEnum `json:"dbType"`
+	DBVersion string     `json:"dbVersion"`
 }
 
 type InitializationModel struct {

@@ -100,7 +100,7 @@ var _ = Describe("create", func() {
 		})
 
 		It("Steps", func() {
-			o.Steps = make([]string, 0, 0)
+			o.Steps = make([]string, 0)
 			err = o.BuildWithSteps(&errMsgArr)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(o.TaskType).Should(Equal(InitializationAndCdc.String()))

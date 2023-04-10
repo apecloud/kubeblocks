@@ -148,11 +148,11 @@ func (o *LogsOptions) getMigrationObjects(taskName string) (*migrationv1.Migrati
 	}
 	var err error
 	taskGvr := types.MigrationTaskGVR()
-	if err = ApiResource(&o.Dynamic, &taskGvr, taskName, o.logOptions.Namespace, obj.Task); err != nil {
+	if err = APIResource(&o.Dynamic, &taskGvr, taskName, o.logOptions.Namespace, obj.Task); err != nil {
 		return nil, err
 	}
 	templateGvr := types.MigrationTemplateGVR()
-	if err = ApiResource(&o.Dynamic, &templateGvr, obj.Task.Spec.Template, "", obj.Template); err != nil {
+	if err = APIResource(&o.Dynamic, &templateGvr, obj.Task.Spec.Template, "", obj.Template); err != nil {
 		return nil, err
 	}
 	listOpts := func() metav1.ListOptions {

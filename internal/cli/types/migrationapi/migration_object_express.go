@@ -17,12 +17,12 @@ limitations under the License.
 package v1alpha1
 
 type MigrationObjectExpress struct {
-	WhiteList []DbObjectExpress `json:"whiteList"`
+	WhiteList []DBObjectExpress `json:"whiteList"`
 	// +optional
-	BlackList []DbObjectExpress `json:"blackList"`
+	BlackList []DBObjectExpress `json:"blackList"`
 }
 
-type DbObjectExpress struct {
+type DBObjectExpress struct {
 	SchemaName string `json:"schemaName"`
 	// +optional
 	SchemaMappingName string `json:"schemaMappingName"`

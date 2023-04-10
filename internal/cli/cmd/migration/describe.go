@@ -145,11 +145,11 @@ func getMigrationObjects(o *describeOptions, taskName string) (*v1alpha1.Migrati
 	}
 	var err error
 	taskGvr := types.MigrationTaskGVR()
-	if err = ApiResource(&o.dynamic, &taskGvr, taskName, o.namespace, obj.Task); err != nil {
+	if err = APIResource(&o.dynamic, &taskGvr, taskName, o.namespace, obj.Task); err != nil {
 		return nil, err
 	}
 	templateGvr := types.MigrationTemplateGVR()
-	if err = ApiResource(&o.dynamic, &templateGvr, obj.Task.Spec.Template, "", obj.Template); err != nil {
+	if err = APIResource(&o.dynamic, &templateGvr, obj.Task.Spec.Template, "", obj.Template); err != nil {
 		return nil, err
 	}
 	listOpts := func() metav1.ListOptions {

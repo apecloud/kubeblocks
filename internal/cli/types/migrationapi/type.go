@@ -24,17 +24,17 @@ import (
 	"strings"
 )
 
-// DbTypeEnum defines the MigrationTemplate CR .spec.Source.DbType or .spec.Sink.DbType
+// DBTypeEnum defines the MigrationTemplate CR .spec.Source.DbType or .spec.Sink.DbType
 // +enum
 // +kubebuilder:validation:Enum={MySQL, PostgreSQL}
-type DbTypeEnum string
+type DBTypeEnum string
 
 const (
-	MYSQL      DbTypeEnum = "MySQL" // default value
-	POSTGRESQL DbTypeEnum = "PostgreSQL"
+	MYSQL      DBTypeEnum = "MySQL" // default value
+	POSTGRESQL DBTypeEnum = "PostgreSQL"
 )
 
-func (d DbTypeEnum) String() string {
+func (d DBTypeEnum) String() string {
 	return string(d)
 }
 

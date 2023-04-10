@@ -38,24 +38,24 @@ func (e *EndpointModel) BuildFromStr(msgArr *[]string, endpointStr string) error
 	}
 	e.clear()
 	endpointStr = strings.TrimSpace(endpointStr)
-	accountUrlPair := strings.Split(endpointStr, "@")
-	if len(accountUrlPair) != 2 {
+	accountURLPair := strings.Split(endpointStr, "@")
+	if len(accountURLPair) != 2 {
 		BuildErrorMsg(msgArr, "endpoint maybe does not contain account info")
 		return nil
 	}
-	accountPair := strings.Split(accountUrlPair[0], ":")
+	accountPair := strings.Split(accountURLPair[0], ":")
 	if len(accountPair) != 2 {
 		BuildErrorMsg(msgArr, "the account info in endpoint is invalid, should be like \"user:123456\"")
 		return nil
 	}
 	e.UserName = accountPair[0]
 	e.Password = accountPair[1]
-	if strings.LastIndex(accountUrlPair[1], "/") != -1 {
-		addressDatabasePair := strings.Split(accountUrlPair[1], "/")
+	if strings.LastIndex(accountURLPair[1], "/") != -1 {
+		addressDatabasePair := strings.Split(accountURLPair[1], "/")
 		e.Address = strings.Join(addressDatabasePair[:len(addressDatabasePair)-1], "/")
 		e.Database = addressDatabasePair[len(addressDatabasePair)-1]
 	} else {
-		e.Address = accountUrlPair[1]
+		e.Address = accountURLPair[1]
 	}
 	return nil
 }
@@ -70,10 +70,10 @@ func (e *EndpointModel) clear() {
 // Migration Object
 
 type MigrationObjectModel struct {
-	WhiteList []DbObjectExpress `json:"whiteList"`
+	WhiteList []DBObjectExpress `json:"whiteList"`
 }
 
-type DbObjectExpress struct {
+type DBObjectExpress struct {
 	SchemaName string `json:"schemaName"`
 	// +optional
 	IsAll bool `json:"isAll"`
@@ -106,7 +106,7 @@ func (m *MigrationObjectModel) BuildFromStrs(errMsgArr *[]string, objStrs []stri
 			return nil
 		}
 		if len(dbTablePair) == 1 {
-			m.WhiteList = append(m.WhiteList, DbObjectExpress{
+			m.WhiteList = append(m.WhiteList, DBObjectExpress{
 				SchemaName: str,
 				IsAll:      true,
 			})
@@ -121,7 +121,7 @@ func (m *MigrationObjectModel) BuildFromStrs(errMsgArr *[]string, objStrs []stri
 					IsAll:     true,
 				})
 			} else {
-				m.WhiteList = append(m.WhiteList, DbObjectExpress{
+				m.WhiteList = append(m.WhiteList, DBObjectExpress{
 					SchemaName: dbTablePair[0],
 					TableList: []TableObjectExpress{{
 						TableName: dbTablePair[1],
@@ -134,7 +134,7 @@ func (m *MigrationObjectModel) BuildFromStrs(errMsgArr *[]string, objStrs []stri
 	return nil
 }
 
-func (m *MigrationObjectModel) ContainSchema(schemaName string) (*DbObjectExpress, error) {
+func (m *MigrationObjectModel) ContainSchema(schemaName string) (*DBObjectExpress, error) {
 	for i := 0; i < len(m.WhiteList); i++ {
 		if m.WhiteList[i].SchemaName == schemaName {
 			return &m.WhiteList[i], nil
@@ -170,13 +170,13 @@ func (s TaskTypeEnum) String() string {
 
 func IsMigrationCrdValidWithDynamic(dynamic *dynamic.Interface) (bool, error) {
 	resource := types.CustomResourceDefinitionGVR()
-	if err := ApiResource(dynamic, &resource, "migrationtasks.datamigration.apecloud.io", "", nil); err != nil {
+	if err := APIResource(dynamic, &resource, "migrationtasks.datamigration.apecloud.io", "", nil); err != nil {
 		return false, err
 	}
-	if err := ApiResource(dynamic, &resource, "migrationtemplates.datamigration.apecloud.io", "", nil); err != nil {
+	if err := APIResource(dynamic, &resource, "migrationtemplates.datamigration.apecloud.io", "", nil); err != nil {
 		return false, err
 	}
-	if err := ApiResource(dynamic, &resource, "serialjobs.common.apecloud.io", "", nil); err != nil {
+	if err := APIResource(dynamic, &resource, "serialjobs.common.apecloud.io", "", nil); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -190,7 +190,7 @@ func IsMigrationCrdValidWithFactory(factory *cmdutil.Factory) (bool, error) {
 	return IsMigrationCrdValidWithDynamic(&dymatic)
 }
 
-func ApiResource(dynamic *dynamic.Interface, resource *schema.GroupVersionResource, name string, namespace string, res interface{}) error {
+func APIResource(dynamic *dynamic.Interface, resource *schema.GroupVersionResource, name string, namespace string, res interface{}) error {
 	obj, err := (*dynamic).Resource(*resource).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{}, "")
 	if err != nil {
 		return err

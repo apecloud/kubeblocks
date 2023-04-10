@@ -131,8 +131,8 @@ const (
 
 // Crd Api group
 const (
-	CustomResourceDefinitionApiGroup   = "apiextensions.k8s.io"
-	CustomResourceDefinitionApiVersion = "v1"
+	CustomResourceDefinitionAPIGroup   = "apiextensions.k8s.io"
+	CustomResourceDefinitionAPIVersion = "v1"
 	ResourceCustomResourceDefinition   = "customresourcedefinitions"
 )
 
@@ -318,8 +318,8 @@ func MigrationTemplateGVR() schema.GroupVersionResource {
 
 func CustomResourceDefinitionGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{
-		Group:    CustomResourceDefinitionApiGroup,
-		Version:  CustomResourceDefinitionApiVersion,
+		Group:    CustomResourceDefinitionAPIGroup,
+		Version:  CustomResourceDefinitionAPIVersion,
 		Resource: ResourceCustomResourceDefinition,
 	}
 }

@@ -208,7 +208,7 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 
 func (o *CreateOptions) Validate() error {
 	if o.ClusterDefRef == "" {
-		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli cluster-definition list\" to show all cluster definition")
+		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli clusterdefinition list\" to show all cluster definition")
 	}
 
 	if o.TerminationPolicy == "" {

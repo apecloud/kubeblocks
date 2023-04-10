@@ -56,7 +56,7 @@ func NewListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 			util.CheckErr(o.run())
 		},
 	}
-	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cluster-definition list\" to show all available cluster definition")
+	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli clusterdefinition list\" to show all available cluster definition")
 	util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
 	return cmd
 }

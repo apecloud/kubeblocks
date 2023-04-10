@@ -157,7 +157,7 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		}}
 	inputs := buildOperationsInputs(f, editOptions.OperationsOptions)
 	inputs.Use = "edit-config"
-	inputs.Short = "Edit config file for component."
+	inputs.Short = "Edit the config file of the component."
 	inputs.Example = editConfigExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		editOptions.buildReconfigureCommonFlags(cmd)
@@ -186,17 +186,4 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		inputs.BuildFlags(cmd)
 	}
 	return cmd
-}
-
-func fromKeyValuesToMap(params []cfgcore.VisualizedParam, file string) map[string]string {
-	result := make(map[string]string)
-	for _, param := range params {
-		if param.Key != file {
-			continue
-		}
-		for _, kv := range param.Parameters {
-			result[kv.Key] = kv.Value
-		}
-	}
-	return result
 }

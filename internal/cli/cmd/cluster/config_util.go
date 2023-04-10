@@ -121,3 +121,16 @@ func displayDiffWithColor(out io.Writer, diffText string) {
 		fmt.Fprint(out, line)
 	}
 }
+
+func fromKeyValuesToMap(params []cfgcore.VisualizedParam, file string) map[string]string {
+	result := make(map[string]string)
+	for _, param := range params {
+		if param.Key != file {
+			continue
+		}
+		for _, kv := range param.Parameters {
+			result[kv.Key] = kv.Value
+		}
+	}
+	return result
+}

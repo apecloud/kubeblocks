@@ -61,6 +61,7 @@ spec:
             port: 6379
             targetPort: redis
           - name: metrics
+            port: 9121
             targetPort: metrics
       configSpecs:
         - name: redis-replication-config

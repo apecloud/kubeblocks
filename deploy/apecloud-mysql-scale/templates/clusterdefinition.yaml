@@ -54,6 +54,9 @@ spec:
         followers:
           - name: follower
             accessMode: Readonly
+        learner:
+          name: learner
+          accessMode: Readonly
       service:
         ports:
           - name: mysql

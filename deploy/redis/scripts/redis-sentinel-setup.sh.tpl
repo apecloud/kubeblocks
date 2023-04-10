@@ -12,8 +12,10 @@ set -ex
     {{- $sentinel_component = $e }}
   {{- else if eq $e.componentDefRef "redis" }}
     {{- $redis_component = $e }}
-    {{- if ne ($e.primaryIndex | int) 0 }}
-      {{- $primary_index = ($e.primaryIndex | int) }}
+    {{- if index $e "primaryIndex" }}
+        {{- if ne ($e.primaryIndex | int) 0 }}
+          {{- $primary_index = ($e.primaryIndex | int) }}
+        {{- end }}
     {{- end }}
   {{- end }}
 {{- end }}

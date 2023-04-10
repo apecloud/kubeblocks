@@ -38,6 +38,33 @@ spec:
           spec:
             description: BackupPolicyTemplateSpec defines the desired state of BackupPolicyTemplate
             properties:
+              backupStatusUpdates:
+                description: define how to update metadata for backup status.
+                items:
+                  properties:
+                    containerName:
+                      description: which container name that kubectl can execute.
+                      type: string
+                    path:
+                      description: 'specify the json path of backup object for patch.
+                        example: manifests.backupLog -- means patch the backup json
+                        path of status.manifests.backupLog.'
+                      type: string
+                    script:
+                      description: the shell Script commands to collect backup status
+                        metadata. The script must exist in the container of ContainerName
+                        and the output format must be set to JSON. Note that outputting
+                        to stderr may cause the result format to not be in JSON.
+                      type: string
+                    updateStage:
+                      description: 'when to update the backup status, pre: before
+                        backup, post: after backup'
+                      enum:
+                      - pre
+                      - post
+                      type: string
+                  type: object
+                type: array
               backupToolName:
                 description: which backup tool to perform database backup, only support
                   one tool.

@@ -705,3 +705,20 @@ func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secre
 	}
 	return secret, nil
 }
+
+func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) (*batchv1.Job, error) {
+	const tplFile = "backup_manifests_template.cue"
+
+	job := &batchv1.Job{}
+	if err := buildFromCUE(tplFile,
+		map[string]any{
+			"job.metadata.name":      key.Name,
+			"job.metadata.namespace": key.Namespace,
+			"backup":                 backup,
+			"podSpec":                podSpec,
+		},
+		"job", job); err != nil {
+		return nil, err
+	}
+	return job, nil
+}

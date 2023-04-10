@@ -47,6 +47,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	ctrlbuilder "github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -209,6 +210,9 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		if !isOK {
 			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 		}
+		if err = r.createUpdatesJobs(reqCtx, backup, dataprotectionv1alpha1.PRE); err != nil {
+			r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPreUpdatesJob", err.Error())
+		}
 		if err = r.createVolumeSnapshot(reqCtx, backup); err != nil {
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
@@ -229,6 +233,11 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		}
 		if !isOK {
 			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+		}
+
+		// Failure MetadataCollectionJob does not affect the backup status.
+		if err = r.createUpdatesJobs(reqCtx, backup, dataprotectionv1alpha1.POST); err != nil {
+			r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPostUpdatesJob", err.Error())
 		}
 
 		backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
@@ -452,7 +461,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		}
 
 		reqCtx.Log.V(1).Info("create a volumeSnapshot from backup", "snapshot", snap.Name)
-		if err := r.Client.Create(reqCtx.Ctx, snap); err != nil {
+		if err = r.Client.Create(reqCtx.Ctx, snap); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
@@ -481,6 +490,54 @@ func (r *BackupReconciler) ensureVolumeSnapshotReady(reqCtx intctrlutil.RequestC
 	}
 
 	return ready, nil
+}
+
+func (r *BackupReconciler) createUpdatesJobs(reqCtx intctrlutil.RequestCtx,
+	backup *dataprotectionv1alpha1.Backup, stage dataprotectionv1alpha1.BackupStatusUpdateStage) error {
+	// get backup policy
+	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+	backupPolicyNameSpaceName := types.NamespacedName{
+		Namespace: reqCtx.Req.Namespace,
+		Name:      backup.Spec.BackupPolicyName,
+	}
+	if err := r.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
+		reqCtx.Log.V(1).Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
+		return err
+	}
+	for _, update := range backupPolicy.Spec.BackupStatusUpdates {
+		if update.UpdateStage != stage {
+			continue
+		}
+		if err := r.createMetadataCollectionJob(reqCtx, backup, update); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.RequestCtx,
+	backup *dataprotectionv1alpha1.Backup, updateInfo dataprotectionv1alpha1.BackupStatusUpdate) error {
+	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-" + strings.ToLower(updateInfo.Path)}
+	job := &batchv1.Job{}
+	// check if job is created
+	if exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, job); err != nil {
+		return err
+	} else if exists {
+		return nil
+	}
+
+	// build job and create
+	jobPodSpec, err := r.buildMetadataCollectionPodSpec(reqCtx, backup, updateInfo)
+	if err != nil {
+		return err
+	}
+	if job, err = ctrlbuilder.BuildBackupManifestsJob(key, backup, &jobPodSpec); err != nil {
+		return err
+	}
+	msg := fmt.Sprintf("creating job %s", key.Name)
+	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatingJob-"+key.Name, msg)
+	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))
 }
 
 func (r *BackupReconciler) createBackupToolJob(
@@ -594,6 +651,7 @@ func (r *BackupReconciler) createBatchV1Job(
 	backup *dataprotectionv1alpha1.Backup,
 	templatePodSpec corev1.PodSpec) error {
 
+	backOffLimit := int32(3)
 	job := &batchv1.Job{
 		// TypeMeta:   metav1.TypeMeta{Kind: "Job", APIVersion: "batch/v1"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -608,15 +666,13 @@ func (r *BackupReconciler) createBatchV1Job(
 					Name:      key.Name},
 				Spec: templatePodSpec,
 			},
+			BackoffLimit: &backOffLimit,
 		},
 	}
 	controllerutil.AddFinalizer(job, dataProtectionFinalizerName)
 
 	reqCtx.Log.V(1).Info("create a built-in job from backup", "job", job)
-	if err := r.Client.Create(reqCtx.Ctx, job); err != nil {
-		return err
-	}
-	return nil
+	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))
 }
 
 func (r *BackupReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) (*batchv1.Job, error) {
@@ -937,20 +993,82 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 
+	if err = addTolerations(&podSpec); err != nil {
+		return podSpec, err
+	}
+
+	return podSpec, nil
+}
+
+func generateJSON(path string, value string) string {
+	segments := strings.Split(path, ".")
+	jsonString := value
+	for i := len(segments) - 1; i >= 0; i-- {
+		jsonString = fmt.Sprintf(`{\"%s\":%s}`, segments[i], jsonString)
+	}
+	return jsonString
+}
+
+func addTolerations(podSpec *corev1.PodSpec) (err error) {
 	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
 		if err = json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
-			return podSpec, err
+			return err
 		}
 	}
 	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
 		if err = json.Unmarshal([]byte(cmAffinity), &podSpec.Affinity); err != nil {
-			return podSpec, err
+			return err
 		}
 	}
 	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
 		if err = json.Unmarshal([]byte(cmNodeSelector), &podSpec.NodeSelector); err != nil {
-			return podSpec, err
+			return err
 		}
+	}
+	return nil
+}
+
+func (r *BackupReconciler) buildMetadataCollectionPodSpec(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dataprotectionv1alpha1.Backup,
+	updateInfo dataprotectionv1alpha1.BackupStatusUpdate) (corev1.PodSpec, error) {
+	podSpec := corev1.PodSpec{}
+	logger := reqCtx.Log
+
+	// get backup policy
+	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+	backupPolicyNameSpaceName := types.NamespacedName{
+		Namespace: reqCtx.Req.Namespace,
+		Name:      backup.Spec.BackupPolicyName,
+	}
+
+	if err := r.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
+		logger.Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
+		return podSpec, err
+	}
+	targetPod, err := r.getTargetPod(reqCtx, backup, backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
+	if err != nil {
+		return podSpec, err
+	}
+
+	container := corev1.Container{}
+	container.Name = backup.Name
+	container.Command = []string{"sh", "-c"}
+	args := "set -o errexit; set -o nounset;" +
+		"OUTPUT=$(kubectl -n %s exec -it pod/%s -c %s -- %s);" +
+		"kubectl -n %s patch backup %s --subresource=status --type=merge --patch \"%s\";"
+	patchJSON := generateJSON("status."+updateInfo.Path, "$OUTPUT")
+	args = fmt.Sprintf(args, targetPod.Namespace, targetPod.Name, updateInfo.ContainerName,
+		updateInfo.Script, backup.Namespace, backup.Name, patchJSON)
+	container.Args = []string{args}
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
+	podSpec.Containers = []corev1.Container{container}
+	podSpec.RestartPolicy = corev1.RestartPolicyNever
+	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
+
+	if err = addTolerations(&podSpec); err != nil {
+		return podSpec, err
 	}
 
 	return podSpec, nil

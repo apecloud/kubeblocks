@@ -1,73 +1,71 @@
 ---
 title: Configure cluster parameters
 description: Configure cluster parameters
+keywords: [parameter, configuration, reconfiguration]
 sidebar_position: 1
 ---
 
 # Configure cluster parameters
 
-The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter change interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
+The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
 
 ## Before you start
 
 1. Install KubeBlocks. For details, refer to [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md). 
 2. Create a MySQL standalone and wait until the cluster status is Running.
 
-## View the parameter information
+## View parameter information
 
-1. Run the command below to search for parameter information.
-   
+View the current configuration file of a cluster.
+```bash
+kbcli cluster describe-config mysql-cluster
+>
+ConfigSpecs Meta:
+CONFIG-SPEC-NAME            FILE     ENABLED   TEMPLATE                   CONSTRAINT                    RENDERED                                  COMPONENT   CLUSTER                
+mysql-consensusset-config   my.cnf   true      mysql8.0-config-template   mysql8.0-config-constraints   mysql-cluster-mysql-mysql-config          mysql       mysql-cluster   
+```
+
+From the meta information, the cluster `mysql-cluster` has a configuration file named `my.cnf`.
+
+You can also view the details of this configuration file and parameters.
+* View the details of the current configuration file.
+
    ```bash
-   kbcli cluster explain-config mysql-cluster |head -n 20
-   >
-   template meta:
-   ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mysql-cluster
-
-   Parameter Explain:
-   +----------------------------------------------------------+--------------------------------------------+--------+---------+---------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | PARAMETER NAME                                           | ALLOWED VALUES                             | SCOPE  | DYNAMIC | TYPE    | DESCRIPTION                                                                                                                                                                                                                                                                                                                                                                      |
-   +----------------------------------------------------------  +--------------------------------------------+--------+---------+---------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | activate_all_roles_on_login                              | "0","1","OFF", "ON"                         | Global | false   | string  | Automatically set all granted roles as active after the user has authenticated successfully.                                                                                                                                                                                                                                                                                    |
-   | allow-suspicious-udfs                                    | "0","1","OFF","ON"                         | Global | false   | string  | Controls whether user-defined functions that have only an xxx symbol for the main function can be loaded                                                                                                                                                                                                                                                                         |
-   | auto_generate_certs                                      | "0","1","OFF","ON"                         | Global | false   | string  | Controls whether the server autogenerates SSL key and certificate files in the data directory, if they do not already exist.                                                                                                                                                                                                                                                     |
-   | auto_increment_increment                                 | [1-65535]                                  | Global | false   | integer | Intended for use with master-to-master replication, and can be used to control the operation of AUTO_INCREMENT columns                                                                                                                                                                                                                                                           |
-   | auto_increment_offset                                    | [1-65535]                                  | Global | false   | integer | Determines the starting point for the AUTO_INCREMENT column value                                                                                                                                                                                                                                                                                                                |
-   | autocommit                                               | "0","1","OFF","ON"                         | Global | false   | string  | Sets the autocommit mode                                                                                                                                                                                                                                                                                                                                                         |
-   | automatic_sp_privileges                                  | "0","1","OFF","ON"                         | Global | false   | string  | When this variable has a value of 1 (the default), the server automatically grants the EXECUTE and ALTER ROUTINE privileges to the creator of a stored routine, if the user cannot already execute and alter or drop the routine.                                                                                                                                                |
-   | avoid_temporal_upgrade                                   | "0","1","OFF","ON"                         | Global | false   | string  | This variable controls whether ALTER TABLE implicitly upgrades temporal columns found to be in pre-5.6.4 format.                                                                                                                                                                                                                                                                 |
-   | back_log                                                 | [1-65535]                                  | Global | false   | integer | The number of outstanding connection requests MySQL can have                                                                                                                                                                                                                                                                                                                     |
-   | basedir                                                  |                                            | Global | false   | string  | The MySQL installation base directory.                                                                                                                                                                                                                                                                                                                                           |
-   | big_tables                                               | "0","1","OFF","ON"                         | Global | false   | string  |                                                                                                                                                                                                                                                                                                                                                                                  |
-   | bind_address                                             |                                            | Global | false   | string  |                                                                                                                                                                                                                                                                                                                                                                                  |
-   | binlog_cache_size                                        | [4096-18446744073709548000]                | Global | false   | integer | The size of the cache to hold the SQL statements for the binary log during a transaction.
+   kbcli cluster describe-config mysql-cluster --show-detail
    ```
 
-2. View the user guide of a parameter.
-   ```bash
-   kbcli cluster explain-config mysql-cluster --param=innodb_buffer_pool_size
-   template meta:
-      ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mysql-cluster
+* View the parameter description.
+  ```bash
+  kbcli cluster explain-config mysql-cluster |head -n 20
+  ```
 
-   Configure Constraint:
-     Parameter Name:     innodb_buffer_pool_size
-     Allowed Values:     [5242880-18446744073709552000]
-     Scope:              Global
-     Dynamic:            false
-     Type:               integer
-     Description:        The size in bytes of the memory buffer innodb uses to cache data and indexes of its tables  
-    ```
-    * Allowed Values: It defines the valid value of this parameter.
-    * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. As mentioned in [How KubeBlocks configuration works](#how-kubeblocks-configuration-works), there are two different reconfiguration strategies based on the effectiveness type of changed parameters, i.e. **dynamic** and **static**. 
-      * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and you can follow the instructions in [Reconfigure dynamic parameters](#reconfigure-dynamic-parameters).
-      * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and you can follow the instructions in [Reconfigure static parameters](#reconfigure-static-parameters).
-    * Description: It describes the parameter definition.
+* View the user guide of a specified parameter.
+  
+  ```bash
+  kbcli cluster explain-config mysql-cluster --param=innodb_buffer_pool_size
+  template meta:
+    ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mysql-cluster
 
+  Configure Constraint:
+    Parameter Name:     innodb_buffer_pool_size
+    Allowed Values:     [5242880-18446744073709552000]
+    Scope:              Global
+    Dynamic:            false
+    Type:               integer
+    Description:        The size in bytes of the memory buffer innodb uses to cache data and indexes of its tables  
+  ```
+
+  * Allowed Values: It defines the valid value range of this parameter.
+  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. There are two different reconfiguration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**. 
+    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be updated online. Follow the instructions in [Reconfigure dynamic parameters](#reconfigure-dynamic-parameters).
+    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make reconfiguration effective. Follow the instructions in [Reconfigure static parameters](#reconfigure-static-parameters).
+  * Description: It describes the parameter definition.
 
 ## Reconfigure dynamic parameters
 
-Here we take reconfiguring `max_connection` and `beb_buffer_pool_size` as an example.
+The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
 
-1. Run the command to view the current values of `max_connection` and `beb_buffer_pool_size`.
+1. View the current values of `max_connection` and `innodb_buffer_pool_size`.
    ```bash
    kbcli cluster connect mysql-cluster
    ```
@@ -96,13 +94,13 @@ Here we take reconfiguring `max_connection` and `beb_buffer_pool_size` as an exa
 
 2. Adjust the values of `max_connections` and `innodb_buffer_pool_size`.
    ```bash
-   kbcli cluster configure rose15  --set=max_connections=600,innodb_buffer_pool_size=512M
+   kbcli cluster configure mysql-cluster --set=max_connections=600,innodb_buffer_pool_size=512M
    ```
    
    :::note
 
-   Make sure the value you set is within the Allowed Values of this parameters. If you set a value that does not meet the value range, the system prompts an error. For example,
-
+   Make sure the value you set is within the Allowed Values of this parameter. If you set a value that does not meet the value range, the system prompts an error. For example,
+   
    ```bash
    kbcli cluster configure mysql-cluster  --set=max_connections=200,innodb_buffer_pool_size=2097152
    error: failed to validate updated config: [failed to cue template render configure: [mysqld.innodb_buffer_pool_size: invalid value 2097152 (out of bound >=5242880):
@@ -114,10 +112,11 @@ Here we take reconfiguring `max_connection` and `beb_buffer_pool_size` as an exa
    :::
 
 3. Search the status of the parameter reconfiguration.
-   `Status.Progress` shows the overall status of the parameter change and `Conditions` show the details.
+   
+   `Status.Progress` shows the overall status of the parameter reconfiguration and `Conditions` show the details.
 
    ```bash
-   kbcli cluster describe-ops mysql-cluster-reconfiguring-z2wvn
+   kbcli cluster describe-ops mysql-cluster-reconfiguring-z2wvn -n default
    >
    Spec:
      Name: mysql-cluster-reconfiguring-z2wvn        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
@@ -142,8 +141,9 @@ Here we take reconfiguring `max_connection` and `beb_buffer_pool_size` as an exa
     Mar 13,2023 02:55 UTC+0800   Succeed              OpsRequestProcessedSuccessfully   True     Successfully processed the OpsRequest: mysql-cluster-reconfiguring-z2wvn in Cluster: mysql-cluster
     ```
 
-4. Verify whether the parameters are modified. 
-   The whole searching process has a 30-second delay since it takes some time for kubelete to synchronize changes to the volume of the pod.
+4. Connect to the database to verify whether the parameters are modified. 
+   
+   The whole searching process has a 30-second delay since it takes some time for kubelete to synchronize modifications to the volume of the pod.
 
    ```bash
    kbcli cluster connect mysql-cluster
@@ -173,7 +173,7 @@ Here we take reconfiguring `max_connection` and `beb_buffer_pool_size` as an exa
 
 ## Reconfigure static parameters
 
-Static parameter reconfiguring requires restarting the pod. Here we take reconfiguring `ngram_token_size` as an example.
+Static parameter reconfiguring requires restarting the pod. The following example reconfigures `ngram_token_size`.
 
 1. Search the current value of `ngram_token_size` and the default value is 2.
    ```bash
@@ -217,14 +217,14 @@ Static parameter reconfiguring requires restarting the pod. Here we take reconfi
    
    :::note
 
-   Make sure the value you set is within the Allowed Values of this parameters. Otherwise, the configuration may fail.
+   Make sure the value you set is within the Allowed Values of this parameter. Otherwise, the reconfiguration may fail.
 
    :::
 
 3. Watch the progress of searching parameter reconfiguration and pay attention to the output of `Status.Progress` and `Status.Status`.
    ```bash
    # In progress
-   kbcli cluster describe-ops mysql-cluster-reconfiguring-nrnpf
+   kbcli cluster describe-ops mysql-cluster-reconfiguring-nrnpf -n default
    >
    Spec:
      Name: mysql-cluster-reconfiguring-nrnpf        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
@@ -241,8 +241,8 @@ Static parameter reconfiguring requires restarting the pod. Here we take reconfi
    ```
 
    ```bash
-   # Parameter change is completed
-   kbcli cluster describe-ops mysql-cluster-reconfiguring-nrnpf
+   # Parameter reconfiguration is completed
+   kbcli cluster describe-ops mysql-cluster-reconfiguring-nrnpf -n default
    >
    Spec:
      Name: mysql-cluster-reconfiguring-nrnpf        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
@@ -259,7 +259,7 @@ Static parameter reconfiguring requires restarting the pod. Here we take reconfi
                          OBJECT-KEY   STATUS   DURATION   MESSAGE
    ```
 
-4. After the reconfiguration is completed, connect to the database and verify the changes.
+4. Connect to the database and verify the modifications after the reconfiguration is completed.
    ```bash
    kbcli cluster connect mysql-cluster
 
@@ -282,3 +282,37 @@ Static parameter reconfiguring requires restarting the pod. Here we take reconfi
    +------------------+-------+
    1 row in set (0.09 sec)
    ```
+
+## View history and compare differences
+
+After the reconfiguration is completed, you can search the reconfiguration history and compare the parameter differences.
+
+View the parameter reconfiguration history.
+```bash
+kbcli cluster describe-config mysql-cluster
+>
+ConfigSpecs Meta:
+CONFIG-SPEC-NAME            FILE     ENABLED   TEMPLATE                   CONSTRAINT                    RENDERED                                  COMPONENT   CLUSTER                
+mysql-consensusset-config   my.cnf   true      mysql8.0-config-template   mysql8.0-config-constraints   mysql-cluster-mysql-mysql-config   mysql       mysql-cluster   
+
+History modifications:
+OPS-NAME                            CLUSTER         COMPONENT   CONFIG-SPEC-NAME            FILE     STATUS    POLICY   PROGRESS   CREATED-TIME                 VALID-UPDATED                                                                                                                     
+mysql-cluster-reconfiguring-4q5kv   mysql-cluster   mysql       mysql-consensusset-config   my.cnf   Succeed   reload   -/-        Mar 16,2023 15:44 UTC+0800   {"my.cnf":"{\"mysqld\":{\"max_connections\":\"3000\",\"read_buffer_size\":\"24288\"}}"}                                           
+mysql-cluster-reconfiguring-cclvm   mysql-cluster   mysql       mysql-consensusset-config   my.cnf   Succeed   reload   -/-        Mar 16,2023 17:28 UTC+0800   {"my.cnf":"{\"mysqld\":{\"innodb_buffer_pool_size\":\"1G\",\"max_connections\":\"600\"}}"}   
+mysql-cluster-reconfiguring-gx58r   mysql-cluster   mysql       mysql-consensusset-config   my.cnf   Succeed            -/-        Mar 16,2023 17:28 UTC+0800                       
+```
+
+From the above results, there are three parameter modifications. 
+
+Compare these modifications to view the configured parameters and their different values for different versions.
+
+```bash
+kbcli cluster diff-config mysql-cluster-reconfiguring-4q5kv mysql-cluster-reconfiguring-gx58r
+>
+DIFF-CONFIGURE RESULT:
+  ConfigFile: my.cnf    TemplateName: mysql-consensusset-config ComponentName: mysql    ClusterName: mysql-cluster       UpdateType: update      
+
+PARAMETERNAME             MYSQL-CLUSTER-RECONFIGURING-4Q5KV   MYSQL-CLUSTER-RECONFIGURING-GX58R   
+max_connections           3000                                600                                        
+innodb_buffer_pool_size   128M                                1G 
+```

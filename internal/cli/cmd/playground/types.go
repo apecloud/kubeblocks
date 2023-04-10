@@ -17,6 +17,8 @@ limitations under the License.
 package playground
 
 import (
+	"github.com/pkg/errors"
+
 	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -45,6 +47,11 @@ var (
 
 	// defaultKubeConfigPath is the default kubeconfig path, it is ~/.kube/config
 	defaultKubeConfigPath = util.ConfigPath("config")
+)
+
+// errors
+var (
+	kubeClusterUnreachableErr = errors.New("Kubernetes cluster unreachable")
 )
 
 var guideStr = `

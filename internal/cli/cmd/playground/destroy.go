@@ -30,6 +30,8 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -95,11 +97,6 @@ func (o *destroyOptions) destroy() error {
 
 // destroyLocal destroy local k3d cluster that will destroy all resources
 func (o *destroyOptions) destroyLocal() error {
-	// for test
-	if err := o.deleteClustersAndUninstallKB(); err != nil {
-		return err
-	}
-
 	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
 	spinner := printer.Spinner(o.Out, "%-50s", "Delete playground k3d cluster "+o.prevCluster.ClusterName)
 	defer spinner(false)
@@ -149,7 +146,11 @@ func (o *destroyOptions) destroyCloud() error {
 	// delete all clusters created by KubeBlocks, MUST BE VERY CAUTIOUS, use the right
 	// kubeconfig and context, otherwise, it will delete the wrong cluster.
 	if err = o.deleteClustersAndUninstallKB(); err != nil {
-		return err
+		if strings.Contains(err.Error(), kubeClusterUnreachableErr.Error()) {
+			printer.Warning(o.Out, err.Error())
+		} else {
+			return err
+		}
 	}
 
 	// destroy playground kubernetes cluster
@@ -197,25 +198,24 @@ func (o *destroyOptions) deleteClustersAndUninstallKB() error {
 		return err
 	}
 
+	client, dynamic, err := getKubeClient()
+	if err != nil {
+		return err
+	}
+
 	// delete all clusters created by KubeBlocks
-	if err = o.deleteClusters(); err != nil {
+	if err = o.deleteClusters(dynamic); err != nil {
 		return err
 	}
 
 	// uninstall KubeBlocks and remove namespace created by KubeBlocks
-	return o.uninstallKubeBlocks(o.kubeConfigPath)
+	return o.uninstallKubeBlocks(client, dynamic)
 }
 
 // delete all clusters created by KubeBlocks
-func (o *destroyOptions) deleteClusters() error {
+func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
+	var err error
 	ctx := context.Background()
-
-	// the caller should ensure the kubeconfig is set
-	f := util.NewFactory()
-	dynamic, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
 
 	// get all clusters in all namespaces
 	getClusters := func() (*unstructured.UnstructuredList, error) {
@@ -322,30 +322,20 @@ func (o *destroyOptions) deleteClusters() error {
 	return nil
 }
 
-func (o *destroyOptions) uninstallKubeBlocks(configPath string) error {
+func (o *destroyOptions) uninstallKubeBlocks(client kubernetes.Interface, dynamic dynamic.Interface) error {
 	var err error
-	f := util.NewFactory()
 	uninstall := kubeblocks.UninstallOptions{
-		Factory: f,
 		Options: kubeblocks.Options{
 			IOStreams: o.IOStreams,
+			Client:    client,
+			Dynamic:   dynamic,
 		},
 		AutoApprove:     true,
 		RemoveNamespace: true,
 		Quiet:           true,
 	}
 
-	uninstall.Client, err = f.KubernetesClientSet()
-	if err != nil {
-		return err
-	}
-
-	uninstall.Dynamic, err = f.DynamicClient()
-	if err != nil {
-		return err
-	}
-
-	uninstall.HelmCfg = helm.NewConfig("", configPath, "", klog.V(1).Enabled())
+	uninstall.HelmCfg = helm.NewConfig("", o.kubeConfigPath, "", klog.V(1).Enabled())
 	if err = uninstall.PreCheck(); err != nil {
 		return err
 	}

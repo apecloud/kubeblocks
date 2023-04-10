@@ -25,6 +25,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -130,4 +133,27 @@ func writeAndUseKubeConfig(kubeConfig string, kubeConfigPath string, out io.Writ
 
 	spinner(true)
 	return nil
+}
+
+// getKubeClient returns a kubernetes dynamic client and check if the cluster is reachable
+func getKubeClient() (kubernetes.Interface, dynamic.Interface, error) {
+	f := util.NewFactory()
+	client, err := f.KubernetesClientSet()
+	errMsg := kubeClusterUnreachableErr.Error()
+	if err == genericclioptions.ErrEmptyConfig {
+		return nil, nil, kubeClusterUnreachableErr
+	}
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errMsg)
+	}
+
+	if _, err = client.ServerVersion(); err != nil {
+		return nil, nil, errors.Wrap(err, errMsg)
+	}
+
+	dynamic, err := f.DynamicClient()
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errMsg)
+	}
+	return client, dynamic, nil
 }

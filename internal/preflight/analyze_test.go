@@ -18,13 +18,13 @@ package preflight
 
 import (
 	"context"
+	preflightTesting "github.com/apecloud/kubeblocks/internal/preflight/testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
-
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 )
 
 var _ = Describe("analyze_test", func() {
@@ -35,37 +35,12 @@ var _ = Describe("analyze_test", func() {
 		kbAnalyzers      []*preflightv1beta2.ExtendAnalyze
 		hostAnalyzers    []*troubleshoot.HostAnalyze
 		kbhHostAnalyzers []*preflightv1beta2.ExtendHostAnalyze
-		clusterVersion   = `
-{
-  "info": {
-    "major": "1",
-    "minor": "23",
-    "gitVersion": "v1.23.15",
-    "gitCommit": "b84cb8ab29366daa1bba65bc67f54de2f6c34848",
-    "gitTreeState": "clean",
-    "buildDate": "2022-12-08T10:42:57Z",
-    "goVersion": "go1.17.13",
-    "compiler": "gc",
-    "platform": "linux/arm64"
-  },
-  "string": "v1.23.15"
-}`
 	)
 
 	BeforeEach(func() {
 		ctx = context.TODO()
-		allCollectedData = map[string][]byte{"cluster-info/cluster_version.json": []byte(clusterVersion)}
-		analyzers = []*troubleshoot.Analyze{
-			{ClusterVersion: &troubleshoot.ClusterVersion{
-				AnalyzeMeta: troubleshoot.AnalyzeMeta{
-					CheckName: "ClusterVersionCheck",
-				},
-				Outcomes: []*troubleshoot.Outcome{
-					{
-						Pass: &troubleshoot.SingleOutcome{
-							Message: "version is ok.",
-						}}}}},
-		}
+		allCollectedData = preflightTesting.FakeCollectedData()
+		analyzers = preflightTesting.FakeAnalyzers()
 		kbAnalyzers = []*preflightv1beta2.ExtendAnalyze{{}}
 		hostAnalyzers = []*troubleshoot.HostAnalyze{{}}
 		kbhHostAnalyzers = []*preflightv1beta2.ExtendHostAnalyze{{}}

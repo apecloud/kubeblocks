@@ -2,7 +2,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}-replicaset
+  name: {{ .Release.Name }}
   labels:
     {{- include "mongodb-cluster.labels" . | nindent 4}}
 spec:

@@ -1,9 +1,0 @@
-apiVersion: v2
-name: pgcluster
-description: A PostgreSQL (with Patroni HA) cluster Helm chart for KubeBlocks.
-
-type: application
-
-version: 0.5.0-alpha.3
-
-appVersion: "15.2.0"

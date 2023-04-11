@@ -669,3 +669,22 @@ func CombineLabels(labels map[string]string) string {
 	}
 	return strings.TrimSuffix(labelStr, ",")
 }
+
+func BuildComponentNameLables(prefix string, names []string) string {
+	return buildLableSelectors(prefix, constant.KBAppComponentLabelKey, names)
+}
+
+// BuildLableSelectors build the label selector by given lable key, the label selector is
+// like "label-key in (name1, name2)"
+func buildLableSelectors(prefix string, key string, names []string) string {
+	if len(names) == 0 {
+		return prefix
+	}
+
+	label := fmt.Sprintf("%s in (%s)", key, strings.Join(names, ","))
+	if len(prefix) == 0 {
+		return label
+	} else {
+		return prefix + "," + label
+	}
+}

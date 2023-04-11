@@ -31,7 +31,6 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	"github.com/apecloud/kubeblocks/internal/cli/engine"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -84,18 +83,43 @@ var _ = Describe("connection", func() {
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
-	It("connection", func() {
+	It("validate", func() {
 		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
 
 		By("specified more than one cluster")
-		Expect(o.connect([]string{"c1", "c2"})).Should(HaveOccurred())
+		Expect(o.validate([]string{"c1", "c2"})).Should(HaveOccurred())
 
 		By("without cluster name")
-		Expect(o.connect(nil)).Should(HaveOccurred())
+		Expect(o.validate(nil)).Should(HaveOccurred())
 
-		By("specify cluster name")
-		Expect(o.ExecOptions.Complete()).Should(Succeed())
-		_ = o.connect([]string{clusterName})
+		Expect(o.validate([]string{clusterName})).Should(Succeed())
+
+		// set instance name and cluster name, should fail
+		o.PodName = "test-pod-0"
+		Expect(o.validate([]string{clusterName})).Should(HaveOccurred())
+		o.componentName = "test-component"
+		Expect(o.validate([]string{})).Should(HaveOccurred())
+
+		// unset pod name
+		o.PodName = ""
+		Expect(o.validate([]string{clusterName})).Should(Succeed())
+		// unset component name as well
+		o.componentName = ""
+		Expect(o.validate([]string{clusterName})).Should(Succeed())
+	})
+
+	It("complete by cluster name", func() {
+		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
+		Expect(o.validate([]string{clusterName})).Should(Succeed())
+		Expect(o.complete()).Should(Succeed())
+		Expect(o.Pod).ShouldNot(BeNil())
+	})
+
+	It("complete by pod name", func() {
+		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
+		o.PodName = "test-pod-0"
+		Expect(o.validate([]string{})).Should(Succeed())
+		Expect(o.complete()).Should(Succeed())
 		Expect(o.Pod).ShouldNot(BeNil())
 	})
 
@@ -130,41 +154,6 @@ var _ = Describe("connection", func() {
 		Expect(err).Should(Succeed())
 		Expect(u).Should(Equal(user))
 		Expect(p).Should(Equal(password))
-	})
-
-	It("build connect command", func() {
-		type argsCases struct {
-			command []string
-			args    []string
-			expect  []string
-		}
-
-		testCases := []argsCases{
-			{
-				command: []string{"mysql"},
-				args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e", "$(KB_ACCOUNT_STATEMENT)"},
-				expect:  []string{"sh", "-c", "mysql -h127.0.0.1"},
-			},
-			{
-				command: []string{"psql"},
-				args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-c", "$(KB_ACCOUNT_STATEMENT)"},
-				expect:  []string{"sh", "-c", "psql -h127.0.0.1"},
-			},
-			{
-				command: []string{"sh", "-c"},
-				args:    []string{"redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)"},
-				expect:  []string{"sh", "-c", "redis-cli -h 127.0.0.1"},
-			},
-		}
-
-		for _, testCase := range testCases {
-			info := &engine.ConnectionInfo{
-				Command: testCase.command,
-				Args:    testCase.args,
-			}
-			result := buildCommand(info)
-			Expect(result).Should(BeEquivalentTo(testCase.expect))
-		}
 	})
 })
 

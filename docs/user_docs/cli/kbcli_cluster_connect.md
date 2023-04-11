@@ -30,10 +30,11 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
 ### Options
 
 ```
-      --client string     Which client connection example should be output, only valid if --show-example is true.
-  -h, --help              help for connect
-  -i, --instance string   The instance name to connect.
-      --show-example      Show how to connect to cluster or instance from different client.
+      --client string           Which client connection example should be output, only valid if --show-example is true.
+      --component-name string   The component to connect. If not specified, the first component will be used.
+  -h, --help                    help for connect
+  -i, --instance string         The instance name to connect.
+      --show-example            Show how to connect to cluster or instance from different client.
 ```
 
 ### Options inherited from parent commands

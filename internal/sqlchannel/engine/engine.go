@@ -22,27 +22,22 @@ import (
 	"strings"
 )
 
-// ClusterDefinition ComponentDefRef Const Define
 const (
 	stateMysql      = "mysql"
 	statePostgreSQL = "postgresql"
 	stateRedis      = "redis"
 )
 
-type Interface interface {
-	ConnectCommand() []string
-	Container() string
-	ConnectExample(info *ConnectionInfo, client string) string
+// AuthInfo is the authentication information for the database
+type AuthInfo struct {
+	UserName   string
+	UserPasswd string
 }
 
-type ConnectionInfo struct {
-	Host     string
-	User     string
-	Password string
-	Database string
-	Port     string
-	Command  []string
-	Args     []string
+type Interface interface {
+	ConnectCommand(info *AuthInfo) []string
+	Container() string
+	ConnectExample(info *ConnectionInfo, client string) string
 }
 
 type EngineInfo struct {
@@ -52,8 +47,6 @@ type EngineInfo struct {
 	UserEnv     string
 	Database    string
 }
-
-type buildConnectExample func(info *ConnectionInfo) string
 
 func New(typeName string) (Interface, error) {
 	switch typeName {
@@ -67,6 +60,16 @@ func New(typeName string) (Interface, error) {
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}
 }
+
+type ConnectionInfo struct {
+	Host     string
+	User     string
+	Password string
+	Database string
+	Port     string
+}
+
+type buildConnectExample func(info *ConnectionInfo) string
 
 func buildExample(info *ConnectionInfo, client string, examples map[ClientType]buildConnectExample) string {
 	// if client is not specified, output all examples

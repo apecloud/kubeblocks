@@ -241,3 +241,20 @@ func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, confi
 		Message:            message,
 	}
 }
+
+// NewReconfigureFailedCondition creates a condition for the failed reconfigure.
+func NewReconfigureFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
+	var msg string
+	if err != nil {
+		msg = err.Error()
+	} else {
+		msg = fmt.Sprintf("Failed to reconfigure: %s in cluster: %s", ops.Name, ops.Spec.ClusterRef)
+	}
+	return &metav1.Condition{
+		Type:               ReasonReconfigureFailed,
+		Status:             metav1.ConditionFalse,
+		Reason:             "ReconfigureFailed",
+		LastTransitionTime: metav1.Now(),
+		Message:            msg,
+	}
+}

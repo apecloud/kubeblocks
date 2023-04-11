@@ -1,8 +1,5 @@
 ## @section PostgreSQL common parameters
-##
 
-## Bitnami PostgreSQL image version
-## ref: https://hub.docker.com/r/bitnami/postgresql/tags/
 ## @param image.registry PostgreSQL image registry
 ## @param image.repository PostgreSQL image repository
 ## @param image.tag PostgreSQL image tag (immutable tags are recommended)
@@ -13,9 +10,9 @@
 ##
 image:
   registry: registry.cn-hangzhou.aliyuncs.com
-  repository: apecloud/postgresql
-  tag:
-
+  repository: apecloud/spilo
+  tag: 15.2.0
+  digest: ""
   ## Specify a imagePullPolicy
   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
   ## ref: https://kubernetes.io/docs/user-guide/images/#pre-pulling-images
@@ -67,7 +64,7 @@ audit:
 ##
 postgresqlSharedPreloadLibraries: "pg_stat_statements, auto_explain"
 ## Start PostgreSQL pod(s) without limitations on shm memory.
-## By default docker and containerd (and possibly other container runtimes) limit `/dev/shm` to `64M`
+## By default, docker and containerd (and possibly other container runtimes) limit `/dev/shm` to `64M`
 ##
 shmVolume:
   ## @param shmVolume.enabled Enable emptyDir volume for /dev/shm for PostgreSQL pod(s)
@@ -101,6 +98,7 @@ metrics:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/postgres-exporter
     tag: 0.11.1-debian-11-r66
+    digest: ""
     pullPolicy: IfNotPresent
     ## Optionally specify an array of imagePullSecrets.
     ## Secrets must be manually created in the namespace.

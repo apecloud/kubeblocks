@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/StudioSol/set"
 	"github.com/go-logr/logr"
@@ -37,17 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
-)
-
-const (
-	ConfigReconcileInterval = time.Second * 1
-
-	ReconfigureFirstConfigType = "created"
-	ReconfigureNoChangeType    = "noChange"
-	ReconfigureAutoReloadType  = string(appsv1alpha1.AutoReload)
-	ReconfigureSimpleType      = string(appsv1alpha1.NormalPolicy)
-	ReconfigureParallelType    = string(appsv1alpha1.RestartPolicy)
-	ReconfigureRollingType     = string(appsv1alpha1.RollingPolicy)
 )
 
 type ValidateConfigMap func(configTpl, ns string) (*corev1.ConfigMap, error)
@@ -445,23 +433,24 @@ func NeedReloadVolume(config appsv1alpha1.ComponentConfigSpec) bool {
 	return config.ConfigConstraintRef != ""
 }
 
-func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ReloadOptions, error) {
+func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ReloadOptions, *appsv1alpha1.FormatterConfig, error) {
 	for _, configSpec := range configSpecs {
 		if !NeedReloadVolume(configSpec) {
 			continue
 		}
-		cfgConst := &appsv1alpha1.ConfigConstraint{}
-		if err := cli.Get(ctx, client.ObjectKey{
+		ccKey := client.ObjectKey{
 			Namespace: "",
 			Name:      configSpec.ConfigConstraintRef,
-		}, cfgConst); err != nil {
-			return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
+		}
+		cfgConst := &appsv1alpha1.ConfigConstraint{}
+		if err := cli.Get(ctx, ccKey, cfgConst); err != nil {
+			return nil, nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 		}
 		if cfgConst.Spec.ReloadOptions != nil {
-			return cfgConst.Spec.ReloadOptions, nil
+			return cfgConst.Spec.ReloadOptions, cfgConst.Spec.FormatterConfig, nil
 		}
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 func getComponentFromClusterDefinition(

@@ -18,6 +18,7 @@ kbcli cluster vscale [flags]
 ### Options
 
 ```
+      --class string                 Component class
       --components strings            Component names to this operations
       --cpu string                   Requested and limited size of component cpu
   -h, --help                         help for vscale

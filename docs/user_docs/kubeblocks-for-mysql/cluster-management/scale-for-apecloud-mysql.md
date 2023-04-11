@@ -38,19 +38,18 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    
    **Option 1.** (**Recommended**) Use kbcli
    
-   Configure the parameters `component-names`, `requests`, and `limits` and run the command.
+   Configure the parameters `--component-names`, `--memory`, and `--cpu` and run the command.
    
    ***Example***
    
    ```bash
    kbcli cluster vscale mysql-cluster \
    --component-names="mysql" \
-   --requests.memory="2Gi" --requests.cpu="1" \
-   --limits.memory="4Gi" --limits.cpu="2"
+   --memory="4Gi" --cpu="2" \
    ```
-   - `component-names` describes the component name ready for vertical scaling.
-   - `requests` describes the minimum amount of computing resources required. If `requests` is omitted for a container, it uses the `limits` value if `limits` is explicitly specified, otherwise uses an implementation-defined value. For more details, see [Resource Management for Pods and Containers](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/).
-   - `--limits` describes the maximum amount of computing resources allowed. For more details, see [Resource Management for Pods and Containers](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
+   - `--component-names` describes the component name ready for vertical scaling.
+   - `--memory` describes the requested and limited size of the component memory.
+   - `--cpu` describes the requested and limited size of the component CPU.
   
    **Option 2.** Create an OpsRequest
   
@@ -90,9 +89,9 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    spec:
      clusterDefinitionRef: apecloud-mysql
      clusterVersionRef: ac-mysql-8.0.30
-     components:
+     componentSpecs:
      - name: mysql
-       type: mysql
+       componentDefRef: mysql
        replicas: 1
        resources: # Change the values of resources.
          requests:
@@ -158,7 +157,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    
    **Option 1.** (**Recommended**) Use kbcli
    
-   Configure the parameters `component-names` and `replicas`, and run the command.
+   Configure the parameters `--component-names` and `--replicas`, and run the command.
 
    ***Example***
 
@@ -167,7 +166,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    --component-names="mysql" --replicas=3
    ```
    - `--component-names` describes the component name ready for vertical scaling.
-   - `--replicas` describe the replicas with the specified components.
+   - `--replicas` describes the replicas with the specified components.
 
    **Option 2.** Create an OpsRequest
 
@@ -206,9 +205,9 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    spec:
      clusterDefinitionRef: apecloud-mysql
      clusterVersionRef: ac-mysql-8.0.30
-     components:
+     componentSpecs:
      - name: mysql
-       type: mysql
+       componentDefRef: mysql
        replicas: 1 # Change the pod amount.
        volumeClaimTemplates:
        - name: data

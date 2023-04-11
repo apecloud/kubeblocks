@@ -1,0 +1,23 @@
+apiVersion: v2
+name: weaviate-standalone
+description: .
+
+type: application
+
+# This is the chart version.
+version: 0.1.0
+
+# This is the version number of weaviate.
+appVersion: "1.18.0"
+
+home: https://weaviate.tech/
+icon: https://weaviate.tech/images/logo_with_text.svg
+
+
+maintainers:
+  - name: ApeCloud
+    url: https://github.com/apecloud/kubeblocks/
+
+
+sources:
+  - https://github.com/apecloud/kubeblocks/

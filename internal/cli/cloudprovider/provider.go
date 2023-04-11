@@ -57,7 +57,7 @@ func (p *cloudProvider) Name() string {
 }
 
 // CreateK8sCluster create a kubernetes cluster
-func (p *cloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo, init bool) error {
+func (p *cloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo) error {
 	// init terraform
 	fmt.Fprintf(p.stdout, "Check and install terraform... \n")
 	if err := initTerraform(); err != nil {
@@ -66,7 +66,7 @@ func (p *cloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo, init bool)
 
 	// create cluster
 	fmt.Fprintf(p.stdout, "\nInit and apply %s in %s\n", K8sService(p.name), p.tfPath)
-	return tfInitAndApply(p.tfPath, init, p.stdout, p.stderr, clusterInfo.buildApplyOpts()...)
+	return tfInitAndApply(p.tfPath, p.stdout, p.stderr, clusterInfo.buildApplyOpts()...)
 }
 
 func (p *cloudProvider) DeleteK8sCluster(clusterInfo *K8sClusterInfo) error {
@@ -85,7 +85,7 @@ func (p *cloudProvider) DeleteK8sCluster(clusterInfo *K8sClusterInfo) error {
 
 	// destroy cluster
 	fmt.Fprintf(p.stdout, "\nDestroy %s cluster in %s\n", K8sService(p.name), p.tfPath)
-	return tfDestroy(p.tfPath, p.stdout, p.stderr, clusterInfo.buildDestroyOpts()...)
+	return tfInitAndDestroy(p.tfPath, p.stdout, p.stderr, clusterInfo.buildDestroyOpts()...)
 }
 
 func (p *cloudProvider) GetClusterInfo() (*K8sClusterInfo, error) {

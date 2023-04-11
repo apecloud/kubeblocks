@@ -82,7 +82,7 @@ func fillCompInfoByName(ctx context.Context, dynamic dynamic.Interface, namespac
 	if len(componentName) == 0 {
 		compInfo.comp = &cluster.Spec.ComponentSpecs[0]
 	} else {
-		compInfo.comp = cluster.GetComponentByName(componentName)
+		compInfo.comp = cluster.Spec.GetComponentByName(componentName)
 	}
 	if compInfo.comp == nil {
 		return nil, fmt.Errorf("component %s not found in cluster %s", componentName, clusterName)

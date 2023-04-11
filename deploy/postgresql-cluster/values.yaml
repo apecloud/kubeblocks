@@ -9,6 +9,9 @@ clusterVersionOverride: ""
 
 primaryIndex: 0
 
+switchPolicy:
+  type: Noop
+
 monitor:
   enabled: false
 

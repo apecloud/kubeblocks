@@ -396,44 +396,53 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 		clusterVersionObj = appsv1alpha1.ClusterVersion{}
 	)
 
-	if err := GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
+	clusterKey := client.ObjectKey{
 		Namespace: namespace,
 		Name:      clusterName,
-	}, cli, &clusterObj); err != nil {
+	}
+	if err := GetResourceObjectFromGVR(types.ClusterGVR(), clusterKey, cli, &clusterObj); err != nil {
 		return nil, err
 	}
-
-	clusterDefName := clusterObj.Spec.ClusterDefRef
-	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
+	clusterDefKey := client.ObjectKey{
 		Namespace: "",
-		Name:      clusterDefName,
-	}, cli, &clusterDefObj); err != nil {
+		Name:      clusterObj.Spec.ClusterDefRef,
+	}
+	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), clusterDefKey, cli, &clusterDefObj); err != nil {
 		return nil, err
 	}
-	clusterVersionName := clusterObj.Spec.ClusterVersionRef
-	if clusterVersionName != "" {
-		if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
-			Namespace: "",
-			Name:      clusterVersionName,
-		}, cli, &clusterVersionObj); err != nil {
+	clusterVerKey := client.ObjectKey{
+		Namespace: "",
+		Name:      clusterObj.Spec.ClusterVersionRef,
+	}
+	if clusterVerKey.Name != "" {
+		if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), clusterVerKey, cli, &clusterVersionObj); err != nil {
 			return nil, err
 		}
 	}
+	return GetConfigTemplateListWithResource(clusterObj.Spec.ComponentSpecs, clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName, reloadTpl)
+}
 
-	tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs, clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName)
+func GetConfigTemplateListWithResource(cComponents []appsv1alpha1.ClusterComponentSpec,
+	dComponents []appsv1alpha1.ClusterComponentDefinition,
+	vComponents []appsv1alpha1.ClusterComponentVersion,
+	componentName string,
+	reloadTpl bool) ([]appsv1alpha1.ComponentConfigSpec, error) {
+
+	configSpecs, err := cfgcore.GetConfigTemplatesFromComponent(cComponents, dComponents, vComponents, componentName)
 	if err != nil {
 		return nil, err
-	} else if !reloadTpl {
-		return tpls, nil
+	}
+	if !reloadTpl {
+		return configSpecs, nil
 	}
 
-	validTpls := make([]appsv1alpha1.ComponentConfigSpec, 0, len(tpls))
-	for _, tpl := range tpls {
-		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
-			validTpls = append(validTpls, tpl)
+	validConfigSpecs := make([]appsv1alpha1.ComponentConfigSpec, 0, len(configSpecs))
+	for _, configSpec := range configSpecs {
+		if configSpec.ConfigConstraintRef != "" && configSpec.TemplateRef != "" {
+			validConfigSpecs = append(validConfigSpecs, configSpec)
 		}
 	}
-	return validTpls, nil
+	return validConfigSpecs, nil
 }
 
 // GetResourceObjectFromGVR query the resource object using GVR.
@@ -448,8 +457,8 @@ func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.Object
 	return apiruntime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, k8sObj)
 }
 
-// GetComponentsFromClusterCR returns name of component.
-func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]string, error) {
+// GetComponentsFromClusterName returns name of component.
+func GetComponentsFromClusterName(key client.ObjectKey, cli dynamic.Interface) ([]string, error) {
 	clusterObj := appsv1alpha1.Cluster{}
 	clusterDefObj := appsv1alpha1.ClusterDefinition{}
 	if err := GetResourceObjectFromGVR(types.ClusterGVR(), key, cli, &clusterObj); err != nil {
@@ -463,8 +472,13 @@ func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]
 		return nil, err
 	}
 
-	componentNames := make([]string, 0, len(clusterObj.Spec.ComponentSpecs))
-	for _, component := range clusterObj.Spec.ComponentSpecs {
+	return GetComponentsFromResource(clusterObj.Spec.ComponentSpecs, &clusterDefObj)
+}
+
+// GetComponentsFromResource returns name of component.
+func GetComponentsFromResource(componentSpecs []appsv1alpha1.ClusterComponentSpec, clusterDefObj *appsv1alpha1.ClusterDefinition) ([]string, error) {
+	componentNames := make([]string, 0, len(componentSpecs))
+	for _, component := range componentSpecs {
 		cdComponent := clusterDefObj.GetComponentDefByName(component.ComponentDefRef)
 		if enableReconfiguring(cdComponent) {
 			componentNames = append(componentNames, component.Name)
@@ -521,8 +535,8 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 }
 
 func getIPLocation() (string, error) {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://ifconfig.io/country_code", nil)
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("GET", "https://ifconfig.io/country_code", nil)
 	if err != nil {
 		return "", err
 	}
@@ -547,7 +561,8 @@ func GetHelmChartRepoURL() string {
 	}
 
 	location, _ := getIPLocation()
-	if location == "CN" {
+	// if location is CN, or we can not get location, use GitLab helm chart repo
+	if location == "CN" || location == "" {
 		return types.GitLabHelmChartRepo
 	}
 	return types.KubeBlocksChartURL
@@ -642,4 +657,13 @@ func GetK8SProvider(client kubernetes.Interface) (K8sProvider, error) {
 // BuildAddonReleaseName returns the release name of addon, its f
 func BuildAddonReleaseName(addon string) string {
 	return fmt.Sprintf("%s-%s", types.AddonReleasePrefix, addon)
+}
+
+// CombineLabels combines labels into a string
+func CombineLabels(labels map[string]string) string {
+	var labelStr string
+	for k, v := range labels {
+		labelStr += fmt.Sprintf("%s=%s,", k, v)
+	}
+	return strings.TrimSuffix(labelStr, ",")
 }

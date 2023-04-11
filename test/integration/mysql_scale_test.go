@@ -158,21 +158,14 @@ var _ = Describe("MySQL Scaling function", func() {
 		}
 
 		By("Create a cluster obj with both log and data volume of 1GB size")
-		dataPvcSpec := corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: oldStorageValue,
-				},
-			},
-		}
+		dataPvcSpec := testapps.NewPVCSpec(oldStorageValue.String())
 		logPvcSpec := dataPvcSpec
 		logPvcSpec.StorageClassName = &defaultStorageClass.Name
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &dataPvcSpec).
-			AddVolumeClaimTemplate(testapps.LogVolumeName, &logPvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, dataPvcSpec).
+			AddVolumeClaimTemplate(testapps.LogVolumeName, logPvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 

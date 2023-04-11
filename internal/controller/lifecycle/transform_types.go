@@ -89,6 +89,8 @@ type lifecycleVertex struct {
 	immutable bool
 	isOrphan  bool
 	action    *Action
+	// postHandleAfterStatusPatch is called after the object status has changed
+	postHandleAfterStatusPatch []func() error
 }
 
 func (v lifecycleVertex) String() string {
@@ -121,14 +123,6 @@ func (r *realRequeueError) RequeueAfter() time.Duration {
 func (r *realRequeueError) Reason() string {
 	return r.reason
 }
-
-// TODO: dedup
-// postHandler defines the handler after patching cluster status.
-type postHandler func(cluster *appsv1alpha1.Cluster) error
-
-// TODO: dedup
-// clusterStatusHandler a cluster status handler which changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
-type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (postHandler, error)
 
 type delegateClient struct {
 	client.Client

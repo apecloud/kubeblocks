@@ -45,11 +45,11 @@ const (
 func init() {
 	// the volume expansion operation only support online expanding now, so this operation not affect the cluster availability.
 	volumeExpansionBehaviour := OpsBehaviour{
-		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
-		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.VolumeExpandingPhase,
-		// TODO: add cluster reconcile VolumeExpanding phase.
-		MaintainClusterPhaseBySelf: true,
-		OpsHandler:                 volumeExpansionOpsHandler{},
+		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
+		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
+		MaintainClusterPhaseBySelf:         true,
+		OpsHandler:                         volumeExpansionOpsHandler{},
+		ProcessingReasonInClusterCondition: ProcessingReasonVolumeExpanding,
 	}
 
 	opsMgr := GetOpsManager()
@@ -64,7 +64,7 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(opsRequest *appsv1alp
 // Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
 func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
-		volumeExpansionMap = opsRes.OpsRequest.ConvertVolumeExpansionListToMap()
+		volumeExpansionMap = opsRes.OpsRequest.Spec.ToVolumeExpansionListToMap()
 		volumeExpansionOps appsv1alpha1.VolumeExpansion
 		ok                 bool
 	)
@@ -72,19 +72,16 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 		if volumeExpansionOps, ok = volumeExpansionMap[component.Name]; !ok {
 			continue
 		}
+		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[index]
 		for _, v := range volumeExpansionOps.VolumeClaimTemplates {
 			for i, vct := range component.VolumeClaimTemplates {
 				if vct.Name != v.Name {
 					continue
 				}
-				if vct.Spec == nil {
-					continue
-				}
-				opsRes.Cluster.Spec.ComponentSpecs[index].VolumeClaimTemplates[i].
+				compSpec.VolumeClaimTemplates[i].
 					Spec.Resources.Requests[corev1.ResourceStorage] = v.Storage
 			}
 		}
-
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
@@ -169,17 +166,17 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (ve volumeExpansionOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return opsRequest.GetVolumeExpansionComponentNameMap()
+	return realAffectedComponentMap(opsRequest.Spec.GetVolumeExpansionComponentNameSet())
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
-	componentNameMap := opsRequest.GetComponentNameMap()
+	componentNameSet := opsRequest.GetComponentNameSet()
 	storageMap := ve.getRequestStorageMap(opsRequest)
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-		if _, ok := componentNameMap[v.Name]; !ok {
+		if _, ok := componentNameSet[v.Name]; !ok {
 			continue
 		}
 		lastVCTs := make([]appsv1alpha1.OpsRequestVolumeClaimTemplate, 0)

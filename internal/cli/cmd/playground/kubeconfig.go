@@ -219,3 +219,11 @@ func kubeConfigCurrentContext(kubeConfigStr string) (string, error) {
 	}
 	return kubeConfig.CurrentContext, nil
 }
+
+func kubeConfigCurrentContextFromFile(kubeConfigPath string) (string, error) {
+	kubeConfig, err := clientcmd.LoadFromFile(kubeConfigPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to load kubeconfig: %w", err)
+	}
+	return kubeConfig.CurrentContext, nil
+}

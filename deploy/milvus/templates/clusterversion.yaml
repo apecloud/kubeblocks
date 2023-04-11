@@ -1,0 +1,27 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: milvus-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "milvus.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: milvus-standalone
+  componentVersions:
+    - componentDefRef: minio
+      versionsContext:
+        containers:
+        - name: minio
+          image: {{ .Values.images.minio.repository }}:{{ default .Chart.AppVersion .Values.images.minio.tag }}
+    - componentDefRef: etcd
+      versionsContext:
+        containers:
+          - name: etcd
+            image: {{ .Values.images.etcd.repository }}:{{ default .Chart.AppVersion .Values.images.etcd.tag }}
+    - componentDefRef: milvus
+      versionsContext:
+        initContainers:
+          - name: milvus-init
+            image: {{ .Values.images.milvus_init.repository }}:{{ default .Chart.AppVersion .Values.images.milvus_init.tag }}
+        containers:
+          - name: milvus
+            image: {{ .Values.images.milvus.repository }}:{{ default .Chart.AppVersion .Values.images.milvus.tag }}

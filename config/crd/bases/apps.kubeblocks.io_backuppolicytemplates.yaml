@@ -379,9 +379,9 @@ spec:
                           type: object
                       type: object
                     ttl:
-                      description: ttl is a time string in days and ending with the
-                        'd' or 'D' character to describe how long the Backup should
-                        be retained.
+                      description: ttl is a time string ending with the 'd'|'D'|'h'|'H'
+                        character to describe how long the Backup should be retained.
+                        if not set, will be retained forever.
                       pattern: ^\d+[d|D|h|H]$
                       type: string
                   required:

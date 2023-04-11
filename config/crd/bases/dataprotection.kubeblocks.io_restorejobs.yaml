@@ -122,8 +122,8 @@ spec:
                         type: string
                       usernameKey:
                         default: username
-                        description: usernameKey the map keyword of the user in the
-                          connection credential secret
+                        description: usernameKey the map key of the user in the connection
+                          credential secret
                         type: string
                     required:
                     - name

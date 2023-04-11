@@ -27,8 +27,8 @@ import (
 
 // BackupPolicySpec defines the desired state of BackupPolicy
 type BackupPolicySpec struct {
-	// ttl is a time string in days and ending with the 'd' or 'D' character to describe how long
-	// the Backup should be retained. if not set,
+	// ttl is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
+	// the Backup should be retained. if not set, will be retained forever.
 	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
 	// +optional
 	TTL *string `json:"ttl,omitempty"`
@@ -62,7 +62,7 @@ type Schedule struct {
 
 type BaseBackupSchedulePolicy struct {
 	SchedulePolicy `json:",inline"`
-	// the type of base backup, only support full and incremental.
+	// the type of base backup, only support full and snapshot.
 	// +kubebuilder:validation:Required
 	Type BaseBackupType `json:"type"`
 }
@@ -141,7 +141,7 @@ type BackupPolicySecret struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// usernameKey the map keyword of the user in the connection credential secret
+	// usernameKey the map key of the user in the connection credential secret
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=username
 	UsernameKey string `json:"usernameKey,omitempty"`
@@ -211,7 +211,7 @@ type BackupPolicyStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// backup policy phase valid value: available, failed, new.
+	// backup policy phase valid value: Available, Failed.
 	// +optional
 	Phase BackupPolicyPhase `json:"phase,omitempty"`
 

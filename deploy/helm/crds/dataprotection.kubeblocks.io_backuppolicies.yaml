@@ -1747,8 +1747,8 @@ spec:
                             type: string
                           usernameKey:
                             default: username
-                            description: usernameKey the map keyword of the user in
-                              the connection credential secret
+                            description: usernameKey the map key of the user in the
+                              connection credential secret
                             type: string
                         required:
                         - name
@@ -3457,8 +3457,8 @@ spec:
                             type: string
                           usernameKey:
                             default: username
-                            description: usernameKey the map keyword of the user in
-                              the connection credential secret
+                            description: usernameKey the map key of the user in the
+                              connection credential secret
                             type: string
                         required:
                         - name
@@ -3485,7 +3485,7 @@ spec:
                         type: boolean
                       type:
                         description: the type of base backup, only support full and
-                          incremental.
+                          snapshot.
                         enum:
                         - full
                         - snapshot
@@ -3640,8 +3640,8 @@ spec:
                             type: string
                           usernameKey:
                             default: username
-                            description: usernameKey the map keyword of the user in
-                              the connection credential secret
+                            description: usernameKey the map key of the user in the
+                              connection credential secret
                             type: string
                         required:
                         - name
@@ -3653,9 +3653,9 @@ spec:
                 - target
                 type: object
               ttl:
-                description: ttl is a time string in days and ending with the 'd'
-                  or 'D' character to describe how long the Backup should be retained.
-                  if not set,
+                description: ttl is a time string ending with the 'd'|'D'|'h'|'H'
+                  character to describe how long the Backup should be retained. if
+                  not set, will be retained forever.
                 pattern: ^\d+[d|D|h|H]$
                 type: string
             type: object
@@ -3682,8 +3682,7 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: 'backup policy phase valid value: available, failed,
-                  new.'
+                description: 'backup policy phase valid value: Available, Failed.'
                 enum:
                 - Available
                 - Failed

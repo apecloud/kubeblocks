@@ -44,8 +44,8 @@ type BackupPolicy struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
-	// ttl is a time string in days and ending with the 'd' or 'D' character to describe how long
-	// the Backup should be retained.
+	// ttl is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
+	// the Backup should be retained. if not set, will be retained forever.
 	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
 	// +optional
 	TTL *string `json:"ttl,omitempty"`

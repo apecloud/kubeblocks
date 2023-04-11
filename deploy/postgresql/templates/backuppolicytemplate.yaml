@@ -8,7 +8,7 @@ metadata:
 spec:
   clusterDefinitionRef: postgresql
   backupPolicies:
-  - componentDefRef: pg-replication
+  - componentDefRef: postgresql
     ttl: 7d
     schedule:
       baseBackup:
@@ -16,18 +16,9 @@ spec:
         enable: false
         cronExpression: "0 18 * * 0"
     snapshot:
-      hooks:
-        containerName: postgresql
-        preCommands:
-          - psql -c "CHECKPOINT"
-      backupStatusUpdates:
-        - path: manifests.backupLog
-          containerName: postgresql
-          script: /scripts/backup-log-collector.sh
-          updateStage: pre
       target:
         connectionCredentialKey:
           passwordKey: password
           usernameKey: username
     full:
-      backupToolName: pg-basebackup
+      backupToolName: postgres-basebackup

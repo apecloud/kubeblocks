@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: kafka-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  name: {{ include "kafka.name" . }}-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   labels:
     {{- include "kafka.labels" . | nindent 4 }}
     {{- if .Values.commonLabels }}

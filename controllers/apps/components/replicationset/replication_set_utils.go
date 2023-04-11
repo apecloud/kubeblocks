@@ -384,7 +384,7 @@ func filterReplicationWorkload(ctx context.Context,
 	if compSpecName == "" {
 		return nil, fmt.Errorf("cluster's compSpecName is nil, pls check")
 	}
-	compDefName := cluster.GetComponentDefRefName(compSpecName)
+	compDefName := cluster.Spec.GetComponentDefRefName(compSpecName)
 	compDef, err := util.GetComponentDefByCluster(ctx, cli, *cluster, compDefName)
 	if err != nil {
 		return compDef, err

@@ -59,10 +59,10 @@ func CreateConsensusMysqlCluster(
 	clusterName,
 	workloadType,
 	consensusCompName string) *appsv1alpha1.Cluster {
-	pvcSpec := NewPVC("2Gi")
+	pvcSpec := NewPVCSpec("2Gi")
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 		AddComponent(consensusCompName, workloadType).SetReplicas(3).SetEnabledLogs(errorLogName).
-		AddVolumeClaimTemplate("data", &pvcSpec).Create(&testCtx).GetObject()
+		AddVolumeClaimTemplate("data", pvcSpec).Create(&testCtx).GetObject()
 }
 
 // CreateConsensusMysqlClusterDef creates a mysql clusterDefinition with a component of ConsensusSet type.

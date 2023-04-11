@@ -13,23 +13,6 @@
 
 ##@ Sub-commands
 
-## loadbalancer cmd
-
-.PHONY: loadbalancer-go-generate
-loadbalancer-go-generate: ## Run go generate against loadbalancer code.
-ifeq ($(SKIP_GO_GEN), false)
-	$(GO) generate -x ./cmd/loadbalancer/internal/...
-endif
-
-.PHONY: loadbalancer
-loadbalancer: loadbalancer-go-generate test-go-generate build-checks  ## Build loadbalancer binary.
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer ./cmd/loadbalancer
-
-
-.PHONY: clean-loadbalancer
-clean-loadbalancer: ## Clean bin/loadbalancer.
-	rm -f bin/loadbalancer
-
 ## reloader cmd
 
 RELOADER_LD_FLAGS = "-s -w"
@@ -78,6 +61,13 @@ bin/probe.%: ## Cross build bin/probe.$(OS).$(ARCH) .
 probe: OS=$(shell $(GO) env GOOS)
 probe: ARCH=$(shell $(GO) env GOARCH)
 probe: test-go-generate build-checks ## Build probe related binaries
+	$(MAKE) bin/probe.${OS}.${ARCH}
+	mv bin/probe.${OS}.${ARCH} bin/probe
+
+.PHONY: probe-fast
+probe-fast: OS=$(shell $(GO) env GOOS)
+probe-fast: ARCH=$(shell $(GO) env GOARCH)
+probe-fast:
 	$(MAKE) bin/probe.${OS}.${ARCH}
 	mv bin/probe.${OS}.${ARCH} bin/probe
 

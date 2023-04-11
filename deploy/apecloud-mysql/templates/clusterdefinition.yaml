@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
+  type: mysql
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
@@ -49,9 +50,12 @@ spec:
         followers:
           - name: follower
             accessMode: Readonly
+        learner:
+          name: learner
+          accessMode: Readonly
       service:
         ports:
-          - protocol: TCP
+          - name: mysql
             port: 3306
             targetPort: mysql
         selector:
@@ -74,6 +78,8 @@ spec:
                 name: mysql-config
               - name: scripts
                 mountPath: /scripts
+              - name: annotations
+                mountPath: /etc/annotations
             ports:
               - containerPort: 3306
                 name: mysql
@@ -113,6 +119,10 @@ spec:
               - name: MYSQL_DYNAMIC_CONFIG
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
             command: ["/scripts/setup.sh"]
+            lifecycle:
+              preStop:
+                exec:
+                  command: ["/scripts/pre-stop.sh"]
           - name: metrics
             image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
@@ -156,6 +166,13 @@ spec:
               httpGet:
                 path: /
                 port: http-metrics
+        volumes:
+          - name: annotations
+            downwardAPI:
+              items:
+                - path: "leader"
+                  fieldRef:
+                    fieldPath: metadata.annotations['cs.apps.kubeblocks.io/leader']
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}

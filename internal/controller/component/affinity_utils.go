@@ -167,8 +167,8 @@ func patchBuiltInAffinity(affinity *corev1.Affinity) *corev1.Affinity {
 	return affinity
 }
 
-// patchBuiltInToleration patches built-in tolerations configuration
-func patchBuiltInToleration(tolerations []corev1.Toleration) []corev1.Toleration {
+// PatchBuiltInToleration patches built-in tolerations configuration
+func PatchBuiltInToleration(tolerations []corev1.Toleration) []corev1.Toleration {
 	tolerations = append(tolerations, corev1.Toleration{
 		Key:      intctrlutil.KubeBlocksDataNodeTolerationKey,
 		Operator: corev1.TolerationOpEqual,

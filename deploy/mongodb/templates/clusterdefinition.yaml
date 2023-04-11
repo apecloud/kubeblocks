@@ -5,6 +5,10 @@ metadata:
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
+  type: mongodb
+  connectionCredential:
+    username: admin
+    password: ""
   componentDefs:
     - name: mongos
       scriptSpecs:
@@ -16,14 +20,14 @@ spec:
       workloadType: Stateless
       service:
         ports:
-          - protocol: TCP
+          - name: mongos
             port: 27017
+            targetPort: mongos
       podSpec:
         containers:
           - name: mongos
             ports:
-              - protocol: TCP
-                name: mongos
+              - name: mongos
                 containerPort: 27017
             command:
               - /scripts/mongos-setup.sh
@@ -53,17 +57,17 @@ spec:
           periodSeconds: 2
           failureThreshold: 3
       service:
-        ports:
-          - protocol: TCP
-            port: 27018
         selector:
           kubeblocks.io/role: leader
+        ports:
+          - name: configsvr
+            port: 27018
+            targetPort: configsvr
       podSpec:
         containers:
           - name: configsvr
             ports:
               - name: configsvr
-                protocol: TCP
                 containerPort: 27018
             command:
               - /scripts/replicaset-setup.sh
@@ -105,16 +109,19 @@ spec:
           failureThreshold: 3
       service:
         ports:
-          - protocol: TCP
+          - name: shard
             port: 27018
+<<<<<<< HEAD
         selector:
           kubeblocks.io/role: leader
+=======
+            targetPort: shard
+>>>>>>> origin
       podSpec:
         containers:
           - name: shard
             ports:
               - name: shard
-                protocol: TCP
                 containerPort: 27018
             command:
               - /scripts/replicaset-setup.sh
@@ -140,6 +147,3 @@ spec:
               - name: scripts
                 mountPath: /scripts/shard-agent.sh
                 subPath: shard-agent.sh
-  connectionCredential:
-    username: admin
-    password: ""

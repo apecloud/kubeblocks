@@ -32,7 +32,7 @@ jobs:
 
   release-chart:
     needs: chart-version
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.0
+    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.2
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "${{ needs.chart-version.outputs.chart-version }}"

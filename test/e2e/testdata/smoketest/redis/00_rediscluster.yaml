@@ -5,7 +5,7 @@ kind: ConfigMap
 metadata:
   name: redis7-config-template
   labels:
-    helm.sh/chart: redis-0.1.0
+    helm.sh/chart: redis-0.5.0-alpha.3
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.5"
@@ -108,7 +108,7 @@ metadata:
   name: backup-policy-template-redis
   labels:
     clusterdefinition.kubeblocks.io/name: redis
-    helm.sh/chart: redis-0.1.0
+    helm.sh/chart: redis-0.5.0-alpha.3
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.5"
@@ -124,7 +124,7 @@ kind: ClusterDefinition
 metadata:
   name: redis
   labels:
-    helm.sh/chart: redis-0.1.0
+    helm.sh/chart: redis-0.5.0-alpha.3
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.5"
@@ -300,7 +300,7 @@ kind: ClusterVersion
 metadata:
   name: redis-7.0.5
   labels:
-    helm.sh/chart: redis-0.1.0
+    helm.sh/chart: redis-0.5.0-alpha.3
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.5"
@@ -321,7 +321,7 @@ kind: ConfigConstraint
 metadata:
   name: redis7-config-constraints
   labels:
-    helm.sh/chart: redis-0.1.0
+    helm.sh/chart: redis-0.5.0-alpha.3
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.5"
@@ -502,7 +502,7 @@ kind: Cluster
 metadata:
   name: mycluster
   labels: 
-    helm.sh/chart: redis-cluster-0.1.0
+    helm.sh/chart: redis-cluster-0.5.0-alpha.3
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.5"

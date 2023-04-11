@@ -88,7 +88,8 @@ var _ = Describe("DataProtection", func() {
 			secrets := testing.FakeSecrets(testing.Namespace, testing.ClusterName)
 			pods := testing.FakePods(1, testing.Namespace, testing.ClusterName)
 			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-				scheme.Scheme, &secrets.Items[0], cluster, template, &pods.Items[0])
+				scheme.Scheme, &secrets.Items[0], cluster, clusterDef, template, &pods.Items[0])
+			tf.Client = &clientfake.RESTClient{}
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
@@ -192,6 +193,9 @@ var _ = Describe("DataProtection", func() {
 		pods := testing.FakePods(1, testing.Namespace, clusterName)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
 			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, template)
+		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterDef, cluster, template)
+		tf.Client = &clientfake.RESTClient{}
 		// create backup
 		cmd := NewCreateBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())

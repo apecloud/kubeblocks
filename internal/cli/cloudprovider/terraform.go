@@ -77,17 +77,15 @@ func initTerraform() error {
 	return nil
 }
 
-func tfInitAndApply(workingDir string, init bool, stdout, stderr io.Writer, opts ...tfexec.ApplyOption) error {
+func tfInitAndApply(workingDir string, stdout, stderr io.Writer, opts ...tfexec.ApplyOption) error {
 	ctx := context.Background()
 	tf, err := newTerraform(workingDir, stdout, stderr)
 	if err != nil {
 		return err
 	}
 
-	if init {
-		if err = tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
-			return err
-		}
+	if err = tf.Init(ctx, tfexec.Upgrade(false)); err != nil {
+		return err
 	}
 
 	if err = tf.Apply(ctx, opts...); err != nil {
@@ -96,12 +94,17 @@ func tfInitAndApply(workingDir string, init bool, stdout, stderr io.Writer, opts
 	return nil
 }
 
-func tfDestroy(workingDir string, stdout, stderr io.Writer, opts ...tfexec.DestroyOption) error {
+func tfInitAndDestroy(workingDir string, stdout, stderr io.Writer, opts ...tfexec.DestroyOption) error {
 	ctx := context.Background()
 	tf, err := newTerraform(workingDir, stdout, stderr)
 	if err != nil {
 		return err
 	}
+
+	if err = tf.Init(ctx, tfexec.Upgrade(false)); err != nil {
+		return err
+	}
+
 	return tf.Destroy(ctx, opts...)
 }
 

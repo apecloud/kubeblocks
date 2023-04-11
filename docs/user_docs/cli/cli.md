@@ -36,6 +36,15 @@ Run a benchmark.
 * [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
 
 
+## [class](kbcli_class.md)
+
+Manage classes
+
+* [kbcli class create](kbcli_class_create.md)	 - Create a class
+* [kbcli class list](kbcli_class_list.md)	 - List classes
+* [kbcli class template](kbcli_class_template.md)	 - Generate class definition template
+
+
 ## [cluster](kbcli_cluster.md)
 
 Cluster command.
@@ -55,6 +64,7 @@ Cluster command.
 * [kbcli cluster describe-config](kbcli_cluster_describe-config.md)	 - Show details of a specific reconfiguring.
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest.
 * [kbcli cluster diff-config](kbcli_cluster_diff-config.md)	 - Show the difference in parameters between the two submitted OpsRequest.
+* [kbcli cluster edit-config](kbcli_cluster_edit-config.md)	 - Edit the config file of the component.
 * [kbcli cluster explain-config](kbcli_cluster_explain-config.md)	 - List the constraint for supported configuration params.
 * [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster.
 * [kbcli cluster grant-role](kbcli_cluster_grant-role.md)	 - Grant role to account

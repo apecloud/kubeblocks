@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
+  type: mysql
   connectionCredential:
     username: root
     password: root  #"$(RANDOM_PASSWD)"
@@ -53,26 +54,25 @@ spec:
         followers:
           - name: follower
             accessMode: Readonly
+        learner:
+          name: learner
+          accessMode: Readonly
       service:
-        ports:
-          - protocol: TCP
-            port: 3306
-            targetPort: mysql
-            name: mysql
-          - protocol: TCP
-            port: 15100  
-            targetPort: vttabletport
-            name: vttabletport
-          - protocol: TCP
-            port: 16100
-            targetPort: vttabletgrpc
-            name: vttabletgrpc
-          - protocol: TCP
-            port: 40000
-            targetPort: delvedebug
-            name: delvedebug   
         selector:
           kubeblocks.io/role: leader
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: mysql
+          - name: vttabletport
+            port: 15100
+            targetPort: vttabletport
+          - name: vttabletgrpc
+            port: 16100
+            targetPort: vttabletgrpc
+          - name: delvedebug
+            port: 40000
+            targetPort: delvedebug
       horizontalScalePolicy:
         type: Snapshot
         backupTemplateSelector:
@@ -175,14 +175,11 @@ spec:
             imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }} 
             ports:
               - containerPort: 15100
-                protocol: TCP
-                name: vttabletport 
+                name: vttabletport
               - containerPort: 16100
-                protocol: TCP
                 name: vttabletgrpc
               - containerPort: 40000
-                protocol: TCP
-                name: delvedebug  
+                name: delvedebug
             env:
               - name: CELL
                 value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
@@ -342,17 +339,15 @@ spec:
       workloadType: Stateful
       service:
         ports:
-          - protocol: TCP
+          - name: client
             port: 2379
             targetPort: client 
-            name: client
       podSpec:
         containers:
           - name: etcd
             imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 2379
-                protocol: TCP
                 name: client
             env:
               - name: CELL
@@ -413,31 +408,25 @@ spec:
       workloadType: Stateful
       service:
         ports:
-          - protocol: TCP
+          - name: webport
             port: 15000
             targetPort: webport
-            name: webport 
-          - protocol: TCP
+          - name: grpcport
             port: 15999
             targetPort: grpcport
-            name: grpcport
-          - protocol: TCP
+          - name: delvedebug
             port: 40000
             targetPort: delvedebug
-            name: delvedebug  
       podSpec:
         containers:
           - name: vtctld
             imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 15000
-                protocol: TCP
                 name: webport
               - containerPort: 15999
-                protocol: TCP
                 name: grpcport
               - containerPort: 40000
-                protocol: TCP
                 name: delvedebug
             env:
               - name: CELL
@@ -482,24 +471,20 @@ spec:
       workloadType: Stateful
       service:
         ports:
-          - protocol: TCP
+          - name: port
             port: 16000
             targetPort: port
-            name: port
-          - protocol: TCP
+          - name: delvedebug
             port: 40000
             targetPort: delvedebug
-            name: delvedebug
       podSpec:
         containers:
           - name: vtconsensus
             imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 16000
-                protocol: TCP
                 name: port
               - containerPort: 40000
-                protocol: TCP
                 name: delvedebug
             env:
               - name: CELL
@@ -550,39 +535,31 @@ spec:
       workloadType: Stateful
       service:
         ports:
-          - protocol: TCP
+          - name: webport
             port: 15001
             targetPort: webport
-            name: webport 
-          - protocol: TCP
+          - name: grpcport
             port: 15991
             targetPort: grpcport
-            name: grpcport
-          - protocol: TCP
+          - name: serverport
             port: 15306
             targetPort: serverport
-            name: serverport     
-          - protocol: TCP
+          - name: delvedebug
             port: 40000
             targetPort: delvedebug
-            name: delvedebug       
       podSpec:
         containers:
           - name: vtgate
             imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 15001
-                protocol: TCP
                 name: webport
               - containerPort: 15991
-                protocol: TCP
                 name: grpcport
               - containerPort: 15306
-                protocol: TCP
-                name: serverport 
+                name: serverport
               - containerPort: 40000
-                protocol: TCP
-                name: delvedebug 
+                name: delvedebug
             env:
               - name: MYSQL_ROOT_USER
                 valueFrom:

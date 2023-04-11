@@ -106,11 +106,11 @@ var _ = Describe("builder", func() {
 			clusterVersionObj = allFieldsClusterVersionObj(needCreate)
 		}
 
-		pvcSpec := testapps.NewPVC("1Gi")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
 			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
 			GetObject()
@@ -223,6 +223,14 @@ var _ = Describe("builder", func() {
 			credential, err := BuildConnCredential(*params)
 			Expect(err).Should(BeNil())
 			Expect(credential).ShouldNot(BeNil())
+			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(BeEmpty())
+			By("setting type")
+			characterType := "test-character-type"
+			params.ClusterDefinition.Spec.Type = characterType
+			credential, err = BuildConnCredential(*params)
+			Expect(err).Should(BeNil())
+			Expect(credential).ShouldNot(BeNil())
+			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(Equal(characterType))
 			// "username":      "root",
 			// "SVC_FQDN":      "$(SVC_FQDN)",
 			// "RANDOM_PASSWD": "$(RANDOM_PASSWD)",
@@ -468,7 +476,7 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds config manager sidecar container correctly", func() {
-			sidecarRenderedParam := &cfgcm.ConfigManagerParams{
+			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
 				CharacterType: "mysql",
 				SecreteName:   "test-secret",

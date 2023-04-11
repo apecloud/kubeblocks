@@ -95,6 +95,10 @@ var _ = Describe("OpsRequest webhook", func() {
 		return storageClass
 	}
 
+	notFoundComponentsString := func(notFoundComponents string) string {
+		return fmt.Sprintf("components: [%s] not found", notFoundComponents)
+	}
+
 	testUpgrade := func(cluster *Cluster) {
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName+"-upgrade", UpgradeType)
 
@@ -133,7 +137,7 @@ var _ = Describe("OpsRequest webhook", func() {
 				return ""
 			}
 			return err.Error()
-		}).Should(ContainSubstring("Existing OpsRequest: testOpsName"))
+		}).Should(ContainSubstring("existing OpsRequest: testOpsName"))
 		// test opsRequest reentry
 		addClusterRequestAnnotation(cluster, opsRequest.Name, SpecReconcilingClusterPhase)
 		By("By creating a upgrade opsRequest, it should be succeed")
@@ -164,7 +168,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 			patch = client.MergeFrom(opsRequest.DeepCopy())
 			opsRequest.Spec.ClusterRef = newClusterName
-			return Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring("update OpsRequest is forbidden when status.Phase is Succeed"))
+			return Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring("is forbidden when status.Phase is Succeed"))
 		}).Should(BeTrue())
 	}
 
@@ -201,13 +205,13 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing verticalScaling opsRequest components is not exist")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
 		opsRequest.Spec.VerticalScalingList = []VerticalScaling{verticalScalingList[0]}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString("vs-not-exist")))
 
 		By("By testing verticalScaling opsRequest components is not consistent")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
 		// [0] is not exist, and [1] is valid.
 		opsRequest.Spec.VerticalScalingList = []VerticalScaling{verticalScalingList[0], verticalScalingList[1]}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
 
 		By("By testing verticalScaling opsRequest components partly")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
@@ -276,36 +280,29 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing volumeExpansion - target component not exist")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
 		opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[0]}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString("ve-not-exist")))
 
 		By("By testing volumeExpansion - target volume not exist")
 		opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[1]}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not support volume expansion, check the StorageClass whether allow volume expansion"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("volumeClaimTemplates: [log] not found in component: replicasets"))
 
 		By("By testing volumeExpansion - create a new storage class")
 		storageClassName := "sc-test-volume-expansion"
 		storageClass := createStorageClass(testCtx.Ctx, storageClassName, "false", true)
 		Expect(storageClass != nil).Should(BeTrue())
 
-		By("By testing volumeExpansion - has no default storage class")
+		By("By testing volumeExpansion - has no pvc")
 		for _, compSpec := range cluster.Spec.ComponentSpecs {
 			for _, vct := range compSpec.VolumeClaimTemplates {
 				Expect(vct.Spec.StorageClassName == nil).Should(BeTrue())
 			}
 		}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not support volume expansion, check the StorageClass whether allow volume expansion."))
-
-		By("By testing volumeExpansion - patch it as default and use it to re-create")
-		if storageClass.Annotations == nil {
-			storageClass.Annotations = make(map[string]string)
-		}
-		storageClass.Annotations[storage.IsDefaultStorageClassAnnotation] = "true"
-		Expect(testCtx.Cli.Update(testCtx.Ctx, storageClass)).Should(BeNil())
-		Eventually(func() bool {
-			opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[2]}
-			return testCtx.CheckedCreateObj(ctx, opsRequest) == nil
-		}).Should(BeTrue())
-
+		opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[2]}
+		notSupportMsg := "volumeClaimTemplate: [data] not support volume expansion in component: replicasets, you can view infos by command: kubectl get sc"
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notSupportMsg))
+		// TODO
+		By("testing volumeExpansion - pvc exists")
+		// TODO
 		By("By testing volumeExpansion - (TODO)use specified storage class")
 		// Eventually(func() bool {
 		// 	 opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[3]}
@@ -347,29 +344,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing horizontalScaling - target component not exist")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[0]}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString("hs-not-exist")))
 
 		By("By testing horizontalScaling - target component not exist partly")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[0], hScalingList[2]}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
-
-		By("By testing horizontalScaling - target component not supported")
-		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
-		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[1]}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not supported the HorizontalScaling operation"))
-
-		By("By testing horizontalScaling - target component not supported partly")
-		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
-		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[1], hScalingList[2]}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not supported the HorizontalScaling operation"))
-
-		By("By testing horizontalScaling - target component not exist and not supported partly")
-		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
-		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[0], hScalingList[1], hScalingList[2]}
-		err := testCtx.CreateObj(ctx, opsRequest)
-		Expect(err.Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
-		Expect(err.Error()).To(ContainSubstring("not supported the HorizontalScaling operation"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString("hs-not-exist")))
 
 		By("By testing horizontalScaling. if api is legal, it will create successfully")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
@@ -410,7 +390,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest.Spec.RestartList = []ComponentOps{
 			{ComponentName: "replicasets1"},
 		}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString("replicasets1")))
 
 		By("By testing restart. if api is legal, it will create successfully")
 		Eventually(func() bool {

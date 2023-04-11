@@ -99,9 +99,9 @@ var _ = Describe("Consensus Component", func() {
 
 			sts := testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
 			componentName := consensusCompName
-			compDefName := cluster.GetComponentDefRefName(componentName)
+			compDefName := cluster.Spec.GetComponentDefRefName(componentName)
 			componentDef := clusterDef.GetComponentDefByName(compDefName)
-			component := cluster.GetComponentByName(componentName)
+			component := cluster.Spec.GetComponentByName(componentName)
 
 			By("test pods are not ready")
 			consensusComponent, err := NewConsensusSet(k8sClient, cluster, component, *componentDef)

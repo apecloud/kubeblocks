@@ -77,10 +77,8 @@ type ClusterStatus struct {
 	// Stopped: cluster has stopped, all its components are stopped. [terminal state]
 	// Failed: cluster is unavailable. [terminal state]
 	// Abnormal: Cluster is still running, but part of its components are Abnormal/Failed. [terminal state]
-	// Starting: Cluster has entered starting process.
+	// Creating: Cluster has entered creating process.
 	// Updating: Cluster has entered updating process, triggered by Spec. updated.
-	// Stopping: Cluster has entered a stopping process.
-	// if the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// +optional
 	Phase ClusterPhase `json:"phase,omitempty"`
 
@@ -183,16 +181,14 @@ type ComponentMessageMap map[string]string
 // ClusterComponentStatus record components status information
 type ClusterComponentStatus struct {
 	// phase describes the phase of the component, the detail information of the phases are as following:
-	// Failed: component is unavailable, i.e, all pods are not ready for Stateless/Stateful component;
-	// Leader/Primary pod is not ready for Consensus/Replication component.
 	// Running: component is running. [terminal state]
 	// Stopped: component is stopped, as no running pod. [terminal state]
-	// Failed: component has failed to start running. [terminal state]
-	// Abnormal: component is running but part of its pods are not ready. [terminal state]
-	// Starting: component has entered starting process.
+	// Failed: component is unavailable. i.e, all pods are not ready for Stateless/Stateful component,
+	// Leader/Primary pod is not ready for Consensus/Replication component. [terminal state]
+	// Abnormal: component is running but part of its pods are not ready.
+	// Leader/Primary pod is ready for Consensus/Replication component. [terminal state]
+	// Creating: component has entered creating process.
 	// Updating: component has entered updating process, triggered by Spec. updated.
-	// Stopping: component has entered a stopping process.
-	// If the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.
@@ -283,7 +279,56 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// spec defines the desired characteristics of a volume requested by a pod author.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Spec *corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
+	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
+}
+
+func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
+	t := corev1.PersistentVolumeClaimTemplate{}
+	t.ObjectMeta.Name = r.Name
+	t.Spec = r.Spec.ToV1PersistentVolumeClaimSpec()
+	return t
+}
+
+type PersistentVolumeClaimSpec struct {
+	// accessModes contains the desired access modes the volume should have.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
+	// +optional
+	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+	// resources represents the minimum resources the volume should have.
+	// If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
+	// that are lower than previous value but must still be higher than capacity recorded in the
+	// status field of the claim.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	// storageClassName is the name of the StorageClass required by the claim.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
+	// TODO:
+	// // preferStorageClassNames added support specifying storageclasses.storage.k8s.io names, in order
+	// // to adapt multi-cloud deployment, where storageclasses are all distinctly different among clouds.
+	// // +listType=set
+	// // +optional
+	// PreferSCNames []string `json:"preferStorageClassNames,omitempty"`
+}
+
+// ToV1PersistentVolumeClaimSpec converts to corev1.PersistentVolumeClaimSpec.
+func (r PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
+	return corev1.PersistentVolumeClaimSpec{
+		AccessModes:      r.AccessModes,
+		Resources:        r.Resources,
+		StorageClassName: r.StorageClassName,
+	}
+}
+
+// GetStorageClassName return PersistentVolumeClaimSpec.StorageClassName if value is assigned, otherwise
+// return preferSC argument.
+func (r PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
+	if r.StorageClassName != nil && *r.StorageClassName != "" {
+		return r.StorageClassName
+	}
+	return &preferSC
 }
 
 type Affinity struct {
@@ -426,10 +471,30 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
+// GetComponentByName gets component by name.
+func (r ClusterSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
+	for _, v := range r.ComponentSpecs {
+		if v.Name == componentName {
+			return &v
+		}
+	}
+	return nil
+}
+
+// GetComponentDefRefName gets the name of referenced component definition.
+func (r ClusterSpec) GetComponentDefRefName(componentName string) string {
+	for _, component := range r.ComponentSpecs {
+		if componentName == component.Name {
+			return component.ComponentDefRef
+		}
+	}
+	return ""
+}
+
 // ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detect invalid values.
-func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
+func (r ClusterSpec) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	message := make([]string, 0)
-	for _, comp := range r.Spec.ComponentSpecs {
+	for _, comp := range r.ComponentSpecs {
 		invalidLogNames := cd.ValidateEnabledLogConfigs(comp.ComponentDefRef, comp.EnabledLogs)
 		if len(invalidLogNames) == 0 {
 			continue
@@ -443,9 +508,9 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 }
 
 // GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentSpec.
-func (r *Cluster) GetDefNameMappingComponents() map[string][]ClusterComponentSpec {
+func (r ClusterSpec) GetDefNameMappingComponents() map[string][]ClusterComponentSpec {
 	m := map[string][]ClusterComponentSpec{}
-	for _, c := range r.Spec.ComponentSpecs {
+	for _, c := range r.ComponentSpecs {
 		v := m[c.ComponentDefRef]
 		v = append(v, c)
 		m[c.ComponentDefRef] = v
@@ -454,77 +519,51 @@ func (r *Cluster) GetDefNameMappingComponents() map[string][]ClusterComponentSpe
 }
 
 // GetMessage gets message map deep copy object
-func (in *ClusterComponentStatus) GetMessage() ComponentMessageMap {
+func (r ClusterComponentStatus) GetMessage() ComponentMessageMap {
 	messageMap := map[string]string{}
-	for k, v := range in.Message {
+	for k, v := range r.Message {
 		messageMap[k] = v
 	}
 	return messageMap
 }
 
 // SetMessage override message map object
-func (in *ClusterComponentStatus) SetMessage(messageMap ComponentMessageMap) {
-	if in == nil {
+func (r *ClusterComponentStatus) SetMessage(messageMap ComponentMessageMap) {
+	if r == nil {
 		return
 	}
-	in.Message = messageMap
+	r.Message = messageMap
 }
 
 // SetObjectMessage sets k8s workload message to component status message map
-func (in *ClusterComponentStatus) SetObjectMessage(objectKind, objectName, message string) {
-	if in == nil {
+func (r *ClusterComponentStatus) SetObjectMessage(objectKind, objectName, message string) {
+	if r == nil {
 		return
 	}
-	if in.Message == nil {
-		in.Message = map[string]string{}
+	if r.Message == nil {
+		r.Message = map[string]string{}
 	}
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
-	in.Message[messageKey] = message
+	r.Message[messageKey] = message
 }
 
 // GetObjectMessage gets the k8s workload message in component status message map
-func (in *ClusterComponentStatus) GetObjectMessage(objectKind, objectName string) string {
-	if in == nil {
-		return ""
-	}
+func (r ClusterComponentStatus) GetObjectMessage(objectKind, objectName string) string {
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
-	return in.Message[messageKey]
+	return r.Message[messageKey]
 }
 
 // SetObjectMessage sets k8s workload message to component status message map
-func (m ComponentMessageMap) SetObjectMessage(objectKind, objectName, message string) {
-	if m == nil {
+func (r ComponentMessageMap) SetObjectMessage(objectKind, objectName, message string) {
+	if r == nil {
 		return
 	}
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
-	m[messageKey] = message
-}
-
-// GetComponentByName gets component by name.
-func (r *Cluster) GetComponentByName(componentName string) *ClusterComponentSpec {
-	for _, v := range r.Spec.ComponentSpecs {
-		if v.Name == componentName {
-			return &v
-		}
-	}
-	return nil
-}
-
-// GetComponentDefRefName gets the name of referenced component definition.
-func (r *Cluster) GetComponentDefRefName(componentName string) string {
-	for _, component := range r.Spec.ComponentSpecs {
-		if componentName == component.Name {
-			return component.ComponentDefRef
-		}
-	}
-	return ""
+	r[messageKey] = message
 }
 
 // SetComponentStatus does safe operation on ClusterStatus.Components map object update.
 func (r *ClusterStatus) SetComponentStatus(name string, status ClusterComponentStatus) {
-	if r == nil {
-		return
-	}
 	r.checkedInitComponentsMap()
 	r.Components[name] = status
 }
@@ -541,8 +580,8 @@ func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolum
 		return nil
 	}
 	var ts []corev1.PersistentVolumeClaimTemplate
-	for _, template := range r.VolumeClaimTemplates {
-		ts = append(ts, toVolumeClaimTemplate(template))
+	for _, t := range r.VolumeClaimTemplates {
+		ts = append(ts, t.toVolumeClaimTemplate())
 	}
 	return ts
 }
@@ -570,7 +609,7 @@ func GetClusterUpRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
 		AbnormalClusterPhase,
-		// FailedClusterPhase, // REVIEW/TODO: single component with single pod component are handled as FailedClusterPhase, ought to remove this.
+		FailedClusterPhase, // REVIEW/TODO: single component with single pod component are handled as FailedClusterPhase, ought to remove this.
 	}
 }
 
@@ -590,13 +629,4 @@ func GetComponentTerminalPhases() []ClusterComponentPhase {
 		FailedClusterCompPhase,
 		AbnormalClusterCompPhase,
 	}
-}
-
-func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
-	t := corev1.PersistentVolumeClaimTemplate{}
-	t.ObjectMeta.Name = template.Name
-	if template.Spec != nil {
-		t.Spec = *template.Spec
-	}
-	return t
 }

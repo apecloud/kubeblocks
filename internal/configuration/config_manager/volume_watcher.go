@@ -26,7 +26,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-type WatchEventHandler func(event fsnotify.Event) error
+type WatchEventHandler func(ctx context.Context, event fsnotify.Event) error
 type NotifyEventFilter func(event fsnotify.Event) (bool, error)
 
 const (
@@ -125,7 +125,7 @@ func (w *ConfigMapVolumeWatcher) loopNotifyEvent(watcher *fsnotify.Watcher, ctx 
 				continue
 			}
 			w.log.Debugf("volume configmap updated. event: %s, path: %s", event.Op.String(), event.Name)
-			runWithRetry(w.handler, event, w.retryCount, w.log)
+			runWithRetry(w.ctx, w.handler, event, w.retryCount, w.log)
 		case err := <-watcher.Errors:
 			w.log.Error(err)
 		case <-ctx.Done():
@@ -135,10 +135,10 @@ func (w *ConfigMapVolumeWatcher) loopNotifyEvent(watcher *fsnotify.Watcher, ctx 
 	}
 }
 
-func runWithRetry(handler WatchEventHandler, event fsnotify.Event, retryCount int, logger *zap.SugaredLogger) {
+func runWithRetry(ctx context.Context, handler WatchEventHandler, event fsnotify.Event, retryCount int, logger *zap.SugaredLogger) {
 	var err error
 	for {
-		if err = handler(event); err == nil {
+		if err = handler(ctx, event); err == nil {
 			return
 		}
 		retryCount--

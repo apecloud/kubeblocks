@@ -1,0 +1,24 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: weaviate
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'Weaviate is an open-source (BSD-3.0 licensed)  vector database. It allows you to store data objects and vector embeddings from your favorite ML-models, and scale seamlessly into billions of data objects.'
+
+  type: Helm
+
+  helm:
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/weaviate-{{ default .Chart.Version .Values.versionOverride }}.tgz
+
+  installable:
+    autoInstall: false
+
+  defaultInstallValues:
+    - enabled: true

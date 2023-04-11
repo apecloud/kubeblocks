@@ -1,0 +1,897 @@
+# Default values for weaviate.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+
+clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
+
+## @param commonLabels Labels to add to all deployed objects
+##
+commonLabels: {}
+
+## @param application images
+##
+images:
+  pullPolicy: IfNotPresent
+  weaviate:
+    repository: docker.io/semitechnologies/weaviate
+    tag: 1.18.0
+
+## @param debugEnabled enables containers' debug logging
+##
+debugEnabled: true
+
+# overwrite command and args if you want to run specific startup scripts, for
+# example setting the nofile limit
+command: ["/bin/weaviate"]
+args:
+  - '--host'
+  - '0.0.0.0'
+  - '--port'
+  - '8080'
+  - '--scheme'
+  - 'http'
+  - '--config-file'
+  - '/weaviate-config/conf.yaml'
+  - --read-timeout=60s
+  - --write-timeout=60s
+
+# below is an example that can be used to set an arbitrary nofile limit at
+# startup:
+#
+# command:
+#   - "/bin/sh"
+# args:
+#   - "-c"
+#   - "ulimit -n 65535 && /bin/weaviate --host 0.0.0.0 --port 8080 --scheme http --config-file /weaviate-config/conf.yaml"
+
+# Scale replicas of Weaviate. Note that as of v1.8.0 dynamic scaling is limited
+# to cases where no data is imported yet. Scaling down after importing data may
+# break usability. Full dynamic scalability will be added in a future release.
+replicas: 1
+resources: {}
+  # requests:
+  #   cpu: '500m'
+  #   memory: '300Mi'
+  # limits:
+  #   cpu: '1000m'
+#   memory: '1Gi'
+
+
+# Add a service account ot the Weaviate pods if you need Weaviate to have permissions to
+# access kubernetes resources or cloud provider resources. For example for it to have
+# access to a backup up bucket, or if you want to restrict Weaviate pod in any way.
+# By default, use the default ServiceAccount
+serviceAccountName:
+
+# The Persistent Volume Claim settings for Weaviate. If there's a
+# storage.fullnameOverride field set, then the default pvc will not be
+# created, instead the one defined in fullnameOverride will be used
+storage:
+  size: 32Gi
+  storageClassName: ""
+
+# The service controls how weaviate is exposed to the outside world. If you
+# don't want a public load balancer, you can also choose 'ClusterIP' to make
+# weaviate only accessible within your cluster.
+service:
+  name: weaviate
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      # Target port is going to be the same for every port
+  type: LoadBalancer
+  loadBalancerSourceRanges: []
+  # optionally set cluster IP if you want to set a static IP
+  clusterIP:
+  annotations: {}
+
+# Adjust liveness, readiness and startup probes configuration
+startupProbe:
+  # For kubernetes versions prior to 1.18 startupProbe is not supported thus can be disabled.
+  enabled: false
+
+  initialDelaySeconds: 300
+  periodSeconds: 60
+  failureThreshold: 50
+  successThreshold: 1
+  timeoutSeconds: 3
+
+livenessProbe:
+  initialDelaySeconds: 900
+  periodSeconds: 10
+  failureThreshold: 30
+  successThreshold: 1
+  timeoutSeconds: 3
+
+readinessProbe:
+  initialDelaySeconds: 3
+  periodSeconds: 10
+  failureThreshold: 3
+  successThreshold: 1
+  timeoutSeconds: 3
+
+
+terminationGracePeriodSeconds: 600
+
+# Weaviate Config
+#
+# The following settings allow you to customize Weaviate to your needs, for
+# example set authentication and authorization options. See weaviate docs
+# (https://www.weaviate.io/developers/weaviate/) for all
+# configuration.
+authentication:
+  anonymous_access:
+    enabled: true
+authorization:
+  admin_list:
+    enabled: false
+query_defaults:
+  limit: 100
+debug: false
+
+
+# Insert any custom environment variables or envSecrets by putting the exact name
+# and desired value into the settings below. Any env name passed will be automatically
+# set for the statefulSet.
+env:
+  CLUSTER_GOSSIP_BIND_PORT: 7000
+  CLUSTER_DATA_BIND_PORT: 7001
+  # The aggressiveness of the Go Garbage Collector. 100 is the default value.
+  GOGC: 100
+
+  # Expose metrics on port 2112 for Prometheus to scrape
+  PROMETHEUS_MONITORING_ENABLED: false
+
+  # Set a MEM limit for the Weaviate Pod so it can help you both increase GC-related
+  # performance as well as avoid GC-related out-of-memory (“OOM”) situations
+  # GOMEMLIMIT: 6GiB
+
+  # Maximum results Weaviate can query with/without pagination
+  # NOTE: Affects performance, do NOT set to a very high value.
+  # The default is 100K
+  QUERY_MAXIMUM_RESULTS: 100000
+
+  # whether to enable vector dimensions tracking metric
+  TRACK_VECTOR_DIMENSIONS: false
+
+  # whether to re-index/-compute the vector dimensions metric (needed if upgrading from weaviate < v1.16.0)
+  REINDEX_VECTOR_DIMENSIONS_AT_STARTUP: false
+
+envSecrets:
+
+
+# Configure backup providers
+backups:
+  # The backup-filesystem module enables creation of the DB backups in
+  # the local filesystem
+  filesystem:
+    enabled: false
+    envconfig:
+      # Configure folder where backups should be saved
+      BACKUP_FILESYSTEM_PATH: /tmp/backups
+
+  s3:
+    enabled: false
+    # If one is using AWS EKS and has already configured K8s Service Account
+    # that holds the AWS credentials one can pass a name of that service account
+    # here using this setting.
+    # NOTE: the root `serviceAccountName` config has priority over this one, and
+    # if the root one is set this one will NOT overwrite it. This one is here for
+    # backwards compatibility.
+    serviceAccountName:
+
+    envconfig:
+      # Configure bucket where backups should be saved, this setting is mandatory
+      BACKUP_S3_BUCKET: weaviate-backups
+
+      # Optional setting. Defaults to empty string.
+      # Set this option if you want to save backups to a given location
+      # inside the bucket
+      # BACKUP_S3_PATH: path/inside/bucket
+
+      # Optional setting. Defaults to AWS S3 (s3.amazonaws.com).
+      # Set this option if you have a MinIO storage configured in your environment
+      # and want to use it instead of the AWS S3.
+      # BACKUP_S3_ENDPOINT: custom.minio.endpoint.address
+
+      # Optional setting. Defaults to true.
+      # Set this option if you don't want to use SSL.
+      # BACKUP_S3_USE_SSL: true
+
+      # You can pass environment AWS settings here:
+      # Define the region
+      # AWS_REGION: eu-west-1
+
+    # For Weaviate to be able to create bucket objects it needs a user credentials to authenticate to AWS.
+    # The User must have permissions to read/create/delete bucket objects.
+    # You can pass the User credentials (access-key id and access-secret-key) in 2 ways:
+    # 1. by setting the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY plain values in the `secrets` section below
+    #     this chart will create a kubernetes secret for you with these key-values pairs
+    # 2. create Kubernetes secret/s with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY  keys and their respective values
+    #     Set the Key and the secret where it is set in `envSecrets` section below
+    secrets: {}
+    #   AWS_ACCESS_KEY_ID: access-key-id (plain text)
+    #   AWS_SECRET_ACCESS_KEY: secret-access-key (plain text)
+
+    # If one has already defined secrets with AWS credentials one can pass them using
+    # this setting:
+    envSecrets: {}
+    #   AWS_ACCESS_KEY_ID: name-of-the-k8s-secret-containing-the-key-id
+    #   AWS_SECRET_ACCESS_KEY: name-of-the-k8s-secret-containing-the-key
+
+  gcs:
+    enabled: false
+    envconfig:
+      # Configure bucket where backups should be saved, this setting is mandatory
+      BACKUP_GCS_BUCKET: weaviate-backups
+
+      # Optional setting. Defaults to empty string.
+      # Set this option if you want to save backups to a given location
+      # inside the bucket
+      # BACKUP_GCS_PATH: path/inside/bucket
+
+      # You can pass environment Google settings here:
+      # Define the project
+      # GOOGLE_CLOUD_PROJECT: project-id
+
+    # For Weaviate to be able to create bucket objects it needs a ServiceAccount credentials to authenticate to GCP.
+    # The ServiceAccount must have permissions to read/create/delete bucket objects.
+    # You can pass the ServiceAccount credentials (as JSON) in 2 ways:
+    # 1. by setting the GOOGLE_APPLICATION_CREDENTIALS json as plain text in the `secrets` section below
+    #     this chart will create a kubernetes secret for you with this key-values pairs
+    # 2. create a Kubernetes secret with GOOGLE_APPLICATION_CREDENTIALS key and its respective value
+    #     Set the Key and the secret where it is set in `envSecrets` section below
+    secrets: {}
+    #   GOOGLE_APPLICATION_CREDENTIALS: credentials-json-string
+
+    # If one has already defined a secret with GOOGLE_APPLICATION_CREDENTIALS one can pass them using
+    # this setting:
+    envSecrets: {}
+    #   GOOGLE_APPLICATION_CREDENTIALS: name-of-the-k8s-secret-containing-the-key
+
+  azure:
+    enabled: false
+    envconfig:
+      # Configure container where backups should be saved, this setting is mandatory
+      BACKUP_AZURE_CONTAINER: weaviate-backups
+
+      # Optional setting. Defaults to empty string.
+      # Set this option if you want to save backups to a given location
+      # inside the container
+      # BACKUP_AZURE_PATH: path/inside/container
+
+    # For Weaviate to be able to create container objects it needs a user credentials to authenticate to Azure Storage.
+    # The User must have permissions to read/create/delete container objects.
+    # You can pass the User credentials (account-name id and account-key or connection-string) in 2 ways:
+    # 1. by setting the AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_KEY
+    #     or AZURE_STORAGE_CONNECTION_STRING plain values in the `secrets` section below
+    #     this chart will create a kubernetes secret for you with these key-values pairs
+    # 2. create Kubernetes secret/s with AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_KEY
+    #     or AZURE_STORAGE_CONNECTION_STRING and their respective values
+    #     Set the Key and the secret where it is set in `envSecrets` section below
+    secrets: {}
+    #   AZURE_STORAGE_ACCOUNT: account-name (plain text)
+    #   AZURE_STORAGE_KEY: account-key (plain text)
+    #   AZURE_STORAGE_CONNECTION_STRING: connection-string (plain text)
+
+    # If one has already defined secrets with Azure Storage credentials one can pass them using
+    # this setting:
+    envSecrets: {}
+    #   AZURE_STORAGE_ACCOUNT: name-of-the-k8s-secret-containing-the-account-name
+    #   AZURE_STORAGE_KEY: name-of-the-k8s-secret-containing-account-key
+    #   AZURE_STORAGE_CONNECTION_STRING: name-of-the-k8s-secret-containing-connection-string
+
+
+# modules are extensions to Weaviate, they can be used to support various
+# ML-models, but also other features unrelated to model inference.
+# An inference/vectorizer module is not required, you can also run without any
+# modules and import your own vectors.
+modules:
+
+  # The text2vec-contextionary module uses a fastText-based vector-space to
+  # derive vector embeddings for your objects. It is very efficient on CPUs,
+  # but in some situations it cannot reach the same level of accuracy as
+  # transformers-based models.
+  text2vec-contextionary:
+    # disable if you want to use transformers or import or own vectors
+    enabled: false
+
+    # The configuration below is ignored if enabled==false
+    fullnameOverride: contextionary
+    tag: en0.16.0-v1.0.2
+    repo: semitechnologies/contextionary
+    registry: docker.io
+    replicas: 1
+    envconfig:
+      occurrence_weight_linear_factor: 0.75
+      neighbor_occurrence_ignore_percentile: 5
+      enable_compound_splitting: false
+      extensions_storage_mode: weaviate
+    resources:
+      requests:
+        cpu: '500m'
+        memory: '500Mi'
+      limits:
+        cpu: '1000m'
+        memory: '5000Mi'
+
+    # It is possible to add a ServiceAccount to this module's Pods, it can be
+    # used in cases where the module is in a private registry and you want to
+    # give access to the registry only to this pod.
+    # NOTE: if not set the root `serviceAccountName` config will be used.
+    serviceAccountName:
+
+    # You can guide where the pods are scheduled on a per-module basis,
+    # as well as for Weaviate overall. Each module accepts nodeSelector,
+    # tolerations, and affinity configuration. If it is set on a per-
+    # module basis, this configuration overrides the global config.
+
+    nodeSelector:
+    tolerations:
+    affinity:
+
+  # The text2vec-transformers modules uses neural networks, such as BERT,
+  # DistilBERT, etc. to dynamically compute vector embeddings based on the
+  # sentence's context. It is very slow on CPUs and should run with
+  # CUDA-enabled GPUs for optimal performance.
+  text2vec-transformers:
+
+    # enable if you want to use transformers instead of the
+    # text2vec-contextionary module
+    enabled: false
+    # You can set directly an inference URL of this module without deploying it with this release.
+    # You can do so by setting a value for the `inferenceUrl` here AND by setting the `enable` to `false`
+    inferenceUrl: {}
+    # The configuration below is ignored if enabled==false
+
+    # replace with model of choice, see
+    # https://weaviate.io/developers/weaviate/modules/retriever-vectorizer-modules/text2vec-transformers
+    # for all supported models or build your own container.
+    tag: distilbert-base-uncased
+    repo: semitechnologies/transformers-inference
+    registry: docker.io
+    replicas: 1
+    fullnameOverride: transformers-inference
+    probeInitialDelaySeconds: 120
+    envconfig:
+      # enable for CUDA support. Your K8s cluster needs to be configured
+      # accordingly and you need to explicitly set GPU requests & limits below
+      enable_cuda: false
+
+      # only used when cuda is enabled
+      nvidia_visible_devices: all
+      nvidia_driver_capabilities: compute,utility
+
+      # only used when cuda is enabled
+      ld_library_path: /usr/local/nvidia/lib64
+
+    resources:
+      requests:
+        cpu: '1000m'
+        memory: '3000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+      limits:
+        cpu: '1000m'
+        memory: '5000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+
+    # It is possible to add a ServiceAccount to this module's Pods, it can be
+    # used in cases where the module is in a private registry and you want to
+    # give access to the registry only to this pod.
+    # NOTE: if not set the root `serviceAccountName` config will be used.
+    serviceAccountName:
+
+    # You can guide where the pods are scheduled on a per-module basis,
+    # as well as for Weaviate overall. Each module accepts nodeSelector,
+    # tolerations, and affinity configuration. If it is set on a per-
+    # module basis, this configuration overrides the global config.
+
+    nodeSelector:
+    tolerations:
+    affinity:
+
+    passageQueryServices:
+      passage:
+        enabled: false
+        # You can set directly an inference URL of this module without deploying it with this release.
+        # You can do so by setting a value for the `inferenceUrl` here AND by setting the `enable` to `false`
+        inferenceUrl: {}
+
+        tag: facebook-dpr-ctx_encoder-single-nq-base
+        repo: semitechnologies/transformers-inference
+        registry: docker.io
+        replicas: 1
+        fullnameOverride: transformers-inference-passage
+        envconfig:
+          # enable for CUDA support. Your K8s cluster needs to be configured
+          # accordingly and you need to explicitly set GPU requests & limits below
+          enable_cuda: false
+
+          # only used when cuda is enabled
+          nvidia_visible_devices: all
+          nvidia_driver_capabilities: compute,utility
+
+          # only used when cuda is enabled
+          ld_library_path: /usr/local/nvidia/lib64
+
+        resources:
+          requests:
+            cpu: '1000m'
+            memory: '3000Mi'
+
+            # enable if running with CUDA support
+            # nvidia.com/gpu: 1
+          limits:
+            cpu: '1000m'
+            memory: '5000Mi'
+
+            # enable if running with CUDA support
+            # nvidia.com/gpu: 1
+
+        # You can guide where the pods are scheduled on a per-module basis,
+        # as well as for Weaviate overall. Each module accepts nodeSelector,
+        # tolerations, and affinity configuration. If it is set on a per-
+        # module basis, this configuration overrides the global config.
+
+        nodeSelector:
+        tolerations:
+        affinity:
+
+      query:
+        enabled: false
+        # You can set directly an inference URL of this module without deploying it with this release.
+        # You can do so by setting a value for the `inferenceUrl` here AND by setting the `enable` to `false`
+        inferenceUrl: {}
+
+        tag: facebook-dpr-question_encoder-single-nq-base
+        repo: semitechnologies/transformers-inference
+        registry: docker.io
+        replicas: 1
+        fullnameOverride: transformers-inference-query
+        envconfig:
+          # enable for CUDA support. Your K8s cluster needs to be configured
+          # accordingly and you need to explicitly set GPU requests & limits below
+          enable_cuda: false
+
+          # only used when cuda is enabled
+          nvidia_visible_devices: all
+          nvidia_driver_capabilities: compute,utility
+
+          # only used when cuda is enabled
+          ld_library_path: /usr/local/nvidia/lib64
+
+        resources:
+          requests:
+            cpu: '1000m'
+            memory: '3000Mi'
+
+            # enable if running with CUDA support
+            # nvidia.com/gpu: 1
+          limits:
+            cpu: '1000m'
+            memory: '5000Mi'
+
+            # enable if running with CUDA support
+            # nvidia.com/gpu: 1
+
+        # You can guide where the pods are scheduled on a per-module basis,
+        # as well as for Weaviate overall. Each module accepts nodeSelector,
+        # tolerations, and affinity configuration. If it is set on a per-
+        # module basis, this configuration overrides the global config.
+
+        nodeSelector:
+        tolerations:
+        affinity:
+
+  # The text2vec-openai module uses OpenAI Embeddings API
+  # to dynamically compute vector embeddings based on the
+  # sentence's context.
+  # More information about OpenAI Embeddings API can be found here:
+  # https://beta.openai.com/docs/guides/embeddings/what-are-embeddings
+  text2vec-openai:
+
+    # enable if you want to use OpenAI module
+    enabled: false
+
+    # Set your OpenAI API Key to be passed to Weaviate pod as
+    # an environment variable
+    apiKey: ''
+
+  # The text2vec-huggingface module uses HuggingFace API
+  # to dynamically compute vector embeddings based on the
+  # sentence's context.
+  # More information about HuggingFace API can be found here:
+  # https://huggingface.co/docs/api-inference/detailed_parameters#feature-extraction-task
+  text2vec-huggingface:
+
+    # enable if you want to use HuggingFace module
+    enabled: false
+
+    # Set your HuggingFace API Key to be passed to Weaviate pod as
+    # an environment variable
+    apiKey: ''
+
+  # The text2vec-cohere module uses Cohere API
+  # to dynamically compute vector embeddings based on the
+  # sentence's context.
+  # More information about Cohere API can be found here: https://docs.cohere.ai/
+  text2vec-cohere:
+
+    # enable if you want to use Cohere module
+    enabled: false
+
+    # Set your Cohere API Key to be passed to Weaviate pod as
+    # an environment variable
+    apiKey: ''
+
+  # The ref2vec-centroid module
+  ref2vec-centroid:
+
+    # enable if you want to use Centroid module
+    enabled: false
+
+  # The multi2vec-clip modules uses CLIP transformers to vectorize both images
+  # and text in the same vector space. It is typically slow(er) on CPUs and should
+  # run with CUDA-enabled GPUs for optimal performance.
+  multi2vec-clip:
+
+    # enable if you want to use transformers instead of the
+    # text2vec-contextionary module
+    enabled: false
+    # You can set directly an inference URL of this module without deploying it with this release.
+    # You can do so by setting a value for the `inferenceUrl` here AND by setting the `enable` to `false`
+    inferenceUrl: {}
+
+    # The configuration below is ignored if enabled==false
+
+    # replace with model of choice, see
+    # https://weaviate.io/developers/weaviate/modules/retriever-vectorizer-modules/multi2vec-clip
+    # for all supported models or build your own container.
+    tag: sentence-transformers-clip-ViT-B-32-multilingual-v1
+    repo: semitechnologies/multi2vec-clip
+    registry: docker.io
+    replicas: 1
+    fullnameOverride: clip-inference
+    envconfig:
+      # enable for CUDA support. Your K8s cluster needs to be configured
+      # accordingly and you need to explicitly set GPU requests & limits below
+      enable_cuda: false
+
+      # only used when cuda is enabled
+      nvidia_visible_devices: all
+      nvidia_driver_capabilities: compute,utility
+
+      # only used when cuda is enabled
+      ld_library_path: /usr/local/nvidia/lib64
+
+    resources:
+      requests:
+        cpu: '1000m'
+        memory: '3000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+      limits:
+        cpu: '1000m'
+        memory: '5000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+    annotations:
+    nodeSelector:
+    tolerations:
+
+  # The qna-transformers module uses neural networks, such as BERT,
+  # DistilBERT, to find an aswer in text to a given question
+  qna-transformers:
+    enabled: false
+    # You can set directly an inference URL of this module without deploying it with this release.
+    # You can do so by setting a value for the `inferenceUrl` here AND by setting the `enable` to `false`
+    inferenceUrl: {}
+    tag: bert-large-uncased-whole-word-masking-finetuned-squad-34d66b1
+    repo: semitechnologies/qna-transformers
+    registry: docker.io
+    replicas: 1
+    fullnameOverride: qna-transformers
+    envconfig:
+      # enable for CUDA support. Your K8s cluster needs to be configured
+      # accordingly and you need to explicitly set GPU requests & limits below
+      enable_cuda: false
+
+      # only used when cuda is enabled
+      nvidia_visible_devices: all
+      nvidia_driver_capabilities: compute,utility
+
+      # only used when cuda is enabled
+      ld_library_path: /usr/local/nvidia/lib64
+
+    resources:
+      requests:
+        cpu: '1000m'
+        memory: '3000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+      limits:
+        cpu: '1000m'
+        memory: '5000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+
+    # It is possible to add a ServiceAccount to this module's Pods, it can be
+    # used in cases where the module is in a private registry and you want to
+    # give access to the registry only to this pod.
+    # NOTE: if not set the root `serviceAccountName` config will be used.
+    serviceAccountName:
+
+    # You can guide where the pods are scheduled on a per-module basis,
+    # as well as for Weaviate overall. Each module accepts nodeSelector,
+    # tolerations, and affinity configuration. If it is set on a per-
+    # module basis, this configuration overrides the global config.
+
+    nodeSelector:
+    tolerations:
+    affinity:
+
+  # The qna-openai module uses OpenAI Completions API
+  # to dynamically answer given questions.
+  # More information about OpenAI Completions API can be found here:
+  # https://beta.openai.com/docs/api-reference/completions
+  qna-openai:
+
+    # enable if you want to use OpenAI module
+    enabled: false
+
+    # Set your OpenAI API Key to be passed to Weaviate pod as
+    # an environment variable
+    apiKey: ''
+
+  # The generative-openai module uses OpenAI Completions API
+  # along with text-davinci-003 model to behave as ChatGPT.
+  # More information about OpenAI Completions API can be found here:
+  # https://beta.openai.com/docs/api-reference/completions
+  generative-openai:
+
+    # enable if you want to use OpenAI module
+    enabled: false
+
+    # Set your OpenAI API Key to be passed to Weaviate pod as
+    # an environment variable
+    apiKey: ''
+
+  # The img2vec-neural module uses neural networks, to generate
+  # a vector representation of the image
+  img2vec-neural:
+    enabled: false
+    # You can set directly an inference URL of this module without deploying it with this release.
+    # You can do so by setting a value for the `inferenceUrl` here AND by setting the `enable` to `false`
+    inferenceUrl: {}
+    tag: resnet50
+    repo: semitechnologies/img2vec-pytorch
+    registry: docker.io
+    replicas: 1
+    fullnameOverride: img2vec-neural
+    envconfig:
+      # enable for CUDA support. Your K8s cluster needs to be configured
+      # accordingly and you need to explicitly set GPU requests & limits below
+      enable_cuda: false
+
+      # only used when cuda is enabled
+      nvidia_visible_devices: all
+      nvidia_driver_capabilities: compute,utility
+
+      # only used when cuda is enabled
+      ld_library_path: /usr/local/nvidia/lib64
+
+    resources:
+      requests:
+        cpu: '1000m'
+        memory: '3000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+      limits:
+        cpu: '1000m'
+        memory: '5000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+
+    # It is possible to add a ServiceAccount to this module's Pods, it can be
+    # used in cases where the module is in a private registry and you want to
+    # give access to the registry only to this pod.
+    # NOTE: if not set the root `serviceAccountName` config will be used.
+    serviceAccountName:
+
+    # You can guide where the pods are scheduled on a per-module basis,
+    # as well as for Weaviate overall. Each module accepts nodeSelector,
+    # tolerations, and affinity configuration. If it is set on a per-
+    # module basis, this configuration overrides the global config.
+
+    nodeSelector:
+    tolerations:
+    affinity:
+
+  # The text-spellcheck module uses spellchecker library to check
+  # misspellings in a given text
+  text-spellcheck:
+    enabled: false
+    # You can set directly an inference URL of this module without deploying it with this release.
+    # You can do so by setting a value for the `inferenceUrl` here AND by setting the `enable` to `false`
+    inferenceUrl: {}
+    tag: pyspellchecker-en
+    repo: semitechnologies/text-spellcheck-model
+    registry: docker.io
+    replicas: 1
+    fullnameOverride: text-spellcheck
+
+    resources:
+      requests:
+        cpu: '400m'
+        memory: '400Mi'
+      limits:
+        cpu: '500m'
+        memory: '500Mi'
+
+    # It is possible to add a ServiceAccount to this module's Pods, it can be
+    # used in cases where the module is in a private registry and you want to
+    # give access to the registry only to this pod.
+    # NOTE: if not set the root `serviceAccountName` config will be used.
+    serviceAccountName:
+
+    # You can guide where the pods are scheduled on a per-module basis,
+    # as well as for Weaviate overall. Each module accepts nodeSelector,
+    # tolerations, and affinity configuration. If it is set on a per-
+    # module basis, this configuration overrides the global config.
+
+    nodeSelector:
+    tolerations:
+    affinity:
+
+  # The ner-transformers module uses spellchecker library to check
+  # misspellings in a given text
+  ner-transformers:
+    enabled: false
+    # You can set directly an inference URL of this module without deploying it with this release.
+    # You can do so by setting a value for the `inferenceUrl` here AND by setting the `enable` to `false`
+    inferenceUrl: {}
+    tag: dbmdz-bert-large-cased-finetuned-conll03-english-0.0.2
+    repo: semitechnologies/ner-transformers
+    registry: docker.io
+    replicas: 1
+    fullnameOverride: ner-transformers
+    envconfig:
+      # enable for CUDA support. Your K8s cluster needs to be configured
+      # accordingly and you need to explicitly set GPU requests & limits below
+      enable_cuda: false
+
+      # only used when cuda is enabled
+      nvidia_visible_devices: all
+      nvidia_driver_capabilities: compute,utility
+
+      # only used when cuda is enabled
+      ld_library_path: /usr/local/nvidia/lib64
+
+    resources:
+      requests:
+        cpu: '1000m'
+        memory: '3000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+      limits:
+        cpu: '1000m'
+        memory: '5000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+
+    # It is possible to add a ServiceAccount to this module's Pods, it can be
+    # used in cases where the module is in a private registry and you want to
+    # give access to the registry only to this pod.
+    # NOTE: if not set the root `serviceAccountName` config will be used.
+    serviceAccountName:
+
+    # You can guide where the pods are scheduled on a per-module basis,
+    # as well as for Weaviate overall. Each module accepts nodeSelector,
+    # tolerations, and affinity configuration. If it is set on a per-
+    # module basis, this configuration overrides the global config.
+
+    nodeSelector:
+    tolerations:
+    affinity:
+
+  # The sum-transformers module makes result texts summarizations
+  sum-transformers:
+    enabled: false
+    # You can set directly an inference URL of this module without deploying it with this release.
+    # You can do so by setting a value for the `inferenceUrl` here AND by setting the `enable` to `false`
+    inferenceUrl: {}
+    tag: facebook-bart-large-cnn-1.0.0
+    repo: semitechnologies/sum-transformers
+    registry: docker.io
+    replicas: 1
+    fullnameOverride: sum-transformers
+    envconfig:
+      # enable for CUDA support. Your K8s cluster needs to be configured
+      # accordingly and you need to explicitly set GPU requests & limits below
+      enable_cuda: false
+
+      # only used when cuda is enabled
+      nvidia_visible_devices: all
+      nvidia_driver_capabilities: compute,utility
+
+      # only used when cuda is enabled
+      ld_library_path: /usr/local/nvidia/lib64
+
+    resources:
+      requests:
+        cpu: '1000m'
+        memory: '3000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+      limits:
+        cpu: '1000m'
+        memory: '5000Mi'
+
+        # enable if running with CUDA support
+        # nvidia.com/gpu: 1
+
+    # It is possible to add a ServiceAccount to this module's Pods, it can be
+    # used in cases where the module is in a private registry and you want to
+    # give access to the registry only to this pod.
+    # NOTE: if not set the root `serviceAccountName` config will be used.
+    serviceAccountName:
+
+    # You can guide where the pods are scheduled on a per-module basis,
+    # as well as for Weaviate overall. Each module accepts nodeSelector,
+    # tolerations, and affinity configuration. If it is set on a per-
+    # module basis, this configuration overrides the global config.
+
+    nodeSelector:
+    tolerations:
+    affinity:
+
+  # by choosing the default vectorizer module, you can tell Weaviate to always
+  # use this module as the vectorizer if nothing else is specified. Can be
+  # overwritten on a per-class basis.
+  # set to text2vec-transformers if running with transformers instead
+  default_vectorizer_module: none
+
+# It is also possible to configure authentication and authorization through a
+# custom configmap The authorization and authentication values defined in
+# values.yaml will be ignored when defining a custom config map.
+custom_config_map:
+  enabled: false
+  name: 'custom-config'
+
+# Pass any annotations to Weaviate pods
+annotations:
+
+nodeSelector:
+
+tolerations:
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 1
+        podAffinityTerm:
+          topologyKey: "kubernetes.io/hostname"
+          labelSelector:
+            matchExpressions:
+              - key: "app"
+                operator: In
+                values:
+                  - weaviate

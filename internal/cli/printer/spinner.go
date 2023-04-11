@@ -19,8 +19,11 @@ package printer
 import (
 	"fmt"
 	"io"
+	"os"
+	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/briandowns/spinner"
@@ -43,6 +46,15 @@ func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
 		_ = s.Color("cyan")
 		s.Suffix = fmt.Sprintf(" %s", msg)
 		s.Start()
+
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-c
+			s.Stop()
+			fmt.Print("\033[?25")
+			os.Exit(0)
+		}()
 	}
 
 	return func(result bool) {

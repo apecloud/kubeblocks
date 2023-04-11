@@ -170,3 +170,39 @@ func IsSchedulableConfigResource(object client.Object) bool {
 	}
 	return true
 }
+
+func hasImportTemplate(cm *corev1.ConfigMap) bool {
+	annotations := cm.GetAnnotations()
+	if annotations == nil {
+		return false
+	}
+	_, ok := annotations[constant.CMImportedConfigTemplateLabelKey]
+	return ok
+}
+
+func isKnownImportTemplate(templateKey client.ObjectKey, cm *corev1.ConfigMap) bool {
+	annotations := cm.GetAnnotations()
+	if annotations == nil {
+		return false
+	}
+	v, ok := annotations[constant.CMImportedConfigTemplateLabelKey]
+	if !ok {
+		return false
+	}
+	return v == templateKey.String()
+}
+
+// IsChangedImportTemplate is used to check whether the imported template is changed
+// case1: cancel imported template
+// case2: add imported template or change imported template
+func IsChangedImportTemplate(template *appsv1alpha1.ImportConfigTemplate, cm *corev1.ConfigMap) bool {
+	if template == nil {
+		return hasImportTemplate(cm)
+	}
+
+	templateKey := client.ObjectKey{
+		Namespace: template.Namespace,
+		Name:      template.TemplateRef,
+	}
+	return !isKnownImportTemplate(templateKey, cm)
+}

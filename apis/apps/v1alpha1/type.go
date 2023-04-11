@@ -510,3 +510,14 @@ func RegisterWebhookManager(mgr manager.Manager) {
 }
 
 type ComponentNameSet map[string]struct{}
+
+// MergedPolicy defines how to merge external imported templates into component templates.
+// +enum
+// +kubebuilder:validation:Enum={patch,replace,add}
+type MergedPolicy string
+
+const (
+	PatchPolicy   MergedPolicy = "patch"
+	ReplacePolicy MergedPolicy = "replace"
+	OnlyAddPolicy MergedPolicy = "add"
+)

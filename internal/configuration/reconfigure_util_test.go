@@ -234,3 +234,76 @@ func TestIsSchedulableConfigResource(t *testing.T) {
 		})
 	}
 }
+
+func TestIsChangedImportTemplate(t *testing.T) {
+	type args struct {
+		template *appsv1alpha1.ImportConfigTemplate
+		cm       *corev1.ConfigMap
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{{
+		name: "test",
+		args: args{
+			template: nil,
+			cm: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constant.CMImportedConfigTemplateLabelKey: "test",
+					},
+				},
+			},
+		},
+		want: true,
+	}, {
+		name: "test",
+		args: args{
+			template: &appsv1alpha1.ImportConfigTemplate{
+				Namespace:   "default",
+				Name:        "test",
+				TemplateRef: "for_test",
+			},
+			cm: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constant.CMImportedConfigTemplateLabelKey: "default/for_test",
+					},
+				},
+			},
+		},
+		want: false,
+	}, {
+		name: "test",
+		args: args{
+			template: &appsv1alpha1.ImportConfigTemplate{
+				Namespace:   "default",
+				Name:        "test",
+				TemplateRef: "for_test",
+			},
+			cm: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constant.CMImportedConfigTemplateLabelKey: "default/test2",
+					},
+				},
+			},
+		},
+		want: true,
+	}, {
+		name: "test",
+		args: args{
+			template: nil,
+			cm:       &corev1.ConfigMap{},
+		},
+		want: false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsChangedImportTemplate(tt.args.template, tt.args.cm); got != tt.want {
+				t.Errorf("IsChangedImportTemplate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

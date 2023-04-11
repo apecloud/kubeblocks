@@ -102,6 +102,9 @@ const (
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 
+	// CMImportedConfigTemplateLabelKey configmap is imported config template
+	CMImportedConfigTemplateLabelKey = "config.kubeblocks.io/imported"
+
 	// CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationSpecProviderLabelKey = "config.kubeblocks.io/config-spec"
 

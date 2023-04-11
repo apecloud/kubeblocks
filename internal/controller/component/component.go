@@ -60,6 +60,7 @@ func BuildComponent(
 		VolumeTypes:           clusterCompDefObj.VolumeTypes,
 		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
 		ComponentDef:          clusterCompSpec.ComponentDefRef,
+		ImportConfigTemplate:  clusterCompSpec.ImportConfigTemplate,
 	}
 
 	// resolve component.ConfigTemplates

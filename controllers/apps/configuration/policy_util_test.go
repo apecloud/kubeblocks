@@ -120,7 +120,7 @@ func withConfigConstraintSpec(formatter *appsv1alpha1.FormatterConfig) ParamsOps
 
 func withConfigPatch(patch map[string]string) ParamsOps {
 	mockEmptyData := func(m map[string]string) map[string]string {
-		r := make(map[string]string, len(patch))
+		r := make(map[string]string, len(m))
 		for key := range m {
 			r[key] = ""
 		}

@@ -171,6 +171,41 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
+                    importConfigTemplate:
+                      description: importConfigTemplate is used to import config template
+                        from ConfigMap.
+                      properties:
+                        name:
+                          description: Specify the name of configuration template.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                        namespace:
+                          default: default
+                          description: Specify the namespace of the referenced the
+                            configuration template ConfigMap object. An empty namespace
+                            is equivalent to the "default" namespace.
+                          maxLength: 63
+                          type: string
+                        policy:
+                          default: patch
+                          description: policy defines how to merge external imported
+                            templates into component templates.
+                          enum:
+                          - patch
+                          - replace
+                          - add
+                          type: string
+                        templateRef:
+                          description: Specify the name of the referenced the configuration
+                            template ConfigMap object.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - name
+                      - templateRef
+                      type: object
                     issuer:
                       description: issuer who provides tls certs required when TLS
                         enabled

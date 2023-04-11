@@ -198,6 +198,25 @@ func (r *Cluster) validateClusterVersionRef(allErrs *field.ErrorList) {
 	}
 }
 
+// validateImportTemplate validate spec.clusterVersionRef is legal
+func (r *Cluster) validateImportTemplate(allErrs *field.ErrorList) {
+	configMap := &corev1.ConfigMap{}
+	for _, clusterComponentSpec := range r.Spec.ComponentSpecs {
+		if clusterComponentSpec.ImportConfigTemplate == nil {
+			continue
+		}
+		configTemplate := clusterComponentSpec.ImportConfigTemplate
+		templateKey := types.NamespacedName{
+			Namespace: configTemplate.Namespace,
+			Name:      configTemplate.TemplateRef,
+		}
+		if err := webhookMgr.client.Get(context.Background(), templateKey, configMap); err != nil {
+			*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.componentSpecs.importConfigTemplate"),
+				configTemplate, err.Error()))
+		}
+	}
+}
+
 // ValidateComponents validate spec.components is legal
 func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *ClusterDefinition) {
 	var (
@@ -225,6 +244,8 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 	r.validatePrimaryIndex(allErrs)
 
 	r.validateComponentTLSSettings(allErrs)
+
+	r.validateImportTemplate(allErrs)
 
 	if len(invalidComponentDefs) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),

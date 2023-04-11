@@ -32,6 +32,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -64,7 +65,7 @@ func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *a
 	}
 }
 
-func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, task *intctrltypes.ReconcileTask) (bool, *corev1.ConfigMap, error) {
+func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, task *intctrltypes.ReconcileTask, importedTemplate *appsv1alpha1.ImportConfigTemplate) (bool, *corev1.ConfigMap, error) {
 	cmKey := client.ObjectKey{
 		Name:      cfgCMName,
 		Namespace: wrapper.cluster.Namespace,
@@ -88,7 +89,13 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, task *
 		return true, nil, nil
 	}
 
-	// Config is exists
+	// There are two case that can cause rerendering
+	// case1: cancel imported template
+	// case2: add imported template or change imported template
+	if cfgcore.IsChangedImportTemplate(importedTemplate, cmObj) {
+		return true, cmObj, nil
+	}
+
 	return cfgcore.IsNotUserReconfigureOperation(cmObj), cmObj, nil
 }
 
@@ -96,7 +103,8 @@ func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileT
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, configSpec := range task.Component.ConfigTemplates {
 		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, configSpec.Name)
-		enableRerender, origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, task)
+		importedTemplate := getCustomConfigTemplate(task.Component, configSpec)
+		enableRerender, origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, task, importedTemplate)
 		if err != nil {
 			return err
 		}
@@ -111,6 +119,11 @@ func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileT
 			})
 		if err != nil {
 			return err
+		}
+		if importedTemplate != nil {
+			if err := mergerConfigTemplate(importedTemplate, wrapper.templateBuilder, configSpec, newCMObj, wrapper.ctx, wrapper.cli); err != nil {
+				return err
+			}
 		}
 		if err := wrapper.checkAndPatchConfigResource(origCMObj, newCMObj.Data); err != nil {
 			return err
@@ -135,7 +148,6 @@ func (wrapper *renderWrapper) renderScriptTemplate(task *intctrltypes.ReconcileT
 			wrapper.addVolumeMountMeta(templateSpec, object)
 			continue
 		}
-
 		// Generate ConfigMap objects for config files
 		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, "", templateSpec, wrapper.params, wrapper.ctx, wrapper.cli, nil)
 		if err != nil {
@@ -273,14 +285,27 @@ func validateRenderedData(
 	}, configConstraint); err != nil {
 		return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
 	}
+	return validateRawData(renderedData, configSpec, &configConstraint.Spec)
+}
 
+func validateRawData(renderedData map[string]string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec) error {
 	// NOTE: not require checker configuration template status
-	configChecker := cfgcore.NewConfigValidator(&configConstraint.Spec, cfgcore.WithKeySelector(configSpec.Keys))
-
+	configChecker := cfgcore.NewConfigValidator(cc, cfgcore.WithKeySelector(configSpec.Keys))
 	// NOTE: It is necessary to verify the correctness of the data
 	if err := configChecker.Validate(renderedData); err != nil {
 		return cfgcore.WrapError(err, "failed to validate configmap")
 	}
-
 	return nil
+}
+
+// getCustomConfigTemplate get custom config template
+func getCustomConfigTemplate(r *component.SynthesizedComponent, configSpec appsv1alpha1.ComponentConfigSpec) *appsv1alpha1.ImportConfigTemplate {
+	// NOTE: configSpec.ConfigConstraintRef is empty, it means that config patch cannot be supported
+	if configSpec.ConfigConstraintRef == "" {
+		return nil
+	}
+	if r.ImportConfigTemplate == nil || r.ImportConfigTemplate.Name != configSpec.Name {
+		return nil
+	}
+	return r.ImportConfigTemplate
 }

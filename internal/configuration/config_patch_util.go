@@ -82,3 +82,15 @@ func LoadRawConfigObject(data map[string]string, formatConfig *appsv1alpha1.Form
 	}
 	return r, nil
 }
+
+func TransformConfigPatchFromData(data map[string]string, format appsv1alpha1.CfgFileFormat, keys []string) (*ConfigPatchInfo, error) {
+	emptyData := func(m map[string]string) map[string]string {
+		r := make(map[string]string, len(m))
+		for key := range m {
+			r[key] = ""
+		}
+		return r
+	}
+	patch, _, err := CreateConfigPatch(emptyData(data), data, format, keys, false)
+	return patch, err
+}

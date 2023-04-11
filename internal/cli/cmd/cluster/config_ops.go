@@ -92,31 +92,31 @@ func (o *configOpsOptions) Validate() error {
 	if o.editMode {
 		return nil
 	}
-	if err := o.validateConfigParams(o.wrapper.ConfigSpec()); err != nil {
+	if err := o.validateUpdatedParameters(o.wrapper.ConfigSpec()); err != nil {
 		return err
 	}
 	o.printConfigureTips()
 	return nil
 }
 
-func (o *configOpsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConfigSpec) error {
+func (o *configOpsOptions) validateUpdatedParameters(configSpec *appsv1alpha1.ComponentConfigSpec) error {
 	configConstraintKey := client.ObjectKey{
 		Namespace: "",
-		Name:      tpl.ConfigConstraintRef,
+		Name:      configSpec.ConfigConstraintRef,
 	}
 	configConstraint := appsv1alpha1.ConfigConstraint{}
 	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), configConstraintKey, o.Dynamic, &configConstraint); err != nil {
 		return err
 	}
 
-	newConfigData, err := cfgcore.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
+	newConfigData, err := cfgcore.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, configSpec.Keys, []cfgcore.ParamPairs{{
 		Key:           o.CfgFile,
 		UpdatedParams: cfgcore.FromStringMap(o.KeyValues),
 	}})
 	if err != nil {
 		return err
 	}
-	return o.checkChangedParamsAndDoubleConfirm(&configConstraint.Spec, newConfigData, tpl)
+	return o.checkChangedParamsAndDoubleConfirm(&configConstraint.Spec, newConfigData, configSpec)
 }
 
 func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.ConfigConstraintSpec, data map[string]string, tpl *appsv1alpha1.ComponentConfigSpec) error {

@@ -174,6 +174,36 @@ type ClusterComponentSpec struct {
 	// required when TLS enabled
 	// +optional
 	Issuer *Issuer `json:"issuer,omitempty"`
+
+	// importConfigTemplate is used to import config template from ConfigMap.
+	// +optional
+	ImportConfigTemplate *ImportConfigTemplate `json:"importConfigTemplate,omitempty"`
+}
+
+type ImportConfigTemplate struct {
+	// Specify the name of configuration template.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Specify the name of the referenced the configuration template ConfigMap object.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	TemplateRef string `json:"templateRef"`
+
+	// Specify the namespace of the referenced the configuration template ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// policy defines how to merge external imported templates into component templates.
+	// +kubebuilder:default="patch"
+	// +optional
+	Policy MergedPolicy `json:"policy,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

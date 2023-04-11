@@ -12,16 +12,16 @@ kbcli cluster explain-config [flags]
 
 ```
   # describe a cluster, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster
+  kbcli cluster explain-config mycluster
   
   # describe a specified configure template, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster --component-name=mysql --config-specs=mysql-3node-tpl
+  kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl
   
   # describe a specified configure template, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster --component-name=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
+  kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
   
   # describe a specified parameters, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster --component-name=mysql --config-specs=mysql-3node-tpl --param=sql_mode
+  kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl --param=sql_mode
 ```
 
 ### Options

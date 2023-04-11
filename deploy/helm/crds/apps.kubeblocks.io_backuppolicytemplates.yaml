@@ -250,7 +250,7 @@ spec:
                               type: boolean
                             type:
                               description: the type of base backup, only support full
-                                and incremental.
+                                and snapshot.
                               enum:
                               - full
                               - snapshot

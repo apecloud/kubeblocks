@@ -79,7 +79,7 @@ type Schedule struct {
 
 type BaseBackupSchedulePolicy struct {
 	SchedulePolicy `json:",inline"`
-	// the type of base backup, only support full and incremental.
+	// the type of base backup, only support full and snapshot.
 	// +kubebuilder:validation:Required
 	Type BaseBackupType `json:"type"`
 }

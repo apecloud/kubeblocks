@@ -1,21 +1,21 @@
 ---
-title: kbcli cluster configure
+title: kbcli cluster edit-config
 ---
 
-Reconfigure parameters with the specified components in the cluster.
+Edit the config file of the component.
 
 ```
-kbcli cluster configure [flags]
+kbcli cluster edit-config [flags]
 ```
 
 ### Examples
 
 ```
-  # update component params
-  kbcli cluster configure <cluster-name> --component=<component-name> --config-spec=<config-spec-name> --config-file=<config-file> --set max_connections=1000,general_log=OFF
+  # edit config for component
+  kbcli cluster edit-config <cluster-name> [--component=<component-name>] [--config-spec=<config-spec-name>] [--config-file=<config-file>]
   
   # update mysql max_connections, cluster name is mycluster
-  kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=2000
+  kbcli cluster edit-config mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf
 ```
 
 ### Options
@@ -24,8 +24,9 @@ kbcli cluster configure [flags]
       --component string             Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.
       --config-file string           Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.
       --config-spec string           Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.
-  -h, --help                         help for configure
+  -h, --help                         help for edit-config
       --name string                  OpsRequest name. if not specified, it will be randomly generated 
+      --replace                      Specify whether to replace the config file. Default to false.
       --set strings                  Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-config'.
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```

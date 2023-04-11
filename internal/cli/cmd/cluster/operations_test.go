@@ -21,8 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -32,8 +30,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("operations", func() {
@@ -147,58 +143,6 @@ var _ = Describe("operations", func() {
 		restartCmd.Run(restartCmd, []string{clusterName})
 		capturedOutput, _ := done()
 		Expect(testing.ContainExpectStrings(capturedOutput, "kbcli cluster describe-ops")).Should(BeTrue())
-	})
-
-	It("check params for reconfiguring operations", func() {
-		const (
-			ns                 = "default"
-			clusterDefName     = "test-clusterdef"
-			clusterVersionName = "test-clusterversion"
-			clusterName        = "test-cluster"
-			statefulCompType   = "replicasets"
-			statefulCompName   = "mysql"
-			configSpecName     = "mysql-config-tpl"
-			configVolumeName   = "mysql-config"
-		)
-
-		By("Create configmap and config constraint obj")
-		configmap := testapps.NewCustomizedObj("resources/mysql-config-template.yaml", &corev1.ConfigMap{}, testapps.WithNamespace(ns))
-		constraint := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
-			&appsv1alpha1.ConfigConstraint{})
-		componentConfig := testapps.NewConfigMap(ns, cfgcore.GetComponentCfgName(clusterName, statefulCompName, configSpecName), testapps.SetConfigMapData("my.cnf", ""))
-		By("Create a clusterDefinition obj")
-		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
-			AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, ns, configVolumeName).
-			GetObject()
-		By("Create a clusterVersion obj")
-		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(statefulCompType).
-			GetObject()
-		By("creating a cluster")
-		clusterObj := testapps.NewClusterFactory(ns, clusterName,
-			clusterDefObj.Name, "").
-			AddComponent(statefulCompName, statefulCompType).GetObject()
-
-		objs := []runtime.Object{configmap, constraint, clusterDefObj, clusterVersionObj, clusterObj, componentConfig}
-		ttf, o := NewFakeOperationsOptions(ns, clusterObj.Name, appsv1alpha1.ReconfiguringType, objs...)
-		defer ttf.Cleanup()
-		o.ComponentNames = []string{"replicasets", "proxy"}
-		By("validate reconfiguring when multi components")
-		Expect(o.Validate()).To(MatchError("reconfiguring only support one component."))
-
-		By("validate reconfiguring parameter")
-		o.ComponentNames = []string{statefulCompName}
-		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
-		o.Parameters = []string{"abcd"}
-
-		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("updated parameter format"))
-		o.Parameters = []string{"abcd=test"}
-		o.CfgTemplateName = configSpecName
-		o.IOStreams = streams
-		in.Write([]byte(o.Name + "\n"))
-
-		Expect(o.Validate()).Should(Succeed())
 	})
 
 	It("list and delete operations", func() {

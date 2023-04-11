@@ -39,8 +39,6 @@ import (
 const (
 	connectionURLKey = "url"
 	commandSQLKey    = "sql"
-	PRIMARY          = "primary"
-	SECONDARY        = "secondary"
 
 	listUserTpl = `
 	SELECT usename AS userName, valuntil <now() AS expired,  usesuper,

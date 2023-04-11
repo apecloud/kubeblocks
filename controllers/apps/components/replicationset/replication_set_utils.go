@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"sort"
 
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -414,8 +415,14 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	compName string,
 	pod *corev1.Pod,
 	newRole string) error {
-	// if newRole is empty or pod current role label equals to newRole, return
-	if newRole == "" || pod.Labels[constant.RoleLabelKey] == newRole {
+	// if newRole is not Primary or Secondary, ignore it.
+	if !slices.Contains([]string{string(Primary), string(Secondary)}, newRole) {
+		reqCtx.Log.Info("new role is invalid, please check", "new role", newRole)
+		return nil
+	}
+
+	// if pod current role label equals to newRole, return
+	if pod.Labels[constant.RoleLabelKey] == newRole {
 		reqCtx.Log.Info("new role label is empty or pod current role label equals to new role, ignore it", "new role", newRole)
 		return nil
 	}

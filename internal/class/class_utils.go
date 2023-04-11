@@ -176,9 +176,9 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 		}
 		for _, volume := range class.Volumes {
 			result.Volumes = append(result.Volumes, v1alpha1.Volume{
-				Name:  volume.Name,
-				Class: volume.Class,
-				Size:  volume.Size,
+				Name:             volume.Name,
+				StorageClassName: volume.StorageClassName,
+				Size:             volume.Size,
 			})
 		}
 		return result, nil

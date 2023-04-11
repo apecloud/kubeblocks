@@ -258,7 +258,7 @@ func (o *CreateOptions) buildClass() (*v1alpha1.ComponentClass, error) {
 			case "size":
 				volume.Size = resource.MustParse(parts[1])
 			case "class":
-				volume.Class = parts[1]
+				volume.StorageClassName = parts[1]
 			default:
 				return nil, fmt.Errorf("invalid storage item: %s", item)
 			}

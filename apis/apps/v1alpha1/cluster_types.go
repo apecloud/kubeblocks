@@ -112,9 +112,9 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
-	// ClassDefRef reference class defined in ComponentClassDefinition.
+	// classDefRef reference class defined in ComponentClassDefinition.
 	// +optional
-	ClassDefRef ClassDefRef `json:"classDefRef,omitempty"`
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
 	// monitor which is a switch to enable monitoring, default is false
 	// KubeBlocks provides an extension mechanism to support component level monitoring,
@@ -432,13 +432,13 @@ type ClusterComponentService struct {
 }
 
 type ClassDefRef struct {
-	// The ComponentClassDefinition resource name that class reference to.
+	// name refers to the name of the ComponentClassDefinition.
 	// +optional
 	Name string `json:"name,omitempty"`
 
-	// The class name in the ComponentClassDefinition resource.
-	// +optional
-	Class string `json:"class,omitempty"`
+	// class refers to the name of the class that is defined in the ComponentClassDefinition.
+	// +kubebuilder:validation:Required
+	Class string `json:"class"`
 }
 
 // +kubebuilder:object:root=true

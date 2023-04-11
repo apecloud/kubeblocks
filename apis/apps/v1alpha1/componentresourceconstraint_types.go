@@ -33,11 +33,11 @@ type ComponentResourceConstraintSpec struct {
 type ResourceConstraint struct {
 	// The constraint for vcpu cores.
 	// +kubebuilder:validation:Required
-	CPU CPUConstraint `json:"cpu,omitempty"`
+	CPU CPUConstraint `json:"cpu"`
 
 	// The constraint for memory size.
 	// +kubebuilder:validation:Required
-	Memory MemoryConstraint `json:"memory,omitempty"`
+	Memory MemoryConstraint `json:"memory"`
 }
 
 type CPUConstraint struct {

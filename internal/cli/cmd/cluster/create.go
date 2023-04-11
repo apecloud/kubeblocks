@@ -462,7 +462,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		compObj := &appsv1alpha1.ClusterComponentSpec{
 			Name:            c.Name,
 			ComponentDefRef: c.Name,
-			ClassDefRef:     appsv1alpha1.ClassDefRef{Class: getVal(keyClass, sets)},
+			ClassDefRef:     &appsv1alpha1.ClassDefRef{Class: getVal(keyClass, sets)},
 			Replicas:        replicas,
 			Resources: corev1.ResourceRequirements{
 				Requests: resourceList,

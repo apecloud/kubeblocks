@@ -1,3 +1,4 @@
+{{- if eq .Values.architecture "replicaset" }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -43,3 +44,4 @@ spec:
               requests:
                 storage: {{ $.Values.replicaset.persistence.data.size }}
       {{- end }}
+{{- end }}

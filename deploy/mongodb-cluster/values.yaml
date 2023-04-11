@@ -1,3 +1,5 @@
+## @param architecture define MongoDB cluster topology architecture ( `replicaset` or `sharding`)
+architecture: replicaset
 
 ## @param terminationPolicy define Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
 ##

@@ -18,7 +18,6 @@ package preflight
 
 import (
 	"context"
-	preflightTesting "github.com/apecloud/kubeblocks/internal/preflight/testing"
 	"net/http"
 	"time"
 
@@ -38,6 +37,7 @@ import (
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	preflightTesting "github.com/apecloud/kubeblocks/internal/preflight/testing"
 )
 
 var _ = Describe("collect_test", func() {

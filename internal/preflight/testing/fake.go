@@ -1,9 +1,9 @@
 package testing
 
 import (
-	"embed"
-	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+
+	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 )
 
 const (
@@ -26,10 +26,6 @@ const (
 	{
 	  "string": "1"
 	}`
-)
-
-var (
-	defaultVendorYamlData embed.FS
 )
 
 func FakeAnalyzers() []*troubleshoot.Analyze {

@@ -18,13 +18,14 @@ package preflight
 
 import (
 	"context"
-	preflightTesting "github.com/apecloud/kubeblocks/internal/preflight/testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+
+	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
+	preflightTesting "github.com/apecloud/kubeblocks/internal/preflight/testing"
 )
 
 var _ = Describe("analyze_test", func() {

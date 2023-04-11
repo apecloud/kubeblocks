@@ -44,7 +44,7 @@ spec:
       configSpecs:
         - name: postgresql-configuration
           templateRef: postgresql-configuration
-          constraintRef: postgresql14-ha-cc
+          constraintRef: postgresql14-cc
           keys:
             - postgresql.conf
           namespace: {{ .Release.Namespace }}
@@ -56,8 +56,8 @@ spec:
           volumeName: postgresql-custom-metrics
           defaultMode: 0777
       scriptSpecs:
-        - name: patroni-scripts
-          templateRef: patroni-scripts
+        - name: postgresql-scripts
+          templateRef: postgresql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 0777

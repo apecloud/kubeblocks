@@ -99,6 +99,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileT
 			return err
 		}
 		if !enableRerender {
+			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, cmName)
 			continue
 		}
 
@@ -111,7 +112,6 @@ func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileT
 			return err
 		}
 		updateCMConfigSpecLabels(cm, configSpec)
-
 		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, cm, scheme); err != nil {
 			return err
 		}
@@ -127,6 +127,7 @@ func (wrapper *renderWrapper) renderScriptTemplate(task *intctrltypes.ReconcileT
 			Name:      cmName,
 			Namespace: wrapper.cluster.Namespace,
 		}, generics.ToGVK(&corev1.ConfigMap{})) != nil {
+			wrapper.addVolumeMountMeta(templateSpec, cmName)
 			continue
 		}
 
@@ -150,12 +151,14 @@ func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.Compon
 	}
 
 	cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
-
-	cmName := cm.Name
-	wrapper.volumes[cmName] = templateSpec
 	wrapper.renderedObjs = append(wrapper.renderedObjs, cm)
-	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = cmName
+	wrapper.addVolumeMountMeta(templateSpec, cm.Name)
 	return nil
+}
+
+func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.ComponentTemplateSpec, cmName string) {
+	wrapper.volumes[cmName] = templateSpec
+	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = cmName
 }
 
 func updateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {

@@ -9,6 +9,7 @@ OWNER=$(dirname ${REMOTE_URL} | awk -F ":" '{print $2}')
 REPO=$(basename -s .git ${REMOTE_URL})
 MILESTONE_ID=${MILESTONE_ID:-5}
 
+# GH list issues API ref: https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28#list-repository-issues
 ISSUE_LIST=$(gh api \
     --header 'Accept: application/vnd.github+json' \
     --method GET \
@@ -26,6 +27,7 @@ echo "---|---|---|---|---|---"
 for ROW in $ROWS
 do 
     ISSUE_ID=$(echo $ROW | awk -F "," '{print $1}')
+    # GH get issue API ref: https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28#get-an-issue
     ISSUE_BODY=$(gh api \
         --header 'Accept: application/vnd.github+json' \
         --method GET \

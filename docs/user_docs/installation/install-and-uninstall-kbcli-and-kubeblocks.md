@@ -5,6 +5,9 @@ sidebar_position: 1
 sidebar_label: kbcli and KubeBlocks
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Install and uninstall kbcli and KubeBlocks
 
 This guide introduces how to install KubeBlocks by `kbcli`, the command line tool of KubeBlocks.
@@ -12,27 +15,148 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 ## Before you start
 
 1. A Kubernetes environment is required.
-2. `kubectl` is required and can connect to your Kubernetes clusters. Refer to [Install and Set Up kubectl on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) for installation details.
-   
+2. `kubectl` is required and can connect to your Kubernetes clusters. Refer to [Install and Set Up kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) for installation details.
+
 ## Install kbcli
 
-1. Run the command below to install `kbcli`. `kbcli` can run on macOS and Linux.
+<Tabs>
+<TabItem value="cURL" label="cURL" default>
+
+1. Run the command below to install `kbcli`.
     ```bash
     curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
     ```
 
     :::note
-
+    
     Please try again if a time-out exception occurs during installation. It may relate to your network condition.
 
     :::
 
-2. Run this command to check the version and verify whether `kbcli` is installed successfully.
+2. Check the version and verify whether `kbcli` is installed successfully.
     ```bash
     kbcli version
     ```
 
+</TabItem>
+<TabItem value="Homebrew" label="Homebrew">
+
+1. Install the ApeCloud tap, a repository of all Homebrew packages of ApeCloud.
+   ```bash
+   brew tap apecloud/tap
+   ```
+
+   <details>
+
+   <summary>Expected output</summary>
+
+   ```bash
+   ==> Tapping apecloud/tap
+   Cloning into '/opt/homebrew/Library/Taps/apecloud/homebrew-tap'...
+   remote: Enumerating objects: 59, done.
+   remote: Counting objects: 100% (59/59), done.
+   remote: Compressing objects: 100% (44/44), done.
+   remote: Total 59 (delta 8), reused 48 (delta 5), pack-reused 0
+   Receiving objects: 100% (59/59), 14.21 KiB | 4.74 MiB/s, done.
+   Resolving deltas: 100% (8/8), done.
+   Tapped 2 formulae (16 files, 37.8KB). 
+   ```
+
+2. Install `kbcli`.
+   ```bash
+   brew install kbcli
+   ```
+
+   <details>
+
+   <summary>Expected output</summary>
+
+   ```bash
+   ==> Fetching apecloud/tap/kbcli
+   ==> Downloading https:/.../kubeblocks/v0.4.0/kbcli-darwin-arm64-v0.4.0.tar.gz
+   ==> Installing kbcli from apecloud/tap
+   ==> Caveats
+   zsh completions have been installed to:
+     /opt/homebrew/share/zsh/site-functions
+   ==> Summary
+   🍺  /opt/homebrew/Cellar/kbcli/0.4.0: 5 files, 87.7MB, built in 2 seconds
+   ==> Running `brew cleanup kbcli`...
+   Disable this behaviour by setting HOMEBREW_NO_INSTALL_CLEANUP.
+   Hide these hints with HOMEBREW_NO_ENV_HINTS (see `man brew`). 
+
+   </details>
+
+3. Verify whether `kbcli` is installed successfully.
+   ```bash
+   kbcli -h
+   ```
+
+   <details>
+
+   <summary>Expect output</summary>
+
+   ```bash
+   =============================================
+    __    __ _______   ______  __       ______
+   |  \  /  \       \ /      \|  \     |      \
+   | ▓▓ /  ▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓\ ▓▓      \▓▓▓▓▓▓
+   | ▓▓/  ▓▓| ▓▓__/ ▓▓ ▓▓   \▓▓ ▓▓       | ▓▓
+   | ▓▓  ▓▓ | ▓▓    ▓▓ ▓▓     | ▓▓       | ▓▓
+   | ▓▓▓▓▓\ | ▓▓▓▓▓▓▓\ ▓▓   __| ▓▓       | ▓▓
+   | ▓▓ \▓▓\| ▓▓__/ ▓▓ ▓▓__/  \ ▓▓_____ _| ▓▓_
+   | ▓▓  \▓▓\ ▓▓    ▓▓\▓▓    ▓▓ ▓▓     \   ▓▓ \
+    \▓▓   \▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓ \▓▓▓▓▓▓▓▓\▓▓▓▓▓▓
+
+   =============================================
+   A Command Line Interface for KubeBlocks
+
+   Available Commands:
+     addon               Addon command.
+     alert               Manage alert receiver, include add, list and delete receiver.
+     backup-config       KubeBlocks backup config.
+     bench               Run a benchmark.
+     cluster             Cluster command.
+     clusterdefinition   ClusterDefinition command.
+     clusterversion      ClusterVersion command.
+     completion          Generate the autocompletion script for the specified shell
+     dashboard           List and open the KubeBlocks dashboards.
+     kubeblocks          KubeBlocks operation commands.
+     playground          Bootstrap a playground KubeBlocks in local host or cloud.
+     version             Print the version information, include kubernetes, KubeBlocks and kbcli version.
+
+   Usage:
+     kbcli [flags] [options]
+
+   Use "kbcli <command> --help" for more information about a given command.
+   Use "kbcli options" for a list of global command-line options (applies to all commands). 
+   ```
+
+   </details>
+
+
+If you have installed `kbcli` and want to upgrade it, run
+```bash
+brew upgrade kbcli
+```
+
+If you want to install a specified version, 
+
+1. Get a full list of versions.
+   ```bash
+   brew search kbcli
+   ```
+2. Install a specified version of `kbcli`. For example, install v0.4.0.
+   ```bash
+   brew install kbcli@0.4.0
+   ```
+
 ## Install KubeBlocks
+
+:::note
+
+For the local environment, it is recommended to run `kbcli playground init` to install KubeBlocks and create database clusters.
+
+:::
 
 1. Run the command below to install KubeBlocks.
     ```bash
@@ -57,7 +181,12 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 
     ```bash
     kbcli kubeblocks install --help
-    >
+    ```
+
+    <details>
+
+    <summary>Installation guide</summary>
+
     Install KubeBlocks
 
     Examples:
@@ -107,7 +236,8 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
        kbcli kubeblocks install [flags] [options]
 
     Use "kbcli options" for a list of global command-line options (applies to all commands).
-    ```
+
+    </details>
    
    * `-namespace` and its abbreviated version `-n` is used to name a namespace. `--create-namespace` is used to specify whether to create a namespace if it does not exist. `-n` is a global command line option. For global command line options, run `kbcli options` to list all options (applies to all commands).
    * Use `monitor` to specify whether to install the add-ons relevant to database monitoring and visualization.
@@ -121,7 +251,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
     ***Example***
 
     ```bash
-    kubectl get pod -n kb-system
+    kubectl get pod -n kubeblocks
     ```
 
     ***Result***
@@ -136,6 +266,28 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
     kb-addon-prometheus-server-0                             2/2     Running     0          84s
     kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
     ```
+
+### Handle an exception
+
+If installing KubeBlocks fails, run preflight checks to find whether your environment meets the requirements of running KubeBlocks and clusters.
+
+```bash
+kbcli kubeblocks preflight
+```
+
+Add the `--verbose` sub-command to output the details of the preflight checks.
+
+```bash
+kbcli kubeblocks preflight --verbose
+```
+
+***Result***
+
+There are three types of results:
+
+* `warn`: The target environment affects the stability and performance of KubeBlocks and clusters, but running KubeBlocks and clusters is not affected, and you can continue the following installation.
+* `fail`: The environment requirements for installing KubeBlocks are not met, and KubeBlocks can only be installed after these requirements are met. It is required to check these items again and re-run the preflight checks.
+* `congratulation`: All checks pass and you can continue the following installation.
 
 ## (Optional) Enable kbcli automatic command line completion
 
@@ -169,12 +321,26 @@ Uninstall KubeBlocks first.
 
 :::
 
-Run the command below to uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
-   ```bash
-   kbcli kubeblocks uninstall
-   ```
+Uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
 
-Run the command below to uninstall `kbcli`.
-   ```bash
-   sudo rm /usr/local/bin/kbcli
-   ```
+```bash
+kbcli kubeblocks uninstall
+```
+
+Uninstall `kbcli`.
+
+<TabItem value="cURL" label="cURL" default>
+
+```bash
+sudo rm /usr/local/bin/kbcli
+```
+
+</TabItem>
+
+<TabItem value="Homebrew" label="Homebrew">
+
+```bash
+brew cleanup kbcli
+```
+
+</TabItem>

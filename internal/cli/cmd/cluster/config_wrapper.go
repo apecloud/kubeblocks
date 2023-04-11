@@ -1,0 +1,253 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cluster
+
+import (
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+)
+
+type configWrapper struct {
+	create.BaseOptions
+
+	clusterName   string
+	updatedParams map[string]string
+
+	// auto fill field
+	componentName  string
+	configSpecName string
+	configKey      string
+
+	configSpec appsv1alpha1.ComponentConfigSpec
+
+	clusterObj    *appsv1alpha1.Cluster
+	clusterDefObj *appsv1alpha1.ClusterDefinition
+	clusterVerObj *appsv1alpha1.ClusterVersion
+}
+
+func (w *configWrapper) ConfigSpec() *appsv1alpha1.ComponentConfigSpec {
+	return &w.configSpec
+}
+
+func (w *configWrapper) ConfigSpecName() string {
+	return w.configSpecName
+}
+
+func (w *configWrapper) ComponentName() string {
+	return w.componentName
+}
+
+func (w *configWrapper) ConfigFile() string {
+	return w.configKey
+}
+
+// AutoFillRequiredParam auto fill required param.
+func (w *configWrapper) AutoFillRequiredParam() error {
+	if err := w.fillComponent(); err != nil {
+		return err
+	}
+	if err := w.fillConfigSpec(); err != nil {
+		return err
+	}
+	return w.fillConfigFile()
+}
+
+// ValidateRequiredParam validate required param.
+func (w *configWrapper) ValidateRequiredParam() error {
+	// step1: validate component exist.
+	if w.clusterObj.Spec.GetComponentByName(w.componentName) == nil {
+		return makeComponentNotExistErr(w.clusterName, w.componentName)
+	}
+
+	// step2: validate configmap exist.
+	cmObj := corev1.ConfigMap{}
+	cmKey := client.ObjectKey{
+		Name:      cfgcore.GetComponentCfgName(w.clusterName, w.componentName, w.configSpecName),
+		Namespace: w.Namespace,
+	}
+	if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), cmKey, w.Dynamic, &cmObj); err != nil {
+		return err
+	}
+
+	// step3: validate fileKey exist.
+	if _, ok := cmObj.Data[w.configKey]; !ok {
+		return makeNotFoundConfigFileErr(w.configKey, w.configSpecName, cfgcore.ToSet(cmObj.Data).AsSlice())
+	}
+
+	// TODO support all config file update.
+	if !cfgcore.CheckConfigTemplateReconfigureKey(w.configSpec, w.configKey) {
+		return makeNotSupportConfigFileUpdateErr(w.configKey, w.configSpec)
+	}
+	return nil
+}
+
+func (w *configWrapper) fillComponent() error {
+	if w.componentName != "" {
+		return nil
+	}
+	componentNames, err := util.GetComponentsFromResource(w.clusterObj.Spec.ComponentSpecs, w.clusterDefObj)
+	if err != nil {
+		return err
+	}
+	if len(componentNames) != 1 {
+		return cfgcore.MakeError(multiComponentsErrorMessage)
+	}
+	w.componentName = componentNames[0]
+	return nil
+}
+
+func (w *configWrapper) fillConfigSpec() error {
+	foundConfigSpec := func(configSpecs []appsv1alpha1.ComponentConfigSpec, name string) *appsv1alpha1.ComponentConfigSpec {
+		for _, configSpec := range configSpecs {
+			if configSpec.Name == name {
+				w.configSpec = configSpec
+				return &configSpec
+			}
+		}
+		return nil
+	}
+
+	var vComponents []appsv1alpha1.ClusterComponentVersion
+	var cComponents = w.clusterObj.Spec.ComponentSpecs
+	var dComponents = w.clusterDefObj.Spec.ComponentDefs
+
+	if w.clusterVerObj != nil {
+		vComponents = w.clusterVerObj.Spec.ComponentVersions
+	}
+
+	configSpecs, err := util.GetConfigTemplateListWithResource(cComponents, dComponents, vComponents, w.componentName, true)
+	if err != nil {
+		return err
+	}
+	if len(configSpecs) == 0 {
+		return makeNotFoundTemplateErr(w.clusterName, w.componentName)
+	}
+
+	if w.configSpecName != "" {
+		if foundConfigSpec(configSpecs, w.configSpecName) == nil {
+			return makeConfigSpecNotExistErr(w.clusterName, w.componentName, w.configSpecName)
+		}
+		return nil
+	}
+
+	w.configSpec = configSpecs[0]
+	if len(configSpecs) == 1 {
+		w.configSpecName = configSpecs[0].Name
+		return nil
+	}
+
+	supportUpdatedTpl := make([]appsv1alpha1.ComponentConfigSpec, 0)
+	for _, configSpec := range configSpecs {
+		if ok, err := util.IsSupportReconfigureParams(configSpec, w.updatedParams, w.Dynamic); err == nil && ok {
+			supportUpdatedTpl = append(supportUpdatedTpl, configSpec)
+		}
+	}
+	if len(supportUpdatedTpl) == 1 {
+		w.configSpec = configSpecs[0]
+		w.configSpecName = supportUpdatedTpl[0].Name
+		return nil
+	}
+	return cfgcore.MakeError(multiConfigTemplateErrorMessage)
+}
+
+func (w *configWrapper) fillConfigFile() error {
+	if w.configKey != "" {
+		return nil
+	}
+
+	if w.configSpec.TemplateRef == "" {
+		return makeNotFoundTemplateErr(w.clusterName, w.componentName)
+	}
+
+	cmObj := corev1.ConfigMap{}
+	cmKey := client.ObjectKey{
+		Name:      cfgcore.GetComponentCfgName(w.clusterName, w.componentName, w.configSpecName),
+		Namespace: w.Namespace,
+	}
+	if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), cmKey, w.Dynamic, &cmObj); err != nil {
+		return err
+	}
+	if len(cmObj.Data) == 0 {
+		return cfgcore.MakeError("not support reconfiguring because there is no config file.")
+	}
+
+	keys := w.filterForReconfiguring(cmObj.Data)
+	if len(keys) == 1 {
+		w.configKey = keys[0]
+		return nil
+	}
+	return cfgcore.MakeError(multiConfigFileErrorMessage)
+}
+
+func (w *configWrapper) filterForReconfiguring(data map[string]string) []string {
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		if cfgcore.CheckConfigTemplateReconfigureKey(w.configSpec, k) {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
+
+func newConfigWrapper(baseOptions create.BaseOptions, clusterName, componentName, configSpec, configKey string, params map[string]string) (*configWrapper, error) {
+	var (
+		err           error
+		clusterObj    *appsv1alpha1.Cluster
+		clusterDefObj *appsv1alpha1.ClusterDefinition
+	)
+
+	if clusterObj, err = cluster.GetClusterByName(baseOptions.Dynamic, clusterName, baseOptions.Namespace); err != nil {
+		return nil, err
+	}
+	if clusterDefObj, err = cluster.GetClusterDefByName(baseOptions.Dynamic, clusterObj.Spec.ClusterDefRef); err != nil {
+		return nil, err
+	}
+
+	w := &configWrapper{
+		BaseOptions:   baseOptions,
+		clusterObj:    clusterObj,
+		clusterDefObj: clusterDefObj,
+		clusterName:   clusterName,
+
+		componentName:  componentName,
+		configSpecName: configSpec,
+		configKey:      configKey,
+		updatedParams:  params,
+	}
+
+	if w.clusterObj.Spec.ClusterVersionRef == "" {
+		return w, err
+	}
+
+	clusterVerObj := &appsv1alpha1.ClusterVersion{}
+	if err := util.GetResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      w.clusterObj.Spec.ClusterVersionRef,
+	}, w.Dynamic, clusterVerObj); err != nil {
+		return nil, err
+	}
+
+	w.clusterVerObj = clusterVerObj
+	return w, nil
+}

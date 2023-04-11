@@ -385,8 +385,6 @@ bump-chart-ver: \
 	bump-single-chart-appver.nyancat \
 	bump-single-chart-ver.postgresql \
 	bump-single-chart-ver.postgresql-cluster \
-	bump-single-chart-ver.postgresql-patroni-ha \
-	bump-single-chart-ver.postgresql-patroni-ha-cluster \
 	bump-single-chart-ver.redis \
 	bump-single-chart-ver.redis-cluster \
 	bump-single-chart-ver.milvus \

@@ -181,7 +181,11 @@ func run(o *list.ListOptions, printType cluster.PrintType) error {
 		return err
 	}
 
-	p := cluster.NewPrinter(o.IOStreams.Out, printType)
+	opt := &cluster.PrinterOptions{
+		ShowLabels: o.ShowLabels,
+	}
+
+	p := cluster.NewPrinter(o.IOStreams.Out, printType, opt)
 	for _, info := range infos {
 		if err = addRow(dynamic, client, info.Namespace, info.Name, p); err != nil {
 			return err

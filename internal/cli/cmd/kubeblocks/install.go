@@ -185,7 +185,7 @@ func (o *InstallOptions) Install() error {
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// add helm repo
-	spinner := printer.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksRepoName)
+	spinner := printer.Spinner(o.Out, "%-50s", "Add and update repo "+types.KubeBlocksRepoName)
 	defer spinner(false)
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()}); err != nil {
@@ -194,7 +194,7 @@ func (o *InstallOptions) Install() error {
 	spinner(true)
 
 	// install KubeBlocks chart
-	spinner = printer.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
+	spinner = printer.Spinner(o.Out, "%-50s", "Install KubeBlocks "+o.Version)
 	defer spinner(false)
 	if err = o.installChart(); err != nil {
 		return err
@@ -268,13 +268,13 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	}
 
 	okMsg := func(msg string) string {
-		return fmt.Sprintf("%-40s %s\n", msg, printer.BoldGreen("OK"))
+		return fmt.Sprintf("%-50s %s\n", msg, printer.BoldGreen("OK"))
 	}
 	failMsg := func(msg string) string {
-		return fmt.Sprintf("%-40s %s\n", msg, printer.BoldRed("FAIL"))
+		return fmt.Sprintf("%-50s %s\n", msg, printer.BoldRed("FAIL"))
 	}
 	suffixMsg := func(msg string) string {
-		return fmt.Sprintf(" %-40s", msg)
+		return fmt.Sprintf(" %-50s", msg)
 	}
 
 	// create spinner
@@ -336,7 +336,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	}
 
 	// timeout to wait for all auto-install addons to be enabled
-	s.FinalMSG = fmt.Sprintf("%-40s %s\n", msg, printer.BoldRed("TIMEOUT"))
+	s.FinalMSG = fmt.Sprintf("%-50s %s\n", msg, printer.BoldRed("TIMEOUT"))
 	s.Stop()
 	return nil
 }
@@ -470,7 +470,7 @@ func (o *InstallOptions) createVolumeSnapshotClass() error {
 		options.BaseOptions.IOStreams = o.IOStreams
 		options.BaseOptions.Quiet = true
 
-		spinner := printer.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
+		spinner := printer.Spinner(o.Out, "%-50s", "Configure VolumeSnapshotClass")
 		defer spinner(false)
 
 		if err := options.Complete(); err != nil {

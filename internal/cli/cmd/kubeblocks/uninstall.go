@@ -54,24 +54,25 @@ var (
         kbcli kubeblocks uninstall`)
 )
 
-type uninstallOptions struct {
-	factory cmdutil.Factory
+type UninstallOptions struct {
+	Factory cmdutil.Factory
 	Options
 
-	// autoApprove if true, skip interactive approval
-	autoApprove     bool
+	// AutoApprove if true, skip interactive approval
+	AutoApprove     bool
 	removePVs       bool
 	removePVCs      bool
-	removeNamespace bool
+	RemoveNamespace bool
 	addons          []*extensionsv1alpha1.Addon
+	Quiet           bool
 }
 
 func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &uninstallOptions{
+	o := &UninstallOptions{
 		Options: Options{
 			IOStreams: streams,
 		},
-		factory: f,
+		Factory: f,
 	}
 	cmd := &cobra.Command{
 		Use:     "uninstall",
@@ -80,21 +81,21 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
-			util.CheckErr(o.preCheck())
-			util.CheckErr(o.uninstall())
+			util.CheckErr(o.PreCheck())
+			util.CheckErr(o.Uninstall())
 		},
 	}
 
-	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before uninstalling KubeBlocks")
+	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before uninstalling KubeBlocks")
 	cmd.Flags().BoolVar(&o.removePVs, "remove-pvs", false, "Remove PersistentVolume or not")
 	cmd.Flags().BoolVar(&o.removePVCs, "remove-pvcs", false, "Remove PersistentVolumeClaim or not")
-	cmd.Flags().BoolVar(&o.removeNamespace, "remove-namespace", false, "Remove default created \"kb-system\" namespace or not")
+	cmd.Flags().BoolVar(&o.RemoveNamespace, "remove-namespace", false, "Remove default created \"kb-system\" namespace or not")
 	return cmd
 }
 
-func (o *uninstallOptions) preCheck() error {
+func (o *UninstallOptions) PreCheck() error {
 	// wait user to confirm
-	if !o.autoApprove {
+	if !o.AutoApprove {
 		printer.Warning(o.Out, "uninstall will remove all KubeBlocks resources.\n")
 		if err := confirmUninstall(o.In); err != nil {
 			return err
@@ -143,8 +144,10 @@ func (o *uninstallOptions) preCheck() error {
 	kbNamespace, err := util.GetKubeBlocksNamespace(o.Client)
 	if err != nil {
 		printer.Warning(o.Out, "failed to locate KubeBlocks meta, will clean up all KubeBlocks resources.\n")
-		fmt.Fprintf(o.Out, "to find out the namespace where KubeBlocks is installed, please use:\n\t'kbcli kubeblocks status'\n")
-		fmt.Fprintf(o.Out, "to uninstall KubeBlocks completely, please use:\n\t`kbcli kubeblocks uninstall -n <namespace>`\n")
+		if !o.Quiet {
+			fmt.Fprintf(o.Out, "to find out the namespace where KubeBlocks is installed, please use:\n\t'kbcli kubeblocks status'\n")
+			fmt.Fprintf(o.Out, "to uninstall KubeBlocks completely, please use:\n\t`kbcli kubeblocks uninstall -n <namespace>`\n")
+		}
 	} else if o.Namespace != kbNamespace {
 		o.Namespace = kbNamespace
 		fmt.Fprintf(o.Out, "Uninstall KubeBlocks in namespace \"%s\"\n", kbNamespace)
@@ -152,7 +155,7 @@ func (o *uninstallOptions) preCheck() error {
 	return nil
 }
 
-func (o *uninstallOptions) uninstall() error {
+func (o *UninstallOptions) Uninstall() error {
 	printSpinner := func(spinner func(result bool), err error) {
 		if err == nil || apierrors.IsNotFound(err) ||
 			strings.Contains(err.Error(), "release: not found") {
@@ -216,7 +219,7 @@ func (o *uninstallOptions) uninstall() error {
 	}
 
 	// delete namespace if it is default namespace
-	if o.Namespace == types.DefaultNamespace && o.removeNamespace {
+	if o.Namespace == types.DefaultNamespace && o.RemoveNamespace {
 		printSpinner(newSpinner("Remove namespace "+types.DefaultNamespace),
 			deleteNamespace(o.Client, types.DefaultNamespace))
 	}
@@ -226,7 +229,7 @@ func (o *uninstallOptions) uninstall() error {
 }
 
 // uninstallAddons uninstall all KubeBlocks addons
-func (o *uninstallOptions) uninstallAddons() error {
+func (o *UninstallOptions) uninstallAddons() error {
 	var (
 		allErrs []error
 		stop    bool

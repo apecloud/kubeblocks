@@ -268,6 +268,9 @@ func (r *BackupPolicyReconciler) mergeBackupPolicyTemplate(
 	if backupPolicy.Spec.OnFailAttempted == 0 {
 		backupPolicy.Spec.OnFailAttempted = template.Spec.OnFailAttempted
 	}
+	if len(backupPolicy.Spec.BackupStatusUpdates) == 0 {
+		backupPolicy.Spec.BackupStatusUpdates = template.Spec.BackupStatusUpdates
+	}
 	return nil
 }
 

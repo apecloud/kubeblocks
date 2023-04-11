@@ -1,7 +1,7 @@
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
-  name: pg-basebackup
+  name: postgres-basebackup
   labels:
     clusterdefinition.kubeblocks.io/name: postgresql
     {{- include "postgresql.labels" . | nindent 4 }}
@@ -16,30 +16,34 @@ spec:
       cpu: "1"
       memory: 128Mi
   env:
+    - name: RESTORE_DATA_DIR
+      value: /home/postgres/pgdata/kb_restore
+    - name: TMP_DATA_DIR
+      value: /home/postgres/pgdata/kb_restore/tmp_data
+    - name: TMP_ARCH_DATA_DIR
+      value: /home/postgres/pgdata/kb_restore/arch
     - name: DATA_DIR
-      value: /postgresql/data
+      value: /home/postgres/pgdata/pgroot/data
   physical:
     restoreCommands:
       - |
+        #!/bin/sh
         set -e
-        mkdir -p ${DATA_DIR}
-        res=`ls -A ${DATA_DIR}`
-        if [ ! -z ${res} ]; then
-          echo "${DATA_DIR} is not empty! Please make sure that the directory is empty before restoring the backup."
-          exit 1
-        fi
-        mkdir -p ${DATA_DIR} && mkdir -p ${DATA_DIR}/../arch
+        # create a new directory for restore
+        mkdir -p ${RESTORE_DATA_DIR} && rm -rf ${RESTORE_DATA_DIR}/*
+        cd ${RESTORE_DATA_DIR}
+        touch kb_restore.sh && touch kb_restore.signal
+        echo "mkdir -p ${DATA_DIR}/../arch" >> kb_restore.sh
+        echo "mv -f ${TMP_DATA_DIR}/* ${DATA_DIR}/" >> kb_restore.sh
+        echo "mv -f ${TMP_ARCH_DATA_DIR}/* ${DATA_DIR}/../arch" >> kb_restore.sh
+        echo "rm -rf ${RESTORE_DATA_DIR}" >> kb_restore.sh
+
+        # extract the data file to the temporary data directory
+        mkdir -p ${TMP_DATA_DIR} && mkdir -p ${TMP_ARCH_DATA_DIR}
+        rm -rf ${TMP_ARCH_DATA_DIR}/* && rm -rf ${TMP_DATA_DIR}/*
         cd ${BACKUP_DIR}/${BACKUP_NAME}
-        tar -xvf base.tar.gz -C ${DATA_DIR}/
-        tar -xvf pg_wal.tar.gz -C ${DATA_DIR}/../arch
-        chmod -R 777 ${DATA_DIR}/../arch
-        cd ${DATA_DIR}
-        echo "set recovery configuration..."
-        echo "restore_command = 'cp ${DATA_DIR}/../arch/%f %p'" >> postgresql.auto.conf
-        echo "recovery_target_timeline = 'latest'" >> postgresql.auto.conf
-        init_scripts_dir=${DATA_DIR}/../init-scripts
-        mkdir -p ${init_scripts_dir}
-        echo "touch ${DATA_DIR}/recovery.signal" > ${init_scripts_dir}/kb_restore.sh
+        tar -xvf base.tar.gz -C ${TMP_DATA_DIR}/
+        tar -xvf pg_wal.tar.gz -C ${TMP_ARCH_DATA_DIR}/
         echo "done!"
     incrementalRestoreCommands: []
   logical:
@@ -49,5 +53,5 @@ spec:
     - >
       set -e;
       mkdir -p ${BACKUP_DIR}/${BACKUP_NAME}/;
-      echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -Xs -z -D ${BACKUP_DIR}/${BACKUP_NAME} -Z5 -h ${DB_HOST} -U ${DB_USER} -W;
+      echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -Xs -z -D ${BACKUP_DIR}/${BACKUP_NAME} -Z5 -h ${DB_HOST} -U standby -W;
   incrementalBackupCommands: []

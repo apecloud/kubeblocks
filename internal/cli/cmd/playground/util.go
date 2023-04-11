@@ -19,13 +19,18 @@ package playground
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -52,20 +57,20 @@ func cloudProviderRepoDir() (string, error) {
 	return filepath.Join(dir, cpDir), err
 }
 
-func initPlaygroundDir() error {
+func initPlaygroundDir() (string, error) {
 	dir, err := playgroundDir()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if _, err = os.Stat(dir); err != nil && os.IsNotExist(err) {
-		return os.MkdirAll(dir, 0750)
+		err = os.MkdirAll(dir, 0750)
 	}
-	return nil
+	return dir, err
 }
 
-// writeClusterInfoToFile writes the cluster info to a state file
-func writeClusterInfoToFile(path string, info *cp.K8sClusterInfo) error {
+// writeClusterInfo writes the cluster info to a state file
+func writeClusterInfo(path string, info *cp.K8sClusterInfo) error {
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
 	if err != nil {
 		return err
@@ -111,10 +116,44 @@ func readClusterInfoFromFile(path string) (*cp.K8sClusterInfo, error) {
 	return &info, nil
 }
 
-func stateFilePath() (string, error) {
-	dir, err := playgroundDir()
-	if err != nil {
-		return "", err
+func writeAndUseKubeConfig(kubeConfig string, kubeConfigPath string, out io.Writer) error {
+	spinner := printer.Spinner(out, fmt.Sprintf("%-50s", "Write kubeconfig to "+kubeConfigPath))
+	defer spinner(false)
+	if err := kubeConfigWrite(kubeConfig, kubeConfigPath, writeKubeConfigOptions{
+		UpdateExisting:       true,
+		UpdateCurrentContext: true,
+		OverwriteExisting:    true}); err != nil {
+		return err
 	}
-	return filepath.Join(dir, stateFileName), nil
+
+	// use the new kubeconfig file
+	if err := util.SetKubeConfig(kubeConfigPath); err != nil {
+		return err
+	}
+
+	spinner(true)
+	return nil
+}
+
+// getKubeClient returns a kubernetes dynamic client and check if the cluster is reachable
+func getKubeClient() (kubernetes.Interface, dynamic.Interface, error) {
+	f := util.NewFactory()
+	client, err := f.KubernetesClientSet()
+	errMsg := kubeClusterUnreachableErr.Error()
+	if err == genericclioptions.ErrEmptyConfig {
+		return nil, nil, kubeClusterUnreachableErr
+	}
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errMsg)
+	}
+
+	if _, err = client.ServerVersion(); err != nil {
+		return nil, nil, errors.Wrap(err, errMsg)
+	}
+
+	dynamic, err := f.DynamicClient()
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errMsg)
+	}
+	return client, dynamic, nil
 }

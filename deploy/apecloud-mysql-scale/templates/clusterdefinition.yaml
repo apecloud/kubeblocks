@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
+  type: mysql
   connectionCredential:
     username: root
     password: root  #"$(RANDOM_PASSWD)"
@@ -19,10 +20,10 @@ spec:
     - name: mysql
       characterType: mysql
       probes:
-        roleChangedProbe:
-          failureThreshold: {{ .Values.roleChangedProbe.failureThreshold }}
-          periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.roleChangedProbe.timeoutSeconds }}
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       monitor:
         builtIn: false
         exporterConfig:
@@ -53,6 +54,9 @@ spec:
         followers:
           - name: follower
             accessMode: Readonly
+        learner:
+          name: learner
+          accessMode: Readonly
       service:
         ports:
           - name: mysql

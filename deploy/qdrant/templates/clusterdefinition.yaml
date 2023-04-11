@@ -6,6 +6,7 @@ metadata:
   labels:
     {{- include "qdrant.labels" . | nindent 4 }}
 spec:
+  type: qdrant
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"

@@ -176,6 +176,8 @@ func checkOptions(opt *VolumeWatcherOpts) error {
 type TplScriptConfig struct {
 	Scripts         string                       `json:"scripts"`
 	FileRegex       string                       `json:"fileRegex"`
+	DataType        string                       `json:"dataType"`
+	DSN             string                       `json:"dsn"`
 	FormatterConfig appsv1alpha1.FormatterConfig `json:"formatterConfig"`
 }
 
@@ -198,6 +200,8 @@ func checkTPLScriptOptions(opt *VolumeWatcherOpts) error {
 	}
 
 	opt.FormatterConfig = &tplConfig.FormatterConfig
+	opt.DSN = tplConfig.DSN
+	opt.DataType = tplConfig.DataType
 	opt.FileRegex = tplConfig.FileRegex
 	opt.TPLScriptPath = filepath.Join(filepath.Dir(opt.TPLConfig), tplConfig.Scripts)
 	return nil
@@ -239,7 +243,7 @@ func createHandlerWithVolumeWatch(opt *VolumeWatcherOpts) (cfgcore.WatchEventHan
 	case ShellTool:
 		return cfgcore.CreateExecHandler(opt.Command)
 	case TPLScript:
-		return cfgcore.CreateTPLScriptHandler(opt.TPLScriptPath, opt.VolumeDirs, opt.FileRegex, opt.BackupPath, opt.FormatterConfig)
+		return cfgcore.CreateTPLScriptHandler(opt.TPLScriptPath, opt.VolumeDirs, opt.FileRegex, opt.BackupPath, opt.FormatterConfig, opt.DataType, opt.DSN)
 	case SQL, WebHook:
 		return nil, cfgutil.MakeError("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
 	default:

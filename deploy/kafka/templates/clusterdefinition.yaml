@@ -11,6 +11,7 @@ metadata:
   annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
   {{- end }}
 spec:
+  type: kafka
   connectionCredential:
     superusers: "User:admin"
     endpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-ctrlr)"

@@ -19,9 +19,11 @@ package configuration
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/golang/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
@@ -101,6 +103,68 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 			Expect(status.Status).Should(BeEquivalentTo(ESNone))
 			Expect(status.SucceedCount).Should(BeEquivalentTo(3))
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+		})
+	})
+
+	Context("sync reconfigure policy with selector test", func() {
+		It("Should success without error", func() {
+			By("check policy name")
+			Expect(operatorSyncPolicy.GetPolicyName()).Should(BeEquivalentTo("operatorSyncUpdate"))
+
+			By("prepare reconfigure policy params")
+			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
+				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
+					return reconfigureClient, nil
+				}),
+				withMockStatefulSet(3, nil),
+				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
+				withConfigConstraintSpec(&appsv1alpha1.FormatterConfig{Format: appsv1alpha1.RedisCfg}),
+				withConfigPatch(map[string]string{
+					"a": "c b e f",
+				}),
+				withClusterComponent(3),
+				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					},
+				}}))
+
+			// add selector
+			mockParam.ConfigConstraint.Selector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"primary": "true",
+				},
+			}
+
+			By("mock client get pod caller")
+			k8sMockClient.MockListMethod(testutil.WithListReturned(
+				testutil.WithConstructListReturnedResult(
+					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 3,
+						withReadyPod(0, 1), func(pod *corev1.Pod, index int) {
+							if index == 0 {
+								if pod.Labels == nil {
+									pod.Labels = make(map[string]string)
+								}
+								pod.Labels["primary"] = "true"
+							}
+						}))),
+				testutil.WithAnyTimes()))
+
+			By("mock client patch caller")
+			// mock client update caller
+			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithTimes(1)))
+
+			By("mock remote online update caller")
+			reconfigureClient.EXPECT().OnlineUpgradeParams(gomock.Any(), gomock.Any()).Return(
+				&cfgproto.OnlineUpgradeParamsResponse{}, nil).
+				Times(1)
+
+			status, err := operatorSyncPolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESNone))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(1))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(1))
 		})
 	})
 

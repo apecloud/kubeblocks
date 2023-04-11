@@ -23,7 +23,7 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 * Run `kubectl get cd apecloud-mysql -o yaml` to check whether _roleprobe_ is enabled in the ApeCloud MySQL Paxos Group (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
   ```
   probes:
-  roleChangedProbe:
+  roleProbe:
     failureThreshold: 3
     periodSeconds: 2
     timeoutSeconds: 1

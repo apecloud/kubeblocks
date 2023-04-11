@@ -1,2 +1,2 @@
 #!/bin/sh
-make fast-lint
+make lint-fast

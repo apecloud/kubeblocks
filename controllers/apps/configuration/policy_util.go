@@ -19,7 +19,9 @@ package configuration
 import (
 	"context"
 	"fmt"
+	"net"
 	"sort"
+	"strconv"
 
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
@@ -166,7 +168,11 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 
 // TODO commonOnlineUpdateWithPod migrate to sql command pipeline
 func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, updatedParams map[string]string) error {
-	client, err := createClient(generateManagerSidecarAddr(pod))
+	address, err := cfgManagerGrpcURL(pod)
+	if err != nil {
+		return err
+	}
+	client, err := createClient(address)
 	if err != nil {
 		return err
 	}
@@ -196,8 +202,12 @@ func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerN
 		containerIDs = append(containerIDs, containerID)
 	}
 
+	address, err := cfgManagerGrpcURL(pod)
+	if err != nil {
+		return err
+	}
 	// stop container
-	client, err := createClient(generateManagerSidecarAddr(pod))
+	client, err := createClient(address)
 	if err != nil {
 		return err
 	}
@@ -216,10 +226,20 @@ func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerN
 	return nil
 }
 
-func generateManagerSidecarAddr(pod *corev1.Pod) string {
-	var (
-		podAddress = pod.Status.PodIP
-		podPort    = viper.GetInt32(constant.ConfigManagerGPRCPortEnv)
-	)
-	return fmt.Sprintf("%s:%d", podAddress, podPort)
+func cfgManagerGrpcURL(pod *corev1.Pod) (string, error) {
+	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
+	return getURLFromPod(pod, podPort)
+}
+
+func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
+	ip := net.ParseIP(pod.Status.PodIP)
+	if ip == nil {
+		return "", cfgcore.MakeError("%s is not a valid IP", pod.Status.PodIP)
+	}
+
+	// Sanity check PodIP
+	if ip.To4() == nil && ip.To16() == nil {
+		return "", fmt.Errorf("%s is not a valid IPv4/IPv6 address", pod.Status.PodIP)
+	}
+	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
 }

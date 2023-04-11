@@ -186,6 +186,7 @@ func newMockPodsWithStatefulSet(sts *appsv1.StatefulSet, replicas int, options .
 	for i := 0; i < replicas; i++ {
 		pods[i] = newMockPod(sts.Name+"-"+fmt.Sprint(i), &sts.Spec.Template.Spec)
 		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(sts, stsSchemaKind)}
+		pods[i].Status.PodIP = "1.1.1.1"
 	}
 	for _, customFn := range options {
 		for i := range pods {

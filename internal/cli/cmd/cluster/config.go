@@ -52,7 +52,7 @@ type reconfigureOptions struct {
 
 	clusterName   string
 	componentName string
-	templateNames []string
+	configSpecs   []string
 
 	isExplain     bool
 	truncEnum     bool
@@ -89,36 +89,36 @@ type parameterTemplate struct {
 var (
 	describeReconfigureExample = templates.Examples(`
 		# describe a cluster, e.g. cluster name is mycluster
-		kbcli cluster describe-configure mycluster
+		kbcli cluster describe-config mycluster
 
 		# describe a component, e.g. cluster name is mycluster, component name is mysql
-		kbcli cluster describe-configure mycluster --component-name=mysql
+		kbcli cluster describe-config mycluster --component-name=mysql
 
 		# describe all configuration files. 
-		kbcli cluster describe-configure mycluster --component-name=mysql --show-detail
+		kbcli cluster describe-config mycluster --component-name=mysql --show-detail
 
 		# describe a content of configuration file. 
-		kbcli cluster describe-configure mycluster --component-name=mysql --configure-file=my.cnf --show-detail`)
+		kbcli cluster describe-config mycluster --component-name=mysql --config-file=my.cnf --show-detail`)
 	explainReconfigureExample = templates.Examples(`
 		# describe a cluster, e.g. cluster name is mycluster
-		kbcli cluster explain-configure mycluster
+		kbcli cluster explain-config mycluster
 
 		# describe a specified configure template, e.g. cluster name is mycluster
-		kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl
+		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl
 
 		# describe a specified configure template, e.g. cluster name is mycluster
-		kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --trunc-document=false --trunc-enum=false
+		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
 
 		# describe a specified parameters, e.g. cluster name is mycluster
-		kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --param=sql_mode`)
+		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl --param=sql_mode`)
 	diffConfigureExample = templates.Examples(`
 		# compare config files 
-		kbcli cluster diff-configure opsrequest1 opsrequest2`)
+		kbcli cluster diff-config opsrequest1 opsrequest2`)
 )
 
 func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&r.componentName, "component-name", "", "Specify the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter.\"")
-	cmd.Flags().StringSliceVar(&r.templateNames, "template-names", nil, "Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --template-names=mysql-3node-tpl)")
+	cmd.Flags().StringSliceVar(&r.configSpecs, "config-specs", nil, "Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)")
 }
 
 func (r *reconfigureOptions) validate() error {
@@ -132,11 +132,11 @@ func (r *reconfigureOptions) validate() error {
 		return err
 	}
 
-	if r.isExplain && len(r.templateNames) != 1 {
+	if r.isExplain && len(r.configSpecs) != 1 {
 		return cfgcore.MakeError("explain require one template")
 	}
 
-	for _, tplName := range r.templateNames {
+	for _, tplName := range r.configSpecs {
 		tpl, err := r.findTemplateByName(tplName)
 		if err != nil {
 			return err
@@ -171,7 +171,7 @@ func (r *reconfigureOptions) complete2(args []string) error {
 	if err := r.syncClusterComponent(); err != nil {
 		return err
 	}
-	if len(r.templateNames) != 0 {
+	if len(r.configSpecs) != 0 {
 		return nil
 	}
 	if err := r.syncComponentCfgTpl(); err != nil {
@@ -186,7 +186,7 @@ func (r *reconfigureOptions) complete2(args []string) error {
 		for _, tpl := range r.tpls {
 			templateNames = append(templateNames, tpl.Name)
 		}
-		r.templateNames = templateNames
+		r.configSpecs = templateNames
 		return nil
 	}
 
@@ -196,7 +196,7 @@ func (r *reconfigureOptions) complete2(args []string) error {
 			templateNames = append(templateNames, tpl.Name)
 		}
 	}
-	r.templateNames = templateNames
+	r.configSpecs = templateNames
 	return nil
 }
 
@@ -217,7 +217,7 @@ func (r *reconfigureOptions) syncClusterComponent() error {
 		return nil
 	}
 
-	componentNames, err := util.GetComponentsFromClusterCR(client.ObjectKey{
+	componentNames, err := util.GetComponentsFromClusterName(client.ObjectKey{
 		Namespace: r.namespace,
 		Name:      r.clusterName,
 	}, r.dynamic)
@@ -245,7 +245,7 @@ func (r *reconfigureOptions) printDescribeReconfigure() error {
 }
 
 func (r *reconfigureOptions) printAllExplainConfigure() error {
-	for _, templateName := range r.templateNames {
+	for _, templateName := range r.configSpecs {
 		fmt.Println("template meta:")
 		printer.PrintLineWithTabSeparator(
 			printer.NewPair("  ConfigSpec", templateName),
@@ -297,12 +297,12 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 
 func (r *reconfigureOptions) getReconfigureMeta() ([]types.ConfigTemplateInfo, error) {
 	configs := make([]types.ConfigTemplateInfo, 0)
-	for _, tplName := range r.templateNames {
+	for _, tplName := range r.configSpecs {
 		// checked by validate
 		tpl, _ := r.findTemplateByName(tplName)
 		// fetch config configmap
 		cmObj := &corev1.ConfigMap{}
-		cmName := cfgcore.GetComponentCfgName(r.clusterName, r.componentName, tpl.VolumeName)
+		cmName := cfgcore.GetComponentCfgName(r.clusterName, r.componentName, tpl.Name)
 		if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
 			Name:      cmName,
 			Namespace: r.namespace,
@@ -319,7 +319,7 @@ func (r *reconfigureOptions) getReconfigureMeta() ([]types.ConfigTemplateInfo, e
 }
 
 func (r *reconfigureOptions) printConfigureContext(configs []types.ConfigTemplateInfo) {
-	printer.PrintTitle("Configures Context[${component-name}/${template-name}/${file-name}]")
+	printer.PrintTitle("Configures Context[${component-name}/${config-spec}/${file-name}]")
 
 	keys := set.NewLinkedHashSetString(r.keys...)
 	for _, info := range configs {
@@ -565,7 +565,7 @@ func (o *opsRequestDiffOptions) run() error {
 		baseConfigs[tplName] = baseObj
 	}
 
-	printer.PrintTitle("DIFF-CONFIGURE RESULT")
+	printer.PrintTitle("DIFF-CONFIG RESULT")
 	for tplName, diff := range configDiffs {
 		configObjects := baseConfigs[tplName]
 		for _, params := range diff {
@@ -828,8 +828,8 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 		},
 	}
 	o.addCommonFlags(cmd)
-	cmd.Flags().BoolVar(&o.showDetail, "show-detail", o.showDetail, "If true, the content of the files specified by configure-file will be printed.")
-	cmd.Flags().StringSliceVar(&o.keys, "configure-file", nil, "Specify the name of the configuration file to be describe (e.g. for mysql: --configure-file=my.cnf). If unset, all files.")
+	cmd.Flags().BoolVar(&o.showDetail, "show-detail", o.showDetail, "If true, the content of the files specified by config-file will be printed.")
+	cmd.Flags().StringSliceVar(&o.keys, "config-file", nil, "Specify the name of the configuration file to be describe (e.g. for mysql: --config-file=my.cnf). If unset, all files.")
 	return cmd
 }
 

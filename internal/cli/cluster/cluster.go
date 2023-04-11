@@ -204,6 +204,7 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 		CreatedTime:       util.TimeFormat(&c.CreationTimestamp),
 		InternalEP:        types.None,
 		ExternalEP:        types.None,
+		Labels:            util.CombineLabels(c.Labels),
 	}
 
 	if o.ClusterDef == nil {

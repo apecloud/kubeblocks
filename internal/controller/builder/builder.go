@@ -661,7 +661,7 @@ func BuildConfigMapWithTemplate(
 	return &cm, nil
 }
 
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.ConfigManagerParams) (*corev1.Container, error) {
+func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams) (*corev1.Container, error) {
 	const tplFile = "config_manager_sidecar.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -705,4 +705,21 @@ func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secre
 		return nil, err
 	}
 	return secret, nil
+}
+
+func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) (*batchv1.Job, error) {
+	const tplFile = "backup_manifests_template.cue"
+
+	job := &batchv1.Job{}
+	if err := buildFromCUE(tplFile,
+		map[string]any{
+			"job.metadata.name":      key.Name,
+			"job.metadata.namespace": key.Namespace,
+			"backup":                 backup,
+			"podSpec":                podSpec,
+		},
+		"job", job); err != nil {
+		return nil, err
+	}
+	return job, nil
 }

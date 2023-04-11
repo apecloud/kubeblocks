@@ -445,3 +445,5 @@ const (
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }
+
+type ComponentNameSet map[string]struct{}

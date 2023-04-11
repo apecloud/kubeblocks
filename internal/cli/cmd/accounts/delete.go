@@ -41,7 +41,7 @@ func (o *DeleteUserOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.info.UserName, "username", "u", "", "Required. Specify the name of user")
 }
 
-func (o DeleteUserOptions) Validate(args []string) error {
+func (o *DeleteUserOptions) Validate(args []string) error {
 	if err := o.AccountBaseOptions.Validate(args); err != nil {
 		return err
 	}

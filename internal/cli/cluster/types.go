@@ -46,6 +46,7 @@ type ClusterInfo struct {
 	InternalEP        string `json:"internalEP,omitempty"`
 	ExternalEP        string `json:"externalEP,omitempty"`
 	CreatedTime       string `json:"age,omitempty"`
+	Labels            string `json:"labels,omitempty"`
 }
 
 type ComponentInfo struct {

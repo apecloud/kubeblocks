@@ -6,6 +6,7 @@ metadata:
   labels:
     {{- include "weaviate.labels" . | nindent 4 }}
 spec:
+  type: weaviate
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"

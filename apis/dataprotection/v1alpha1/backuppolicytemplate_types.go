@@ -53,10 +53,6 @@ type BackupPolicyTemplateSpec struct {
 	// define how to update metadata for backup status.
 	// +optional
 	BackupStatusUpdates []BackupStatusUpdate `json:"backupStatusUpdates,omitempty"`
-
-	// PointInTimeRecovery determines scripts and configurations of the recovery point in time.
-	// +optional
-	PointInTimeRecovery *BackupPointInTimeRecovery `json:"pointInTimeRecovery,omitempty"`
 }
 
 // BackupPolicyCredentialKeyword defined for the target database secret that backup tool can connect.
@@ -70,55 +66,6 @@ type BackupPolicyCredentialKeyword struct {
 	// +kubebuilder:default=password
 	// +optional
 	PasswordKeyword string `json:"passwordKeyword,omitempty"`
-}
-
-// BackupPointInTimeRecovery defines the backup point in time recovery info of BackupPolicyTemplate
-type BackupPointInTimeRecovery struct {
-	// +optional
-	Scripts *ScriptSpec `json:"scripts,omitempty"`
-
-	// +optional
-	Config map[string]string `json:"config,omitempty"`
-
-	// time format
-	// +optional
-	TimeFormat string `json:"timeFormat,omitempty"`
-}
-
-type ScriptSpec struct {
-	// Name of the container specified.
-	// +optional
-	// +kubebuilder:default=script
-	Name string `json:"name"`
-
-	// Container image name.
-	// More info: https://kubernetes.io/docs/concepts/containers/images
-	// This field is optional to allow higher level config management to default or override
-	// container images in workload controllers like Deployments and StatefulSets.
-	// +optional
-	Image string `json:"image,omitempty"`
-
-	// Entrypoint array. Not executed within a shell.
-	// The container image's ENTRYPOINT is used if this is not provided.
-	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
-	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
-	// produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
-	// of whether the variable exists or not. Cannot be updated.
-	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
-	// +optional
-	Command []string `json:"command,omitempty" protobuf:"bytes,3,rep,name=command"`
-
-	// Arguments to the entrypoint.
-	// The container image's CMD is used if this is not provided.
-	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
-	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
-	// produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
-	// of whether the variable exists or not. Cannot be updated.
-	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
-	// +optional
-	Args []string `json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
 }
 
 // BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate

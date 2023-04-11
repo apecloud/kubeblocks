@@ -337,13 +337,16 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	if err := updateConfigManagerWithComponent(podSpec, task.Component.ConfigTemplates, ctx, cli, task.GetBuilderParams()); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
-	if err := mergePITRConfigIfNeeded(ctx, cli, task.Cluster, renderWrapper.renderedObjs); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to merge PITR configuations")
-	}
+	/*
+		if err := mergePITRConfigIfNeeded(ctx, cli, task.Cluster, renderWrapper.renderedObjs); err != nil {
+			return nil, cfgcore.WrapError(err, "failed to merge PITR configuations")
+		}
+	*/
 
 	return renderWrapper.renderedObjs, nil
 }
 
+/*
 func mergePITRConfigIfNeeded(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, configs []client.Object) error {
 	pitrMgr := PointInTimeRecoveryManager{
 		Cluster: cluster,
@@ -361,6 +364,7 @@ func mergePITRConfigIfNeeded(ctx context.Context, cli client.Client, cluster *ap
 	}
 	return nil
 }
+*/
 
 func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotations map[string]string) {
 	// full configmap upgrade

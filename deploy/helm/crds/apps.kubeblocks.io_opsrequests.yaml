@@ -223,6 +223,34 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+              restoreFrom:
+                description: cluster RestoreFrom backup or point in time
+                properties:
+                  backup:
+                    description: use the backup name and component name for restore,
+                      support for multiple components' recovery.
+                    items:
+                      properties:
+                        ref:
+                          description: 'specify a reference backup to restore example:
+                            my-namespace/my-backup-name'
+                          type: string
+                      type: object
+                    type: array
+                  pointInTime:
+                    description: specified the point in time to recovery
+                    properties:
+                      ref:
+                        description: 'specify the source cluster name to restore example:
+                          my-namespace/source-cluster-name'
+                        type: string
+                      time:
+                        description: specify the time point to restore, with UTC as
+                          the time zone.
+                        format: date-time
+                        type: string
+                    type: object
+                type: object
               ttlSecondsAfterSucceed:
                 description: ttlSecondsAfterSucceed OpsRequest will be deleted after
                   TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.

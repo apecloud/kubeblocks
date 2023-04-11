@@ -111,59 +111,6 @@ spec:
                   retry unlimit attempted.
                 format: int32
                 type: integer
-              pointInTimeRecovery:
-                description: PointInTimeRecovery determines scripts and configurations
-                  of the recovery point in time.
-                properties:
-                  config:
-                    additionalProperties:
-                      type: string
-                    type: object
-                  scripts:
-                    properties:
-                      args:
-                        description: 'Arguments to the entrypoint. The container image''s
-                          CMD is used if this is not provided. Variable references
-                          $(VAR_NAME) are expanded using the container''s environment.
-                          If a variable cannot be resolved, the reference in the input
-                          string will be unchanged. Double $$ are reduced to a single
-                          $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-                          "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
-                          Escaped references will never be expanded, regardless of
-                          whether the variable exists or not. Cannot be updated. More
-                          info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
-                        items:
-                          type: string
-                        type: array
-                      command:
-                        description: 'Entrypoint array. Not executed within a shell.
-                          The container image''s ENTRYPOINT is used if this is not
-                          provided. Variable references $(VAR_NAME) are expanded using
-                          the container''s environment. If a variable cannot be resolved,
-                          the reference in the input string will be unchanged. Double
-                          $$ are reduced to a single $, which allows for escaping
-                          the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce
-                          the string literal "$(VAR_NAME)". Escaped references will
-                          never be expanded, regardless of whether the variable exists
-                          or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
-                        items:
-                          type: string
-                        type: array
-                      image:
-                        description: 'Container image name. More info: https://kubernetes.io/docs/concepts/containers/images
-                          This field is optional to allow higher level config management
-                          to default or override container images in workload controllers
-                          like Deployments and StatefulSets.'
-                        type: string
-                      name:
-                        default: script
-                        description: Name of the container specified.
-                        type: string
-                    type: object
-                  timeFormat:
-                    description: time format
-                    type: string
-                type: object
               schedule:
                 description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
                 type: string

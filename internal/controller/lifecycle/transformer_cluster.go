@@ -96,12 +96,10 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 				return err
 			}
 		}
-		if cluster.Spec.RestoreFrom != nil && cluster.Spec.RestoreFrom.PointIn != nil &&
-			cluster.Spec.RestoreFrom.PointIn.Time != nil {
-			if err = plan.DoPITRPrepare(c.ctx.Ctx, c.cli, cluster, synthesizedComp); err != nil {
-				return err
-			}
+		if err = plan.DoPITRPrepare(c.ctx.Ctx, c.cli, cluster, synthesizedComp); err != nil {
+			return err
 		}
+
 		return plan.PrepareComponentResources(c.ctx, c.cli, &iParams)
 	}
 

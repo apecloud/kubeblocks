@@ -17,10 +17,13 @@ limitations under the License.
 package apps
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type MockClusterFactory struct {
@@ -194,12 +197,13 @@ func (factory *MockClusterFactory) AddService(serviceName string, serviceType co
 }
 
 func (factory *MockClusterFactory) AddRestorePointInTime(restoreTime metav1.Time, sourceCluster string) *MockClusterFactory {
-	restoreFrom := appsv1alpha1.RestoreFromSpec{
-		PointIn: &appsv1alpha1.FromPointInSpec{
-			SourceClusterName: sourceCluster,
-			Time:              &restoreTime,
-		},
+	annotations := factory.get().Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
 	}
-	factory.get().Spec.RestoreFrom = &restoreFrom
+	annotations[constant.RestoreFromTimeAnnotationKey] = restoreTime.Format(time.RFC3339)
+	annotations[constant.RestoreFromSrcClusterAnnotationKey] = sourceCluster
+
+	factory.get().Annotations = annotations
 	return factory
 }

@@ -307,36 +307,8 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 			}
 			components = append(components, comp)
 		}
-
-		if err = o.buildClassMappings(componentObjs, compSets); err != nil {
-			return nil, err
-		}
 	}
 	return components, nil
-}
-
-func (o *CreateOptions) buildClassMappings(components []*appsv1alpha1.ClusterComponentSpec, setsMap map[string]map[setKey]string) error {
-	classMappings := make(map[string]string)
-	for _, comp := range components {
-		sets, ok := setsMap[comp.ComponentDefRef]
-		if !ok {
-			continue
-		}
-		class, ok := sets[keyClass]
-		if !ok {
-			continue
-		}
-		classMappings[comp.Name] = class
-	}
-	bytes, err := json.Marshal(classMappings)
-	if err != nil {
-		return err
-	}
-	if o.Annotations == nil {
-		o.Annotations = make(map[string]string)
-	}
-	o.Annotations[types.ComponentClassAnnotationKey] = string(bytes)
-	return nil
 }
 
 // MultipleSourceComponents get component data from multiple source, such as stdin, URI and local file
@@ -490,6 +462,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		compObj := &appsv1alpha1.ClusterComponentSpec{
 			Name:            c.Name,
 			ComponentDefRef: c.Name,
+			ClassDefRef:     appsv1alpha1.ClassDefRef{Class: getVal(keyClass, sets)},
 			Replicas:        replicas,
 			Resources: corev1.ResourceRequirements{
 				Requests: resourceList,

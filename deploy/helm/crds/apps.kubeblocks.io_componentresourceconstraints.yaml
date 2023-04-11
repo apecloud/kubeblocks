@@ -16,7 +16,7 @@ spec:
     listKind: ComponentResourceConstraintList
     plural: componentresourceconstraints
     shortNames:
-    - cf
+    - crc
     singular: componentresourceconstraint
   scope: Cluster
   versions:

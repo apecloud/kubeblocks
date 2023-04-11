@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -229,14 +230,15 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 		return nil
 	}
 
-	getComponentType := func(name string) string {
+	getComponent := func(name string) *ClusterComponentSpec {
 		for _, comp := range cluster.Spec.ComponentSpecs {
 			if comp.Name == name {
-				return comp.ComponentDefRef
+				return &comp
 			}
 		}
-		return ""
+		return nil
 	}
+
 	// validate resources is legal and get component name slice
 	componentNames := make([]string, len(verticalScalingList))
 	for i, v := range verticalScalingList {
@@ -248,13 +250,22 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 		if invalidValue, err := validateVerticalResourceList(v.Limits); err != nil {
 			return invalidValueError(invalidValue, err.Error())
 		}
-		if classes, ok := compClasses[getComponentType(v.ComponentName)]; ok {
-			if err = validateMatchingClass(classes, v.ResourceRequirements); err != nil {
-				return invalidValueError("", err.Error())
-			}
-		}
 		if invalidValue, err := compareRequestsAndLimits(v.ResourceRequirements); err != nil {
 			return invalidValueError(invalidValue, err.Error())
+		}
+		comp := getComponent(v.ComponentName)
+		if comp == nil {
+			continue
+		}
+		if classes, ok := compClasses[comp.ComponentDefRef]; ok {
+			if comp.ClassDefRef.Class != "" {
+				if _, ok = classes[comp.ClassDefRef.Class]; !ok {
+					return field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].classDefRef", i)), comp.ClassDefRef.Class, err.Error())
+				}
+			}
+			if err = validateMatchingClass(classes, v.ResourceRequirements); err != nil {
+				return fmt.Errorf("can not find matching class for component %s", v.ComponentName)
+			}
 		}
 	}
 	return r.checkComponentExistence(cluster, componentNames)
@@ -492,8 +503,9 @@ func getClasses(clusterDef string) (map[string]map[string]*ComponentClassInstanc
 			return nil, fmt.Errorf("failed to find component type")
 		}
 		classes := make(map[string]*ComponentClassInstance)
-		for _, item := range classDefinition.Status.Classes {
-			classes[item.Name] = &item
+		for idx := range classDefinition.Status.Classes {
+			cls := classDefinition.Status.Classes[idx]
+			classes[cls.Name] = &cls
 		}
 		if _, ok := componentClasses[componentType]; !ok {
 			componentClasses[componentType] = classes

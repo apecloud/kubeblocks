@@ -101,7 +101,6 @@ const (
 
 	ClassProviderLabelKey              = "class.kubeblocks.io/provider"
 	ResourceConstraintProviderLabelKey = "resourceconstraint.kubeblocks.io/provider"
-	ComponentClassAnnotationKey        = "cluster.kubeblocks.io/component-class"
 )
 
 // DataProtection API group

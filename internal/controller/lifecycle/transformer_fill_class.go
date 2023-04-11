@@ -17,7 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -50,15 +49,8 @@ func (r *fillClass) Transform(dag *graph.DAG) error {
 
 func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, clusterDefinition appsv1alpha1.ClusterDefinition) error {
 	var (
-		value                 = cluster.GetAnnotations()[constant.ClassAnnotationKey]
-		componentClassMapping = make(map[string]string)
-		classDefinitionList   appsv1alpha1.ComponentClassDefinitionList
+		classDefinitionList appsv1alpha1.ComponentClassDefinitionList
 	)
-	if value != "" {
-		if err := json.Unmarshal([]byte(value), &componentClassMapping); err != nil {
-			return err
-		}
-	}
 
 	ml := []client.ListOption{
 		client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefinition.Name},
@@ -114,13 +106,12 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		classes := compClasses[comp.ComponentDefRef]
 
 		var cls *appsv1alpha1.ComponentClassInstance
-		className, ok := componentClassMapping[comp.Name]
 		// TODO another case if len(constraintList.Items) > 0, use matchClassFamilies to find matching resource constraint:
 		switch {
-		case ok:
-			cls = classes[className]
+		case comp.ClassDefRef.Class != "":
+			cls = classes[comp.ClassDefRef.Class]
 			if cls == nil {
-				return fmt.Errorf("unknown component class %s", className)
+				return fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
 			}
 		case classes != nil:
 			cls = matchComponentClass(comp, classes)
@@ -132,7 +123,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 			// TODO reconsider handling policy for this case
 			continue
 		}
-		componentClassMapping[comp.Name] = cls.Name
+		comp.ClassDefRef.Name = cls.Name
 		requests := corev1.ResourceList{
 			corev1.ResourceCPU:    cls.CPU,
 			corev1.ResourceMemory: cls.Memory,

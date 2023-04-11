@@ -226,7 +226,14 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		r.validateComponentResources(allErrs, v.Resources, i)
 
 		if classes, ok := compClasses[v.ComponentDefRef]; ok {
+			if v.ClassDefRef.Class != "" {
+				if _, ok = classes[v.ClassDefRef.Class]; !ok {
+					*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].classDefRef", i)), v.ClassDefRef.Class, "can not find the specified class"))
+					return
+				}
+			}
 			if err = validateMatchingClass(classes, v.Resources); err != nil {
+				*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].resources", i)), v.Resources.String(), err.Error()))
 				return
 			}
 		}

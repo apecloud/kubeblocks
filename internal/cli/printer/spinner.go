@@ -52,7 +52,7 @@ func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
 		go func() {
 			<-c
 			s.Stop()
-			fmt.Print("\033[?25")
+			fmt.Print("\033[?25h")
 			os.Exit(0)
 		}()
 	}

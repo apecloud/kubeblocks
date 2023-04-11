@@ -313,6 +313,13 @@ spec:
                                       description: Requests value mapping key.
                                       type: string
                                   type: object
+                                pvcSelector:
+                                  additionalProperties:
+                                    type: string
+                                  description: pvcSelector defines PVC label selector,
+                                    if provided, storage expansion will be controlled
+                                    via PVC resize.
+                                  type: object
                                 storage:
                                   description: storage sets storage size value mapping
                                     key.
@@ -379,6 +386,13 @@ spec:
                               requests:
                                 description: Requests value mapping key.
                                 type: string
+                            type: object
+                          pvcSelector:
+                            additionalProperties:
+                              type: string
+                            description: pvcSelector defines PVC label selector, if
+                              provided, storage expansion will be controlled via PVC
+                              resize.
                             type: object
                           storage:
                             description: storage sets storage size value mapping key.

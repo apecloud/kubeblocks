@@ -58,6 +58,12 @@ func init() {
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=delete;deletecollection
 
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;update;patch;watch
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
+
+// read only + watch access
+// +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //

@@ -27,8 +27,10 @@ import (
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -117,8 +119,13 @@ type progressingHandler struct {
 	disablingStage disablingStage
 }
 
+type storageExpansionStage struct {
+	stageCtx
+}
+
 type helmTypeInstallStage struct {
 	stageCtx
+	storageExpansionStage storageExpansionStage
 }
 
 type helmTypeUninstallStage struct {
@@ -400,7 +407,79 @@ func getHelmReleaseName(addon *extensionsv1alpha1.Addon) string {
 	return fmt.Sprintf("kb-addon-%s", addon.Name)
 }
 
+func (r *storageExpansionStage) Handle(ctx context.Context) {
+	r.process(func(addon *extensionsv1alpha1.Addon) {
+		mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+		processStorageExpansion := func(labels client.MatchingLabels, quantity *resource.Quantity) error {
+			if quantity == nil {
+				return nil
+			}
+			pvcList := &corev1.PersistentVolumeClaimList{}
+			labels["release"] = getHelmReleaseName(addon)
+			if err := r.reconciler.Client.List(ctx, pvcList, client.InNamespace(mgrNS),
+				labels); err != nil {
+				return err
+			}
+			for _, i := range pvcList.Items {
+				// cannot expand volume if there is no storage class
+				if i.Spec.StorageClassName == nil || *i.Spec.StorageClassName == "" {
+					continue
+				}
+				sc := &storagev1.StorageClass{}
+				if err := r.reconciler.Get(ctx, client.ObjectKey{
+					Namespace: mgrNS,
+					Name:      *i.Spec.StorageClassName,
+				}, sc); err != nil {
+					return err
+				}
+				if sc.AllowVolumeExpansion == nil || !*sc.AllowVolumeExpansion {
+					continue
+				}
+				i.Spec.Resources.Requests[corev1.ResourceStorage] = *quantity
+				if err := r.reconciler.Client.Update(ctx, &i); err != nil {
+					return err
+				}
+				// only process 1st allowable PVC item
+				break
+			}
+			return nil
+		}
+
+		if q := addon.Spec.InstallSpec.Resources.Requests.Storage(); q != nil {
+			rm := addon.Spec.Helm.ValuesMapping.ResourcesMapping
+			if rm.HasPVCSelector() {
+				if err := processStorageExpansion(rm.PVCSelector, q); err != nil {
+					r.setRequeueWithErr(err, "")
+					return
+				}
+			}
+		}
+		for _, i := range addon.Spec.InstallSpec.ExtraItems {
+			q := i.Resources.Requests.Storage()
+			if q == nil {
+				continue
+			}
+			for _, j := range addon.Spec.Helm.ValuesMapping.ExtraItems {
+				if i.Name != j.Name {
+					continue
+				}
+				rm := j.ResourcesMapping
+				if !rm.HasPVCSelector() {
+					continue
+				}
+				if err := processStorageExpansion(rm.PVCSelector, q); err != nil {
+					r.setRequeueWithErr(err, "")
+					return
+				}
+				break
+			}
+		}
+	})
+	r.next.Handle(ctx)
+}
+
 func (r *helmTypeInstallStage) Handle(ctx context.Context) {
+	r.storageExpansionStage.stageCtx = r.stageCtx
 	r.process(func(addon *extensionsv1alpha1.Addon) {
 		r.reqCtx.Log.V(1).Info("helmTypeInstallStage", "phase", addon.Status.Phase)
 		mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
@@ -416,6 +495,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			return
 		} else if err == nil {
 			if helmInstallJob.Status.Succeeded > 0 {
+				r.storageExpansionStage.Handle(ctx)
 				return
 			}
 

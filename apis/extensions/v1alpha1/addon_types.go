@@ -221,6 +221,11 @@ type ResourceMappingItem struct {
 	// +optional
 	Storage string `json:"storage,omitempty"`
 
+	// pvcSelector defines PVC label selector, if provided, storage expansion
+	// will be controlled via PVC resize.
+	// +optional
+	PVCSelector map[string]string `json:"pvcSelector,omitempty"`
+
 	// cpu sets CPU requests and limits mapping keys.
 	// +optional
 	CPU *ResourceReqLimItem `json:"cpu,omitempty"`
@@ -516,7 +521,7 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 		for k, v := range installSpecItem.Resources.Requests {
 			switch k {
 			case corev1.ResourceStorage:
-				if valueMapping.ResourcesMapping.Storage != "" {
+				if valueMapping.ResourcesMapping.Storage != "" && len(valueMapping.ResourcesMapping.PVCSelector) == 0 {
 					installValues.SetValues = append(installValues.SetValues,
 						fmt.Sprintf("%s=%v", valueMapping.ResourcesMapping.Storage, v.ToUnstructured()))
 				}
@@ -559,6 +564,13 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 		}
 	}
 	return installValues
+}
+
+func (r *ResourceMappingItem) HasPVCSelector() bool {
+	if r == nil {
+		return false
+	}
+	return len(r.PVCSelector) > 0
 }
 
 // GetSortedDefaultInstallValues return DefaultInstallValues items with items that has

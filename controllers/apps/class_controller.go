@@ -35,13 +35,13 @@ import (
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentclassdefinitions/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentclassdefinitions/finalizers,verbs=update
 
-type ClassReconciler struct {
+type ComponentClassReconciler struct {
 	client.Client
 	Scheme   *k8sruntime.Scheme
 	Recorder record.EventRecorder
 }
 
-func (r *ClassReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
@@ -86,6 +86,6 @@ func (r *ClassReconciler) Reconcile(ctx context.Context, req reconcile.Request) 
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ComponentClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).For(&appsv1alpha1.ComponentClassDefinition{}).Complete(r)
 }

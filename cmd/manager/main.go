@@ -391,7 +391,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&appscontrollers.ClassReconciler{
+	if err = (&appscontrollers.ComponentClassReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("class-controller"),

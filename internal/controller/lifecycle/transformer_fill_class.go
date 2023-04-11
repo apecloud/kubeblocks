@@ -84,9 +84,11 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		candidate := candidates[0]
 		cpu, memory := class.GetMinCPUAndMemory(candidate.Constraint)
 		cls := &appsv1alpha1.ComponentClassInstance{
-			Name:   fmt.Sprintf("%s-%vc%vg", candidate.Name, cpu.AsDec().String(), memory.AsDec().String()),
-			CPU:    *cpu,
-			Memory: *memory,
+			ComponentClass: appsv1alpha1.ComponentClass{
+				Name:   fmt.Sprintf("%s-%vc%vg", candidate.Name, cpu.AsDec().String(), memory.AsDec().String()),
+				CPU:    *cpu,
+				Memory: *memory,
+			},
 		}
 		return cls
 	}
@@ -144,15 +146,15 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 
 func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
 	var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
-	for _, disk := range cls.Storage {
+	for _, volume := range cls.Volumes {
 		volume := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
-			Name: disk.Name,
+			Name: volume.Name,
 			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 				// TODO define access mode in class
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 				Resources: corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: disk.Size,
+						corev1.ResourceStorage: volume.Size,
 					},
 				},
 			},

@@ -56,7 +56,12 @@ spec:
 
 func TestResourceConstraint_ByClassCPUAndMemory(t *testing.T) {
 	buildClass := func(cpu string, memory string) *appsv1alpha1.ComponentClassInstance {
-		return &appsv1alpha1.ComponentClassInstance{CPU: resource.MustParse(cpu), Memory: resource.MustParse(memory)}
+		return &appsv1alpha1.ComponentClassInstance{
+			ComponentClass: appsv1alpha1.ComponentClass{
+				CPU:    resource.MustParse(cpu),
+				Memory: resource.MustParse(memory),
+			},
+		}
 	}
 	classes := []*appsv1alpha1.ComponentClassInstance{
 		buildClass("1", "2Gi"),

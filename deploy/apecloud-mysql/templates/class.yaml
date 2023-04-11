@@ -12,7 +12,7 @@ spec:
     template: |
       cpu: {{ printf "{{ or .cpu 1 }}" }}
       memory: {{ printf "{{ or .memory 4 }}Gi" }}
-      storage:
+      volumes:
       - name: data
         size: {{ printf "{{ or .dataStorageSize 10 }}Gi" }}
       - name: log
@@ -37,7 +37,7 @@ spec:
     template: |
       cpu: {{ printf "{{ or .cpu 1 }}" }}
       memory: {{ printf "{{ or .memory 8 }}Gi" }}
-      storage:
+      volumes:
       - name: data
         size: {{ printf "{{ or .dataStorageSize 10 }}Gi" }}
       - name: log

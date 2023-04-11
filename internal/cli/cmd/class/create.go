@@ -243,34 +243,30 @@ func (o *CreateOptions) run() error {
 }
 
 func (o *CreateOptions) buildClass() (*v1alpha1.ComponentClass, error) {
-	cls := v1alpha1.ComponentClass{Name: o.ClassName, CPU: o.CPU, Memory: o.Memory}
-	for _, disk := range o.Storage {
-		kvs := strings.Split(disk, ",")
-		diskDef := v1alpha1.DiskDef{}
+	cls := v1alpha1.ComponentClass{Name: o.ClassName, CPU: resource.MustParse(o.CPU), Memory: resource.MustParse(o.Memory)}
+	for _, item := range o.Storage {
+		kvs := strings.Split(item, ",")
+		volume := v1alpha1.Volume{}
 		for _, kv := range kvs {
 			parts := strings.Split(kv, "=")
 			if len(parts) != 2 {
-				return nil, fmt.Errorf("invalid storage disk: %s", disk)
+				return nil, fmt.Errorf("invalid storage item: %s", item)
 			}
 			switch parts[0] {
 			case "name":
-				diskDef.Name = parts[1]
+				volume.Name = parts[1]
 			case "size":
-				diskDef.Size = parts[1]
+				volume.Size = resource.MustParse(parts[1])
 			case "class":
-				diskDef.Class = parts[1]
+				volume.Class = parts[1]
 			default:
-				return nil, fmt.Errorf("invalid storage disk: %s", disk)
+				return nil, fmt.Errorf("invalid storage item: %s", item)
 			}
 		}
-		// validate disk size
-		if _, err := resource.ParseQuantity(diskDef.Size); err != nil {
-			return nil, fmt.Errorf("invalid disk size: %s", disk)
+		if volume.Name == "" {
+			return nil, fmt.Errorf("invalid item name: %s", item)
 		}
-		if diskDef.Name == "" {
-			return nil, fmt.Errorf("invalid disk name: %s", disk)
-		}
-		cls.Storage = append(cls.Storage, diskDef)
+		cls.Volumes = append(cls.Volumes, volume)
 	}
 	return &cls, nil
 }

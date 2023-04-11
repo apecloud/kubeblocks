@@ -19,6 +19,7 @@ package apps
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -54,8 +55,8 @@ var _ = Describe("", func() {
 		)
 		class := v1alpha1.ComponentClass{
 			Name:   className,
-			CPU:    "1",
-			Memory: "2Gi",
+			CPU:    resource.MustParse("1"),
+			Memory: resource.MustParse("2Gi"),
 		}
 		componentClassDefinition = testapps.NewComponentClassDefinitionFactory("custom", "apecloud-mysql", "mysql").
 			AddClass(class).Create(&testCtx).GetObject()

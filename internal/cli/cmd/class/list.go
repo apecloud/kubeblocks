@@ -100,12 +100,12 @@ func (o *ListOptions) printClass(constraintName string, compName string, classes
 	_, _ = fmt.Fprintf(o.Out, "\nConstraint %s:\n", constraintName)
 	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY", "STORAGE")
 	sort.Sort(class.ByClassCPUAndMemory(classes))
-	for _, class := range classes {
-		var disks []string
-		for _, disk := range class.Storage {
-			disks = append(disks, disk.String())
+	for _, cls := range classes {
+		var volumes []string
+		for _, volume := range cls.Volumes {
+			volumes = append(volumes, fmt.Sprintf("name=%s,size=%s", volume.Name, volume.Size.String()))
 		}
-		tbl.AddRow(compName, class.Name, class.CPU.String(), class.Memory.String(), strings.Join(disks, ","))
+		tbl.AddRow(compName, cls.Name, cls.CPU.String(), cls.Memory.String(), strings.Join(volumes, ","))
 	}
 	tbl.Print()
 }

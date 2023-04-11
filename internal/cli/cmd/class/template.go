@@ -32,7 +32,7 @@ const ComponentClassTemplate = `
   template: |
     cpu: "{{ or .cpu 1 }}"
     memory: "{{ or .memory 4 }}Gi"
-    storage:
+    volumes:
     - name: data
       size: "{{ or .dataStorageSize 10 }}Gi"
     - name: log

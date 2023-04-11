@@ -181,10 +181,6 @@ spec:
             env:
               - name: CELL
                 value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
-              - name: KEYSPACE
-                value: {{ .Values.wesqlscale.keySpace | default "commerce" | quote }}
-              - name: SHARD
-                value: {{ .Values.wesqlscale.shard | default "0" | quote }}
               - name: ETCD_SERVER
                 value: "$(KB_CLUSTER_NAME)-etcd-headless"
               - name: ETCD_PORT
@@ -214,8 +210,6 @@ spec:
               - -c
               - |
                 cell=${CELL:-'zone1'}
-                keyspace=${KEYSPACE:-'commerce'}
-                shard=${SHARD:-'0'}
                 uid="${KB_POD_NAME##*-}"
                 mysql_root=${MYSQL_ROOT_USER:-'root'}
                 mysql_root_passwd=${MYSQL_ROOT_PASSWORD:-'123456'}
@@ -242,8 +236,6 @@ spec:
                 --log_queries_to_file $VTDATAROOT/$tablet_logfile \
                 --tablet-path $alias \
                 --tablet_hostname "$tablet_hostname" \
-                --init_keyspace $keyspace \
-                --init_shard $shard \
                 --init_tablet_type $tablet_type \
                 --health_check_interval 1s \
                 --shard_sync_retry_delay 1s \
@@ -511,8 +503,6 @@ spec:
               - |
                 echo "starting vtconsensus"
                 cell=${CELL:-'zone1'}
-                keyspace=${KEYSPACE:-'commerce'}
-                shard=${SHARD:-'0'}
 
                 vtconsensusport=${VTCONSENSUS_PORT:-'16000'}
                 topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
@@ -521,7 +511,6 @@ spec:
                 exec vtconsensus \
                   $topology_fags \
                   --alsologtostderr \
-                  --clusters_to_watch "$keyspace/$shard" \
                   --refresh_interval 1s \
                   --scan_repair_timeout 1s \
                   --log_dir ${VTDATAROOT} \

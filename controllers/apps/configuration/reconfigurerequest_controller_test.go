@@ -88,7 +88,9 @@ var _ = Describe("Reconfigure Controller", func() {
 					constant.CMConfigurationConstraintsNameLabelKey, cmName,
 					constant.CMConfigurationSpecProviderLabelKey, configSpecName,
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
-				))
+				),
+				testapps.WithAnnotations(constant.KBParameterUpdateSourceAnnotationKey,
+					constant.ReconfigureManagerSource))
 
 			constraint := testapps.CreateCustomizedObj(&testCtx,
 				"resources/mysql-config-constraint.yaml",

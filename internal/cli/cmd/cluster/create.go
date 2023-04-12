@@ -482,7 +482,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		case "MaximumPerformance":
 			switchPolicyType = appsv1alpha1.MaximumDataProtection
 		default:
-			return fmt.Errorf("switchPolicy is illegal")
+			return fmt.Errorf("switchPolicy is illegal, only support Noop, MaximumAvailability, MaximumPerformance")
 		}
 		compObj.SwitchPolicy = &appsv1alpha1.ClusterSwitchPolicy{
 			Type: switchPolicyType,

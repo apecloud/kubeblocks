@@ -133,7 +133,7 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		dbPort := port.ContainerPort
 		container.Env = append(container.Env, corev1.EnvVar{
 			Name:      constant.KBPrefix + "_SERVICE_PORT",
-			Value:     strconv.Itoa(dbPort),
+			Value:     strconv.Itoa(int(dbPort)),
 			ValueFrom: nil,
 		})
 	}

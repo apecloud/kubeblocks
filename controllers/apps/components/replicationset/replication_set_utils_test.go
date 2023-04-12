@@ -18,6 +18,7 @@ package replicationset
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -62,7 +63,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StatefulSetSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
@@ -86,59 +87,24 @@ var _ = Describe("ReplicationSet Util", func() {
 			Image:           testapps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		stsList := make([]*appsv1.StatefulSet, 0)
-		secondaryName := clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-1"
-		for k, v := range map[string]string{
-			string(Primary):   clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-0",
-			string(Secondary): secondaryName,
-		} {
-			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
-				AddFinalizers([]string{DBClusterFinalizerName}).
-				AddContainer(container).
-				AddAppInstanceLabel(clusterObj.Name).
-				AddAppComponentLabel(testapps.DefaultRedisCompName).
-				AddAppManangedByLabel().
-				AddRoleLabel(k).
-				SetReplicas(1).
-				Create(&testCtx).GetObject()
-			isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
-			if k == string(Primary) {
-				Expect(err).To(Succeed())
-				Expect(isStsPrimary).Should(BeTrue())
-			} else {
-				Expect(err).To(Succeed())
-				Expect(isStsPrimary).ShouldNot(BeTrue())
-			}
-			stsList = append(stsList, sts)
-		}
+		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+			clusterObj.Name+"-"+testapps.DefaultRedisCompName, clusterObj.Name, testapps.DefaultRedisCompName).
+			AddFinalizers([]string{DBClusterFinalizerName}).
+			AddContainer(container).
+			AddAppInstanceLabel(clusterObj.Name).
+			AddAppComponentLabel(testapps.DefaultRedisCompName).
+			AddAppManangedByLabel().
+			SetReplicas(2).
+			Create(&testCtx).GetObject()
 
 		By("Creating Pods of replication workloadType.")
-		for _, sts := range stsList {
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+		for i := int32(0); i < *sts.Spec.Replicas; i++ {
+			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
 				AddContainer(container).
 				AddLabelsInMap(sts.Labels).
+				AddRoleLabel(DefaultRole(i)).
 				Create(&testCtx).GetObject()
 		}
-
-		By("Test ReplicationSet pod number of sts equals 1")
-		_, err := getAndCheckReplicationPodByStatefulSet(ctx, k8sClient, stsList[0])
-		Expect(err).Should(Succeed())
-
-		By("Test handleReplicationSet success when stsList count equal cluster.replicas.")
-		err = HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)
-		Expect(err).Should(Succeed())
-
-		By("Test handleReplicationSet scale-in return err when remove Finalizer after delete the sts")
-		clusterObj.Spec.ComponentSpecs[0].Replicas = testapps.DefaultReplicationReplicas - 1
-		Expect(HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)).Should(Succeed())
-		Eventually(testapps.GetListLen(&testCtx, generics.StatefulSetSignature,
-			client.InNamespace(testCtx.DefaultNamespace))).Should(Equal(1))
-
-		By("Test handleReplicationSet scale replicas to 0")
-		clusterObj.Spec.ComponentSpecs[0].Replicas = 0
-		Expect(HandleReplicationSet(ctx, k8sClient, clusterObj, stsList[:1])).Should(Succeed())
-		Eventually(testapps.GetListLen(&testCtx, generics.StatefulSetSignature, client.InNamespace(testCtx.DefaultNamespace))).Should(Equal(0))
-		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
 	}
 
 	testNeedUpdateReplicationSetStatus := func() {
@@ -155,14 +121,14 @@ var _ = Describe("ReplicationSet Util", func() {
 				Phase: appsv1alpha1.RunningClusterCompPhase,
 				ReplicationSetStatus: &appsv1alpha1.ReplicationSetStatus{
 					Primary: appsv1alpha1.ReplicationMemberStatus{
-						Pod: clusterObj.Name + testapps.DefaultRedisCompName + "-0-0",
+						Pod: clusterObj.Name + testapps.DefaultRedisCompName + "-0",
 					},
 					Secondaries: []appsv1alpha1.ReplicationMemberStatus{
 						{
-							Pod: clusterObj.Name + testapps.DefaultRedisCompName + "-1-0",
+							Pod: clusterObj.Name + testapps.DefaultRedisCompName + "-1",
 						},
 						{
-							Pod: clusterObj.Name + testapps.DefaultRedisCompName + "-2-0",
+							Pod: clusterObj.Name + testapps.DefaultRedisCompName + "-2",
 						},
 					},
 				},
@@ -171,28 +137,28 @@ var _ = Describe("ReplicationSet Util", func() {
 		Expect(k8sClient.Status().Patch(context.Background(), clusterObj, patch)).Should(Succeed())
 
 		By("testing sync cluster status with add pod")
-		var podList []*corev1.Pod
-		sts := testk8s.NewFakeStatefulSet(clusterObj.Name+testapps.DefaultRedisCompName+"-3", 3)
-		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
-			AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-			AddRoleLabel(string(Secondary)).
-			Create(&testCtx).GetObject()
-		podList = append(podList, pod)
+
+		var podList []corev1.Pod
+		sts := testk8s.NewFakeStatefulSet(clusterObj.Name+testapps.DefaultRedisCompName, 4)
+
+		for i := int32(0); i < *sts.Spec.Replicas; i++ {
+			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
+				AddRoleLabel(DefaultRole(i)).
+				Create(&testCtx).GetObject()
+			podList = append(podList, *pod)
+		}
 		err := syncReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus, podList)
 		Expect(err).Should(Succeed())
 		Expect(len(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus.Secondaries)).Should(Equal(3))
 
 		By("testing sync cluster status with remove pod")
 		var podRemoveList []corev1.Pod
-		sts = testk8s.NewFakeStatefulSet(clusterObj.Name+testapps.DefaultRedisCompName+"-2", 3)
-		pod = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
-			AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-			AddRoleLabel(string(Secondary)).
-			Create(&testCtx).GetObject()
-		podRemoveList = append(podRemoveList, *pod)
+		*sts.Spec.Replicas = *sts.Spec.Replicas - 1
+		podRemoveList = append(podRemoveList, podList[len(podList)-1])
 		Expect(removeTargetPodsInfoInStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus,
 			podRemoveList, clusterObj.Spec.ComponentSpecs[0].Replicas)).Should(Succeed())
-		Expect(len(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus.Secondaries)).Should(Equal(2))
+		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus.Secondaries).Should(HaveLen(2))
 	}
 
 	testGeneratePVCFromVolumeClaimTemplates := func() {

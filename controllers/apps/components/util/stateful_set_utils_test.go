@@ -130,7 +130,7 @@ var _ = Describe("StatefulSet utils test", func() {
 				Create(&testCtx).GetObject()
 
 			By("Creating pods by the StatefulSet")
-			testapps.MockReplicationComponentPods(testCtx, sts, clusterName, testapps.DefaultRedisCompName, role)
+			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompName, nil)
 			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
 
 			By("Updating the StatefulSet's UpdateRevision")
@@ -152,7 +152,7 @@ var _ = Describe("StatefulSet utils test", func() {
 			Expect(len(podList)).To(Equal(0))
 
 			By("Creating new pods by StatefulSet with new UpdateRevision")
-			testapps.MockReplicationComponentPods(testCtx, sts, clusterName, testapps.DefaultRedisCompName, role)
+			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompName, nil)
 			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
 		})
 	})

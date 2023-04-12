@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
@@ -33,7 +34,9 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type ConsensusSet types.ComponentBase
+type ConsensusSet struct {
+	stateful.Stateful
+}
 
 var _ types.Component = &ConsensusSet{}
 
@@ -60,11 +63,7 @@ func (r *ConsensusSet) IsRunning(ctx context.Context, obj client.Object) (bool, 
 }
 
 func (r *ConsensusSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
-	if obj == nil {
-		return false, nil
-	}
-	sts := util.ConvertToStatefulSet(obj)
-	return util.StatefulSetPodsAreReady(sts, r.Component.Replicas), nil
+	return r.Stateful.PodsReady(ctx, obj)
 }
 
 func (r *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
@@ -265,9 +264,11 @@ func NewConsensusComponent(
 		return nil, err
 	}
 	return &ConsensusSet{
-		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		ComponentDef: &componentDef,
+		Stateful: stateful.Stateful{
+			Cli:          cli,
+			Cluster:      cluster,
+			Component:    component,
+			ComponentDef: &componentDef,
+		},
 	}, nil
 }

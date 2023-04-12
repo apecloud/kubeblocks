@@ -17,10 +17,11 @@ limitations under the License.
 package replicationset
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -87,35 +88,24 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 			Image:           testapps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		stsList := make([]*appsv1.StatefulSet, 0)
-		for k, v := range map[string]string{
-			string(Primary):   clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-0",
-			string(Secondary): clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-1",
-		} {
-			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
-				AddContainer(container).
-				AddAppInstanceLabel(clusterObj.Name).
-				AddAppComponentLabel(testapps.DefaultRedisCompName).
-				AddAppManangedByLabel().
-				AddRoleLabel(k).
-				SetReplicas(1).
-				Create(&testCtx).GetObject()
-			isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
-			if k == string(Primary) {
-				Expect(err).To(Succeed())
-				Expect(isStsPrimary).Should(BeTrue())
-			} else {
-				Expect(err).To(Succeed())
-				Expect(isStsPrimary).ShouldNot(BeTrue())
-			}
-			stsList = append(stsList, sts)
-		}
+		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+			clusterObj.Name+"-"+testapps.DefaultRedisCompName,
+			clusterObj.Name,
+			testapps.DefaultRedisCompName).
+			AddContainer(container).
+			AddAppInstanceLabel(clusterObj.Name).
+			AddAppComponentLabel(testapps.DefaultRedisCompName).
+			AddAppManangedByLabel().
+			SetReplicas(2).
+			Create(&testCtx).GetObject()
 
 		By("Creating Pods of replication workloadType.")
-		for _, sts := range stsList {
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+
+		for i := int32(0); i < *sts.Spec.Replicas; i++ {
+			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
 				AddContainer(container).
 				AddLabelsInMap(sts.Labels).
+				AddRoleLabel(DefaultRole(i)).
 				Create(&testCtx).GetObject()
 		}
 		clusterComponentSpec := &clusterObj.Spec.ComponentSpecs[0]
@@ -131,12 +121,14 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 		Expect(err).Should(Succeed())
 
 		By("Test update cluster component primaryIndex should be successful.")
-		testapps.UpdateClusterCompSpecPrimaryIndex(&testCtx, clusterObj, clusterComponentSpec.Name, &DefaultPrimaryIndexDiffWithStsOrdinal)
+		testapps.UpdateClusterCompSpecPrimaryIndex(&testCtx, clusterObj, clusterComponentSpec.Name,
+			&DefaultPrimaryIndexDiffWithStsOrdinal)
 
 		By("Test new Switch obj and init SwitchInstance should be successful.")
 		clusterObj.Spec.ComponentSpecs[0].PrimaryIndex = &DefaultPrimaryIndexDiffWithStsOrdinal
 		clusterComponentSpec.PrimaryIndex = &DefaultPrimaryIndexDiffWithStsOrdinal
-		s := newSwitch(testCtx.Ctx, k8sClient, clusterObj, &clusterDefObj.Spec.ComponentDefs[0], clusterComponentSpec, nil, nil, nil, nil, nil)
+		s := newSwitch(testCtx.Ctx, k8sClient, clusterObj, &clusterDefObj.Spec.ComponentDefs[0], clusterComponentSpec,
+			nil, nil, nil, nil, nil)
 		err = s.initSwitchInstance(DefaultReplicationPrimaryIndex, DefaultPrimaryIndexDiffWithStsOrdinal)
 		Expect(err).Should(Succeed())
 

@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
@@ -357,14 +358,18 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.GetListLen(&testCtx, intctrlutil.StatefulSetSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterObj.Name,
-				}, client.InNamespace(clusterObj.Namespace))).Should(BeEquivalentTo(2))
-			stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), testapps.DefaultRedisCompName)
-			for _, v := range stsList.Items {
-				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
-					testk8s.MockStatefulSetReady(&v)
-				})).ShouldNot(HaveOccurred())
-				podName := v.Name + "-0"
-				pod := testapps.MockReplicationComponentStsPod(testCtx, &v, clusterObj.Name, testapps.DefaultRedisCompName, podName, v.Labels[constant.RoleLabelKey])
+				}, client.InNamespace(clusterObj.Namespace))).Should(BeEquivalentTo(1))
+			stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj),
+				testapps.DefaultRedisCompName)
+			Expect(stsList.Items).Should(HaveLen(1))
+			sts := &stsList.Items[0]
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				testk8s.MockStatefulSetReady(sts)
+			})).ShouldNot(HaveOccurred())
+			for i := int32(0); i < *sts.Spec.Replicas; i++ {
+				podName := fmt.Sprintf("%s-%d", sts.Name, i)
+				pod := testapps.MockReplicationComponentStsPod(nil, testCtx, sts, clusterObj.Name,
+					testapps.DefaultRedisCompName, podName, replicationset.DefaultRole(i))
 				podList = append(podList, pod)
 			}
 		}
@@ -379,7 +384,8 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("Create a clusterVersion obj with replication workloadType.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(testapps.DefaultRedisCompType).AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
+				AddComponent(testapps.DefaultRedisCompType).AddContainerShort(testapps.DefaultRedisContainerName,
+				testapps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 
 			By("Creating a cluster with replication workloadType.")
@@ -394,7 +400,8 @@ var _ = Describe("OpsRequest Controller", func() {
 			// mock sts ready and create pod
 			createStsPodAndMockStsReady()
 			// wait for cluster to running
-			Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).
+				Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
 
 		It("test stop/start ops", func() {

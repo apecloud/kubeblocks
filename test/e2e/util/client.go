@@ -17,8 +17,12 @@ limitations under the License.
 package util
 
 import (
+	"os"
+
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -59,4 +63,16 @@ func InitTestClient(kubecontext string) (TestClient, error) {
 		ClientGo:       clientGo,
 		dynamicFactory: factory,
 	}, nil
+}
+
+func GetConfig() (*rest.Config, error) {
+	kubeConfigPath, exists := os.LookupEnv("KUBECONFIG")
+	if !exists {
+		kubeConfigPath = os.ExpandEnv("$HOME/.kube/config")
+	}
+	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
+	if err != nil {
+		return nil, err
+	}
+	return config, nil
 }

@@ -195,7 +195,7 @@ func (p *PreflightOptions) run() error {
 		fmt.Print(cursor.Hide())
 		defer fmt.Print(cursor.Show())
 	}
-	// set progress chain
+	// set progress chan
 	progressCh := make(chan interface{})
 	defer close(progressCh)
 	// make sure we shut down progress collection goroutines if an error occurs

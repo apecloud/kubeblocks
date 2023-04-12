@@ -29,7 +29,8 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-type ConfigManagerParams struct {
+// CfgManagerBuildParams is the params for building config manager sidecar
+type CfgManagerBuildParams struct {
 	ManagerName string          `json:"name"`
 	Image       string          `json:"sidecarImage"`
 	Args        []string        `json:"args"`

@@ -34,6 +34,8 @@ import (
 type ExposeOpsHandler struct {
 }
 
+var _ OpsHandler = ExposeOpsHandler{}
+
 func init() {
 	// ToClusterPhase is not defined, because expose not affect the cluster status.
 	exposeBehavior := OpsBehaviour{
@@ -48,7 +50,7 @@ func init() {
 
 func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
-		exposeMap = opsRes.OpsRequest.ConvertExposeListToMap()
+		exposeMap = opsRes.OpsRequest.Spec.ToExposeListToMap()
 	)
 
 	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
@@ -170,13 +172,12 @@ func (e ExposeOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsReq
 }
 
 func (e ExposeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error {
-	componentNameMap := opsResource.OpsRequest.GetComponentNameMap()
+	componentNameSet := opsResource.OpsRequest.GetComponentNameSet()
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsResource.Cluster.Spec.ComponentSpecs {
-		if _, ok := componentNameMap[v.Name]; !ok {
+		if _, ok := componentNameSet[v.Name]; !ok {
 			continue
 		}
-
 		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
 			Services: v.Services,
 		}
@@ -186,7 +187,5 @@ func (e ExposeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 }
 
 func (e ExposeOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return opsRequest.GetExposeComponentNameMap()
+	return realAffectedComponentMap(opsRequest.Spec.GetExposeComponentNameSet())
 }
-
-var _ OpsHandler = ExposeOpsHandler{}

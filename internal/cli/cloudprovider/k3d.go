@@ -89,7 +89,7 @@ func (p *localCloudProvider) Name() string {
 }
 
 // CreateK8sCluster create a local kubernetes cluster using k3d
-func (p *localCloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo, init bool) error {
+func (p *localCloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo) error {
 	var err error
 
 	if p.cfg, err = buildClusterRunConfig(clusterInfo.ClusterName); err != nil {

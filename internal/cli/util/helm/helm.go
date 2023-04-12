@@ -406,7 +406,9 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	} else {
 		client.Version = installed.Chart.AppVersion()
 	}
-	client.ReuseValues = true
+	// do not use helm's ReuseValues, do it ourselves, helm's default upgrade also set it to false
+	// if ReuseValues set to true, helm will use old values instead of new ones, which will cause nil pointer error if new values added.
+	client.ReuseValues = false
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
 	if err != nil {
@@ -415,6 +417,17 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 
 	p := getter.All(settings)
 	vals, err := i.ValueOpts.MergeValues(p)
+	if err != nil {
+		return "", err
+	}
+	// get coalesced values of current chart
+	currentValues, err := chartutil.CoalesceValues(installed.Chart, installed.Config)
+	if err != nil {
+		return "", err
+	}
+	// merge current values into vals, so current release's user values can be kept
+	installed.Chart.Values = currentValues
+	vals, err = chartutil.CoalesceValues(installed.Chart, vals)
 	if err != nil {
 		return "", err
 	}

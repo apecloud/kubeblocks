@@ -36,19 +36,6 @@ import (
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
-func checkCompletedPhase(t *testing.T, phase appsv1alpha1.ClusterComponentPhase) {
-	isComplete := IsCompleted(phase)
-	if !isComplete {
-		t.Errorf("%s status is the completed status", phase)
-	}
-}
-
-func TestIsCompleted(t *testing.T) {
-	checkCompletedPhase(t, appsv1alpha1.FailedClusterCompPhase)
-	checkCompletedPhase(t, appsv1alpha1.RunningClusterCompPhase)
-	checkCompletedPhase(t, appsv1alpha1.AbnormalClusterCompPhase)
-}
-
 func TestIsFailedOrAbnormal(t *testing.T) {
 	if !IsFailedOrAbnormal(appsv1alpha1.AbnormalClusterCompPhase) {
 		t.Error("isAbnormal should be true")
@@ -217,7 +204,6 @@ var _ = Describe("Consensus Component", func() {
 			By("test ComponentRuntimeReqArgsCheck function")
 			err = ComponentRuntimeReqArgsCheck(k8sClient, cluster, clusterComp)
 			Expect(err).Should(Succeed())
-			Expect(IgnoreNoOps(err)).Should(Succeed())
 			By("test ComponentRuntimeReqArgsCheck function when cluster nil")
 			err = ComponentRuntimeReqArgsCheck(k8sClient, nil, clusterComp)
 			Expect(err).ShouldNot(Succeed())
@@ -307,7 +293,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(err).ShouldNot(Succeed())
 
 			By("test GetComponentPhaseWhenPodsNotReady function")
-			consensusComp := cluster.GetComponentByName(consensusCompName)
+			consensusComp := cluster.Spec.GetComponentByName(consensusCompName)
 			checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
 				sts := workload.(*appsv1.StatefulSet)
 				return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)

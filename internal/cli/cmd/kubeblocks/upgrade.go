@@ -137,6 +137,8 @@ func (o *InstallOptions) Upgrade() error {
 
 	if !o.Quiet {
 		fmt.Fprintf(o.Out, "\nKubeBlocks has been upgraded %s SUCCESSFULLY!\n", msg)
+		// set monitor to true, so that we can print notes with monitor
+		o.Monitor = true
 		o.printNotes()
 	}
 	return nil

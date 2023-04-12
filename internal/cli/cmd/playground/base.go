@@ -18,29 +18,37 @@ package playground
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 )
 
 type baseOptions struct {
-	startTime     time.Time
-	prevCluster   *cp.K8sClusterInfo
+	startTime time.Time
+	// prevCluster is the previous cluster info
+	prevCluster *cp.K8sClusterInfo
+	// kubeConfigPath is the tmp kubeconfig path that will be used when int and destroy
+	kubeConfigPath string
+	// stateFilePath is the state file path
 	stateFilePath string
 }
 
 func (o *baseOptions) validate() error {
-	var err error
-
-	if err = initPlaygroundDir(); err != nil {
-		return err
-	}
-
-	o.stateFilePath, err = stateFilePath()
+	playgroundDir, err := initPlaygroundDir()
 	if err != nil {
 		return err
 	}
 
+	o.kubeConfigPath = filepath.Join(playgroundDir, "kubeconfig")
+	if _, err = os.Stat(o.kubeConfigPath); err == nil {
+		if err = os.Remove(o.kubeConfigPath); err != nil {
+			return err
+		}
+	}
+
+	o.stateFilePath = filepath.Join(playgroundDir, stateFileName)
 	o.prevCluster, err = readClusterInfoFromFile(o.stateFilePath)
 	if err != nil {
 		return err

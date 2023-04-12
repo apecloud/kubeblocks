@@ -31,7 +31,8 @@ type ClusterAccessAnalyze struct {
 type ExtendAnalyze struct {
 	// clusterAccess is to determine the accessibility of target k8s cluster
 	// +optional
-	ClusterAccess *ClusterAccessAnalyze `json:"clusterAccess,omitempty"`
+	ClusterAccess *ClusterAccessAnalyze  `json:"clusterAccess,omitempty"`
+	StorageClass  *KbStorageClassAnalyze `json:"storageClass,omitempty"`
 }
 
 type HostUtility struct {
@@ -79,6 +80,24 @@ type ClusterRegionAnalyze struct {
 	// regionNames is a set of expected region names
 	// +kubebuilder:validation:Required
 	RegionNames []string `json:"regionNames"`
+}
+
+// KbStorageClassAnalyze overcome default storageClassAnalyze in preflight
+type KbStorageClassAnalyze struct {
+	// analyzeMeta is defined in troubleshoot.sh
+	troubleshoot.AnalyzeMeta `json:",inline"`
+	// outcomes are expected user defined results.
+	// +kubebuilder:validation:Required
+	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
+	// regionNames is a set of expected region names
+	// +kubebuilder:validation:Required
+	RegionNames []string `json:"regionNames"`
+	// Parameters is a set of parameters including type and fsType...
+	// +kubebuilder:validation:Required
+	StorageClassType string `json:"storageClassType"`
+	// provisioner is the provisioner of storageClass
+	// +optional
+	Provisioner string `json:"provisioner,omitempty"`
 }
 
 type ExtendHostAnalyze struct {

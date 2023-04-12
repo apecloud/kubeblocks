@@ -25,14 +25,6 @@ spec:
               message: This application requires at least 3 nodes
           - pass:
               message: This cluster has enough nodes.
-    - storageClass:
-        checkName: Required-GP3-SC
-        storageClassName: "gp3"
-        outcomes:
-          - fail:
-              message: The gp3 storage class was not found
-          - pass:
-              message: gp3 is the presence, and all good on storage classes
     - deploymentStatus:
         checkName: AWS-Load-Balancer-Check
         name: aws-load-balancer-controller
@@ -57,3 +49,12 @@ spec:
               message: k8s cluster access fail
           - pass:
               message: k8s cluster access ok
+    - storageClass:
+        checkName: Required-GP3-SC
+        storageClassType: "gp3"
+        provisioner: "ebs.csi.aws.com"
+        outcomes:
+          - fail:
+              message: The gp3 storage class was not found
+          - pass:
+              message: gp3 is the presence, and all good on storage classes

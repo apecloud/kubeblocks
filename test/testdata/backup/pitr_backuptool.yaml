@@ -2,9 +2,6 @@ apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
   name: backup-tool-
-  labels:
-    clusterdefinition.kubeblocks.io/name: postgresql
-    kubeblocks.io/backup-tool-type: pitr
 spec:
   image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
   deployKind: job

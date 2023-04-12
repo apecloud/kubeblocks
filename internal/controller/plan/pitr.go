@@ -338,21 +338,6 @@ func (p *PointInTimeRecoveryManager) runRecoveryJob() error {
 	return nil
 }
 
-func (p *PointInTimeRecoveryManager) runLogicRecoveryJob() error {
-	objs, err := p.buildResourceObjs()
-	if err != nil {
-		return err
-	}
-
-	for _, obj := range objs {
-		err = p.Client.Create(p.Ctx, obj)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
-}
-
 func (p *PointInTimeRecoveryManager) checkJobDone(key client.ObjectKey) (bool, error) {
 	result := &batchv1.Job{}
 	if err := p.Client.Get(p.Ctx, key, result); err != nil {

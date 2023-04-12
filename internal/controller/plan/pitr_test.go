@@ -17,6 +17,7 @@ limitations under the License.
 package plan
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -37,7 +38,7 @@ import (
 )
 
 var _ = Describe("PITR Functions", func() {
-	const defaultTTL = "168h0m0s"
+	const defaultTTL = "7d"
 	const backupName = "test-backup-job"
 	const sourceCluster = "source-cluster"
 
@@ -101,11 +102,11 @@ var _ = Describe("PITR Functions", func() {
 				AddInitContainerShort("nginx-init", testapps.NginxImage).
 				AddContainerShort("nginx", testapps.NginxImage).
 				Create(&testCtx).GetObject()
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddRestorePointInTime(metav1.Time{Time: metav1.Now().Time}, sourceCluster).
 				Create(&testCtx).GetObject()
 
@@ -125,18 +126,21 @@ var _ = Describe("PITR Functions", func() {
 				backupSelfDefineObj, testapps.RandomizedObjName())
 			backupToolName = backupTool.Name
 
+			backupObj := dpv1alpha1.BackupToolList{}
+			Expect(testCtx.Cli.List(testCtx.Ctx, &backupObj)).Should(Succeed())
+
 			By("By creating backup policyTemplate: ")
 			backupTplLabels := map[string]string{
 				constant.ClusterDefLabelKey: clusterDefName,
 			}
 			_ = testapps.NewBackupPolicyTemplateFactory("backup-policy-template").
 				WithRandomName().SetLabels(backupTplLabels).
+				AddBackupPolicy(mysqlCompName).
+				SetClusterDefRef(clusterDefName).
 				SetBackupToolName(backupToolName).
-				SetSchedule("0 * * * *").
+				SetSchedule("0 * * * *", true).
+				AddSnapshotPolicy().
 				SetTTL(defaultTTL).
-				SetCredentialKeyword("username", "password").
-				AddHookPreCommand("touch /data/mysql/.restore;sync").
-				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
 				Create(&testCtx).GetObject()
 
 			clusterCompDefObj := clusterDef.Spec.ComponentDefs[0]
@@ -155,7 +159,6 @@ var _ = Describe("PITR Functions", func() {
 			}
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(backupLabels).
-				SetTTL(defaultTTL).
 				SetBackupPolicyName("test-fake").
 				SetBackupType(dpv1alpha1.BackupTypeFull).
 				Create(&testCtx).GetObject()
@@ -180,7 +183,6 @@ var _ = Describe("PITR Functions", func() {
 			latestStopTime := &metav1.Time{Time: now.Add(time.Hour * 2)}
 			backupNext := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(backupLabels).
-				SetTTL(defaultTTL).
 				SetBackupPolicyName("test-fake").
 				SetBackupType(dpv1alpha1.BackupTypeFull).
 				Create(&testCtx).GetObject()
@@ -202,22 +204,9 @@ var _ = Describe("PITR Functions", func() {
 			Expect(DoPITRPrepare(ctx, testCtx.Cli, cluster, synthesizedComponent)).Should(Succeed())
 			Expect(synthesizedComponent.PodSpec.InitContainers).ShouldNot(BeEmpty())
 		})
-		/*
-			It("Test Merge pitr config", func() {
-				pitrMgr := PointInTimeRecoveryManager{
-					Cluster: cluster,
-					Client:  testCtx.Cli,
-					Ctx:     ctx,
-				}
-				configMap := corev1.ConfigMap{
-					Data: map[string]string{"pg.conf": "key=value"},
-				}
-				Expect(pitrMgr.MergeConfigMap(&configMap)).Should(Succeed())
-				Expect(configMap.Data).ShouldNot(Equal(map[string]string{"pg.conf": "key=value"}))
-			})
-		*/
 		It("Test PITR job run and cleanup", func() {
 			By("when data pvc is pending")
+			cluster.Status.ObservedGeneration = 1
 			shouldRequeue, err := DoPITRIfNeed(ctx, testCtx.Cli, cluster)
 			Expect(err).Should(Succeed())
 			Expect(shouldRequeue).Should(BeTrue())
@@ -228,7 +217,8 @@ var _ = Describe("PITR Functions", func() {
 			_, err = DoPITRIfNeed(ctx, testCtx.Cli, cluster)
 			Expect(err).Should(Succeed())
 			By("when job is completed")
-			jobKey := types.NamespacedName{Namespace: cluster.Namespace, Name: "pitr-prepare-" + clusterName}
+			jobName := fmt.Sprintf("pitr-phy-%s-%s-0", clusterName, mysqlCompName)
+			jobKey := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, jobKey, func(fetched *batchv1.Job) {
 				fetched.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete}}
 			})).Should(Succeed())

@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"sort"
 
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -414,9 +415,14 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	compName string,
 	pod *corev1.Pod,
 	newRole string) error {
-	// if newRole is empty or pod current role label equals to newRole, return
-	if newRole == "" || pod.Labels[constant.RoleLabelKey] == newRole {
-		reqCtx.Log.Info("new role label is empty or pod current role label equals to new role, ignore it", "new role", newRole)
+	// if newRole is not Primary or Secondary, ignore it.
+	if !slices.Contains([]string{string(Primary), string(Secondary)}, newRole) {
+		reqCtx.Log.Info("replicationSet new role is invalid, please check", "new role", newRole)
+		return nil
+	}
+	// if pod current role label equals to newRole, return
+	if pod.Labels[constant.RoleLabelKey] == newRole {
+		reqCtx.Log.Info("pod current role label equals to new role, ignore it", "new role", newRole)
 		return nil
 	}
 	// if switchPolicy is not Noop, return
@@ -440,11 +446,32 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	}
 
 	// pod is old secondary and newRole is primary
-	// update old primary to secondary
+	oldPrimarySts, err := util.GetPodOwnerReferencesSts(reqCtx.Ctx, cli, oldPrimaryPod)
+	if err != nil {
+		return err
+	}
+	// update old primary pod to secondary
 	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimaryPod, string(Secondary)); err != nil {
 		return err
 	}
+	// update old primary sts to secondary
+	if oldPrimarySts != nil {
+		if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimarySts, string(Secondary)); err != nil {
+			return err
+		}
+	}
 
+	newPrimarySts, err := util.GetPodOwnerReferencesSts(reqCtx.Ctx, cli, pod)
+	if err != nil {
+		return err
+	}
 	// update secondary pod to primary
-	return updateObjRoleLabel(reqCtx.Ctx, cli, *pod, newRole)
+	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, string(Primary)); err != nil {
+		return err
+	}
+	// update secondary sts to primary
+	if newPrimarySts != nil {
+		return updateObjRoleLabel(reqCtx.Ctx, cli, *newPrimarySts, string(Primary))
+	}
+	return nil
 }

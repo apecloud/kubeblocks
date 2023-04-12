@@ -382,10 +382,7 @@ func buildSelectorStrings(selectors []SelectorRequirement) []string {
 }
 
 // GetSelectorsStrings extract selectors to string representations.
-func (r *AddonDefaultInstallSpecItem) GetSelectorsStrings() []string {
-	if r == nil {
-		return nil
-	}
+func (r AddonDefaultInstallSpecItem) GetSelectorsStrings() []string {
 	return buildSelectorStrings(r.Selectors)
 }
 
@@ -397,16 +394,13 @@ func (r *InstallableSpec) GetSelectorsStrings() []string {
 	return buildSelectorStrings(r.Selectors)
 }
 
-func (r *SelectorRequirement) String() string {
+func (r SelectorRequirement) String() string {
 	return fmt.Sprintf("{key=%s,op=%s,values=%v}",
 		r.Key, r.Operator, r.Values)
 }
 
 // MatchesFromConfig matches selector requirement value.
-func (r *SelectorRequirement) MatchesFromConfig() bool {
-	if r == nil {
-		return false
-	}
+func (r SelectorRequirement) MatchesFromConfig() bool {
 	verIf := viper.Get(constant.CfgKeyServerInfo)
 	ver, ok := verIf.(version.Info)
 	if !ok {
@@ -422,7 +416,7 @@ func (r *SelectorRequirement) MatchesFromConfig() bool {
 	return r.matchesLine(l)
 }
 
-func (r *SelectorRequirement) matchesLine(line string) bool {
+func (r SelectorRequirement) matchesLine(line string) bool {
 	processor := func(op bool, predicate func(string) bool) bool {
 		if len(r.Values) == 0 {
 			return !op
@@ -569,10 +563,7 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 
 // GetSortedDefaultInstallValues return DefaultInstallValues items with items that has
 // provided selector first.
-func (r *AddonSpec) GetSortedDefaultInstallValues() []AddonDefaultInstallSpecItem {
-	if r == nil {
-		return nil
-	}
+func (r AddonSpec) GetSortedDefaultInstallValues() []AddonDefaultInstallSpecItem {
 	values := make([]AddonDefaultInstallSpecItem, 0, len(r.DefaultInstallValues))
 	nvalues := make([]AddonDefaultInstallSpecItem, 0, len(r.DefaultInstallValues))
 	for _, i := range r.DefaultInstallValues {

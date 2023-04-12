@@ -52,13 +52,16 @@ Cluster command.
 * [kbcli cluster describe-config](kbcli_cluster_describe-config.md)	 - Show details of a specific reconfiguring.
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest.
 * [kbcli cluster diff-config](kbcli_cluster_diff-config.md)	 - Show the difference in parameters between the two submitted OpsRequest.
+* [kbcli cluster edit-config](kbcli_cluster_edit-config.md)	 - Edit the config file of the component.
+* [kbcli cluster edit-backup-policy](kbcli_cluster_edit-backup-policy.md)	 - Edit backup policy
 * [kbcli cluster explain-config](kbcli_cluster_explain-config.md)	 - List the constraint for supported configuration params.
 * [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster.
 * [kbcli cluster grant-role](kbcli_cluster_grant-role.md)	 - Grant role to account
 * [kbcli cluster hscale](kbcli_cluster_hscale.md)	 - Horizontally scale the specified components in the cluster.
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters.
 * [kbcli cluster list-accounts](kbcli_cluster_list-accounts.md)	 - List accounts for a cluster
-* [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backups.
+* [kbcli cluster list-backup](kbcli_cluster_list-backup.md)	 - List backups.
+* [kbcli cluster list-backup-policy](kbcli_cluster_list-backup-policy.md)	 - List backups policies.
 * [kbcli cluster list-components](kbcli_cluster_list-components.md)	 - List cluster components.
 * [kbcli cluster list-events](kbcli_cluster_list-events.md)	 - List cluster events.
 * [kbcli cluster list-instances](kbcli_cluster_list-instances.md)	 - List cluster instances.

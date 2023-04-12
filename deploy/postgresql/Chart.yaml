@@ -1,12 +1,12 @@
 apiVersion: v2
 name: postgresql
-description: A PostgreSQL cluster definition Helm chart for Kubernetes
+description: A PostgreSQL (with Patroni HA) cluster definition Helm chart for Kubernetes
 
 type: application
 
 version: 0.5.0-alpha.3
 
-appVersion: "14.7.0"
+appVersion: "15.2.0"
 
 home: https://kubeblocks.io/
 icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png

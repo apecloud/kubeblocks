@@ -130,7 +130,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		Expect(len(validTpls) > 0).Should(BeTrue())
 
 		cmObj = &corev1.ConfigMap{}
-		cmName := cfgcore.GetComponentCfgName(clusterObj.Name, componentName, tpls[0].VolumeName)
+		cmName := cfgcore.GetComponentCfgName(clusterObj.Name, componentName, tpls[0].Name)
 		err = cliutil.GetResourceObjectFromGVR(clitypes.ConfigmapGVR(), client.ObjectKey{
 			Name:      cmName,
 			Namespace: testCtx.DefaultNamespace,

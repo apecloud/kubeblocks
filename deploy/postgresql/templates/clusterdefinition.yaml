@@ -8,14 +8,24 @@ spec:
   type: postgresql
   connectionCredential:
     username: postgres
-    password: {{ (include "postgresql.postgresPassword" .) | quote  }}
+    password: "$(RANDOM_PASSWD)"
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-postgresql)"
   componentDefs:
-    - name: pg-replication
+    - name: postgresql
       workloadType: Replication
       characterType: postgresql
+      customLabelSpecs:
+        - key: apps.kubeblocks.postgres.patroni/scope
+          value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni"
+          resources:
+            - gvk: "v1/Pod"
+              selector:
+                app.kubernetes.io/managed-by: kubeblocks
+            - gvk: "apps/v1/StatefulSet"
+              selector:
+                app.kubernetes.io/managed-by: kubeblocks
       probes:
         roleChangedProbe:
           failureThreshold: 2
@@ -56,45 +66,43 @@ spec:
           - name: tcp-postgresql
             port: 5432
             targetPort: tcp-postgresql
+          - name: http-metrics-postgresql
+            port: 9187
+            targetPort: http-metrics
       volumeTypes:
         - name: data
           type: data
       podSpec:
+        serviceAccountName: operator
         securityContext:
-          fsGroup: 1001
+          runAsUser: 0
+          fsGroup: 103
+          runAsGroup: 103
+        initContainers:
+          - name: pg-init-container
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+            command:
+              - /kb-scripts/init_container.sh
+            volumeMounts:
+              - name: data
+                mountPath: /home/postgres/pgdata
+                mode: 0777
+              - name: postgresql-config
+                mountPath: /home/postgres/conf
+                mode: 0777
+              - name: scripts
+                mountPath: /kb-scripts
+                mode: 0777
         containers:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
             securityContext:
               runAsUser: 0
-            volumeMounts:
-              - name: dshm
-                mountPath: /dev/shm
-              - name: data
-                mountPath: /postgresql
-              - name: postgresql-config
-                mountPath: /postgresql/conf
-              - name: scripts
-                mountPath: /scripts
-            ports:
-              - name: tcp-postgresql
-                containerPort: 5432
             command:
-              - /scripts/setup.sh
-            livenessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 30
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              exec:
-                command:
-                  - /bin/sh
-                  - -c
-                  - exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+              - /kb-scripts/setup.sh
             readinessProbe:
               failureThreshold: 6
-              initialDelaySeconds: 5
+              initialDelaySeconds: 10
               periodSeconds: 10
               successThreshold: 1
               timeoutSeconds: 5
@@ -106,15 +114,79 @@ spec:
                   - |
                     exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
                     [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
-            env:
-              - name: BITNAMI_DEBUG
-                value: "false"
-              - name: POSTGRESQL_PORT_NUMBER
-                value: "5432"
-              - name: POSTGRESQL_VOLUME_DIR
-                value: /postgresql
-              - name: PGDATA
-                value: /postgresql/data
+            volumeMounts:
+              - name: dshm
+                mountPath: /dev/shm
+              - name: data
+                mountPath: /home/postgres/pgdata
+                mode: 0777
+              - name: postgresql-config
+                mountPath: /home/postgres/conf
+                mode: 0777
+              - name: scripts
+                mountPath: /kb-scripts
+            ports:
+              - name: tcp-postgresql
+                containerPort: 5432
+              - name: patroni
+                containerPort: 8008
+            env: ## refer https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst
+              - name: DCS_ENABLE_KUBERNETES_API
+                value: "true"
+              - name: KUBERNETES_USE_CONFIGMAPS
+                value: "true"
+              - name: SCOPE
+                value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni"
+              - name: KUBERNETES_SCOPE_LABEL
+                value: "apps.kubeblocks.postgres.patroni/scope"
+              - name: KUBERNETES_ROLE_LABEL
+                value: "apps.kubeblocks.postgres.patroni/role"
+              - name: KUBERNETES_LABELS
+                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)","app.kubernetes.io/managed-by":"kubeblocks"}'
+              - name: RESTORE_DATA_DIR
+                value: /home/postgres/pgdata/kb_restore
+              - name: SPILO_CONFIGURATION
+                value: | ## https://github.com/zalando/patroni#yaml-configuration
+                  bootstrap:
+                    initdb:
+                      - auth-host: md5
+                      - auth-local: trust
+              - name: ALLOW_NOSSL
+                value: "true"
+              - name: PGROOT
+                value: /home/postgres/pgdata/pgroot
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+              - name: PGUSER_SUPERUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: PGPASSWORD_SUPERUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: PGUSER_ADMIN
+                value: superadmin
+              - name: PGPASSWORD_ADMIN
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: PGPASSWORD_STANDBY
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
               - name: PGUSER
                 valueFrom:
                   secretKeyRef:
@@ -125,64 +197,6 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
-              # Authentication
-              - name: POSTGRES_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: username
-              - name: POSTGRES_POSTGRES_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-              - name: POSTGRES_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-              - name: POSTGRES_DB
-                value: {{ (include "postgresql.database" .) | quote }}
-              # Audit
-              - name: POSTGRESQL_LOG_HOSTNAME
-                value: {{ .Values.audit.logHostname | quote }}
-              - name: POSTGRESQL_LOG_CONNECTIONS
-                value: {{ .Values.audit.logConnections | quote }}
-              - name: POSTGRESQL_LOG_DISCONNECTIONS
-                value: {{ .Values.audit.logDisconnections | quote }}
-              {{- if .Values.audit.logLinePrefix }}
-              - name: POSTGRESQL_LOG_LINE_PREFIX
-                value: {{ .Values.audit.logLinePrefix | quote }}
-              {{- end }}
-              {{- if .Values.audit.logTimezone }}
-              - name: POSTGRESQL_LOG_TIMEZONE
-                value: {{ .Values.audit.logTimezone | quote }}
-              {{- end }}
-              {{- if .Values.audit.pgAuditLog }}
-              - name: POSTGRESQL_PGAUDIT_LOG
-                value: {{ .Values.audit.pgAuditLog | quote }}
-              {{- end }}
-              - name: POSTGRESQL_PGAUDIT_LOG_CATALOG
-                value: {{ .Values.audit.pgAuditLogCatalog | quote }}
-              # Others
-              - name: POSTGRESQL_CLIENT_MIN_MESSAGES
-                value: {{ .Values.audit.clientMinMessages | quote }}
-              - name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES
-                value: {{ .Values.postgresqlSharedPreloadLibraries | quote }}
-              {{- if .Values.primary.extraEnvVars }}
-              {{- include "tplvalues.render" (dict "value" .Values.primary.extraEnvVars "context" $) | nindent 12 }}
-              {{- end }}
-            {{- if or .Values.primary.extraEnvVarsCM .Values.primary.extraEnvVarsSecret }}
-            envFrom:
-              {{- if .Values.primary.extraEnvVarsCM }}
-              - configMapRef:
-                  name: {{ .Values.primary.extraEnvVarsCM }}
-              {{- end }}
-              {{- if .Values.primary.extraEnvVarsSecret }}
-              - secretRef:
-                  name: {{ .Values.primary.extraEnvVarsSecret }}
-              {{- end }}
-            {{- end }}
           - name: metrics
             image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
@@ -242,13 +256,13 @@ spec:
               {{- end }}
       systemAccounts:
         cmdExecutorConfig:
-          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
           command:
-          - psql
+            - psql
           args:
-          - -h$(KB_ACCOUNT_ENDPOINT)
-          - -c
-          - $(KB_ACCOUNT_STATEMENT)
+            - -h$(KB_ACCOUNT_ENDPOINT)
+            - -c
+            - $(KB_ACCOUNT_STATEMENT)
           env:
           - name: PGUSER
             valueFrom:

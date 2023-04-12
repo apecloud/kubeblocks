@@ -17,93 +17,142 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"strconv"
+	"strings"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // BackupPolicySpec defines the desired state of BackupPolicy
 type BackupPolicySpec struct {
-	// policy can inherit from backup config and override some fields.
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// ttl is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
+	// the Backup should be retained. if not set, will be retained forever.
+	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
 	// +optional
-	BackupPolicyTemplateName string `json:"backupPolicyTemplateName,omitempty"`
+	TTL *string `json:"ttl,omitempty"`
 
-	// The schedule in Cron format, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
+	// schedule policy for backup.
 	// +optional
-	Schedule string `json:"schedule,omitempty"`
+	Schedule Schedule `json:"schedule,omitempty"`
 
-	// Backup ComponentDefRef. full or incremental or snapshot. if unset, default is snapshot.
-	// +kubebuilder:validation:Enum={full,incremental,snapshot}
-	// +kubebuilder:default=snapshot
+	// the policy for snapshot backup.
 	// +optional
-	BackupType string `json:"backupType,omitempty"`
+	Snapshot *SnapshotPolicy `json:"snapshot,omitempty"`
 
-	// The number of automatic backups to retain. Value must be non-negative integer.
-	// 0 means NO limit on the number of backups.
-	// +kubebuilder:default=7
+	// the policy for full backup.
 	// +optional
-	BackupsHistoryLimit int32 `json:"backupsHistoryLimit,omitempty"`
+	Full *CommonBackupPolicy `json:"full,omitempty"`
 
-	// which backup tool to perform database backup, only support one tool.
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// the policy for incremental backup.
 	// +optional
-	BackupToolName string `json:"backupToolName,omitempty"`
+	Incremental *CommonBackupPolicy `json:"incremental,omitempty"`
+}
 
-	// TTL is a time.Duration-parseable string describing how long
-	// the Backup should be retained for.
+type Schedule struct {
+	// schedule policy for base backup.
 	// +optional
-	TTL *metav1.Duration `json:"ttl,omitempty"`
+	BaseBackup *BaseBackupSchedulePolicy `json:"baseBackup,omitempty"`
 
-	// database cluster service
+	// schedule policy for incremental backup.
+	// +optional
+	Incremental *SchedulePolicy `json:"incremental,omitempty"`
+}
+
+type BaseBackupSchedulePolicy struct {
+	SchedulePolicy `json:",inline"`
+	// the type of base backup, only support full and snapshot.
 	// +kubebuilder:validation:Required
-	Target TargetCluster `json:"target"`
+	Type BaseBackupType `json:"type"`
+}
+
+type SchedulePolicy struct {
+	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
+	// +kubebuilder:validation:Required
+	CronExpression string `json:"cronExpression"`
+
+	// enable or disable the schedule.
+	// +kubebuilder:validation:Required
+	Enable bool `json:"enable"`
+}
+
+type SnapshotPolicy struct {
+	BasePolicy `json:",inline"`
 
 	// execute hook commands for backup.
 	// +optional
 	Hooks *BackupPolicyHook `json:"hooks,omitempty"`
+}
+
+type CommonBackupPolicy struct {
+	BasePolicy `json:",inline"`
 
 	// array of remote volumes from CSI driver definition.
 	// +kubebuilder:validation:Required
 	RemoteVolume corev1.Volume `json:"remoteVolume"`
 
+	// which backup tool to perform database backup, only support one tool.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	BackupToolName string `json:"backupToolName,omitempty"`
+}
+
+type BasePolicy struct {
+	// target database cluster for backup.
+	// +kubebuilder:validation:Required
+	Target TargetCluster `json:"target"`
+
+	// the number of automatic backups to retain. Value must be non-negative integer.
+	// 0 means NO limit on the number of backups.
+	// +kubebuilder:default=7
+	// +optional
+	BackupsHistoryLimit int32 `json:"backupsHistoryLimit,omitempty"`
+
 	// count of backup stop retries on fail.
 	// +optional
 	OnFailAttempted int32 `json:"onFailAttempted,omitempty"`
+
+	// define how to update metadata for backup status.
+	// +optional
+	BackupStatusUpdates []BackupStatusUpdate `json:"backupStatusUpdates,omitempty"`
 }
 
 // TargetCluster TODO (dsj): target cluster need redefined from Cluster API
 type TargetCluster struct {
-	// LabelSelector is used to find matching pods.
+	// labelsSelector is used to find matching pods.
 	// Pods that match this label selector are counted to determine the number of pods
 	// in their corresponding topology domain.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:pruning:PreserveUnknownFields
 	LabelsSelector *metav1.LabelSelector `json:"labelsSelector"`
 
-	// Secret is used to connect to the target database cluster.
+	// secret is used to connect to the target database cluster.
 	// If not set, secret will be inherited from backup policy template.
 	// if still not set, the controller will check if any system account for dataprotection has been created.
 	// +optional
 	Secret *BackupPolicySecret `json:"secret,omitempty"`
 }
 
-// BackupPolicySecret defined for the target database secret that backup tool can connect.
+// BackupPolicySecret defines for the target database secret that backup tool can connect.
 type BackupPolicySecret struct {
 	// the secret name
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// UserKeyword the map keyword of the user in the connection credential secret
-	// +optional
-	UserKeyword string `json:"userKeyword,omitempty"`
+	// usernameKey the map key of the user in the connection credential secret
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=username
+	UsernameKey string `json:"usernameKey,omitempty"`
 
-	// PasswordKeyword the map keyword of the password in the connection credential secret
-	// +optional
-	PasswordKeyword string `json:"passwordKeyword,omitempty"`
+	// passwordKey the map key of the password in the connection credential secret
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=password
+	PasswordKey string `json:"passwordKey,omitempty"`
 }
 
-// BackupPolicyHook defined for the database execute commands before and after backup.
+// BackupPolicyHook defines for the database execute commands before and after backup.
 type BackupPolicyHook struct {
 	// pre backup to perform commands
 	// +optional
@@ -122,30 +171,67 @@ type BackupPolicyHook struct {
 	ContainerName string `json:"containerName,omitempty"`
 }
 
+// BackupStatusUpdateStage defines the stage of backup status update.
+// +enum
+// +kubebuilder:validation:Enum={pre,post}
+type BackupStatusUpdateStage string
+
+const (
+	PRE  BackupStatusUpdateStage = "pre"
+	POST BackupStatusUpdateStage = "post"
+)
+
+type BackupStatusUpdate struct {
+	// specify the json path of backup object for patch.
+	// example: manifests.backupLog -- means patch the backup json path of status.manifests.backupLog.
+	// +optional
+	Path string `json:"path,omitempty"`
+
+	// which container name that kubectl can execute.
+	// +optional
+	ContainerName string `json:"containerName,omitempty"`
+
+	// the shell Script commands to collect backup status metadata.
+	// The script must exist in the container of ContainerName and the output format must be set to JSON.
+	// Note that outputting to stderr may cause the result format to not be in JSON.
+	// +optional
+	Script string `json:"script,omitempty"`
+
+	// when to update the backup status, pre: before backup, post: after backup
+	// +optional
+	UpdateStage BackupStatusUpdateStage `json:"updateStage,omitempty"`
+}
+
 // BackupPolicyStatus defines the observed state of BackupPolicy
 type BackupPolicyStatus struct {
-	// backup policy phase valid value: available, failed, new.
+
+	// observedGeneration is the most recent generation observed for this
+	// BackupPolicy. It corresponds to the Cluster's generation, which is
+	// updated on mutation by the API Server.
 	// +optional
-	Phase BackupPolicyTemplatePhase `json:"phase,omitempty"`
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// backup policy phase valid value: Available, Failed.
+	// +optional
+	Phase BackupPolicyPhase `json:"phase,omitempty"`
 
 	// the reason if backup policy check failed.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 
-	// Information when was the last time the job was successfully scheduled.
+	// information when was the last time the job was successfully scheduled.
 	// +optional
 	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
 
-	// Information when was the last time the job successfully completed.
+	// information when was the last time the job successfully completed.
 	// +optional
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
+// +kubebuilder:resource:categories={kubeblocks},scope=Namespaced,shortName=bp
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="SCHEDULE",type=string,JSONPath=`.spec.schedule`
 // +kubebuilder:printcolumn:name="LAST SCHEDULE",type=string,JSONPath=`.status.lastScheduleTime`
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 
@@ -169,4 +255,28 @@ type BackupPolicyList struct {
 
 func init() {
 	SchemeBuilder.Register(&BackupPolicy{}, &BackupPolicyList{})
+}
+
+func (r *BackupPolicySpec) GetCommonPolicy(backupType BackupType) *CommonBackupPolicy {
+	switch backupType {
+	case BackupTypeFull:
+		return r.Full
+	case BackupTypeIncremental:
+		return r.Incremental
+	}
+	return nil
+}
+
+// ToDuration converts the ttl string to time.Duration.
+func ToDuration(ttl *string) time.Duration {
+	if ttl == nil {
+		return time.Duration(0)
+	}
+	ttlLower := strings.ToLower(*ttl)
+	if strings.HasSuffix(ttlLower, "d") {
+		days, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "d", ""))
+		return time.Hour * 24 * time.Duration(days)
+	}
+	hours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
+	return time.Hour * time.Duration(hours)
 }

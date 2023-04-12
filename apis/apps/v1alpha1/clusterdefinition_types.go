@@ -481,7 +481,7 @@ type HorizontalScalePolicy struct {
 	// Policy is in enum of {None, Snapshot}. The default policy is `None`.
 	// None: Default policy, do nothing.
 	// Snapshot: Do native volume snapshot before scaling and restore to newly scaled pods.
-	//           Prefer backup job to create snapshot if `BackupTemplateSelector` can find a template.
+	//           Prefer backup job to create snapshot if can find a backupPolicy from 'BackupPolicyTemplateName'.
 	//           Notice that 'Snapshot' policy will only take snapshot on one volumeMount, default is
 	//           the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
 	//           since take multiple snapshots at one time might cause consistency problem.
@@ -489,9 +489,9 @@ type HorizontalScalePolicy struct {
 	// +optional
 	Type HScaleDataClonePolicyType `json:"type,omitempty"`
 
-	// backupTemplateSelector defines the label selector for finding associated BackupTemplate API object.
+	// BackupPolicyTemplateName reference the backup policy template.
 	// +optional
-	BackupTemplateSelector map[string]string `json:"backupTemplateSelector,omitempty"`
+	BackupPolicyTemplateName string `json:"backupPolicyTemplateName,omitempty"`
 
 	// volumeMountsName defines which volumeMount of the container to do backup,
 	// only work if Type is not None

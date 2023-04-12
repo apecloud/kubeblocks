@@ -79,7 +79,7 @@ const (
 	KindConfigConstraint             = "ConfigConstraint"
 	KindBackup                       = "Backup"
 	KindRestoreJob                   = "RestoreJob"
-	KindBackupPolicyTemplate         = "BackupPolicyTemplate"
+	KindBackupPolicy                 = "BackupPolicy"
 	KindOps                          = "OpsRequest"
 )
 
@@ -186,8 +186,8 @@ func BackupGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackups}
 }
 
-func BackupPolicyTemplateGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupPolicyTemplates}
+func BackupPolicyGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupPolicies}
 }
 
 func BackupToolGVR() schema.GroupVersionResource {

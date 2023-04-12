@@ -67,6 +67,11 @@ const (
 	NoPrivileges   string = ""
 	CustomizedRole string = "customized"
 	InvalidRole    string = "invalid"
+
+	PRIMARY   = "primary"
+	SECONDARY = "secondary"
+	MASTER    = "master"
+	SLAVE     = "slave"
 )
 
 const (

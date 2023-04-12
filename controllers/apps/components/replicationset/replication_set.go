@@ -194,6 +194,10 @@ func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) er
 			return err
 		}
 	}
+	// sync cluster.spec.componentSpecs.[x].primaryIndex when failover occurs and switchPolicy is Noop.
+	if err := syncPrimaryIndex(ctx, r.Cli, r.Cluster, sts.Labels[constant.KBAppComponentLabelKey]); err != nil {
+		return err
+	}
 	// sync cluster.status.components.replicationSet.status
 	clusterDeepCopy := r.Cluster.DeepCopy()
 	if err := syncReplicationSetClusterStatus(r.Cli, ctx, r.Cluster, podList); err != nil {

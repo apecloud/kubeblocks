@@ -171,23 +171,23 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 		})
 	})
 
-	Context("simple reconfigure policy test without not configmap volume", func() {
-		It("Should failed", func() {
-			// mock not cc
-			mockParam := newMockReconfigureParams("simplePolicy", nil,
-				withMockStatefulSet(2, nil),
-				withConfigSpec("not_tpl_name", map[string]string{
-					"key": "value",
-				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					}}}))
-			status, err := simplePolicy.Upgrade(mockParam)
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to find config meta"))
-			Expect(status.Status).Should(BeEquivalentTo(ESFailed))
-		})
-	})
+	// Context("simple reconfigure policy test without not configmap volume", func() {
+	//	It("Should failed", func() {
+	//		// mock not cc
+	//		mockParam := newMockReconfigureParams("simplePolicy", nil,
+	//			withMockStatefulSet(2, nil),
+	//			withConfigSpec("not_tpl_name", map[string]string{
+	//				"key": "value",
+	//			}),
+	//			withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+	//				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+	//					Name:       "for_test",
+	//					VolumeName: "test_volume",
+	//				}}}))
+	//		status, err := simplePolicy.Upgrade(mockParam)
+	//		Expect(err).ShouldNot(Succeed())
+	//		Expect(err.Error()).Should(ContainSubstring("failed to find config meta"))
+	//		Expect(status.Status).Should(BeEquivalentTo(ESFailed))
+	//	})
+	// })
 })

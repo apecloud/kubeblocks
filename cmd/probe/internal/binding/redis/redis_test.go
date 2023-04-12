@@ -163,7 +163,7 @@ func TestRedisGetRoles(t *testing.T) {
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
 	assert.Equal(t, RespEveSucc, opsResult[RespTypEve])
-	assert.Equal(t, "master", opsResult["role"])
+	assert.Equal(t, PRIMARY, opsResult["role"])
 
 	// invoke one more time
 	bindingRes, err = r.Invoke(context.TODO(), request)
@@ -171,7 +171,7 @@ func TestRedisGetRoles(t *testing.T) {
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
 	assert.Equal(t, RespEveSucc, opsResult[RespTypEve])
-	assert.Equal(t, "slave", opsResult["role"])
+	assert.Equal(t, SECONDARY, opsResult["role"])
 }
 
 func TestRedisAccounts(t *testing.T) {

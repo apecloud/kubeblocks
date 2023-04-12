@@ -113,7 +113,6 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	uncachedObjects := []client.Object{
-		&dataprotectionv1alpha1.BackupPolicyTemplate{},
 		&dataprotectionv1alpha1.BackupPolicy{},
 		&dataprotectionv1alpha1.BackupTool{},
 		&dataprotectionv1alpha1.Backup{},

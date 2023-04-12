@@ -126,7 +126,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 			// TODO reconsider handling policy for this case
 			continue
 		}
-		comp.ClassDefRef.Name = &cls.Name
+		comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: cls.Name}
 		requests := corev1.ResourceList{
 			corev1.ResourceCPU:    cls.CPU,
 			corev1.ResourceMemory: cls.Memory,

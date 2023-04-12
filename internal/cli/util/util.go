@@ -640,20 +640,6 @@ func GetExposeAnnotations(provider K8sProvider, exposeType ExposeType) (map[stri
 	return annotations, nil
 }
 
-func GetK8SProvider(client kubernetes.Interface) (K8sProvider, error) {
-	versionInfo, err := GetVersionInfo(client)
-	if err != nil {
-		return "", err
-	}
-
-	versionErr := fmt.Errorf("failed to get kubernetes version")
-	k8sVersionStr, ok := versionInfo[KubernetesApp]
-	if !ok {
-		return "", versionErr
-	}
-	return GetK8sProvider(k8sVersionStr, client)
-}
-
 // BuildAddonReleaseName returns the release name of addon, its f
 func BuildAddonReleaseName(addon string) string {
 	return fmt.Sprintf("%s-%s", types.AddonReleasePrefix, addon)

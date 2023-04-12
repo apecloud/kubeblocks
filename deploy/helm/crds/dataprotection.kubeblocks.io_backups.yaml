@@ -72,10 +72,6 @@ spec:
               parentBackupName:
                 description: if backupType is incremental, parentBackupName is required.
                 type: string
-              ttl:
-                description: ttl is a time.Duration-parsable string describing how
-                  long the Backup should be retained for.
-                type: string
             required:
             - backupPolicyName
             - backupType

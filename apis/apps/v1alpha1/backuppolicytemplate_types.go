@@ -17,16 +17,33 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"strconv"
-	"strings"
-	"time"
-
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BackupPolicySpec defines the desired state of BackupPolicy
-type BackupPolicySpec struct {
+// BackupPolicyTemplateSpec defines the desired state of BackupPolicyTemplate
+type BackupPolicyTemplateSpec struct {
+	// clusterDefinitionRef references ClusterDefinition name, this is an immutable attribute.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	ClusterDefRef string `json:"clusterDefinitionRef"`
+
+	// backupPolicies is a list of backup policy template for the specified componentDefinition.
+	// +patchMergeKey=componentDefRef
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentDefRef
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	BackupPolicies []BackupPolicy `json:"backupPolicies"`
+}
+
+type BackupPolicy struct {
+	// componentDefRef references componentDef defined in ClusterDefinition spec.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	ComponentDefRef string `json:"componentDefRef"`
+
 	// ttl is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
 	// the Backup should be retained. if not set, will be retained forever.
 	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
@@ -88,10 +105,6 @@ type SnapshotPolicy struct {
 type CommonBackupPolicy struct {
 	BasePolicy `json:",inline"`
 
-	// array of remote volumes from CSI driver definition.
-	// +kubebuilder:validation:Required
-	RemoteVolume corev1.Volume `json:"remoteVolume"`
-
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
@@ -99,9 +112,9 @@ type CommonBackupPolicy struct {
 }
 
 type BasePolicy struct {
-	// target database cluster for backup.
-	// +kubebuilder:validation:Required
-	Target TargetCluster `json:"target"`
+	// target instance for backup.
+	// +optional
+	Target TargetInstance `json:"target"`
 
 	// the number of automatic backups to retain. Value must be non-negative integer.
 	// 0 means NO limit on the number of backups.
@@ -118,38 +131,40 @@ type BasePolicy struct {
 	BackupStatusUpdates []BackupStatusUpdate `json:"backupStatusUpdates,omitempty"`
 }
 
-// TargetCluster TODO (dsj): target cluster need redefined from Cluster API
-type TargetCluster struct {
-	// labelsSelector is used to find matching pods.
-	// Pods that match this label selector are counted to determine the number of pods
-	// in their corresponding topology domain.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:pruning:PreserveUnknownFields
-	LabelsSelector *metav1.LabelSelector `json:"labelsSelector"`
-
-	// secret is used to connect to the target database cluster.
-	// If not set, secret will be inherited from backup policy template.
-	// if still not set, the controller will check if any system account for dataprotection has been created.
+type TargetInstance struct {
+	// select instance of corresponding role for backup, role are:
+	// - the name of Leader/Follower/Leaner for Consensus component.
+	// - primary or secondary for Replication component.
+	// finally, invalid role of the component will be ignored.
+	// such as if workload type is Replication and component's replicas is 1,
+	// the secondary role is invalid. and it also will be ignored when component is Stateful/Stateless.
+	// the role will be transformed to a role LabelSelector for BackupPolicy's target attribute.
 	// +optional
-	Secret *BackupPolicySecret `json:"secret,omitempty"`
+	Role string `json:"role"`
+
+	// refer to spec.componentDef.systemAccounts.accounts[*].name in ClusterDefinition.
+	// the secret created by this account will be used to connect the database.
+	// if not set, the secret created by spec.ConnectionCredential of the ClusterDefinition will be used.
+	// it will be transformed to a secret for BackupPolicy's target secret.
+	// +optional
+	Account string `json:"account,omitempty"`
+
+	// connectionCredentialKey defines connection credential key in secret
+	// which created by spec.ConnectionCredential of the ClusterDefinition.
+	// it will be ignored when "account" is set.
+	ConnectionCredentialKey ConnectionCredentialKey `json:"connectionCredentialKey,omitempty"`
 }
 
-// BackupPolicySecret defines for the target database secret that backup tool can connect.
-type BackupPolicySecret struct {
-	// the secret name
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
+type ConnectionCredentialKey struct {
+	// the key of password in the ConnectionCredential secret.
+	// if not set, the default key is "password".
+	// +optional
+	PasswordKey *string `json:"passwordKey,omitempty"`
 
-	// usernameKey the map key of the user in the connection credential secret
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=username
-	UsernameKey string `json:"usernameKey,omitempty"`
-
-	// passwordKey the map key of the password in the connection credential secret
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=password
-	PasswordKey string `json:"passwordKey,omitempty"`
+	// the key of username in the ConnectionCredential secret.
+	// if not set, the default key is "username".
+	// +optional
+	UsernameKey *string `json:"usernameKey,omitempty"`
 }
 
 // BackupPolicyHook defines for the database execute commands before and after backup.
@@ -170,16 +185,6 @@ type BackupPolicyHook struct {
 	// +optional
 	ContainerName string `json:"containerName,omitempty"`
 }
-
-// BackupStatusUpdateStage defines the stage of backup status update.
-// +enum
-// +kubebuilder:validation:Enum={pre,post}
-type BackupStatusUpdateStage string
-
-const (
-	PRE  BackupStatusUpdateStage = "pre"
-	POST BackupStatusUpdateStage = "post"
-)
 
 type BackupStatusUpdate struct {
 	// specify the json path of backup object for patch.
@@ -202,81 +207,34 @@ type BackupStatusUpdate struct {
 	UpdateStage BackupStatusUpdateStage `json:"updateStage,omitempty"`
 }
 
-// BackupPolicyStatus defines the observed state of BackupPolicy
-type BackupPolicyStatus struct {
-
-	// observedGeneration is the most recent generation observed for this
-	// BackupPolicy. It corresponds to the Cluster's generation, which is
-	// updated on mutation by the API Server.
-	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-
-	// backup policy phase valid value: Available, Failed.
-	// +optional
-	Phase BackupPolicyPhase `json:"phase,omitempty"`
-
-	// the reason if backup policy check failed.
-	// +optional
-	FailureReason string `json:"failureReason,omitempty"`
-
-	// information when was the last time the job was successfully scheduled.
-	// +optional
-	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
-
-	// information when was the last time the job successfully completed.
-	// +optional
-	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
+// BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate
+type BackupPolicyTemplateStatus struct {
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks},scope=Namespaced,shortName=bp
-// +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="LAST SCHEDULE",type=string,JSONPath=`.status.lastScheduleTime`
-// +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=bpt
+// +kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// BackupPolicy is the Schema for the backuppolicies API (defined by User)
-type BackupPolicy struct {
+// BackupPolicyTemplate is the Schema for the BackupPolicyTemplates API (defined by provider)
+type BackupPolicyTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   BackupPolicySpec   `json:"spec,omitempty"`
-	Status BackupPolicyStatus `json:"status,omitempty"`
+	Spec   BackupPolicyTemplateSpec   `json:"spec,omitempty"`
+	Status BackupPolicyTemplateStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// BackupPolicyList contains a list of BackupPolicy
-type BackupPolicyList struct {
+// BackupPolicyTemplateList contains a list of BackupPolicyTemplate
+type BackupPolicyTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []BackupPolicy `json:"items"`
+	Items           []BackupPolicyTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&BackupPolicy{}, &BackupPolicyList{})
-}
-
-func (r *BackupPolicySpec) GetCommonPolicy(backupType BackupType) *CommonBackupPolicy {
-	switch backupType {
-	case BackupTypeFull:
-		return r.Full
-	case BackupTypeIncremental:
-		return r.Incremental
-	}
-	return nil
-}
-
-// ToDuration converts the ttl string to time.Duration.
-func ToDuration(ttl *string) time.Duration {
-	if ttl == nil {
-		return time.Duration(0)
-	}
-	ttlLower := strings.ToLower(*ttl)
-	if strings.HasSuffix(ttlLower, "d") {
-		days, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "d", ""))
-		return time.Hour * 24 * time.Duration(days)
-	}
-	hours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
-	return time.Hour * time.Duration(hours)
+	SchemeBuilder.Register(&BackupPolicyTemplate{}, &BackupPolicyTemplateList{})
 }

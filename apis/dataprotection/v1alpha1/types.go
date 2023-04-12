@@ -39,16 +39,24 @@ const (
 	BackupTypeSnapshot    BackupType = "snapshot"
 )
 
-// BackupPolicyTemplatePhase defines phases for BackupPolicyTemplate CR.
+// BaseBackupType the base backup type.
 // +enum
-// +kubebuilder:validation:Enum={New,Available,InProgress,Failed}
-type BackupPolicyTemplatePhase string
+// +kubebuilder:validation:Enum={full,snapshot}
+type BaseBackupType string
 
 const (
-	ConfigNew        BackupPolicyTemplatePhase = "New"
-	ConfigAvailable  BackupPolicyTemplatePhase = "Available"
-	ConfigInProgress BackupPolicyTemplatePhase = "InProgress"
-	ConfigFailed     BackupPolicyTemplatePhase = "Failed"
+	BaseBackupTypeFull     BaseBackupType = "full"
+	BaseBackupTypeSnapshot BaseBackupType = "snapshot"
+)
+
+// BackupPolicyPhase defines phases for BackupPolicy CR.
+// +enum
+// +kubebuilder:validation:Enum={Available,Failed}
+type BackupPolicyPhase string
+
+const (
+	PolicyAvailable BackupPolicyPhase = "Available"
+	PolicyFailed    BackupPolicyPhase = "Failed"
 )
 
 // RestoreJobPhase The current phase. Valid values are New, InProgressPhy, InProgressLogic, Completed, Failed.

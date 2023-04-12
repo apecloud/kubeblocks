@@ -201,6 +201,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&clusterTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
 		// tls certs secret
 		&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
+		// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
+		&backupPolicyTPLTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
 		// add our finalizer to all objects
 		&ownershipTransformer{finalizer: dbClusterFinalizerName},
 		// make all workload objects depending on credential secret

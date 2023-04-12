@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -182,16 +181,6 @@ var _ = Describe("builder", func() {
 			Component:         newAllFieldsComponent(clusterDef, clusterVersion),
 		}
 		return &params
-	}
-
-	newBackupPolicyTemplate := func() *dataprotectionv1alpha1.BackupPolicyTemplate {
-		return testapps.NewBackupPolicyTemplateFactory("backup-policy-template-mysql").
-			SetBackupToolName("mysql-xtrabackup").
-			SetSchedule("0 2 * * *").
-			SetTTL("168h0m0s").
-			AddHookPreCommand("touch /data/mysql/.restore;sync").
-			AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-			Create(&testCtx).GetObject()
 	}
 
 	Context("has helper function which builds specific object from cue template", func() {
@@ -410,18 +399,6 @@ var _ = Describe("builder", func() {
 			var newPrimaryIndex = int32(1)
 			params.Component.PrimaryIndex = &newPrimaryIndex
 			checkEnvValues()
-		})
-
-		It("builds BackupPolicy correctly", func() {
-			sts := newStsObj()
-			backupPolicyTemplate := newBackupPolicyTemplate()
-			backupKey := types.NamespacedName{
-				Namespace: "default",
-				Name:      "test-backup",
-			}
-			policy, err := BuildBackupPolicy(sts, backupPolicyTemplate, backupKey)
-			Expect(err).Should(BeNil())
-			Expect(policy).ShouldNot(BeNil())
 		})
 
 		It("builds BackupJob correctly", func() {

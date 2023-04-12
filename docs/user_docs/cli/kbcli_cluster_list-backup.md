@@ -1,32 +1,29 @@
 ---
-title: kbcli backup-config
+title: kbcli cluster list-backup
 ---
 
-KubeBlocks backup config.
+List backups.
 
 ```
-kbcli backup-config [flags]
+kbcli cluster list-backup [flags]
 ```
 
 ### Examples
 
 ```
-  # Enable the snapshot-controller and volume snapshot, to support snapshot backup.
-  kbcli backup-config --set snapshot-controller.enabled=true
-  
-  # If you have already installed a snapshot-controller, only enable the snapshot backup feature
-  kbcli backup-config --set dataProtection.enableVolumeSnapshot=true
+  # list all backup
+  kbcli cluster list-backup
 ```
 
 ### Options
 
 ```
-  -h, --help                     help for backup-config
-      --set stringArray          Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
-      --set-file stringArray     Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)
-      --set-json stringArray     Set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)
-      --set-string stringArray   Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
-  -f, --values strings           Specify values in a YAML file or a URL (can specify multiple)
+  -A, --all-namespace     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
+  -h, --help              help for list-backup
+      --name string       The backup name to get the details.
+  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
+  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
+      --show-labels       When printing, show all labels as the last column (default hide labels column)
 ```
 
 ### Options inherited from parent commands
@@ -55,7 +52,7 @@ kbcli backup-config [flags]
 
 ### SEE ALSO
 
-
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

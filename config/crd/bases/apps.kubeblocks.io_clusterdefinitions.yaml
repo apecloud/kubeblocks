@@ -94,6 +94,7 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: set
                           name:
                             description: Specify the name of configuration template.
                             maxLength: 63
@@ -371,12 +372,12 @@ spec:
                               maxLength: 128
                               type: string
                             scrapePort:
+                              anyOf:
+                              - type: integer
+                              - type: string
                               description: scrapePort is exporter port for Time Series
                                 Database to scrape metrics.
-                              format: int32
-                              maximum: 65535
-                              minimum: 0
-                              type: integer
+                              x-kubernetes-int-or-string: true
                           required:
                           - scrapePort
                           type: object
@@ -8683,8 +8684,13 @@ spec:
                             - data
                             - log
                             type: string
+                        required:
+                        - name
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     workloadType:
                       description: workloadType defines type of the workload. Stateless
                         is a stateless workload type used to describe stateless applications.

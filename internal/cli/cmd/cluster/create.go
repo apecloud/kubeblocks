@@ -455,20 +455,26 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 		replicas := int32(setReplicas)
 
-		resourceList := corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
-			corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
-		}
 		compObj := &appsv1alpha1.ClusterComponentSpec{
 			Name:            c.Name,
 			ComponentDefRef: c.Name,
-			ClassDefRef:     &appsv1alpha1.ClassDefRef{Class: getVal(keyClass, sets)},
 			Replicas:        replicas,
-			Resources: corev1.ResourceRequirements{
+		}
+
+		// class has higher priority than other resource related parameters
+		className := getVal(keyClass, sets)
+		if className != "" {
+			compObj.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: className}
+		} else {
+			resourceList := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
+				corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
+			}
+			compObj.Resources = corev1.ResourceRequirements{
 				Requests: resourceList,
 				Limits:   resourceList,
-			},
-			VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
+			}
+			compObj.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
 				Name: "data",
 				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -480,7 +486,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 						},
 					},
 				},
-			}},
+			}}
 		}
 		comps = append(comps, compObj)
 	}

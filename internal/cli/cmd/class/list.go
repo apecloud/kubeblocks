@@ -103,7 +103,7 @@ func (o *ListOptions) printClass(constraintName string, compName string, classes
 	for _, cls := range classes {
 		var volumes []string
 		for _, volume := range cls.Volumes {
-			volumes = append(volumes, fmt.Sprintf("name=%s,size=%s", volume.Name, volume.Size.String()))
+			volumes = append(volumes, fmt.Sprintf("%s=%s", volume.Name, volume.Size.String()))
 		}
 		tbl.AddRow(compName, cls.Name, cls.CPU.String(), cls.Memory.String(), strings.Join(volumes, ","))
 	}

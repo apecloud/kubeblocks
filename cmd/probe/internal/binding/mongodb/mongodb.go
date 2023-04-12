@@ -32,6 +32,7 @@ import (
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	"github.com/apecloud/kubeblocks/cmd/probe/vendor/github.com/spf13/viper"
 )
 
 // MongoDBOperations is a binding implementation for MongoDB.
@@ -323,6 +324,14 @@ func getMongoDBMetaData(metadata bindings.Metadata) (*mongoDBMetadata, error) {
 
 	if val, ok := metadata.Properties[password]; ok && val != "" {
 		meta.password = val
+	}
+
+	if viper.IsSet("KB_SERVICE_USER") {
+		meta.username = viper.GetString("KB_SERVICE_USER")
+	}
+
+	if viper.IsSet("KB_SERVICE_PASSWORD") {
+		meta.password = viper.GetString("KB_SERVICE_PASSWORD")
 	}
 
 	meta.databaseName = adminDatabase

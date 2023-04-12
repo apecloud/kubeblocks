@@ -434,7 +434,7 @@ type ClusterComponentService struct {
 type ClassDefRef struct {
 	// name refers to the name of the ComponentClassDefinition.
 	// +optional
-	Name string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty"`
 
 	// class refers to the name of the class that is defined in the ComponentClassDefinition.
 	// +kubebuilder:validation:Required

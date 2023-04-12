@@ -49,7 +49,7 @@ type ComponentClassGroup struct {
 	//	    size: "{{ or .logStorageSize 1 }}Gi"
 	//
 	// +optional
-	Template string `json:"template,omitempty"`
+	Template *string `json:"template,omitempty"`
 
 	// vars defines the variables declared in the template and will be used to generating the complete class definition by
 	// render the template.
@@ -123,7 +123,7 @@ type Volume struct {
 
 	// The StorageClass name of the volume.
 	// +optional
-	StorageClassName string `json:"storageCLassName,omitempty"`
+	StorageClassName *string `json:"storageCLassName,omitempty"`
 }
 
 // ComponentClassDefinitionStatus defines the observed state of ComponentClassDefinition

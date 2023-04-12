@@ -83,9 +83,10 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		sort.Sort(class.ByConstraintList(candidates))
 		candidate := candidates[0]
 		cpu, memory := class.GetMinCPUAndMemory(candidate.Constraint)
+		name := fmt.Sprintf("%s-%vc%vg", candidate.Name, cpu.AsDec().String(), memory.AsDec().String())
 		cls := &appsv1alpha1.ComponentClassInstance{
 			ComponentClass: appsv1alpha1.ComponentClass{
-				Name:   fmt.Sprintf("%s-%vc%vg", candidate.Name, cpu.AsDec().String(), memory.AsDec().String()),
+				Name:   name,
 				CPU:    *cpu,
 				Memory: *memory,
 			},
@@ -110,7 +111,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		var cls *appsv1alpha1.ComponentClassInstance
 		// TODO another case if len(constraintList.Items) > 0, use matchClassFamilies to find matching resource constraint:
 		switch {
-		case comp.ClassDefRef.Class != "":
+		case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
 			cls = classes[comp.ClassDefRef.Class]
 			if cls == nil {
 				return fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
@@ -125,7 +126,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 			// TODO reconsider handling policy for this case
 			continue
 		}
-		comp.ClassDefRef.Name = cls.Name
+		comp.ClassDefRef.Name = &cls.Name
 		requests := corev1.ResourceList{
 			corev1.ResourceCPU:    cls.CPU,
 			corev1.ResourceMemory: cls.Memory,

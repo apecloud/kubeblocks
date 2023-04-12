@@ -72,7 +72,7 @@ func TestResourceConstraint_ByClassCPUAndMemory(t *testing.T) {
 	}
 	sort.Sort(ByClassCPUAndMemory(classes))
 	candidate := classes[0]
-	if candidate.CPU != resource.MustParse("0.5") || candidate.Memory != resource.MustParse("10Gi") {
+	if !candidate.CPU.Equal(resource.MustParse("0.5")) || !candidate.Memory.Equal(resource.MustParse("10Gi")) {
 		t.Errorf("case failed")
 	}
 }

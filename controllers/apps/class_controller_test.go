@@ -51,10 +51,10 @@ var _ = Describe("", func() {
 
 	It("Class should exist in status", func() {
 		var (
-			className = "test"
+			clsName = "test"
 		)
 		class := v1alpha1.ComponentClass{
-			Name:   className,
+			Name:   clsName,
 			CPU:    resource.MustParse("1"),
 			Memory: resource.MustParse("2Gi"),
 		}
@@ -63,7 +63,7 @@ var _ = Describe("", func() {
 		key := client.ObjectKeyFromObject(componentClassDefinition)
 		Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *v1alpha1.ComponentClassDefinition) {
 			g.Expect(pobj.Status.Classes).ShouldNot(BeEmpty())
-			g.Expect(pobj.Status.Classes[0].Name).Should(Equal(className))
+			g.Expect(pobj.Status.Classes[0].Name).Should(Equal(clsName))
 		})).Should(Succeed())
 	})
 })

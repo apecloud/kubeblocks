@@ -41,10 +41,12 @@ var _ = Describe("utils", func() {
 		results := make(map[string]*v1alpha1.ComponentClassInstance)
 		for cpu := cpuMin; cpu <= cpuMax; cpu++ {
 			for _, scale := range scales {
-				name := fmt.Sprintf("cpu-%d-scale-%d", cpu, scale)
-				results[name] = &v1alpha1.ComponentClassInstance{
+				var (
+					clsName = fmt.Sprintf("cpu-%d-scale-%d", cpu, scale)
+				)
+				results[clsName] = &v1alpha1.ComponentClassInstance{
 					ComponentClass: v1alpha1.ComponentClass{
-						Name:   name,
+						Name:   clsName,
 						CPU:    resource.MustParse(fmt.Sprintf("%d", cpu)),
 						Memory: resource.MustParse(fmt.Sprintf("%dGi", cpu*scale)),
 					},

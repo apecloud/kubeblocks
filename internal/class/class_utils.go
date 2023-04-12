@@ -145,16 +145,17 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 			return result, err
 		}
 
-		result.Name, err = renderTemplate(nameTpl, values)
+		name, err := renderTemplate(nameTpl, values)
 		if err != nil {
 			return result, err
 		}
+		result.Name = name
 		return result, nil
 	}
 
 	parser := func(group v1alpha1.ComponentClassGroup, series v1alpha1.ComponentClassSeries, class v1alpha1.ComponentClass) (*v1alpha1.ComponentClassInstance, error) {
-		if len(class.Args) > 0 {
-			cls, err := genClass(series.Name, group.Template, group.Vars, class.Args)
+		if len(class.Args) > 0 && group.Template != nil {
+			cls, err := genClass(series.Name, *group.Template, group.Vars, class.Args)
 			if err != nil {
 				return nil, err
 			}

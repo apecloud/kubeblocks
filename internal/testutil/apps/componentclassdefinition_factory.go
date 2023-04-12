@@ -23,6 +23,16 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
+var classTemplate = `
+cpu: "{{ or .cpu 1 }}"
+memory: "{{ or .memory 4 }}Gi"
+storage:
+- name: data
+  size: "{{ or .dataStorageSize 10 }}Gi"
+- name: log
+  size: "{{ or .logStorageSize 1 }}Gi"
+`
+
 type MockComponentClassDefinitionFactory struct {
 	BaseFactory[appsv1alpha1.ComponentClassDefinition, *appsv1alpha1.ComponentClassDefinition, MockComponentClassDefinitionFactory]
 }
@@ -42,16 +52,8 @@ func NewComponentClassDefinitionFactory(name, clusterDefinitionRef, componentTyp
 			Groups: []appsv1alpha1.ComponentClassGroup{
 				{
 					ResourceConstraintRef: "kube-resource-constraint-general",
-					Template: `
-cpu: "{{ or .cpu 1 }}"
-memory: "{{ or .memory 4 }}Gi"
-storage:
-- name: data
-  size: "{{ or .dataStorageSize 10 }}Gi"
-- name: log
-  size: "{{ or .logStorageSize 1 }}Gi"
-					`,
-					Vars: []string{"cpu", "memory", "dataStorageSize", "logStorageSize"},
+					Template:              &classTemplate,
+					Vars:                  []string{"cpu", "memory", "dataStorageSize", "logStorageSize"},
 					Series: []appsv1alpha1.ComponentClassSeries{
 						{
 							Name: "general-{{ .cpu }}c{{ .memory }}g",

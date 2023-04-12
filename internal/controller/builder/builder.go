@@ -535,22 +535,6 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 	return &config, nil
 }
 
-func BuildBackupPolicy(sts *appsv1.StatefulSet,
-	template *dataprotectionv1alpha1.BackupPolicyTemplate,
-	backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
-	backupKey.Name = backupKey.Name + "-" + randomString(6)
-	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
-	if err := buildFromCUE("backup_policy_template.cue", map[string]any{
-		"sts":        sts,
-		"backup_key": backupKey,
-		"template":   template.Name,
-	}, "backup_policy", &backupPolicy); err != nil {
-		return nil, err
-	}
-
-	return &backupPolicy, nil
-}
-
 func BuildBackup(sts *appsv1.StatefulSet,
 	backupPolicyName string,
 	backupKey types.NamespacedName) (*dataprotectionv1alpha1.Backup, error) {

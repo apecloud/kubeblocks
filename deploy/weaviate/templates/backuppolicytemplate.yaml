@@ -1,15 +1,22 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: backup-policy-template-weaviate
+  name: weaviate-standalone-backup-policy-template
   labels:
     clusterdefinition.kubeblocks.io/name: weaviate-standalone
     {{- include "weaviate.labels" . | nindent 4 }}
 spec:
-  # which backup tool to perform database backup, only support one tool.
-  backupToolName: volumesnapshot
-  ttl: 168h0m0s
-
-  credentialKeyword:
-    userKeyword: username
-    passwordKeyword: password
+  clusterDefinitionRef: weaviate-standalone
+  backupPolicies:
+  - componentDefRef: weaviate
+    ttl: 7d
+    schedule:
+      baseBackup:
+        type: snapshot
+        enable: false
+        cronExpression: "0 18 * * 0"
+    snapshot:
+      target:
+        connectionCredentialKey:
+          passwordKey: password
+          usernameKey: username

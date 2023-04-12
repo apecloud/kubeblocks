@@ -25,6 +25,8 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/spf13/viper"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 var disableAutoTransfer = viper.GetBool("DISABLE_AUTO_TRANSFER")
@@ -45,7 +47,7 @@ func (c *cueTypeExtractor) Visit(val cue.Value) {
 		c.fieldTypes = make(map[string]CueType)
 		c.fieldUnits = make(map[string]string)
 	}
-	c.visitStruct(val)
+	c.visitStruct(val, "")
 }
 
 func (c *cueTypeExtractor) visitValue(x cue.Value, path string) {
@@ -69,13 +71,20 @@ func (c *cueTypeExtractor) visitValue(x cue.Value, path string) {
 		c.visitList(x, path)
 	case k&cue.StructKind == cue.StructKind:
 		c.addFieldType(path, StructType)
-		c.visitStruct(x)
+		c.visitStruct(x, path)
 	default:
 		log.Log.Info(fmt.Sprintf("cannot convert value of type %s", k.String()))
 	}
 }
 
-func (c *cueTypeExtractor) visitStruct(v cue.Value) {
+func (c *cueTypeExtractor) visitStruct(v cue.Value, parentPath string) {
+	joinFieldPath := func(path string, name string) string {
+		if path == "" || strings.HasPrefix(path, "#") {
+			return name
+		}
+		return path + "." + name
+	}
+
 	switch op, v := v.Expr(); op {
 	// SelectorOp refer of other struct type
 	case cue.NoOp, cue.SelectorOp:
@@ -90,7 +99,7 @@ func (c *cueTypeExtractor) visitStruct(v cue.Value) {
 
 	for itr, _ := v.Fields(cue.Optional(true), cue.Definitions(true)); itr.Next(); {
 		name := itr.Label()
-		c.visitValue(itr.Value(), name)
+		c.visitValue(itr.Value(), joinFieldPath(parentPath, name))
 	}
 }
 
@@ -104,7 +113,7 @@ func (c *cueTypeExtractor) visitList(v cue.Value, path string) {
 
 	count := 0
 	for i, _ := v.List(); i.Next(); count++ {
-		c.visitValue(i.Value(), fmt.Sprintf("%s_%d", path, count))
+		c.visitValue(i.Value(), path)
 	}
 }
 
@@ -119,7 +128,21 @@ func (c *cueTypeExtractor) addFieldUnits(path string, t CueType, base string) {
 	}
 }
 
-func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn, expand string, trimString bool) error {
+func (c *cueTypeExtractor) hasFieldType(parent string, cur string) (string, bool) {
+	fieldRef := cur
+	if parent != "" {
+		fieldRef = parent + "." + cur
+	}
+	if _, exist := c.fieldTypes[fieldRef]; exist {
+		return fieldRef, true
+	}
+	if _, exist := c.fieldTypes[cur]; exist {
+		return cur, true
+	}
+	return "", false
+}
+
+func transNumberOrBoolType(t CueType, obj reflect.Value, fn util.UpdateFn, expand string, trimString bool) error {
 	switch t {
 	case IntType:
 		return processTypeTrans[int](obj, strconv.Atoi, fn, trimString)
@@ -145,7 +168,7 @@ func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn, expand str
 	return nil
 }
 
-func trimStringQuotes(obj reflect.Value, fn UpdateFn) {
+func trimStringQuotes(obj reflect.Value, fn util.UpdateFn) {
 	if obj.Type().Kind() != reflect.String {
 		return
 	}
@@ -160,7 +183,7 @@ func trimStringQuotes(obj reflect.Value, fn UpdateFn) {
 	}
 }
 
-func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn UpdateFn, trimString bool) error {
+func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn util.UpdateFn, trimString bool) error {
 	switch obj.Type().Kind() {
 	case reflect.String:
 		str := obj.String()
@@ -188,17 +211,15 @@ func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Va
 		context: context,
 	}
 	typeTransformer.Visit(tpl)
-	return UnstructuredObjectWalk(typeTransformer.data,
-		func(parent, cur string, obj reflect.Value, fn UpdateFn) error {
+	return util.UnstructuredObjectWalk(typeTransformer.data,
+		func(parent, cur string, obj reflect.Value, fn util.UpdateFn) error {
 			if fn == nil || cur == "" || !obj.IsValid() {
 				return nil
 			}
-			if t, exist := typeTransformer.fieldTypes[cur]; exist {
-				err := transNumberOrBoolType(t, obj, fn, typeTransformer.fieldUnits[cur], trimString)
-				if err != nil {
-					return WrapError(err, "failed to type convertor, field[%s]", cur)
-				}
+			fieldPath, exist := typeTransformer.hasFieldType(parent, cur)
+			if !exist {
+				return nil
 			}
-			return nil
+			return transNumberOrBoolType(typeTransformer.fieldTypes[fieldPath], obj, fn, typeTransformer.fieldUnits[fieldPath], trimString)
 		}, false)
 }

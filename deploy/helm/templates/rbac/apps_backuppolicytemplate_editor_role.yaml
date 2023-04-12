@@ -2,10 +2,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: backuppolicytemplate-editor-role
+  name: {{ include "kubeblocks.fullname" . }}-backuppolicytemplate-editor-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 rules:
 - apiGroups:
-  - dataprotection.kubeblocks.io
+  - apps.kubeblocks.io
   resources:
   - backuppolicytemplates
   verbs:
@@ -17,7 +19,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dataprotection.kubeblocks.io
+  - apps.kubeblocks.io
   resources:
   - backuppolicytemplates/status
   verbs:

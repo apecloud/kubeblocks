@@ -14,30 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configuration
+package edit
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"hash/fnv"
-	"io"
+	"testing"
 
-	"k8s.io/apimachinery/pkg/util/rand"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func ComputeHash(object interface{}) (string, error) {
-	objString, err := json.Marshal(object)
-	if err != nil {
-		return "", WrapError(err, "failed to compute hash.")
-	}
-
-	// hasher := sha1.New()
-	hasher := fnv.New32()
-	if _, err := io.Copy(hasher, bytes.NewReader(objString)); err != nil {
-		return "", WrapError(err, "failed to compute hash for sha256. [%s]", objString)
-	}
-
-	sha := hasher.Sum32()
-	return rand.SafeEncodeString(fmt.Sprint(sha)), nil
+func TestList(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Edit Suite")
 }

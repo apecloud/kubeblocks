@@ -63,6 +63,9 @@ var _ = Describe("OpsRequest Controller", func() {
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
 		testapps.ClearClusterResources(&testCtx)
 		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
+
+		// non-namespaced
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 	}
 
 	BeforeEach(func() {
@@ -254,7 +257,8 @@ var _ = Describe("OpsRequest Controller", func() {
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
 				AddHorizontalScalePolicy(appsv1alpha1.HorizontalScalePolicy{
-					Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
+					Type:                     appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
+					BackupPolicyTemplateName: backupPolicyTPLName,
 				}).Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")

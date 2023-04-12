@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 type configEditContext struct {
@@ -67,7 +68,7 @@ func (c *configEditContext) prepare() error {
 
 	val, ok := cmObj.Data[c.configKey]
 	if !ok {
-		return makeNotFoundConfigFileErr(c.configKey, c.configSpecName, cfgcore.ToSet(cmObj.Data).AsSlice())
+		return makeNotFoundConfigFileErr(c.configKey, c.configSpecName, cfgutil.ToSet(cmObj.Data).AsSlice())
 	}
 
 	c.original = val

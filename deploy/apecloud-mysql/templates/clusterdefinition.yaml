@@ -60,8 +60,7 @@ spec:
             targetPort: mysql
       horizontalScalePolicy:
         type: Snapshot
-        backupTemplateSelector:
-          "clusterdefinition.kubeblocks.io/name": apecloud-mysql
+        backupPolicyTemplateName: apecloud-mysql-backup-policy-template
       volumeTypes:
         - name: data
           type: data

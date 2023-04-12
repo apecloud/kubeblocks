@@ -2,6 +2,7 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
+- bases/apps.kubeblocks.io_backuppolicytemplates.yaml
 - bases/apps.kubeblocks.io_clusters.yaml
 - bases/apps.kubeblocks.io_clusterdefinitions.yaml
 - bases/apps.kubeblocks.io_clusterversions.yaml
@@ -11,7 +12,6 @@ resources:
 - bases/dataprotection.kubeblocks.io_backuppolicies.yaml
 - bases/dataprotection.kubeblocks.io_backups.yaml
 - bases/dataprotection.kubeblocks.io_restorejobs.yaml
-- bases/dataprotection.kubeblocks.io_backuppolicytemplates.yaml
 - bases/extensions.kubeblocks.io_addons.yaml
 - bases/apps.kubeblocks.io_classfamilies.yaml
 #+kubebuilder:scaffold:crdkustomizeresource

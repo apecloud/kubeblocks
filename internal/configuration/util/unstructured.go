@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configuration
+package util
 
 import (
 	"fmt"
@@ -46,7 +46,7 @@ type unstructuredAccessor struct {
 func (accessor *unstructuredAccessor) Visit(data interface{}) error {
 	v := reflect.ValueOf(data)
 	if !v.IsValid() {
-		return MakeError("invalid data type: %T", data)
+		return fmt.Errorf("invalid data type: %T", data)
 	}
 	return accessor.visitValueType(v, v.Type(), "", "", nil)
 }
@@ -77,25 +77,25 @@ func (accessor *unstructuredAccessor) visitValueType(v reflect.Value, t reflect.
 		implValue := v.Elem()
 		return accessor.visitValueType(implValue, implValue.Type(), parent, cur, updateFn)
 	case reflect.Struct:
-		return accessor.visitStruct(v, cur)
+		return accessor.visitStruct(v, joinFieldPath(parent, cur))
 	case reflect.Map:
-		return accessor.visitMap(v, t, cur)
+		return accessor.visitMap(v, t, joinFieldPath(parent, cur))
 	case reflect.Slice:
-		return accessor.visitArray(v, t.Elem(), cur)
+		return accessor.visitArray(v, t.Elem(), parent, cur)
 	case reflect.Array:
-		return accessor.visitArray(v, t.Elem(), cur)
+		return accessor.visitArray(v, t.Elem(), parent, cur)
 	case reflect.Pointer:
 		return accessor.visitValueType(v, t.Elem(), parent, cur, updateFn)
 	default:
-		return MakeError("not support type: %s", k)
+		return fmt.Errorf("not support type: %s", k)
 	}
 }
 
-func (accessor *unstructuredAccessor) visitArray(v reflect.Value, t reflect.Type, parent string) error {
+func (accessor *unstructuredAccessor) visitArray(v reflect.Value, t reflect.Type, parent, cur string) error {
 	n := v.Len()
 	for i := 0; i < n; i++ {
-		index := fmt.Sprintf("%s_%d", parent, i)
-		if err := accessor.visitValueType(v.Index(i), t, parent, index, nil); err != nil {
+		// index := fmt.Sprintf("%s_%d", parent, i)
+		if err := accessor.visitValueType(v.Index(i), t, parent, cur, nil); err != nil {
 			return err
 		}
 	}
@@ -111,7 +111,7 @@ func (accessor *unstructuredAccessor) visitMap(v reflect.Value, t reflect.Type, 
 	switch k := t.Key().Kind(); k {
 	case reflect.String:
 	default:
-		return MakeError("not support key type: %s", k)
+		return fmt.Errorf("not support key type: %s", k)
 	}
 
 	t = t.Elem()
@@ -157,6 +157,18 @@ func toString(key reflect.Value, kind reflect.Kind) string {
 	}
 }
 
+func joinFieldPath(parent, cur string) string {
+	if parent == "" {
+		return cur
+	}
+
+	if cur == "" {
+		return parent
+	}
+
+	return parent + "." + cur
+}
+
 func (accessor *unstructuredAccessor) visitStruct(v reflect.Value, parent string) error {
-	return MakeError("not support struct.")
+	return fmt.Errorf("not support struct")
 }

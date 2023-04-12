@@ -48,12 +48,12 @@ func InitClusterWithHybridComps(
 		AddComponent(consensusComp).AddContainerShort(DefaultMySQLContainerName, NginxImage).
 		AddComponent(statefulComp).AddContainerShort(DefaultMySQLContainerName, NginxImage).
 		Create(&testCtx).GetObject()
-	pvcSpec := NewPVC("1Gi")
+	pvcSpec := NewPVCSpec("1Gi")
 	cluster := NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 		AddComponent(statelessComp, statelessComp).SetReplicas(1).
 		AddComponent(consensusComp, consensusComp).SetReplicas(3).
 		AddComponent(statefulComp, statefulComp).SetReplicas(3).
-		AddVolumeClaimTemplate(DataVolumeName, &pvcSpec).
+		AddVolumeClaimTemplate(DataVolumeName, pvcSpec).
 		Create(&testCtx).GetObject()
 	return clusterDef, clusterVersion, cluster
 }

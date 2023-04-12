@@ -127,13 +127,10 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		"--config", "/config/probe/config.yaml",
 		"--components-path", "/config/probe/components"}
 
-	if len(component.Services) > 0 && len(component.Services[0].Spec.Ports) > 0 {
-		service := component.Services[0]
-		port := service.Spec.Ports[0]
-		dbPort := port.TargetPort.IntValue()
-		if dbPort == 0 {
-			dbPort = int(port.Port)
-		}
+	if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
+		mainContainer := component.PodSpec.Containers[0]
+		port := mainContainer.Ports[0]
+		dbPort := port.ContainerPort
 		container.Env = append(container.Env, corev1.EnvVar{
 			Name:      constant.KBPrefix + "_SERVICE_PORT",
 			Value:     strconv.Itoa(dbPort),

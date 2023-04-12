@@ -105,7 +105,7 @@ const (
 
 	defaultTimeout = 5 * time.Second
 
-	defaultDBPort = 27018
+	defaultDBPort = 27017
 
 	// mongodb://<username>:<password@<host>/<database><params>
 	connectionURIFormatWithAuthentication = "mongodb://%s:%s@%s/%s%s"
@@ -198,6 +198,10 @@ func (mongoOps *MongoDBOperations) InitDelay() error {
 }
 
 func (mongoOps *MongoDBOperations) GetRunningPort() int {
+	if viper.IsSet("KB_SERVICE_PORT") {
+		return viper.GetInt("KB_SERVICE_PORT")
+	}
+
 	uri := getMongoURI(&mongoOps.mongoDBMetadata)
 	index := strings.Index(uri, "://")
 	if index < 0 {
@@ -213,12 +217,17 @@ func (mongoOps *MongoDBOperations) GetRunningPort() int {
 	if index < 0 {
 		return defaultDBPort
 	}
-	uri = uri[:index]
+	uri = uri[index:]
 	index = strings.Index(uri, ":")
 	if index < 0 {
 		return defaultDBPort
 	}
-	port, err := strconv.Atoi(uri[index+1:])
+	portStr := uri[index+1:]
+	if viper.IsSet("KB_SERVICE_PORT") {
+		portStr = viper.GetString("KB_SERVICE_PORT")
+	}
+
+	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		return defaultDBPort
 	}
@@ -304,6 +313,10 @@ func getMongoDBMetaData(metadata bindings.Metadata) (*mongoDBMetadata, error) {
 
 	if val, ok := metadata.Properties[host]; ok && val != "" {
 		meta.host = val
+	}
+
+	if viper.IsSet("KB_SERVICE_PORT") {
+		meta.host = "localhost:" + viper.GetString("KB_SERVICE_PORT")
 	}
 
 	if val, ok := metadata.Properties[server]; ok && val != "" {

@@ -18,6 +18,7 @@ package binding
 
 import (
 	"fmt"
+	"strings"
 )
 
 const (
@@ -61,18 +62,41 @@ const (
 	RespEveSucc = "Success"
 	RespEveFail = "Failed"
 
-	SuperUserRole  string = "superuser"
-	ReadWriteRole  string = "readwrite"
-	ReadOnlyRole   string = "readonly"
-	NoPrivileges   string = ""
-	CustomizedRole string = "customized"
-	InvalidRole    string = "invalid"
-
 	PRIMARY   = "primary"
 	SECONDARY = "secondary"
 	MASTER    = "master"
 	SLAVE     = "slave"
 )
+
+type RoleType string
+
+const (
+	SuperUserRole  RoleType = "superuser"
+	ReadWriteRole  RoleType = "readwrite"
+	ReadOnlyRole   RoleType = "readonly"
+	NoPrivileges   RoleType = ""
+	CustomizedRole RoleType = "customized"
+	InvalidRole    RoleType = "invalid"
+)
+
+func (r RoleType) EqualTo(role string) bool {
+	return strings.EqualFold(string(r), role)
+}
+
+func (r RoleType) GetWeight() int32 {
+	switch r {
+	case SuperUserRole:
+		return 1 << 3
+	case ReadWriteRole:
+		return 1 << 2
+	case ReadOnlyRole:
+		return 1 << 1
+	case CustomizedRole:
+		return 1
+	default:
+		return 0
+	}
+}
 
 const (
 	errMsgNoSQL           = "no sql provided"

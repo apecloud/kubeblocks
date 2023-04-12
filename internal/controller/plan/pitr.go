@@ -18,7 +18,6 @@ package plan
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -219,11 +218,17 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupToolSp
 		return nil, errors.New("not support recovery because of non-existed pitr backupTool")
 	}
 	spec := &toolList.Items[0].Spec
+	timeFormat := time.RFC3339
+	envTimeEnvIdx := -1
 	for i, env := range spec.Env {
 		if env.Value == "$KB_RECOVERY_TIME" {
-			spec.Env[i].Value = p.restoreTime.Time.UTC().Format(time.RFC3339)
-			break
+			envTimeEnvIdx = i
+		} else if env.Name == "TIME_FORMAT" {
+			timeFormat = env.Value
 		}
+	}
+	if envTimeEnvIdx != -1 {
+		spec.Env[envTimeEnvIdx].Value = p.restoreTime.Time.UTC().Format(timeFormat)
 	}
 
 	return spec, nil
@@ -243,7 +248,7 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 		sts := &appsv1.StatefulSet{}
 		vct := corev1.PersistentVolumeClaimTemplate{}
 		vct.Name = componentSpec.VolumeClaimTemplates[0].Name
-		vct.Spec = *(componentSpec.VolumeClaimTemplates[0].Spec)
+		vct.Spec = componentSpec.VolumeClaimTemplates[0].Spec.ToV1PersistentVolumeClaimSpec()
 
 		// get data dir pvc name
 		dataPVCList := corev1.PersistentVolumeClaimList{}
@@ -278,9 +283,6 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 			if err != nil {
 				return objs, err
 			}
-			if pitrPVC.Annotations == nil {
-				pitrPVC.Annotations = map[string]string{}
-			}
 			volumes := []corev1.Volume{
 				{Name: "data", VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.Name}}},
@@ -299,12 +301,19 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 			}
 			jobName := fmt.Sprintf("pitr-phy-%s-%s-%d", p.Cluster.Name, componentSpec.Name, i)
 			job, err := builder.BuildPITRJob(jobName, p.Cluster, image, []string{"sh", "-c"},
-				recoveryInfo.Physical.RestoreCommands, volumes, volumeMounts)
+				recoveryInfo.Physical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env)
 			if err != nil {
 				return objs, err
 			}
-			if job.Annotations == nil {
-				job.Annotations = map[string]string{}
+			// create logic restore job
+			if p.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase {
+				logicJobName := fmt.Sprintf("pitr-logic-%s-%s-%d", p.Cluster.Name, componentSpec.Name, i)
+				logicJob, err := builder.BuildPITRJob(logicJobName, p.Cluster, image, []string{"sh", "-c"},
+					recoveryInfo.Logical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env)
+				if err != nil {
+					return objs, err
+				}
+				objs = append(objs, logicJob)
 			}
 			// collect pvcs and jobs for later deletion
 			objs = append(objs, pitrPVC)
@@ -314,7 +323,7 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 	return objs, nil
 }
 
-func (p *PointInTimeRecoveryManager) runPhyRecoveryJob() error {
+func (p *PointInTimeRecoveryManager) runRecoveryJob() error {
 	objs, err := p.buildResourceObjs()
 	if err != nil {
 		return err
@@ -329,67 +338,8 @@ func (p *PointInTimeRecoveryManager) runPhyRecoveryJob() error {
 	return nil
 }
 
-func (p *PointInTimeRecoveryManager) buildLogicResourceObjs() (objs []client.Object, err error) {
-	objs = make([]client.Object, 0)
-	recoveryInfo, err := p.getRecoveryInfo()
-	if err != nil {
-		return objs, err
-	}
-	for _, componentSpec := range p.Cluster.Spec.ComponentSpecs {
-		if len(componentSpec.VolumeClaimTemplates) == 0 {
-			continue
-		}
-
-		vct := corev1.PersistentVolumeClaimTemplate{}
-		vct.Name = componentSpec.VolumeClaimTemplates[0].Name
-		vct.Spec = *(componentSpec.VolumeClaimTemplates[0].Spec)
-
-		// get data dir pvc name
-		dataPVCList := corev1.PersistentVolumeClaimList{}
-		dataPVCLabels := map[string]string{
-			constant.AppInstanceLabelKey:    p.Cluster.Name,
-			constant.KBAppComponentLabelKey: componentSpec.Name,
-			constant.VolumeTypeLabelKey:     string(appsv1alpha1.VolumeTypeData),
-		}
-		if err = p.Client.List(p.Ctx, &dataPVCList,
-			client.InNamespace(p.namespace),
-			client.MatchingLabels(dataPVCLabels)); err != nil {
-			return objs, err
-		}
-		for _, dataPVC := range dataPVCList.Items {
-			if dataPVC.Status.Phase != corev1.ClaimBound {
-				return objs, errors.New("waiting PVC Bound")
-			}
-			volumes := []corev1.Volume{
-				{Name: "data", VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.Name}}},
-			}
-			volumeMounts := []corev1.VolumeMount{
-				{Name: "data", MountPath: "/data"},
-			}
-
-			// render the job cue template
-			image := recoveryInfo.Image
-			if image == "" {
-				image = viper.GetString(constant.KBToolsImage)
-			}
-			job, err := builder.BuildPITRJob("pitr-logic-"+p.Cluster.Name, p.Cluster, image, []string{"sh", "-c"},
-				recoveryInfo.Logical.RestoreCommands, volumes, volumeMounts)
-			if err != nil {
-				return objs, err
-			}
-			if job.Annotations == nil {
-				job.Annotations = map[string]string{}
-			}
-			// collect pvcs and jobs for later deletion
-			objs = append(objs, job)
-		}
-	}
-	return objs, nil
-}
-
 func (p *PointInTimeRecoveryManager) runLogicRecoveryJob() error {
-	objs, err := p.buildLogicResourceObjs()
+	objs, err := p.buildResourceObjs()
 	if err != nil {
 		return err
 	}
@@ -435,13 +385,13 @@ func (p *PointInTimeRecoveryManager) ensureJobDone() bool {
 		if jobObj, ok = obj.(*batchv1.Job); !ok {
 			continue
 		}
-		done, err := p.checkJobDone(client.ObjectKeyFromObject(jobObj))
-		if err != nil {
+		if done, err := p.checkJobDone(client.ObjectKeyFromObject(jobObj)); err != nil {
+			return false
+		} else if !done {
 			return false
 		}
-		return done
 	}
-	return false
+	return true
 }
 
 func (p *PointInTimeRecoveryManager) cleanupScriptsJob() error {
@@ -459,6 +409,17 @@ func (p *PointInTimeRecoveryManager) cleanupScriptsJob() error {
 	return nil
 }
 
+func (p *PointInTimeRecoveryManager) cleanupClusterAnnotations() error {
+	if p.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase && p.Cluster.Annotations != nil {
+		cluster := p.Cluster
+		patch := client.MergeFrom(cluster.DeepCopy())
+		delete(cluster.Annotations, constant.RestoreFromSrcClusterAnnotationKey)
+		delete(cluster.Annotations, constant.RestoreFromTimeAnnotationKey)
+		return p.Client.Patch(p.Ctx, cluster, patch)
+	}
+	return nil
+}
+
 // DoRecoveryJob run a physical recovery job before cluster service start
 func (p *PointInTimeRecoveryManager) DoRecoveryJob() (shouldRequeue bool, err error) {
 	if need, err := p.checkAndInit(); err != nil {
@@ -468,7 +429,7 @@ func (p *PointInTimeRecoveryManager) DoRecoveryJob() (shouldRequeue bool, err er
 	}
 
 	// mount the data+log pvc, and run scripts job to prepare data
-	if err = p.runPhyRecoveryJob(); err != nil {
+	if err = p.runRecoveryJob(); err != nil {
 		if err.Error() == "waiting PVC Bound" {
 			return true, nil
 		}
@@ -487,55 +448,8 @@ func (p *PointInTimeRecoveryManager) DoRecoveryJob() (shouldRequeue bool, err er
 		}
 	}
 
-	// mount the data+log pvc, and run scripts job to prepare data
-	if err = p.runPhyRecoveryJob(); err != nil {
-		if err.Error() == "waiting PVC Bound" {
-			return true, nil
-		}
-		return false, err
-	}
-
 	return false, nil
 
-}
-
-// rollbackClusterStatusToCreating rollback the cluster status to creating after cluster is Running.
-func (p *PointInTimeRecoveryManager) rollbackClusterConfigMaps() error {
-	cluster := p.Cluster
-	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
-		return nil
-	}
-	cmList := corev1.ConfigMapList{}
-	cmLabels := map[string]string{
-		constant.AppInstanceLabelKey: p.Cluster.Name,
-	}
-	if err := p.Client.List(p.Ctx, &cmList,
-		client.InNamespace(p.namespace),
-		client.MatchingLabels(cmLabels)); err != nil {
-		return err
-	}
-	for _, cm := range cmList.Items {
-		patch := client.MergeFrom(cm.DeepCopy())
-		if cm.Annotations == nil {
-			continue
-		}
-		val, ok := cm.Annotations["original-data"]
-		if !ok {
-			continue
-		}
-		delete(cm.Annotations, "original-data")
-		originalData := map[string]string{}
-		if err := json.Unmarshal([]byte(val), &originalData); err != nil {
-			return err
-		}
-		for k, v := range originalData {
-			cm.Data[k] = v
-		}
-		if err := p.Client.Patch(p.Ctx, &cm, patch); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // DoPrepare prepare init container and pvc before point in time recovery
@@ -597,40 +511,6 @@ func (p *PointInTimeRecoveryManager) removeStsInitContainer(
 	return nil
 }
 
-/*
-// MergeConfigMap merge configmap with the config to recover from a point in time.
-func (p *PointInTimeRecoveryManager) MergeConfigMap(configMap *corev1.ConfigMap) error {
-	if need, err := p.checkAndInit(); err != nil {
-		return err
-	} else if !need {
-		return nil
-	}
-
-	recoveryInfo, err := p.getRecoveryInfo()
-	if err != nil {
-		return nil
-	}
-
-	// replace config variables
-	pitrConfigMap := recoveryInfo.Config
-	timeFormat := recoveryInfo.TimeFormat
-	for key, val := range pitrConfigMap {
-		if v, ok := configMap.Data[key]; ok {
-			if configMap.Annotations == nil {
-				configMap.Annotations = map[string]string{}
-			}
-			originDataBytes, _ := json.Marshal(map[string]string{key: configMap.Data[key]})
-			configMap.Annotations["original-data"] = string(originDataBytes)
-			restoreTimeStr := p.restoreTime.Time.UTC().Format(timeFormat)
-			pitrConfigMap[key] = strings.ReplaceAll(val, "$KB_RECOVERY_TIME", restoreTimeStr)
-			// append pitr config map into cluster config
-			configMap.Data[key] = v + "\n" + pitrConfigMap[key]
-		}
-	}
-	return nil
-}
-*/
-
 // DoPITRPrepare prepare init container and pvc before point in time recovery
 func DoPITRPrepare(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
 	if cluster.Status.ObservedGeneration >= 1 {
@@ -682,8 +562,8 @@ func DoPITRCleanup(ctx context.Context, cli client.Client, cluster *appsv1alpha1
 	if err := pitrMgr.cleanupScriptsJob(); err != nil {
 		return err
 	}
-	// rollback cluster status to creating
-	if err := pitrMgr.rollbackClusterConfigMaps(); err != nil {
+	// clean cluster annotations
+	if err := pitrMgr.cleanupClusterAnnotations(); err != nil {
 		return err
 	}
 	return nil

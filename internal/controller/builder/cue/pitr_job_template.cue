@@ -5,6 +5,7 @@ container: {
 	command: [...]
 	args: [...]
 	volumeMounts: [...]
+	env: [...]
 }
 
 job: {

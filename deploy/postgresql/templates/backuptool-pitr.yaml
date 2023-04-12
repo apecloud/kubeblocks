@@ -1,0 +1,45 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupTool
+metadata:
+  labels:
+    clusterdefinition.kubeblocks.io/name: postgresql
+    kubeblocks.io/backup-tool-type: pitr
+    {{- include "postgresql.labels" . | nindent 4 }}
+  name: postgres-pitr
+spec:
+  backupCommands: []
+  deployKind: job
+  env:
+    - name: PGMOUNT
+      value: /home/postgres/pgdata
+    - name: PITR_DIR
+      value: /data/pitr
+    - name: DATA_DIR
+      value: /data/pgroot/data
+    - name: CONF_DIR
+      value: /data/conf
+    - name: LOG_DIR
+      value: /log/pgroot/data/pg_wal
+    - name: RECOVERY_TIME
+      value: $KB_RECOVERY_TIME
+    - name: TIME_FORMAT
+      value: 2006-01-02 15:04:05 MST
+  image: alpine:3.17
+  logical:
+    restoreCommands:
+      - |
+        rm -rf $PITR_DIR/*;
+        rm -f $CONF_DIR/recovery.conf;
+        sync;
+  physical:
+    restoreCommands:
+      - |
+        mkdir -p $PITR_DIR;
+        cp -R $LOG_DIR $PITR_DIR/;
+        chmod 777 -R $PITR_DIR;
+        touch $DATA_DIR/recovery.signal;
+        mkdir -p $CONF_DIR;
+        chmod 777 -R $CONF_DIR;
+        echo -e "restore_command='mv $PGMOUNT/pitr/pg_wal/%f %p'\nrecovery_target_time='$RECOVERY_TIME'\nrecovery_target_action='promote'" > $CONF_DIR/recovery.conf;
+        sync;
+  type: pitr

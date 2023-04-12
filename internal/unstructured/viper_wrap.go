@@ -37,7 +37,7 @@ type viperWrap struct {
 
 func init() {
 	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.Ini, createViper(appsv1alpha1.Ini))
-	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.YAML, createViper(appsv1alpha1.YAML))
+	// CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.YAML, createViper(appsv1alpha1.YAML))
 	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.JSON, createViper(appsv1alpha1.JSON))
 	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.Dotenv, createViper(appsv1alpha1.Dotenv))
 	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.HCL, createViper(appsv1alpha1.HCL))

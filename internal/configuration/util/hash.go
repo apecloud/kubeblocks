@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configuration
+package util
 
 import (
 	"bytes"
@@ -23,19 +23,20 @@ import (
 	"hash/fnv"
 	"io"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 func ComputeHash(object interface{}) (string, error) {
 	objString, err := json.Marshal(object)
 	if err != nil {
-		return "", WrapError(err, "failed to compute hash.")
+		return "", errors.Wrap(err, "failed to compute hash.")
 	}
 
 	// hasher := sha1.New()
 	hasher := fnv.New32()
 	if _, err := io.Copy(hasher, bytes.NewReader(objString)); err != nil {
-		return "", WrapError(err, "failed to compute hash for sha256. [%s]", objString)
+		return "", errors.Wrapf(err, "failed to compute hash for sha256. [%s]", objString)
 	}
 
 	sha := hasher.Sum32()

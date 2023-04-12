@@ -22,9 +22,9 @@ import (
 	"github.com/StudioSol/set"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/apecloud/kubeblocks/internal/unstructured"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
+	"github.com/apecloud/kubeblocks/internal/unstructured"
 )
 
 // CreateConfigPatch creates a patch for configuration files with difference version.
@@ -49,10 +49,10 @@ func CreateConfigPatch(oldVersion, newVersion map[string]string, format appsv1al
 
 func checkExcludeConfigDifference(oldVersion map[string]string, newVersion map[string]string, keys []string) bool {
 	keySet := set.NewLinkedHashSetString(keys...)
-	leftOldKey := Difference(ToSet(oldVersion), keySet)
-	leftNewKey := Difference(ToSet(newVersion), keySet)
+	leftOldKey := util.Difference(util.ToSet(oldVersion), keySet)
+	leftNewKey := util.Difference(util.ToSet(newVersion), keySet)
 
-	if !EqSet(leftOldKey, leftNewKey) {
+	if !util.EqSet(leftOldKey, leftNewKey) {
 		return true
 	}
 

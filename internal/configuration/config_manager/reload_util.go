@@ -17,6 +17,7 @@ limitations under the License.
 package configmanager
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -24,8 +25,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-
-	"github.com/spf13/viper"
+	"text/template/parse"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
@@ -37,39 +37,83 @@ type regexFilter = func(fileName string) bool
 
 const (
 	builtInExecFunctionName           = "exec"
-	builtInUpdateVariableFunctionName = "exec_sql"
+	builtInUpdateVariableFunctionName = "execSql"
+	builtInParamsPatchFunctionName    = "patchParams"
+
+	buildInFilesObjectName = "Files"
 )
 
-func wrapGoTemplateRun(tplName string, tplContent string, updatedParams map[string]string) error {
+type DynamicUpdater = func(ctx context.Context, updatedParams map[string]string) error
+
+func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *appsv1alpha1.FormatterConfig, dataType, dsn string) (DynamicUpdater, error) {
+	tplContent, err := os.ReadFile(tplScriptPath)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkTPLScript(tplScriptPath, string(tplContent)); err != nil {
+		return nil, err
+	}
+	return func(ctx context.Context, updatedParams map[string]string) error {
+		return wrapGoTemplateRun(ctx, tplScriptPath, string(tplContent), updatedParams, formatConfig, dataType, dsn)
+	}, nil
+}
+
+func checkTPLScript(tplName string, tplContent string) error {
+	tr := parse.New(tplName)
+	tr.Mode = parse.SkipFuncCheck
+	_, err := tr.Parse(tplContent, "", "", make(map[string]*parse.Tree))
+	return err
+}
+
+func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent string, updatedParams map[string]string, formatConfig *appsv1alpha1.FormatterConfig, dataType string, dsn string) error {
 	var (
 		err            error
 		commandChannel DynamicParamUpdater
 	)
 
-	if commandChannel, err = NewCommandChannel(viper.GetString(DBType)); err != nil {
+	if commandChannel, err = NewCommandChannel(ctx, dataType, dsn); err != nil {
 		return err
 	}
 	defer commandChannel.Close()
 
 	logger.Info(fmt.Sprintf("update global dynamic params: %v", updatedParams))
 	values := gotemplate.ConstructFunctionArgList(updatedParams)
-	engine := gotemplate.NewTplEngine(&values, constructReloadBuiltinFuncs(commandChannel), tplName, nil, nil)
+	values[buildInFilesObjectName] = newFiles(filepath.Dir(tplScriptPath))
+	engine := gotemplate.NewTplEngine(&values, constructReloadBuiltinFuncs(ctx, commandChannel, formatConfig), tplScriptPath, nil, nil)
 	_, err = engine.Render(tplContent)
 	return err
 }
 
-func constructReloadBuiltinFuncs(cc DynamicParamUpdater) *gotemplate.BuiltInObjectsFunc {
+func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, formatConfig *appsv1alpha1.FormatterConfig) *gotemplate.BuiltInObjectsFunc {
 	return &gotemplate.BuiltInObjectsFunc{
 		builtInExecFunctionName: func(command string, args ...string) (string, error) {
-			execCommand := exec.Command(command, args...)
+			execCommand := exec.CommandContext(ctx, command, args...)
 			stdout, err := cfgcontainer.ExecShellCommand(execCommand)
 			logger.V(1).Info(fmt.Sprintf("command: [%s], output: %s, err: %v", execCommand.String(), stdout, err))
 			return stdout, err
 		},
-		builtInUpdateVariableFunctionName: func(sql string) error {
-			r, err := cc.ExecCommand(sql)
+		builtInUpdateVariableFunctionName: func(sql string, args ...string) error {
+			r, err := cc.ExecCommand(ctx, sql, args...)
 			logger.V(1).Info(fmt.Sprintf("sql: [%s], result: [%v]", sql, r))
 			return err
+		},
+		builtInParamsPatchFunctionName: func(updatedParams map[string]string, basefile, newfile string) error {
+			logger.V(1).Info(fmt.Sprintf("update params: %v, basefile: %s, newfile: %s", updatedParams, basefile, newfile))
+			if len(updatedParams) == 0 {
+				if basefile == newfile {
+					return nil
+				}
+				return copyFileContents(basefile, newfile)
+			}
+			b, err := os.ReadFile(basefile)
+			if err != nil {
+				return err
+			}
+			newConfig, err := cfgutil.ApplyConfigPatch(b, updatedParams, formatConfig)
+			if err != nil {
+				return err
+			}
+			return os.WriteFile(newfile, []byte(newConfig), os.ModePerm)
 		},
 	}
 }

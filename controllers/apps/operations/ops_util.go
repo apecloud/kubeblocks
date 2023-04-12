@@ -68,7 +68,7 @@ func ReconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		completedProgressCount   int32
 		checkAllClusterComponent bool
 	)
-	componentNameMap := opsRequest.GetComponentNameMap()
+	componentNameMap := opsRequest.GetComponentNameSet()
 	// if no specified components, we should check the all components phase of cluster.
 	if len(componentNameMap) == 0 {
 		checkAllClusterComponent = true
@@ -93,7 +93,7 @@ func ReconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		if compStatus.Phase != v.Phase {
 			compStatus.Phase = v.Phase
 		}
-		clusterComponent := opsRes.Cluster.GetComponentByName(k)
+		clusterComponent := opsRes.Cluster.Spec.GetComponentByName(k)
 		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, progressResource{
 			opsMessageKey:       opsMessageKey,
 			clusterComponent:    clusterComponent,

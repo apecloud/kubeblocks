@@ -6,6 +6,7 @@ metadata:
   labels:
     {{- include "weaviate.labels" . | nindent 4 }}
 spec:
+  type: weaviate
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
@@ -31,7 +32,6 @@ spec:
       service:
         ports:
           - name: tcp-weaviate
-            protocol: TCP
             port: 8080
             targetPort: tcp-weaviate
       volumeTypes:
@@ -126,5 +126,3 @@ spec:
                 value: "7000"
               - name: CLUSTER_DATA_BIND_PORT
                 value: "7001"
-              - name: CLUSTER_JOIN
-                value: weaviate-headless.default.svc.cluster.local

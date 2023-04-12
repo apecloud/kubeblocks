@@ -646,11 +646,11 @@ var _ = Describe("Cluster Controller", func() {
 		updatedReplicas := int32(3)
 
 		By("Creating a single component cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVC("1Gi")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -669,14 +669,14 @@ var _ = Describe("Cluster Controller", func() {
 		secondMysqlCompName := mysqlCompName + "1"
 
 		By("Creating a multi components cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVC("1Gi")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(initialReplicas).
 			AddComponent(secondMysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -704,14 +704,14 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(testCtx.CreateObj(testCtx.Ctx, storageClass)).Should(Succeed())
 
 		By("Creating a cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVC("1Gi")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		pvcSpec.StorageClassName = &storageClass.Name
 
 		By("Create cluster and waiting for the cluster initialized")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(replicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -733,7 +733,7 @@ var _ = Describe("Cluster Controller", func() {
 					Labels: map[string]string{
 						constant.AppInstanceLabelKey: clusterKey.Name,
 					}},
-				Spec: pvcSpec,
+				Spec: pvcSpec.ToV1PersistentVolumeClaimSpec(),
 			}
 			Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).Should(Succeed())
 			pvc.Status.Phase = corev1.ClaimBound // only bound pvc allows resize
@@ -959,14 +959,7 @@ var _ = Describe("Cluster Controller", func() {
 		const replicas = 3
 
 		By("Mock a cluster obj")
-		pvcSpec := &corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-		}
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
@@ -1106,11 +1099,11 @@ var _ = Describe("Cluster Controller", func() {
 		updatedReplicas := int32(3)
 
 		By("Creating a cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVC("1Gi")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -1336,17 +1329,16 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(k8sClient.Delete(ctx, deletingPVC)).Should(Succeed())
 
 			By("Creating cluster")
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeEmpty())
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
+			Consistently(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
 
 			By("Removing pvc's finalizers to make it deleted, cleanup the resources")
 			Expect(testapps.ChangeObj(&testCtx, deletingPVC, func() {
@@ -1382,11 +1374,11 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &tmpPVC, true)).Should(Succeed())
 
 			By("Creating cluster")
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -1519,13 +1511,13 @@ var _ = Describe("Cluster Controller", func() {
 		//     with cluster.phase.phase=creating
 		It("Should success with primary sts and secondary sts", func() {
 			By("Mock a cluster obj with replication componentDefRef.")
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
 				SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 				SetReplicas(testapps.DefaultReplicationReplicas).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -1567,9 +1559,9 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("Should successfully doing volume expansion", func() {
 			storageClassName := "test-storage"
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			pvcSpec.StorageClassName = &storageClassName
-			updatedPVCSpec := testapps.NewPVC("2Gi")
+			updatedPVCSpec := testapps.NewPVCSpec("2Gi")
 			updatedPVCSpec.StorageClassName = &storageClassName
 
 			By("Mock a cluster obj with replication componentDefRef.")
@@ -1578,7 +1570,7 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
 				SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 				SetReplicas(testapps.DefaultReplicationReplicas).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -1654,8 +1646,8 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Updating PVC volume size")
 			patch := client.MergeFrom(clusterObj.DeepCopy())
-			componentSpec := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
-			componentSpec.VolumeClaimTemplates[0].Spec = &updatedPVCSpec
+			componentSpec := clusterObj.Spec.GetComponentByName(testapps.DefaultRedisCompName)
+			componentSpec.VolumeClaimTemplates[0].Spec = updatedPVCSpec
 			Expect(testCtx.Cli.Patch(ctx, clusterObj, patch)).Should(Succeed())
 
 			By("Waiting cluster update reconcile succeed")

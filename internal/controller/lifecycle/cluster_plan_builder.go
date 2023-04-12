@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -157,7 +158,34 @@ func (c *clusterPlanBuilder) Validate() error {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
+	// check no dirty resources left by last cluster with same name
+	hasDirtyResources := false
+	if hasDirtyResources, err = c.hasDirtyResources(c.ctx.Ctx, c.cluster); err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+	// if there's any dirty resource, wait for next reconcile loop
+	if hasDirtyResources {
+		return newRequeueError(requeueDuration, "")
+	}
+
 	return nil
+}
+
+func (c *clusterPlanBuilder) hasDirtyResources(ctx context.Context, cluster *appsv1alpha1.Cluster) (bool, error) {
+	// check if there's any deleting pvcs
+	pvcList := corev1.PersistentVolumeClaimList{}
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name,
+	}
+	if err := c.cli.List(ctx, &pvcList, ml); err != nil {
+		return false, err
+	}
+	for _, pvc := range pvcList.Items {
+		if !pvc.DeletionTimestamp.IsZero() {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c *clusterPlanBuilder) handleProvisionStartedCondition() {
@@ -193,6 +221,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	chain := &graph.TransformerChain{
 		// init dag, that is put cluster vertex into dag
 		&initTransformer{cluster: c.cluster, originCluster: &c.originCluster},
+		// fill class related info
+		&fillClass{cc: *cr, cli: c.cli, ctx: c.ctx},
 		// fix cd&cv labels of cluster
 		&fixClusterLabelsTransformer{},
 		// cluster to K8s objects and put them into dag

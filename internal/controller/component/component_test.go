@@ -65,11 +65,11 @@ var _ = Describe("component module", func() {
 				AddInitContainerShort("nginx-init", testapps.NginxImage).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
-			pvcSpec := testapps.NewPVC("1Gi")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
 

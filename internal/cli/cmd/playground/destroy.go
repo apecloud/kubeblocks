@@ -164,10 +164,9 @@ func (o *destroyOptions) destroyCloud() error {
 }
 
 func (o *destroyOptions) removeKubeConfig() error {
-	configPath := util.ConfigPath("config")
-	spinner := printer.Spinner(o.Out, "Remove kubeconfig from %s", configPath)
+	spinner := printer.Spinner(o.Out, "Remove kubeconfig from %s", defaultKubeConfigPath)
 	defer spinner(false)
-	if err := kubeConfigRemove(o.prevCluster.KubeConfig, configPath); err != nil {
+	if err := kubeConfigRemove(o.prevCluster.KubeConfig, defaultKubeConfigPath); err != nil {
 		return err
 	}
 	spinner(true)

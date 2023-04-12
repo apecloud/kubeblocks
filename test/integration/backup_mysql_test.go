@@ -106,12 +106,12 @@ var _ = Describe("MySQL data protection function", func() {
 
 		By("Create a cluster obj")
 
-		pvcSpec := testapps.NewPVC("1Gi")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
 			SetReplicas(1).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))

@@ -236,3 +236,65 @@ func TestMergeUpdatedConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyConfigPatch(t *testing.T) {
+	type args struct {
+		baseCfg           []byte
+		updatedParameters map[string]string
+		formatConfig      *v1alpha1.FormatterConfig
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{{
+		name: "normal_test",
+		args: args{
+			baseCfg: []byte(`[test]
+test=test`),
+			updatedParameters: map[string]string{
+				"a":               "b",
+				"max_connections": "600",
+			},
+			formatConfig: &v1alpha1.FormatterConfig{
+				Format: v1alpha1.Ini,
+				FormatterOptions: v1alpha1.FormatterOptions{
+					IniConfig: &v1alpha1.IniConfig{
+						SectionName: "test",
+					}}},
+		},
+		want: `[test]
+a=b
+max_connections=600
+test=test
+`,
+		wantErr: false,
+	}, {
+		name: "normal_test",
+		args: args{
+			baseCfg: []byte(` `),
+			updatedParameters: map[string]string{
+				"a": "b",
+				"c": "d e f g",
+			},
+			formatConfig: &v1alpha1.FormatterConfig{
+				Format: v1alpha1.RedisCfg,
+			},
+		},
+		want:    "a b\nc d e f g",
+		wantErr: false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ApplyConfigPatch(tt.args.baseCfg, tt.args.updatedParameters, tt.args.formatConfig)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ApplyConfigPatch() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ApplyConfigPatch() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -138,7 +138,7 @@ func workloadCompClusterReconcile(
 
 	// create a component object
 	componentName := operand.GetLabels()[constant.KBAppComponentLabelKey]
-	componentSpec := cluster.GetComponentByName(componentName)
+	componentSpec := cluster.Spec.GetComponentByName(componentName)
 	if componentSpec == nil {
 		return intctrlutil.Reconciled()
 	}

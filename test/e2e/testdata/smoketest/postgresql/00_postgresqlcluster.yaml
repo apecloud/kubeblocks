@@ -5,7 +5,7 @@ kind: Cluster
 metadata:
   name: mycluster
   labels: 
-    helm.sh/chart: pgcluster-0.2.0
+    helm.sh/chart: pgcluster-0.5.0-alpha.3
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "14.7.0"

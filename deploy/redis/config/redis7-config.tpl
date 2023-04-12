@@ -68,3 +68,6 @@ dynamic-hz yes
 aof-rewrite-incremental-fsync yes
 rdb-save-incremental-fsync yes
 jemalloc-bg-thread yes
+enable-debug-command yes
+protected-mode no
+

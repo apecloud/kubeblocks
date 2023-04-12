@@ -30,21 +30,24 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
-	ClusterName        = "fake-cluster-name"
-	Namespace          = "fake-namespace"
-	ClusterVersionName = "fake-cluster-version"
-	ClusterDefName     = "fake-cluster-definition"
-	ComponentName      = "fake-component-name"
-	ComponentDefName   = "fake-component-type"
-	NodeName           = "fake-node-name"
-	SecretName         = "fake-secret-conn-credential"
-	StorageClassName   = "fake-storage-class"
-	PVCName            = "fake-pvc"
+	ClusterName                = "fake-cluster-name"
+	Namespace                  = "fake-namespace"
+	ClusterVersionName         = "fake-cluster-version"
+	ClusterDefName             = "fake-cluster-definition"
+	ComponentName              = "fake-component-name"
+	ComponentDefName           = "fake-component-type"
+	NodeName                   = "fake-node-name"
+	SecretName                 = "fake-secret-conn-credential"
+	StorageClassName           = "fake-storage-class"
+	PVCName                    = "fake-pvc"
+	GeneralClassFamily         = "kb-class-family-general"
+	MemoryOptimizedClassFamily = "kb-class-family-memory-optimized"
 
 	KubeBlocksRepoName  = "fake-kubeblocks-repo"
 	KubeBlocksChartName = "fake-kubeblocks"
@@ -106,7 +109,7 @@ func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1
 					VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 						{
 							Name: "data",
-							Spec: &corev1.PersistentVolumeClaimSpec{
+							Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 								AccessModes: []corev1.PersistentVolumeAccessMode{
 									corev1.ReadWriteOnce,
 								},
@@ -132,7 +135,7 @@ func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1
 					VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 						{
 							Name: "data",
-							Spec: &corev1.PersistentVolumeClaimSpec{
+							Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 								AccessModes: []corev1.PersistentVolumeAccessMode{
 									corev1.ReadWriteOnce,
 								},
@@ -250,6 +253,21 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 		},
 	}
 	return clusterDef
+}
+
+func FakeComponentClassDef(clusterDef *appsv1alpha1.ClusterDefinition, def []byte) *corev1.ConfigMapList {
+	result := &corev1.ConfigMapList{}
+	cm := &corev1.ConfigMap{}
+	cm.Name = fmt.Sprintf("fake-kubeblocks-classes-%s", ComponentName)
+	cm.SetLabels(map[string]string{
+		types.ClassLevelLabelKey:              "component",
+		constant.KBAppComponentDefRefLabelKey: ComponentDefName,
+		types.ClassProviderLabelKey:           "kubeblocks",
+		constant.ClusterDefLabelKey:           clusterDef.Name,
+	})
+	cm.Data = map[string]string{"families-20230223162700": string(def)}
+	result.Items = append(result.Items, *cm)
+	return result
 }
 
 func FakeClusterVersion() *appsv1alpha1.ClusterVersion {
@@ -426,4 +444,26 @@ func FakeKBDeploy(version string) *appsv1.Deployment {
 		deploy.Labels["app.kubernetes.io/version"] = version
 	}
 	return deploy
+}
+
+func FakeAddon(name string) *extensionsv1alpha1.Addon {
+	addon := &extensionsv1alpha1.Addon{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.ExtensionsAPIGroup, types.ExtensionsAPIVersion),
+			Kind:       "Addon",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: Namespace,
+		},
+		Spec: extensionsv1alpha1.AddonSpec{
+			Installable: &extensionsv1alpha1.InstallableSpec{
+				Selectors: []extensionsv1alpha1.SelectorRequirement{
+					{Key: extensionsv1alpha1.KubeGitVersion, Operator: extensionsv1alpha1.Contains, Values: []string{"k3s"}},
+				},
+			},
+		},
+	}
+	addon.SetCreationTimestamp(metav1.Now())
+	return addon
 }

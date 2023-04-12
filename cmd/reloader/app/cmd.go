@@ -19,6 +19,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
@@ -27,23 +28,25 @@ import (
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 )
 
 var logger *zap.SugaredLogger
 
-// NewConfigReloadCommand This command is used to reload configuration
-func NewConfigReloadCommand(ctx context.Context, name string) *cobra.Command {
+// NewConfigManagerCommand This command is used to reload configuration
+func NewConfigManagerCommand(ctx context.Context, name string) *cobra.Command {
 	opt := NewVolumeWatcherOpts()
 	cmd := &cobra.Command{
 		Use:   name,
 		Short: name + " provides a mechanism to implement reload config files in a sidecar for kubeblocks.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runVolumeWatchCommand(ctx, opt)
+			return runConfigManagerCommand(ctx, opt)
 		},
 	}
 
@@ -52,7 +55,7 @@ func NewConfigReloadCommand(ctx context.Context, name string) *cobra.Command {
 	return cmd
 }
 
-func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
+func runConfigManagerCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 	zapLog := initLog(opt.LogLevel)
 	defer func() {
 		_ = zapLog.Sync()
@@ -64,9 +67,6 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 		return err
 	}
 
-	// new volume watcher
-	watcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
-
 	if opt.NotifyHandType == TPLScript && opt.BackupPath == "" {
 		tmpDir, err := os.MkdirTemp(os.TempDir(), "reload-backup-")
 		if err != nil {
@@ -75,28 +75,87 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 		opt.BackupPath = tmpDir
 		defer os.RemoveAll(tmpDir)
 	}
-	defer watcher.Close()
+
+	return run(ctx, opt)
+}
+
+func run(ctx context.Context, opt *VolumeWatcherOpts) error {
+	volumeWatcher, err := startVolumeWatcher(ctx, opt)
+	if err != nil {
+		return err
+	}
+	defer volumeWatcher.Close()
+
+	serviceOpt := opt.ServiceOpt
+	if serviceOpt.ContainerRuntimeEnable || serviceOpt.RemoteOnlineUpdateEnable {
+		if err := startGRPCService(opt, ctx); err != nil {
+			logger.Error(err, "failed to start grpc service.")
+			return err
+		}
+	}
+
+	logger.Info("config manager started.")
+	<-ctx.Done()
+	logger.Info("config manager shutdown.")
+	return nil
+
+}
+
+func startVolumeWatcher(ctx context.Context, opt *VolumeWatcherOpts) (*cfgcore.ConfigMapVolumeWatcher, error) {
+	volumeWatcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
 
 	logger.Info("config backup path: ", opt.BackupPath)
-	eventHandle, err := createHandlerWithWatchType(opt)
+	eventHandle, err := createHandlerWithVolumeWatch(opt)
 	if err != nil {
 		logger.Error(err, "failed to create event handle.")
+		return nil, err
 	}
-	err = watcher.AddHandler(eventHandle).Run()
+	err = volumeWatcher.AddHandler(eventHandle).Run()
 	if err != nil {
 		logger.Error(err, "failed to handle VolumeWatcher.")
+		return nil, err
+	}
+	return volumeWatcher, nil
+}
+
+func startGRPCService(opt *VolumeWatcherOpts, ctx context.Context) error {
+	var (
+		server *grpc.Server
+		proxy  = &reconfigureProxy{opt: opt.ServiceOpt, ctx: ctx, logger: logger.Named("grpcProxy")}
+	)
+
+	if err := proxy.Init(opt); err != nil {
 		return err
 	}
 
-	logger.Info("reload started.")
-	<-ctx.Done()
-	logger.Info("reload shutdown.")
+	tcpSpec := fmt.Sprintf("%s:%d", proxy.opt.PodIP, proxy.opt.GrpcPort)
 
+	logger.Infof("starting reconfigure service: %s", tcpSpec)
+	listener, err := net.Listen("tcp", tcpSpec)
+	if err != nil {
+		return cfgutil.WrapError(err, "failed to create listener: [%s]", tcpSpec)
+	}
+
+	server = grpc.NewServer(grpc.UnaryInterceptor(logUnaryServerInterceptor))
+	cfgproto.RegisterReconfigureServer(server, proxy)
+
+	go func() {
+		if err := server.Serve(listener); err != nil {
+			logger.Error(err, "failed to serve connections from cri")
+			os.Exit(1)
+		}
+	}()
+	logger.Info("reconfigure service started.")
 	return nil
 }
 
+func logUnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	logger.Debugf("info: [%+v]", info)
+	return handler(ctx, req)
+}
+
 func checkOptions(opt *VolumeWatcherOpts) error {
-	if len(opt.VolumeDirs) == 0 {
+	if len(opt.VolumeDirs) == 0 && opt.NotifyHandType != TPLScript {
 		return cfgutil.MakeError("require volume directory is null.")
 	}
 
@@ -117,6 +176,8 @@ func checkOptions(opt *VolumeWatcherOpts) error {
 type TplScriptConfig struct {
 	Scripts         string                       `json:"scripts"`
 	FileRegex       string                       `json:"fileRegex"`
+	DataType        string                       `json:"dataType"`
+	DSN             string                       `json:"dsn"`
 	FormatterConfig appsv1alpha1.FormatterConfig `json:"formatterConfig"`
 }
 
@@ -139,6 +200,8 @@ func checkTPLScriptOptions(opt *VolumeWatcherOpts) error {
 	}
 
 	opt.FormatterConfig = &tplConfig.FormatterConfig
+	opt.DSN = tplConfig.DSN
+	opt.DataType = tplConfig.DataType
 	opt.FileRegex = tplConfig.FileRegex
 	opt.TPLScriptPath = filepath.Join(filepath.Dir(opt.TPLConfig), tplConfig.Scripts)
 	return nil
@@ -172,7 +235,7 @@ func initLog(level string) *zap.Logger {
 	return zapLog
 }
 
-func createHandlerWithWatchType(opt *VolumeWatcherOpts) (cfgcore.WatchEventHandler, error) {
+func createHandlerWithVolumeWatch(opt *VolumeWatcherOpts) (cfgcore.WatchEventHandler, error) {
 	logger.Infof("access info: [%d] [%s]", opt.NotifyHandType, opt.ProcessName)
 	switch opt.NotifyHandType {
 	case UnixSignal:
@@ -180,7 +243,7 @@ func createHandlerWithWatchType(opt *VolumeWatcherOpts) (cfgcore.WatchEventHandl
 	case ShellTool:
 		return cfgcore.CreateExecHandler(opt.Command)
 	case TPLScript:
-		return cfgcore.CreateTPLScriptHandler(opt.TPLScriptPath, opt.VolumeDirs, opt.FileRegex, opt.BackupPath, opt.FormatterConfig)
+		return cfgcore.CreateTPLScriptHandler(opt.TPLScriptPath, opt.VolumeDirs, opt.FileRegex, opt.BackupPath, opt.FormatterConfig, opt.DataType, opt.DSN)
 	case SQL, WebHook:
 		return nil, cfgutil.MakeError("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
 	default:

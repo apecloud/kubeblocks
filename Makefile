@@ -157,20 +157,20 @@ cue-fmt: cuetool ## Run cue fmt against code.
 	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fmt
 	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fix
 
-.PHONY: fast-lint
-fast-lint: golangci staticcheck vet  # [INTERNAL] fast lint
+.PHONY: lint-fast
+lint-fast: golangci staticcheck vet  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
 lint: test-go-generate generate ## Run golangci-lint against code.
-	$(MAKE) fast-lint
+	$(MAKE) lint-fast
 
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code.
 	$(STATICCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports fast-lint ## Run build checks.
+build-checks: generate fmt vet goimports lint-fast ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -269,7 +269,6 @@ kbcli-doc: generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 
-
 ##@ Operator Controller Manager
 
 .PHONY: manager
@@ -301,8 +300,6 @@ ARGUMENTS=
 DEBUG_PORT=2345
 run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
-
-
 ##@ Deployment
 
 ifndef ignore-not-found
@@ -312,12 +309,10 @@ endif
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	($(KUSTOMIZE) build config/crd | kubectl replace -f -) || ($(KUSTOMIZE) build config/crd | kubectl create -f -)
-	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl apply -f -
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
-	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
@@ -397,6 +392,8 @@ bump-chart-ver: \
 	bump-single-chart-ver.milvus \
 	bump-single-chart-ver.qdrant \
 	bump-single-chart-ver.qdrant-cluster \
+	bump-single-chart-ver.weaviate \
+	bump-single-chart-ver.weaviate-cluster \
 	bump-single-chart-ver.chatgpt-retrieval-plugin
 bump-chart-ver: ## Bump helm chart version.
 
@@ -750,7 +747,7 @@ endif
 .PHONY: render-smoke-testdata-manifests
 render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
-	$(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
 	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
 	$(HELM) template mycluster deploy/redis-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
 

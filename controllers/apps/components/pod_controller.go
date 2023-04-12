@@ -95,6 +95,9 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	// sync leader status from cluster.status
 	patch := client.MergeFrom(pod.DeepCopy())
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
 	pod.Annotations[constant.LeaderAnnotationKey] = componentStatus.ConsensusSetStatus.Leader.Pod
 	if err = r.Client.Patch(reqCtx.Ctx, pod, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

@@ -19,6 +19,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +45,7 @@ func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
 		KBCLIApp: version.GetVersion(),
 	}
 
-	if client == nil {
+	if client == nil || reflect.ValueOf(client).IsNil() {
 		return versionInfo, nil
 	}
 

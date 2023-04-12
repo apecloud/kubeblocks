@@ -20,7 +20,8 @@ import (
 	"context"
 
 	"github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -99,15 +100,14 @@ func GetClusterObservedGeneration(testCtx *testutil.TestContext, clusterKey type
 	}
 }
 
-func GetClusterConditionStatus(testCtx *testutil.TestContext, clusterKey types.NamespacedName, condType string) func(gomega.Gomega) metav1.ConditionStatus {
-	return func(g gomega.Gomega) metav1.ConditionStatus {
-		cluster := &appsv1alpha1.Cluster{}
-		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(gomega.Succeed())
-		for _, cond := range cluster.Status.Conditions {
-			if cond.Type == condType {
-				return cond.Status
-			}
-		}
-		return metav1.ConditionUnknown
+// NewPVCSpec create appsv1alpha1.PersistentVolumeClaimSpec.
+func NewPVCSpec(size string) appsv1alpha1.PersistentVolumeClaimSpec {
+	return appsv1alpha1.PersistentVolumeClaimSpec{
+		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse(size),
+			},
+		},
 	}
 }

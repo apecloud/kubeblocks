@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
+  type: mysql
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
@@ -49,9 +50,12 @@ spec:
         followers:
           - name: follower
             accessMode: Readonly
+        learner:
+          name: learner
+          accessMode: Readonly
       service:
         ports:
-          - protocol: TCP
+          - name: mysql
             port: 3306
             targetPort: mysql
       horizontalScalePolicy:

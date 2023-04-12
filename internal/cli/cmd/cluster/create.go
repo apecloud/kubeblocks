@@ -238,6 +238,10 @@ func (o *CreateOptions) Validate() error {
 			return fmt.Errorf("failed to generate a random cluster name")
 		}
 		o.Name = name
+	} else {
+		if len(o.Name) > 16 {
+			return fmt.Errorf("cluster name must be no more than 16 characters")
+		}
 	}
 	return nil
 }

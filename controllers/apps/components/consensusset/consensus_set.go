@@ -33,12 +33,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type ConsensusSet struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
-}
+type ConsensusSet types.ComponentBase
 
 var _ types.Component = &ConsensusSet{}
 
@@ -95,7 +90,7 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 	if compStatus.PodsReadyTime == nil {
 		return true, nil
 	}
-	if !util.IsProbeTimeout(r.componentDef, compStatus.PodsReadyTime) {
+	if !util.IsProbeTimeout(r.ComponentDef, compStatus.PodsReadyTime) {
 		return true, nil
 	}
 
@@ -111,7 +106,7 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, pod := range podList.Items {
 		role := pod.Labels[constant.RoleLabelKey]
-		if role == r.componentDef.ConsensusSpec.Leader.Name {
+		if role == r.ComponentDef.ConsensusSpec.Leader.Name {
 			isFailed = false
 		}
 		if role == "" {
@@ -158,7 +153,7 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 	var (
 		existLatestRevisionFailedPod bool
 		leaderIsReady                bool
-		consensusSpec                = r.componentDef.ConsensusSpec
+		consensusSpec                = r.ComponentDef.ConsensusSpec
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
@@ -261,11 +256,11 @@ func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) erro
 	}
 	return nil
 }
-func NewConsensusSet(
+func NewConsensusComponent(
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (*ConsensusSet, error) {
+	componentDef appsv1alpha1.ClusterComponentDefinition) (types.Component, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
@@ -273,6 +268,6 @@ func NewConsensusSet(
 		Cli:          cli,
 		Cluster:      cluster,
 		Component:    component,
-		componentDef: &componentDef,
+		ComponentDef: &componentDef,
 	}, nil
 }

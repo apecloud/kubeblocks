@@ -200,7 +200,7 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 		return 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of deployment to be synchronized")
 	}
 
-	currComponent, err := stateless.NewStateless(cli, opsRes.Cluster,
+	currComponent, err := stateless.NewStatelessComponent(cli, opsRes.Cluster,
 		pgRes.clusterComponent, *pgRes.clusterComponentDef)
 	if err != nil {
 		return 0, err

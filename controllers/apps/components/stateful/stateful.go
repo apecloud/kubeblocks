@@ -33,12 +33,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type Stateful struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
-}
+type Stateful types.ComponentBase
 
 var _ types.Component = &Stateful{}
 
@@ -95,12 +90,12 @@ func (stateful *Stateful) HandleUpdate(ctx context.Context, obj client.Object) e
 	return nil
 }
 
-func NewStateful(
+func NewStatefulComponent(
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
 	componentDef appsv1alpha1.ClusterComponentDefinition,
-) (*Stateful, error) {
+) (types.Component, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
@@ -108,6 +103,6 @@ func NewStateful(
 		Cli:          cli,
 		Cluster:      cluster,
 		Component:    component,
-		componentDef: &componentDef,
+		ComponentDef: &componentDef,
 	}, nil
 }

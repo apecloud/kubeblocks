@@ -34,12 +34,7 @@ import (
 )
 
 // ReplicationSet is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec
-type ReplicationSet struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
-}
+type ReplicationSet types.ComponentBase
 
 var _ types.Component = &ReplicationSet{}
 
@@ -209,12 +204,12 @@ func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) er
 	return r.Cli.Status().Patch(ctx, r.Cluster, client.MergeFrom(clusterDeepCopy))
 }
 
-// NewReplicationSet creates a new ReplicationSet object.
-func NewReplicationSet(
+// NewReplicationComponent creates a new ReplicationSet object.
+func NewReplicationComponent(
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (*ReplicationSet, error) {
+	componentDef appsv1alpha1.ClusterComponentDefinition) (types.Component, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
@@ -222,6 +217,6 @@ func NewReplicationSet(
 		Cli:          cli,
 		Cluster:      cluster,
 		Component:    component,
-		componentDef: &componentDef,
+		ComponentDef: &componentDef,
 	}, nil
 }

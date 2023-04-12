@@ -139,7 +139,7 @@ var _ = Describe("Replication Component", func() {
 			compDefName := clusterObj.Spec.GetComponentDefRefName(testapps.DefaultRedisCompName)
 			componentDef := clusterDefObj.GetComponentDefByName(compDefName)
 			component := clusterObj.Spec.GetComponentByName(testapps.DefaultRedisCompName)
-			replicationComponent, err := NewReplicationSet(k8sClient, clusterObj, component, *componentDef)
+			replicationComponent, err := NewReplicationComponent(k8sClient, clusterObj, component, *componentDef)
 			Expect(err).Should(Succeed())
 			var podList []*corev1.Pod
 			for _, availableReplica := range []int32{0, 1} {

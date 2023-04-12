@@ -42,12 +42,7 @@ import (
 // is at least the minimum available pods that need to run for the deployment.
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
-type Stateless struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
-}
+type Stateless types.ComponentBase
 
 var _ types.Component = &Stateless{}
 
@@ -104,11 +99,11 @@ func (stateless *Stateless) HandleUpdate(ctx context.Context, obj client.Object)
 	return nil
 }
 
-func NewStateless(
+func NewStatelessComponent(
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (*Stateless, error) {
+	componentDef appsv1alpha1.ClusterComponentDefinition) (types.Component, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
@@ -116,7 +111,7 @@ func NewStateless(
 		Cli:          cli,
 		Cluster:      cluster,
 		Component:    component,
-		componentDef: &componentDef,
+		ComponentDef: &componentDef,
 	}, nil
 }
 

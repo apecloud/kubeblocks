@@ -79,6 +79,9 @@ var clusterCreateExample = templates.Examples(`
 	# Create a cluster and set class to general-1c4g
 	kbcli cluster create myclsuter --cluster-definition apecloud-mysql --set class=general-1c4g
 
+	# Create a cluster with replicationSet workloadType and set switchPolicy to Noop
+	kbcli cluster create myclsuter --cluster-definition postgresql --set switchPolicy=Noop
+
 	# Create a cluster and use a URL to set cluster resource
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/my.yaml
 

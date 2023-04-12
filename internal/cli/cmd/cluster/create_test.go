@@ -181,6 +181,11 @@ var _ = Describe("create", func() {
 		comps, err := buildClusterComp(cd, setsMap)
 		Expect(err).Should(Succeed())
 		checkComponent(comps, "10Gi", 10, "10", "2Gi")
+
+		setsMap[testing.ComponentDefName][keySwitchPolicy] = "invalid"
+		cd.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
+		_, err = buildClusterComp(cd, setsMap)
+		Expect(err).Should(HaveOccurred())
 	})
 
 	It("build component and set values map", func() {
@@ -314,16 +319,6 @@ var _ = Describe("create", func() {
 					},
 				},
 				true,
-			},
-			{
-				[]string{"switchPolicy=invalid"},
-				[]string{"my-comp"},
-				map[string]map[setKey]string{
-					"my-comp": {
-						keySwitchPolicy: "MaximumAvailability",
-					},
-				},
-				false,
 			},
 		}
 

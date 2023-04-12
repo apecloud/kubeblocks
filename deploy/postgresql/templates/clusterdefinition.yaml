@@ -182,6 +182,8 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+              - name: PGUSER_STANDBY
+                value: standby
               - name: PGPASSWORD_STANDBY
                 valueFrom:
                   secretKeyRef:

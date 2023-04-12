@@ -18,14 +18,14 @@ package graph
 
 // Validator validate everything is ok before Build the plan
 type Validator interface {
-	Validate() error
+	Validate(dag *DAG) error
 }
 
 type ValidatorChain []Validator
 
-func (v *ValidatorChain) WalkThrough() error {
+func (v *ValidatorChain) WalkThrough(dag *DAG) error {
 	for _, validator := range *v {
-		if err := validator.Validate(); err != nil {
+		if err := validator.Validate(dag); err != nil {
 			return err
 		}
 	}

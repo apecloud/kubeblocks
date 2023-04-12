@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"reflect"
 	"strings"
 
@@ -47,6 +48,14 @@ func conditionIsChanged(oldCondition *metav1.Condition, newCondition metav1.Cond
 		newCondition.LastTransitionTime = oldCondition.LastTransitionTime
 	}
 	return !reflect.DeepEqual(oldCondition, &newCondition)
+}
+
+func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName string, clusterGeneration int64, err error) {
+	condition := newProvisioningStartedCondition(clusterName, clusterGeneration)
+	if err != nil {
+		condition = newFailedProvisioningStartedCondition(err.Error(), ReasonPreCheckFailed)
+	}
+	meta.SetStatusCondition(conditions, condition)
 }
 
 // newProvisioningStartedCondition creates the provisioning started condition in cluster conditions.

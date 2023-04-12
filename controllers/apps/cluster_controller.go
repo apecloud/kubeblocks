@@ -132,19 +132,59 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if re, ok := err.(lifecycle.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
+	// TODO: builder context design
 	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req, r.Recorder)
+
 	if err := planBuilder.Init(); err != nil {
 		return requeueError(err)
-	} else if err := planBuilder.Validate(); err != nil {
-		return requeueError(err)
-	} else if plan, err := planBuilder.Build(); err != nil {
-		return requeueError(err)
-	} else if err = plan.Execute(); err != nil {
+	}
+
+	plan, err := planBuilder.
+		AddValidator(
+			&lifecycle.RefResourcesValidator{},
+			&lifecycle.EnableLogsValidator{},
+		).
+		AddTransformer(
+			&lifecycle.ClusterDeletionTransformer{},
+			//	// fill class related info
+			//	&fillClass{cc: *cr, cli: c.cli, ctx: c.ctx},
+			//	// fix cd&cv labels of cluster
+			//	&fixClusterLabelsTransformer{},
+			//	// cluster to K8s objects and put them into dag
+			//	&clusterTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
+			//	// tls certs secret
+			//	&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
+			//	// add our finalizer to all objects
+			//	&ownershipTransformer{finalizer: dbClusterFinalizerName},
+			//	// make all workload objects depending on credential secret
+			//	&credentialTransformer{},
+			//	// make config configmap immutable
+			//	&configTransformer{},
+			//	// read old snapshot from cache, and generate diff plan
+			//	&objectActionTransformer{cli: roClient, ctx: c.ctx},
+			//	// handle TerminationPolicyType=DoNotTerminate
+			//	&doNotTerminateTransformer{},
+			//	// horizontal scaling
+			//	&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
+			//	// stateful set pvc Update
+			//	&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
+			//	// replication set horizontal scaling
+			//	&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
+			//	// finally, update cluster status
+			//	newClusterStatusTransformer(c.ctx, c.cli, c.recorder, *cr),
+		).
+		Build()
+	if err != nil {
 		return requeueError(err)
 	}
+
+	if err = plan.Execute(); err != nil {
+		return requeueError(err)
+	}
+
 	return intctrlutil.Reconciled()
 }
 

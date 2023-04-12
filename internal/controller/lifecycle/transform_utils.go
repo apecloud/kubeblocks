@@ -161,3 +161,7 @@ func isTypeOf[T interface{}](obj client.Object) bool {
 	_, ok := obj.(T)
 	return ok
 }
+
+func isFastReturnErr(err error) bool {
+	return err == FastReturnError
+}

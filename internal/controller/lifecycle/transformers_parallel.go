@@ -17,29 +17,31 @@ limitations under the License.
 package lifecycle
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"fmt"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"sync"
 )
 
-type EnableLogsValidator struct {
-	cr clusterRefResources
+type ParallelTransformers struct {
+	transformers []graph.Transformer
 }
 
-func (e *EnableLogsValidator) Validate(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
-	if err != nil {
-		return err
+func (t *ParallelTransformers) Transform(dag *graph.DAG) error {
+	var group sync.WaitGroup
+	var errs error
+	for _, transformer := range t.transformers {
+		group.Add(1)
+		go func() {
+			err := transformer.Transform(dag)
+			if err != nil {
+				// TODO: sync.Mutex errs
+				errs = fmt.Errorf("%v; %v", errs, err)
+			}
+			group.Done()
+		}()
 	}
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-	if isClusterDeleting(*cluster) {
-		return nil
-	}
-
-	// validate config and send warning event log necessarily
-	err = cluster.Spec.ValidateEnabledLogs(&e.cr.cd)
-	setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
-
-	return err
+	group.Wait()
+	return errs
 }
 
-var _ graph.Validator = &EnableLogsValidator{}
+var _ graph.Transformer = &ParallelTransformers{}

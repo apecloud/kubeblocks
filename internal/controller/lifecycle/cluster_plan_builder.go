@@ -37,29 +37,26 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
+	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation
 type clusterPlanBuilder struct {
-	ctx           intctrlutil.RequestCtx
-	cli           client.Client
-	req           ctrl.Request
-	recorder      record.EventRecorder
-	cluster       *appsv1alpha1.Cluster
-	originCluster appsv1alpha1.Cluster
+	ctx          intctrlutil.RequestCtx
+	cli          client.Client
+	req          ctrl.Request
+	recorder     record.EventRecorder
+	refResources clusterRefResources
+	transformers graph.TransformerChain
+	validators   graph.ValidatorChain
 }
 
 // clusterPlan a graph.Plan implementation for Cluster reconciliation
 type clusterPlan struct {
-	ctx      intctrlutil.RequestCtx
-	cli      client.Client
-	recorder record.EventRecorder
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
-	cluster  *appsv1alpha1.Cluster
 }
 
 var _ graph.PlanBuilder = &clusterPlanBuilder{}
@@ -70,94 +67,32 @@ func (c *clusterPlanBuilder) Init() error {
 	if err := c.cli.Get(c.ctx.Ctx, c.req.NamespacedName, cluster); err != nil {
 		return err
 	}
-	c.cluster = cluster
-	c.originCluster = *cluster.DeepCopy()
-	// handles the cluster phase and ops condition first to indicates what the current cluster is doing.
-	c.handleClusterPhase()
-	c.handleLatestOpsRequestProcessingCondition()
+
+	c.transformers = append(c.transformers, &initTransformer{
+		cluster: cluster,
+		originCluster: cluster.DeepCopy(),
+	})
 	return nil
 }
 
-// updateClusterPhase handles the cluster phase and ops condition first to indicates what the current cluster is doing.
-func (c *clusterPlanBuilder) handleClusterPhase() {
-	clusterPhase := c.cluster.Status.Phase
-	if isClusterUpdating(*c.cluster) {
-		if clusterPhase == "" {
-			c.cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
-		} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
-			c.cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
-		}
-	}
+func (c *clusterPlanBuilder) AddValidator(validator ...graph.Validator) graph.PlanBuilder {
+	c.validators = append(c.validators, validator...)
+	return c
 }
 
-// updateLatestOpsRequestProcessingCondition handles the latest opsRequest processing condition.
-func (c *clusterPlanBuilder) handleLatestOpsRequestProcessingCondition() {
-	opsRecords, _ := opsutil.GetOpsRequestSliceFromCluster(c.cluster)
-	if len(opsRecords) == 0 {
-		return
-	}
-	ops := opsRecords[0]
-	opsBehaviour, ok := appsv1alpha1.OpsRequestBehaviourMapper[ops.Type]
-	if !ok {
-		return
-	}
-	opsCondition := newOpsRequestProcessingCondition(ops.Name, string(ops.Type), opsBehaviour.ProcessingReasonInClusterCondition)
-	oldCondition := meta.FindStatusCondition(c.cluster.Status.Conditions, opsCondition.Type)
-	if oldCondition == nil {
-		// if this condition not exists, insert it to the first position.
-		opsCondition.LastTransitionTime = metav1.Now()
-		c.cluster.Status.Conditions = append([]metav1.Condition{opsCondition}, c.cluster.Status.Conditions...)
-	} else {
-		meta.SetStatusCondition(&c.cluster.Status.Conditions, opsCondition)
-	}
+func (c *clusterPlanBuilder) AddParallelValidator(validator ...graph.Validator) graph.PlanBuilder {
+	c.validators = append(c.validators, &ParallelValidators{validators: validator})
+	return c
 }
 
-func (c *clusterPlanBuilder) Validate() error {
-	var err error
-	defer func() {
-		if err != nil {
-			_ = c.updateClusterStatusWithCondition(newFailedProvisioningStartedCondition(err.Error(), ReasonPreCheckFailed))
-		}
-	}()
+func (c *clusterPlanBuilder) AddTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
+	c.transformers = append(c.transformers, transformer...)
+	return c
+}
 
-	validateExistence := func(key client.ObjectKey, object client.Object) error {
-		err = c.cli.Get(c.ctx.Ctx, key, object)
-		if err != nil {
-			return newRequeueError(requeueDuration, err.Error())
-		}
-		return nil
-	}
-
-	// validate cd & cv existences
-	cd := &appsv1alpha1.ClusterDefinition{}
-	if err = validateExistence(types.NamespacedName{Name: c.cluster.Spec.ClusterDefRef}, cd); err != nil {
-		return err
-	}
-	var cv *appsv1alpha1.ClusterVersion
-	if len(c.cluster.Spec.ClusterVersionRef) > 0 {
-		cv = &appsv1alpha1.ClusterVersion{}
-		if err = validateExistence(types.NamespacedName{Name: c.cluster.Spec.ClusterVersionRef}, cv); err != nil {
-			return err
-		}
-	}
-
-	// validate cd & cv availability
-	if cd.Status.Phase != appsv1alpha1.AvailablePhase || (cv != nil && cv.Status.Phase != appsv1alpha1.AvailablePhase) {
-		message := fmt.Sprintf("ref resource is unavailable, this problem needs to be solved first. cd: %v, cv: %v", cd, cv)
-		err = errors.New(message)
-		return newRequeueError(requeueDuration, message)
-	}
-
-	// validate logs
-	// and a sample validator chain
-	chain := &graph.ValidatorChain{
-		&enableLogsValidator{cluster: c.cluster, clusterDef: cd},
-	}
-	if err = chain.WalkThrough(); err != nil {
-		return newRequeueError(requeueDuration, err.Error())
-	}
-
-	return nil
+func (c *clusterPlanBuilder) AddParallelTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
+	c.transformers = append(c.transformers, &ParallelTransformers{transformers: transformer})
+	return c
 }
 
 func (c *clusterPlanBuilder) handleProvisionStartedCondition() {
@@ -172,8 +107,6 @@ func (c *clusterPlanBuilder) handleProvisionStartedCondition() {
 
 // Build only cluster Creation, Update and Deletion supported.
 func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
-	// set provisioning cluster condition
-	c.handleProvisionStartedCondition()
 	var err error
 	defer func() {
 		if err != nil {
@@ -186,56 +119,59 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	if err != nil {
 		return nil, err
 	}
-	var roClient types2.ReadonlyClient = delegateClient{Client: c.cli}
+	var roClient roclient.ReadonlyClient = delegateClient{Client: c.cli}
 
 	// TODO: remove all cli & ctx fields from transformers, keep them in pure-dag-manipulation form
 	// build transformer chain
-	chain := &graph.TransformerChain{
-		// init dag, that is put cluster vertex into dag
-		&initTransformer{cluster: c.cluster, originCluster: &c.originCluster},
-		// fill class related info
-		&fillClass{cc: *cr, cli: c.cli, ctx: c.ctx},
-		// fix cd&cv labels of cluster
-		&fixClusterLabelsTransformer{},
-		// cluster to K8s objects and put them into dag
-		&clusterTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
-		// tls certs secret
-		&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
-		// add our finalizer to all objects
-		&ownershipTransformer{finalizer: dbClusterFinalizerName},
-		// make all workload objects depending on credential secret
-		&credentialTransformer{},
-		// make config configmap immutable
-		&configTransformer{},
-		// read old snapshot from cache, and generate diff plan
-		&objectActionTransformer{cli: roClient, ctx: c.ctx},
-		// handle TerminationPolicyType=DoNotTerminate
-		&doNotTerminateTransformer{},
-		// horizontal scaling
-		&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
-		// stateful set pvc Update
-		&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
-		// replication set horizontal scaling
-		&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
-		// finally, update cluster status
-		newClusterStatusTransformer(c.ctx, c.cli, c.recorder, *cr),
-	}
+	//chain := &graph.TransformerChain{
+	//	// init dag, that is put cluster vertex into dag
+	//	&initTransformer{cluster: c.cluster, originCluster: &c.originCluster},
+	//	// fill class related info
+	//	&fillClass{cc: *cr, cli: c.cli, ctx: c.ctx},
+	//	// fix cd&cv labels of cluster
+	//	&fixClusterLabelsTransformer{},
+	//	// cluster to K8s objects and put them into dag
+	//	&clusterTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
+	//	// tls certs secret
+	//	&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
+	//	// add our finalizer to all objects
+	//	&ownershipTransformer{finalizer: dbClusterFinalizerName},
+	//	// make all workload objects depending on credential secret
+	//	&credentialTransformer{},
+	//	// make config configmap immutable
+	//	&configTransformer{},
+	//	// read old snapshot from cache, and generate diff plan
+	//	&objectActionTransformer{cli: roClient, ctx: c.ctx},
+	//	// handle TerminationPolicyType=DoNotTerminate
+	//	&doNotTerminateTransformer{},
+	//	// horizontal scaling
+	//	&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
+	//	// stateful set pvc Update
+	//	&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
+	//	// replication set horizontal scaling
+	//	&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
+	//	// finally, update cluster status
+	//	newClusterStatusTransformer(c.ctx, c.cli, c.recorder, *cr),
+	//}
 
 	// new a DAG and apply chain on it, after that we should get the final Plan
 	dag := graph.NewDAG()
-	if err = chain.ApplyTo(dag); err != nil {
+	err = c.validators.WalkThrough(dag)
+	if err != nil && !isFastReturnErr(err) {
 		return nil, err
+	}
+	if !isFastReturnErr(err) {
+		// TODO: load cr
+		if err = c.transformers.ApplyTo(dag); err != nil && !isFastReturnErr(err) {
+			return nil, err
+		}
 	}
 
 	c.ctx.Log.Info(fmt.Sprintf("DAG: %s", dag))
 	// we got the execution plan
 	plan := &clusterPlan{
-		ctx:      c.ctx,
-		cli:      c.cli,
-		recorder: c.recorder,
 		dag:      dag,
 		walkFunc: c.defaultWalkFunc,
-		cluster:  c.cluster,
 	}
 	return plan, nil
 }

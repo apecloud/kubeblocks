@@ -21,25 +21,22 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-type EnableLogsValidator struct {
-	cr clusterRefResources
+type ClusterDeletionTransformer struct {
+
 }
 
-func (e *EnableLogsValidator) Validate(dag *graph.DAG) error {
+func (t *ClusterDeletionTransformer) Transform(dag *graph.DAG) error {
 	rootVertex, err := findRootVertex(dag)
 	if err != nil {
 		return err
 	}
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-	if isClusterDeleting(*cluster) {
+	cluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+	if !isClusterDeleting(*cluster) {
 		return nil
 	}
-
-	// validate config and send warning event log necessarily
-	err = cluster.Spec.ValidateEnabledLogs(&e.cr.cd)
-	setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
-
-	return err
+	// TODO: implementation
+	panic("implementation ClusterDeletionTransformer")
+	return nil
 }
 
-var _ graph.Validator = &EnableLogsValidator{}
+var _ graph.Transformer = &ClusterDeletionTransformer{}

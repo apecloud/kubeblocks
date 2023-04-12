@@ -189,7 +189,8 @@ var _ = Describe("create", func() {
 			var comps []appsv1alpha1.ClusterComponentDefinition
 			for _, n := range compDefNames {
 				comp := appsv1alpha1.ClusterComponentDefinition{
-					Name: n,
+					Name:         n,
+					WorkloadType: appsv1alpha1.Replication,
 				}
 				comps = append(comps, comp)
 			}
@@ -303,6 +304,26 @@ var _ = Describe("create", func() {
 					},
 				},
 				true,
+			},
+			{
+				[]string{"switchPolicy=MaximumAvailability"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keySwitchPolicy: "MaximumAvailability",
+					},
+				},
+				true,
+			},
+			{
+				[]string{"switchPolicy=invalid"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keySwitchPolicy: "MaximumAvailability",
+					},
+				},
+				false,
 			},
 		}
 

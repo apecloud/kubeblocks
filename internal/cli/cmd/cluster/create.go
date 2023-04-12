@@ -107,13 +107,14 @@ const (
 type setKey string
 
 const (
-	keyType     setKey = "type"
-	keyCPU      setKey = "cpu"
-	keyClass    setKey = "class"
-	keyMemory   setKey = "memory"
-	keyReplicas setKey = "replicas"
-	keyStorage  setKey = "storage"
-	keyUnknown  setKey = "unknown"
+	keyType         setKey = "type"
+	keyCPU          setKey = "cpu"
+	keyClass        setKey = "class"
+	keyMemory       setKey = "memory"
+	keyReplicas     setKey = "replicas"
+	keyStorage      setKey = "storage"
+	keySwitchPolicy setKey = "switchPolicy"
+	keyUnknown      setKey = "unknown"
 )
 
 type envSet struct {
@@ -459,7 +460,6 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				return v
 			}
 		}
-
 		// get value from environment variables
 		env := setKeyEnvMap[key]
 		val := viper.GetString(env.name)
@@ -467,6 +467,27 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 			val = env.defaultVal
 		}
 		return val
+	}
+
+	buildSwitchPolicy := func(c *appsv1alpha1.ClusterComponentDefinition, compObj *appsv1alpha1.ClusterComponentSpec, sets map[setKey]string) error {
+		if c.WorkloadType != appsv1alpha1.Replication {
+			return nil
+		}
+		var switchPolicyType appsv1alpha1.SwitchPolicyType
+		switch getVal(keySwitchPolicy, sets) {
+		case "Noop", "":
+			switchPolicyType = appsv1alpha1.Noop
+		case "MaximumAvailability":
+			switchPolicyType = appsv1alpha1.MaximumAvailability
+		case "MaximumPerformance":
+			switchPolicyType = appsv1alpha1.MaximumDataProtection
+		default:
+			return fmt.Errorf("switchPolicy is illegal")
+		}
+		compObj.SwitchPolicy = &appsv1alpha1.ClusterSwitchPolicy{
+			Type: switchPolicyType,
+		}
+		return nil
 	}
 
 	var comps []*appsv1alpha1.ClusterComponentSpec
@@ -509,6 +530,9 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				},
 			}},
 		}
+		if err := buildSwitchPolicy(&c, compObj, sets); err != nil {
+			return nil, err
+		}
 		comps = append(comps, compObj)
 	}
 	return comps, nil
@@ -518,7 +542,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 // specified in the set, use the cluster definition default component name.
 func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
-	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass)}
+	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keySwitchPolicy)}
 	parseKey := func(key string) setKey {
 		for _, k := range keys {
 			if strings.EqualFold(k, key) {

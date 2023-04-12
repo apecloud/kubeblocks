@@ -40,9 +40,9 @@ const ComponentClassTemplate = `
   # class schema template variables
   vars: [cpu, memory, dataStorageSize, logStorageSize]
   series:
-  - # class name generator, you can reference variables in class schema template
+  - # class name template, you can reference variables in class schema template
     # it's also ok to define static class name in following class definitions
-    name: "custom-{{ .cpu }}c{{ .memory }}g"
+    namingTemplate: "custom-{{ .cpu }}c{{ .memory }}g"
 
     # class definitions, we support two kinds of class definitions:
     # 1. define arguments for class schema variables, class schema will be dynamically generated

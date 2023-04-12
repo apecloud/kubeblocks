@@ -103,6 +103,9 @@ spec:
                                     - provider
                                     type: object
                                   type: array
+                                  x-kubernetes-list-map-keys:
+                                  - provider
+                                  x-kubernetes-list-type: map
                                 volumes:
                                   description: the volumes of the class
                                   items:
@@ -126,14 +129,17 @@ spec:
                                     - size
                                     type: object
                                   type: array
+                                  x-kubernetes-list-map-keys:
+                                  - name
+                                  x-kubernetes-list-type: map
                               type: object
                             type: array
-                          name:
-                            description: 'name is a template that uses the Go template
-                              syntax and allows for referencing variables defined
-                              in ComponentClassGroup.Template. This enables dynamic
-                              generation of class names. For example: name: "general-{{
-                              .cpu }}c{{ .memory }}g"'
+                          namingTemplate:
+                            description: 'namingTemplate is a template that uses the
+                              Go template syntax and allows for referencing variables
+                              defined in ComponentClassGroup.Template. This enables
+                              dynamic generation of class names. For example: name:
+                              "general-{{ .cpu }}c{{ .memory }}g"'
                             type: string
                         type: object
                       type: array
@@ -154,6 +160,7 @@ spec:
                       items:
                         type: string
                       type: array
+                      x-kubernetes-list-type: set
                   required:
                   - resourceConstraintRef
                   type: object
@@ -210,6 +217,9 @@ spec:
                         - provider
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - provider
+                      x-kubernetes-list-type: map
                     volumes:
                       description: the volumes of the class
                       items:
@@ -232,6 +242,9 @@ spec:
                         - size
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                   type: object
                 type: array
               observedGeneration:

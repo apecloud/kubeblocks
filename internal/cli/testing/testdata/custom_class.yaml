@@ -9,7 +9,7 @@
         size: "{{ or .logStorageSize 1 }}Gi"
     vars: [cpu, memory, dataStorageSize, logStorageSize]
     series:
-    - name: "custom-{{ .cpu }}c{{ .memory }}g"
+    - namingTemplate: "custom-{{ .cpu }}c{{ .memory }}g"
       classes:
       - args: ["1", "1", "100", "10"]
       - name: custom-200c400g
@@ -27,7 +27,7 @@
         size: "{{ or .logStorageSize 1 }}Gi"
     vars: [cpu, memory, dataStorageSize, logStorageSize]
     series:
-    - name: "custom-{{ .cpu }}c{{ .memory }}g"
+    - namingTemplate: "custom-{{ .cpu }}c{{ .memory }}g"
       classes:
       - args: ["1", "32", "100", "10"]
       - args: ["2", "64", "100", "10"]

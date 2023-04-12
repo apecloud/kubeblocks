@@ -24,7 +24,7 @@ spec:
     series:
     - # class name generator, you can reference variables in class schema template
       # it's also ok to define static class name in following class definitions
-      name: "general-{{ .cpu }}c{{ .memory }}g"
+      namingTemplate: "general-{{ .cpu }}c{{ .memory }}g"
 
       # class definitions, we support two kinds of class definitions:
       # 1. define arguments for class schema variables, class schema will be dynamically generated
@@ -52,7 +52,7 @@ spec:
         size: "{{ or .logStorageSize 1 }}Gi"
     vars: [ cpu, memory, dataStorageSize, logStorageSize ]
     series:
-    - name: "mo-{{ .cpu }}c{{ .memory }}g"
+    - namingTemplate: "mo-{{ .cpu }}c{{ .memory }}g"
       classes:
       - args: [ "2", "16", "100", "10" ]
       - args: [ "4", "32", "100", "10" ]

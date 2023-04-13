@@ -169,7 +169,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 
 		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
 		//  then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
-		// TODO/REVIEW: why using Max?
+		// REVIEW/TODO: why using Max?
 		// replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {

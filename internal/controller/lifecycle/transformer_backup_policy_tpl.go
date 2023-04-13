@@ -106,6 +106,11 @@ func (r *backupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 	backupPolicy.Labels[constant.AppInstanceLabelKey] = cluster.Name
 	backupPolicy.Labels[constant.KBAppComponentDefRefLabelKey] = policyTPL.ComponentDefRef
 
+	// REVIEW/TODO: (wangyelei)
+	// 1. following is rather hack-ish, as Backup target criteria has no direct relation with workloadType,
+	// need extra attributes for the target selector.
+	// 2. need to update workloadType API attributes documentation for current design implementation.
+	//
 	// only update the role labelSelector of the backup target instance when component workload is Replication/Consensus.
 	if !slices.Contains([]appsv1alpha1.WorkloadType{appsv1alpha1.Replication, appsv1alpha1.Consensus}, workloadType) {
 		return

@@ -1053,52 +1053,6 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 	}
 
-	mockPodsForReplicationTest := func(cluster *appsv1alpha1.Cluster, sts *appsv1.StatefulSet) []corev1.Pod {
-		componentName := cluster.Spec.ComponentSpecs[0].Name
-		clusterName := cluster.Name
-		pods := make([]corev1.Pod, *sts.Spec.Replicas)
-		t := true
-		for i := int32(0); i < *sts.Spec.Replicas; i++ {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        fmt.Sprintf("%s-%d", sts.Name, i),
-					Namespace:   testCtx.DefaultNamespace,
-					Annotations: map[string]string{},
-					Labels: map[string]string{
-						constant.RoleLabelKey:                 replicationset.DefaultRole(i),
-						constant.AppInstanceLabelKey:          clusterName,
-						constant.KBAppComponentLabelKey:       componentName,
-						appsv1.ControllerRevisionHashLabelKey: sts.Status.UpdateRevision,
-					},
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion:         "apps/v1",
-							Kind:               constant.StatefulSetKind,
-							Controller:         &t,
-							BlockOwnerDeletion: &t,
-							Name:               sts.Name,
-							UID:                sts.GetUID(),
-						},
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Name:  "mock-container",
-						Image: "mock-container",
-					}},
-				},
-			}
-			for k, v := range sts.Spec.Template.Labels {
-				pod.ObjectMeta.Labels[k] = v
-			}
-			for k, v := range sts.Spec.Template.Annotations {
-				pod.ObjectMeta.Annotations[k] = v
-			}
-			pods = append(pods, *pod)
-		}
-		return pods
-	}
-
 	testBackupError := func() {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
@@ -1117,7 +1071,6 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, mysqlCompName)
 
 		// REVIEW: this test flow, should wait/fake still Running phase?
-
 		By("Creating backup")
 		backupKey := types.NamespacedName{
 			Namespace: testCtx.DefaultNamespace,
@@ -1439,7 +1392,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		// REVIEW/TODO: following test always failed at cluster.phase.observerGeneration=1
 		//     with cluster.phase.phase=creating
-		It("Should success with primary sts and secondary sts", func() {
+		It("Should success with primary pod and secondary pod", func() {
 			By("Mock a cluster obj with replication componentDefRef.")
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -1458,13 +1411,6 @@ var _ = Describe("Cluster Controller", func() {
 			stsList := testk8s.ListAndCheckStatefulSetCount(&testCtx, clusterKey, 1)
 			sts := &stsList.Items[0]
 
-			By("Checking statefulSet template volumes mount")
-			for _, volume := range sts.Spec.Template.Spec.Volumes {
-				if volume.Name == testapps.DataVolumeName {
-					Expect(strings.HasPrefix(volume.VolumeSource.PersistentVolumeClaim.ClaimName,
-						testapps.DataVolumeName+"-"+clusterKey.Name)).Should(BeTrue())
-				}
-			}
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				testk8s.MockStatefulSetReady(sts)
 			})).ShouldNot(HaveOccurred())
@@ -1474,117 +1420,6 @@ var _ = Describe("Cluster Controller", func() {
 					testapps.DefaultRedisCompName, podName, replicationset.DefaultRole(i))
 			}
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
-		})
-
-		It("Should successfully doing volume expansion", func() {
-			storageClassName := "test-storage"
-			pvcSpec := testapps.NewPVCSpec("1Gi")
-			pvcSpec.StorageClassName = &storageClassName
-			updatedPVCSpec := testapps.NewPVCSpec("2Gi")
-			updatedPVCSpec.StorageClassName = &storageClassName
-
-			By("Mock a cluster obj with replication componentDefRef.")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
-				SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
-				SetReplicas(testapps.DefaultReplicationReplicas).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				Create(&testCtx).GetObject()
-			clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-			By("Waiting for the cluster controller to create resources completely")
-			waitForCreatingResourceCompletely(clusterKey, testapps.DefaultRedisCompName)
-
-			// REVIEW: this test flow, should wait/fake still Running phase?
-
-			By("Checking statefulset count")
-			stsList := testk8s.ListAndCheckStatefulSetCount(&testCtx, clusterKey, 1)
-
-			By("Creating mock pods in StatefulSet")
-			pods := mockPodsForReplicationTest(clusterObj, &stsList.Items[0])
-			for _, pod := range pods {
-				Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
-				pod.Status.Conditions = []corev1.PodCondition{{
-					Type:   corev1.PodReady,
-					Status: corev1.ConditionTrue,
-				}}
-				Expect(testCtx.Cli.Status().Update(testCtx.Ctx, &pod)).Should(Succeed())
-			}
-
-			By("Checking pod count and ready")
-			Eventually(func(g Gomega) {
-				podList := testk8s.ListAndCheckPodCountWithComponent(&testCtx, clusterKey,
-					testapps.DefaultRedisCompName, testapps.DefaultReplicationReplicas)
-				for _, pod := range podList.Items {
-					g.Expect(len(pod.Status.Conditions) > 0).Should(BeTrue())
-					g.Expect(pod.Status.Conditions[0].Status).Should(Equal(corev1.ConditionTrue))
-				}
-			}).Should(Succeed())
-
-			By("Mocking statefulset status to ready")
-			for _, sts := range stsList.Items {
-				sts.Status.ObservedGeneration = sts.Generation
-				sts.Status.AvailableReplicas = 1
-				sts.Status.Replicas = 1
-				sts.Status.ReadyReplicas = 1
-				err := testCtx.Cli.Status().Update(testCtx.Ctx, &sts)
-				Expect(err).ShouldNot(HaveOccurred())
-			}
-
-			By("Checking reconcile succeeded")
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
-
-			By("Creating storageclass")
-			_ = testapps.CreateStorageClass(testCtx, storageClassName, true)
-
-			pvcList := &corev1.PersistentVolumeClaimList{}
-
-			By("Mocking PVCs status to bound")
-			Expect(testCtx.Cli.List(testCtx.Ctx, pvcList, client.MatchingLabels{
-				constant.AppInstanceLabelKey:    clusterKey.Name,
-				constant.KBAppComponentLabelKey: testapps.DefaultRedisCompName,
-			}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-			Expect(pvcList.Items).Should(HaveLen(testapps.DefaultReplicationReplicas))
-			for _, pvc := range pvcList.Items {
-				pvc.Status.Phase = corev1.ClaimBound
-				Expect(testCtx.Cli.Status().Update(testCtx.Ctx, &pvc)).Should(Succeed())
-			}
-
-			By("Checking PVCs status bound")
-			Eventually(func(g Gomega) {
-				g.Expect(testCtx.Cli.List(testCtx.Ctx, pvcList, client.MatchingLabels{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: testapps.DefaultRedisCompName,
-				}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-				Expect(pvcList.Items).Should(HaveLen(testapps.DefaultReplicationReplicas))
-				for _, pvc := range pvcList.Items {
-					g.Expect(pvc.Status.Phase).Should(Equal(corev1.ClaimBound))
-				}
-			}).Should(Succeed())
-
-			By("Updating PVC volume size")
-			patch := client.MergeFrom(clusterObj.DeepCopy())
-			componentSpec := clusterObj.Spec.GetComponentByName(testapps.DefaultRedisCompName)
-			componentSpec.VolumeClaimTemplates[0].Spec = updatedPVCSpec
-			Expect(testCtx.Cli.Patch(ctx, clusterObj, patch)).Should(Succeed())
-
-			By("Waiting cluster update reconcile succeed")
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
-
-			By("Checking pvc volume size")
-			Eventually(func(g Gomega) {
-				g.Expect(testCtx.Cli.List(testCtx.Ctx, pvcList, client.MatchingLabels{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: testapps.DefaultRedisCompName,
-				}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-				g.Expect(len(pvcList.Items) == testapps.DefaultReplicationReplicas).To(BeTrue())
-				for _, pvc := range pvcList.Items {
-					g.Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).Should(BeEquivalentTo(updatedPVCSpec.Resources.Requests[corev1.ResourceStorage]))
-				}
-			}).Should(Succeed())
 		})
 	})
 

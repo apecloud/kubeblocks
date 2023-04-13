@@ -220,6 +220,15 @@ func getContainerCPU(args interface{}) (int64, error) {
 	return intctrlutil.GetCoreNum(*container), nil
 }
 
+// getContainerRequestMemory for general built-in
+func getContainerRequestMemory(args interface{}) (int64, error) {
+	container, err := fromJSONObject[corev1.Container](args)
+	if err != nil {
+		return 0, err
+	}
+	return intctrlutil.GetRequestMemorySize(*container), nil
+}
+
 // getArgByName for general built-in
 func getArgByName(args interface{}, argName string) string {
 	// TODO Support parse command args

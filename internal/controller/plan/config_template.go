@@ -42,14 +42,15 @@ const (
 
 // General Built-in functions
 const (
-	builtInGetVolumeFunctionName          = "getVolumePathByName"
-	builtInGetPvcFunctionName             = "getPVCByName"
-	builtInGetEnvFunctionName             = "getEnvByName"
-	builtInGetArgFunctionName             = "getArgByName"
-	builtInGetPortFunctionName            = "getPortByName"
-	builtInGetContainerFunctionName       = "getContainerByName"
-	builtInGetContainerMemoryFunctionName = "getContainerMemory"
-	builtInGetContainerCoreFunctionName   = "getContainerCPU"
+	builtInGetVolumeFunctionName                 = "getVolumePathByName"
+	builtInGetPvcFunctionName                    = "getPVCByName"
+	builtInGetEnvFunctionName                    = "getEnvByName"
+	builtInGetArgFunctionName                    = "getArgByName"
+	builtInGetPortFunctionName                   = "getPortByName"
+	builtInGetContainerFunctionName              = "getContainerByName"
+	builtInGetContainerMemoryFunctionName        = "getContainerMemory"
+	builtInGetContainerRequestMemoryFunctionName = "getContainerRequestMemory"
+	builtInGetContainerCoreFunctionName          = "getContainerCPU"
 
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
@@ -173,18 +174,19 @@ func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.SynthesizedComponent, task *intctrltypes.ReconcileTask) error {
 	// TODO add built-in function
 	c.builtInFunctions = &gotemplate.BuiltInObjectsFunc{
-		builtInMysqlCalBufferFunctionName:     calDBPoolSize,
-		builtInGetVolumeFunctionName:          getVolumeMountPathByName,
-		builtInGetPvcFunctionName:             getPVCByName,
-		builtInGetEnvFunctionName:             wrapGetEnvByName(c, task),
-		builtInGetPortFunctionName:            getPortByName,
-		builtInGetArgFunctionName:             getArgByName,
-		builtInGetContainerFunctionName:       getPodContainerByName,
-		builtInGetContainerMemoryFunctionName: getContainerMemory,
-		builtInGetContainerCoreFunctionName:   getContainerCPU,
-		builtInGetCAFile:                      getCAFile,
-		builtInGetCertFile:                    getCertFile,
-		builtInGetKeyFile:                     getKeyFile,
+		builtInMysqlCalBufferFunctionName:            calDBPoolSize,
+		builtInGetVolumeFunctionName:                 getVolumeMountPathByName,
+		builtInGetPvcFunctionName:                    getPVCByName,
+		builtInGetEnvFunctionName:                    wrapGetEnvByName(c, task),
+		builtInGetPortFunctionName:                   getPortByName,
+		builtInGetArgFunctionName:                    getArgByName,
+		builtInGetContainerFunctionName:              getPodContainerByName,
+		builtInGetContainerMemoryFunctionName:        getContainerMemory,
+		builtInGetContainerRequestMemoryFunctionName: getContainerRequestMemory,
+		builtInGetContainerCoreFunctionName:          getContainerCPU,
+		builtInGetCAFile:                             getCAFile,
+		builtInGetCertFile:                           getCertFile,
+		builtInGetKeyFile:                            getKeyFile,
 	}
 	return nil
 }

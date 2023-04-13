@@ -126,6 +126,18 @@ KubeBlocks operation commands.
 * [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks.
 
 
+## [migration](kbcli_migration.md)
+
+Data migration between two data sources.
+
+* [kbcli migration create](kbcli_migration_create.md)	 - Create a migration task.
+* [kbcli migration describe](kbcli_migration_describe.md)	 - Show details of a specific migration task.
+* [kbcli migration list](kbcli_migration_list.md)	 - List migration tasks.
+* [kbcli migration logs](kbcli_migration_logs.md)	 - Access migration task log file.
+* [kbcli migration templates](kbcli_migration_templates.md)	 - List migration templates.
+* [kbcli migration terminate](kbcli_migration_terminate.md)	 - Delete migration task.
+
+
 ## [options](kbcli_options.md)
 
 Print the list of flags inherited by all commands.

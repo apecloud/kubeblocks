@@ -129,7 +129,7 @@ func GetK8sProviderFromVersion(version string) K8sProvider {
 	return UnknownProvider
 }
 
-func GetK8sVersion(version string) string {
+func GetK8sSemVer(version string) string {
 	removeFirstChart := func(v string) string {
 		if len(v) == 0 {
 			return v

@@ -19,7 +19,7 @@ We would like to extend our appreciation to all contributors who helped make thi
 
 **Highlights**
   * Automatic pod container environment variables updates:
-    * [NEW] KB_POD_FQDN - KubeBlock Cluster component workload associated headless service name, N/A if workloadType=Stateless.
+    * [NEW] KB_POD_FQDN - KubeBlock Cluster component workload associated service name, N/A if workloadType=Stateless.
     * [NEW] KB_POD_IP -  Pod IP address
     * [NEW] KB_POD_IPS - Pod IP addresses
     * [NEW] KB_HOST_IP - Host IP address

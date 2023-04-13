@@ -46,8 +46,8 @@ var backupConfigExample = templates.Examples(`
         # will replace the storageClassName when it is nil in the backup policy.
         dataProtection.backupPVCStorageClassName=csi-s3
 
-         # the pvc create policy.
-         # if the storageClass supports dynamic provisioning, recommend "IfNotPresent" policy.
+ 		# the pvc create policy.
+	    # if the storageClass supports dynamic provisioning, recommend "IfNotPresent" policy.
         # otherwise, using "Never" policy. only affect the backupPolicy automatically created by Kubeblocks.
 		dataProtection.backupPVCCreatePolicy=Never
 	`)

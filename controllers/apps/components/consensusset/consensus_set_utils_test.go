@@ -170,12 +170,12 @@ func TestComposeRoleEnv(t *testing.T) {
 		WorkloadType: appsv1alpha1.Consensus,
 		ConsensusSpec: &appsv1alpha1.ConsensusSetSpec{
 			Leader: appsv1alpha1.ConsensusMember{
-				Name: "leader",
+				Name:       "leader",
 				AccessMode: appsv1alpha1.ReadWrite,
 			},
 			Followers: []appsv1alpha1.ConsensusMember{
 				{
-					Name: "follower",
+					Name:       "follower",
 					AccessMode: appsv1alpha1.Readonly,
 				},
 			},
@@ -206,5 +206,4 @@ func TestComposeRoleEnv(t *testing.T) {
 	leader, followers = composeRoleEnv(componentDef, pods)
 	assert.Equal(t, "foo-0", leader)
 	assert.Equal(t, "foo-1,foo-2", followers)
-
 }

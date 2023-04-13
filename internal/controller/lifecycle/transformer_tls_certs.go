@@ -23,25 +23,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type tlsCertsTransformer struct {
-	cr  clusterRefResources
-	cli client.ReadonlyClient
-	ctx intctrlutil.RequestCtx
-}
+// TLSCertsTransformer handles tls certs provisioning or validation
+type TLSCertsTransformer struct {}
 
-func (t *tlsCertsTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+func (t *TLSCertsTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx := ctx.(*ClusterTransformContext)
+	origCluster := transCtx.OrigCluster
+	cluster := transCtx.Cluster
 	// return fast when cluster is deleting
 	if isClusterDeleting(*origCluster) {
 		return nil
@@ -58,7 +50,7 @@ func (t *tlsCertsTransformer) Transform(dag *graph.DAG) error {
 
 		switch comp.Issuer.Name {
 		case appsv1alpha1.IssuerUserProvided:
-			if err := plan.CheckTLSSecretRef(t.ctx, t.cli, cluster.Namespace, comp.Issuer.SecretRef); err != nil {
+			if err := plan.CheckTLSSecretRef(transCtx.Context, transCtx.Client, cluster.Namespace, comp.Issuer.SecretRef); err != nil {
 				return err
 			}
 		case appsv1alpha1.IssuerKubeBlocks:
@@ -82,3 +74,5 @@ func (t *tlsCertsTransformer) Transform(dag *graph.DAG) error {
 
 	return nil
 }
+
+var _ graph.Transformer = &TLSCertsTransformer{}

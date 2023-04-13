@@ -158,8 +158,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.FixClusterLabelsTransformer{},
 			// cluster to K8s objects and put them into dag
 			&lifecycle.ClusterTransformer{Client: r.Client},
-			//	// tls certs secret
-			//	&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
+			// tls certs secret
+			&lifecycle.TLSCertsTransformer{},
 			//	// add our finalizer to all objects
 			//	&ownershipTransformer{finalizer: dbClusterFinalizerName},
 			//	// make all workload objects depending on credential secret

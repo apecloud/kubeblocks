@@ -1,19 +1,15 @@
 package lifecycle
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// fixClusterLabelsTransformer should patch the label first to prevent the label from being modified by the user.
-type fixClusterLabelsTransformer struct{}
+// FixClusterLabelsTransformer patches the label first to prevent the label from being modified by the user.
+type FixClusterLabelsTransformer struct{}
 
-func (f *fixClusterLabelsTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+func (f *FixClusterLabelsTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	cluster := transCtx.Cluster
 	labels := cluster.Labels
 	if labels == nil {
 		labels = map[string]string{}
@@ -29,3 +25,5 @@ func (f *fixClusterLabelsTransformer) Transform(dag *graph.DAG) error {
 	cluster.Labels = labels
 	return nil
 }
+
+var _ graph.Transformer = &FixClusterLabelsTransformer{}

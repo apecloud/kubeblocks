@@ -13,26 +13,24 @@ import (
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// fixClusterLabelsTransformer fill the class related info to cluster
-type fillClass struct {
-	cc  clusterRefResources
-	cli client.Client
-	ctx intctrlutil.RequestCtx
-}
+// FillClassTransformer fill the class related info to cluster
+type FillClassTransformer struct {}
 
-func (r *fillClass) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
-	if err != nil {
-		return err
+func (r *FillClassTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	cluster := transCtx.Cluster
+	if isClusterDeleting(*cluster) {
+		return nil
 	}
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-	return r.fillClass(r.ctx, cluster, r.cc.cd)
+	return r.fillClass(transCtx)
 }
 
-func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, clusterDefinition appsv1alpha1.ClusterDefinition) error {
+func (r *FillClassTransformer) fillClass(transCtx *ClusterTransformContext) error {
+	cluster := transCtx.Cluster
+	clusterDefinition := transCtx.ClusterDef
+
 	var (
 		value                 = cluster.GetAnnotations()[constant.ClassAnnotationKey]
 		componentClassMapping = make(map[string]string)
@@ -48,7 +46,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefinition.Name},
 		client.HasLabels{constant.ClassProviderLabelKey},
 	}
-	if err := r.cli.List(reqCtx.Ctx, &cmList, cmLabels...); err != nil {
+	if err := transCtx.Client.List(transCtx.Context, &cmList, cmLabels...); err != nil {
 		return err
 	}
 	compClasses, err := class.ParseClasses(&cmList)
@@ -57,7 +55,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	}
 
 	var classFamilyList appsv1alpha1.ClassFamilyList
-	if err = r.cli.List(reqCtx.Ctx, &classFamilyList); err != nil {
+	if err = transCtx.Client.List(transCtx.Context, &classFamilyList); err != nil {
 		return err
 	}
 
@@ -155,3 +153,5 @@ func buildVolumeClaimByClass(cls *class.ComponentClass) []appsv1alpha1.ClusterCo
 	}
 	return volumes
 }
+
+var _ graph.Transformer = &FillClassTransformer{}

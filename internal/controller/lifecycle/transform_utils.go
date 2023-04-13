@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -31,7 +32,6 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func findAll[T interface{}](dag *graph.DAG) []graph.Vertex {
@@ -139,19 +139,19 @@ func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
 	//	slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
 }
 
-func getBackupObjects(reqCtx intctrlutil.RequestCtx,
+func getBackupObjects(ctx context.Context,
 	cli types2.ReadonlyClient,
 	namespace string,
 	backupName string) (*dataprotectionv1alpha1.Backup, *dataprotectionv1alpha1.BackupTool, error) {
 	// get backup
 	backup := &dataprotectionv1alpha1.Backup{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, backup); err != nil {
+	if err := cli.Get(ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, backup); err != nil {
 		return nil, nil, err
 	}
 
 	// get backup tool
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
+	if err := cli.Get(ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
 		return nil, nil, err
 	}
 	return backup, backupTool, nil
@@ -160,8 +160,4 @@ func getBackupObjects(reqCtx intctrlutil.RequestCtx,
 func isTypeOf[T interface{}](obj client.Object) bool {
 	_, ok := obj.(T)
 	return ok
-}
-
-func isFastReturnErr(err error) bool {
-	return err == FastReturnError
 }

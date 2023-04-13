@@ -26,7 +26,7 @@ type initTransformer struct {
 	originCluster *appsv1alpha1.Cluster
 }
 
-func (i *initTransformer) Transform(dag *graph.DAG) error {
+func (i *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// put the cluster object first, it will be root vertex of DAG
 	rootVertex := &lifecycleVertex{obj: i.cluster, oriObj: i.originCluster}
 	dag.AddVertex(rootVertex)

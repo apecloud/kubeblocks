@@ -16,18 +16,47 @@ limitations under the License.
 
 package graph
 
+import (
+	"context"
+	"errors"
+
+	"github.com/go-logr/logr"
+	"k8s.io/client-go/tools/record"
+
+	"github.com/apecloud/kubeblocks/internal/controller/client"
+)
+
+type TransformContext interface {
+	GetContext() context.Context
+	GetClient() client.ReadonlyClient
+	GetRecorder() record.EventRecorder
+	GetLogger() logr.Logger
+}
+
 // Transformer transforms a DAG to a new version
 type Transformer interface {
-	Transform(dag *DAG) error
+	Transform(ctx TransformContext, dag *DAG) error
 }
 
 type TransformerChain []Transformer
 
-func (t *TransformerChain) ApplyTo(dag *DAG) error {
+var FastReturnError = errors.New("fast return")
+
+func (t *TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
+	if t == nil {
+		return nil
+	}
 	for _, transformer := range *t {
-		if err := transformer.Transform(dag); err != nil {
-			return err
+		if err := transformer.Transform(ctx, dag); err != nil {
+			return fastReturnErrorToNil(err)
 		}
 	}
 	return nil
+}
+
+func fastReturnErrorToNil(err error) error {
+	if err == FastReturnError {
+		return nil
+	}
+	return err
 }

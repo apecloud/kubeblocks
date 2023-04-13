@@ -18,21 +18,22 @@ package lifecycle
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"sync"
+
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
 type ParallelTransformers struct {
 	transformers []graph.Transformer
 }
 
-func (t *ParallelTransformers) Transform(dag *graph.DAG) error {
+func (t *ParallelTransformers) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	var group sync.WaitGroup
 	var errs error
 	for _, transformer := range t.transformers {
 		group.Add(1)
 		go func() {
-			err := transformer.Transform(dag)
+			err := transformer.Transform(ctx, dag)
 			if err != nil {
 				// TODO: sync.Mutex errs
 				errs = fmt.Errorf("%v; %v", errs, err)

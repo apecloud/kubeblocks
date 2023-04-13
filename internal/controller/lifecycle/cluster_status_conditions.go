@@ -79,6 +79,14 @@ func newFailedProvisioningStartedCondition(message, reason string) metav1.Condit
 	}
 }
 
+func setApplyResourceCondition(conditions *[]metav1.Condition, clusterGeneration int64, err error) {
+	condition := newApplyResourcesCondition(clusterGeneration)
+	if err != nil {
+		condition = newFailedApplyResourcesCondition(err.Error())
+	}
+	meta.SetStatusCondition(conditions, condition)
+}
+
 // newApplyResourcesCondition creates a condition when applied resources succeed.
 func newApplyResourcesCondition(clusterGeneration int64) metav1.Condition {
 	return metav1.Condition{

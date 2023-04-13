@@ -136,25 +136,28 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// TODO: builder context design
-	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req, r.Recorder)
+	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req)
 
 	if err := planBuilder.Init(); err != nil {
 		return requeueError(err)
 	}
 
 	plan, err := planBuilder.
-		AddValidator(
-			&lifecycle.RefResourcesValidator{},
-			&lifecycle.EnableLogsValidator{},
-		).
 		AddTransformer(
+			// handle cluster deletion first
 			&lifecycle.ClusterDeletionTransformer{},
-			//	// fill class related info
-			//	&fillClass{cc: *cr, cli: c.cli, ctx: c.ctx},
-			//	// fix cd&cv labels of cluster
-			//	&fixClusterLabelsTransformer{},
-			//	// cluster to K8s objects and put them into dag
-			//	&clusterTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
+			// validate cd & cv's existence and availability
+			&lifecycle.ValidateRefResourcesTransformer{},
+			// inject cd & cv into the TransformContext, a little bit hacky
+			&lifecycle.LoadRefResourcesTransformer{},
+			// validate config
+			&lifecycle.ValidateEnableLogsTransformer{},
+			// fill class related info
+			&lifecycle.FillClassTransformer{},
+			// fix cd&cv labels of cluster
+			&lifecycle.FixClusterLabelsTransformer{},
+			// cluster to K8s objects and put them into dag
+			&lifecycle.ClusterTransformer{Client: r.Client},
 			//	// tls certs secret
 			//	&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 			//	// add our finalizer to all objects

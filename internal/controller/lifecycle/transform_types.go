@@ -17,7 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -124,8 +123,6 @@ func (r *realRequeueError) RequeueAfter() time.Duration {
 func (r *realRequeueError) Reason() string {
 	return r.reason
 }
-
-var FastReturnError = errors.New("fast return")
 
 type delegateClient struct {
 	client.Client

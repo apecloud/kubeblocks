@@ -17,17 +17,18 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,22 +36,32 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// TODO: cluster plan builder can be abstracted as a common flow
+
+// ClusterTransformContext a graph.TransformContext implementation for Cluster reconciliation
+type ClusterTransformContext struct {
+	context.Context
+	Client roclient.ReadonlyClient
+	record.EventRecorder
+	logr.Logger
+	Cluster *appsv1alpha1.Cluster
+	OrigCluster *appsv1alpha1.Cluster
+	ClusterDef *appsv1alpha1.ClusterDefinition
+	ClusterVer *appsv1alpha1.ClusterVersion
+}
+
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation
 type clusterPlanBuilder struct {
-	ctx          intctrlutil.RequestCtx
-	cli          client.Client
 	req          ctrl.Request
-	recorder     record.EventRecorder
-	refResources clusterRefResources
+	cli          client.Client
+	transCtx     *ClusterTransformContext
 	transformers graph.TransformerChain
-	validators   graph.ValidatorChain
 }
 
 // clusterPlan a graph.Plan implementation for Cluster reconciliation
@@ -59,30 +70,43 @@ type clusterPlan struct {
 	walkFunc graph.WalkFunc
 }
 
+var _ graph.TransformContext = &ClusterTransformContext{}
 var _ graph.PlanBuilder = &clusterPlanBuilder{}
 var _ graph.Plan = &clusterPlan{}
 
+// TransformContext implementation
+
+func (c *ClusterTransformContext) GetContext() context.Context {
+	return c.Context
+}
+
+func (c *ClusterTransformContext) GetClient() roclient.ReadonlyClient {
+	return c.Client
+}
+
+func (c *ClusterTransformContext) GetRecorder() record.EventRecorder {
+	return c.EventRecorder
+}
+
+func (c *ClusterTransformContext) GetLogger() logr.Logger {
+	return c.Logger
+}
+
+// PlanBuilder implementation
+
 func (c *clusterPlanBuilder) Init() error {
 	cluster := &appsv1alpha1.Cluster{}
-	if err := c.cli.Get(c.ctx.Ctx, c.req.NamespacedName, cluster); err != nil {
+	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, cluster); err != nil {
 		return err
 	}
 
+	c.transCtx.Cluster = cluster
+	c.transCtx.OrigCluster = cluster.DeepCopy()
 	c.transformers = append(c.transformers, &initTransformer{
-		cluster: cluster,
-		originCluster: cluster.DeepCopy(),
+		cluster: c.transCtx.Cluster,
+		originCluster: c.transCtx.OrigCluster,
 	})
 	return nil
-}
-
-func (c *clusterPlanBuilder) AddValidator(validator ...graph.Validator) graph.PlanBuilder {
-	c.validators = append(c.validators, validator...)
-	return c
-}
-
-func (c *clusterPlanBuilder) AddParallelValidator(validator ...graph.Validator) graph.PlanBuilder {
-	c.validators = append(c.validators, &ParallelValidators{validators: validator})
-	return c
 }
 
 func (c *clusterPlanBuilder) AddTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
@@ -95,79 +119,34 @@ func (c *clusterPlanBuilder) AddParallelTransformer(transformer ...graph.Transfo
 	return c
 }
 
-func (c *clusterPlanBuilder) handleProvisionStartedCondition() {
-	// set provisioning cluster condition
-	condition := newProvisioningStartedCondition(c.cluster.Name, c.cluster.Generation)
-	oldCondition := meta.FindStatusCondition(c.cluster.Status.Conditions, condition.Type)
-	if conditionIsChanged(oldCondition, condition) {
-		meta.SetStatusCondition(&c.cluster.Status.Conditions, condition)
-		c.recorder.Event(c.cluster, corev1.EventTypeNormal, condition.Reason, condition.Message)
-	}
-}
-
 // Build only cluster Creation, Update and Deletion supported.
 func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	var err error
 	defer func() {
-		if err != nil {
-			_ = c.updateClusterStatusWithCondition(newFailedApplyResourcesCondition(err.Error()))
+		// set apply resource condition
+		// if cluster is being deleted, no need to set apply resource condition
+		if isClusterDeleting(*c.transCtx.Cluster) {
+			return
 		}
+		preCheckCondition := meta.FindStatusCondition(c.transCtx.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
+		if preCheckCondition == nil {
+			// this should not happen
+			return
+		}
+		// if pre-check failed, this is a fast return, no need to set apply resource condition
+		if preCheckCondition.Status != metav1.ConditionTrue {
+			return
+		}
+		setApplyResourceCondition(&c.transCtx.Cluster.Status.Conditions, c.transCtx.Cluster.Generation, err)
 	}()
-
-	var cr *clusterRefResources
-	cr, err = c.getClusterRefResources()
-	if err != nil {
-		return nil, err
-	}
-	var roClient roclient.ReadonlyClient = delegateClient{Client: c.cli}
-
-	// TODO: remove all cli & ctx fields from transformers, keep them in pure-dag-manipulation form
-	// build transformer chain
-	//chain := &graph.TransformerChain{
-	//	// init dag, that is put cluster vertex into dag
-	//	&initTransformer{cluster: c.cluster, originCluster: &c.originCluster},
-	//	// fill class related info
-	//	&fillClass{cc: *cr, cli: c.cli, ctx: c.ctx},
-	//	// fix cd&cv labels of cluster
-	//	&fixClusterLabelsTransformer{},
-	//	// cluster to K8s objects and put them into dag
-	//	&clusterTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
-	//	// tls certs secret
-	//	&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
-	//	// add our finalizer to all objects
-	//	&ownershipTransformer{finalizer: dbClusterFinalizerName},
-	//	// make all workload objects depending on credential secret
-	//	&credentialTransformer{},
-	//	// make config configmap immutable
-	//	&configTransformer{},
-	//	// read old snapshot from cache, and generate diff plan
-	//	&objectActionTransformer{cli: roClient, ctx: c.ctx},
-	//	// handle TerminationPolicyType=DoNotTerminate
-	//	&doNotTerminateTransformer{},
-	//	// horizontal scaling
-	//	&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
-	//	// stateful set pvc Update
-	//	&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
-	//	// replication set horizontal scaling
-	//	&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
-	//	// finally, update cluster status
-	//	newClusterStatusTransformer(c.ctx, c.cli, c.recorder, *cr),
-	//}
 
 	// new a DAG and apply chain on it, after that we should get the final Plan
 	dag := graph.NewDAG()
-	err = c.validators.WalkThrough(dag)
-	if err != nil && !isFastReturnErr(err) {
+	if err = c.transformers.ApplyTo(c.transCtx, dag); err != nil {
 		return nil, err
 	}
-	if !isFastReturnErr(err) {
-		// TODO: load cr
-		if err = c.transformers.ApplyTo(dag); err != nil && !isFastReturnErr(err) {
-			return nil, err
-		}
-	}
+	c.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
 
-	c.ctx.Log.Info(fmt.Sprintf("DAG: %s", dag))
 	// we got the execution plan
 	plan := &clusterPlan{
 		dag:      dag,
@@ -176,86 +155,29 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	return plan, nil
 }
 
-func (c *clusterPlanBuilder) updateClusterStatusWithCondition(condition metav1.Condition) error {
-	oldCondition := meta.FindStatusCondition(c.cluster.Status.Conditions, condition.Type)
-	meta.SetStatusCondition(&c.cluster.Status.Conditions, condition)
-	if !reflect.DeepEqual(c.cluster.Status, c.originCluster.Status) {
-		if err := c.cli.Status().Patch(c.ctx.Ctx, c.cluster, client.MergeFrom(c.originCluster.DeepCopy())); err != nil {
-			return err
-		}
-	}
-	// Normal events are only sent once.
-	if !conditionIsChanged(oldCondition, condition) && condition.Status == metav1.ConditionTrue {
-		return nil
-	}
-	eventType := corev1.EventTypeWarning
-	if condition.Status == metav1.ConditionTrue {
-		eventType = corev1.EventTypeNormal
-	}
-	c.recorder.Event(c.cluster, eventType, condition.Reason, condition.Message)
-	return nil
-}
-
-// NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
-// TODO: change ctx to context.Context
-func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request, recorder record.EventRecorder) graph.PlanBuilder {
-	return &clusterPlanBuilder{
-		ctx:      ctx,
-		cli:      cli,
-		req:      req,
-		recorder: recorder,
-	}
-}
+// Plan implementation
 
 func (p *clusterPlan) Execute() error {
-	err := p.dag.WalkReverseTopoOrder(p.walkFunc)
-	if err != nil {
-		if hErr := p.handleDAGWalkError(err); hErr != nil {
-			return hErr
-		}
-	}
-	return err
+	return p.dag.WalkReverseTopoOrder(p.walkFunc)
 }
 
-func (p *clusterPlan) handleDAGWalkError(err error) error {
-	condition := newFailedApplyResourcesCondition(err.Error())
-	meta.SetStatusCondition(&p.cluster.Status.Conditions, condition)
-	p.recorder.Event(p.cluster, corev1.EventTypeWarning, condition.Reason, condition.Message)
-	rootVertex, _ := findRootVertex(p.dag)
-	if rootVertex == nil {
-		return nil
+// Do the real works
+
+// NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
+func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
+	return &clusterPlanBuilder{
+		req:      req,
+		cli:      cli,
+		transCtx: &ClusterTransformContext{
+			Context: ctx.Ctx,
+			Client: cli,
+			EventRecorder: ctx.Recorder,
+			Logger: ctx.Log,
+		},
 	}
-	originCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
-	if originCluster == nil || reflect.DeepEqual(originCluster.Status, p.cluster.Status) {
-		return nil
-	}
-	return p.cli.Status().Patch(p.ctx.Ctx, p.cluster, client.MergeFrom(originCluster.DeepCopy()))
 }
 
-func (c *clusterPlanBuilder) getClusterRefResources() (*clusterRefResources, error) {
-	cluster := c.cluster
-	cd := &appsv1alpha1.ClusterDefinition{}
-	if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{
-		Name: cluster.Spec.ClusterDefRef,
-	}, cd); err != nil {
-		return nil, err
-	}
-	cv := &appsv1alpha1.ClusterVersion{}
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{
-			Name: cluster.Spec.ClusterVersionRef,
-		}, cv); err != nil {
-			return nil, err
-		}
-	}
-
-	cc := &clusterRefResources{
-		cd: *cd,
-		cv: *cv,
-	}
-	return cc, nil
-}
-
+// TODO: retry strategy on error
 func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	node, ok := vertex.(*lifecycleVertex)
 	if !ok {
@@ -272,7 +194,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 			newSpec := reflect.ValueOf(curr).Elem().FieldByName("Spec").Interface()
 			if !reflect.DeepEqual(origSpec, newSpec) {
 				// sync component phase
-				updateComponentPhaseWithOperation(c.cluster, componentName)
+				updateComponentPhaseWithOperation(c.transCtx.Cluster, componentName)
 			}
 		}
 	}
@@ -295,8 +217,8 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 				//	return err
 				// }
 				patch := client.MergeFrom(origCluster.DeepCopy())
-				if err := c.cli.Patch(c.ctx.Ctx, cluster, patch); err != nil {
-					c.ctx.Log.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
+				if err := c.cli.Patch(c.transCtx.Context, cluster, patch); err != nil {
+					c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
 					return err
 				}
 			}
@@ -311,7 +233,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	}
 	switch *node.action {
 	case CREATE:
-		err := c.cli.Create(c.ctx.Ctx, node.obj)
+		err := c.cli.Create(c.transCtx.Context, node.obj)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
@@ -323,23 +245,23 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		if err != nil {
 			return err
 		}
-		err = c.cli.Update(c.ctx.Ctx, o)
+		err = c.cli.Update(c.transCtx.Context, o)
 		if err != nil && !apierrors.IsNotFound(err) {
-			c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", o, node.oriObj, o))
+			c.transCtx.Logger.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", o, node.oriObj, o))
 			return err
 		}
 		// TODO: find a better comparison way that knows whether fields are updated before calling the Update func
 		updateComponentPhaseIfNeeded(node.oriObj, o)
 	case DELETE:
 		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
-			err := c.cli.Update(c.ctx.Ctx, node.obj)
+			err := c.cli.Update(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
-				c.ctx.Log.Error(err, fmt.Sprintf("delete %T error, orig: %v, curr: %v", node.obj, node.oriObj, node.obj))
+				c.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error, orig: %v, curr: %v", node.obj, node.oriObj, node.obj))
 				return err
 			}
 		}
 		if node.isOrphan {
-			err := c.cli.Delete(c.ctx.Ctx, node.obj)
+			err := c.cli.Delete(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -349,7 +271,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		if isTypeOf[*snapshotv1.VolumeSnapshot](node.obj) ||
 			isTypeOf[*dataprotectionv1alpha1.BackupPolicy](node.obj) ||
 			isTypeOf[*dataprotectionv1alpha1.Backup](node.obj) {
-			_ = c.cli.Delete(c.ctx.Ctx, node.obj)
+			_ = c.cli.Delete(c.transCtx.Context, node.obj)
 		}
 
 	case STATUS:
@@ -357,7 +279,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 			return nil
 		}
 		patch := client.MergeFrom(node.oriObj)
-		if err := c.cli.Status().Patch(c.ctx.Ctx, node.obj, patch); err != nil {
+		if err := c.cli.Status().Patch(c.transCtx.Context, node.obj, patch); err != nil {
 			return err
 		}
 		for _, postHandle := range node.postHandleAfterStatusPatch {
@@ -374,7 +296,7 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		stsObj := origObj.DeepCopy()
 		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
 		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-			c.recorder.Eventf(c.cluster,
+			c.transCtx.EventRecorder.Eventf(c.transCtx.Cluster,
 				corev1.EventTypeNormal,
 				"HorizontalScale",
 				"Start horizontal scale component %s from %d to %d",
@@ -435,7 +357,7 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster) error {
 	switch cluster.Spec.TerminationPolicy {
 	case appsv1alpha1.DoNotTerminate:
-		c.recorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate", "spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
+		c.transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate", "spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
 		return nil
 	case appsv1alpha1.Delete, appsv1alpha1.WipeOut:
 		if err := c.deletePVCs(cluster); err != nil && !apierrors.IsNotFound(err) {
@@ -465,11 +387,11 @@ func (c *clusterPlanBuilder) deletePVCs(cluster *appsv1alpha1.Cluster) error {
 	inNS := client.InNamespace(cluster.Namespace)
 
 	pvcList := &corev1.PersistentVolumeClaimList{}
-	if err := c.cli.List(c.ctx.Ctx, pvcList, inNS, ml); err != nil {
+	if err := c.cli.List(c.transCtx.Context, pvcList, inNS, ml); err != nil {
 		return err
 	}
 	for _, pvc := range pvcList.Items {
-		if err := c.cli.Delete(c.ctx.Ctx, &pvc); err != nil {
+		if err := c.cli.Delete(c.transCtx.Context, &pvc); err != nil {
 			return err
 		}
 	}
@@ -482,7 +404,7 @@ func (c *clusterPlanBuilder) deleteBackupPolicies(cluster *appsv1alpha1.Cluster)
 		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	// clean backupPolicies
-	return c.cli.DeleteAllOf(c.ctx.Ctx, &dataprotectionv1alpha1.BackupPolicy{}, inNS, ml)
+	return c.cli.DeleteAllOf(c.transCtx.Context, &dataprotectionv1alpha1.BackupPolicy{}, inNS, ml)
 }
 
 func (c *clusterPlanBuilder) deleteBackups(cluster *appsv1alpha1.Cluster) error {
@@ -492,7 +414,7 @@ func (c *clusterPlanBuilder) deleteBackups(cluster *appsv1alpha1.Cluster) error 
 	}
 	// clean backups
 	backups := &dataprotectionv1alpha1.BackupList{}
-	if err := c.cli.List(c.ctx.Ctx, backups, inNS, ml); err != nil {
+	if err := c.cli.List(c.transCtx.Context, backups, inNS, ml); err != nil {
 		return err
 	}
 	for _, backup := range backups.Items {
@@ -500,7 +422,7 @@ func (c *clusterPlanBuilder) deleteBackups(cluster *appsv1alpha1.Cluster) error 
 		deleteProtection, exists := backup.GetLabels()[constant.BackupProtectionLabelKey]
 		// not found backup-protection or value is Delete, delete it.
 		if !exists || deleteProtection == constant.BackupDelete {
-			if err := c.cli.Delete(c.ctx.Ctx, &backup); err != nil {
+			if err := c.cli.Delete(c.transCtx.Context, &backup); err != nil {
 				return err
 			}
 		}

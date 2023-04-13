@@ -17,29 +17,27 @@ limitations under the License.
 package lifecycle
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-type EnableLogsValidator struct {
-	cr clusterRefResources
-}
+// ValidateEnableLogsTransformer validate config and send warning event log necessarily
+type ValidateEnableLogsTransformer struct {}
 
-func (e *EnableLogsValidator) Validate(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+func (e *ValidateEnableLogsTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	cluster := transCtx.Cluster
 	if isClusterDeleting(*cluster) {
 		return nil
 	}
 
 	// validate config and send warning event log necessarily
-	err = cluster.Spec.ValidateEnabledLogs(&e.cr.cd)
+	err := cluster.Spec.ValidateEnabledLogs(transCtx.ClusterDef)
 	setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
+	if err != nil {
+		return graph.FastReturnError
+	}
 
-	return err
+	return nil
 }
 
-var _ graph.Validator = &EnableLogsValidator{}
+var _ graph.Transformer = &ValidateEnableLogsTransformer{}

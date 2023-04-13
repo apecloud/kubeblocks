@@ -1,7 +1,7 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: backup-policy-template-mongodb
+  name: mongodb-backup-policy-template
   labels:
     clusterdefinition.kubeblocks.io/name: mongodb
     {{- include "mongodb.labels" . | nindent 4 }}

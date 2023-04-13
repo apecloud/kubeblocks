@@ -400,31 +400,7 @@ func updateConsensusRoleInfo(ctx context.Context,
 	componentDef *appsv1alpha1.ClusterComponentDefinition,
 	componentName string,
 	pods []corev1.Pod) error {
-	leader := ""
-	followers := ""
-	for _, pod := range pods {
-		if !intctrlutil.PodIsReadyWithLabel(pod) {
-			continue
-		}
-		role := pod.Labels[constant.RoleLabelKey]
-		// mapping role label to consensus member
-		roleMap := composeConsensusRoleMap(componentDef)
-		memberExt, ok := roleMap[role]
-		if !ok {
-			continue
-		}
-		switch memberExt.consensusRole {
-		case roleLeader:
-			leader = pod.Name
-		case roleFollower:
-			if len(followers) > 0 {
-				followers += ","
-			}
-			followers += pod.Name
-		case roleLearner:
-			// TODO: CT
-		}
-	}
+	leader, followers := composeRoleEnv(componentDef, pods)
 
 	ml := client.MatchingLabels{
 		constant.AppInstanceLabelKey:    cluster.GetName(),
@@ -460,4 +436,32 @@ func updateConsensusRoleInfo(ctx context.Context,
 	}
 
 	return nil
+}
+
+func composeRoleEnv(componentDef *appsv1alpha1.ClusterComponentDefinition, pods []corev1.Pod) (leader, followers string) {
+	leader, followers = "", ""
+	for _, pod := range pods {
+		if !intctrlutil.PodIsReadyWithLabel(pod) {
+			continue
+		}
+		role := pod.Labels[constant.RoleLabelKey]
+		// mapping role label to consensus member
+		roleMap := composeConsensusRoleMap(componentDef)
+		memberExt, ok := roleMap[role]
+		if !ok {
+			continue
+		}
+		switch memberExt.consensusRole {
+		case roleLeader:
+			leader = pod.Name
+		case roleFollower:
+			if len(followers) > 0 {
+				followers += ","
+			}
+			followers += pod.Name
+		case roleLearner:
+			// TODO: CT
+		}
+	}
+	return
 }

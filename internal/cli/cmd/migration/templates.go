@@ -1,13 +1,13 @@
 package migration
 
 import (
+	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/spf13/cobra"
 )
 
 func NewMigrationTemplatesCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -15,11 +15,11 @@ func NewMigrationTemplatesCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd := &cobra.Command{
 		Use:               "templates [NAME]",
 		Short:             "List migration templates.",
-		Example:           MigrationTemplateExample,
+		Example:           TemplateExample,
 		Aliases:           []string{"tp", "template"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
-			_, validErr := IsMigrationCrdValidWithFactory(&o.Factory)
+			_, validErr := IsMigrationCrdValidWithFactory(o.Factory)
 			util.CheckErr(validErr)
 			o.Names = args
 			_, err := o.Run()

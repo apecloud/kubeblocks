@@ -30,8 +30,8 @@ import (
 type DBTypeEnum string
 
 const (
-	MYSQL      DBTypeEnum = "MySQL" // default value
-	POSTGRESQL DBTypeEnum = "PostgreSQL"
+	MigrationDBTypeMySQL      DBTypeEnum = "MySQL" // default value
+	MigrationDBTypePostgreSQL DBTypeEnum = "PostgreSQL"
 )
 
 func (d DBTypeEnum) String() string {

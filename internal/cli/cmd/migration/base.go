@@ -22,6 +22,7 @@ const (
 )
 
 // Endpoint
+// Todo: For the source or target is cluster in KubeBlocks. A better way is to get secret from {$clustername}-conn-credential, so the username, password, addresses can be omitted
 
 type EndpointModel struct {
 	UserName string `json:"userName"`
@@ -182,12 +183,12 @@ func IsMigrationCrdValidWithDynamic(dynamic *dynamic.Interface) (bool, error) {
 	return true, nil
 }
 
-func IsMigrationCrdValidWithFactory(factory *cmdutil.Factory) (bool, error) {
-	dymatic, err := (*factory).DynamicClient()
+func IsMigrationCrdValidWithFactory(factory cmdutil.Factory) (bool, error) {
+	dynamic, err := factory.DynamicClient()
 	if err != nil {
 		return false, err
 	}
-	return IsMigrationCrdValidWithDynamic(&dymatic)
+	return IsMigrationCrdValidWithDynamic(&dynamic)
 }
 
 func APIResource(dynamic *dynamic.Interface, resource *schema.GroupVersionResource, name string, namespace string, res interface{}) error {
@@ -199,14 +200,6 @@ func APIResource(dynamic *dynamic.Interface, resource *schema.GroupVersionResour
 		return runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, res)
 	}
 	return nil
-}
-
-func TimeFormat(t *metav1.Time) string {
-	if t == nil || t.IsZero() {
-		return "-"
-	}
-	const layout = "Jan 02,2006 15:04:05 UTC-0700"
-	return t.Format(layout)
 }
 
 func BuildErrorMsg(msgArr *[]string, msg string) {

@@ -3,16 +3,16 @@ package migration
 import (
 	"bytes"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdTest "k8s.io/kubectl/pkg/cmd/testing"
 
 	app "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	v1alpha1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
-
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	v1alpha1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
 )
 
 var (
@@ -135,6 +135,22 @@ var _ = Describe("create", func() {
 			Expect(o.ResourceModel[v1alpha1.CliStepGlobal.String()]).ShouldNot(BeEmpty())
 			Expect(o.ResourceModel[v1alpha1.CliStepInitData.String()]).ShouldNot(BeEmpty())
 			Expect(o.ResourceModel[v1alpha1.CliStepPreCheck.String()]).Should(BeEmpty())
+		})
+
+		It("RuntimeParams", func() {
+			type void struct{}
+			var setValue void
+			serverIdSet := make(map[uint32]void)
+
+			loopCount := 0
+			for loopCount < 1000 {
+				newServerId := o.generateRandomMySqlServerId()
+				Expect(newServerId >= 10001 && newServerId <= 1<<32-10001).Should(BeTrue())
+				serverIdSet[newServerId] = setValue
+
+				loopCount += 1
+			}
+			Expect(len(serverIdSet) > 500).Should(BeTrue())
 		})
 	})
 

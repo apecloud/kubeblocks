@@ -16,10 +16,29 @@ limitations under the License.
 
 package v1alpha1
 
+import (
+	"fmt"
+	"strings"
+)
+
 type MigrationObjectExpress struct {
 	WhiteList []DBObjectExpress `json:"whiteList"`
 	// +optional
 	BlackList []DBObjectExpress `json:"blackList"`
+}
+
+func (m *MigrationObjectExpress) String(isWhite bool) string {
+	expressArr := m.WhiteList
+	if !isWhite {
+		expressArr = m.BlackList
+	}
+	stringArr := make([]string, 0)
+	for _, db := range expressArr {
+		for _, dbStr := range db.String() {
+			stringArr = append(stringArr, dbStr)
+		}
+	}
+	return strings.Join(stringArr, ",")
 }
 
 type DBObjectExpress struct {
@@ -31,6 +50,18 @@ type DBObjectExpress struct {
 	// +optional
 	TableList   []TableObjectExpress `json:"tableList"`
 	DxlOpConfig `json:""`
+}
+
+func (d *DBObjectExpress) String() []string {
+	stringArr := make([]string, 0)
+	if d.IsAll {
+		stringArr = append(stringArr, d.SchemaName)
+	} else {
+		for _, tb := range d.TableList {
+			stringArr = append(stringArr, fmt.Sprintf("%s.%s", d.SchemaName, tb.TableName))
+		}
+	}
+	return stringArr
 }
 
 type TableObjectExpress struct {

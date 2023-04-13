@@ -7,7 +7,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/spf13/cobra"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,7 +24,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	v1alpha1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -61,7 +62,7 @@ func NewMigrationDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 	cmd := &cobra.Command{
 		Use:               "describe NAME",
 		Short:             "Show details of a specific migration task.",
-		Example:           MigrationDescribeExample,
+		Example:           DescribeExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.MigrationTaskGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(args))
@@ -118,6 +119,9 @@ func (o *describeOptions) describeMigration(name string) error {
 	// MigrationTask Summary
 	showTaskSummary(o.Task, o.Out)
 
+	// MigrationTask Config
+	showTaskConfig(o.Task, o.Out)
+
 	// MigrationTemplate Summary
 	showTemplateSummary(o.Template, o.Out)
 
@@ -172,7 +176,28 @@ func showTaskSummary(task *v1alpha1.MigrationTask, out io.Writer) {
 	}
 	title := fmt.Sprintf("Name: %s\t Status: %s", task.Name, task.Status.TaskStatus)
 	tbl := newTbl(out, title, "NAMESPACE", "CREATED-TIME", "START-TIME", "FINISHED-TIME")
-	tbl.AddRow(task.Namespace, TimeFormat(&task.CreationTimestamp), TimeFormat(task.Status.StartTime), TimeFormat(task.Status.FinishTime))
+	tbl.AddRow(task.Namespace, util.TimeFormatWithDuration(&task.CreationTimestamp, time.Second), util.TimeFormatWithDuration(task.Status.StartTime, time.Second), util.TimeFormatWithDuration(task.Status.FinishTime, time.Second))
+	tbl.Print()
+}
+
+func showTaskConfig(task *v1alpha1.MigrationTask, out io.Writer) {
+	if task == nil {
+		return
+	}
+	tbl := newTbl(out, "\nMigration Config:")
+	tbl.AddRow("source", fmt.Sprintf("%s:%s@%s/%s",
+		task.Spec.SourceEndpoint.UserName,
+		task.Spec.SourceEndpoint.Password,
+		task.Spec.SourceEndpoint.Address,
+		task.Spec.SourceEndpoint.DatabaseName,
+	))
+	tbl.AddRow("sink", fmt.Sprintf("%s:%s@%s/%s",
+		task.Spec.SinkEndpoint.UserName,
+		task.Spec.SinkEndpoint.Password,
+		task.Spec.SinkEndpoint.Address,
+		task.Spec.SinkEndpoint.DatabaseName,
+	))
+	tbl.AddRow("migration objects", task.Spec.MigrationObj.String(true))
 	tbl.Print()
 }
 
@@ -203,7 +228,7 @@ func showInitialization(task *v1alpha1.MigrationTask, template *v1alpha1.Migrati
 		return
 	}
 	for i, job := range jobList.Items {
-		tbl.AddRow(cliStepOrder[i], job.Namespace, getJobStatus(job.Status.Conditions), TimeFormat(&job.CreationTimestamp), TimeFormat(job.Status.StartTime), TimeFormat(job.Status.CompletionTime))
+		tbl.AddRow(cliStepOrder[i], job.Namespace, getJobStatus(job.Status.Conditions), util.TimeFormatWithDuration(&job.CreationTimestamp, time.Second), util.TimeFormatWithDuration(job.Status.StartTime, time.Second), util.TimeFormatWithDuration(job.Status.CompletionTime, time.Second))
 	}
 	tbl.Print()
 }
@@ -217,7 +242,7 @@ func showCdc(pods *v1.PodList, out io.Writer) {
 		if pod.Annotations[MigrationTaskStepAnnotation] != v1alpha1.StepCdc.String() {
 			continue
 		}
-		tbl.AddRow(pod.Namespace, pod.Status.Phase, TimeFormat(&pod.CreationTimestamp), TimeFormat(pod.Status.StartTime))
+		tbl.AddRow(pod.Namespace, pod.Status.Phase, util.TimeFormatWithDuration(&pod.CreationTimestamp, time.Second), util.TimeFormatWithDuration(pod.Status.StartTime, time.Second))
 	}
 	tbl.Print()
 }

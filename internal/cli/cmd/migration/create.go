@@ -3,9 +3,12 @@ package migration
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
@@ -13,7 +16,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	migrationv1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -46,6 +48,7 @@ type CreateMigrationOptions struct {
 	TolerationModel      map[string][]interface{} `json:"tolerationModel,omitempty"`
 	Resources            []string                 `json:"resources,omitempty"`
 	ResourceModel        map[string]interface{}   `json:"resourceModel,omitempty"`
+	ServerId             uint32                   `json:"serverId,omitempty"`
 	create.BaseOptions
 }
 
@@ -53,8 +56,8 @@ func NewMigrationCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	o := &CreateMigrationOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
 		Use:                          "create name",
-		Short:                        "Create a Migration.",
-		Example:                      MigrationCreateTemplate,
+		Short:                        "Create a migration task.",
+		Example:                      CreateTemplate,
 		CueTemplateName:              "migration_template.cue",
 		ResourceName:                 types.ResourceMigrationTasks,
 		Group:                        types.MigrationAPIGroup,
@@ -128,6 +131,11 @@ func (o *CreateMigrationOptions) Validate() error {
 		return err
 	}
 
+	// RuntimeParams
+	if err = o.BuildWithRuntimeParams(); err != nil {
+		return err
+	}
+
 	// Log errors if necessary
 	if len(errMsgArr) > 0 {
 		return fmt.Errorf(strings.Join(errMsgArr, ";\n"))
@@ -167,14 +175,15 @@ func (o *CreateMigrationOptions) BuildWithSteps(errMsgArr *[]string) error {
 				enableInitData = enable
 			}
 		}
-		switch enableInitData == StringBoolTrue {
-		case true && enableCdc == StringBoolTrue:
-			taskType = InitializationAndCdc.String()
-		case true && enableCdc == StringBoolFalse:
-			taskType = Initialization.String()
-		default:
+
+		if enableInitData != StringBoolTrue {
 			BuildErrorMsg(errMsgArr, "step init-data is needed")
 			return nil
+		}
+		if enableCdc == StringBoolTrue {
+			taskType = InitializationAndCdc.String()
+		} else {
+			taskType = Initialization.String()
 		}
 	}
 	o.TaskType = taskType
@@ -217,6 +226,23 @@ func (o *CreateMigrationOptions) BuildWithResources() error {
 	return nil
 }
 
+func (o *CreateMigrationOptions) BuildWithRuntimeParams() error {
+	template := migrationv1.MigrationTemplate{}
+	templateGvr := types.MigrationTemplateGVR()
+	if err := APIResource(&o.BaseOptions.Dynamic, &templateGvr, o.Template, "", &template); err != nil {
+		return err
+	}
+
+	// Generate random serverId for MySQL type database.Possible values are between 10001 and 2^32-10001
+	if template.Spec.Source.DBType == migrationv1.MigrationDBTypeMySQL {
+		o.ServerId = o.generateRandomMySqlServerId()
+	} else {
+		o.ServerId = 10001
+	}
+
+	return nil
+}
+
 func (o *CreateMigrationOptions) buildTolerationOrResources(raws []string) map[string][]interface{} {
 	results := make(map[string][]interface{})
 	for _, raw := range raws {
@@ -239,4 +265,9 @@ func (o *CreateMigrationOptions) buildTolerationOrResources(raws []string) map[s
 		results[step] = append(results[step], tmpMap)
 	}
 	return results
+}
+
+func (o *CreateMigrationOptions) generateRandomMySqlServerId() uint32 {
+	rand.Seed(time.Now().UnixNano())
+	return uint32(rand.Int63nRange(10001, 1<<32-10001))
 }

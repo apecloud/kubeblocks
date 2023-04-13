@@ -138,6 +138,9 @@ var _ = Describe("util", func() {
 		t, _ := time.Parse(time.RFC3339, "2023-01-04T01:00:00.000Z")
 		metav1Time := metav1.Time{Time: t}
 		Expect(TimeFormat(&metav1Time)).Should(Equal("Jan 04,2023 01:00 UTC+0000"))
+		Expect(TimeFormatWithDuration(&metav1Time, time.Minute)).Should(Equal("Jan 04,2023 01:00 UTC+0000"))
+		Expect(TimeFormatWithDuration(&metav1Time, time.Second)).Should(Equal("Jan 04,2023 01:00:00 UTC+0000"))
+		Expect(TimeFormatWithDuration(&metav1Time, time.Millisecond)).Should(Equal("Jan 04,2023 01:00:00.000 UTC+0000"))
 	})
 
 	It("CheckEmpty", func() {

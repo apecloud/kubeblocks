@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,7 +22,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	migrationv1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/spf13/cobra"
 )
 
 type LogsOptions struct {
@@ -44,7 +44,7 @@ func NewMigrationLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	cmd := &cobra.Command{
 		Use:               "logs NAME",
 		Short:             "Access migration task log file.",
-		Example:           MigrationLogsExample,
+		Example:           LogsExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.MigrationTaskGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(l.ExecOptions.Complete())

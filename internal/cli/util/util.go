@@ -307,14 +307,30 @@ func OpenBrowser(url string) error {
 }
 
 func TimeFormat(t *metav1.Time) string {
+	return TimeFormatWithDuration(t, time.Minute)
+}
+
+// TimeFormatWithDuration format time with specified precision
+func TimeFormatWithDuration(t *metav1.Time, duration time.Duration) string {
 	if t == nil || t.IsZero() {
 		return ""
 	}
-	return TimeTimeFormat(t.Time)
+	return TimeTimeFormatWithDuration(t.Time, duration)
 }
 
 func TimeTimeFormat(t time.Time) string {
 	const layout = "Jan 02,2006 15:04 UTC-0700"
+	return t.Format(layout)
+}
+
+func TimeTimeFormatWithDuration(t time.Time, precision time.Duration) string {
+	layout := "Jan 02,2006 15:04 UTC-0700"
+	switch precision {
+	case time.Second:
+		layout = "Jan 02,2006 15:04:05 UTC-0700"
+	case time.Millisecond:
+		layout = "Jan 02,2006 15:04:05.000 UTC-0700"
+	}
 	return t.Format(layout)
 }
 

@@ -4,7 +4,7 @@ import "k8s.io/kubectl/pkg/util/templates"
 
 // Cli Migration Command Examples
 var (
-	MigrationCreateTemplate = templates.Examples(`
+	CreateTemplate = templates.Examples(`
 		# Create a migration task to migrate the entire database under mysql: mydb1 and mytable1 under database: mydb2 to the target mysql
 		kbcli migration create mytask --template apecloud-mysql2mysql 
 		--source user:123456@127.0.0.1:3306 
@@ -38,11 +38,11 @@ var (
 		--migration-object '"myschema"'
 		--resources '"step=init-data,cpu=1000m,memory=1Gi"'
 	`)
-	MigrationDescribeExample = templates.Examples(`
+	DescribeExample = templates.Examples(`
 		# describe a specified migration task
 		kbcli migration describe mytask
 	`)
-	MigrationListExample = templates.Examples(`
+	ListExample = templates.Examples(`
 		# list all migration tasks
 		kbcli migration list
 
@@ -58,7 +58,7 @@ var (
 		# list a single migration task in wide output format
 		kbcli migration list mytask -o wide
 	`)
-	MigrationTemplateExample = templates.Examples(`
+	TemplateExample = templates.Examples(`
 		# list all migration templates
 		kbcli migration templates
 
@@ -74,11 +74,11 @@ var (
 		# list a single migration template in wide output format
 		kbcli migration templates mytemplate -o wide
 	`)
-	MigrationDeleteExample = templates.Examples(`
+	DeleteExample = templates.Examples(`
 		# terminate a migration task named mytask and delete resources in k8s without affecting source and target data in database
 		kbcli migration terminate mytask
 	`)
-	MigrationLogsExample = templates.Examples(`
+	LogsExample = templates.Examples(`
 		# Logs when returning to the "init-struct" step from the migration task mytask
 		kbcli migration logs mytask --step init-struct
 

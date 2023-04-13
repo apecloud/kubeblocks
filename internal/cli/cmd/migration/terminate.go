@@ -3,13 +3,13 @@ package migration
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/spf13/cobra"
 )
 
 func NewMigrationTerminateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -17,10 +17,10 @@ func NewMigrationTerminateCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd := &cobra.Command{
 		Use:               "terminate NAME",
 		Short:             "Delete migration task.",
-		Example:           MigrationDeleteExample,
+		Example:           DeleteExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.MigrationTaskGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			_, validErr := IsMigrationCrdValidWithFactory(&o.Factory)
+			_, validErr := IsMigrationCrdValidWithFactory(o.Factory)
 			util.CheckErr(validErr)
 			util.CheckErr(deleteMigrationTask(o, args))
 		},

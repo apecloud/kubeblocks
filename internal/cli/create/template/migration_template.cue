@@ -30,6 +30,7 @@ options: {
 	tolerationModel:  {}
 	resources:         [...]
 	resourceModel:    {}
+	serverId:          int
 }
 
 // required, k8s api resource content
@@ -73,7 +74,10 @@ content: {
     		resource: {
     				limits: options.resourceModel["cdc"]
     			},
-    		tolerations: options.tolerationModel["cdc"]
+    		tolerations: options.tolerationModel["cdc"],
+    		param: {
+    			"extractor.server_id": options.serverId
+    		}
     	}
     }
     migrationObj: options.migrationObjectModel

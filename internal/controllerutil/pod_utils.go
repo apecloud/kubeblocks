@@ -217,6 +217,16 @@ func GetMemorySize(container corev1.Container) int64 {
 	return 0
 }
 
+// GetRequestMemorySize function description:
+// if not Resource field, return 0 else Resources.Limits.memory
+func GetRequestMemorySize(container corev1.Container) int64 {
+	requests := container.Resources.Requests
+	if val, ok := (requests)[corev1.ResourceMemory]; ok {
+		return val.Value()
+	}
+	return 0
+}
+
 // PodIsReady check the pod is ready
 func PodIsReady(pod *corev1.Pod) bool {
 	if pod.Status.Conditions == nil {

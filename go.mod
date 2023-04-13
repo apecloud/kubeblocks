@@ -39,6 +39,7 @@ require (
 	github.com/hashicorp/terraform-exec v0.18.0
 	github.com/jackc/pgx/v5 v5.2.0
 	github.com/jedib0t/go-pretty/v6 v6.4.4
+	github.com/json-iterator/go v1.1.12
 	github.com/k3d-io/k3d/v5 v5.4.4
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.2.0
 	github.com/leaanthony/debme v1.2.1
@@ -224,7 +225,6 @@ require (
 	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/klauspost/pgzip v1.2.6-0.20220930104621-17e8dac29df8 // indirect

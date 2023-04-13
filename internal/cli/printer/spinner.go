@@ -49,10 +49,12 @@ func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
 
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+		// Capture the interrupt signal, make the `spinner` program exit gracefully, and prevent the cursor from disappearing.
 		go func() {
 			<-c
 			s.Stop()
-			fmt.Print("\033[?25h")
+			// Show cursor in terminal.
+			fmt.Fprintf(os.Stdout, "\033[?25h")
 			os.Exit(0)
 		}()
 	}

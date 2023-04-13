@@ -7915,7 +7915,7 @@ spec:
                     probes:
                       description: probes setting for healthy checks.
                       properties:
-                        roleChangedProbe:
+                        roleProbe:
                           description: Probe for DB role changed check.
                           properties:
                             commands:
@@ -7962,9 +7962,8 @@ spec:
                             exceed the InitializationTimeoutSeconds time without a
                             role label, this component will enter the Failed/Abnormal
                             phase. Note that this configuration will only take effect
-                            if the component supports RoleChangedProbe and will not
-                            affect the life cycle of the pod. default values are 60
-                            seconds.
+                            if the component supports RoleProbe and will not affect
+                            the life cycle of the pod. default values are 60 seconds.
                           format: int32
                           minimum: 30
                           type: integer
@@ -8724,9 +8723,12 @@ spec:
                   - generate a random UUID v4 string. `$(UUID_B64)` - generate a random
                   UUID v4 BASE64 encoded string``. `$(UUID_STR_B64)` - generate a
                   random UUID v4 string then BASE64 encoded``. `$(UUID_HEX)` - generate
-                  a random UUID v4 wth HEX representation``. `$(SVC_FQDN)` - service
-                  FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+                  a random UUID v4 wth HEX representation``. `$(HEADLESS_SVC_FQDN)`
+                  - headless service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
                   where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
+                  attribute; `$(SVC_FQDN)` - service FQDN  placeholder, value pattern
+                  - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME
+                  is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
                   attribute; `$(SVC_PORT_<PORT-NAME>)` - a ServicePort''s port value
                   with specified port name, i.e, a servicePort JSON struct: { "name":
                   "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and

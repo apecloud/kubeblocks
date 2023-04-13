@@ -19,7 +19,7 @@ spec:
             accessMode: ReadWrite
         updateStrategy: BestEffortParallel
       probes:
-        roleChangedProbe:
+        roleProbe:
           periodSeconds: 1
           failureThreshold: 3
       service:

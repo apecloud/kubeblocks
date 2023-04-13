@@ -54,7 +54,7 @@ func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
 			<-c
 			s.Stop()
 			// Show cursor in terminal.
-			fmt.Fprintf(os.Stdout, "\033[?25h")
+			fmt.Fprintf(s.Writer, "\033[?25h")
 			os.Exit(0)
 		}()
 	}

@@ -134,16 +134,6 @@ var _ = Describe("ReplicationSet Switch", func() {
 			}
 			_ = podBuilder.Create(&testCtx).GetObject()
 		}
-		// TODO: should check pods' label
-		// isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
-		// if v == string(Primary) {
-		// 	Expect(err).To(Succeed())
-		// 	Expect(isStsPrimary).Should(BeTrue())
-		// } else {
-		// 	Expect(err).To(Succeed())
-		// 	Expect(isStsPrimary).ShouldNot(BeTrue())
-		// }
-
 		clusterComponentSpec := &clusterObj.Spec.ComponentSpecs[0]
 
 		mockSwitchHandler := &MockSwitchActionHandler{}

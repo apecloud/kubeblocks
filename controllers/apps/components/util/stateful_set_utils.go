@@ -123,31 +123,6 @@ func ConvertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 	return nil
 }
 
-// // Len is the implementation of the sort.Interface, calculate the length of the list of DescendingOrdinalSts.
-// // Deprecated: to be removed
-// func (dos DescendingOrdinalSts) Len() int {
-// 	return len(dos)
-// }
-
-// // Swap is the implementation of the sort.Interface, exchange two items in DescendingOrdinalSts.
-// // Deprecated: to be removed
-// func (dos DescendingOrdinalSts) Swap(i, j int) {
-// 	dos[i], dos[j] = dos[j], dos[i]
-// }
-//
-// // Less is the implementation of the sort.Interface, sort the size of the statefulSet ordinal in descending order.
-// // Deprecated: to be removed
-// func (dos DescendingOrdinalSts) Less(i, j int) bool {
-// 	return GetOrdinalSts(dos[i]) > GetOrdinalSts(dos[j])
-// }
-//
-// // GetOrdinalSts gets StatefulSet's ordinal. If StatefulSet has no ordinal, -1 is returned.
-// // Deprecated: to be removed
-// func GetOrdinalSts(sts *appsv1.StatefulSet) int {
-// 	_, ordinal := ParseParentNameAndOrdinal(sts.Name)
-// 	return ordinal
-// }
-
 // ParseParentNameAndOrdinal gets the name of cluster-component and StatefulSet's ordinal as extracted from its Name. If
 // the StatefulSet's Name was not match a statefulSetRegex, its parent is considered to be empty string,
 // and its ordinal is considered to be -1.

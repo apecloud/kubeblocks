@@ -405,68 +405,6 @@ var _ = Describe("OpsRequest Controller", func() {
 				Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
 
-		// // TODO: caught error, following setup tailored for old Replication workload component, ought to remove
-		// It("test stop/start ops", func() {
-		// 	By("Create a stop ops")
-		// 	stopOpsName := "stop-ops" + testCtx.GetRandomStr()
-		// 	stopOps := testapps.NewOpsRequestObj(stopOpsName, clusterObj.Namespace,
-		// 		clusterObj.Name, appsv1alpha1.StopType)
-		// 	Expect(testCtx.CreateObj(testCtx.Ctx, stopOps)).Should(Succeed())
-		// 	clusterKey = client.ObjectKeyFromObject(clusterObj)
-		// 	opsKey := client.ObjectKeyFromObject(stopOps)
-		// 	Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-		//
-		// 	By("should be Running before pods are not deleted successfully")
-		// 	// mock deleting pod
-		// 	for _, pod := range podList {
-		// 		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
-		// 	}
-		// 	// reconcile opsRequest
-		// 	Expect(testapps.ChangeObj(&testCtx, stopOps, func(lOpsReq *appsv1alpha1.OpsRequest) {
-		// 		lOpsReq.Annotations = map[string]string{
-		// 			constant.ReconcileAnnotationKey: time.Now().Format(time.RFC3339Nano),
-		// 		}
-		// 	})).ShouldNot(HaveOccurred())
-		// 	Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
-		// 	Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-		//
-		// 	By("ops phase should be Succeed")
-		// 	checkLatestOpsIsProcessing(clusterKey, stopOps.Spec.Type)
-		// 	// mock pod deleted successfully
-		// 	for _, pod := range podList {
-		// 		Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
-		// 			lpod.SetFinalizers([]string{})
-		// 		})).ShouldNot(HaveOccurred())
-		// 	}
-		// 	Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StoppedClusterPhase))
-		// 	// reconcile opsRequest
-		// 	Expect(testapps.ChangeObj(&testCtx, stopOps, func(lopsReq *appsv1alpha1.OpsRequest) {
-		// 		lopsReq.Annotations = map[string]string{
-		// 			constant.ReconcileAnnotationKey: time.Now().Format(time.RFC3339Nano),
-		// 		}
-		// 	})).ShouldNot(HaveOccurred())
-		// 	// still in Running phase due to Cluster.status.phase == Updating
-		// 	//   [FAILED] Timed out after 10.001s.
-		// 	//  Expected
-		// 	//      <v1alpha1.OpsPhase>: Running
-		// 	//  to equal
-		// 	//      <v1alpha1.OpsPhase>: Succeed
-		// 	Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
-		// 	checkLatestOpsHasProcessed(clusterKey)
-		//
-		// 	By("test start ops")
-		// 	startOpsName := "start-ops" + testCtx.GetRandomStr()
-		// 	startOps := testapps.NewOpsRequestObj(startOpsName, clusterObj.Namespace,
-		// 		clusterObj.Name, appsv1alpha1.StartType)
-		// 	opsKey = client.ObjectKeyFromObject(startOps)
-		// 	Expect(testCtx.CreateObj(testCtx.Ctx, startOps)).Should(Succeed())
-		// 	Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-		// 	// mock sts ready and create pod
-		// 	createStsPodAndMockStsReady()
-		// 	Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
-		// 	Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
-		// })
-
 		It("delete Running opsRequest", func() {
 			By("Create a volume-expand ops")
 			opsName := "volume-expand" + testCtx.GetRandomStr()

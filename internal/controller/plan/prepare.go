@@ -239,12 +239,6 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	// TODO: refactor following with pod watcher and apply label to matching pod
-	// if stsIndex == task.Component.GetPrimaryIndex() {
-	// 	sts.Labels[constant.RoleLabelKey] = string(replicationset.Primary)
-	// } else {
-	// 	sts.Labels[constant.RoleLabelKey] = string(replicationset.Secondary)
-	// }
 	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
 	return sts, nil
 }

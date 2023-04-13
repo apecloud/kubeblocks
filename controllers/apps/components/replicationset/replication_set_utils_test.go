@@ -154,7 +154,7 @@ var _ = Describe("ReplicationSet Util", func() {
 
 		By("testing sync cluster status with remove pod")
 		var podRemoveList []corev1.Pod
-		*sts.Spec.Replicas = *sts.Spec.Replicas - 1
+		*sts.Spec.Replicas -= 1
 		podRemoveList = append(podRemoveList, podList[len(podList)-1])
 		Expect(removeTargetPodsInfoInStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus,
 			podRemoveList, clusterObj.Spec.ComponentSpecs[0].Replicas)).Should(Succeed())

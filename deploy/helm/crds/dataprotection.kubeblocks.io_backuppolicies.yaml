@@ -389,7 +389,7 @@ spec:
                         type: boolean
                       type:
                         description: the type of base backup, only support full and
-                          incremental.
+                          snapshot.
                         enum:
                         - full
                         - snapshot
@@ -586,7 +586,7 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: 'backup policy phase valid value: Available, failed.'
+                description: 'backup policy phase valid value: Available, Failed.'
                 enum:
                 - Available
                 - Failed

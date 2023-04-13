@@ -61,7 +61,10 @@ data:
     set -ex
     KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
     if [ "$KB_PRIMARY_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
-        sleep 3
+        # waiting for primary pod to be ready
+        until pg_isready -U {{ default "postgres" | quote }} -h $KB_PRIMARY_POD_NAME -p 5432; do
+            sleep 5
+        done
     fi
     python3 /kb-scripts/generate_patroni_yaml.py tmp_patroni.yaml
     export SPILO_CONFIGURATION=$(cat tmp_patroni.yaml)

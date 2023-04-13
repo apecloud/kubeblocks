@@ -208,11 +208,11 @@ var _ = Describe("OpsRequest Controller", func() {
 		checkLatestOpsHasProcessed(clusterKey)
 
 		By("patch opsrequest controller to run")
-		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
-			if verticalScalingOpsRequest.Annotations == nil {
-				verticalScalingOpsRequest.Annotations = map[string]string{}
+		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {
+			if lopsReq.Annotations == nil {
+				lopsReq.Annotations = map[string]string{}
 			}
-			verticalScalingOpsRequest.Annotations[constant.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+			lopsReq.Annotations[constant.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
 		})).ShouldNot(HaveOccurred())
 
 		By("check VerticalScalingOpsRequest succeed")
@@ -225,8 +225,8 @@ var _ = Describe("OpsRequest Controller", func() {
 		})).Should(Succeed())
 
 		By("check OpsRequest reclaimed after ttl")
-		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
-			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
+		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {
+			lopsReq.Spec.TTLSecondsAfterSucceed = 1
 		})).ShouldNot(HaveOccurred())
 
 		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest), verticalScalingOpsRequest, false)).Should(Succeed())
@@ -338,8 +338,8 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("delete h-scale ops")
 			testapps.DeleteObject(&testCtx, opsKey, ops)
-			Expect(testapps.ChangeObj(&testCtx, ops, func() {
-				ops.Finalizers = []string{}
+			Expect(testapps.ChangeObj(&testCtx, ops, func(lopsReq *appsv1alpha1.OpsRequest) {
+				lopsReq.SetFinalizers([]string{})
 			})).ShouldNot(HaveOccurred())
 
 			By("reset replicas to 1 and cluster should reconcile to Running")
@@ -419,8 +419,8 @@ var _ = Describe("OpsRequest Controller", func() {
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 			}
 			// reconcile opsRequest
-			Expect(testapps.ChangeObj(&testCtx, stopOps, func() {
-				stopOps.Annotations = map[string]string{
+			Expect(testapps.ChangeObj(&testCtx, stopOps, func(lOpsReq *appsv1alpha1.OpsRequest) {
+				lOpsReq.Annotations = map[string]string{
 					constant.ReconcileAnnotationKey: time.Now().Format(time.RFC3339Nano),
 				}
 			})).ShouldNot(HaveOccurred())
@@ -431,14 +431,14 @@ var _ = Describe("OpsRequest Controller", func() {
 			checkLatestOpsIsProcessing(clusterKey, stopOps.Spec.Type)
 			// mock pod deleted successfully
 			for _, pod := range podList {
-				Expect(testapps.ChangeObj(&testCtx, pod, func() {
-					pod.Finalizers = make([]string, 0)
+				Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+					lpod.SetFinalizers([]string{})
 				})).ShouldNot(HaveOccurred())
 			}
 			By("ops phase should be Succeed")
 			// reconcile opsRequest
-			Expect(testapps.ChangeObj(&testCtx, stopOps, func() {
-				stopOps.Annotations = map[string]string{
+			Expect(testapps.ChangeObj(&testCtx, stopOps, func(lopsReq *appsv1alpha1.OpsRequest) {
+				lopsReq.Annotations = map[string]string{
 					constant.ReconcileAnnotationKey: time.Now().Format(time.RFC3339Nano),
 				}
 			})).ShouldNot(HaveOccurred())
@@ -487,8 +487,8 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("delete the Running ops")
 			testapps.DeleteObject(&testCtx, opsKey, volumeExpandOps)
-			Expect(testapps.ChangeObj(&testCtx, volumeExpandOps, func() {
-				volumeExpandOps.Finalizers = []string{}
+			Expect(testapps.ChangeObj(&testCtx, volumeExpandOps, func(lopsReq *appsv1alpha1.OpsRequest) {
+				lopsReq.SetFinalizers([]string{})
 			})).ShouldNot(HaveOccurred())
 
 			By("check the cluster annotation")

@@ -177,8 +177,8 @@ var _ = Describe("Replication Component", func() {
 			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			// mock pod label is empty
-			Expect(testapps.ChangeObj(&testCtx, primaryPod, func() {
-				primaryPod.Labels[constant.RoleLabelKey] = ""
+			Expect(testapps.ChangeObj(&testCtx, primaryPod, func(lpod *corev1.Pod) {
+				lpod.Labels[constant.RoleLabelKey] = ""
 			})).Should(Succeed())
 			_, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj),

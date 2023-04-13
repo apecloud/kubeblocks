@@ -91,7 +91,7 @@ var _ = Describe("Cluster Controller", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		// non-namespaced
@@ -1171,8 +1171,8 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	updateClusterAnnotation := func(cluster *appsv1alpha1.Cluster) {
-		Expect(testapps.ChangeObj(&testCtx, cluster, func() {
-			cluster.Annotations = map[string]string{
+		Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
+			lcluster.Annotations = map[string]string{
 				"time": time.Now().Format(time.RFC3339),
 			}
 		})).ShouldNot(HaveOccurred())

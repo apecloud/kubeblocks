@@ -145,8 +145,8 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 		for _, newReplicas := range []int32{4, 2, 7, 1} {
 			By(fmt.Sprintf("horizontal scale out to %d", newReplicas))
-			Expect(testapps.ChangeObj(&testCtx, clusterObj, func() {
-				clusterObj.Spec.ComponentSpecs[0].Replicas = newReplicas
+			Expect(testapps.ChangeObj(&testCtx, clusterObj, func(lcluster *appsv1alpha1.Cluster) {
+				lcluster.Spec.ComponentSpecs[0].Replicas = newReplicas
 			})).Should(Succeed())
 
 			By("Wait for the cluster to be running")

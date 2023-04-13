@@ -589,7 +589,7 @@ func mockContainerError(pod *corev1.Pod) error {
 }
 
 func setPodRole(pod *corev1.Pod, role string) error {
-	return testapps.ChangeObj(&testCtx, pod, func() {
-		pod.Labels[constant.RoleLabelKey] = role
+	return testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+		lpod.Labels[constant.RoleLabelKey] = role
 	})
 }

@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -262,8 +263,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 				clusterVersionName, clusterName, "consensus", consensusCompName)
 			// init storageClass
 			sc := testapps.CreateStorageClass(testCtx, storageClassName, true)
-			Expect(testapps.ChangeObj(&testCtx, sc, func() {
-				sc.Annotations = map[string]string{storage.IsDefaultStorageClassAnnotation: "true"}
+			Expect(testapps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {
+				lsc.Annotations = map[string]string{storage.IsDefaultStorageClassAnnotation: "true"}
 			})).ShouldNot(HaveOccurred())
 
 			opsRes := &OpsResource{

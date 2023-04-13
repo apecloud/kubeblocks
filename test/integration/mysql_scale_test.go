@@ -135,8 +135,8 @@ var _ = Describe("MySQL Scaling function", func() {
 		})).Should(Succeed())
 
 		By("check OpsRequest reclaimed after ttl")
-		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
-			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
+		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {
+			lopsReq.Spec.TTLSecondsAfterSucceed = 1
 		})).Should(Succeed())
 
 		By("OpsRequest reclaimed after ttl")

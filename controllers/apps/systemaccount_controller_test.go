@@ -436,7 +436,9 @@ var _ = Describe("SystemAccount Controller", func() {
 					jobs := &batchv1.JobList{}
 					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					for _, job := range jobs.Items {
-						g.Expect(testapps.ChangeObj(&testCtx, &job, func() { controllerutil.RemoveFinalizer(&job, orphanFinalizerName) })).To(Succeed())
+						g.Expect(testapps.ChangeObj(&testCtx, &job, func(ljob *batchv1.Job) {
+							controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
+						})).To(Succeed())
 					}
 					g.Expect(len(jobs.Items)).To(Equal(0), "Verify all jobs completed and deleted")
 				}).Should(Succeed())
@@ -672,7 +674,9 @@ var _ = Describe("SystemAccount Controller", func() {
 					tmpJob := &batchv1.Job{}
 					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())
 					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
-					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func() { controllerutil.RemoveFinalizer(tmpJob, orphanFinalizerName) })).To(Succeed())
+					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func(ljob *batchv1.Job) {
+						controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
+					})).To(Succeed())
 				}).Should(Succeed())
 
 				By("Verify jobs size decreased and secrets size increased")
@@ -710,7 +714,9 @@ var _ = Describe("SystemAccount Controller", func() {
 					err := k8sClient.Get(ctx, jobKey, tmpJob)
 					g.Expect(err).To(Succeed())
 					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
-					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func() { controllerutil.RemoveFinalizer(tmpJob, orphanFinalizerName) })).To(Succeed())
+					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func(ljob *batchv1.Job) {
+						controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
+					})).To(Succeed())
 				}).Should(Succeed())
 
 				By("Verify jobs size decreased and secrets size increased")

@@ -166,8 +166,8 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("create horizontalScaling operation to test the progressDetails when scaling up the replicas ")
 			initClusterForOps(opsRes)
 			expectClusterComponentReplicas := int32(2)
-			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func() {
-				opsRes.Cluster.Spec.ComponentSpecs[1].Replicas = expectClusterComponentReplicas
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(lcluster *appsv1alpha1.Cluster) {
+				lcluster.Spec.ComponentSpecs[1].Replicas = expectClusterComponentReplicas
 			})).ShouldNot(HaveOccurred())
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 3)
 			// update ops phase to Running first

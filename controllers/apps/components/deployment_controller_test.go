@@ -123,8 +123,8 @@ var _ = Describe("Deployment Controller", func() {
 				}
 			})).Should(Succeed())
 			// mark deployment to reconcile
-			Expect(testapps.ChangeObj(&testCtx, deploy, func() {
-				deploy.Annotations = map[string]string{
+			Expect(testapps.ChangeObj(&testCtx, deploy, func(ldeploy *appsv1.Deployment) {
+				ldeploy.Annotations = map[string]string{
 					"reconcile": "1",
 				}
 			})).Should(Succeed())

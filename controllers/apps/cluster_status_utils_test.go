@@ -51,14 +51,11 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-
 		testapps.ClearClusterResources(&testCtx)
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		// testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
 	}
 	BeforeEach(cleanEnv)
 
@@ -301,9 +298,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				g.Expect(tmpCluster.Status.Components).Should(HaveLen(len(tmpCluster.Spec.ComponentSpecs)))
 			})).Should(Succeed())
 
-			changeAndCheckComponents := func(changeFunc func(), expectObservedGeneration int64, checkFun func(Gomega, *appsv1alpha1.Cluster)) {
-				Expect(testapps.ChangeObj(&testCtx, cluster, func() {
-					changeFunc()
+			changeAndCheckComponents := func(changeFunc func(*appsv1alpha1.Cluster), expectObservedGeneration int64, checkFun func(Gomega, *appsv1alpha1.Cluster)) {
+				Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
+					changeFunc(lcluster)
 				})).ShouldNot(HaveOccurred())
 				// wait for cluster controller reconciles to complete.
 				Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(cluster))).Should(Equal(expectObservedGeneration))
@@ -313,8 +310,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("delete consensus component")
 			consensusClusterComponent := cluster.Spec.ComponentSpecs[2]
 			changeAndCheckComponents(
-				func() {
-					cluster.Spec.ComponentSpecs = cluster.Spec.ComponentSpecs[:2]
+				func(lcluster *appsv1alpha1.Cluster) {
+					lcluster.Spec.ComponentSpecs = cluster.Spec.ComponentSpecs[:2]
 				}, 2,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					g.Expect(tmpCluster.Status.Components).Should(HaveLen(2))
@@ -324,8 +321,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("add consensus component")
 			consensusClusterComponent.Name = "consensus1"
 			changeAndCheckComponents(
-				func() {
-					cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, consensusClusterComponent)
+				func(lcluster *appsv1alpha1.Cluster) {
+					lcluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, consensusClusterComponent)
 				}, 3,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					_, isExist := tmpCluster.Status.Components[consensusClusterComponent.Name]
@@ -336,8 +333,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("modify consensus component name")
 			modifyConsensusName := "consensus2"
 			changeAndCheckComponents(
-				func() {
-					cluster.Spec.ComponentSpecs[2].Name = modifyConsensusName
+				func(lcluster *appsv1alpha1.Cluster) {
+					lcluster.Spec.ComponentSpecs[2].Name = modifyConsensusName
 				}, 4,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					_, isExist := tmpCluster.Status.Components[modifyConsensusName]

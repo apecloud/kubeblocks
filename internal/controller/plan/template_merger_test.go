@@ -47,6 +47,11 @@ max_connections=1000
 default_storage_engine=xengine
 log_error_verbosity=3
 
+xengine_compression_per_level=kNoCompression:KZSTD:kZSTD
+xengine_db_total_write_buffer_size=307
+xengine_block_cache_size=307
+xengine_row_cache_size=102
+
 max_connections=666
 `
 	const (
@@ -142,6 +147,8 @@ max_connections=666
 			Expect(configObject.Get("default_storage_engine")).Should(BeEquivalentTo("xengine"))
 			Expect(configObject.Get("log_error_verbosity")).Should(BeEquivalentTo("3"))
 			Expect(configObject.Get("max_connections")).Should(BeEquivalentTo("666"))
+			Expect(configObject.Get("xengine_compression_per_level")).Should(BeEquivalentTo("kNoCompression:KZSTD:kZSTD"))
+			Expect(configObject.Get("xengine_block_cache_size")).Should(BeEquivalentTo("307"))
 		})
 	})
 

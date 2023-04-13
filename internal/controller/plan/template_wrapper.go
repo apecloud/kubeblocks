@@ -125,7 +125,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileT
 				return err
 			}
 		}
-		if err := wrapper.checkAndPatchConfigResource(origCMObj, newCMObj.Data); err != nil {
+		if err := wrapper.checkAndPatchConfigResource(origCMObj, newCMObj); err != nil {
 			return err
 		}
 		updateCMConfigSpecLabels(newCMObj, configSpec)
@@ -178,20 +178,23 @@ func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.Compo
 	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = object.GetName()
 }
 
-func (wrapper *renderWrapper) checkAndPatchConfigResource(origCMObj *corev1.ConfigMap, newData map[string]string) error {
+func (wrapper *renderWrapper) checkAndPatchConfigResource(origCMObj *corev1.ConfigMap, newCMObject *corev1.ConfigMap) error {
 	if origCMObj == nil {
 		return nil
 	}
-	if reflect.DeepEqual(origCMObj.Data, newData) {
+	if reflect.DeepEqual(origCMObj.Data, newCMObject.Data) {
 		return nil
 	}
 
 	patch := client.MergeFrom(origCMObj.DeepCopy())
-	origCMObj.Data = newData
+	origCMObj.Data = newCMObject.Data
 	if origCMObj.Annotations == nil {
 		origCMObj.Annotations = make(map[string]string)
 	}
 	cfgcore.SetParametersUpdateSource(origCMObj, constant.ReconfigureManagerSource)
+	if importedTemplateSignature, ok := newCMObject.Annotations[constant.CMImportedConfigTemplateLabelKey]; ok {
+		origCMObj.Annotations[constant.CMImportedConfigTemplateLabelKey] = importedTemplateSignature
+	}
 	rawData, err := json.Marshal(origCMObj.Data)
 	if err != nil {
 		return err

@@ -24,3 +24,13 @@ data:
       format: ini
       iniConfig:
         sectionName: mysqld
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xengine-config-template
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+data:
+  my.cnf: |-
+    {{- .Files.Get "config/xengine-config.tpl" | nindent 4 }}

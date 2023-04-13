@@ -49,6 +49,7 @@ const (
 	builtInGetPortFunctionName            = "getPortByName"
 	builtInGetContainerFunctionName       = "getContainerByName"
 	builtInGetContainerMemoryFunctionName = "getContainerMemory"
+	builtInGetContainerCoreFunctionName   = "getContainerCPU"
 
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
@@ -180,6 +181,7 @@ func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.Synt
 		builtInGetArgFunctionName:             getArgByName,
 		builtInGetContainerFunctionName:       getPodContainerByName,
 		builtInGetContainerMemoryFunctionName: getContainerMemory,
+		builtInGetContainerCoreFunctionName:   getContainerCPU,
 		builtInGetCAFile:                      getCAFile,
 		builtInGetCertFile:                    getCertFile,
 		builtInGetKeyFile:                     getKeyFile,

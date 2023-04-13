@@ -661,9 +661,13 @@ func BuildAddonReleaseName(addon string) string {
 
 // CombineLabels combines labels into a string
 func CombineLabels(labels map[string]string) string {
-	var labelStr string
+	var labelStr []string
 	for k, v := range labels {
-		labelStr += fmt.Sprintf("%s=%s,", k, v)
+		labelStr = append(labelStr, fmt.Sprintf("%s=%s", k, v))
 	}
-	return strings.TrimSuffix(labelStr, ",")
+
+	// sort labelStr to make sure the order is stable
+	sort.Strings(labelStr)
+
+	return strings.Join(labelStr, ",")
 }

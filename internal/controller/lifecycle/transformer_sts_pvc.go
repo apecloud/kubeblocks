@@ -26,7 +26,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-type StsPVCTransformer struct {}
+type StsPVCTransformer struct{}
 
 func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)

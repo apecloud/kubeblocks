@@ -21,7 +21,7 @@ import (
 )
 
 // ValidateEnableLogsTransformer validate config and send warning event log necessarily
-type ValidateEnableLogsTransformer struct {}
+type ValidateEnableLogsTransformer struct{}
 
 func (e *ValidateEnableLogsTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
@@ -34,7 +34,7 @@ func (e *ValidateEnableLogsTransformer) Transform(ctx graph.TransformContext, da
 	err := cluster.Spec.ValidateEnabledLogs(transCtx.ClusterDef)
 	setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	if err != nil {
-		return graph.FastReturnError
+		return graph.ErrFastReturn
 	}
 
 	return nil

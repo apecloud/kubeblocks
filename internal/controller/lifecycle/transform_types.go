@@ -62,17 +62,9 @@ const (
 	STATUS = Action("STATUS")
 )
 
-// default reconcile requeue after duration
-var requeueDuration = time.Millisecond * 100
-
 type gvkName struct {
 	gvk      schema.GroupVersionKind
 	ns, name string
-}
-
-type clusterRefResources struct {
-	cd appsv1alpha1.ClusterDefinition
-	cv appsv1alpha1.ClusterVersion
 }
 
 // lifecycleVertex describes expected object spec and how to reach it

@@ -50,10 +50,10 @@ type ClusterTransformContext struct {
 	Client roclient.ReadonlyClient
 	record.EventRecorder
 	logr.Logger
-	Cluster *appsv1alpha1.Cluster
+	Cluster     *appsv1alpha1.Cluster
 	OrigCluster *appsv1alpha1.Cluster
-	ClusterDef *appsv1alpha1.ClusterDefinition
-	ClusterVer *appsv1alpha1.ClusterVersion
+	ClusterDef  *appsv1alpha1.ClusterDefinition
+	ClusterVer  *appsv1alpha1.ClusterVersion
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation
@@ -103,7 +103,7 @@ func (c *clusterPlanBuilder) Init() error {
 	c.transCtx.Cluster = cluster
 	c.transCtx.OrigCluster = cluster.DeepCopy()
 	c.transformers = append(c.transformers, &initTransformer{
-		cluster: c.transCtx.Cluster,
+		cluster:       c.transCtx.Cluster,
 		originCluster: c.transCtx.OrigCluster,
 	})
 	return nil
@@ -166,13 +166,13 @@ func (p *clusterPlan) Execute() error {
 // NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
 func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
 	return &clusterPlanBuilder{
-		req:      req,
-		cli:      cli,
+		req: req,
+		cli: cli,
 		transCtx: &ClusterTransformContext{
-			Context: ctx.Ctx,
-			Client: cli,
+			Context:       ctx.Ctx,
+			Client:        cli,
 			EventRecorder: ctx.Recorder,
-			Logger: ctx.Log,
+			Logger:        ctx.Log,
 		},
 	}
 }

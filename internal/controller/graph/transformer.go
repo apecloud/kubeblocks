@@ -40,7 +40,7 @@ type Transformer interface {
 
 type TransformerChain []Transformer
 
-var FastReturnError = errors.New("fast return")
+var ErrFastReturn = errors.New("fast return")
 
 func (t *TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
 	if t == nil {
@@ -55,7 +55,7 @@ func (t *TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
 }
 
 func fastReturnErrorToNil(err error) error {
-	if err == FastReturnError {
+	if err == ErrFastReturn {
 		return nil
 	}
 	return err

@@ -25,7 +25,7 @@ import (
 
 // LoadRefResourcesTransformer injects cd & cv into the shared transCtx, a little bit hacky
 // TODO: a better design to load cd & cv into the transformer chain
-type LoadRefResourcesTransformer struct {}
+type LoadRefResourcesTransformer struct{}
 
 func (t *LoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
@@ -36,7 +36,7 @@ func (t *LoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag 
 	cd := &appsv1alpha1.ClusterDefinition{}
 	if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{
 		Namespace: cluster.Namespace,
-		Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
+		Name:      cluster.Spec.ClusterDefRef}, cd); err != nil {
 		return err
 	}
 	var cv *appsv1alpha1.ClusterVersion
@@ -44,7 +44,7 @@ func (t *LoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag 
 		cv = &appsv1alpha1.ClusterVersion{}
 		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{
 			Namespace: cluster.Namespace,
-			Name: cluster.Spec.ClusterVersionRef,
+			Name:      cluster.Spec.ClusterVersionRef,
 		}, cv); err != nil {
 			return err
 		}

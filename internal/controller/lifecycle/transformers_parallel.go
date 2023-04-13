@@ -31,6 +31,7 @@ func (t *ParallelTransformers) Transform(ctx graph.TransformContext, dag *graph.
 	var group sync.WaitGroup
 	var errs error
 	for _, transformer := range t.transformers {
+		transformer := transformer
 		group.Add(1)
 		go func() {
 			err := transformer.Transform(ctx, dag)

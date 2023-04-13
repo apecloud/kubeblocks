@@ -16,7 +16,7 @@ import (
 )
 
 // FillClassTransformer fill the class related info to cluster
-type FillClassTransformer struct {}
+type FillClassTransformer struct{}
 
 func (r *FillClassTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)

@@ -28,7 +28,7 @@ import (
 )
 
 // TLSCertsTransformer handles tls certs provisioning or validation
-type TLSCertsTransformer struct {}
+type TLSCertsTransformer struct{}
 
 func (t *TLSCertsTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx := ctx.(*ClusterTransformContext)

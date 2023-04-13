@@ -19,8 +19,6 @@ package lifecycle
 import (
 	"context"
 	"fmt"
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -116,13 +114,6 @@ func isOwnerOf(owner, obj client.Object, scheme *runtime.Scheme) bool {
 
 func actionPtr(action Action) *Action {
 	return &action
-}
-
-func newRequeueError(after time.Duration, reason string) error {
-	return &realRequeueError{
-		reason:       reason,
-		requeueAfter: after,
-	}
 }
 
 func isClusterDeleting(cluster appsv1alpha1.Cluster) bool {

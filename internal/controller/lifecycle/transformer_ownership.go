@@ -25,7 +25,7 @@ import (
 )
 
 // OwnershipTransformer add finalizer to all none cluster objects
-type OwnershipTransformer struct {}
+type OwnershipTransformer struct{}
 
 func (f *OwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	rootVertex, err := findRootVertex(dag)

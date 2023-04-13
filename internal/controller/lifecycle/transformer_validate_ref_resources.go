@@ -27,7 +27,7 @@ import (
 )
 
 // ValidateRefResourcesTransformer handles referenced resources'(cd & cv) validation
-type ValidateRefResourcesTransformer struct {}
+type ValidateRefResourcesTransformer struct{}
 
 func (t *ValidateRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
@@ -43,13 +43,13 @@ func (t *ValidateRefResourcesTransformer) Transform(ctx graph.TransformContext, 
 	// if we can't get the referenced cd & cv, set provisioning condition failed, and jump to plan.Execute()
 	cd := &appsv1alpha1.ClusterDefinition{}
 	if err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
-		return graph.FastReturnError
+		return graph.ErrFastReturn
 	}
 	var cv *appsv1alpha1.ClusterVersion
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
 		cv = &appsv1alpha1.ClusterVersion{}
 		if err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv); err != nil {
-			return graph.FastReturnError
+			return graph.ErrFastReturn
 		}
 	}
 
@@ -61,7 +61,8 @@ func (t *ValidateRefResourcesTransformer) Transform(ctx graph.TransformContext, 
 			message = fmt.Sprintf("%s, cv: %s", message, cv.Name)
 		}
 		err = errors.New(message)
-		return graph.FastReturnError
+		transCtx.Logger.Info(fmt.Sprintf("validation error: %v", err))
+		return graph.ErrFastReturn
 	}
 
 	return nil

@@ -67,8 +67,8 @@ func (c *ClusterTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	process1stComp := true
 
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: transCtx.Context,
-		Log: transCtx.Logger,
+		Ctx:      transCtx.Context,
+		Log:      transCtx.Logger,
 		Recorder: transCtx.EventRecorder,
 	}
 	// TODO: should move credential secrets creation from system_account_controller & here into credential_transformer,

@@ -42,13 +42,13 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type StsHorizontalScalingTransformer struct {}
+type StsHorizontalScalingTransformer struct{}
 
 func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	tranxCtx, _ := ctx.(*ClusterTransformContext)
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: tranxCtx.Context,
-		Log: tranxCtx.Logger,
+		Ctx:      tranxCtx.Context,
+		Log:      tranxCtx.Logger,
 		Recorder: tranxCtx.EventRecorder,
 	}
 	rootVertex, err := findRootVertex(dag)

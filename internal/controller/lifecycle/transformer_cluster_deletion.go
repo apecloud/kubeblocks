@@ -28,7 +28,7 @@ import (
 )
 
 // ClusterDeletionTransformer handles cluster deletion
-type ClusterDeletionTransformer struct {}
+type ClusterDeletionTransformer struct{}
 
 func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
@@ -38,7 +38,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 
 	if !controllerutil.ContainsFinalizer(cluster, dbClusterFinalizerName) {
-		return graph.FastReturnError
+		return graph.ErrFastReturn
 	}
 
 	// list all objects owned by this cluster in cache, and delete them all
@@ -61,7 +61,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	root.action = actionPtr(DELETE)
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
-	return graph.FastReturnError
+	return graph.ErrFastReturn
 }
 
 // TODO: @free6om dedup after model abstraction done

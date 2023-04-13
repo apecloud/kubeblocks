@@ -32,7 +32,7 @@ import (
 )
 
 // ObjectActionTransformer reads all Vertex.Obj in cache and compute the diff DAG.
-type ObjectActionTransformer struct {}
+type ObjectActionTransformer struct{}
 
 func ownKinds() []client.ObjectList {
 	return []client.ObjectList{

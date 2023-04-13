@@ -125,16 +125,11 @@ var _ = Describe("connection", func() {
 
 	It("show example", func() {
 		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
-		Expect(o.ExecOptions.Complete()).Should(Succeed())
-
-		By("without args")
-		Expect(o.runShowExample(nil)).Should(HaveOccurred())
-
-		By("specify more than one cluster")
-		Expect(o.runShowExample([]string{"c1", "c2"})).Should(HaveOccurred())
+		Expect(o.validate([]string{clusterName})).Should(Succeed())
+		Expect(o.complete()).Should(Succeed())
 
 		By("specify one cluster")
-		Expect(o.runShowExample([]string{clusterName})).Should(Succeed())
+		Expect(o.runShowExample()).Should(Succeed())
 	})
 
 	It("getUserAndPassword", func() {

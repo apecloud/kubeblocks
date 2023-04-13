@@ -98,7 +98,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			util.CheckErr(o.validate(args))
 			util.CheckErr(o.complete())
 			if o.showExample {
-				util.CheckErr(o.runShowExample(args))
+				util.CheckErr(o.runShowExample())
 			} else {
 				util.CheckErr(o.connect())
 			}
@@ -123,7 +123,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return cmd
 }
 
-func (o *ConnectOptions) runShowExample(args []string) error {
+func (o *ConnectOptions) runShowExample() error {
 	// get connection info
 	info, err := o.getConnectionInfo()
 	if err != nil {

@@ -403,6 +403,9 @@ func updateConsensusRoleInfo(ctx context.Context,
 	leader := ""
 	followers := ""
 	for _, pod := range pods {
+		if !intctrlutil.PodIsReadyWithLabel(pod) {
+			continue
+		}
 		role := pod.Labels[constant.RoleLabelKey]
 		// mapping role label to consensus member
 		roleMap := composeConsensusRoleMap(componentDef)

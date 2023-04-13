@@ -1,0 +1,48 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}
+  labels: {{ include "foxlake-cluster.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: foxlake  # ref clusterdefinition.name
+  clusterVersionRef: foxlake-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
+  terminationPolicy: {{ $.Values.terminationPolicy }}
+  affinity:
+    {{- with $.Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  componentSpecs:
+    - name: foxlake # user-defined
+      componentDefRef: foxlake # ref clusterdefinition componentDefs.name
+      replicas: 1
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "4Gi"
+    - name: foxlake-metadb
+      componentDefRef: foxlake-metadb
+      replicas: 1
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "512Mi"
+        limits:
+          cpu: "1"
+          memory: "4Gi"
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 16Gi
+
+

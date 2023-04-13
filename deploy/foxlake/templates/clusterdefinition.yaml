@@ -1,0 +1,92 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: foxlake
+  labels:
+    {{- include "foxlake.labels" . | nindent 4 }}
+
+  annotations:
+    k8s.foxlake.io/mpp-worker-image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+    k8s.foxlake.io/mpp-worker-tolerations: spot=true:NoSchedule
+spec:
+  connectionCredential:
+    username: "foxlake_root"
+    password: "foxlake2023"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_foxlake)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_foxlake)"
+    metaDbPasswd: "$(RANDOM_PASSWD)"
+  componentDefs:
+    - name: foxlake
+      workloadType: Stateless
+      characterType: foxlake
+      service:
+        ports:
+          - name: foxlake
+            targetPort: foxlake
+            port: 11288
+            nodePort: null
+          - name: foxlake-coordinator
+            targetPort: mpp
+            port: 10030
+            nodePort: null
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+          seccompProfile:
+            type: RuntimeDefault
+        initContainers:
+          - name: wait-mysql-ready
+            image: busybox:1.35
+            command: [ "sh" ]
+            args: [ "-c", 'echo -e "Checking for the availability of MySQL Server deployment"; while ! nc -z $(MYSQL_SERVICE_NAME) 3306; do sleep 1; printf "-"; done; echo -e "  >> MySQL Server has started";' ]
+            env:
+              - name: MYSQL_SERVICE_NAME
+                value: "{{ include "foxlake.metadb.fqdn" . }}"
+            resources:
+              limits:
+                cpu: "10m"
+                memory: "64Mi"
+
+          - name: foxlake-gms-initializer
+            env:
+              - name: initializeGms
+                value: "true"
+              {{- include "foxlake.env" . | nindent 14 }}
+            resources:
+              limits:
+                cpu: "100m"
+                memory: "1Gi"
+        containers:
+          - name: foxlake
+            ports:
+              - containerPort: 10030
+                name: mpp
+              - containerPort: 11288
+                name: foxlake
+            env:
+              {{- include "foxlake.env" . | nindent 14 }}
+
+    - name: foxlake-metadb
+      workloadType: Stateful
+      characterType: mysql
+      service:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: mysql
+      podSpec:
+        containers:
+          - name: mysql
+            env:
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: metaDbPasswd
+            ports:
+              - containerPort: 3306
+                name: mysql
+            volumeMounts:
+              - name: data
+                mountPath: /var/lib/mysql

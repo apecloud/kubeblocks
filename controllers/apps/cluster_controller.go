@@ -160,24 +160,26 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.ClusterTransformer{Client: r.Client},
 			// tls certs secret
 			&lifecycle.TLSCertsTransformer{},
-			//	// add our finalizer to all objects
-			//	&ownershipTransformer{finalizer: dbClusterFinalizerName},
-			//	// make all workload objects depending on credential secret
-			//	&credentialTransformer{},
-			//	// make config configmap immutable
-			//	&configTransformer{},
-			//	// read old snapshot from cache, and generate diff plan
-			//	&objectActionTransformer{cli: roClient, ctx: c.ctx},
-			//	// handle TerminationPolicyType=DoNotTerminate
-			//	&doNotTerminateTransformer{},
-			//	// horizontal scaling
-			//	&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
-			//	// stateful set pvc Update
-			//	&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
-			//	// replication set horizontal scaling
-			//	&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
-			//	// finally, update cluster status
-			//	newClusterStatusTransformer(c.ctx, c.cli, c.recorder, *cr),
+			// add our finalizer to all objects
+			&lifecycle.OwnershipTransformer{},
+			// make all workload objects depending on credential secret
+			&lifecycle.CredentialTransformer{},
+			// make all workload objects depending on all none workload objects
+			&lifecycle.WorkloadsLastTransformer{},
+			// make config configmap immutable
+			&lifecycle.ConfigTransformer{},
+			// read old snapshot from cache, and generate diff plan
+			&lifecycle.ObjectActionTransformer{},
+			// handle TerminationPolicyType=DoNotTerminate
+			&lifecycle.DoNotTerminateTransformer{},
+			// horizontal scaling
+			&lifecycle.StsHorizontalScalingTransformer{},
+			// stateful set pvc Update
+			&lifecycle.StsPVCTransformer{},
+			// replication set horizontal scaling
+			&lifecycle.RplSetHorizontalScalingTransformer{Client: r.Client},
+			// finally, update cluster status
+			lifecycle.NewClusterStatusTransformer(r.Client),
 		).
 		Build()
 	if err != nil {

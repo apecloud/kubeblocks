@@ -24,28 +24,22 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type rplSetHorizontalScalingTransformer struct {
-	cr  clusterRefResources
-	cli client.Client
-	ctx intctrlutil.RequestCtx
+type RplSetHorizontalScalingTransformer struct {
+	client.Client
 }
 
-func (r *rplSetHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+func (t *RplSetHorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	origCluster := transCtx.OrigCluster
+	cluster := transCtx.Cluster
 
 	if isClusterDeleting(*origCluster) {
 		return nil
 	}
 
-	hasScaling, err := r.hasReplicationSetHScaling(*cluster)
+	hasScaling, err := t.hasReplicationSetHScaling(transCtx, *cluster)
 	if err != nil {
 		return err
 	}
@@ -59,7 +53,7 @@ func (r *rplSetHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 		v, _ := vertex.(*lifecycleVertex)
 		stsList = append(stsList, v.obj.(*appsv1.StatefulSet))
 	}
-	if err := replicationset.HandleReplicationSet(r.ctx.Ctx, r.cli, cluster, stsList); err != nil {
+	if err := replicationset.HandleReplicationSet(transCtx.Context, t.Client, cluster, stsList); err != nil {
 		return err
 	}
 
@@ -68,8 +62,8 @@ func (r *rplSetHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 
 // TODO: fix stale cache problem
 // TODO: if sts created in last reconcile-loop not present in cache, hasReplicationSetHScaling return false positive
-func (r *rplSetHorizontalScalingTransformer) hasReplicationSetHScaling(cluster appsv1alpha1.Cluster) (bool, error) {
-	stsList, err := r.listAllStsOwnedByCluster(cluster)
+func (t *RplSetHorizontalScalingTransformer) hasReplicationSetHScaling(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster) (bool, error) {
+	stsList, err := t.listAllStsOwnedByCluster(transCtx, cluster)
 	if err != nil {
 		return false, err
 	}
@@ -77,7 +71,7 @@ func (r *rplSetHorizontalScalingTransformer) hasReplicationSetHScaling(cluster a
 		return false, err
 	}
 
-	for _, compDef := range r.cr.cd.Spec.ComponentDefs {
+	for _, compDef := range transCtx.ClusterDef.Spec.ComponentDefs {
 		if compDef.WorkloadType == appsv1alpha1.Replication {
 			return true, nil
 		}
@@ -86,9 +80,9 @@ func (r *rplSetHorizontalScalingTransformer) hasReplicationSetHScaling(cluster a
 	return false, nil
 }
 
-func (r *rplSetHorizontalScalingTransformer) listAllStsOwnedByCluster(cluster appsv1alpha1.Cluster) ([]appsv1.StatefulSet, error) {
+func (t *RplSetHorizontalScalingTransformer) listAllStsOwnedByCluster(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster) ([]appsv1.StatefulSet, error) {
 	stsList := &appsv1.StatefulSetList{}
-	if err := r.cli.List(r.ctx.Ctx, stsList,
+	if err := transCtx.Client.List(transCtx.Context, stsList,
 		client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name},
 		client.InNamespace(cluster.Namespace)); err != nil {
 		return nil, err

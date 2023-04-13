@@ -28,16 +28,11 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// objectActionTransformer reads all Vertex.Obj in cache and compute the diff DAG.
-type objectActionTransformer struct {
-	cli client2.ReadonlyClient
-	ctx intctrlutil.RequestCtx
-}
+// ObjectActionTransformer reads all Vertex.Obj in cache and compute the diff DAG.
+type ObjectActionTransformer struct {}
 
 func ownKinds() []client.ObjectList {
 	return []client.ObjectList{
@@ -52,14 +47,14 @@ func ownKinds() []client.ObjectList {
 }
 
 // read all objects owned by our cluster
-func (c *objectActionTransformer) readCacheSnapshot(cluster appsv1alpha1.Cluster) (clusterSnapshot, error) {
+func (t *ObjectActionTransformer) readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster) (clusterSnapshot, error) {
 	// list what kinds of object cluster owns
 	kinds := ownKinds()
 	snapshot := make(clusterSnapshot)
 	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
 	inNS := client.InNamespace(cluster.Namespace)
 	for _, list := range kinds {
-		if err := c.cli.List(c.ctx.Ctx, list, inNS, ml); err != nil {
+		if err := transCtx.Client.List(transCtx.Context, list, inNS, ml); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items
@@ -82,19 +77,20 @@ func (c *objectActionTransformer) readCacheSnapshot(cluster appsv1alpha1.Cluster
 	return snapshot, nil
 }
 
-func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
+func (t *ObjectActionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	origCluster := transCtx.OrigCluster
+
+	// get the old objects snapshot
+	oldSnapshot, err := t.readCacheSnapshot(transCtx, *origCluster)
+	if err != nil {
+		return err
+	}
+
 	rootVertex, err := findRootVertex(dag)
 	if err != nil {
 		return err
 	}
-	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
-
-	// get the old objects snapshot
-	oldSnapshot, err := c.readCacheSnapshot(*origCluster)
-	if err != nil {
-		return err
-	}
-
 	// we have the target objects snapshot in dag
 	newNameVertices := make(map[gvkName]graph.Vertex)
 	for _, vertex := range dag.Vertices() {
@@ -195,3 +191,5 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 
 	return nil
 }
+
+var _ graph.Transformer = &ObjectActionTransformer{}

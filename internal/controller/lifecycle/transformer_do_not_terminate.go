@@ -21,16 +21,12 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-type doNotTerminateTransformer struct{}
+type DoNotTerminateTransformer struct{}
 
-func (d *doNotTerminateTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	cluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
-
-	if cluster.DeletionTimestamp.IsZero() {
+func (d *DoNotTerminateTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	cluster := transCtx.OrigCluster
+	if !isClusterDeleting(*cluster) {
 		return nil
 	}
 	if cluster.Spec.TerminationPolicy != appsv1alpha1.DoNotTerminate {
@@ -43,3 +39,5 @@ func (d *doNotTerminateTransformer) Transform(dag *graph.DAG) error {
 	}
 	return nil
 }
+
+var _ graph.Transformer = &DoNotTerminateTransformer{}

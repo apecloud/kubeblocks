@@ -22,10 +22,10 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// configTransformer makes all config related ConfigMaps immutable
-type configTransformer struct{}
+// ConfigTransformer makes all config related ConfigMaps immutable
+type ConfigTransformer struct{}
 
-func (c *configTransformer) Transform(dag *graph.DAG) error {
+func (c *ConfigTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	cmVertices := findAll[*corev1.ConfigMap](dag)
 	isConfig := func(cm *corev1.ConfigMap) bool {
 		// TODO: we should find a way to know if cm is a true config
@@ -42,3 +42,5 @@ func (c *configTransformer) Transform(dag *graph.DAG) error {
 	}
 	return nil
 }
+
+var _ graph.Transformer = &ConfigTransformer{}

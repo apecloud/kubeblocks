@@ -84,7 +84,7 @@ type ClusterRegionAnalyze struct {
 	RegionNames []string `json:"regionNames"`
 }
 
-// KbStorageClassAnalyze overcome default storageClassAnalyze in preflight
+// KbStorageClassAnalyze replaces default storageClassAnalyze in preflight
 type KbStorageClassAnalyze struct {
 	// analyzeMeta is defined in troubleshoot.sh
 	troubleshoot.AnalyzeMeta `json:",inline"`

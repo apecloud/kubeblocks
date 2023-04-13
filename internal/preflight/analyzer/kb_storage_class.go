@@ -27,7 +27,13 @@ import (
 	"github.com/apecloud/kubeblocks/internal/preflight/util"
 )
 
-const StorageClassPath = "cluster-resources/storage-classes.json"
+const (
+	StorageClassPath      = "cluster-resources/storage-classes.json"
+	MissingOutcomeMessage = "there is a missing outcome message"
+	PassType              = "Pass"
+	WarnType              = "Warn"
+	FailType              = "Fail"
+)
 
 type AnalyzeStorageClassByKb struct {
 	analyzer *preflightv1beta2.KbStorageClassAnalyze
@@ -51,22 +57,13 @@ func (a *AnalyzeStorageClassByKb) Analyze(getFile GetCollectedFileContents, find
 }
 
 func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2.KbStorageClassAnalyze, getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) (*analyze.AnalyzeResult, error) {
-	result := analyze.AnalyzeResult{
-		Title: a.Title(),
-	}
-
 	storageClassesData, err := getFile(StorageClassPath)
 	if err != nil {
-		result.IsFail = true
-		result.Message = fmt.Sprintf("get jsonfile failed, err:%v", err)
-		return &result, err
+		return a.FailedResultWithMessage(fmt.Sprintf("get jsonfile failed, err:%v", err)), err
 	}
-
 	var storageClasses storagev1beta1.StorageClassList
-	if err := json.Unmarshal(storageClassesData, &storageClasses); err != nil {
-		result.IsFail = true
-		result.Message = fmt.Sprintf("get jsonfile failed, err:%v", err)
-		return &result, err
+	if err = json.Unmarshal(storageClassesData, &storageClasses); err != nil {
+		return a.FailedResultWithMessage(fmt.Sprintf("get jsonfile failed, err:%v", err)), err
 	}
 
 	for _, storageClass := range storageClasses.Items {
@@ -74,23 +71,58 @@ func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2
 			continue
 		}
 		if storageClass.Provisioner == "" || (storageClass.Provisioner == analyzer.Provisioner) {
-			for _, outcome := range analyzer.Outcomes {
-				if outcome.Pass != nil {
-					result.IsPass = true
-					result.Message = outcome.Pass.Message
-					result.URI = outcome.Pass.URI
-				}
-			}
-			return &result, nil
+			return a.GenerateResult(PassType), nil
 		}
 	}
-
-	result.IsFail = true
-	for _, outcome := range analyzer.Outcomes {
-		if outcome.Fail != nil {
-			result.Message = outcome.Fail.Message
-			result.URI = outcome.Fail.URI
-		}
-	}
-	return &result, nil
+	return a.GenerateResult(FailType), nil
 }
+
+func (a *AnalyzeStorageClassByKb) GenerateResult(resultType string) *analyze.AnalyzeResult {
+	result := analyze.AnalyzeResult{
+		Title: a.Title(),
+	}
+	for _, outcome := range a.analyzer.Outcomes {
+		if outcome == nil {
+			continue
+		}
+		switch resultType {
+		case PassType:
+			if outcome.Pass != nil {
+				result.IsPass = true
+				result.IsPass = true
+				result.Message = outcome.Pass.Message
+				result.URI = outcome.Pass.URI
+				return &result
+			}
+		case WarnType:
+			if outcome.Warn != nil {
+				result.IsWarn = true
+				result.Message = outcome.Warn.Message
+				result.URI = outcome.Warn.URI
+				return &result
+			}
+		case FailType:
+			if outcome.Fail != nil {
+				result.IsFail = true
+				result.Message = outcome.Fail.Message
+				result.URI = outcome.Fail.URI
+				return &result
+			}
+		default:
+			break
+		}
+	}
+	result.IsFail = true
+	result.Message = MissingOutcomeMessage
+	return &result
+}
+
+func (a *AnalyzeStorageClassByKb) FailedResultWithMessage(message string) *analyze.AnalyzeResult {
+	return &analyze.AnalyzeResult{
+		Title:   a.Title(),
+		Message: message,
+		IsFail:  true,
+	}
+}
+
+var _ KBAnalyzer = &AnalyzeStorageClassByKb{}

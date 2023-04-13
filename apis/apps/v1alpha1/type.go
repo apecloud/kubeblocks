@@ -513,7 +513,7 @@ type ComponentNameSet map[string]struct{}
 
 // MergedPolicy defines how to merge external imported templates into component templates.
 // +enum
-// +kubebuilder:validation:Enum={patch,replace,add}
+// +kubebuilder:validation:Enum={patch,replace}
 type MergedPolicy string
 
 const (

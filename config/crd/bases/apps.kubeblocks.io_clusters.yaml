@@ -194,7 +194,6 @@ spec:
                           enum:
                           - patch
                           - replace
-                          - add
                           type: string
                         templateRef:
                           description: Specify the name of the referenced the configuration

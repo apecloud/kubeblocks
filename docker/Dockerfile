@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM --platform=${BUILDPLATFORM} golang:1.19 as builder
+FROM --platform=${BUILDPLATFORM} golang:1.20 as builder
 
 ## docker buildx buid injected build-args:
 #BUILDPLATFORM — matches the current machine. (e.g. linux/amd64)

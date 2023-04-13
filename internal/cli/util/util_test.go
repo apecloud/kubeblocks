@@ -84,7 +84,7 @@ var _ = Describe("util", func() {
 				"spec": map[string]interface{}{
 					"backupPolicyName": "backup-policy-demo",
 					"backupType":       "full",
-					"ttl":              "168h0m0s",
+					"ttl":              "7d",
 				},
 			},
 		}

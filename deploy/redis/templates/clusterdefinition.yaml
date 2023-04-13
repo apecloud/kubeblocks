@@ -16,6 +16,11 @@ spec:
     - name: redis
       workloadType: Replication
       characterType: redis
+      probes:
+        roleChangedProbe:
+          failureThreshold: 2
+          periodSeconds: 2
+          timeoutSeconds: 1
       replicationSpec:
         switchPolicies:
           - type: MaximumAvailability

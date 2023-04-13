@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -42,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/edit"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -50,13 +50,27 @@ import (
 )
 
 var (
+	listBackupPolicyExample = templates.Examples(`
+		# list all backup policy
+		kbcli cluster list-backup-policy 
+        
+		# using short cmd to list backup policy of specified cluster 
+        kbcli cluster list-bp <cluster-name>
+	`)
+	editExample = templates.Examples(`
+		# edit backup policy
+		kbcli cluster edit-backup-policy <backup-policy-name>
+
+	    # using short cmd to edit backup policy 
+        kbcli cluster edit-bp <backup-policy-name>
+	`)
 	createBackupExample = templates.Examples(`
 		# create a backup
 		kbcli cluster backup cluster-name
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backup
-		kbcli cluster list-backups
+		kbcli cluster list-backup
 	`)
 	deleteBackupExample = templates.Examples(`
 		# delete a backup named backup-name
@@ -76,21 +90,13 @@ var (
 	`)
 )
 
+const annotationTrueValue = "true"
+
 type CreateBackupOptions struct {
 	BackupType   string `json:"backupType"`
 	BackupName   string `json:"backupName"`
 	Role         string `json:"role,omitempty"`
 	BackupPolicy string `json:"backupPolicy"`
-	TTL          string `json:"ttl,omitempty"`
-	create.BaseOptions
-}
-
-type CreateBackupPolicyOptions struct {
-	ClusterName      string `json:"clusterName,omitempty"`
-	TTL              string `json:"ttl,omitempty"`
-	ConnectionSecret string `json:"connectionSecret,omitempty"`
-	PolicyTemplate   string `json:"policyTemplate,omitempty"`
-	Role             string `json:"role,omitempty"`
 	create.BaseOptions
 }
 
@@ -98,6 +104,11 @@ type CreateVolumeSnapshotClassOptions struct {
 	Driver string `json:"driver"`
 	Name   string `json:"name"`
 	create.BaseOptions
+}
+
+type ListBackupOptions struct {
+	*list.ListOptions
+	BackupName string
 }
 
 func (o *CreateVolumeSnapshotClassOptions) Complete() error {
@@ -112,7 +123,7 @@ func (o *CreateVolumeSnapshotClassOptions) Complete() error {
 		if annotations == nil {
 			continue
 		}
-		if annotations["storageclass.kubernetes.io/is-default-class"] == "true" {
+		if annotations["storageclass.kubernetes.io/is-default-class"] == annotationTrueValue {
 			o.Driver, _, _ = unstructured.NestedString(sc.Object, "provisioner")
 			o.Name = "default-vsc"
 		}
@@ -137,7 +148,7 @@ func (o *CreateVolumeSnapshotClassOptions) Create() error {
 			continue
 		}
 		// skip creation if default volumesnapshotclass exists.
-		if annotations["snapshot.storage.kubernetes.io/is-default-class"] == "true" {
+		if annotations["snapshot.storage.kubernetes.io/is-default-class"] == annotationTrueValue {
 			return nil
 		}
 	}
@@ -161,7 +172,6 @@ func (o *CreateBackupOptions) Complete() error {
 	if len(o.BackupName) == 0 {
 		o.BackupName = strings.Join([]string{"backup", o.Namespace, o.Name, time.Now().Format("20060102150405")}, "-")
 	}
-
 	return nil
 }
 
@@ -170,120 +180,68 @@ func (o *CreateBackupOptions) Validate() error {
 	if o.Name == "" {
 		return fmt.Errorf("missing cluster name")
 	}
+	if o.BackupPolicy == "" {
+		return o.completeDefaultBackupPolicy()
+	}
+	// check if backup policy exists
+	_, err := o.Dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.Namespace).Get(context.TODO(), o.BackupPolicy, metav1.GetOptions{})
+	// TODO: check if pvc exists
+	return err
+}
 
-	connectionSecret, err := o.getConnectionSecret()
+// completeDefaultBackupPolicy completes the default backup policy.
+func (o *CreateBackupOptions) completeDefaultBackupPolicy() error {
+	defaultBackupPolicyName, err := o.getDefaultBackupPolicy()
 	if err != nil {
 		return err
 	}
-
-	backupPolicyTemplate, err := o.getDefaultBackupPolicyTemplate()
-	if err != nil {
-		return err
-	}
-
-	role, err := o.getDefaultRole()
-	if err != nil {
-		return err
-	}
-	// apply backup policy
-	policyOptions := CreateBackupPolicyOptions{
-		TTL:              o.TTL,
-		ClusterName:      o.Name,
-		ConnectionSecret: connectionSecret,
-		PolicyTemplate:   backupPolicyTemplate,
-		BaseOptions:      o.BaseOptions,
-	}
-	if role != "" {
-		policyOptions.Role = role
-	}
-	policyOptions.Name = "backup-policy-" + o.Namespace + "-" + o.Name
-	inputs := create.Inputs{
-		CueTemplateName: "backuppolicy_template.cue",
-		ResourceName:    types.ResourceBackupPolicies,
-		Group:           types.DPAPIGroup,
-		Version:         types.DPAPIVersion,
-		BaseOptionsObj:  &policyOptions.BaseOptions,
-		Options:         policyOptions,
-	}
-
-	// cluster backup do 2 following things:
-	// 1. create or apply the backupPolicy, cause backupJob reference to a backupPolicy,
-	//   and backupPolicy reference to the cluster.
-	//   so it need apply the backupPolicy after the first backupPolicy created.
-	// 2. create a backupJob.
-	if err := policyOptions.BaseOptions.Run(inputs); err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
-	}
-	o.BackupPolicy = policyOptions.Name
-
+	o.BackupPolicy = defaultBackupPolicyName
 	return nil
 }
 
-func (o *CreateBackupOptions) getConnectionSecret() (string, error) {
-	// find secret from cluster label
-	opts := metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s,%s=%s",
-			constant.AppInstanceLabelKey, o.Name,
-			constant.AppManagedByLabelKey, constant.AppName),
-	}
-	gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
-	secretObjs, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).List(context.TODO(), opts)
-	if err != nil {
-		return "", err
-	}
-	if len(secretObjs.Items) == 0 {
-		return "", fmt.Errorf("not found connection credential for cluster %s", o.Name)
-	}
-	return secretObjs.Items[0].GetName(), nil
-}
-
-func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
+func (o *CreateBackupOptions) getDefaultBackupPolicy() (string, error) {
 	clusterObj, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	// find backupPolicyTemplate from cluster label
+	// TODO: support multiple components backup, add --componentDef flag
 	opts := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s",
-			constant.ClusterDefLabelKey, clusterObj.GetLabels()[constant.ClusterDefLabelKey]),
+			constant.AppInstanceLabelKey, clusterObj.GetName()),
 	}
 	objs, err := o.Dynamic.
-		Resource(types.BackupPolicyTemplateGVR()).
+		Resource(types.BackupPolicyGVR()).
 		List(context.TODO(), opts)
 	if err != nil {
 		return "", err
 	}
 	if len(objs.Items) == 0 {
-		return "", fmt.Errorf("not found any backupPolicyTemplate for cluster %s", o.Name)
+		return "", fmt.Errorf(`not found any backup policy for cluster "%s"`, o.Name)
 	}
-	return objs.Items[0].GetName(), nil
-}
-
-func (o *CreateBackupOptions) getDefaultRole() (string, error) {
-	gvr := schema.GroupVersionResource{Version: "v1", Resource: "pods"}
-	opts := metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s",
-			constant.AppInstanceLabelKey, o.Name),
+	var defaultBackupPolicies []unstructured.Unstructured
+	for _, obj := range objs.Items {
+		if obj.GetAnnotations()[constant.DefaultBackupPolicyAnnotationKey] == annotationTrueValue {
+			defaultBackupPolicies = append(defaultBackupPolicies, obj)
+		}
 	}
-	objs, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).List(context.TODO(), opts)
-	if err != nil {
-		return "", err
+	if len(defaultBackupPolicies) == 0 {
+		return "", fmt.Errorf(`not found any default backup policy for cluster "%s"`, o.Name)
 	}
-	if len(objs.Items) == 0 {
-		return "", fmt.Errorf("not found any pods for cluster %s", o.Name)
+	if len(defaultBackupPolicies) > 1 {
+		return "", fmt.Errorf(`cluster "%s" has multiple default backup policies`, o.Name)
 	}
-	pod := objs.Items[0]
-	// TODO(dsj):(hack fix) apecloud-mysql just support backup snapshot on the leader pod,
-	// backup snapshot on the follower will be support at the next version.
-	if o.BackupType == "snapshot" && pod.GetLabels()[constant.WorkloadTypeLabelKey] == string(appsv1alpha1.Consensus) {
-		return "leader", nil
-	}
-	return "", nil
+	return defaultBackupPolicies[0].GetName(), nil
 }
 
 func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateBackupOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
+	customOutPut := func(opt *create.BaseOptions) {
+		output := fmt.Sprintf("Backup %s created successfully, you can view the progress:", opt.Name)
+		printer.PrintLine(output)
+		nextLine := fmt.Sprintf("\tkbcli cluster list-backup --name=%s -n %s", opt.Name, opt.Namespace)
+		printer.PrintLine(nextLine)
+	}
 	inputs := create.Inputs{
 		Use:                          "backup",
 		Short:                        "Create a backup.",
@@ -297,12 +255,12 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Factory:                      f,
 		Complete:                     o.Complete,
 		Validate:                     o.Validate,
+		CustomOutPut:                 customOutPut,
 		ResourceNameGVRForCompletion: types.ClusterGVR(),
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.BackupType, "backup-type", "snapshot", "Backup type")
 			cmd.Flags().StringVar(&o.BackupName, "backup-name", "", "Backup name")
-			cmd.Flags().StringVar(&o.Role, "role", "", "backup on cluster role")
-			cmd.Flags().StringVar(&o.TTL, "ttl", "168h0m0s", "Time to live")
+			cmd.Flags().StringVar(&o.BackupPolicy, "backup-policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
 		},
 	}
 	return create.BuildCommand(inputs)
@@ -321,7 +279,7 @@ func getClusterNameMap(dClient dynamic.Interface, o *list.ListOptions) (map[stri
 	return clusterMap, nil
 }
 
-func printBackupList(o *list.ListOptions) error {
+func printBackupList(o ListBackupOptions) error {
 	dynamic, err := o.Factory.DynamicClient()
 	if err != nil {
 		return err
@@ -339,7 +297,7 @@ func printBackupList(o *list.ListOptions) error {
 		return nil
 	}
 
-	clusterNameMap, err := getClusterNameMap(dynamic, o)
+	clusterNameMap, err := getClusterNameMap(dynamic, o.ListOptions)
 	if err != nil {
 		return err
 	}
@@ -361,6 +319,13 @@ func printBackupList(o *list.ListOptions) error {
 		if backup.Status.Duration != nil {
 			durationStr = duration.HumanDuration(backup.Status.Duration.Duration)
 		}
+		if len(o.BackupName) > 0 {
+			if o.BackupName == obj.GetName() {
+				tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, backup.Status.Phase, backup.Status.TotalSize,
+					durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp))
+			}
+			continue
+		}
 		tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, backup.Status.Phase, backup.Status.TotalSize,
 			durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp))
 	}
@@ -369,21 +334,22 @@ func printBackupList(o *list.ListOptions) error {
 }
 
 func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := list.NewListOptions(f, streams, types.BackupGVR())
+	o := &ListBackupOptions{ListOptions: list.NewListOptions(f, streams, types.OpsGVR())}
 	cmd := &cobra.Command{
-		Use:               "list-backups",
+		Use:               "list-backup",
 		Short:             "List backups.",
-		Aliases:           []string{"ls-backups"},
+		Aliases:           []string{"ls-backup"},
 		Example:           listBackupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
 			o.Names = nil
 			util.CheckErr(o.Complete())
-			util.CheckErr(printBackupList(o))
+			util.CheckErr(printBackupList(*o))
 		},
 	}
 	o.AddFlags(cmd)
+	cmd.Flags().StringVar(&o.BackupName, "name", "", "The backup name to get the details.")
 	return cmd
 }
 
@@ -590,4 +556,75 @@ func completeForDeleteRestore(o *delete.DeleteOptions, args []string) error {
 	}
 	o.ConfirmedNames = o.Names
 	return nil
+}
+
+func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := list.NewListOptions(f, streams, types.OpsGVR())
+	cmd := &cobra.Command{
+		Use:               "list-backup-policy",
+		Short:             "List backups policies.",
+		Aliases:           []string{"list-bp"},
+		Example:           listBackupPolicyExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
+			o.Names = nil
+			util.CheckErr(o.Complete())
+			util.CheckErr(printBackupPolicyList(*o))
+		},
+	}
+	o.AddFlags(cmd)
+	return cmd
+}
+
+// printBackupPolicyList prints the backup policy list.
+func printBackupPolicyList(o list.ListOptions) error {
+	dynamic, err := o.Factory.DynamicClient()
+	if err != nil {
+		return err
+	}
+	backupPolicyList, err := dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: o.LabelSelector,
+		FieldSelector: o.FieldSelector,
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(backupPolicyList.Items) == 0 {
+		o.PrintNotFoundResources()
+		return nil
+	}
+
+	tbl := printer.NewTablePrinter(o.Out)
+	tbl.SetHeader("NAME", "DEFAULT", "CLUSTER", "CREATE-TIME")
+	for _, obj := range backupPolicyList.Items {
+		defaultPolicy, ok := obj.GetAnnotations()[constant.DefaultBackupPolicyAnnotationKey]
+		if !ok {
+			defaultPolicy = "false"
+		}
+		createTime := obj.GetCreationTimestamp()
+		tbl.AddRow(obj.GetName(), defaultPolicy, obj.GetLabels()[constant.AppInstanceLabelKey], util.TimeFormat(&createTime))
+	}
+	tbl.Print()
+	return nil
+}
+
+func NewLEditBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := edit.NewEditOptions(f, streams, types.BackupPolicyGVR())
+	cmd := &cobra.Command{
+		Use:                   "edit-backup-policy",
+		DisableFlagsInUseLine: true,
+		Aliases:               []string{"edit-bp"},
+		Short:                 "Edit backup policy",
+		Example:               editExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, types.BackupPolicyGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Complete(cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
+		},
+	}
+	o.AddFlags(cmd)
+	return cmd
 }

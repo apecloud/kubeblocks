@@ -20,3 +20,43 @@ staticParameters:
   - pg_stat_statements.track_utility
   - extwlist.extensions
   - extwlist.custom_path
+
+immutableParameters:
+  - archive_command
+  - archive_timeout
+  - backtrace_functions
+  - config_file
+  - cron.use_background_workers
+  - data_directory
+  - db_user_namespace
+  - exit_on_error
+  - fsync
+  - full_page_writes
+  - hba_file
+  - ident_file
+  - ignore_invalid_pages
+  - listen_addresses
+  - lo_compat_privileges
+  - log_directory
+  - log_file_mode
+  - logging_collector
+  - log_line_prefix
+  - log_timezone
+  - log_truncate_on_rotation
+  - port
+  - rds.max_tcp_buffers
+  - recovery_init_sync_method
+  - restart_after_crash
+  - ssl
+  - ssl_ca_file
+  - ssl_cert_file
+  - ssl_ciphers
+  - ssl_key_file
+  - stats_temp_directory
+  - superuser_reserved_connections
+  - unix_socket_directories
+  - unix_socket_group
+  - unix_socket_permissions
+  - update_process_title
+  - wal_receiver_create_temp_slot
+  - wal_sync_method

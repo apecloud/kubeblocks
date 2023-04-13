@@ -487,6 +487,12 @@ func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest, re
 			}
 		}
 	}
+	if role == MASTER {
+		return PRIMARY, nil
+	}
+	if role == SLAVE {
+		return SECONDARY, nil
+	}
 	return role, nil
 }
 

@@ -19,6 +19,7 @@ package component
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -37,7 +38,7 @@ var _ = Describe("monitor_utils", func() {
 			clusterCompDef.Monitor = &appsv1alpha1.MonitorConfig{
 				BuiltIn: false,
 				Exporter: &appsv1alpha1.ExporterConfig{
-					ScrapePort: 9144,
+					ScrapePort: intstr.FromInt(9144),
 					ScrapePath: "/metrics",
 				},
 			}

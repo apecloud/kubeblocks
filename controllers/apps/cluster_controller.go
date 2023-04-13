@@ -47,6 +47,8 @@ import (
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/finalizers,verbs=update
 
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list
+
 // owned K8s core API resources controller-gen RBAC marker
 // full access on core API resources
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete;deletecollection
@@ -91,7 +93,7 @@ import (
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
 // dataprotection get list and delete
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;delete;deletecollection
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
 
 // classfamily get list
@@ -132,12 +134,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if re, ok := err.(lifecycle.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
 	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req, r.Recorder)
 	if err := planBuilder.Init(); err != nil {
-		return requeueError(err)
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if err := planBuilder.Validate(); err != nil {
 		return requeueError(err)
 	} else if plan, err := planBuilder.Build(); err != nil {

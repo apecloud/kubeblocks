@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -35,11 +37,6 @@ type BackupSpec struct {
 	// if backupType is incremental, parentBackupName is required.
 	// +optional
 	ParentBackupName string `json:"parentBackupName,omitempty"`
-
-	// ttl is a time.Duration-parsable string describing how long
-	// the Backup should be retained for.
-	// +optional
-	TTL *metav1.Duration `json:"ttl,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup
@@ -189,4 +186,24 @@ type BackupList struct {
 
 func init() {
 	SchemeBuilder.Register(&Backup{}, &BackupList{})
+}
+
+// Validate validates the BackupSpec and returns an error if invalid.
+func (r *BackupSpec) Validate(backupPolicy *BackupPolicy) error {
+	notSupportedMessage := "backupPolicy: %s not supports %s backup in backupPolicy"
+	switch r.BackupType {
+	case BackupTypeSnapshot:
+		if backupPolicy.Spec.Snapshot == nil {
+			return fmt.Errorf(notSupportedMessage, r.BackupPolicyName, BackupTypeSnapshot)
+		}
+	case BackupTypeFull:
+		if backupPolicy.Spec.Full == nil {
+			return fmt.Errorf(notSupportedMessage, r.BackupPolicyName, BackupTypeFull)
+		}
+	case BackupTypeIncremental:
+		if backupPolicy.Spec.Incremental == nil {
+			return fmt.Errorf(notSupportedMessage, r.BackupPolicyName, BackupTypeIncremental)
+		}
+	}
+	return nil
 }

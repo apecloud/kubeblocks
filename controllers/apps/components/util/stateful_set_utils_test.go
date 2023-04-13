@@ -140,6 +140,11 @@ var _ = Describe("StatefulSet utils test", func() {
 			Expect(err).To(Succeed())
 			Expect(len(podList)).To(Equal(1))
 
+			By("Testing get the StatefulSet of the pod")
+			ownerSts, err := GetPodOwnerReferencesSts(ctx, k8sClient, &podList[0])
+			Expect(err).To(Succeed())
+			Expect(ownerSts).ShouldNot(BeNil())
+
 			By("Deleting the pods of StatefulSet")
 			Expect(DeleteStsPods(testCtx.Ctx, k8sClient, sts)).Should(Succeed())
 			podList, err = GetPodListByStatefulSet(ctx, k8sClient, sts)

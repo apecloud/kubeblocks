@@ -61,7 +61,7 @@ logConfigs:
   slow: /data/mysql/log/mysqld-slowquery.log
   general: /data/mysql/log/mysqld.log
 
-roleChangedProbe:
+roleProbe:
   failureThreshold: 2
   periodSeconds: 1
   timeoutSeconds: 1
@@ -74,9 +74,7 @@ metrics:
     pullPolicy: IfNotPresent
 
 wesqlscale:
-  cell: "zone1"
-  keySpace: "commerce"
-  shard: "0"    
+  cell: "zone1" 
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/apecloud-mysql-scale

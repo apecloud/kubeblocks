@@ -181,6 +181,25 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 	return pods, nil
 }
 
+// GetPodOwnerReferencesSts gets the owner reference statefulSet of the pod.
+func GetPodOwnerReferencesSts(ctx context.Context, cli client.Client, podObj *corev1.Pod) (*appsv1.StatefulSet, error) {
+	stsList := &appsv1.StatefulSetList{}
+	if err := cli.List(ctx, stsList,
+		&client.ListOptions{Namespace: podObj.Namespace},
+		client.MatchingLabels{
+			constant.KBAppComponentLabelKey: podObj.Labels[constant.KBAppComponentLabelKey],
+			constant.AppInstanceLabelKey:    podObj.Labels[constant.AppInstanceLabelKey],
+		}); err != nil {
+		return nil, err
+	}
+	for _, sts := range stsList.Items {
+		if IsMemberOf(&sts, podObj) {
+			return &sts, nil
+		}
+	}
+	return nil, nil
+}
+
 // MarkPrimaryStsToReconcile marks the primary statefulSet annotation to be reconciled.
 func MarkPrimaryStsToReconcile(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
 	patch := client.MergeFrom(sts.DeepCopy())

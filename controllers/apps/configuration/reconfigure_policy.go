@@ -29,6 +29,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -134,7 +135,7 @@ func (param *reconfigureParams) getConfigKey() string {
 }
 
 func (param *reconfigureParams) getTargetVersionHash() string {
-	hash, err := cfgcore.ComputeHash(param.ConfigMap.Data)
+	hash, err := util.ComputeHash(param.ConfigMap.Data)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to cal configuration version!")
 		return ""
@@ -163,9 +164,9 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 	if isPercent {
 		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
 	} else {
-		r = int32(cfgcore.Min(v, param.getTargetReplicas()))
+		r = int32(util.Min(v, param.getTargetReplicas()))
 	}
-	return cfgcore.Max(r, defaultRolling)
+	return util.Max(r, defaultRolling)
 }
 
 func (param *reconfigureParams) getTargetReplicas() int {
@@ -174,7 +175,7 @@ func (param *reconfigureParams) getTargetReplicas() int {
 
 func (param *reconfigureParams) podMinReadySeconds() int32 {
 	minReadySeconds := param.ComponentUnits[0].Spec.MinReadySeconds
-	return cfgcore.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
+	return util.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
 }
 
 func RegisterPolicy(policy appsv1alpha1.UpgradePolicy, action reconfigurePolicy) {

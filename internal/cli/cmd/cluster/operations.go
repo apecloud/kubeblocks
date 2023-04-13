@@ -229,7 +229,11 @@ func (o *OperationsOptions) validateExpose() error {
 }
 
 func (o *OperationsOptions) fillExpose() error {
-	provider, err := util.GetK8SProvider(o.Client)
+	version, err := util.GetK8sVersion(o.Client.Discovery())
+	if err != nil {
+		return err
+	}
+	provider, err := util.GetK8sProvider(version, o.Client)
 	if err != nil {
 		return err
 	}

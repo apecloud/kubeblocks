@@ -61,7 +61,7 @@ logConfigs:
   slow: /data/mysql/log/mysqld-slowquery.log
   general: /data/mysql/log/mysqld.log
 
-roleChangedProbe:
+roleProbe:
   failureThreshold: 2
   periodSeconds: 1
   timeoutSeconds: 1

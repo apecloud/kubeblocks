@@ -51,6 +51,8 @@ import (
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
+const backupPolicyTPLName = "test-backup-policy-template-mysql"
+
 var _ = Describe("Cluster Controller", func() {
 	const (
 		clusterDefName     = "test-clusterdef"
@@ -601,15 +603,18 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
 		initialGeneration := int(cluster.Status.ObservedGeneration)
 
+		By("Checking backup policy created from backup policy template")
+		policyName := lifecycle.GenerateBackupPolicyName(clusterKey.Name, mysqlCompType)
+		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
+			&dataprotectionv1alpha1.BackupPolicy{}, true)).Should(Succeed())
+
 		By("Set HorizontalScalePolicy")
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 			func(clusterDef *appsv1alpha1.ClusterDefinition) {
 				clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
-					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot}
+					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
+						BackupPolicyTemplateName: backupPolicyTPLName}
 			})()).ShouldNot(HaveOccurred())
-
-		By("Creating a BackupPolicyTemplate")
-		createBackupPolicyTpl(clusterDefObj)
 
 		By("Mocking all components' PVCs to bound")
 		for _, comp := range clusterObj.Spec.ComponentSpecs {
@@ -1129,7 +1134,7 @@ var _ = Describe("Cluster Controller", func() {
 				},
 			},
 			Spec: dataprotectionv1alpha1.BackupSpec{
-				BackupPolicyName: "test-backup-policy",
+				BackupPolicyName: lifecycle.GenerateBackupPolicyName(clusterKey.Name, mysqlCompType),
 				BackupType:       "snapshot",
 			},
 		}
@@ -1140,16 +1145,12 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(backup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
 		})).Should(Succeed())
 
-		By("Creating a BackupPolicyTemplate")
-		createBackupPolicyTpl(clusterDefObj)
-
 		By("Set HorizontalScalePolicy")
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 			func(clusterDef *appsv1alpha1.ClusterDefinition) {
 				clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
-					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot, BackupTemplateSelector: map[string]string{
-						clusterDefLabelKey: clusterDefObj.Name,
-					}}
+					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
+						BackupPolicyTemplateName: backupPolicyTPLName}
 			})()).ShouldNot(HaveOccurred())
 
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
@@ -1213,6 +1214,9 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				AddComponent(nginxCompType).AddContainerShort("nginx", testapps.NginxImage).
 				Create(&testCtx).GetObject()
+
+			By("Creating a BackupPolicyTemplate")
+			createBackupPolicyTpl(clusterDefObj)
 		})
 
 		It("should create all sub-resources successfully", func() {
@@ -1243,6 +1247,9 @@ var _ = Describe("Cluster Controller", func() {
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
+
+			By("Creating a BackupPolicyTemplate")
+			createBackupPolicyTpl(clusterDefObj)
 		})
 
 		It("should delete cluster resources immediately if deleting cluster with WipeOut termination policy", func() {
@@ -1305,6 +1312,9 @@ var _ = Describe("Cluster Controller", func() {
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
+
+			By("Creating a BackupPolicyTemplate")
+			createBackupPolicyTpl(clusterDefObj)
 		})
 
 		It("Should success with one leader pod and two follower pods", func() {
@@ -1695,17 +1705,10 @@ var _ = Describe("Cluster Controller", func() {
 
 func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 	By("Creating a BackupPolicyTemplate")
-	backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
-	backupPolicyTpl := &dataprotectionv1alpha1.BackupPolicyTemplate{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: backupPolicyTplKey.Name,
-			Labels: map[string]string{
-				clusterDefLabelKey: clusterDefObj.Name,
-			},
-		},
-		Spec: dataprotectionv1alpha1.BackupPolicyTemplateSpec{
-			BackupToolName: "mysql-xtrabackup",
-		},
-	}
-	Expect(testCtx.CreateObj(testCtx.Ctx, backupPolicyTpl)).Should(Succeed())
+	testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
+		AddLabels(clusterDefLabelKey, clusterDefObj.Name).
+		AddBackupPolicy(clusterDefObj.Spec.ComponentDefs[0].Name).
+		AddSnapshotPolicy().
+		SetClusterDefRef(clusterDefObj.Name).
+		SetTargetRole("leader").Create(&testCtx)
 }

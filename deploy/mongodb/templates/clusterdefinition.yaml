@@ -7,9 +7,131 @@ metadata:
 spec:
   type: mongodb
   connectionCredential:
-    username: admin
-    password: ""
+    username: root
+    password: {{ (include "mongodb.password" .) | quote  }}
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-monogdb)"
+    headlessEndpoint: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
+    headlessHost: "$(POD_NAME_PREFIX)-0.$(HEADLESS_SVC_FQDN)"
+    headlessPort: "$(SVC_PORT_tcp-monogdb)"
   componentDefs:
+    - name: replicaset
+      characterType: mongodb
+      scriptSpecs:
+        - name: mongodb-scripts
+          templateRef: mongodb-scripts
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 493
+      configSpecs:
+        - name: mongodb-config
+          templateRef: mongodb5.0-config-template
+          namespace: {{ .Release.Namespace }}
+          volumeName: mongodb-config
+          defaultMode: 256
+        - name: mongodb-metrics-config
+          templateRef: mongodb-metrics-config
+          namespace: {{ .Release.Namespace }}
+          volumeName: mongodb-metrics-config
+          defaultMode: 0777
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9216
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
+      workloadType: Consensus
+      consensusSpec:
+        leader:
+          name: "primary"
+          accessMode: ReadWrite
+        followers:
+          - name: "secondary"
+            accessMode: Readonly
+        updateStrategy: Serial
+      probes:
+        roleProbe:
+          periodSeconds: 2
+          failureThreshold: 3
+      service:
+        ports:
+          - protocol: TCP
+            port: 27017
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        containers:
+          - name: mongodb
+            ports:
+              - name: mongodb
+                protocol: TCP
+                containerPort: 27017
+            command:
+              - /scripts/replicaset-setup.sh
+            env:
+              - name: MONGODB_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MONGODB_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+            lifecycle:
+              postStart:
+                exec:
+                  command:
+                    - /scripts/replicaset-post-start.sh
+                    - REPLICASET
+            volumeMounts:
+              - mountPath: /data/mongodb
+                name: data
+              - mountPath: /etc/mongodb/mongodb.conf
+                name: mongodb-config
+                subPath: mongodb.conf
+              - mountPath: /etc/mongodb/keyfile
+                name: mongodb-config
+                subPath: keyfile
+              - name: scripts
+                mountPath: /scripts/replicaset-setup.sh
+                subPath: replicaset-setup.sh
+              - name: scripts
+                mountPath: /scripts/replicaset-post-start.sh
+                subPath: replicaset-post-start.sh
+          - name: metrics
+            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+            env:
+              - name: MONGODB_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MONGODB_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+            command:
+              - "/bin/agamotto"
+              - "--config=/opt/conf/metrics-config.yaml"
+            ports:
+              - name: http-metrics
+                containerPort: 9216
+            volumeMounts:
+              - name: mongodb-metrics-config
+                mountPath: /opt/conf
     - name: mongos
       scriptSpecs:
         - name: mongodb-scripts
@@ -53,7 +175,7 @@ spec:
             accessMode: Readonly
         updateStrategy: Serial
       probes:
-        roleChangedProbe:
+        roleProbe:
           periodSeconds: 2
           failureThreshold: 3
       service:
@@ -102,7 +224,7 @@ spec:
             accessMode: Readonly
         updateStrategy: BestEffortParallel
       probes:
-        roleChangedProbe:
+        roleProbe:
           periodSeconds: 2
           failureThreshold: 3
       service:

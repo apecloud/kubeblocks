@@ -17,6 +17,8 @@ limitations under the License.
 package component
 
 import (
+	"k8s.io/apimachinery/pkg/util/intstr"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
@@ -43,7 +45,19 @@ func buildMonitorConfig(
 		component.Monitor = &MonitorConfig{
 			Enable:     true,
 			ScrapePath: monitorConfig.Exporter.ScrapePath,
-			ScrapePort: monitorConfig.Exporter.ScrapePort,
+			ScrapePort: monitorConfig.Exporter.ScrapePort.IntVal,
+		}
+
+		if monitorConfig.Exporter.ScrapePort.Type == intstr.String {
+			portName := monitorConfig.Exporter.ScrapePort.StrVal
+			for _, c := range clusterCompDef.PodSpec.Containers {
+				for _, p := range c.Ports {
+					if p.Name == portName {
+						component.Monitor.ScrapePort = p.ContainerPort
+						break
+					}
+				}
+			}
 		}
 		return
 	}

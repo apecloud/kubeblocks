@@ -44,8 +44,6 @@ var _ = Describe("MySQL data protection function", func() {
 	const backupPolicyName = "test-backup-policy"
 	const backupRemoteVolumeName = "backup-remote-volume"
 	const backupRemotePVCName = "backup-remote-pvc"
-	const defaultSchedule = "0 3 * * *"
-	const defaultTTL = "168h0m0s"
 	const backupName = "test-backup-job"
 
 	// Cleanups
@@ -66,7 +64,6 @@ var _ = Describe("MySQL data protection function", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
@@ -127,17 +124,11 @@ var _ = Describe("MySQL data protection function", func() {
 		backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 			&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 
-		By("By creating a backupPolicyTemplate from backupTool: " + backupTool.Name)
-		_ = testapps.NewBackupPolicyTemplateFactory(backupPolicyTemplateName).
-			SetBackupToolName(backupTool.Name).
-			SetSchedule(defaultSchedule).
-			SetTTL(defaultTTL).
-			Create(&testCtx).GetObject()
-
 		By("By creating a backupPolicy from backupPolicyTemplate: " + backupPolicyTemplateName)
 		backupPolicyObj := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 			WithRandomName().
-			SetBackupPolicyTplName(backupPolicyTemplateName).
+			AddFullPolicy().
+			SetBackupToolName(backupTool.Name).
 			AddMatchLabels(constant.AppInstanceLabelKey, clusterKey.Name).
 			SetTargetSecretName(component.GenerateConnCredential(clusterKey.Name)).
 			SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
@@ -153,13 +144,12 @@ var _ = Describe("MySQL data protection function", func() {
 
 		By("By check backupPolicy available")
 		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, backupPolicy *dpv1alpha1.BackupPolicy) {
-			g.Expect(backupPolicy.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+			g.Expect(backupPolicy.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 		})).Should(Succeed())
 
 		By("By creating a backup from backupPolicy: " + backupPolicyKey.Name)
 		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			WithRandomName().
-			SetTTL(defaultTTL).
 			SetBackupPolicyName(backupPolicyKey.Name).
 			SetBackupType(dpv1alpha1.BackupTypeFull).
 			Create(&testCtx).GetObject()

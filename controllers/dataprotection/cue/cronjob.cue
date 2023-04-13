@@ -13,14 +13,15 @@
 // limitations under the License.
 
 options: {
-	name:           string
-	namespace:      string
-	mgrNamespace:   string
-	cluster:        string
-	schedule:       string
-	backupType:     string
-	ttl:            string
-	serviceAccount: string
+	name:             string
+	backupPolicyName: string
+	namespace:        string
+	mgrNamespace:     string
+	cluster:          string
+	schedule:         string
+	backupType:       string
+	ttl:              string
+	serviceAccount:   string
 }
 
 cronjob: {
@@ -63,9 +64,8 @@ metadata:
   name: backup-\(options.namespace)-\(options.cluster)-$(date -u +'%Y%m%d%H%M%S')
   namespace: \(options.namespace)
 spec:
-  backupPolicyName: \(options.name)
+  backupPolicyName: \(options.backupPolicyName)
   backupType: \(options.backupType)
-  ttl: \(options.ttl)
 EOF
 """,
 				]

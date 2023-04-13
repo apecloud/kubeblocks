@@ -17,6 +17,8 @@ limitations under the License.
 package configuration
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -104,13 +106,13 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		return makeReturnedStatus(ESAndRetryFailed), err
 	}
 	if len(pods) == 0 {
-		params.Ctx.Log.Info("no pods to update, and retry, selector: %v, current all pod: %v", params.ConfigConstraint.Selector)
+		params.Ctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %s", params.ConfigConstraint.Selector.String()))
 		return makeReturnedStatus(ESRetry), nil
 	}
 
 	requireUpdatedCount := int32(len(pods))
 	for _, pod := range pods {
-		params.Ctx.Log.V(1).Info("sync pod: %s", pod.Name)
+		params.Ctx.Log.V(1).Info(fmt.Sprintf("sync pod: %s", pod.Name))
 		if podutil.IsMatchConfigVersion(&pod, configKey, versionHash) {
 			progress++
 			continue

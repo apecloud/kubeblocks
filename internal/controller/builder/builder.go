@@ -343,12 +343,13 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 	uuidStrB64 := base64.RawStdEncoding.EncodeToString([]byte(strings.ReplaceAll(uuidStr, "-", "")))
 	uuidHex := hex.EncodeToString(uuidBytes)
 	m := map[string]string{
-		"$(RANDOM_PASSWD)": randomString(8),
-		"$(UUID)":          uuidStr,
-		"$(UUID_B64)":      uuidB64,
-		"$(UUID_STR_B64)":  uuidStrB64,
-		"$(UUID_HEX)":      uuidHex,
-		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+		"$(RANDOM_PASSWD)":     randomString(8),
+		"$(UUID)":              uuidStr,
+		"$(UUID_B64)":          uuidB64,
+		"$(UUID_STR_B64)":      uuidStrB64,
+		"$(UUID_HEX)":          uuidHex,
+		"$(SVC_FQDN)":          fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+		"$(HEADLESS_SVC_FQDN)": fmt.Sprintf("%s-%s-headless.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
 	}
 	if len(params.Component.Services) > 0 {
 		for _, p := range params.Component.Services[0].Spec.Ports {
@@ -533,22 +534,6 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 	}
 
 	return &config, nil
-}
-
-func BuildBackupPolicy(sts *appsv1.StatefulSet,
-	template *dataprotectionv1alpha1.BackupPolicyTemplate,
-	backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
-	backupKey.Name = backupKey.Name + "-" + randomString(6)
-	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
-	if err := buildFromCUE("backup_policy_template.cue", map[string]any{
-		"sts":        sts,
-		"backup_key": backupKey,
-		"template":   template.Name,
-	}, "backup_policy", &backupPolicy); err != nil {
-		return nil, err
-	}
-
-	return &backupPolicy, nil
 }
 
 func BuildBackup(sts *appsv1.StatefulSet,

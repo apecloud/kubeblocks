@@ -58,6 +58,7 @@ Cluster command.
 * [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster.
 * [kbcli cluster grant-role](kbcli_cluster_grant-role.md)	 - Grant role to account
 * [kbcli cluster hscale](kbcli_cluster_hscale.md)	 - Horizontally scale the specified components in the cluster.
+* [kbcli cluster label](kbcli_cluster_label.md)	 - Update the labels on cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters.
 * [kbcli cluster list-accounts](kbcli_cluster_list-accounts.md)	 - List accounts for a cluster
 * [kbcli cluster list-backup](kbcli_cluster_list-backup.md)	 - List backups.

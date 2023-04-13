@@ -1,3 +1,19 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package cluster
 
 import (
@@ -23,19 +39,19 @@ import (
 var (
 	labelExample = templates.Examples(`
 		# add label 'env' and value 'dev' for clusters with specified name
-		kbcli cluster label cluster1,cluster2 env=dev
+		kbcli cluster label mycluster env=dev
 
 		# add label 'env' and value 'dev' for all clusters
 		kbcli cluster label env=dev --all
 
-		# add label 'env' and value 'dev' for the specified cluster
+		# add label 'env' and value 'dev' for the clusters that match the selector
 		kbcli cluster label env=dev -l type=mysql
 
-		# overwriting label 'env' with value 'test' for clusters with specified name
-		kbcli cluster label cluster1 --overwrite env=test
+		# update cluster with the label 'env' with value 'test', overwriting any existing value
+		kbcli cluster label mycluster --overwrite env=test
 
 		# delete label env for clusters with specified name
-		kbcli cluster label cluster1 env-`)
+		kbcli cluster label mycluster env-`)
 )
 
 type LabelOptions struct {

@@ -27,6 +27,6 @@ data:
   kb_pitr.conf: |
     method: kb_restore_from_time
     kb_restore_from_time:
-      command: /bin/true
+      command: sh /home/postgres/pgdata/kb_restore/kb_restore.sh
       keep_existing_recovery_conf: false
       recovery_conf: {}

@@ -67,7 +67,7 @@ data:
                 local_config['bootstrap'].update(yaml.safe_load(f))
         # point in time recovery(PITR)
         data_dir = os.environ.get('PGDATA', '')
-        if os.path.isfile(os.path.join(data_dir, 'recovery.signal')):
+        if os.path.isfile("/home/postgres/pgdata/conf/recovery.conf"):
             with open('/home/postgres/conf/kb_pitr.conf', 'r') as f:
                 pitr_config = yaml.safe_load(f)
                 re_config = postgresql_conf_to_dict("/home/postgres/pgdata/conf/recovery.conf")

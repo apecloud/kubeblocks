@@ -203,6 +203,25 @@ func (p *PointInTimeRecoveryManager) checkAndInit() (need bool, err error) {
 	return true, nil
 }
 
+func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) (string, string) {
+	dataVolumeMount := "/data"
+	logVolumeMount := "/log"
+	tag := 0
+	for _, env := range spec.Env {
+		if env.Name == "VOLUME_DATA_DIR" {
+			dataVolumeMount = env.Value
+			tag++
+		} else if env.Name == "VOLUME_LOG_DIR" {
+			logVolumeMount = env.Value
+			tag++
+		}
+		if tag >= 2 {
+			break
+		}
+	}
+	return dataVolumeMount, logVolumeMount
+}
+
 func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupToolSpec, error) {
 	// get scripts from backup template
 	toolList := dpv1alpha1.BackupToolList{}
@@ -289,9 +308,10 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 				{Name: "log", VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pitrPVCName}}},
 			}
+			dataVolumeMount, logVolumeMount := getVolumeMount(recoveryInfo)
 			volumeMounts := []corev1.VolumeMount{
-				{Name: "data", MountPath: "/data"},
-				{Name: "log", MountPath: "/log"},
+				{Name: "data", MountPath: dataVolumeMount},
+				{Name: "log", MountPath: logVolumeMount},
 			}
 
 			// render the job cue template
@@ -306,7 +326,7 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 				return objs, err
 			}
 			// create logic restore job
-			if p.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase {
+			if p.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase && len(recoveryInfo.Logical.RestoreCommands) > 0 {
 				logicJobName := fmt.Sprintf("pitr-logic-%s-%s-%d", p.Cluster.Name, componentSpec.Name, i)
 				logicJob, err := builder.BuildPITRJob(logicJobName, p.Cluster, image, []string{"sh", "-c"},
 					recoveryInfo.Logical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env)

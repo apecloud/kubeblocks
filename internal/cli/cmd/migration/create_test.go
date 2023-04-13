@@ -140,17 +140,17 @@ var _ = Describe("create", func() {
 		It("RuntimeParams", func() {
 			type void struct{}
 			var setValue void
-			serverIdSet := make(map[uint32]void)
+			serverIDSet := make(map[uint32]void)
 
 			loopCount := 0
 			for loopCount < 1000 {
-				newServerId := o.generateRandomMySqlServerId()
-				Expect(newServerId >= 10001 && newServerId <= 1<<32-10001).Should(BeTrue())
-				serverIdSet[newServerId] = setValue
+				newServerID := o.generateRandomMySQLServerID()
+				Expect(newServerID >= 10001 && newServerID <= 1<<32-10001).Should(BeTrue())
+				serverIDSet[newServerID] = setValue
 
 				loopCount += 1
 			}
-			Expect(len(serverIdSet) > 500).Should(BeTrue())
+			Expect(len(serverIDSet) > 500).Should(BeTrue())
 		})
 	})
 

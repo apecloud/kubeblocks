@@ -34,9 +34,7 @@ func (m *MigrationObjectExpress) String(isWhite bool) string {
 	}
 	stringArr := make([]string, 0)
 	for _, db := range expressArr {
-		for _, dbStr := range db.String() {
-			stringArr = append(stringArr, dbStr)
-		}
+		stringArr = append(stringArr, db.String()...)
 	}
 	return strings.Join(stringArr, ",")
 }

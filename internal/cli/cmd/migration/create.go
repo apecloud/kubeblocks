@@ -48,7 +48,7 @@ type CreateMigrationOptions struct {
 	TolerationModel      map[string][]interface{} `json:"tolerationModel,omitempty"`
 	Resources            []string                 `json:"resources,omitempty"`
 	ResourceModel        map[string]interface{}   `json:"resourceModel,omitempty"`
-	ServerId             uint32                   `json:"serverId,omitempty"`
+	ServerID             uint32                   `json:"serverId,omitempty"`
 	create.BaseOptions
 }
 
@@ -235,9 +235,9 @@ func (o *CreateMigrationOptions) BuildWithRuntimeParams() error {
 
 	// Generate random serverId for MySQL type database.Possible values are between 10001 and 2^32-10001
 	if template.Spec.Source.DBType == migrationv1.MigrationDBTypeMySQL {
-		o.ServerId = o.generateRandomMySqlServerId()
+		o.ServerID = o.generateRandomMySQLServerID()
 	} else {
-		o.ServerId = 10001
+		o.ServerID = 10001
 	}
 
 	return nil
@@ -267,7 +267,7 @@ func (o *CreateMigrationOptions) buildTolerationOrResources(raws []string) map[s
 	return results
 }
 
-func (o *CreateMigrationOptions) generateRandomMySqlServerId() uint32 {
+func (o *CreateMigrationOptions) generateRandomMySQLServerID() uint32 {
 	rand.Seed(time.Now().UnixNano())
 	return uint32(rand.Int63nRange(10001, 1<<32-10001))
 }

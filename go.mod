@@ -369,6 +369,7 @@ require (
 )
 
 replace (
+	github.com/spf13/afero => github.com/spf13/afero v1.2.2
 	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.10.0
 	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.10.0
 )

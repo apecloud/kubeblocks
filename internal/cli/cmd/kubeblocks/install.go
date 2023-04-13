@@ -360,16 +360,16 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 		return versionErr
 	}
 
-	version := util.GetK8sVersion(k8sVersionStr)
-	if len(version) == 0 {
+	semVer := util.GetK8sSemVer(k8sVersionStr)
+	if len(semVer) == 0 {
 		return versionErr
 	}
 
 	// output kubernetes version
-	fmt.Fprintf(o.Out, "Kubernetes version %s\n", ""+version)
+	fmt.Fprintf(o.Out, "Kubernetes version %s\n", ""+semVer)
 
 	// disable or enable some features according to the kubernetes environment
-	provider, err := util.GetK8sProvider(version, o.Client)
+	provider, err := util.GetK8sProvider(k8sVersionStr, o.Client)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes provider: %v", err)
 	}

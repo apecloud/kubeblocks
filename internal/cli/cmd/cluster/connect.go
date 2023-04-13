@@ -52,7 +52,7 @@ var connectExample = templates.Examples(`
 		kbcli cluster connect -i mycluster-instance-0
 
 		# connect to a specified component
-		kbcli cluster connect mycluster --component-name mycomponent
+		kbcli cluster connect mycluster --component mycomponent
 
 		# show cli connection example
 		kbcli cluster connect mycluster --show-example --client=cli
@@ -105,7 +105,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "The instance name to connect.")
-	cmd.Flags().StringVar(&o.componentName, "component-name", "", "The component to connect. If not specified, the first component will be used.")
+	cmd.Flags().StringVar(&o.componentName, "component", "", "The component to connect. If not specified, the first component will be used.")
 	cmd.Flags().BoolVar(&o.showExample, "show-example", false, "Show how to connect to cluster or instance from different client.")
 	cmd.Flags().StringVar(&o.clientType, "client", "", "Which client connection example should be output, only valid if --show-example is true.")
 
@@ -157,7 +157,7 @@ func (o *ConnectOptions) validate(args []string) error {
 			return fmt.Errorf("specify either cluster name or instance name, not both")
 		}
 		if len(o.componentName) > 0 {
-			return fmt.Errorf("component-name is valid only when cluster name is specified")
+			return fmt.Errorf("component name is valid only when cluster name is specified")
 		}
 	} else if len(args) == 0 {
 		return fmt.Errorf("either cluster name or instance name should be specified")

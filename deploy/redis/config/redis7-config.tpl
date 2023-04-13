@@ -71,3 +71,9 @@ jemalloc-bg-thread yes
 enable-debug-command yes
 protected-mode no
 
+# maxmemory <bytes>
+{{- $request_memory := getContainerRequestMemory ( index $.podSpec.containers 0 ) }}
+{{- if gt $request_memory 0 }}
+maxmemory {{ $request_memory }}
+{{- end -}}
+

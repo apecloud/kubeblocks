@@ -127,9 +127,9 @@ KubeBlocks operation commands.
 
 Data migration between two data sources.
 
-* [kbcli migration create](kbcli_migration_create.md)	 - Create a Migration.
+* [kbcli migration create](kbcli_migration_create.md)	 - Create a migration task.
 * [kbcli migration describe](kbcli_migration_describe.md)	 - Show details of a specific migration task.
-* [kbcli migration list](kbcli_migration_list.md)	 - List migrations.
+* [kbcli migration list](kbcli_migration_list.md)	 - List migration tasks.
 * [kbcli migration logs](kbcli_migration_logs.md)	 - Access migration task log file.
 * [kbcli migration templates](kbcli_migration_templates.md)	 - List migration templates.
 * [kbcli migration terminate](kbcli_migration_terminate.md)	 - Delete migration task.

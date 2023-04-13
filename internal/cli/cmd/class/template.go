@@ -28,7 +28,7 @@ import (
 
 const ComponentClassTemplate = `
 - resourceConstraintRef: kb-resource-constraint-general
-  # class schema template, you can set default resource values here
+  # class template, you can declare variables and set default values here
   template: |
     cpu: "{{ or .cpu 1 }}"
     memory: "{{ or .memory 4 }}Gi"
@@ -37,18 +37,17 @@ const ComponentClassTemplate = `
       size: "{{ or .dataStorageSize 10 }}Gi"
     - name: log
       size: "{{ or .logStorageSize 1 }}Gi"
-  # class schema template variables
+  # template variables used to define classes
   vars: [cpu, memory, dataStorageSize, logStorageSize]
   series:
-  - # class name template, you can reference variables in class schema template
-    # it's also ok to define static class name in following class definitions
+  - # class naming template, you can reference variables in class template
+    # it's also ok to define static class name in the following class definitions
     namingTemplate: "custom-{{ .cpu }}c{{ .memory }}g"
 
     # class definitions, we support two kinds of class definitions:
-    # 1. define arguments for class schema variables, class schema will be dynamically generated
-    # 2. statically define complete class schema
+    # 1. define values for template variables and the full class definition will be dynamically rendered
+    # 2. statically define the complete class
     classes:
-    # arguments for dynamically generated class
     - args: [1, 1, 100, 10]
 `
 

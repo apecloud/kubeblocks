@@ -76,8 +76,8 @@ var clusterCreateExample = templates.Examples(`
 	# Create a cluster and set cpu to 1 core, memory to 1Gi, storage size to 20Gi and replicas to 3
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1,memory=1Gi,storage=20Gi,replicas=3
 
-	# Create a cluster and set class to general-1c4g
-	kbcli cluster create myclsuter --cluster-definition apecloud-mysql --set class=general-1c4g
+	# Create a cluster and set the class to general-1c1g, valid classes can be found by executing the command "kbcli class list --cluster-definition=<cluster-definition-name>"
+	kbcli cluster create myclsuter --cluster-definition apecloud-mysql --set class=general-1c1g
 
 	# Create a cluster with replicationSet workloadType and set switchPolicy to Noop
 	kbcli cluster create myclsuter --cluster-definition postgresql --set switchPolicy=Noop
@@ -357,7 +357,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cd list\" to show all available cluster definitions")
 			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
 			cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
-			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi)")
+			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 
 			// add updatable flags

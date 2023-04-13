@@ -178,7 +178,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
 			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
 			g.Expect(len(progressDetails) > 0).Should(BeTrue())
-			progressDetail := FindStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
+			progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
 			g.Expect(progressDetail.Status == appsv1alpha1.FailedProgressStatus).Should(BeTrue())
 		})).Should(Succeed())
 	}
@@ -215,7 +215,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
 			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
-			progressDetail := FindStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
+			progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
 			g.Expect(progressDetail != nil && progressDetail.Status == appsv1alpha1.ProcessingProgressStatus).Should(BeTrue())
 		})).Should(Succeed())
 

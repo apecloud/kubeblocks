@@ -56,7 +56,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 
 	// validate OpsRequest.spec
 	if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, true); err != nil {
-		if patchErr := PatchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error()); patchErr != nil {
+		if patchErr := patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error()); patchErr != nil {
 			return nil, patchErr
 		}
 		return nil, err
@@ -101,7 +101,8 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return 0, patchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
 	opsRes.ToClusterPhase = opsBehaviour.ToClusterPhase
-	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(reqCtx, cli, opsRes); err != nil && !isOpsRequestFailedPhase(opsRequestPhase) {
+	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(reqCtx, cli, opsRes); err != nil &&
+		!isOpsRequestFailedPhase(opsRequestPhase) {
 		// if the opsRequest phase is Failed, skipped
 		return requeueAfter, err
 	}

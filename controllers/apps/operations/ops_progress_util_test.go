@@ -193,9 +193,9 @@ var _ = Describe("Ops ProgressDetails", func() {
 })
 
 func getProgressDetailStatus(opsRes *OpsResource, componentName string, pod *corev1.Pod) appsv1alpha1.ProgressStatus {
-	objectKey := GetProgressObjectKey(pod.Kind, pod.Name)
+	objectKey := getProgressObjectKey(pod.Kind, pod.Name)
 	progressDetails := opsRes.OpsRequest.Status.Components[componentName].ProgressDetails
-	progressDetail := FindStatusProgressDetail(progressDetails, objectKey)
+	progressDetail := findStatusProgressDetail(progressDetails, objectKey)
 	var status appsv1alpha1.ProgressStatus
 	if progressDetail != nil {
 		status = progressDetail.Status

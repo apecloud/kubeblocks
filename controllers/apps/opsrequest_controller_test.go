@@ -59,10 +59,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// REVIEW/TODO: do check test cases for isn't proceed to a finite phase
-		// need to explicit remove OpsRequestFinalizer as OpsRequestController will prevent
-		// deletion if OpsRequest.Status.Phase == appsv1alpha1.OpsRunningPhase
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.OpsRequestSignature, true, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
 		testapps.ClearClusterResources(&testCtx)

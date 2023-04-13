@@ -17,7 +17,7 @@ spec:
       workloadType: Replication
       characterType: redis
       probes:
-        roleChangedProbe:
+        roleProbe:
           failureThreshold: 2
           periodSeconds: 2
           timeoutSeconds: 1

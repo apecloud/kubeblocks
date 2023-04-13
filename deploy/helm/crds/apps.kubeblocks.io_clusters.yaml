@@ -390,7 +390,7 @@ spec:
                       items:
                         properties:
                           name:
-                            description: Ref ClusterVersion.spec.components.containers.volumeMounts.name
+                            description: Reference `ClusterDefinition.spec.componentDefs.containers.volumeMounts.name`.
                             type: string
                           spec:
                             description: spec defines the desired characteristics
@@ -402,6 +402,7 @@ spec:
                                 items:
                                   type: string
                                 type: array
+                                x-kubernetes-preserve-unknown-fields: true
                               resources:
                                 description: 'resources represents the minimum resources
                                   the volume should have. If RecoverVolumeExpansionFailure
@@ -458,12 +459,12 @@ spec:
                                       https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                                     type: object
                                 type: object
+                                x-kubernetes-preserve-unknown-fields: true
                               storageClassName:
                                 description: 'storageClassName is the name of the
                                   StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1'
                                 type: string
                             type: object
-                            x-kubernetes-preserve-unknown-fields: true
                         required:
                         - name
                         type: object

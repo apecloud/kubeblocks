@@ -30,6 +30,7 @@ import (
 const (
 	StorageClassPath      = "cluster-resources/storage-classes.json"
 	MissingOutcomeMessage = "there is a missing outcome message"
+	IncorrectOutcomeType  = "there is incorrect outcome type"
 	PassType              = "Pass"
 	WarnType              = "Warn"
 	FailType              = "Fail"
@@ -109,7 +110,9 @@ func (a *AnalyzeStorageClassByKb) GenerateResult(resultType string) *analyze.Ana
 				return &result
 			}
 		default:
-			break
+			result.IsFail = true
+			result.Message = IncorrectOutcomeType
+			return &result
 		}
 	}
 	result.IsFail = true

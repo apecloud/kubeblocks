@@ -18,7 +18,6 @@ package redis
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -29,6 +28,10 @@ import (
 
 	bindings "github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
+
+	// import this json-iterator package to replace the default
+	// to avoid the error: 'json: unsupported type: map[interface {}]interface {}'
+	json "github.com/json-iterator/go"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	rediscomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/redis"
@@ -156,6 +159,9 @@ func (r *Redis) GetLogger() logger.Logger {
 // InternalQuery is used for internal query, implement BaseInternalOps interface.
 func (r *Redis) InternalQuery(ctx context.Context, cmd string) ([]byte, error) {
 	redisArgs := tokenizeCmd2Args(cmd)
+	// Be aware of the result type.
+	// type of result could be string, []string, []interface{}, map[interface]interface{}
+	// it is not solely determined by the command, but also the redis version.
 	result, err := r.query(ctx, redisArgs...)
 	if err != nil {
 		return nil, err
@@ -271,48 +277,24 @@ func (r *Redis) listUsersOps(ctx context.Context, req *bindings.InvokeRequest, r
 func (r *Redis) describeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	var (
 		object        = UserInfo{}
+		profile       map[string]string
+		err           error
 		dataProcessor = func(data interface{}) (interface{}, error) {
-			redisUserPrivContxt := []string{"commands", "keys", "channels", "selectors"}
-			redisUserInfoContext := []string{"flags", "passwords"}
-
-			profile := make(map[string]string, 0)
-			results := make([]interface{}, 0)
-			err := json.Unmarshal(data.([]byte), &results)
+			// parse it to a map or an []interface
+			// try map first
+			profile, err = parseCommandAndKeyFromMap(data)
 			if err != nil {
-				return nil, err
-			}
-
-			var context string
-			for i := 0; i < len(results); i++ {
-				result := results[i]
-				switch result := result.(type) {
-				case string:
-					strVal := strings.TrimSpace(result)
-					if len(strVal) == 0 {
-						continue
-					}
-					if slices.Contains(redisUserInfoContext, strVal) {
-						i++
-						continue
-					}
-					if slices.Contains(redisUserPrivContxt, strVal) {
-						context = strVal
-					} else {
-						profile[context] = strVal
-					}
-				case []interface{}:
-					selectors := make([]string, 0)
-					for _, sel := range result {
-						selectors = append(selectors, sel.(string))
-					}
-					profile[context] = strings.Join(selectors, " ")
+				// try list
+				profile, err = parseCommandAndKeyFromList(data)
+				if err != nil {
+					return nil, err
 				}
 			}
 
 			users := make([]UserInfo, 0)
 			user := UserInfo{
 				UserName: object.UserName,
-				RoleName: redisPriv2RoleName(profile["commands"] + " " + profile["keys"]),
+				RoleName: (string)(r.priv2Role(profile["commands"] + " " + profile["keys"])),
 			}
 			users = append(users, user)
 			if jsonData, err := json.Marshal(users); err != nil {
@@ -334,6 +316,83 @@ func (r *Redis) describeUserOps(ctx context.Context, req *bindings.InvokeRequest
 	}
 
 	return QueryObject(ctx, r, req, DescribeUserOp, cmdRender, dataProcessor, object)
+}
+
+func parseCommandAndKeyFromList(data interface{}) (map[string]string, error) {
+	var (
+		redisUserPrivContxt  = []string{"commands", "keys", "channels", "selectors"}
+		redisUserInfoContext = []string{"flags", "passwords"}
+	)
+
+	profile := make(map[string]string, 0)
+	results := make([]interface{}, 0)
+
+	err := json.Unmarshal(data.([]byte), &results)
+	if err != nil {
+		return nil, err
+	}
+	// parse line by line
+	var context string
+	for i := 0; i < len(results); i++ {
+		result := results[i]
+		switch result := result.(type) {
+		case string:
+			strVal := strings.TrimSpace(result)
+			if len(strVal) == 0 {
+				continue
+			}
+			if slices.Contains(redisUserInfoContext, strVal) {
+				i++
+				continue
+			}
+			if slices.Contains(redisUserPrivContxt, strVal) {
+				context = strVal
+			} else {
+				profile[context] = strVal
+			}
+		case []interface{}:
+			selectors := make([]string, 0)
+			for _, sel := range result {
+				selectors = append(selectors, sel.(string))
+			}
+			profile[context] = strings.Join(selectors, " ")
+		}
+	}
+	return profile, nil
+}
+
+func parseCommandAndKeyFromMap(data interface{}) (map[string]string, error) {
+	var (
+		redisUserPrivContxt = []string{"commands", "keys", "channels", "selectors"}
+	)
+
+	profile := make(map[string]string, 0)
+	results := make(map[string]interface{}, 0)
+
+	err := json.Unmarshal(data.([]byte), &results)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range results {
+		// each key is string, and each v is eigher a string or a list of string
+		if !slices.Contains(redisUserPrivContxt, k) {
+			continue
+		}
+
+		switch v := v.(type) {
+		case string:
+			profile[k] = v
+		case []interface{}:
+			selectors := make([]string, 0)
+			for _, sel := range v {
+				selectors = append(selectors, sel.(string))
+			}
+			profile[k] = strings.Join(selectors, " ")
+		default:
+			return nil, fmt.Errorf("unknown data type: %v", v)
+		}
+	}
+	return profile, nil
 }
 
 func (r *Redis) createUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
@@ -399,7 +458,7 @@ func (r *Redis) managePrivillege(ctx context.Context, req *bindings.InvokeReques
 		object = UserInfo{}
 
 		cmdRend = func(user UserInfo) string {
-			command := roleName2RedisPriv(op, user.RoleName)
+			command := r.role2Priv(op, user.RoleName)
 			return fmt.Sprintf("ACL SETUSER %s %s", user.UserName, command)
 		}
 
@@ -418,7 +477,7 @@ func (r *Redis) managePrivillege(ctx context.Context, req *bindings.InvokeReques
 	return ExecuteObject(ctx, r, req, op, cmdRend, msgTplRend, object)
 }
 
-func roleName2RedisPriv(op bindings.OperationKind, roleName string) string {
+func (r *Redis) role2Priv(op bindings.OperationKind, roleName string) string {
 	const (
 		grantPrefix  = "+"
 		revokePrefix = "-"
@@ -430,22 +489,23 @@ func roleName2RedisPriv(op bindings.OperationKind, roleName string) string {
 		prefix = revokePrefix
 	}
 	var command string
-	switch roleName {
-	case ReadOnlyRole:
-		command = fmt.Sprintf("-@all %s@read allkeys", prefix)
-	case ReadWriteRole:
-		command = fmt.Sprintf("-@all %s@write %s@read allkeys", prefix, prefix)
+
+	roleType := String2RoleType(roleName)
+	switch roleType {
 	case SuperUserRole:
 		command = fmt.Sprintf("%s@all allkeys", prefix)
+	case ReadWriteRole:
+		command = fmt.Sprintf("-@all %s@write %s@read allkeys", prefix, prefix)
+	case ReadOnlyRole:
+		command = fmt.Sprintf("-@all %s@read allkeys", prefix)
 	}
 	return command
 }
 
-func redisPriv2RoleName(commands string) string {
+func (r *Redis) priv2Role(commands string) RoleType {
 	if commands == "-@all" {
 		return NoPrivileges
 	}
-
 	switch commands {
 	case "-@all +@read ~*":
 		return ReadOnlyRole
@@ -486,6 +546,12 @@ func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest, re
 				break
 			}
 		}
+	}
+	if role == MASTER {
+		return PRIMARY, nil
+	}
+	if role == SLAVE {
+		return SECONDARY, nil
 	}
 	return role, nil
 }

@@ -346,7 +346,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				snapshotKey,
 				stsObj,
 				vcts,
-				component.HorizontalScalePolicy.BackupTemplateSelector,
+				component.ComponentDef,
+				component.HorizontalScalePolicy.BackupPolicyTemplateName,
 				dag,
 				root); err != nil {
 				return err
@@ -571,22 +572,21 @@ func doSnapshot(cli roclient.ReadonlyClient,
 	snapshotKey types.NamespacedName,
 	stsObj *appsv1.StatefulSet,
 	vcts []corev1.PersistentVolumeClaimTemplate,
-	backupTemplateSelector map[string]string,
+	componentDef,
+	backupPolicyTemplateName string,
 	dag *graph.DAG,
 	root graph.Vertex) error {
 
 	ctx := reqCtx.Ctx
 
-	ml := client.MatchingLabels(backupTemplateSelector)
-	backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
-	// find backuppolicytemplate by clusterdefinition
-	if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
+	backupPolicyTemplate := &appsv1alpha1.BackupPolicyTemplate{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: backupPolicyTemplateName}, backupPolicyTemplate); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	if len(backupPolicyTemplateList.Items) > 0 {
+	if len(backupPolicyTemplate.Name) > 0 {
 		// if there is backuppolicytemplate created by provider
 		// create backupjob CR, will ignore error if already exists
-		err := createBackup(reqCtx, cli, stsObj, &backupPolicyTemplateList.Items[0], snapshotKey, cluster, dag, root)
+		err := createBackup(reqCtx, cli, stsObj, componentDef, backupPolicyTemplateName, snapshotKey, cluster, dag, root)
 		if err != nil {
 			return err
 		}
@@ -678,39 +678,15 @@ func checkedCreatePVCFromSnapshot(cli roclient.ReadonlyClient,
 func createBackup(reqCtx intctrlutil.RequestCtx,
 	cli roclient.ReadonlyClient,
 	sts *appsv1.StatefulSet,
-	backupPolicyTemplate *dataprotectionv1alpha1.BackupPolicyTemplate,
+	componentDef,
+	backupPolicyTemplateName string,
 	backupKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
 	dag *graph.DAG,
 	root graph.Vertex) error {
 	ctx := reqCtx.Ctx
 
-	createBackupPolicy := func() (backupPolicyName string, Vertex *lifecycleVertex, err error) {
-		backupPolicyName = ""
-		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[constant.KBAppComponentLabelKey])
-		if err = cli.List(ctx, &backupPolicyList, ml); err != nil {
-			return
-		}
-		if len(backupPolicyList.Items) > 0 {
-			backupPolicyName = backupPolicyList.Items[0].Name
-			return
-		}
-		backupPolicy, err := builder.BuildBackupPolicy(sts, backupPolicyTemplate, backupKey)
-		if err != nil {
-			return
-		}
-		if err = controllerutil.SetControllerReference(cluster, backupPolicy, scheme); err != nil {
-			return
-		}
-		backupPolicyName = backupPolicy.Name
-		vertex := &lifecycleVertex{obj: backupPolicy, action: actionPtr(CREATE)}
-		dag.AddVertex(vertex)
-		dag.Connect(root, vertex)
-		return
-	}
-
-	createBackup := func(backupPolicyName string, policyVertex *lifecycleVertex) error {
+	createBackup := func(backupPolicyName string) error {
 		backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
 		if err := cli.Get(ctx, client.ObjectKey{Namespace: backupKey.Namespace, Name: backupPolicyName}, backupPolicy); err != nil && !apierrors.IsNotFound(err) {
 			return err
@@ -746,12 +722,14 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		dag.Connect(root, vertex)
 		return nil
 	}
-
-	backupPolicyName, policyVertex, err := createBackupPolicy()
+	backupPolicy, err := getBackupPolicyFromTemplate(reqCtx, cli, cluster, componentDef, backupPolicyTemplateName)
 	if err != nil {
 		return err
 	}
-	if err := createBackup(backupPolicyName, policyVertex); err != nil {
+	if backupPolicy == nil {
+		return intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTemplateName)
+	}
+	if err = createBackup(backupPolicy.Name); err != nil {
 		return err
 	}
 

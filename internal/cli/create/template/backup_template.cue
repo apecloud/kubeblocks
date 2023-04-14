@@ -18,7 +18,6 @@ options: {
 	namespace:    string
 	backupType:   string
 	backupPolicy: string
-	ttl:          string
 }
 
 // required, k8s api resource content
@@ -35,6 +34,5 @@ content: {
 	spec: {
 		backupType:       options.backupType
 		backupPolicyName: options.backupPolicy
-		ttl:              options.ttl
 	}
 }

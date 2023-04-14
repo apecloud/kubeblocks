@@ -8,7 +8,7 @@ env:
   GITLAB_GO_CACHE_PROJECT_ID: 98800
   GO_CACHE: "go-cache"
   GO_CACHE_DIR: "/root/.cache"
-
+  GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
 
 jobs:
   trigger-mode:
@@ -43,7 +43,7 @@ jobs:
             --project-id ${{ env.GITLAB_GO_CACHE_PROJECT_ID }} \
             --tag-name ${{ env.GO_CACHE }} \
             --asset-name ${{ env.GO_CACHE }}.tar.gz \
-            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
+            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
       - name: Extract ${{ env.GO_CACHE }}
         uses: a7ul/tar-action@v1.1.3

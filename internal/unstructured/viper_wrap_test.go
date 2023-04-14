@@ -118,32 +118,3 @@ func TestJSONFormat(t *testing.T) {
 	assert.EqualValues(t, jsonConfigObj.Get("name"), "test")
 
 }
-
-func TestYAMLFormat(t *testing.T) {
-	const yamlContext = `
-spec:
-    clusterref: pg
-    reconfigure:
-        componentname: postgresql
-        configurations:
-            - keys:
-                - key: postgresql.conf
-                  parameters:
-                    - key: max_connections
-                      value: "2666"
-              name: postgresql-configuration
-`
-
-	yamlConfigObj, err := LoadConfig("yaml_test", yamlContext, appsv1alpha1.YAML)
-	assert.Nil(t, err)
-
-	assert.EqualValues(t, yamlConfigObj.Get("spec.clusterRef"), "pg")
-	assert.EqualValues(t, yamlConfigObj.Get("spec.reconfigure.componentName"), "postgresql")
-
-	dumpContext, err := yamlConfigObj.Marshal()
-	assert.Nil(t, err)
-	assert.EqualValues(t, dumpContext, yamlContext[1:]) // trim "\n"
-
-	assert.Nil(t, yamlConfigObj.Update("spec.my_test", "100"))
-	assert.EqualValues(t, yamlConfigObj.Get("spec.my_test"), "100")
-}

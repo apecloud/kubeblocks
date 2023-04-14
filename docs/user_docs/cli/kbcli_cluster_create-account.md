@@ -12,21 +12,21 @@ kbcli cluster create-account [flags]
 
 ```
   # create account
-  kbcli cluster create-account NAME --component-name COMPNAME --username NAME --password PASSWD
+  kbcli cluster create-account NAME --component COMPNAME --username NAME --password PASSWD
   # create account without password
-  kbcli cluster create-account NAME --component-name COMPNAME --username NAME
+  kbcli cluster create-account NAME --component COMPNAME --username NAME
   # create account with expired interval
-  kbcli cluster create-account NAME --component-name COMPNAME --username NAME --password PASSWD --expiredAt 2046-01-02T15:04:05Z
+  kbcli cluster create-account NAME --component COMPNAME --username NAME --password PASSWD --expiredAt 2046-01-02T15:04:05Z
 ```
 
 ### Options
 
 ```
-      --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
-  -h, --help                    help for create-account
-  -i, --instance string         Specify the name of instance to be connected.
-  -p, --password string         Optional. Specify the password of user. The default value is empty, which means a random password will be generated.
-  -u, --username string         Required. Specify the name of user, which must be unique.
+      --component string   Specify the name of component to be connected. If not specified, the first component will be used.
+  -h, --help               help for create-account
+  -i, --instance string    Specify the name of instance to be connected.
+  -p, --password string    Optional. Specify the password of user. The default value is empty, which means a random password will be generated.
+  -u, --username string    Required. Specify the name of user, which must be unique.
 ```
 
 ### Options inherited from parent commands

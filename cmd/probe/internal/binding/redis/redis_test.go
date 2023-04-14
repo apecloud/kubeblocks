@@ -163,7 +163,7 @@ func TestRedisGetRoles(t *testing.T) {
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
 	assert.Equal(t, RespEveSucc, opsResult[RespTypEve])
-	assert.Equal(t, "master", opsResult["role"])
+	assert.Equal(t, PRIMARY, opsResult["role"])
 
 	// invoke one more time
 	bindingRes, err = r.Invoke(context.TODO(), request)
@@ -171,7 +171,7 @@ func TestRedisGetRoles(t *testing.T) {
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
 	assert.Equal(t, RespEveSucc, opsResult[RespTypEve])
-	assert.Equal(t, "slave", opsResult["role"])
+	assert.Equal(t, SECONDARY, opsResult["role"])
 }
 
 func TestRedisAccounts(t *testing.T) {
@@ -299,7 +299,7 @@ func TestRedisAccounts(t *testing.T) {
 				testName: "validInput",
 				testMetaData: map[string]string{
 					"userName": userName,
-					"roleName": roleName,
+					"roleName": (string)(roleName),
 				},
 				expectEveType: RespEveSucc,
 			},
@@ -307,7 +307,7 @@ func TestRedisAccounts(t *testing.T) {
 
 		for _, ops := range []bindings.OperationKind{GrantUserRoleOp, RevokeUserRoleOp} {
 			// mock exepctation
-			args := tokenizeCmd2Args(fmt.Sprintf("ACL SETUSER %s %s", userName, roleName2RedisPriv(ops, roleName)))
+			args := tokenizeCmd2Args(fmt.Sprintf("ACL SETUSER %s %s", userName, r.role2Priv(ops, (string)(roleName))))
 			mock.ExpectDo(args...).SetVal("ok")
 
 			request := &bindings.InvokeRequest{
@@ -353,6 +353,15 @@ func TestRedisAccounts(t *testing.T) {
 				"selectors",
 				[]interface{}{},
 			}
+
+			userInfoMap = map[string]interface{}{
+				"flags":     []interface{}{"on"},
+				"passwords": []interface{}{"mock-password"},
+				"commands":  "+@all",
+				"keys":      "~*",
+				"channels":  "",
+				"selectors": []interface{}{},
+			}
 		)
 
 		testCases := []redisTestCase{
@@ -383,10 +392,18 @@ func TestRedisAccounts(t *testing.T) {
 				},
 				expectEveType: RespEveSucc,
 			},
+			{
+				testName: "validInputAsMap",
+				testMetaData: map[string]string{
+					"userName": userName,
+				},
+				expectEveType: RespEveSucc,
+			},
 		}
 
 		mock.ExpectDo("ACL", "GETUSER", userName).RedisNil()
 		mock.ExpectDo("ACL", "GETUSER", userName).SetVal(userInfo)
+		mock.ExpectDo("ACL", "GETUSER", userName).SetVal(userInfoMap)
 
 		for _, accTest := range testCases {
 			request.Metadata = accTest.testMetaData
@@ -407,7 +424,7 @@ func TestRedisAccounts(t *testing.T) {
 				assert.Len(t, users, 1)
 				user := users[0]
 				assert.Equal(t, userName, user.UserName)
-				assert.Equal(t, SuperUserRole, user.RoleName)
+				assert.True(t, SuperUserRole.EqualTo(user.RoleName))
 			}
 		}
 		mock.ClearExpect()
@@ -464,7 +481,7 @@ func TestRedisAccounts(t *testing.T) {
 
 	t.Run("RoleName Conversion", func(t *testing.T) {
 		type roleTestCase struct {
-			roleName   string
+			roleName   RoleType
 			redisPrivs string
 		}
 		grantTestCases := []roleTestCase{
@@ -482,12 +499,12 @@ func TestRedisAccounts(t *testing.T) {
 			},
 		}
 		for _, test := range grantTestCases {
-			cmd := roleName2RedisPriv(GrantUserRoleOp, test.roleName)
+			cmd := r.role2Priv(GrantUserRoleOp, (string)(test.roleName))
 			assert.Equal(t, test.redisPrivs, cmd)
 
 			// allkeys -> ~*
 			cmd = strings.Replace(cmd, "allkeys", "~*", 1)
-			inferredRole := redisPriv2RoleName(cmd)
+			inferredRole := r.priv2Role(cmd)
 			assert.Equal(t, test.roleName, inferredRole)
 		}
 
@@ -506,7 +523,7 @@ func TestRedisAccounts(t *testing.T) {
 			},
 		}
 		for _, test := range revokeTestCases {
-			cmd := roleName2RedisPriv(RevokeUserRoleOp, test.roleName)
+			cmd := r.role2Priv(RevokeUserRoleOp, (string)(test.roleName))
 			assert.Equal(t, test.redisPrivs, cmd)
 		}
 	})

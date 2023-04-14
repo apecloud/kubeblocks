@@ -8,8 +8,14 @@ metadata:
 spec:
   reloadOptions:
     tplScriptTrigger:
+      sync: true
       scriptConfigMapRef: patroni-reload-script
       namespace: {{ .Release.Namespace }}
+
+  # update patroni master
+  selector:
+    matchLabels:
+      "apps.kubeblocks.postgres.patroni/role": "master"
 
   # top level mysql configuration type
   cfgSchemaTopLevelName: PGParameter

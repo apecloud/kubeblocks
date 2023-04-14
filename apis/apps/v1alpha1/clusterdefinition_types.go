@@ -49,6 +49,8 @@ type ClusterDefinitionSpec struct {
 	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string``.
 	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded``.
 	// `$(UUID_HEX)` - generate a random UUID v4 wth HEX representation``.
+	// `$(HEADLESS_SVC_FQDN)` - headless service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
+	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
 	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
 	// `$(SVC_PORT_<PORT-NAME>)` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
@@ -176,64 +178,11 @@ func (r ClusterDefinitionStatus) GetTerminalPhases() []Phase {
 	return []Phase{AvailablePhase}
 }
 
-type ComponentTemplateSpec struct {
-	// Specify the name of configuration template.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// Specify the name of the referenced the configuration template ConfigMap object.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	TemplateRef string `json:"templateRef"`
-
-	// Specify the namespace of the referenced the configuration template ConfigMap object.
-	// An empty namespace is equivalent to the "default" namespace.
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:default="default"
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
-
-	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
-	// The volume name must be defined in podSpec.containers[*].volumeMounts.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=32
-	VolumeName string `json:"volumeName"`
-
-	// defaultMode is optional: mode bits used to set permissions on created files by default.
-	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
-	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
-	// Defaults to 0644.
-	// Directories within the path are not affected by this setting.
-	// This might be in conflict with other options that affect the file
-	// mode, like fsGroup, and the result can be other mode bits set.
-	// +optional
-	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
-}
-
-type ComponentConfigSpec struct {
-	ComponentTemplateSpec `json:",inline"`
-
-	// Specify a list of keys.
-	// If empty, ConfigConstraint takes effect for all keys in configmap.
-	// +optional
-	Keys []string `json:"keys,omitempty"`
-
-	// Specify the name of the referenced the configuration constraints object.
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	ConfigConstraintRef string `json:"constraintRef,omitempty"`
-}
-
 type ExporterConfig struct {
 	// scrapePort is exporter port for Time Series Database to scrape metrics.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:validation:Minimum=0
-	ScrapePort int32 `json:"scrapePort"`
+	// +kubebuilder:validation:XIntOrString
+	ScrapePort intstr.IntOrString `json:"scrapePort"`
 
 	// scrapePath is exporter url path for Time Series Database to scrape metrics.
 	// +kubebuilder:validation:MaxLength=128
@@ -272,9 +221,9 @@ type LogConfig struct {
 type VolumeTypeSpec struct {
 	// name definition is the same as the name of the VolumeMounts field in PodSpec.Container,
 	// similar to the relations of Volumes[*].name and VolumesMounts[*].name in Pod.Spec.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 
 	// type is in enum of {data, log}.
 	// VolumeTypeData: the volume is for the persistent data storage.
@@ -392,6 +341,8 @@ type ClusterComponentDefinition struct {
 	// NOTE:
 	//   When volumeTypes is not defined, the backup function will not be supported,
 	// even if a persistent volume has been specified.
+	// +listType=map
+	// +listMapKey=name
 	// +optional
 	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
 
@@ -410,6 +361,7 @@ type ServiceSpec struct {
 	// +listType=map
 	// +listMapKey=port
 	// +listMapKey=protocol
+	// +optional
 	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
 }
 
@@ -462,6 +414,7 @@ type ServicePort struct {
 	// This field is ignored for services with clusterIP=None, and should be
 	// omitted or set equal to the 'port' field.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+	// +kubebuilder:validation:XIntOrString
 	// +optional
 	TargetPort intstr.IntOrString `json:"targetPort,omitempty" protobuf:"bytes,4,opt,name=targetPort"`
 }
@@ -481,7 +434,7 @@ type HorizontalScalePolicy struct {
 	// Policy is in enum of {None, Snapshot}. The default policy is `None`.
 	// None: Default policy, do nothing.
 	// Snapshot: Do native volume snapshot before scaling and restore to newly scaled pods.
-	//           Prefer backup job to create snapshot if `BackupTemplateSelector` can find a template.
+	//           Prefer backup job to create snapshot if can find a backupPolicy from 'BackupPolicyTemplateName'.
 	//           Notice that 'Snapshot' policy will only take snapshot on one volumeMount, default is
 	//           the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
 	//           since take multiple snapshots at one time might cause consistency problem.
@@ -489,9 +442,9 @@ type HorizontalScalePolicy struct {
 	// +optional
 	Type HScaleDataClonePolicyType `json:"type,omitempty"`
 
-	// backupTemplateSelector defines the label selector for finding associated BackupTemplate API object.
+	// BackupPolicyTemplateName reference the backup policy template.
 	// +optional
-	BackupTemplateSelector map[string]string `json:"backupTemplateSelector,omitempty"`
+	BackupPolicyTemplateName string `json:"backupPolicyTemplateName,omitempty"`
 
 	// volumeMountsName defines which volumeMount of the container to do backup,
 	// only work if Type is not None
@@ -542,13 +495,13 @@ type ClusterDefinitionProbes struct {
 
 	// Probe for DB role changed check.
 	// +optional
-	RoleChangedProbe *ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
+	RoleProbe *ClusterDefinitionProbe `json:"roleProbe,omitempty"`
 
 	// roleProbeTimeoutAfterPodsReady(in seconds), when all pods of the component are ready,
 	// it will detect whether the application is available in the pod.
 	// if pods exceed the InitializationTimeoutSeconds time without a role label,
 	// this component will enter the Failed/Abnormal phase.
-	// Note that this configuration will only take effect if the component supports RoleChangedProbe
+	// Note that this configuration will only take effect if the component supports RoleProbe
 	// and will not affect the life cycle of the pod. default values are 60 seconds.
 	// +optional
 	// +kubebuilder:validation:Minimum=30

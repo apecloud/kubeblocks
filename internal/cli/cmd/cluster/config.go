@@ -92,32 +92,32 @@ var (
 		kbcli cluster describe-config mycluster
 
 		# describe a component, e.g. cluster name is mycluster, component name is mysql
-		kbcli cluster describe-config mycluster --component-name=mysql
+		kbcli cluster describe-config mycluster --component=mysql
 
-		# describe all configuration files. 
-		kbcli cluster describe-config mycluster --component-name=mysql --show-detail
+		# describe all configuration files.
+		kbcli cluster describe-config mycluster --component=mysql --show-detail
 
-		# describe a content of configuration file. 
-		kbcli cluster describe-config mycluster --component-name=mysql --config-file=my.cnf --show-detail`)
+		# describe a content of configuration file.
+		kbcli cluster describe-config mycluster --component=mysql --config-file=my.cnf --show-detail`)
 	explainReconfigureExample = templates.Examples(`
 		# describe a cluster, e.g. cluster name is mycluster
 		kbcli cluster explain-config mycluster
 
 		# describe a specified configure template, e.g. cluster name is mycluster
-		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl
+		kbcli cluster explain-config mycluster --component=mysql --config-specs=mysql-3node-tpl
 
 		# describe a specified configure template, e.g. cluster name is mycluster
-		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
+		kbcli cluster explain-config mycluster --component=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
 
 		# describe a specified parameters, e.g. cluster name is mycluster
-		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl --param=sql_mode`)
+		kbcli cluster explain-config mycluster --component=mysql --config-specs=mysql-3node-tpl --param=sql_mode`)
 	diffConfigureExample = templates.Examples(`
-		# compare config files 
+		# compare config files
 		kbcli cluster diff-config opsrequest1 opsrequest2`)
 )
 
 func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&r.componentName, "component-name", "", "Specify the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter.\"")
+	cmd.Flags().StringVar(&r.componentName, "component", "", "Specify the name of Component to be describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
 	cmd.Flags().StringSliceVar(&r.configSpecs, "config-specs", nil, "Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)")
 }
 

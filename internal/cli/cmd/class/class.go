@@ -22,11 +22,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-const (
-	CustomClassNamespace = "kube-system"
-	CMDataKeyDefinition  = "definition"
-)
-
 func NewClassCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "class",

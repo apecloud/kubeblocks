@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/unstructured"
 )
@@ -238,51 +239,6 @@ type ConfigPatchInfo struct {
 	LastVersion *cfgWrapper
 }
 
-func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigPatchInfo, error) {
-	fromOMap := ToSet(c.indexer)
-	fromNMap := ToSet(target.indexer)
-
-	addSet := Difference(fromNMap, fromOMap)
-	deleteSet := Difference(fromOMap, fromNMap)
-	updateSet := Difference(fromOMap, deleteSet)
-
-	reconfigureInfo := &ConfigPatchInfo{
-		IsModify:     false,
-		AddConfig:    make(map[string]interface{}, addSet.Length()),
-		DeleteConfig: make(map[string]interface{}, deleteSet.Length()),
-		UpdateConfig: make(map[string][]byte, updateSet.Length()),
-
-		Target:      target,
-		LastVersion: c,
-	}
-
-	for elem := range addSet.Iter() {
-		reconfigureInfo.AddConfig[elem] = target.indexer[elem].GetAllParameters()
-		reconfigureInfo.IsModify = true
-	}
-
-	for elem := range deleteSet.Iter() {
-		reconfigureInfo.DeleteConfig[elem] = c.indexer[elem].GetAllParameters()
-		reconfigureInfo.IsModify = true
-	}
-
-	for elem := range updateSet.Iter() {
-		old := c.indexer[elem]
-		new := target.indexer[elem]
-
-		patch, err := jsonPatch(old.GetAllParameters(), new.GetAllParameters())
-		if err != nil {
-			return nil, err
-		}
-		if len(patch) > len(emptyJSON) {
-			reconfigureInfo.UpdateConfig[elem] = patch
-			reconfigureInfo.IsModify = true
-		}
-	}
-
-	return reconfigureInfo, nil
-}
-
 func NewCfgOptions(filename string, options ...Option) CfgOpOption {
 	context := CfgOpOption{
 		FileName: filename,
@@ -305,6 +261,13 @@ func WithFormatterConfig(formatConfig *appsv1alpha1.FormatterConfig) Option {
 	}
 }
 
+func NestedPrefixField(formatConfig *appsv1alpha1.FormatterConfig) string {
+	if formatConfig != nil && formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
+		return formatConfig.IniConfig.SectionName
+	}
+	return ""
+}
+
 func (c *cfgWrapper) Query(jsonpath string, option CfgOpOption) ([]byte, error) {
 	if option.AllSearch && c.fileCount > 1 {
 		return c.queryAllCfg(jsonpath, option)
@@ -323,7 +286,7 @@ func (c *cfgWrapper) Query(jsonpath string, option CfgOpOption) ([]byte, error) 
 		}
 	}
 
-	return retrievalWithJSONPath(cfg.GetAllParameters(), jsonpath)
+	return util.RetrievalWithJSONPath(cfg.GetAllParameters(), jsonpath)
 }
 
 func (c *cfgWrapper) queryAllCfg(jsonpath string, option CfgOpOption) ([]byte, error) {
@@ -332,7 +295,7 @@ func (c *cfgWrapper) queryAllCfg(jsonpath string, option CfgOpOption) ([]byte, e
 	for filename, v := range c.indexer {
 		tops[filename] = v.GetAllParameters()
 	}
-	return retrievalWithJSONPath(tops, jsonpath)
+	return util.RetrievalWithJSONPath(tops, jsonpath)
 }
 
 func (c cfgWrapper) getConfigObject(option CfgOpOption) unstructured.ConfigObject {
@@ -363,37 +326,12 @@ func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
 	return cmKeySet
 }
 
-func CreateMergePatch(oldVersion, newVersion interface{}, option CfgOption) (*ConfigPatchInfo, error) {
-
-	ok, err := compareWithConfig(oldVersion, newVersion, option)
-	if err != nil {
-		return nil, err
-	} else if ok {
-		return &ConfigPatchInfo{IsModify: false}, err
-	}
-
-	old, err := NewConfigLoader(withOption(option, oldVersion))
-	if err != nil {
-		return nil, WrapError(err, "failed to create config: [%s]", oldVersion)
-	}
-
-	new, err := NewConfigLoader(withOption(option, newVersion))
-	if err != nil {
-		return nil, WrapError(err, "failed to create config: [%s]", oldVersion)
-	}
-
-	return old.Diff(new.cfgWrapper)
-}
-
 func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig, sets *set.LinkedHashSetString) []VisualizedParam {
 	if !configPatch.IsModify {
 		return nil
 	}
 
-	var trimPrefix = ""
-	if formatConfig != nil && formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
-		trimPrefix = formatConfig.IniConfig.SectionName
-	}
+	var trimPrefix = NestedPrefixField(formatConfig)
 
 	r := make([]VisualizedParam, 0)
 	r = append(r, generateUpdateParam(configPatch.UpdateConfig, trimPrefix, sets)...)

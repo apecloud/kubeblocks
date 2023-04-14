@@ -36,24 +36,21 @@ import (
 )
 
 const (
-	ClusterName                = "fake-cluster-name"
-	Namespace                  = "fake-namespace"
-	ClusterVersionName         = "fake-cluster-version"
-	ClusterDefName             = "fake-cluster-definition"
-	ComponentName              = "fake-component-name"
-	ComponentDefName           = "fake-component-type"
-	NodeName                   = "fake-node-name"
-	SecretName                 = "fake-secret-conn-credential"
-	StorageClassName           = "fake-storage-class"
-	PVCName                    = "fake-pvc"
-	GeneralClassFamily         = "kb-class-family-general"
-	MemoryOptimizedClassFamily = "kb-class-family-memory-optimized"
+	ClusterName        = "fake-cluster-name"
+	Namespace          = "fake-namespace"
+	ClusterVersionName = "fake-cluster-version"
+	ClusterDefName     = "fake-cluster-definition"
+	ComponentName      = "fake-component-name"
+	ComponentDefName   = "fake-component-type"
+	NodeName           = "fake-node-name"
+	SecretName         = "fake-secret-conn-credential"
+	StorageClassName   = "fake-storage-class"
+	PVCName            = "fake-pvc"
 
 	KubeBlocksRepoName  = "fake-kubeblocks-repo"
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupToolName      = "fake-backup-tool"
-	BackupTemplateName  = "fake-backup-policy-template"
 )
 
 func GetRandomStr() string {
@@ -260,7 +257,6 @@ func FakeComponentClassDef(clusterDef *appsv1alpha1.ClusterDefinition, def []byt
 	cm := &corev1.ConfigMap{}
 	cm.Name = fmt.Sprintf("fake-kubeblocks-classes-%s", ComponentName)
 	cm.SetLabels(map[string]string{
-		types.ClassLevelLabelKey:              "component",
 		constant.KBAppComponentDefRefLabelKey: ComponentDefName,
 		types.ClassProviderLabelKey:           "kubeblocks",
 		constant.ClusterDefLabelKey:           clusterDef.Name,
@@ -288,14 +284,21 @@ func FakeBackupTool() *dpv1alpha1.BackupTool {
 	return tool
 }
 
-func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
-	template := &dpv1alpha1.BackupPolicyTemplate{
+func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPolicy {
+	template := &dpv1alpha1.BackupPolicy{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
-			Kind:       types.KindBackupPolicyTemplate,
+			Kind:       types.KindBackupPolicy,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: BackupTemplateName,
+			Name:      backupPolicyName,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: clusterName,
+			},
+			Annotations: map[string]string{
+				constant.DefaultBackupPolicyAnnotationKey: "true",
+			},
 		},
 	}
 	return template

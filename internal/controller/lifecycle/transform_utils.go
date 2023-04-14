@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"context"
 	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,8 +29,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func findAll[T interface{}](dag *graph.DAG) []graph.Vertex {
@@ -142,8 +145,10 @@ func getBackupObjects(ctx context.Context,
 
 	// get backup tool
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
-		return nil, nil, err
+	if backup.Spec.BackupType != dataprotectionv1alpha1.BackupTypeSnapshot {
+		if err := cli.Get(ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
+			return nil, nil, err
+		}
 	}
 	return backup, backupTool, nil
 }
@@ -151,4 +156,27 @@ func getBackupObjects(ctx context.Context,
 func isTypeOf[T interface{}](obj client.Object) bool {
 	_, ok := obj.(T)
 	return ok
+}
+
+// getBackupPolicyFromTemplate gets backup policy from template policy template.
+func getBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
+	cli types2.ReadonlyClient,
+	cluster *appsv1alpha1.Cluster,
+	componentDef,
+	backupPolicyTemplateName string) (*dataprotectionv1alpha1.BackupPolicy, error) {
+	backupPolicyList := &dataprotectionv1alpha1.BackupPolicyList{}
+	if err := cli.List(reqCtx.Ctx, backupPolicyList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{
+			constant.AppInstanceLabelKey:          cluster.Name,
+			constant.KBAppComponentDefRefLabelKey: componentDef,
+		}); err != nil {
+		return nil, err
+	}
+	for _, backupPolicy := range backupPolicyList.Items {
+		if backupPolicy.Annotations[constant.BackupPolicyTemplateAnnotationKey] == backupPolicyTemplateName {
+			return &backupPolicy, nil
+		}
+	}
+	return nil, nil
 }

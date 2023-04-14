@@ -115,7 +115,7 @@ func IsProbeTimeout(componentDef *appsv1alpha1.ClusterComponentDefinition, podsR
 		return false
 	}
 	probes := componentDef.Probes
-	if probes == nil || probes.RoleChangedProbe == nil {
+	if probes == nil || probes.RoleProbe == nil {
 		return false
 	}
 	roleProbeTimeout := time.Duration(appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady) * time.Second

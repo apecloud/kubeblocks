@@ -259,7 +259,8 @@ func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, 
 	// 2. get the latest backup object
 	var latestBackup *dpv1alpha1.Backup
 	for _, item := range backups {
-		if p.restoreTime.Time.After(item.Status.CompletionTimestamp.Time) {
+		if item.Status.Manifests.BackupLog.StopTime != nil &&
+			p.restoreTime.After(item.Status.Manifests.BackupLog.StopTime.Time) {
 			latestBackup = &item
 			break
 		}
@@ -281,7 +282,7 @@ func (p *PointInTimeRecoveryManager) getNextBackup() (*dpv1alpha1.Backup, error)
 	// 2. get the next earliest backup object
 	var nextBackup *dpv1alpha1.Backup
 	for _, item := range backups {
-		if p.restoreTime.Before(item.Status.CompletionTimestamp) {
+		if p.restoreTime.Before(item.Status.Manifests.BackupLog.StopTime) {
 			nextBackup = &item
 			break
 		}
@@ -387,7 +388,13 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 			continue
 		}
 
+		commonLabels := map[string]string{
+			constant.AppManagedByLabelKey:   constant.AppName,
+			constant.AppInstanceLabelKey:    p.Cluster.Name,
+			constant.KBAppComponentLabelKey: componentSpec.Name,
+		}
 		sts := &appsv1.StatefulSet{}
+		sts.SetLabels(commonLabels)
 		vct := corev1.PersistentVolumeClaimTemplate{}
 		vct.Name = componentSpec.VolumeClaimTemplates[0].Name
 		vct.Spec = componentSpec.VolumeClaimTemplates[0].Spec.ToV1PersistentVolumeClaimSpec()
@@ -445,6 +452,7 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 			jobName := fmt.Sprintf("pitr-phy-%s-%s-%d", p.Cluster.Name, componentSpec.Name, i)
 			job, err := builder.BuildPITRJob(jobName, p.Cluster, image, []string{"sh", "-c"},
 				recoveryInfo.Physical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env)
+			job.SetLabels(commonLabels)
 			if err != nil {
 				return objs, err
 			}
@@ -456,6 +464,7 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 				if err != nil {
 					return objs, err
 				}
+				logicJob.SetLabels(commonLabels)
 				objs = append(objs, logicJob)
 			}
 			// collect pvcs and jobs for later deletion

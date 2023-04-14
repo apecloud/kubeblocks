@@ -14,6 +14,9 @@ job: {
 	metadata: {
 		name:      string
 		namespace: string
+		labels: {
+			"app.kubernetes.io/managed-by": "kubeblocks"
+		}
 	}
 	spec: {
 		template: {

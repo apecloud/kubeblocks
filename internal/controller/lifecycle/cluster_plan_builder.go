@@ -23,6 +23,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -519,6 +520,9 @@ func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster
 				return err
 			}
 		}
+		if err := c.deleteJobs(cluster); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
 	}
 	return nil
 }
@@ -569,6 +573,24 @@ func (c *clusterPlanBuilder) deleteBackups(cluster *appsv1alpha1.Cluster) error 
 			if err := c.cli.Delete(c.ctx.Ctx, &backup); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func (c *clusterPlanBuilder) deleteJobs(cluster *appsv1alpha1.Cluster) error {
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.GetName(),
+	}
+	// clean jobs
+	jobList := batchv1.JobList{}
+	if err := c.cli.List(c.ctx.Ctx, &jobList, inNS, ml); err != nil {
+		return err
+	}
+	for _, job := range jobList.Items {
+		if err := intctrlutil.BackgroundDeleteObject(c.cli, c.ctx.Ctx, &job); err != nil {
+			return err
 		}
 	}
 	return nil

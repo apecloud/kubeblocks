@@ -33,6 +33,7 @@ const (
 	PrintInstances  PrintType = "instances"
 	PrintComponents PrintType = "components"
 	PrintEvents     PrintType = "events"
+	PrintCustom     PrintType = "custom"
 )
 
 type PrinterOptions struct {
@@ -86,6 +87,11 @@ var mapTblInfo = map[PrintType]tblInfo{
 		addRow:     AddEventRow,
 		getOptions: GetOptions{WithClusterDef: true, WithPod: true, WithEvent: true},
 	},
+	PrintCustom: {
+		header:     []interface{}{"NAME", "NAMESPACE"},
+		addRow:     AddCustomRow,
+		getOptions: GetOptions{},
+	},
 }
 
 // Printer prints cluster info
@@ -122,6 +128,15 @@ func (p *Printer) Print() {
 
 func (p *Printer) GetterOptions() GetOptions {
 	return p.getOptions
+}
+
+func AddCustomRow(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions) {
+	c := objs.GetClusterInfo()
+	info := []interface{}{c.Name, c.Namespace}
+	if opt.ShowLabels {
+		info = append(info, c.Labels)
+	}
+	tbl.AddRow(info...)
 }
 
 func AddComponentRow(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions) {

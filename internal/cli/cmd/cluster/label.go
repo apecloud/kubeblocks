@@ -32,6 +32,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -162,8 +163,6 @@ func (o *LabelOptions) validate() error {
 }
 
 func (o *LabelOptions) run() error {
-	one := false
-
 	r := o.builder.
 		Unstructured().
 		NamespaceParam(o.namespace).DefaultNamespace().
@@ -172,18 +171,22 @@ func (o *LabelOptions) run() error {
 		ContinueOnError().
 		Latest().
 		Flatten().
-		Do().IntoSingleItemImplied(&one)
+		Do()
 
 	if err := r.Err(); err != nil {
 		return err
 	}
 
-	return r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
 
-		var outputObj runtime.Object
+	if len(infos) == 0 {
+		return fmt.Errorf("no clusters found")
+	}
+
+	for _, info := range infos {
 		obj := info.Object
 		oldData, err := json.Marshal(obj)
 		if err != nil {
@@ -195,7 +198,6 @@ func (o *LabelOptions) run() error {
 			if err != nil {
 				return err
 			}
-			outputObj = info.Object
 		} else {
 			name, namespace := info.Name, info.Namespace
 			if err != nil {
@@ -229,36 +231,41 @@ func (o *LabelOptions) run() error {
 			helper := resource.NewHelper(client, mapping).
 				DryRun(o.dryRunStrategy == cmdutil.DryRunServer)
 			if createPatch {
-				outputObj, err = helper.Patch(namespace, name, ktypes.MergePatchType, patchBytes, nil)
+				_, err = helper.Patch(namespace, name, ktypes.MergePatchType, patchBytes, nil)
 			} else {
-				outputObj, err = helper.Replace(namespace, name, false, obj)
+				_, err = helper.Replace(namespace, name, false, obj)
 			}
 			if err != nil {
 				return err
 			}
 		}
+	}
 
-		if o.list {
-			accessor, err := meta.Accessor(outputObj)
-			if err != nil {
-				return err
-			}
-
-			indent := ""
-			if !one {
-				indent = " "
-				if err != nil {
-					return err
-				}
-				fmt.Fprintf(o.Out, "Listing labels for cluster:%s\n", info.Name)
-			}
-			for k, v := range accessor.GetLabels() {
-				fmt.Fprintf(o.Out, "%s%s=%s\n", indent, k, v)
-			}
+	if o.list {
+		dynamic, err := o.Factory.DynamicClient()
+		if err != nil {
+			return err
 		}
 
-		return nil
-	})
+		client, err := o.Factory.KubernetesClientSet()
+		if err != nil {
+			return err
+		}
+
+		opt := &cluster.PrinterOptions{
+			ShowLabels: true,
+		}
+
+		p := cluster.NewPrinter(o.IOStreams.Out, cluster.PrintCustom, opt)
+		for _, info := range infos {
+			if err = addRow(dynamic, client, info.Namespace, info.Name, p); err != nil {
+				return err
+			}
+		}
+		p.Print()
+	}
+
+	return nil
 }
 
 func parseLabels(spec []string) (map[string]string, []string, error) {

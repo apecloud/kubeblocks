@@ -1,47 +1,30 @@
 ---
-title: kbcli cluster connect
+title: kbcli migration terminate
 ---
 
-Connect to a cluster or instance.
+Delete migration task.
 
 ```
-kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
+kbcli migration terminate NAME [flags]
 ```
 
 ### Examples
 
 ```
-  # connect to a specified cluster, default connect to the leader or primary instance
-  kbcli cluster connect mycluster
-  
-  # connect to cluster as user
-  kbcli cluster connect mycluster --as-user myuser
-  
-  # connect to a specified instance
-  kbcli cluster connect -i mycluster-instance-0
-  
-  # connect to a specified component
-  kbcli cluster connect mycluster --component mycomponent
-  
-  # show cli connection example
-  kbcli cluster connect mycluster --show-example --client=cli
-  
-  # show java connection example
-  kbcli cluster connect mycluster --show-example --client=java
-  
-  # show all connection examples
-  kbcli cluster connect mycluster --show-example
+  # terminate a migration task named mytask and delete resources in k8s without affecting source and target data in database
+  kbcli migration terminate mytask
 ```
 
 ### Options
 
 ```
-      --as-user string     Connect to cluster as user
-      --client string      Which client connection example should be output, only valid if --show-example is true.
-      --component string   The component to connect. If not specified, the first component will be used.
-  -h, --help               help for connect
-  -i, --instance string    The instance name to connect.
-      --show-example       Show how to connect to cluster or instance from different client.
+  -A, --all-namespaces     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
+      --auto-approve       Skip interactive approval before deleting
+      --force              If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.
+      --grace-period int   Period of time in seconds given to the resource to terminate gracefully. Ignored if negative. Set to 1 for immediate shutdown. Can only be set to 0 when --force is true (force deletion). (default -1)
+  -h, --help               help for terminate
+      --now                If true, resources are signaled for immediate shutdown (same as --grace-period=1).
+  -l, --selector string    Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
 ```
 
 ### Options inherited from parent commands
@@ -70,7 +53,7 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli migration](kbcli_migration.md)	 - Data migration between two data sources.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

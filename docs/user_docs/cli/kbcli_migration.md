@@ -1,47 +1,13 @@
 ---
-title: kbcli cluster connect
+title: kbcli migration
 ---
 
-Connect to a cluster or instance.
-
-```
-kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
-```
-
-### Examples
-
-```
-  # connect to a specified cluster, default connect to the leader or primary instance
-  kbcli cluster connect mycluster
-  
-  # connect to cluster as user
-  kbcli cluster connect mycluster --as-user myuser
-  
-  # connect to a specified instance
-  kbcli cluster connect -i mycluster-instance-0
-  
-  # connect to a specified component
-  kbcli cluster connect mycluster --component mycomponent
-  
-  # show cli connection example
-  kbcli cluster connect mycluster --show-example --client=cli
-  
-  # show java connection example
-  kbcli cluster connect mycluster --show-example --client=java
-  
-  # show all connection examples
-  kbcli cluster connect mycluster --show-example
-```
+Data migration between two data sources.
 
 ### Options
 
 ```
-      --as-user string     Connect to cluster as user
-      --client string      Which client connection example should be output, only valid if --show-example is true.
-      --component string   The component to connect. If not specified, the first component will be used.
-  -h, --help               help for connect
-  -i, --instance string    The instance name to connect.
-      --show-example       Show how to connect to cluster or instance from different client.
+  -h, --help   help for migration
 ```
 
 ### Options inherited from parent commands
@@ -70,7 +36,13 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+* [kbcli migration create](kbcli_migration_create.md)	 - Create a migration task.
+* [kbcli migration describe](kbcli_migration_describe.md)	 - Show details of a specific migration task.
+* [kbcli migration list](kbcli_migration_list.md)	 - List migration tasks.
+* [kbcli migration logs](kbcli_migration_logs.md)	 - Access migration task log file.
+* [kbcli migration templates](kbcli_migration_templates.md)	 - List migration templates.
+* [kbcli migration terminate](kbcli_migration_terminate.md)	 - Delete migration task.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

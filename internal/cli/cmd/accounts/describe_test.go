@@ -88,7 +88,7 @@ var _ = Describe("Describe Account Options", func() {
 			o := NewDescribeUserOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			args := []string{}
-			Expect(o.Validate(args)).Should(MatchError(errClusterNameNum))
+			Expect(o.Validate(args)).Should(MatchError(errClusterNameorInstName))
 
 			// add one element
 			By("add one more args, should fail")

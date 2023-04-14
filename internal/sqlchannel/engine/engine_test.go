@@ -23,17 +23,20 @@ import (
 
 var _ = Describe("Engine", func() {
 	It("new mysql engine", func() {
-		typeName := stateMysql
-		engine, _ := New(typeName)
-		Expect(engine).ShouldNot(BeNil())
+		for _, typeName := range []string{stateMysql, statePostgreSQL, stateRedis} {
+			engine, _ := New(typeName)
+			Expect(engine).ShouldNot(BeNil())
 
-		url := engine.ConnectCommand()
-		Expect(len(url)).Should(Equal(3))
+			url := engine.ConnectCommand(nil)
+			Expect(len(url)).Should(Equal(3))
 
-		url = engine.ConnectCommand()
-		Expect(len(url)).Should(Equal(3))
-
-		Expect(engine.Container()).Should(Equal("mysql"))
+			url = engine.ConnectCommand(nil)
+			Expect(len(url)).Should(Equal(3))
+			// it is a tricky way to check the container name
+			// for the moment, we only support mysql, postgresql and redis
+			// and the container name is the same as the state name
+			Expect(engine.Container()).Should(Equal(typeName))
+		}
 	})
 
 	It("new unknown engine", func() {

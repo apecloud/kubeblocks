@@ -21,27 +21,27 @@ import (
 	"strings"
 )
 
-type postgresql struct {
+type mysql struct {
 	info     EngineInfo
 	examples map[ClientType]buildConnectExample
 }
 
-var _ Interface = &postgresql{}
+var _ Interface = &mysql{}
 
-func newPostgreSQL() *postgresql {
-	return &postgresql{
+func newMySQL() *mysql {
+	return &mysql{
 		info: EngineInfo{
-			Client:      "psql",
-			Container:   "postgresql",
-			PasswordEnv: "$POSTGRES_PASSWORD",
-			UserEnv:     "$POSTGRES_USER",
-			Database:    "postgres",
+			Client:      "mysql",
+			Container:   "mysql",
+			PasswordEnv: "$MYSQL_ROOT_PASSWORD",
+			UserEnv:     "$MYSQL_ROOT_USER",
+			Database:    "mysql",
 		},
 		examples: map[ClientType]buildConnectExample{
 			CLI: func(info *ConnectionInfo) string {
-				return fmt.Sprintf(`# psql client connection example
-PGPASSWORD=%s psql -h%s -p %s -U %s %s
-`, info.Password, info.Host, info.Port, info.User, info.Database)
+				return fmt.Sprintf(`# mysql client connection example
+mysql -h %s -P %s -u %s -p%s
+`, info.Host, info.Port, info.User, info.Password)
 			},
 
 			DJANGO: func(info *ConnectionInfo) string {
@@ -55,7 +55,7 @@ DB_PORT=%s
 # settings.py
 DATABASES = {
   'default': {
-    'ENGINE': 'django.db.backends.postgresql',
+    'ENGINE': 'django.db.backends.mysql',
     'NAME': os.environ.get('DB_NAME'),
     'HOST': os.environ.get('DB_HOST'),
     'PORT': os.environ.get('DB_PORT'),
@@ -67,10 +67,19 @@ DATABASES = {
 			},
 
 			DOTNET: func(info *ConnectionInfo) string {
-				return fmt.Sprintf(`# Startup.cs
-var connectionString = "Host=%s;Port=%s;Username=%s;Password=%s;Database=%s";
-await using var dataSource = NpgsqlDataSource.Create(connectionString);
-`, info.Host, info.Port, info.User, info.Password, info.Database)
+				return fmt.Sprintf(`# appsettings.json
+{
+  "ConnectionStrings": {
+    "Default": "server=%s;port=%s;database=%s;user=%s;password=%s;SslMode=VerifyFull;"
+  },
+}
+
+# Startup.cs
+public void ConfigureServices(IServiceCollection services)
+{
+    services.AddTransient<MySqlConnection>(_ => new MySqlConnection(Configuration["ConnectionStrings:Default"]));
+}
+`, info.Host, info.Port, info.Database, info.User, info.Password)
 			},
 
 			GO: func(info *ConnectionInfo) string {
@@ -82,11 +91,11 @@ import (
     "log"
     "os"
 
-     _ "github.com/lib/pq"
+     _ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
-    db, err := sql.Open("postgres", os.Getenv("DSN"))
+    db, err := sql.Open("mysql", os.Getenv("DSN"))
     if err != nil {
         log.Fatalf("failed to connect: %v", err)
     }
@@ -100,26 +109,28 @@ func main() {
 }
 `
 				dsn := fmt.Sprintf(`# .env
-DSN=%s:%s@tcp(%s:%s)/%s
+DSN=%s:%s@tcp(%s:%s)/%s?tls=true
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 				return fmt.Sprintf("%s\n%s", dsn, goConnectExample)
 			},
 
 			JAVA: func(info *ConnectionInfo) string {
-				return fmt.Sprintf(`Class.forName("org.postgresql.Driver");
+				return fmt.Sprintf(`Class.forName("com.mysql.cj.jdbc.Driver");
 Connection conn = DriverManager.getConnection(
-  "jdbc:postgresql://%s:%s/%s?user=%s&password=%s");
+  "jdbc:mysql://%s:%s/%s?sslMode=VERIFY_IDENTITY",
+  "%s",
+  "%s");
 `, info.Host, info.Port, info.Database, info.User, info.Password)
 			},
 
 			NODEJS: func(info *ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
-DATABASE_URL='postgres://%s:%s@%s:%s/%s'
+DATABASE_URL='mysql://%s:%s@%s:%s/%s?ssl={"rejectUnauthorized":true}'
 
 # app.js
 require('dotenv').config();
-const postgres = require('postgres');
-const connection = postgres(process.env.DATABASE_URL);
+const mysql = require('mysql2');
+const connection = mysql.createConnection(process.env.DATABASE_URL);
 connection.end();
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
@@ -134,15 +145,16 @@ DATABASE=%s
 
 # index.php
 <?php
-  $dbconn =pg_connect($_ENV["HOST"], $_ENV["USERNAME"], $_ENV["PASSWORD"], $_ENV["DATABASE"], $_ENV["PORT"]);
-  pg_close($dbconn)
+  $mysqli = mysqli_init();
+  $mysqli->real_connect($_ENV["HOST"], $_ENV["USERNAME"], $_ENV["PASSWORD"], $_ENV["DATABASE"], $_ENV["PORT"]);
+  $mysqli->close();
 ?>
 `, info.Host, info.Port, info.User, info.Password, info.Database)
 			},
 
 			PRISMA: func(info *ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
-DATABASE_URL='postgres://%s:%s@%s:%s/%s'
+DATABASE_URL='mysql://%s:%s@%s:%s/%s?sslaccept=strict'
 
 # schema.prisma
 generator client {
@@ -150,7 +162,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url = env("DATABASE_URL")
   relationMode = "prisma"
 }
@@ -159,7 +171,7 @@ datasource db {
 
 			PYTHON: func(info *ConnectionInfo) string {
 				return fmt.Sprintf(`# run the following command in the terminal to install dependencies
-pip install python-dotenv psycopg2
+pip install python-dotenv mysqlclient
 
 # .env
 HOST=%s
@@ -174,41 +186,45 @@ load_dotenv()
 import os
 import MySQLdb
 
-connection = psycopg2.connect(
+connection = MySQLdb.connect(
   host= os.getenv("HOST"),
   port=os.getenv("PORT"),
   user=os.getenv("USERNAME"),
-  password=os.getenv("PASSWORD"),
-  database=os.getenv("DATABASE"),
+  passwd=os.getenv("PASSWORD"),
+  db=os.getenv("DATABASE"),
+  ssl_mode = "VERIFY_IDENTITY",
 )
 `, info.Host, info.Port, info.User, info.Password, info.Database)
 			},
 
 			RAILS: func(info *ConnectionInfo) string {
 				return fmt.Sprintf(`# Gemfile
-gem 'pg'
+gem 'mysql2'
 
 # config/database.yml
 development:
   <<: *default
-  adapter: postgresql
+  adapter: mysql2
   database: %s
   username: %s
   host: %s
   password: %s
+  ssl_mode: verify_identity
 `, info.Database, info.User, info.Host, info.Password)
 			},
 
 			RUST: func(info *ConnectionInfo) string {
 				return fmt.Sprintf(`# run the following command in the terminal
-export DATABASE_URL="postgresql://%s:%s@%s:%s/%s"
+export DATABASE_URL="mysql://%s:%s@%s:%s/%s"
 
 # src/main.rs
 use std::env;
 
 fn main() {
     let url = env::var("DATABASE_URL").expect("DATABASE_URL not found");
-	let conn = Connection::connect(url, TlsMode::None).unwrap();
+    let builder = mysql::OptsBuilder::from_opts(mysql::Opts::from_url(&url).unwrap());
+    let pool = mysql::Pool::new(builder.ssl_opts(mysql::SslOpts::default())).unwrap();
+    let _conn = pool.get_conn().unwrap();
     println!("Successfully connected!");
 }
 
@@ -216,28 +232,44 @@ fn main() {
 [package]
 name = "kubeblocks_hello_world"
 version = "0.0.1"
+
+[dependencies]
+mysql = "*"
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
 
 			SYMFONY: func(info *ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
-DATABASE_URL='postgresql://%s:%s@%s:%s/%s'
+DATABASE_URL='mysql://%s:%s@%s:%s/%s'
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
 		},
 	}
 }
 
-func (m *postgresql) ConnectCommand() []string {
-	cmd := []string{"PGPASSWORD=" + m.info.PasswordEnv, "PGUSER=" + m.info.UserEnv, m.info.Client}
-	return []string{"sh", "-c", strings.Join(cmd, " ")}
+func (m *mysql) ConnectCommand(connectInfo *AuthInfo) []string {
+	userName := m.info.UserEnv
+	userPass := m.info.PasswordEnv
+
+	if connectInfo != nil {
+		userName = connectInfo.UserName
+		userPass = connectInfo.UserPasswd
+	}
+
+	// avoid use env variables
+	// MYSQL_PWD is deprecated as of MySQL 8.0; expect it to be removed in a future version of MySQL.
+	// ref to mysql manual for more details.
+	// https://dev.mysql.com/doc/refman/8.0/en/environment-variables.html
+	mysqlCmd := []string{fmt.Sprintf("%s -u%s -p%s", m.info.Client, userName, userPass)}
+
+	return []string{"sh", "-c", strings.Join(mysqlCmd, " ")}
 }
 
-func (m *postgresql) Container() string {
+func (m *mysql) Container() string {
 	return m.info.Container
 }
 
-func (m *postgresql) ConnectExample(info *ConnectionInfo, client string) string {
+func (m *mysql) ConnectExample(info *ConnectionInfo, client string) string {
 	if len(info.Database) == 0 {
 		info.Database = m.info.Database
 	}

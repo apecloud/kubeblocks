@@ -29,7 +29,7 @@ jobs:
             --type 5 \
             --tag-name $LATEST_RELEASE_TAG \
             --github-repo ${{ env.CLI_REPO }} \
-            --github-token ${{ env.PERSONAL_ACCESS_TOKEN }}
+            --github-token ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           
           bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
             --type 4 \

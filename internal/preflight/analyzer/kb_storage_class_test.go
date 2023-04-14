@@ -47,7 +47,7 @@ var _ = Describe("kb_storage_class_test", func() {
 	Context("analyze storage class test", func() {
 		BeforeEach(func() {
 			analyzer = AnalyzeStorageClassByKb{
-				analyzer: &preflightv1beta2.KbStorageClassAnalyze{
+				analyzer: &preflightv1beta2.KBStorageClassAnalyze{
 					Provisioner:      "ebs.csi.aws.com",
 					StorageClassType: "gp3",
 					Outcomes: []*troubleshoot.Outcome{

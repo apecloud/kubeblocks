@@ -34,7 +34,7 @@ type ExtendAnalyze struct {
 	ClusterAccess *ClusterAccessAnalyze `json:"clusterAccess,omitempty"`
 	// StorageClass is to determine the correctness of target storage class
 	// +optional
-	StorageClass *KbStorageClassAnalyze `json:"storageClass,omitempty"`
+	StorageClass *KBStorageClassAnalyze `json:"storageClass,omitempty"`
 }
 
 type HostUtility struct {
@@ -84,8 +84,8 @@ type ClusterRegionAnalyze struct {
 	RegionNames []string `json:"regionNames"`
 }
 
-// KbStorageClassAnalyze replaces default storageClassAnalyze in preflight
-type KbStorageClassAnalyze struct {
+// KBStorageClassAnalyze replaces default storageClassAnalyze in preflight
+type KBStorageClassAnalyze struct {
 	// analyzeMeta is defined in troubleshoot.sh
 	troubleshoot.AnalyzeMeta `json:",inline"`
 	// outcomes are expected user defined results.

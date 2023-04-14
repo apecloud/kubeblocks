@@ -30,14 +30,14 @@ import (
 const (
 	StorageClassPath      = "cluster-resources/storage-classes.json"
 	MissingOutcomeMessage = "there is a missing outcome message"
-	IncorrectOutcomeType  = "there is incorrect outcome type"
+	IncorrectOutcomeType  = "there is an incorrect outcome type"
 	PassType              = "Pass"
 	WarnType              = "Warn"
 	FailType              = "Fail"
 )
 
 type AnalyzeStorageClassByKb struct {
-	analyzer *preflightv1beta2.KbStorageClassAnalyze
+	analyzer *preflightv1beta2.KBStorageClassAnalyze
 }
 
 func (a *AnalyzeStorageClassByKb) Title() string {
@@ -57,7 +57,7 @@ func (a *AnalyzeStorageClassByKb) Analyze(getFile GetCollectedFileContents, find
 	return []*analyze.AnalyzeResult{result}, nil
 }
 
-func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2.KbStorageClassAnalyze, getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) (*analyze.AnalyzeResult, error) {
+func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2.KBStorageClassAnalyze, getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) (*analyze.AnalyzeResult, error) {
 	storageClassesData, err := getFile(StorageClassPath)
 	if err != nil {
 		return a.FailedResultWithMessage(fmt.Sprintf("get jsonfile failed, err:%v", err)), err

@@ -23,7 +23,6 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -276,20 +275,10 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 				return err
 			}
 		}
-		if node.isOrphan {
-			err := c.cli.Delete(c.transCtx.Context, node.obj)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
+		err := c.cli.Delete(c.transCtx.Context, node.obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
 		}
-		// TODO: delete backup objects created in scale-out
-		// TODO: should manage backup objects in a better way
-		if isTypeOf[*snapshotv1.VolumeSnapshot](node.obj) ||
-			isTypeOf[*dataprotectionv1alpha1.BackupPolicy](node.obj) ||
-			isTypeOf[*dataprotectionv1alpha1.Backup](node.obj) {
-			_ = c.cli.Delete(c.transCtx.Context, node.obj)
-		}
-
 	case STATUS:
 		patch := client.MergeFrom(node.oriObj)
 		if err := c.cli.Status().Patch(c.transCtx.Context, node.obj, patch); err != nil {

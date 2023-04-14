@@ -307,7 +307,7 @@ func (t *ClusterStatusTransformer) removeGarbageWithRestore(
 		for _, vertex := range vertices {
 			v, _ := vertex.(*lifecycleVertex)
 			labels := v.obj.GetLabels()
-			if labels != nil && labels[constant.KBAppComponentLabelKey] == k{
+			if labels != nil && labels[constant.KBAppComponentLabelKey] == k {
 				vertexList = append(vertexList, vertex)
 			}
 		}

@@ -121,6 +121,21 @@ const (
 	ResourceAddons       = "addons"
 )
 
+// Migration API group
+const (
+	MigrationAPIGroup          = "datamigration.apecloud.io"
+	MigrationAPIVersion        = "v1alpha1"
+	ResourceMigrationTasks     = "migrationtasks"
+	ResourceMigrationTemplates = "migrationtemplates"
+)
+
+// Crd Api group
+const (
+	CustomResourceDefinitionAPIGroup   = "apiextensions.k8s.io"
+	CustomResourceDefinitionAPIVersion = "v1"
+	ResourceCustomResourceDefinition   = "customresourcedefinitions"
+)
+
 const (
 	None = "<none>"
 
@@ -287,4 +302,28 @@ func ClusterRoleGVR() schema.GroupVersionResource {
 }
 func ClusterRoleBindingGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: ClusterRoleBindings}
+}
+
+func MigrationTaskGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    MigrationAPIGroup,
+		Version:  MigrationAPIVersion,
+		Resource: ResourceMigrationTasks,
+	}
+}
+
+func MigrationTemplateGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    MigrationAPIGroup,
+		Version:  MigrationAPIVersion,
+		Resource: ResourceMigrationTemplates,
+	}
+}
+
+func CustomResourceDefinitionGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    CustomResourceDefinitionAPIGroup,
+		Version:  CustomResourceDefinitionAPIVersion,
+		Resource: ResourceCustomResourceDefinition,
+	}
 }

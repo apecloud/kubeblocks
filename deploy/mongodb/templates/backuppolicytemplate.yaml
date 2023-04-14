@@ -1,15 +1,25 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: backup-policy-template-mongodb
+  name: mongodb-backup-policy-template
   labels:
     clusterdefinition.kubeblocks.io/name: mongodb
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
-  # which backup tool to perform database backup, only support one tool.
-  backupToolName: volumesnapshot
-  ttl: 168h0m0s
-
-  credentialKeyword:
-    userKeyword: username
-    passwordKeyword: password
+  clusterDefinitionRef: mongodb
+  backupPolicies:
+  - componentDefRef: replicaset
+    ttl: 7d
+    schedule:
+      baseBackup:
+        type: full
+        enable: false
+        cronExpression: "0 18 * * 0"
+    snapshot:
+      target:
+        role: leader
+        connectionCredentialKey:
+          passwordKey: password
+          usernameKey: username
+    full:
+      backupToolName: xtrabackup-apecloud-mysql

@@ -31,8 +31,8 @@ func newMongoDB() *mongodb {
 		info: EngineInfo{
 			Client:      "mongosh",
 			Container:   "mongodb",
-			UserEnv:     "$(MONGODB_ROOT_USER)",
-			PasswordEnv: "$(MONGODB_ROOT_PASSWORD)",
+			UserEnv:     "$MONGODB_ROOT_USER",
+			PasswordEnv: "$MONGODB_ROOT_PASSWORD",
 		},
 		examples: map[ClientType]buildConnectExample{},
 	}

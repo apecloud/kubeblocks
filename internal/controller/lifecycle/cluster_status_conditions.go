@@ -18,12 +18,12 @@ package lifecycle
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"reflect"
 	"strings"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"

@@ -165,11 +165,6 @@ func getBackupObjects(ctx context.Context,
 	return backup, backupTool, nil
 }
 
-func isTypeOf[T interface{}](obj client.Object) bool {
-	_, ok := obj.(T)
-	return ok
-}
-
 // getBackupPolicyFromTemplate gets backup policy from template policy template.
 func getBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
 	cli types2.ReadonlyClient,

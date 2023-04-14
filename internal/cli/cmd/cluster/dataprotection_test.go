@@ -259,21 +259,63 @@ var _ = Describe("DataProtection", func() {
 			k8sapitypes.MergePatchType, patchCluster, metav1.PatchOptions{})
 		cmdRestore.Run(nil, []string{newClusterName + "-with-nil-affinity"})
 	})
+
+	It("restore-to-time", func() {
+		timestamp := time.Now().Format("20060102150405")
+		backupName := "backup-test-" + timestamp
+		clusterName := "source-cluster-" + timestamp
+		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
+		clusterDef := testing.FakeClusterDef()
+		cluster := testing.FakeCluster(clusterName, testing.Namespace)
+		clusterDefLabel := map[string]string{
+			constant.ClusterDefLabelKey: clusterDef.Name,
+		}
+		cluster.SetLabels(clusterDefLabel)
+		backupPolicy := testing.FakeBackupPolicy("backPolicy", cluster.Name)
+		backup := testing.FakeBackup("backup-base")
+		pods := testing.FakePods(1, testing.Namespace, clusterName)
+		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy, backup)
+		tf.Client = &clientfake.RESTClient{}
+		// create backup
+		cmd := NewCreateBackupCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+		_ = cmd.Flags().Set("backup-type", "snapshot")
+		_ = cmd.Flags().Set("backup-name", backupName)
+		cmd.Run(nil, []string{clusterName})
+
+		By("restore new cluster from source cluster which is not deleted")
+		// mock backup is ok
+		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName)
+		cmdRestore := NewCreateRestoreCmd(tf, streams)
+		Expect(cmdRestore != nil).To(BeTrue())
+		now := metav1.Now()
+		_ = cmdRestore.Flags().Set("restore-to-time", util.TimeFormatWithDuration(&now, time.Second))
+		_ = cmdRestore.Flags().Set("source-cluster-name", clusterName)
+		cmdRestore.Run(nil, []string{})
+	})
 })
 
 func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string) {
 	clusterString := fmt.Sprintf(`{"metadata":{"name":"deleted-cluster","namespace":"%s"},"spec":{"clusterDefinitionRef":"apecloud-mysql","clusterVersionRef":"ac-mysql-8.0.30","componentSpecs":[{"name":"mysql","componentDefRef":"mysql","replicas":1}]}}`, testing.Namespace)
+	now := metav1.Now()
 	backupStatus := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"status": map[string]interface{}{
+		Object: map[string]any{
+			"status": map[string]any{
 				"phase": "Completed",
+				"manifests": map[string]any{
+					"backupLog": map[string]any{
+						"startTime": now.Add(-time.Hour).Format(time.RFC3339),
+						"stopTime":  now.Add(time.Hour).Format(time.RFC3339),
+					},
+				},
 			},
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": backupName,
-				"annotations": map[string]interface{}{
+				"annotations": map[string]any{
 					constant.ClusterSnapshotAnnotationKey: clusterString,
 				},
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					constant.AppInstanceLabelKey:    clusterName,
 					constant.KBAppComponentLabelKey: "test",
 				},

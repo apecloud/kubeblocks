@@ -303,6 +303,9 @@ func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPo
 				constant.DefaultBackupPolicyAnnotationKey: "true",
 			},
 		},
+		Status: dpv1alpha1.BackupPolicyStatus{
+			Phase: dpv1alpha1.PolicyAvailable,
+		},
 	}
 	return template
 }

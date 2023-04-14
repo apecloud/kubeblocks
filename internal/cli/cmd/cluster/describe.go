@@ -296,7 +296,7 @@ func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
 	sortByStartTime(backupsWithLog)
 
 	var result string
-	start, end := backupsWithLog[0].Status.Manifests.BackupLog.StartTime, backupsWithLog[0].Status.Manifests.BackupLog.StopTime
+	start, end := backupsWithLog[0].Status.Manifests.BackupLog.StopTime, backupsWithLog[0].Status.Manifests.BackupLog.StopTime
 
 	for i := 1; i < len(backupsWithLog); i++ {
 		b := backupsWithLog[i].Status.Manifests.BackupLog

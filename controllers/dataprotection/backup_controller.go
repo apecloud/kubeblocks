@@ -218,7 +218,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 
 // handlePersistentVolumeClaim handles the persistent volume claim for the backup, the rules are as follows
 // - if CreatePolicy is "Never", it will check if the pvc exists. if not exist, will report an error.
-// - if CreatePolicy is "IfNotPresent", if the pvc not exists, will create the pvc automatically.
+// - if CreatePolicy is "IfNotPresent" and the pvc not exists, will create the pvc automatically.
 func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.RequestCtx,
 	backupPolicyName string,
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) error {

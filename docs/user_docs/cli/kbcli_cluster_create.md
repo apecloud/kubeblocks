@@ -64,20 +64,25 @@ kbcli cluster create [CLUSTER_NAME] [flags]
 ### Options
 
 ```
-      --backup string                Set a source backup to restore data
-      --cluster-definition string    Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
-      --cluster-version string       Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
-      --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level (default true)
-  -h, --help                         help for create
-      --monitor                      Set monitor enabled and inject metrics exporter (default true)
-      --node-labels stringToString   Node label selector (default [])
-      --pod-anti-affinity string     Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
-      --set stringArray              Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
-  -f, --set-file string              Use yaml file, URL, or stdin to set the cluster resource
-      --tenancy string               Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
-      --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
-      --tolerations strings          Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
-      --topology-keys stringArray    Topology keys for affinity
+      --allow-missing-template-keys    If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
+      --backup string                  Set a source backup to restore data
+      --cluster-definition string      Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
+      --cluster-version string         Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
+      --dry-run string[="unchanged"]   Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --enable-all-logs                Enable advanced application all log extraction, and true will ignore enabledLogs of component level (default true)
+  -h, --help                           help for create
+      --monitor                        Set monitor enabled and inject metrics exporter (default true)
+      --node-labels stringToString     Node label selector (default [])
+  -o, --output string                  Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
+      --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
+      --set stringArray                Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
+  -f, --set-file string                Use yaml file, URL, or stdin to set the cluster resource
+      --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
+      --template string                Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
+      --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
+      --termination-policy string      Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
+      --tolerations strings            Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
+      --topology-keys stringArray      Topology keys for affinity
 ```
 
 ### Options inherited from parent commands

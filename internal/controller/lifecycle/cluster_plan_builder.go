@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -275,17 +276,15 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		}
 
 	case STATUS:
-		if node.immutable {
-			return nil
-		}
 		patch := client.MergeFrom(node.oriObj)
 		if err := c.cli.Status().Patch(c.transCtx.Context, node.obj, patch); err != nil {
 			return err
 		}
-		for _, postHandle := range node.postHandleAfterStatusPatch {
-			if err := postHandle(); err != nil {
-				return err
-			}
+		// handle condition and phase changing triggered events
+		if newCluster, ok := node.obj.(*appsv1alpha1.Cluster); ok {
+			oldCluster, _ := node.oriObj.(*appsv1alpha1.Cluster)
+			c.emitConditionUpdatingEvent(oldCluster.Status.Conditions, newCluster.Status.Conditions)
+			c.emitPhaseUpdatingEvent(oldCluster.Status.Phase, newCluster.Status.Phase)
 		}
 	}
 	return nil
@@ -428,4 +427,40 @@ func (c *clusterPlanBuilder) deleteBackups(cluster *appsv1alpha1.Cluster) error 
 		}
 	}
 	return nil
+}
+
+func (c *clusterPlanBuilder) emitConditionUpdatingEvent(oldConditions, newConditions []metav1.Condition) {
+	for _, newCondition := range newConditions {
+		oldCondition := meta.FindStatusCondition(oldConditions, newCondition.Type)
+		if !reflect.DeepEqual(oldCondition, &newCondition) {
+			eType := corev1.EventTypeNormal
+			if newCondition.Status == metav1.ConditionFalse {
+				eType = corev1.EventTypeWarning
+			}
+			c.transCtx.EventRecorder.Event(c.transCtx.Cluster, eType, newCondition.Reason, newCondition.Message)
+		}
+	}
+}
+
+func (c *clusterPlanBuilder) emitPhaseUpdatingEvent(oldPhase, newPhase appsv1alpha1.ClusterPhase) {
+	if oldPhase == newPhase {
+		return
+	}
+
+	cluster := c.transCtx.Cluster
+	eType := corev1.EventTypeNormal
+	message := ""
+	switch newPhase {
+	case appsv1alpha1.RunningClusterPhase:
+		message = fmt.Sprintf("Cluster: %s is ready, current phase is %s", cluster.Name, newPhase)
+	case appsv1alpha1.StoppedClusterPhase:
+		message = fmt.Sprintf("Cluster: %s stopped successfully.", cluster.Name)
+	case appsv1alpha1.FailedClusterPhase, appsv1alpha1.AbnormalClusterPhase:
+		message = fmt.Sprintf("Cluster: %s is %s, check according to the components message", cluster.Name, newPhase)
+		eType = corev1.EventTypeWarning
+	}
+	if len(message) > 0 {
+		c.transCtx.EventRecorder.Event(cluster, eType, string(newPhase), message)
+		_ = opsutil.MarkRunningOpsRequestAnnotation(c.transCtx.Context, c.cli, cluster)
+	}
 }

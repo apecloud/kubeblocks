@@ -178,8 +178,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.StsPVCTransformer{},
 			// replication set horizontal scaling
 			&lifecycle.RplSetHorizontalScalingTransformer{Client: r.Client},
-			// finally, update cluster status
-			lifecycle.NewClusterStatusTransformer(r.Client),
+			// update cluster status
+			&lifecycle.ClusterStatusTransformer{},
 		).
 		Build()
 	if err != nil {

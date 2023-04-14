@@ -17,18 +17,12 @@ limitations under the License.
 package lifecycle
 
 import (
-	"fmt"
-	"reflect"
-
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -47,7 +41,6 @@ const (
 )
 
 type ClusterStatusTransformer struct {
-	client.Client
 	// phaseSyncLevel defines a phase synchronization level to indicate how to handle cluster phase.
 	phaseSyncLevel phaseSyncLevel
 	// existsAbnormalOrFailed indicates whether the cluster exists abnormal or failed component.
@@ -58,14 +51,6 @@ type ClusterStatusTransformer struct {
 	replicasNotReadyCompNames map[string]struct{}
 }
 
-func NewClusterStatusTransformer(cli client.Client) *ClusterStatusTransformer {
-	return &ClusterStatusTransformer{
-		Client:                    cli,
-		phaseSyncLevel:            clusterPhaseNoChange,
-		notReadyCompNames:         map[string]struct{}{},
-		replicasNotReadyCompNames: map[string]struct{}{},
-	}
-}
 func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	rootVertex, err := findRootVertex(dag)
@@ -75,7 +60,21 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
 
-	updateComponentPhase := func() {
+	updateObservedGeneration := func() {
+		cluster.Status.ObservedGeneration = cluster.Generation
+		cluster.Status.ClusterDefGeneration = transCtx.ClusterDef.Generation
+	}
+
+	updateClusterPhase := func() {
+		clusterPhase := cluster.Status.Phase
+		if clusterPhase == "" {
+			cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
+		} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
+			cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
+		}
+	}
+
+	updateComponentsPhase := func() {
 		vertices := findAllNot[*appsv1alpha1.Cluster](dag)
 		for _, vertex := range vertices {
 			v, _ := vertex.(*lifecycleVertex)
@@ -89,41 +88,32 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 	}
 
+	initClusterStatusParams := func() {
+		t.phaseSyncLevel = clusterPhaseNoChange
+		t.notReadyCompNames = map[string]struct{}{}
+		t.replicasNotReadyCompNames = map[string]struct{}{}
+	}
+
 	switch {
 	case isClusterDeleting(*origCluster):
 		// if cluster is deleting, set root(cluster) vertex.action to DELETE
 		rootVertex.action = actionPtr(DELETE)
 	case isClusterUpdating(*origCluster):
 		transCtx.Logger.Info("update cluster status after applying resources ")
-		defer func() {
-			// update components' phase in cluster.status
-			updateComponentPhase()
-			rootVertex.action = actionPtr(STATUS)
-			rootVertex.immutable = reflect.DeepEqual(cluster.Status, origCluster.Status)
-		}()
-		cluster.Status.ObservedGeneration = cluster.Generation
-		cluster.Status.ClusterDefGeneration = transCtx.ClusterDef.Generation
-		applyResourcesCondition := newApplyResourcesCondition(cluster.Generation)
-		oldApplyCondition := meta.FindStatusCondition(cluster.Status.Conditions, applyResourcesCondition.Type)
-		if !conditionIsChanged(oldApplyCondition, applyResourcesCondition) {
-			return nil
-		}
-		meta.SetStatusCondition(&cluster.Status.Conditions, applyResourcesCondition)
-		rootVertex.postHandleAfterStatusPatch = append(rootVertex.postHandleAfterStatusPatch, func() error {
-			transCtx.EventRecorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
-			return nil
-		})
+		updateObservedGeneration()
+		updateClusterPhase()
+		updateComponentsPhase()
+		// update components' phase in cluster.status
+		rootVertex.action = actionPtr(STATUS)
 	case isClusterStatusUpdating(*origCluster):
-		defer func() {
-			rootVertex.action = actionPtr(STATUS)
-			rootVertex.immutable = reflect.DeepEqual(cluster.Status, origCluster.Status)
-		}()
+		initClusterStatusParams()
+		defer func() { rootVertex.action = actionPtr(STATUS) }()
 		// checks if the controller is handling the garbage of restore.
-		if err := t.handleGarbageOfRestoreBeforeRunning(transCtx, cluster); err != nil {
+		if err := t.handleGarbageOfRestoreBeforeRunning(transCtx, cluster, dag); err != nil {
 			return err
 		}
 		// reconcile the phase and conditions of the Cluster.status
-		if err := t.reconcileClusterStatus(transCtx, cluster, rootVertex); err != nil {
+		if err := t.reconcileClusterStatus(transCtx, cluster); err != nil {
 			return err
 		}
 		t.cleanupAnnotationsAfterRunning(cluster)
@@ -133,7 +123,7 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 }
 
 // reconcileClusterStatus reconciles phase and conditions of the Cluster.status.
-func (t *ClusterStatusTransformer) reconcileClusterStatus(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster, rootVertex *lifecycleVertex) error {
+func (t *ClusterStatusTransformer) reconcileClusterStatus(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster) error {
 	if len(cluster.Status.Components) == 0 {
 		return nil
 	}
@@ -144,23 +134,23 @@ func (t *ClusterStatusTransformer) reconcileClusterStatus(transCtx *ClusterTrans
 	t.doAnalysisAndUpdateSynchronizer(cluster)
 
 	// sync the LatestOpsRequestProcessed condition.
-	t.syncOpsRequestProcessedCondition(transCtx, cluster, rootVertex)
+	t.syncOpsRequestProcessedCondition(cluster)
 
 	// handle the ready condition.
-	t.syncReadyConditionForCluster(transCtx, cluster, rootVertex)
+	t.syncReadyConditionForCluster(cluster)
 
 	// sync the cluster phase.
 	switch t.phaseSyncLevel {
 	case clusterIsRunning:
 		if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
-			t.syncClusterPhaseToRunning(transCtx, cluster, rootVertex)
+			t.syncClusterPhaseToRunning(cluster)
 		}
 	case clusterIsStopped:
 		if cluster.Status.Phase != appsv1alpha1.StoppedClusterPhase {
-			t.syncClusterPhaseToStopped(transCtx, cluster, rootVertex)
+			t.syncClusterPhaseToStopped(cluster)
 		}
 	case clusterExistFailedOrAbnormal:
-		t.handleExistAbnormalOrFailed(transCtx, cluster, rootVertex)
+		t.handleExistAbnormalOrFailed(transCtx, cluster)
 	}
 	return nil
 }
@@ -214,7 +204,7 @@ func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(cluster *apps
 }
 
 // handleOpsRequestProcessedCondition syncs the condition that OpsRequest has been processed.
-func (t *ClusterStatusTransformer) syncOpsRequestProcessedCondition(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster, rootVertex *lifecycleVertex) {
+func (t *ClusterStatusTransformer) syncOpsRequestProcessedCondition(cluster *appsv1alpha1.Cluster) {
 	opsCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
 	if opsCondition == nil || opsCondition.Status == metav1.ConditionTrue {
 		return
@@ -229,26 +219,13 @@ func (t *ClusterStatusTransformer) syncOpsRequestProcessedCondition(transCtx *Cl
 		return
 	}
 	meta.SetStatusCondition(&cluster.Status.Conditions, processedCondition)
-	rootVertex.postHandleAfterStatusPatch = append(rootVertex.postHandleAfterStatusPatch, func() error {
-		// send an event when all pods of the components are ready.
-		transCtx.EventRecorder.Event(cluster, corev1.EventTypeNormal, processedCondition.Reason, processedCondition.Message)
-		return nil
-	})
 }
 
 // syncReadyConditionForCluster syncs the cluster conditions with ClusterReady and ReplicasReady type.
-func (t *ClusterStatusTransformer) syncReadyConditionForCluster(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster, rootVertex *lifecycleVertex) {
+func (t *ClusterStatusTransformer) syncReadyConditionForCluster(cluster *appsv1alpha1.Cluster) {
 	if len(t.replicasNotReadyCompNames) == 0 {
-		oldReplicasReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeReplicasReady)
 		// if all replicas of cluster are ready, set ReasonAllReplicasReady to status.conditions
 		readyCondition := newAllReplicasPodsReadyConditions()
-		if oldReplicasReadyCondition == nil || oldReplicasReadyCondition.Status == metav1.ConditionFalse {
-			rootVertex.postHandleAfterStatusPatch = append(rootVertex.postHandleAfterStatusPatch, func() error {
-				// send an event when all pods of the components are ready.
-				transCtx.EventRecorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
-				return nil
-			})
-		}
 		meta.SetStatusCondition(&cluster.Status.Conditions, readyCondition)
 	} else {
 		meta.SetStatusCondition(&cluster.Status.Conditions, newReplicasNotReadyCondition(t.replicasNotReadyCompNames))
@@ -260,42 +237,22 @@ func (t *ClusterStatusTransformer) syncReadyConditionForCluster(transCtx *Cluste
 }
 
 // syncClusterPhaseToRunning syncs the cluster phase to Running.
-func (t *ClusterStatusTransformer) syncClusterPhaseToRunning(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster, rootVertex *lifecycleVertex) {
+func (t *ClusterStatusTransformer) syncClusterPhaseToRunning(cluster *appsv1alpha1.Cluster) {
 	cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 	meta.SetStatusCondition(&cluster.Status.Conditions, newClusterReadyCondition(cluster.Name))
-	rootVertex.postHandleAfterStatusPatch = append(rootVertex.postHandleAfterStatusPatch, func() error {
-		message := fmt.Sprintf("Cluster: %s is ready, current phase is Running", cluster.Name)
-		transCtx.EventRecorder.Event(cluster, corev1.EventTypeNormal, string(appsv1alpha1.RunningClusterPhase), message)
-		return opsutil.MarkRunningOpsRequestAnnotation(transCtx.Context, t.Client, cluster)
-	})
 }
 
 // syncClusterToStopped syncs the cluster phase to Stopped.
-func (t *ClusterStatusTransformer) syncClusterPhaseToStopped(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster, rootVertex *lifecycleVertex) {
+func (t *ClusterStatusTransformer) syncClusterPhaseToStopped(cluster *appsv1alpha1.Cluster) {
 	cluster.Status.Phase = appsv1alpha1.StoppedClusterPhase
-	rootVertex.postHandleAfterStatusPatch = append(rootVertex.postHandleAfterStatusPatch, func() error {
-		message := fmt.Sprintf("Cluster: %s stopped successfully.", cluster.Name)
-		transCtx.EventRecorder.Event(cluster, corev1.EventTypeNormal, string(cluster.Status.Phase), message)
-		return opsutil.MarkRunningOpsRequestAnnotation(transCtx.Context, t.Client, cluster)
-	})
 }
 
 // handleExistAbnormalOrFailed handles the cluster status when some components are not ready.
-func (t *ClusterStatusTransformer) handleExistAbnormalOrFailed(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster, rootVertex *lifecycleVertex) {
-	oldPhase := cluster.Status.Phase
+func (t *ClusterStatusTransformer) handleExistAbnormalOrFailed(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster) {
 	componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster,
 		*transCtx.ClusterDef, "")
 	// handle the cluster status when some components are not ready.
 	handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
-	currPhase := cluster.Status.Phase
-	if slices.Contains(appsv1alpha1.GetClusterFailedPhases(), currPhase) && oldPhase != currPhase {
-		rootVertex.postHandleAfterStatusPatch = append(rootVertex.postHandleAfterStatusPatch, func() error {
-			message := fmt.Sprintf("Cluster: %s is %s, check according to the components message",
-				cluster.Name, currPhase)
-			transCtx.EventRecorder.Event(cluster, corev1.EventTypeWarning, string(cluster.Status.Phase), message)
-			return opsutil.MarkRunningOpsRequestAnnotation(transCtx.Context, t.Client, cluster)
-		})
-	}
 }
 
 // cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.
@@ -313,7 +270,7 @@ func (t *ClusterStatusTransformer) cleanupAnnotationsAfterRunning(cluster *appsv
 // handleRestoreGarbageBeforeRunning handles the garbage for restore before cluster phase changes to Running.
 // @return ErrNoOps if no operation
 // Deprecated: to be removed by PITR feature.
-func (t *ClusterStatusTransformer) handleGarbageOfRestoreBeforeRunning(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+func (t *ClusterStatusTransformer) handleGarbageOfRestoreBeforeRunning(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
 	clusterBackupResourceMap, err := getClusterBackupSourceMap(cluster)
 	if err != nil {
 		return err
@@ -328,7 +285,7 @@ func (t *ClusterStatusTransformer) handleGarbageOfRestoreBeforeRunning(transCtx 
 		}
 	}
 	// remove the garbage for restore if the cluster restores from backup.
-	return t.removeGarbageWithRestore(transCtx, cluster, clusterBackupResourceMap)
+	return t.removeGarbageWithRestore(transCtx, cluster, clusterBackupResourceMap, dag)
 }
 
 // REVIEW: this handling is rather hackish, call for refactor.
@@ -338,13 +295,24 @@ func (t *ClusterStatusTransformer) handleGarbageOfRestoreBeforeRunning(transCtx 
 func (t *ClusterStatusTransformer) removeGarbageWithRestore(
 	transCtx *ClusterTransformContext,
 	cluster *appsv1alpha1.Cluster,
-	clusterBackupResourceMap map[string]string) error {
+	clusterBackupResourceMap map[string]string,
+	dag *graph.DAG) error {
 	var (
 		err error
 	)
+	vertices := findAll[*appsv1.StatefulSet](dag)
 	for k, v := range clusterBackupResourceMap {
+		// get the vertex list which contains sts owned by componentName
+		vertexList := make([]graph.Vertex, 0)
+		for _, vertex := range vertices {
+			v, _ := vertex.(*lifecycleVertex)
+			labels := v.obj.GetLabels()
+			if labels != nil && labels[constant.KBAppComponentLabelKey] == k{
+				vertexList = append(vertexList, vertex)
+			}
+		}
 		// remove the init container for restore
-		if _, err = t.removeStsInitContainerForRestore(transCtx, cluster, k, v); err != nil {
+		if _, err = t.removeStsInitContainerForRestore(cluster, k, v, vertexList); err != nil {
 			return err
 		}
 	}
@@ -353,17 +321,14 @@ func (t *ClusterStatusTransformer) removeGarbageWithRestore(
 
 // removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
 func (t *ClusterStatusTransformer) removeStsInitContainerForRestore(
-	transCtx *ClusterTransformContext,
 	cluster *appsv1alpha1.Cluster,
 	componentName,
-	backupName string) (bool, error) {
-	// get the sts list of component
-	stsList := &appsv1.StatefulSetList{}
-	if err := util.GetObjectListByComponentName(transCtx.Context, t.Client, *cluster, stsList, componentName); err != nil {
-		return false, err
-	}
+	backupName string,
+	vertexList []graph.Vertex) (bool, error) {
 	var doRemoveInitContainers bool
-	for _, sts := range stsList.Items {
+	for _, vertex := range vertexList {
+		v, _ := vertex.(*lifecycleVertex)
+		sts, _ := v.obj.(*appsv1.StatefulSet)
 		initContainers := sts.Spec.Template.Spec.InitContainers
 		restoreInitContainerName := component.GetRestoredInitContainerName(backupName)
 		restoreInitContainerIndex, _ := intctrlutil.GetContainerByName(initContainers, restoreInitContainerName)
@@ -373,8 +338,9 @@ func (t *ClusterStatusTransformer) removeStsInitContainerForRestore(
 		doRemoveInitContainers = true
 		initContainers = append(initContainers[:restoreInitContainerIndex], initContainers[restoreInitContainerIndex+1:]...)
 		sts.Spec.Template.Spec.InitContainers = initContainers
-		if err := t.Client.Update(transCtx.Context, &sts); err != nil {
-			return false, err
+		if v.oriObj != nil {
+			v.immutable = false
+			v.action = actionPtr(UPDATE)
 		}
 	}
 	if doRemoveInitContainers {

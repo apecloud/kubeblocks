@@ -81,8 +81,6 @@ type lifecycleVertex struct {
 	immutable bool
 	isOrphan  bool
 	action    *Action
-	// postHandleAfterStatusPatch is called after the object status has changed
-	postHandleAfterStatusPatch []func() error
 }
 
 func (v lifecycleVertex) String() string {

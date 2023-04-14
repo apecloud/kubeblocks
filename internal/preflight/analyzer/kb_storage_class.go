@@ -44,6 +44,10 @@ func (a *AnalyzeStorageClassByKb) Title() string {
 	return util.TitleOrDefault(a.analyzer.AnalyzeMeta, "Kubeblocks Storage Class")
 }
 
+func (a *AnalyzeStorageClassByKb) GetAnalyzer() *preflightv1beta2.KBStorageClassAnalyze {
+	return a.analyzer
+}
+
 func (a *AnalyzeStorageClassByKb) IsExcluded() (bool, error) {
 	return util.IsExcluded(a.analyzer.Exclude)
 }
@@ -60,11 +64,11 @@ func (a *AnalyzeStorageClassByKb) Analyze(getFile GetCollectedFileContents, find
 func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2.KBStorageClassAnalyze, getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) (*analyze.AnalyzeResult, error) {
 	storageClassesData, err := getFile(StorageClassPath)
 	if err != nil {
-		return a.FailedResultWithMessage(fmt.Sprintf("get jsonfile failed, err:%v", err)), err
+		return NewFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
 	}
 	var storageClasses storagev1beta1.StorageClassList
 	if err = json.Unmarshal(storageClassesData, &storageClasses); err != nil {
-		return a.FailedResultWithMessage(fmt.Sprintf("get jsonfile failed, err:%v", err)), err
+		return NewFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
 	}
 
 	for _, storageClass := range storageClasses.Items {
@@ -72,60 +76,10 @@ func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2
 			continue
 		}
 		if storageClass.Provisioner == "" || (storageClass.Provisioner == analyzer.Provisioner) {
-			return a.GenerateResult(PassType), nil
+			return NewAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
 		}
 	}
-	return a.GenerateResult(FailType), nil
-}
-
-func (a *AnalyzeStorageClassByKb) GenerateResult(resultType string) *analyze.AnalyzeResult {
-	result := analyze.AnalyzeResult{
-		Title: a.Title(),
-	}
-	for _, outcome := range a.analyzer.Outcomes {
-		if outcome == nil {
-			continue
-		}
-		switch resultType {
-		case PassType:
-			if outcome.Pass != nil {
-				result.IsPass = true
-				result.IsPass = true
-				result.Message = outcome.Pass.Message
-				result.URI = outcome.Pass.URI
-				return &result
-			}
-		case WarnType:
-			if outcome.Warn != nil {
-				result.IsWarn = true
-				result.Message = outcome.Warn.Message
-				result.URI = outcome.Warn.URI
-				return &result
-			}
-		case FailType:
-			if outcome.Fail != nil {
-				result.IsFail = true
-				result.Message = outcome.Fail.Message
-				result.URI = outcome.Fail.URI
-				return &result
-			}
-		default:
-			result.IsFail = true
-			result.Message = IncorrectOutcomeType
-			return &result
-		}
-	}
-	result.IsFail = true
-	result.Message = MissingOutcomeMessage
-	return &result
-}
-
-func (a *AnalyzeStorageClassByKb) FailedResultWithMessage(message string) *analyze.AnalyzeResult {
-	return &analyze.AnalyzeResult{
-		Title:   a.Title(),
-		Message: message,
-		IsFail:  true,
-	}
+	return NewAnalyzeResult(a.Title(), FailType, a.analyzer.Outcomes), nil
 }
 
 var _ KBAnalyzer = &AnalyzeStorageClassByKb{}

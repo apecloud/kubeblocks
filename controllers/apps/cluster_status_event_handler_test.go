@@ -40,10 +40,17 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	var (
 		ctx                = context.Background()
-		clusterName        = "cluster-for-status-" + testCtx.GetRandomStr()
-		clusterDefName     = "clusterdef-for-status-" + testCtx.GetRandomStr()
-		clusterVersionName = "cluster-version-for-status-" + testCtx.GetRandomStr()
+		clusterName        = ""
+		clusterDefName     = ""
+		clusterVersionName = ""
 	)
+
+	setupResourceNames := func() {
+		suffix := testCtx.GetRandomStr()
+		clusterName = "cluster-for-status-" + suffix
+		clusterDefName = "clusterdef-for-status-" + suffix
+		clusterVersionName = "cluster-version-for-status-" + suffix
+	}
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -52,13 +59,18 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		// create the new objects.
 		By("clean resources")
 
-		testapps.ClearClusterResources(&testCtx)
+		if clusterName != "" {
+			testapps.ClearClusterResources(&testCtx)
 
-		inNS := client.InNamespace(testCtx.DefaultNamespace)
-		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		// testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+			inNS := client.InNamespace(testCtx.DefaultNamespace)
+			ml := client.HasLabels{testCtx.TestObjLabelKey}
+			// testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+			// testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
+			testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		}
+
+		// reset all resource names
+		setupResourceNames()
 	}
 	BeforeEach(cleanEnv)
 
@@ -128,11 +140,11 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			func(g Gomega, newCluster *appsv1alpha1.Cluster) {
 				g.Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 				if checkClusterPhase {
-					g.Expect(newCluster.Status.Phase == expectClusterPhase).Should(BeTrue())
-					return
+					g.Expect(newCluster.Status.Phase).Should(Equal(expectClusterPhase))
+				} else {
+					compStatus := newCluster.Status.Components[componentName]
+					g.Expect(compStatus.Phase).Should(Equal(expectCompPhase))
 				}
-				compStatus := newCluster.Status.Components[componentName]
-				g.Expect(compStatus.Phase == expectCompPhase).Should(BeTrue())
 			})).Should(Succeed())
 	}
 
@@ -183,7 +195,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("watch warning event from StatefulSet and component workload type is Stateful")
 			event.Count = 3
 			event.FirstTimestamp = metav1.Time{Time: time.Now()}
-			event.LastTimestamp = metav1.Time{Time: time.Now().Add(31 * time.Second)}
+			event.LastTimestamp = metav1.Time{Time: time.Now().Add(EventTimeOut + time.Second)}
 			handleAndCheckComponentStatus(statefulMySQLCompName, event,
 				appsv1alpha1.FailedClusterPhase,
 				appsv1alpha1.FailedClusterCompPhase,

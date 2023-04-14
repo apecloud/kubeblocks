@@ -420,13 +420,16 @@ func (c *ComponentBase) rebuildStatus(reqCtx intctrlutil.RequestCtx,
 	hasFailedPodTimedOut bool,
 	status *appsv1alpha1.ClusterComponentStatus) error {
 	if !running {
-		if hasFailedPodTimedOut {
-			if phase, err := c.ComponentSet.GetPhaseWhenPodsNotReady(reqCtx.Ctx, c.GetName()); err != nil {
-				return err
-			} else if phase != "" {
-				status.Phase = phase
-			}
+		//// if no operation is running in cluster or failed pod timed out,
+		//// means the component is Failed or Abnormal.
+		// if slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), c.Cluster.Status.Phase) || hasFailedPodTimedOut {
+		// TODO(refactor): should review and check this pre-condition carefully.
+		if phase, err := c.ComponentSet.GetPhaseWhenPodsNotReady(reqCtx.Ctx, c.GetName()); err != nil {
+			return err
+		} else if phase != "" {
+			status.Phase = phase
 		}
+		// }
 	} else {
 		if c.Component.Replicas == 0 {
 			// if replicas number of component is zero, the component has stopped.

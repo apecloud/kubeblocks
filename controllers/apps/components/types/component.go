@@ -63,10 +63,6 @@ type Component interface {
 	GetPhase() appsv1alpha1.ClusterComponentPhase
 	// GetStatus() appsv1alpha1.ClusterComponentStatus
 
-	// Exist checks whether the component exists in cluster, we say that a component exists iff the main workloads
-	// exist in cluster, such as stateful set for consensus/replication/stateful and deployment for stateless.
-	Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error)
-
 	Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 	Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 	Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error

@@ -127,25 +127,9 @@ func (c *replicationComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 	return appsv1alpha1.Replication
 }
 
-func (c *replicationComponent) Exist(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
-	if stsList, err := util.ListStsOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels()); err != nil {
-		return false, err
-	} else {
-		return len(stsList) > 0, nil // component.replica can not be zero
-	}
-}
-
 func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	if err := c.init(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()), false); err != nil {
 		return err
-	}
-
-	if exist, err := c.Exist(reqCtx, cli); err != nil || exist {
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("component to be created is already exist, cluster: %s, component: %s",
-			c.GetClusterName(), c.GetName())
 	}
 
 	if err := c.ValidateObjectsAction(); err != nil {

@@ -78,6 +78,10 @@ var _ = Describe("Deployment Controller", func() {
 				AddComponent(testapps.StatelessNginxComponent, statelessCompType).
 				Create(&testCtx).GetObject()
 
+			testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+				AddComponent(statelessCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
+				Create(&testCtx).GetObject()
+
 			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(statelessCompName, statelessCompType).SetReplicas(2).Create(&testCtx).GetObject()
 
@@ -178,7 +182,7 @@ var _ = Describe("StatefulSet Controller", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
 		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.StatefulSetSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 

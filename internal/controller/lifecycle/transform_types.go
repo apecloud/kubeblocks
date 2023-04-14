@@ -62,6 +62,9 @@ const (
 	STATUS = Action("STATUS")
 )
 
+// default reconcile requeue after duration
+var requeueDuration = time.Millisecond * 100
+
 type gvkName struct {
 	gvk      schema.GroupVersionKind
 	ns, name string

@@ -34,7 +34,7 @@ func (e *ValidateEnableLogsTransformer) Transform(ctx graph.TransformContext, da
 	err := cluster.Spec.ValidateEnabledLogs(transCtx.ClusterDef)
 	setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	if err != nil {
-		return graph.ErrFastReturn
+		return newRequeueError(requeueDuration, err.Error())
 	}
 
 	return nil

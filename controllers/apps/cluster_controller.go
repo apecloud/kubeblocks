@@ -140,7 +140,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return requeueError(err)
 	}
 
-	plan, err := planBuilder.
+	plan, errBuild := planBuilder.
 		AddTransformer(
 			// handle cluster deletion first
 			&lifecycle.ClusterDeletionTransformer{},
@@ -182,12 +182,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.ClusterStatusTransformer{},
 		).
 		Build()
-	if err != nil {
-		return requeueError(err)
-	}
 
-	if err = plan.Execute(); err != nil {
-		return requeueError(err)
+	// errBuild not nil means build stage partial success or validation error
+	// execute the plan first, delay error handling
+	if errExec := plan.Execute(); errExec != nil {
+		return requeueError(errExec)
+	}
+	if errBuild != nil {
+		return requeueError(errBuild)
 	}
 
 	return intctrlutil.Reconciled()

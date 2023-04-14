@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -41,17 +42,25 @@ func (t *ValidateRefResourcesTransformer) Transform(ctx graph.TransformContext, 
 		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	}()
 
+	validateExistence := func(key client.ObjectKey, object client.Object) error {
+		err = transCtx.Client.Get(transCtx.Context, key, object)
+		if err != nil {
+			return newRequeueError(requeueDuration, err.Error())
+		}
+		return nil
+	}
+
 	// validate cd & cv's existence
 	// if we can't get the referenced cd & cv, set provisioning condition failed, and jump to plan.Execute()
 	cd := &appsv1alpha1.ClusterDefinition{}
-	if err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
-		return graph.ErrFastReturn
+	if err = validateExistence(types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
+		return err
 	}
 	var cv *appsv1alpha1.ClusterVersion
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
 		cv = &appsv1alpha1.ClusterVersion{}
-		if err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv); err != nil {
-			return graph.ErrFastReturn
+		if err = validateExistence(types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv); err != nil {
+			return err
 		}
 	}
 
@@ -64,7 +73,7 @@ func (t *ValidateRefResourcesTransformer) Transform(ctx graph.TransformContext, 
 		}
 		err = errors.New(message)
 		transCtx.Logger.Info(fmt.Sprintf("validation error: %v", err))
-		return graph.ErrFastReturn
+		return newRequeueError(requeueDuration, message)
 	}
 
 	return nil

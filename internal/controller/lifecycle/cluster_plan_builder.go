@@ -145,9 +145,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 
 	// new a DAG and apply chain on it, after that we should get the final Plan
 	dag := graph.NewDAG()
-	if err = c.transformers.ApplyTo(c.transCtx, dag); err != nil {
-		return nil, err
-	}
+	err = c.transformers.ApplyTo(c.transCtx, dag)
 	c.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
 
 	// we got the execution plan
@@ -157,7 +155,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		cli:      c.cli,
 		transCtx: c.transCtx,
 	}
-	return plan, nil
+	return plan, err
 }
 
 // Plan implementation

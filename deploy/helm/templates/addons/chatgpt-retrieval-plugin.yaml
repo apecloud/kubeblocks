@@ -35,5 +35,5 @@ spec:
     - replicas: 1
 
   installable:
-    autoInstall: false
+    autoInstall: true
 

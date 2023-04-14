@@ -277,6 +277,9 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
+                    class:
+                      description: class specifies the class name of the component
+                      type: string
                     componentName:
                       description: componentName cluster component name.
                       type: string
@@ -539,6 +542,9 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
+                        class:
+                          description: the last class name of the component.
+                          type: string
                         limits:
                           additionalProperties:
                             anyOf:

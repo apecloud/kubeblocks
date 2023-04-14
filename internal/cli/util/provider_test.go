@@ -125,7 +125,7 @@ var _ = Describe("provider util", func() {
 
 		for _, c := range cases {
 			By(c.description)
-			Expect(GetK8sVersion(c.version)).Should(Equal(c.expectVersion))
+			Expect(GetK8sSemVer(c.version)).Should(Equal(c.expectVersion))
 			client := testing.FakeClientSet(c.nodes)
 			p, err := GetK8sProvider(c.version, client)
 			Expect(err).ShouldNot(HaveOccurred())

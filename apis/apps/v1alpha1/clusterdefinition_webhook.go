@@ -57,13 +57,13 @@ func (r *ClusterDefinition) Default() {
 		if probes == nil {
 			continue
 		}
-		if probes.RoleChangedProbe != nil {
+		if probes.RoleProbe != nil {
 			// set default values
 			if probes.RoleProbeTimeoutAfterPodsReady == 0 {
 				probes.RoleProbeTimeoutAfterPodsReady = DefaultRoleProbeTimeoutAfterPodsReady
 			}
 		} else {
-			// if component does not support RoleChangedProbe, reset RoleProbeTimeoutAtPodsReady to zero
+			// if component does not support RoleProbe, reset RoleProbeTimeoutAtPodsReady to zero
 			if probes.RoleProbeTimeoutAfterPodsReady != 0 {
 				probes.RoleProbeTimeoutAfterPodsReady = 0
 			}

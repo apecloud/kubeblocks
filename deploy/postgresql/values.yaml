@@ -130,6 +130,20 @@ metrics:
         - start_time_seconds:
             usage: "GAUGE"
             description: "Time at which postmaster started"
+    
+    pg_replication:
+      query: |
+        SELECT 
+          (case when (not pg_is_in_recovery() or pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn()) then 0 else greatest (0, extract(epoch from (now() - pg_last_xact_replay_timestamp()))) end) as lag,
+          (case when pg_is_in_recovery() then 0 else 1 end) as is_master
+      master: true
+      metrics:
+        - lag:
+            usage: "GAUGE"
+            description: "Replication lag behind master in seconds"
+        - is_master:
+            usage: "GAUGE"
+            description: "Instance is master or slave"
 
     pg_stat_user_tables:
       query: |

@@ -95,6 +95,8 @@ var RestoreJobSignature = func(_ dataprotectionv1alpha1.RestoreJob, _ dataprotec
 }
 var AddonSignature = func(_ extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList) {
 }
+var ComponentResourceConstraintSignature = func(_ appsv1alpha1.ComponentResourceConstraint, _ appsv1alpha1.ComponentResourceConstraintList) {}
+var ComponentClassDefinitionSignature = func(_ appsv1alpha1.ComponentClassDefinition, _ appsv1alpha1.ComponentClassDefinitionList) {}
 
 func ToGVK(object client.Object) schema.GroupVersionKind {
 	t := reflect.TypeOf(object)

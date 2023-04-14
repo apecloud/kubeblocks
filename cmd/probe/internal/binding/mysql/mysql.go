@@ -36,6 +36,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	. "github.com/apecloud/kubeblocks/cmd/probe/util"
@@ -79,8 +80,8 @@ const (
 	listUserTpl  = "SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired FROM mysql.user WHERE host = '%' and user <> 'root' and user not like 'kb%';"
 	showGrantTpl = "SHOW GRANTS FOR '%s'@'%%';"
 	getUserTpl   = `
-	SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired 
-	FROM mysql.user 
+	SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired
+	FROM mysql.user
 	WHERE host = '%%' and user <> 'root' and user not like 'kb%%' and user ='%s';"
 	`
 	createUserTpl = "CREATE USER '%s'@'%%' IDENTIFIED BY '%s';"
@@ -522,16 +523,22 @@ func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *bindi
 				return nil, err
 			}
 			user := UserInfo{}
-			userRoles := make([]string, 0)
+			// only keep one role name of the highest privilege
+			userRoles := make([]RoleType, 0)
 			for _, roleMap := range roles {
 				for k, v := range roleMap {
 					if len(user.UserName) == 0 {
 						user.UserName = strings.TrimPrefix(strings.TrimSuffix(k, "@%"), "Grants for ")
 					}
-					userRoles = append(userRoles, mysqlOps.inferRoleFromPriv(strings.TrimPrefix(v, "GRANT ")))
+					mysqlRoleType := mysqlOps.priv2Role(strings.TrimPrefix(v, "GRANT "))
+					userRoles = append(userRoles, mysqlRoleType)
 				}
 			}
-			user.RoleName = strings.Join(userRoles, ",")
+			// sort roles by weight
+			slices.SortFunc(userRoles, SortRoleByWeight)
+			if len(userRoles) > 0 {
+				user.RoleName = (string)(userRoles[0])
+			}
 			if jsonData, err := json.Marshal([]UserInfo{user}); err != nil {
 				return nil, err
 			} else {
@@ -618,7 +625,7 @@ func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *bind
 		object     = UserInfo{}
 		sqlTplRend = func(user UserInfo) string {
 			// render sql stmts
-			roleDesc, _ := mysqlOps.renderRoleByName(user.RoleName)
+			roleDesc, _ := mysqlOps.role2Priv(user.RoleName)
 			// update privilege
 			sql := fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
 			return sql
@@ -636,20 +643,20 @@ func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *bind
 	return ExecuteObject(ctx, mysqlOps, req, op, sqlTplRend, msgTplRend, object)
 }
 
-func (mysqlOps *MysqlOperations) renderRoleByName(roleName string) (string, error) {
-	switch strings.ToLower(roleName) {
+func (mysqlOps *MysqlOperations) role2Priv(roleName string) (string, error) {
+	roleType := String2RoleType(roleName)
+	switch roleType {
 	case SuperUserRole:
 		return superUserPriv, nil
 	case ReadWriteRole:
 		return readWritePriv, nil
 	case ReadOnlyRole:
 		return readOnlyRPriv, nil
-	default:
-		return "", fmt.Errorf("role name: %s is not supported", roleName)
 	}
+	return "", fmt.Errorf("role name: %s is not supported", roleName)
 }
 
-func (mysqlOps *MysqlOperations) inferRoleFromPriv(priv string) string {
+func (mysqlOps *MysqlOperations) priv2Role(priv string) RoleType {
 	if strings.HasPrefix(priv, readOnlyRPriv) {
 		return ReadOnlyRole
 	}

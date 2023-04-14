@@ -13,13 +13,18 @@ kbcli cluster restore [flags]
 ```
   # restore a new cluster from a backup
   kbcli cluster restore new-cluster-name --backup backup-name
+  
+  # restore a new cluster from point in time
+  kbcli cluster restore --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --source-cluster-name mycluster
 ```
 
 ### Options
 
 ```
-      --backup string   Backup name
-  -h, --help            help for restore
+      --backup string                Backup name
+  -h, --help                         help for restore
+      --restore-to-time string       point in time recovery(PITR)
+      --source-cluster-name string   source cluster name
 ```
 
 ### Options inherited from parent commands

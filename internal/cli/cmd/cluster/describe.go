@@ -282,27 +282,24 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 
 // getBackupRecoverableTime return the recoverable time range string
 func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
-	if len(backups) == 0 {
-		return nilStr
-	}
 	// filter backups with backupLog
-	backupSlices := make([]dpv1alpha1.Backup, 0)
+	backupsWithLog := make([]dpv1alpha1.Backup, 0)
 	for _, b := range backups {
 		if b.Status.Phase == dpv1alpha1.BackupCompleted &&
 			b.Status.Manifests != nil && b.Status.Manifests.BackupLog != nil {
-			backupSlices = append(backupSlices, b)
+			backupsWithLog = append(backupsWithLog, b)
 		}
 	}
-	if len(backupSlices) == 0 {
+	if len(backupsWithLog) == 0 {
 		return nilStr
 	}
-	sortByStartTime(backupSlices)
+	sortByStartTime(backupsWithLog)
 
 	var result string
-	start, end := backupSlices[0].Status.Manifests.BackupLog.StartTime, backupSlices[0].Status.Manifests.BackupLog.StopTime
+	start, end := backupsWithLog[0].Status.Manifests.BackupLog.StartTime, backupsWithLog[0].Status.Manifests.BackupLog.StopTime
 
-	for i := 1; i < len(backupSlices); i++ {
-		b := backupSlices[i].Status.Manifests.BackupLog
+	for i := 1; i < len(backupsWithLog); i++ {
+		b := backupsWithLog[i].Status.Manifests.BackupLog
 		if b.StartTime.Before(end) || b.StartTime.Equal(end) {
 			if b.StopTime.After(end.Time) {
 				end = b.StopTime

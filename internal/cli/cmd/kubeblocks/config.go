@@ -30,25 +30,25 @@ var backupConfigExample = templates.Examples(`
 		# Enable the snapshot-controller and volume snapshot, to support snapshot backup.
 		kbcli kubeblocks config --set snapshot-controller.enabled=true
         
-        Options Parameters:
+		Options Parameters:
 		# If you have already installed a snapshot-controller, only enable the snapshot backup feature
-        dataProtection.enableVolumeSnapshot=true
+		dataProtection.enableVolumeSnapshot=true
 
 		# the global pvc name which persistent volume claim to store the backup data.
-	    # will replace the pvc name when it is empty in the backup policy.
-        dataProtection.backupPVCName=backup-data
+		# will replace the pvc name when it is empty in the backup policy.
+		dataProtection.backupPVCName=backup-data
 		
-        # the init capacity of pvc for creating the pvc, e.g. 10Gi.
-        # will replace the init capacity when it is empty in the backup policy.
-        dataProtection.backupPVCInitCapacity=100Gi
+		# the init capacity of pvc for creating the pvc, e.g. 10Gi.
+		# will replace the init capacity when it is empty in the backup policy.
+		dataProtection.backupPVCInitCapacity=100Gi
 
-        # the pvc storage class name.
-        # will replace the storageClassName when it is nil in the backup policy.
-        dataProtection.backupPVCStorageClassName=csi-s3
+		# the pvc storage class name.
+		# will replace the storageClassName when it is nil in the backup policy.
+		dataProtection.backupPVCStorageClassName=csi-s3
 
- 		# the pvc create policy.
-	    # if the storageClass supports dynamic provisioning, recommend "IfNotPresent" policy.
-        # otherwise, using "Never" policy. only affect the backupPolicy automatically created by Kubeblocks.
+		# the pvc create policy.
+		# if the storageClass supports dynamic provisioning, recommend "IfNotPresent" policy.
+		# otherwise, using "Never" policy. only affect the backupPolicy automatically created by Kubeblocks.
 		dataProtection.backupPVCCreatePolicy=Never
 	`)
 

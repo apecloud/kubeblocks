@@ -159,7 +159,6 @@ func IsSchedulableConfigResource(object client.Object) bool {
 		constant.CMConfigurationTemplateNameLabelKey,
 		constant.CMConfigurationTypeLabelKey,
 		constant.CMConfigurationSpecProviderLabelKey,
-		constant.CMConfigurationConstraintsNameLabelKey,
 	}
 
 	labels := object.GetLabels()

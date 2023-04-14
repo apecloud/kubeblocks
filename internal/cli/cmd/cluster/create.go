@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -368,7 +369,19 @@ func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 }
 
 func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
+	o := &CreateOptions{
+		BaseOptions: create.BaseOptions{
+			IOStreams:  streams,
+			PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
+		}}
+
+	o.OutputOperation = func(didPatch bool) string {
+		if didPatch {
+			return "created"
+		}
+		return "created (no change)"
+	}
+
 	inputs := create.Inputs{
 		Use:             "create [CLUSTER_NAME]",
 		Short:           "Create a cluster.",
@@ -390,6 +403,11 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 			// add updatable flags
 			o.UpdatableFlags.addFlags(cmd)
+
+			// add print flags
+			o.PrintFlags.AddFlags(cmd)
+			// add dry-run flags
+			cmdutil.AddDryRunFlag(cmd)
 
 			// set required flag
 			util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))

@@ -21,6 +21,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
@@ -34,11 +35,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -75,6 +78,9 @@ type Inputs struct {
 	// Group of Version, default is v1alpha1
 	Version string
 
+	// Command of input
+	Cmd *cobra.Command
+
 	// Factory
 	Factory cmdutil.Factory
 
@@ -96,6 +102,8 @@ type Inputs struct {
 	ResourceNameGVRForCompletion schema.GroupVersionResource
 }
 
+type OutputOperation func(bool) string
+
 // BaseOptions the options of creation command should inherit baseOptions
 type BaseOptions struct {
 	// Namespace k8s namespace
@@ -107,6 +115,12 @@ type BaseOptions struct {
 	Dynamic dynamic.Interface `json:"-"`
 
 	Client kubernetes.Interface `json:"-"`
+
+	PrintFlags *genericclioptions.PrintFlags `json:"-"`
+
+	ToPrinter func(string) (printers.ResourcePrinter, error) `json:"-"`
+
+	OutputOperation OutputOperation `json:"-"`
 
 	// Quiet minimize unnecessary output
 	Quiet bool
@@ -129,6 +143,7 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 			util.CheckErr(inputs.BaseOptionsObj.Run(inputs))
 		},
 	}
+	inputs.Cmd = cmd
 	if inputs.BuildFlags != nil {
 		inputs.BuildFlags(cmd)
 	}
@@ -155,6 +170,17 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 
 	if o.ClientSet, err = inputs.Factory.KubernetesClientSet(); err != nil {
 		return err
+	}
+
+	dryRunStrategy, err := cmdutil.GetDryRunStrategy(inputs.Cmd)
+	if err != nil {
+		return err
+	}
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
+
+	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		return o.PrintFlags.ToPrinter()
 	}
 
 	// do custom options complete
@@ -215,21 +241,45 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	if len(version) == 0 {
 		version = types.AppsAPIVersion
 	}
-	// create k8s resource
-	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
-	if unstructuredObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+
+	previewObj := unstructuredObj
+	dryRunStrategy, err := cmdutil.GetDryRunStrategy(inputs.Cmd)
+	if err != nil {
 		return err
 	}
-	o.Name = unstructuredObj.GetName()
-	if o.Quiet {
-		return nil
+
+	if dryRunStrategy != cmdutil.DryRunClient {
+		gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
+		createOptions := metav1.CreateOptions{}
+
+		if dryRunStrategy == cmdutil.DryRunServer {
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		// create k8s resource
+		previewObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), previewObj, createOptions)
+		if err != nil {
+			return err
+		}
+		if dryRunStrategy != cmdutil.DryRunServer {
+			o.Name = unstructuredObj.GetName()
+			if o.Quiet {
+				return nil
+			}
+			if inputs.CustomOutPut != nil {
+				inputs.CustomOutPut(o)
+			} else {
+				fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+			}
+			return nil
+		}
 	}
-	if inputs.CustomOutPut != nil {
-		inputs.CustomOutPut(o)
-	} else {
-		fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+
+	isChange := !reflect.DeepEqual(previewObj, unstructuredObj)
+	printer, err := o.ToPrinter(o.OutputOperation(isChange))
+	if err != nil {
+		return err
 	}
-	return nil
+	return printer.PrintObj(previewObj, o.Out)
 }
 
 // RunAsApply execute command. the options of parameter contain the command flags and args.

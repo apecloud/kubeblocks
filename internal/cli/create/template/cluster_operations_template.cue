@@ -24,7 +24,7 @@ options: {
 	componentNames: [...string]
 	cpu:      string
 	memory:   string
-	class: 	  string
+	class:    string
 	replicas: int
 	storage:  string
 	vctNames: [...string]

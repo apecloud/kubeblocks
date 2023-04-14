@@ -14,76 +14,76 @@
 
 // required, command line input options for parameters and flags
 options: {
-	name:              string
-	namespace:         string
-	teplate:           string
-	taskType:          string
-	source:            string
+	name:      string
+	namespace: string
+	teplate:   string
+	taskType:  string
+	source:    string
 	sourceEndpointModel: {}
-	sink:              string
+	sink: string
 	sinkEndpointModel: {}
-	migrationObject:   [...]
+	migrationObject: [...]
 	migrationObjectModel: {}
-	steps:             [...]
-	stepsModel:        [...]
-	tolerations:       [...]
-	tolerationModel:  {}
-	resources:         [...]
-	resourceModel:    {}
-	serverId:          int
+	steps: [...]
+	stepsModel: [...]
+	tolerations: [...]
+	tolerationModel: {}
+	resources: [...]
+	resourceModel: {}
+	serverId: int
 }
 
 // required, k8s api resource content
 content: {
 	apiVersion: "datamigration.apecloud.io/v1alpha1"
-	kind: "MigrationTask"
+	kind:       "MigrationTask"
 	metadata: {
-  	name: options.name
-  	namespace: options.namespace
-  }
+		name:      options.name
+		namespace: options.namespace
+	}
 	spec: {
-  	taskType: options.taskType
-  	template: options.template
-  	sourceEndpoint: options.sourceEndpointModel
-  	sinkEndpoint: options.sinkEndpointModel
-  	initialization: {
-    	steps: options.stepsModel
-    	config: {
-    		preCheck: {
-    			resource: {
-    				limits: options.resourceModel["precheck"]
-    			},
-    			tolerations: options.tolerationModel["precheck"]
-    		}
-    		initStruct: {
-    			resource: {
-    				limits: options.resourceModel["init-struct"]
-    			},
-    			tolerations: options.tolerationModel["init-struct"]
-    		}
-    		initData: {
-    			resource: {
-    				limits: options.resourceModel["init-data"]
-    			},
-    			tolerations: options.tolerationModel["init-data"]
-    		}
-    	}
-    }
-    cdc: {
-    	config: {
-    		resource: {
-    				limits: options.resourceModel["cdc"]
-    			},
-    		tolerations: options.tolerationModel["cdc"],
-    		param: {
-    			"extractor.server_id": options.serverId
-    		}
-    	}
-    }
-    migrationObj: options.migrationObjectModel
-    globalTolerations: options.tolerationModel["global"]
-    globalResources: {
-    	limits: options.resourceModel["global"]
-    }
-  }
+		taskType:       options.taskType
+		template:       options.template
+		sourceEndpoint: options.sourceEndpointModel
+		sinkEndpoint:   options.sinkEndpointModel
+		initialization: {
+			steps: options.stepsModel
+			config: {
+				preCheck: {
+					resource: {
+						limits: options.resourceModel["precheck"]
+					}
+					tolerations: options.tolerationModel["precheck"]
+				}
+				initStruct: {
+					resource: {
+						limits: options.resourceModel["init-struct"]
+					}
+					tolerations: options.tolerationModel["init-struct"]
+				}
+				initData: {
+					resource: {
+						limits: options.resourceModel["init-data"]
+					}
+					tolerations: options.tolerationModel["init-data"]
+				}
+			}
+		}
+		cdc: {
+			config: {
+				resource: {
+					limits: options.resourceModel["cdc"]
+				}
+				tolerations: options.tolerationModel["cdc"]
+				param: {
+					"extractor.server_id": options.serverId
+				}
+			}
+		}
+		migrationObj:      options.migrationObjectModel
+		globalTolerations: options.tolerationModel["global"]
+		globalResources: {
+			limits: options.resourceModel["global"]
+		}
+	}
 }

@@ -126,7 +126,10 @@ func IsNotUserReconfigureOperation(cm *corev1.ConfigMap) bool {
 	labels := cm.GetLabels()
 	annotations := cm.GetAnnotations()
 	if labels == nil || annotations == nil {
-		return true
+		return false
+	}
+	if _, ok := annotations[constant.CMInsEnableRerenderTemplateKey]; !ok {
+		return false
 	}
 	lastReconfigurePhase := labels[constant.CMInsLastReconfigurePhaseKey]
 	if annotations[constant.KBParameterUpdateSourceAnnotationKey] != constant.ReconfigureManagerSource {
@@ -156,7 +159,6 @@ func IsSchedulableConfigResource(object client.Object) bool {
 		constant.CMConfigurationTemplateNameLabelKey,
 		constant.CMConfigurationTypeLabelKey,
 		constant.CMConfigurationSpecProviderLabelKey,
-		constant.CMConfigurationConstraintsNameLabelKey,
 	}
 
 	labels := object.GetLabels()

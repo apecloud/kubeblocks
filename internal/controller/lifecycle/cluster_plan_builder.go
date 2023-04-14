@@ -69,6 +69,8 @@ type clusterPlanBuilder struct {
 type clusterPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
+	cli      client.Client
+	transCtx *ClusterTransformContext
 }
 
 var _ graph.TransformContext = &ClusterTransformContext{}
@@ -152,6 +154,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	plan := &clusterPlan{
 		dag:      dag,
 		walkFunc: c.defaultWalkFunc,
+		cli:      c.cli,
+		transCtx: c.transCtx,
 	}
 	return plan, nil
 }
@@ -159,7 +163,20 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 // Plan implementation
 
 func (p *clusterPlan) Execute() error {
-	return p.dag.WalkReverseTopoOrder(p.walkFunc)
+	err := p.dag.WalkReverseTopoOrder(p.walkFunc)
+	if err != nil {
+		if hErr := p.handlePlanExecutionError(err); hErr != nil {
+			return hErr
+		}
+	}
+	return err
+}
+
+func (p *clusterPlan) handlePlanExecutionError(err error) error {
+	condition := newFailedApplyResourcesCondition(err.Error())
+	meta.SetStatusCondition(&p.transCtx.Cluster.Status.Conditions, condition)
+	p.transCtx.EventRecorder.Event(p.transCtx.Cluster, corev1.EventTypeWarning, condition.Reason, condition.Message)
+	return p.cli.Status().Patch(p.transCtx.Context, p.transCtx.Cluster, client.MergeFrom(p.transCtx.OrigCluster.DeepCopy()))
 }
 
 // Do the real works

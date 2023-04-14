@@ -32,7 +32,7 @@ type initTransformer struct {
 
 func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// put the cluster object first, it will be root vertex of DAG
-	rootVertex := &lifecycleVertex{obj: t.cluster, oriObj: t.originCluster}
+	rootVertex := &lifecycleVertex{obj: t.cluster, oriObj: t.originCluster, action: actionPtr(STATUS)}
 	dag.AddVertex(rootVertex)
 
 	if !isClusterDeleting(*t.cluster) {

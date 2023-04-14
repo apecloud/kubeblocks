@@ -37,7 +37,9 @@ func (t *ValidateRefResourcesTransformer) Transform(ctx graph.TransformContext, 
 	}
 
 	var err error
-	defer setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
+	defer func() {
+		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
+	}()
 
 	// validate cd & cv's existence
 	// if we can't get the referenced cd & cv, set provisioning condition failed, and jump to plan.Execute()

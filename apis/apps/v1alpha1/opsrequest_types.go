@@ -234,11 +234,20 @@ type RestoreFromSpec struct {
 	PointInTime *PointInTimeRefSpec `json:"pointInTime,omitempty"`
 }
 
+type RefNamespaceName struct {
+	// specified the name
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// specified the namespace
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
+
 type BackupRefSpec struct {
 	// specify a reference backup to restore
-	// example: my-namespace/my-backup-name
 	// +optional
-	Ref string `json:"ref,omitempty"`
+	Ref RefNamespaceName `json:"ref,omitempty"`
 }
 
 type PointInTimeRefSpec struct {
@@ -246,10 +255,9 @@ type PointInTimeRefSpec struct {
 	// +optional
 	Time *metav1.Time `json:"time,omitempty"`
 
-	// specify the source cluster name to restore
-	// example: my-namespace/source-cluster-name
+	// specify a reference source cluster to restore
 	// +optional
-	Ref string `json:"ref,omitempty"`
+	Ref RefNamespaceName `json:"ref,omitempty"`
 }
 
 // OpsRequestStatus defines the observed state of OpsRequest

@@ -232,18 +232,30 @@ spec:
                     items:
                       properties:
                         ref:
-                          description: 'specify a reference backup to restore example:
-                            my-namespace/my-backup-name'
-                          type: string
+                          description: specify a reference backup to restore
+                          properties:
+                            name:
+                              description: specified the name
+                              type: string
+                            namespace:
+                              description: specified the namespace
+                              type: string
+                          type: object
                       type: object
                     type: array
                   pointInTime:
                     description: specified the point in time to recovery
                     properties:
                       ref:
-                        description: 'specify the source cluster name to restore example:
-                          my-namespace/source-cluster-name'
-                        type: string
+                        description: specify a reference source cluster to restore
+                        properties:
+                          name:
+                            description: specified the name
+                            type: string
+                          namespace:
+                            description: specified the namespace
+                            type: string
+                        type: object
                       time:
                         description: specify the time point to restore, with UTC as
                           the time zone.

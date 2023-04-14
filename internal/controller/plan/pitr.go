@@ -46,9 +46,9 @@ import (
 // 1. get the latest base backup
 // 2. get the next earliest backup
 // 3. add log pvc by datasource volume snapshot
-// 3. update configuration
 // 4. create init container to prepare log
-// 5. end
+// 5. run recovery jobs
+// 6. cleanup
 type PointInTimeRecoveryManager struct {
 	client.Client
 	Ctx     context.Context
@@ -63,6 +63,127 @@ type PointInTimeRecoveryManager struct {
 const (
 	initContainerName = "pitr-for-pause"
 )
+
+// DoPITRPrepare prepares init container and pvc before point in time recovery
+func DoPITRPrepare(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
+	if cluster.Status.ObservedGeneration >= 1 {
+		return nil
+	}
+
+	// build pitr init container to wait prepare data
+	// prepare data if PITR needed
+	pitrMgr := PointInTimeRecoveryManager{
+		Cluster: cluster,
+		Client:  cli,
+		Ctx:     ctx,
+	}
+	return pitrMgr.doPrepare(component)
+}
+
+// DoPITRIfNeed checks if run restore job and copy data for point in time recovery
+func DoPITRIfNeed(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
+	if cluster.Status.ObservedGeneration != 1 {
+		return false, nil
+	}
+	pitrMgr := PointInTimeRecoveryManager{
+		Cluster: cluster,
+		Client:  cli,
+		Ctx:     ctx,
+	}
+	return pitrMgr.doRecoveryJob()
+}
+
+// DoPITRCleanup cleanup the resources and annotations after point in time recovery
+func DoPITRCleanup(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
+	if cluster.Status.ObservedGeneration < 1 {
+		return nil
+	}
+	pitrMgr := PointInTimeRecoveryManager{
+		Cluster: cluster,
+		Client:  cli,
+		Ctx:     ctx,
+	}
+	if need, err := pitrMgr.checkAndInit(); err != nil {
+		return err
+	} else if !need {
+		return nil
+	}
+	// clean up job
+	if err := pitrMgr.cleanupScriptsJob(); err != nil {
+		return err
+	}
+	// clean cluster annotations
+	if err := pitrMgr.cleanupClusterAnnotations(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// doRecoveryJob runs a physical recovery job before cluster service start
+func (p *PointInTimeRecoveryManager) doRecoveryJob() (shouldRequeue bool, err error) {
+	if need, err := p.checkAndInit(); err != nil {
+		return false, err
+	} else if !need {
+		return false, nil
+	}
+
+	// mount the data+log pvc, and run scripts job to prepare data
+	if err = p.runRecoveryJob(); err != nil {
+		if err.Error() == "waiting PVC Bound" {
+			return true, nil
+		}
+		return false, err
+	}
+
+	// check job done
+	if !p.ensureJobDone() {
+		return true, nil
+	}
+
+	// remove init container
+	for _, componentSpec := range p.Cluster.Spec.ComponentSpecs {
+		if err = p.removeStsInitContainer(p.Cluster, componentSpec.Name); err != nil {
+			return false, err
+		}
+	}
+
+	return false, nil
+
+}
+
+// doPrepare prepares init container and pvc before point in time recovery
+func (p *PointInTimeRecoveryManager) doPrepare(component *component.SynthesizedComponent) error {
+	if need, err := p.checkAndInit(); err != nil {
+		return err
+	} else if !need {
+		return nil
+	}
+	// prepare init container
+	container := corev1.Container{}
+	container.Name = initContainerName
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.Command = []string{"sleep", "infinity"}
+	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, container)
+
+	// prepare data pvc
+	if len(component.VolumeClaimTemplates) == 0 {
+		return errors.New("not found data pvc")
+	}
+	latestBackup, err := p.getLatestBaseBackup()
+	if err != nil {
+		return err
+	}
+
+	vct := component.VolumeClaimTemplates[0]
+	snapshotAPIGroup := snapshotv1.GroupName
+	vct.Spec.DataSource = &corev1.TypedLocalObjectReference{
+		APIGroup: &snapshotAPIGroup,
+		Kind:     constant.VolumeSnapshotKind,
+		Name:     latestBackup.Name,
+	}
+	component.VolumeClaimTemplates[0] = vct
+	return nil
+}
 
 func (p *PointInTimeRecoveryManager) listCompletedBackups() (backupItems []dpv1alpha1.Backup, err error) {
 	backups := dpv1alpha1.BackupList{}
@@ -84,7 +205,7 @@ func (p *PointInTimeRecoveryManager) listCompletedBackups() (backupItems []dpv1a
 	return backupItems, nil
 }
 
-// getSortedBackups sorted by BackupLog.StopTime
+// getSortedBackups sorts by StopTime
 func (p *PointInTimeRecoveryManager) getSortedBackups() ([]dpv1alpha1.Backup, error) {
 	backups, err := p.listCompletedBackups()
 	if err != nil {
@@ -105,7 +226,7 @@ func (p *PointInTimeRecoveryManager) getSortedBackups() ([]dpv1alpha1.Backup, er
 	return backups, nil
 }
 
-// getSortedBackups sorted by reverse StopTime
+// getReverseSortedBackups sorts by reverse StopTime
 func (p *PointInTimeRecoveryManager) getReverseSortedBackups() ([]dpv1alpha1.Backup, error) {
 	backups, err := p.listCompletedBackups()
 	if err != nil {
@@ -176,7 +297,7 @@ func (p *PointInTimeRecoveryManager) getNextBackup() (*dpv1alpha1.Backup, error)
 func (p *PointInTimeRecoveryManager) checkAndInit() (need bool, err error) {
 	// check args if pitr supported
 	cluster := p.Cluster
-	if cluster.Annotations == nil || cluster.Annotations[constant.RestoreFromTimeAnnotationKey] == "" {
+	if cluster.Annotations[constant.RestoreFromTimeAnnotationKey] == "" {
 		return false, nil
 	}
 	restoreTimeStr := cluster.Annotations[constant.RestoreFromTimeAnnotationKey]
@@ -207,6 +328,7 @@ func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) (string, string) {
 	dataVolumeMount := "/data"
 	logVolumeMount := "/log"
 	tag := 0
+	// TODO: hack it because the mount path is not explicitly specified in cluster definition
 	for _, env := range spec.Env {
 		if env.Name == "VOLUME_DATA_DIR" {
 			dataVolumeMount = env.Value
@@ -225,6 +347,7 @@ func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) (string, string) {
 func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupToolSpec, error) {
 	// get scripts from backup template
 	toolList := dpv1alpha1.BackupToolList{}
+	// TODO: The reference PITR backup tool needs a stronger reference relationship, for now use label references
 	if err := p.Client.List(p.Ctx, &toolList,
 		client.MatchingLabels{
 			constant.ClusterDefLabelKey:     p.Cluster.Spec.ClusterDefRef,
@@ -425,72 +548,6 @@ func (p *PointInTimeRecoveryManager) cleanupClusterAnnotations() error {
 	return nil
 }
 
-// DoRecoveryJob run a physical recovery job before cluster service start
-func (p *PointInTimeRecoveryManager) DoRecoveryJob() (shouldRequeue bool, err error) {
-	if need, err := p.checkAndInit(); err != nil {
-		return false, err
-	} else if !need {
-		return false, nil
-	}
-
-	// mount the data+log pvc, and run scripts job to prepare data
-	if err = p.runRecoveryJob(); err != nil {
-		if err.Error() == "waiting PVC Bound" {
-			return true, nil
-		}
-		return false, err
-	}
-
-	// check job done
-	if !p.ensureJobDone() {
-		return true, nil
-	}
-
-	// remove init container
-	for _, componentSpec := range p.Cluster.Spec.ComponentSpecs {
-		if err = p.removeStsInitContainer(p.Cluster, componentSpec.Name); err != nil {
-			return false, err
-		}
-	}
-
-	return false, nil
-
-}
-
-// DoPrepare prepare init container and pvc before point in time recovery
-func (p *PointInTimeRecoveryManager) DoPrepare(component *component.SynthesizedComponent) error {
-	if need, err := p.checkAndInit(); err != nil {
-		return err
-	} else if !need {
-		return nil
-	}
-	// prepare init container
-	container := corev1.Container{}
-	container.Name = initContainerName
-	container.Image = viper.GetString(constant.KBToolsImage)
-	container.Command = []string{"sleep", "infinity"}
-	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, container)
-
-	// prepare data pvc
-	if len(component.VolumeClaimTemplates) == 0 {
-		return errors.New("not found data pvc")
-	}
-	latestBackup, err := p.getLatestBaseBackup()
-	if err != nil {
-		return err
-	}
-
-	vct := component.VolumeClaimTemplates[0]
-	snapshotAPIGroup := snapshotv1.GroupName
-	vct.Spec.DataSource = &corev1.TypedLocalObjectReference{
-		APIGroup: &snapshotAPIGroup,
-		Kind:     constant.VolumeSnapshotKind,
-		Name:     latestBackup.Name,
-	}
-	component.VolumeClaimTemplates[0] = vct
-	return nil
-}
-
 // removeStsInitContainerForRestore removes the statefulSet's init container after recovery job completed.
 func (p *PointInTimeRecoveryManager) removeStsInitContainer(
 	cluster *appsv1alpha1.Cluster,
@@ -512,64 +569,6 @@ func (p *PointInTimeRecoveryManager) removeStsInitContainer(
 		if err := p.Client.Update(p.Ctx, &sts); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-// DoPITRPrepare prepare init container and pvc before point in time recovery
-func DoPITRPrepare(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
-	if cluster.Status.ObservedGeneration >= 1 {
-		return nil
-	}
-
-	// build pitr init container to wait prepare data
-	// prepare data if PITR needed
-	pitrMgr := PointInTimeRecoveryManager{
-		Cluster: cluster,
-		Client:  cli,
-		Ctx:     ctx,
-	}
-	if err := pitrMgr.DoPrepare(component); err != nil {
-		return err
-	}
-	return nil
-}
-
-// DoPITRIfNeed checks if run restore job and copy data for point in time recovery
-func DoPITRIfNeed(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
-	if cluster.Status.ObservedGeneration != 1 {
-		return false, nil
-	}
-	pitrMgr := PointInTimeRecoveryManager{
-		Cluster: cluster,
-		Client:  cli,
-		Ctx:     ctx,
-	}
-	return pitrMgr.DoRecoveryJob()
-}
-
-// DoPITRCleanup cleanup resource and config after point in time recovery
-func DoPITRCleanup(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
-	if cluster.Status.ObservedGeneration < 1 {
-		return nil
-	}
-	pitrMgr := PointInTimeRecoveryManager{
-		Cluster: cluster,
-		Client:  cli,
-		Ctx:     ctx,
-	}
-	if need, err := pitrMgr.checkAndInit(); err != nil {
-		return err
-	} else if !need {
-		return nil
-	}
-	// clean up job
-	if err := pitrMgr.cleanupScriptsJob(); err != nil {
-		return err
-	}
-	// clean cluster annotations
-	if err := pitrMgr.cleanupClusterAnnotations(); err != nil {
-		return err
 	}
 	return nil
 }

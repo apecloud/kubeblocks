@@ -53,12 +53,12 @@ type ClusterStatusTransformer struct {
 
 func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
+	origCluster := transCtx.OrigCluster
+	cluster := transCtx.Cluster
 	rootVertex, err := findRootVertex(dag)
 	if err != nil {
 		return err
 	}
-	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
 
 	updateObservedGeneration := func() {
 		cluster.Status.ObservedGeneration = cluster.Generation

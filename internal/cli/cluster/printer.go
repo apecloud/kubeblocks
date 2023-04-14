@@ -135,11 +135,10 @@ func AddLabelRow(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOp
 	c := objs.GetClusterInfo()
 	info := []interface{}{c.Name, c.Namespace}
 	if opt.ShowLabels {
-		labels := strings.Split(c.Labels, ",")
-		for _, label := range labels {
-			tbl.AddRow(append(info, label)...)
-		}
+		labels := strings.ReplaceAll(c.Labels, ",", "\n")
+		info = append(info, labels)
 	}
+	tbl.AddRow(info...)
 }
 
 func AddComponentRow(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions) {

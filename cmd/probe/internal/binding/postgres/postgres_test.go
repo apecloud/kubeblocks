@@ -194,10 +194,10 @@ func TestPostgresIntegration(t *testing.T) {
 }
 
 // SETUP TESTS, run as `postgre` to manage accounts
-// 1. exprot PGUSER=potgres
-// 2. exprot PGPASSWORD=<your-pg-password>
+// 1. export PGUSER=potgres
+// 2. export PGPASSWORD=<your-pg-password>
 // 4. export POSTGRES_TEST_CONN_URL="postgres://${PGUSER}:${PGPASSWORD}@localhost:5432/postgres"
-// 5. `go test -v -count=1 ./bindings/postgres -run ^TestPostgresIntegrationAccounts`
+// 5. `go test -v -count=1 ./cmd/probe/internal/binding/postgres -run ^TestPostgresIntegrationAccounts`
 func TestPostgresIntegrationAccounts(t *testing.T) {
 	url := os.Getenv("POSTGRES_TEST_CONN_URL")
 	if url == "" {
@@ -280,9 +280,16 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
-		req.Metadata["roleName"] = roleName
-		res, err = b.Invoke(ctx, req)
-		assertResponse(t, res, err, RespEveSucc)
+		for _, roleType := range []RoleType{ReadOnlyRole, ReadWriteRole, SuperUserRole} {
+			roleStr := (string)(roleType)
+			req.Metadata["roleName"] = roleStr
+			res, err = b.Invoke(ctx, req)
+			assertResponse(t, res, err, RespEveSucc)
+
+			req.Metadata["roleName"] = strings.ToUpper(roleStr)
+			res, err = b.Invoke(ctx, req)
+			assertResponse(t, res, err, RespEveSucc)
+		}
 
 		// revoke role
 		req = &bindings.InvokeRequest{
@@ -300,10 +307,16 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
-		req.Metadata["roleName"] = roleName
-		res, err = b.Invoke(ctx, req)
-		assertResponse(t, res, err, RespEveSucc)
+		for _, roleType := range []RoleType{ReadOnlyRole, ReadWriteRole, SuperUserRole} {
+			roleStr := (string)(roleType)
+			req.Metadata["roleName"] = roleStr
+			res, err = b.Invoke(ctx, req)
+			assertResponse(t, res, err, RespEveSucc)
 
+			req.Metadata["roleName"] = strings.ToUpper(roleStr)
+			res, err = b.Invoke(ctx, req)
+			assertResponse(t, res, err, RespEveSucc)
+		}
 		// delete user
 		req = &bindings.InvokeRequest{
 			Operation: DeleteUserOp,

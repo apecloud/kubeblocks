@@ -17,7 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -50,63 +49,58 @@ func (r *fillClass) Transform(dag *graph.DAG) error {
 
 func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, clusterDefinition appsv1alpha1.ClusterDefinition) error {
 	var (
-		value                 = cluster.GetAnnotations()[constant.ClassAnnotationKey]
-		componentClassMapping = make(map[string]string)
-		cmList                corev1.ConfigMapList
+		classDefinitionList appsv1alpha1.ComponentClassDefinitionList
 	)
-	if value != "" {
-		if err := json.Unmarshal([]byte(value), &componentClassMapping); err != nil {
-			return err
-		}
-	}
 
-	cmLabels := []client.ListOption{
+	ml := []client.ListOption{
 		client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefinition.Name},
-		client.HasLabels{constant.ClassProviderLabelKey},
 	}
-	if err := r.cli.List(reqCtx.Ctx, &cmList, cmLabels...); err != nil {
+	if err := r.cli.List(reqCtx.Ctx, &classDefinitionList, ml...); err != nil {
 		return err
 	}
-	compClasses, err := class.ParseClasses(&cmList)
+	compClasses, err := class.GetClasses(classDefinitionList)
 	if err != nil {
 		return err
 	}
 
-	var classFamilyList appsv1alpha1.ClassFamilyList
-	if err = r.cli.List(reqCtx.Ctx, &classFamilyList); err != nil {
+	var constraintList appsv1alpha1.ComponentResourceConstraintList
+	if err = r.cli.List(reqCtx.Ctx, &constraintList); err != nil {
 		return err
 	}
 
-	// TODO use this function to get matched class families if class is not specified and component has no classes
-	_ = func(comp appsv1alpha1.ClusterComponentSpec) *class.ComponentClass {
-		var candidates []class.ClassModelWithFamilyName
-		for _, family := range classFamilyList.Items {
-			models := family.FindMatchingModels(&comp.Resources)
-			for _, model := range models {
-				candidates = append(candidates, class.ClassModelWithFamilyName{Family: family.Name, Model: model})
+	// TODO use this function to get matched resource constraints if class is not specified and component has no classes
+	_ = func(comp appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.ComponentClassInstance {
+		var candidates []class.ConstraintWithName
+		for _, item := range constraintList.Items {
+			constraints := item.FindMatchingConstraints(&comp.Resources)
+			for _, constraint := range constraints {
+				candidates = append(candidates, class.ConstraintWithName{Name: item.Name, Constraint: constraint})
 			}
 		}
 		if len(candidates) == 0 {
 			return nil
 		}
-		sort.Sort(class.ByModelList(candidates))
+		sort.Sort(class.ByConstraintList(candidates))
 		candidate := candidates[0]
-		cpu, memory := class.GetMinCPUAndMemory(candidate.Model)
-		cls := &class.ComponentClass{
-			Name:   fmt.Sprintf("%s-%vc%vg", candidate.Family, cpu.AsDec().String(), memory.AsDec().String()),
-			CPU:    *cpu,
-			Memory: *memory,
+		cpu, memory := class.GetMinCPUAndMemory(candidate.Constraint)
+		name := fmt.Sprintf("%s-%vc%vg", candidate.Name, cpu.AsDec().String(), memory.AsDec().String())
+		cls := &appsv1alpha1.ComponentClassInstance{
+			ComponentClass: appsv1alpha1.ComponentClass{
+				Name:   name,
+				CPU:    *cpu,
+				Memory: *memory,
+			},
 		}
 		return cls
 	}
 
-	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*class.ComponentClass) *class.ComponentClass {
-		filters := class.Filters(make(map[string]resource.Quantity))
+	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*appsv1alpha1.ComponentClassInstance) *appsv1alpha1.ComponentClassInstance {
+		filters := make(map[corev1.ResourceName]resource.Quantity)
 		if !comp.Resources.Requests.Cpu().IsZero() {
-			filters[corev1.ResourceCPU.String()] = *comp.Resources.Requests.Cpu()
+			filters[corev1.ResourceCPU] = *comp.Resources.Requests.Cpu()
 		}
 		if !comp.Resources.Requests.Memory().IsZero() {
-			filters[corev1.ResourceMemory.String()] = *comp.Resources.Requests.Memory()
+			filters[corev1.ResourceMemory] = *comp.Resources.Requests.Memory()
 		}
 		return class.ChooseComponentClasses(classes, filters)
 	}
@@ -114,14 +108,13 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	for idx, comp := range cluster.Spec.ComponentSpecs {
 		classes := compClasses[comp.ComponentDefRef]
 
-		var cls *class.ComponentClass
-		className, ok := componentClassMapping[comp.Name]
-		// TODO another case if len(classFamilyList.Items) > 0, use matchClassFamilies to find matching class family:
+		var cls *appsv1alpha1.ComponentClassInstance
+		// TODO another case if len(constraintList.Items) > 0, use matchClassFamilies to find matching resource constraint:
 		switch {
-		case ok:
-			cls = classes[className]
+		case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
+			cls = classes[comp.ClassDefRef.Class]
 			if cls == nil {
-				return fmt.Errorf("unknown component class %s", className)
+				return fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
 			}
 		case classes != nil:
 			cls = matchComponentClass(comp, classes)
@@ -133,7 +126,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 			// TODO reconsider handling policy for this case
 			continue
 		}
-		componentClassMapping[comp.Name] = cls.Name
+		comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: cls.Name}
 		requests := corev1.ResourceList{
 			corev1.ResourceCPU:    cls.CPU,
 			corev1.ResourceMemory: cls.Memory,
@@ -152,17 +145,17 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	return nil
 }
 
-func buildVolumeClaimByClass(cls *class.ComponentClass) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
+func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
 	var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
-	for _, disk := range cls.Storage {
+	for _, volume := range cls.Volumes {
 		volume := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
-			Name: disk.Name,
+			Name: volume.Name,
 			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 				// TODO define access mode in class
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 				Resources: corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: disk.Size,
+						corev1.ResourceStorage: volume.Size,
 					},
 				},
 			},

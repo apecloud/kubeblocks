@@ -30,10 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -96,8 +93,8 @@ import (
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
 
-// classfamily get list
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=classfamilies,verbs=get;list;watch
+// componentresourceconstraint get list
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentresourceconstraints,verbs=get;list;watch
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
@@ -168,10 +165,6 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
 	}
-	b.Watches(&source.Kind{Type: &appsv1alpha1.ClassFamily{}},
-		&handler.EnqueueRequestForObject{},
-		builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool { return true })),
-	)
 	return b.Complete(r)
 }
 

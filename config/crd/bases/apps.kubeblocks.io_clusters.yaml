@@ -156,6 +156,19 @@ spec:
                           type: array
                           x-kubernetes-list-type: set
                       type: object
+                    classDefRef:
+                      description: classDefRef reference class defined in ComponentClassDefinition.
+                      properties:
+                        class:
+                          description: class refers to the name of the class that
+                            is defined in the ComponentClassDefinition.
+                          type: string
+                        name:
+                          description: name refers to the name of the ComponentClassDefinition.
+                          type: string
+                      required:
+                      - class
+                      type: object
                     componentDefRef:
                       description: componentDefRef reference componentDef defined
                         in ClusterDefinition spec.

@@ -25,15 +25,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-const classFamilyBytes = `
+const resourceConstraints = `
 # API scope: cluster
-# ClusterClassFamily
 apiVersion: "apps.kubeblocks.io/v1alpha1"
-kind:       "ClassFamily"
+kind:       "ComponentResourceConstraint"
 metadata:
-  name: kb-class-family-general
+  name: kb-resource-constraint-general
 spec:
-  models:
+  constraints:
   - cpu:
       min: 0.5
       max: 128
@@ -53,11 +52,11 @@ spec:
       maxPerCPU: 8Gi
 `
 
-func TestClassFamily_ValidateResourceRequirements(t *testing.T) {
-	var cf ClassFamily
-	err := yaml.Unmarshal([]byte(classFamilyBytes), &cf)
+func TestResourceConstraints_ValidateResourceRequirements(t *testing.T) {
+	var cf ComponentResourceConstraint
+	err := yaml.Unmarshal([]byte(resourceConstraints), &cf)
 	if err != nil {
-		panic("Failed to unmarshal class family: %v" + err.Error())
+		panic("Failed to unmarshal resource constraints: %v" + err.Error())
 	}
 	cases := []struct {
 		cpu    string
@@ -78,6 +77,6 @@ func TestClassFamily_ValidateResourceRequirements(t *testing.T) {
 				corev1.ResourceMemory: resource.MustParse(item.memory),
 			},
 		}
-		assert.Equal(t, item.expect, len(cf.FindMatchingModels(requirements)) > 0)
+		assert.Equal(t, item.expect, len(cf.FindMatchingConstraints(requirements)) > 0)
 	}
 }

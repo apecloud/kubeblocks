@@ -5,25 +5,26 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: classfamilies.apps.kubeblocks.io
+  name: componentresourceconstraints.apps.kubeblocks.io
 spec:
   group: apps.kubeblocks.io
   names:
     categories:
     - kubeblocks
     - all
-    kind: ClassFamily
-    listKind: ClassFamilyList
-    plural: classfamilies
+    kind: ComponentResourceConstraint
+    listKind: ComponentResourceConstraintList
+    plural: componentresourceconstraints
     shortNames:
-    - cf
-    singular: classfamily
+    - crc
+    singular: componentresourceconstraint
   scope: Cluster
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ClassFamily is the Schema for the classfamilies API
+        description: ComponentResourceConstraint is the Schema for the componentresourceconstraints
+          API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -38,11 +39,11 @@ spec:
           metadata:
             type: object
           spec:
-            description: ClassFamilySpec defines the desired state of ClassFamily
+            description: ComponentResourceConstraintSpec defines the desired state
+              of ComponentResourceConstraint
             properties:
-              models:
-                description: Class family models, generally, a model is a specific
-                  constraint for CPU, memory and their relation.
+              constraints:
+                description: Component resource constraints
                 items:
                   properties:
                     cpu:
@@ -133,6 +134,9 @@ spec:
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
                       type: object
+                  required:
+                  - cpu
+                  - memory
                   type: object
                 type: array
             type: object

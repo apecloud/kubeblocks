@@ -1,20 +1,20 @@
-# permissions for end users to edit classfamilies.
+# permissions for end users to edit componentclassdefinitions.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: classfamily-editor-role
+    app.kubernetes.io/instance: componentclassdefinition-editor-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: kubeblocks
     app.kubernetes.io/part-of: kubeblocks
     app.kubernetes.io/managed-by: kustomize
-  name: classfamily-editor-role
+  name: componentclassdefinition-editor-role
 rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
-  - classfamilies
+  - componentclassdefinitions
   verbs:
   - create
   - delete
@@ -26,6 +26,6 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
-  - classfamilies/status
+  - componentclassdefinitions/status
   verbs:
   - get

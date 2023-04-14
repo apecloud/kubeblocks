@@ -35,8 +35,8 @@ kbcli cluster create [CLUSTER_NAME] [flags]
   # Create a cluster and set cpu to 1 core, memory to 1Gi, storage size to 20Gi and replicas to 3
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1,memory=1Gi,storage=20Gi,replicas=3
   
-  # Create a cluster and set class to general-1c4g
-  kbcli cluster create myclsuter --cluster-definition apecloud-mysql --set class=general-1c4g
+  # Create a cluster and set the class to general-1c1g, valid classes can be found by executing the command "kbcli class list --cluster-definition=<cluster-definition-name>"
+  kbcli cluster create myclsuter --cluster-definition apecloud-mysql --set class=general-1c1g
   
   # Create a cluster with replicationSet workloadType and set switchPolicy to Noop
   kbcli cluster create myclsuter --cluster-definition postgresql --set switchPolicy=Noop
@@ -72,7 +72,7 @@ kbcli cluster create [CLUSTER_NAME] [flags]
       --monitor                      Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString   Node label selector (default [])
       --pod-anti-affinity string     Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
-      --set stringArray              Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi)
+      --set stringArray              Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
   -f, --set-file string              Use yaml file, URL, or stdin to set the cluster resource
       --tenancy string               Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")

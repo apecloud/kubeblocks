@@ -112,6 +112,10 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
+	// classDefRef reference class defined in ComponentClassDefinition.
+	// +optional
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
+
 	// monitor which is a switch to enable monitoring, default is false
 	// KubeBlocks provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
@@ -426,6 +430,16 @@ type ClusterComponentService struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type ClassDefRef struct {
+	// name refers to the name of the ComponentClassDefinition.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// class refers to the name of the class that is defined in the ComponentClassDefinition.
+	// +kubebuilder:validation:Required
+	Class string `json:"class"`
 }
 
 // +kubebuilder:object:root=true

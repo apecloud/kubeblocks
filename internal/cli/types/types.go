@@ -65,22 +65,24 @@ const (
 
 // Apps API group
 const (
-	AppsAPIGroup                     = "apps.kubeblocks.io"
-	AppsAPIVersion                   = "v1alpha1"
-	ResourceClusters                 = "clusters"
-	ResourceClusterDefs              = "clusterdefinitions"
-	ResourceClusterVersions          = "clusterversions"
-	ResourceOpsRequests              = "opsrequests"
-	ResourceConfigConstraintVersions = "configconstraints"
-	ResourceClassFamily              = "classfamilies"
-	KindCluster                      = "Cluster"
-	KindClusterDef                   = "ClusterDefinition"
-	KindClusterVersion               = "ClusterVersion"
-	KindConfigConstraint             = "ConfigConstraint"
-	KindBackup                       = "Backup"
-	KindRestoreJob                   = "RestoreJob"
-	KindBackupPolicy                 = "BackupPolicy"
-	KindOps                          = "OpsRequest"
+	AppsAPIGroup                        = "apps.kubeblocks.io"
+	AppsAPIVersion                      = "v1alpha1"
+	ResourceClusters                    = "clusters"
+	ResourceClusterDefs                 = "clusterdefinitions"
+	ResourceClusterVersions             = "clusterversions"
+	ResourceOpsRequests                 = "opsrequests"
+	ResourceConfigConstraintVersions    = "configconstraints"
+	ResourceComponentResourceConstraint = "componentresourceconstraints"
+	ResourceComponentClassDefinition    = "componentclassdefinitions"
+	KindCluster                         = "Cluster"
+	KindComponentClassDefinition        = "ComponentClassDefinition"
+	KindClusterDef                      = "ClusterDefinition"
+	KindClusterVersion                  = "ClusterVersion"
+	KindConfigConstraint                = "ConfigConstraint"
+	KindBackup                          = "Backup"
+	KindRestoreJob                      = "RestoreJob"
+	KindBackupPolicy                    = "BackupPolicy"
+	KindOps                             = "OpsRequest"
 )
 
 // K8S rbac API group
@@ -97,10 +99,8 @@ const (
 	ServiceHAVIPTypeAnnotationValue = "private-ip"
 	ServiceFloatingIPAnnotationKey  = "service.kubernetes.io/kubeblocks-havip-floating-ip"
 
-	ClassLevelLabelKey          = "class.kubeblocks.io/level"
-	ClassProviderLabelKey       = "class.kubeblocks.io/provider"
-	ClassFamilyProviderLabelKey = "classfamily.kubeblocks.io/provider"
-	ComponentClassAnnotationKey = "cluster.kubeblocks.io/component-class"
+	ClassProviderLabelKey              = "class.kubeblocks.io/provider"
+	ResourceConstraintProviderLabelKey = "resourceconstraint.kubeblocks.io/provider"
 )
 
 // DataProtection API group
@@ -217,8 +217,12 @@ func AddonGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: ExtensionsAPIGroup, Version: ExtensionsAPIVersion, Resource: ResourceAddons}
 }
 
-func ClassFamilyGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceClassFamily}
+func ComponentResourceConstraintGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceComponentResourceConstraint}
+}
+
+func ComponentClassDefinitionGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceComponentClassDefinition}
 }
 
 func CRDGVR() schema.GroupVersionResource {

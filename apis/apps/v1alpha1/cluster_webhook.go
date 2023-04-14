@@ -213,6 +213,10 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		componentMap[v.Name] = v
 	}
 
+	compClasses, err := getClasses(clusterDef.Name)
+	if err != nil {
+		return
+	}
 	for i, v := range r.Spec.ComponentSpecs {
 		if _, ok := componentDefMap[v.ComponentDefRef]; !ok {
 			invalidComponentDefs = append(invalidComponentDefs, v.ComponentDefRef)
@@ -220,6 +224,19 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 
 		componentNameMap[v.Name] = struct{}{}
 		r.validateComponentResources(allErrs, v.Resources, i)
+
+		if classes, ok := compClasses[v.ComponentDefRef]; ok {
+			if v.ClassDefRef.Class != "" {
+				if _, ok = classes[v.ClassDefRef.Class]; !ok {
+					*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].classDefRef", i)), v.ClassDefRef.Class, "can not find the specified class"))
+					return
+				}
+			}
+			if err = validateMatchingClass(classes, v.Resources); err != nil {
+				*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].resources", i)), v.Resources.String(), err.Error()))
+				return
+			}
+		}
 	}
 
 	r.validatePrimaryIndex(allErrs)
@@ -243,6 +260,7 @@ func (r *Cluster) validateComponentResources(allErrs *field.ErrorList, resources
 	if invalidValue, err := compareRequestsAndLimits(resources); err != nil {
 		*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].resources.requests", index)), invalidValue, err.Error()))
 	}
+
 }
 
 func (r *Cluster) validateComponentTLSSettings(allErrs *field.ErrorList) {

@@ -24,20 +24,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ClassFamilySpec defines the desired state of ClassFamily
-type ClassFamilySpec struct {
-	// Class family models, generally, a model is a specific constraint for CPU, memory and their relation.
-	Models []ClassFamilyModel `json:"models,omitempty"`
+// ComponentResourceConstraintSpec defines the desired state of ComponentResourceConstraint
+type ComponentResourceConstraintSpec struct {
+	// Component resource constraints
+	Constraints []ResourceConstraint `json:"constraints,omitempty"`
 }
 
-type ClassFamilyModel struct {
+type ResourceConstraint struct {
 	// The constraint for vcpu cores.
 	// +kubebuilder:validation:Required
-	CPU CPUConstraint `json:"cpu,omitempty"`
+	CPU CPUConstraint `json:"cpu"`
 
 	// The constraint for memory size.
 	// +kubebuilder:validation:Required
-	Memory MemoryConstraint `json:"memory,omitempty"`
+	Memory MemoryConstraint `json:"memory"`
 }
 
 type CPUConstraint struct {
@@ -92,34 +92,31 @@ type MemoryConstraint struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:categories={kubeblocks,all},scope=Cluster,shortName=cf
+// +kubebuilder:resource:categories={kubeblocks,all},scope=Cluster,shortName=crc
 
-// ClassFamily is the Schema for the classfamilies API
-type ClassFamily struct {
+// ComponentResourceConstraint is the Schema for the componentresourceconstraints API
+type ComponentResourceConstraint struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec ClassFamilySpec `json:"spec,omitempty"`
+	Spec ComponentResourceConstraintSpec `json:"spec,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ClassFamilyList contains a list of ClassFamily
-type ClassFamilyList struct {
+// ComponentResourceConstraintList contains a list of ComponentResourceConstraint
+type ComponentResourceConstraintList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClassFamily `json:"items"`
+	Items           []ComponentResourceConstraint `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ClassFamily{}, &ClassFamilyList{})
+	SchemeBuilder.Register(&ComponentResourceConstraint{}, &ComponentResourceConstraintList{})
 }
 
-// ValidateCPU validate if the CPU matches the class family model constraint
-func (m *ClassFamilyModel) ValidateCPU(cpu resource.Quantity) bool {
-	if m == nil {
-		return false
-	}
+// ValidateCPU validate if the CPU matches the resource constraints
+func (m ResourceConstraint) ValidateCPU(cpu resource.Quantity) bool {
 	if m.CPU.Min != nil && m.CPU.Min.Cmp(cpu) > 0 {
 		return false
 	}
@@ -132,12 +129,8 @@ func (m *ClassFamilyModel) ValidateCPU(cpu resource.Quantity) bool {
 	return true
 }
 
-// ValidateMemory validate if the memory matches the class family model constraint
-func (m *ClassFamilyModel) ValidateMemory(cpu *resource.Quantity, memory *resource.Quantity) bool {
-	if m == nil {
-		return false
-	}
-
+// ValidateMemory validate if the memory matches the resource constraints
+func (m ResourceConstraint) ValidateMemory(cpu *resource.Quantity, memory *resource.Quantity) bool {
 	if memory == nil {
 		return true
 	}
@@ -158,16 +151,12 @@ func (m *ClassFamilyModel) ValidateMemory(cpu *resource.Quantity, memory *resour
 	return true
 }
 
-// ValidateResourceRequirements validate if the resource matches the class family model constraints
-func (m *ClassFamilyModel) ValidateResourceRequirements(r *corev1.ResourceRequirements) bool {
+// ValidateResourceRequirements validate if the resource matches the resource constraints
+func (m ResourceConstraint) ValidateResourceRequirements(r *corev1.ResourceRequirements) bool {
 	var (
 		cpu    = r.Requests.Cpu()
 		memory = r.Requests.Memory()
 	)
-
-	if m == nil {
-		return false
-	}
 
 	if cpu.IsZero() && memory.IsZero() {
 		return true
@@ -184,16 +173,16 @@ func (m *ClassFamilyModel) ValidateResourceRequirements(r *corev1.ResourceRequir
 	return true
 }
 
-// FindMatchingModels find all class family models that resource matches
-func (c *ClassFamily) FindMatchingModels(r *corev1.ResourceRequirements) []ClassFamilyModel {
+// FindMatchingConstraints find all constraints that resource matches
+func (c *ComponentResourceConstraint) FindMatchingConstraints(r *corev1.ResourceRequirements) []ResourceConstraint {
 	if c == nil {
 		return nil
 	}
-	var models []ClassFamilyModel
-	for _, model := range c.Spec.Models {
-		if model.ValidateResourceRequirements(r) {
-			models = append(models, model)
+	var constraints []ResourceConstraint
+	for _, constraint := range c.Spec.Constraints {
+		if constraint.ValidateResourceRequirements(r) {
+			constraints = append(constraints, constraint)
 		}
 	}
-	return models
+	return constraints
 }

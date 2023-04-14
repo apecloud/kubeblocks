@@ -141,8 +141,6 @@ func isClusterUpdating(cluster appsv1alpha1.Cluster) bool {
 
 func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
 	return !isClusterDeleting(cluster) && !isClusterUpdating(cluster)
-	// return cluster.Status.ObservedGeneration == cluster.Generation &&
-	//	slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
 }
 
 func getBackupObjects(ctx context.Context,

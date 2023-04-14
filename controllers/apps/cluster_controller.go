@@ -158,6 +158,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.ClusterTransformer{Client: r.Client},
 			// tls certs secret
 			&lifecycle.TLSCertsTransformer{},
+			// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
+			&lifecycle.BackupPolicyTPLTransformer{},
 			// add our finalizer to all objects
 			&lifecycle.OwnershipTransformer{},
 			// make all workload objects depending on credential secret

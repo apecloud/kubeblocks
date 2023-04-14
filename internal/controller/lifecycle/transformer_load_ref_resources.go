@@ -39,9 +39,8 @@ func (t *LoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag 
 		Name:      cluster.Spec.ClusterDefRef}, cd); err != nil {
 		return err
 	}
-	var cv *appsv1alpha1.ClusterVersion
+	cv := &appsv1alpha1.ClusterVersion{}
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		cv = &appsv1alpha1.ClusterVersion{}
 		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Spec.ClusterVersionRef,

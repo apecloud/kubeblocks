@@ -17,13 +17,8 @@ limitations under the License.
 package lifecycle
 
 import (
-	"reflect"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
@@ -45,7 +40,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	// there is chance that objects leak occurs because of cache stale
 	// ignore the problem currently
 	// TODO: GC the leaked objects
-	snapshot, err := t.readCacheSnapshot(transCtx, *cluster)
+	snapshot, err := readCacheSnapshot(transCtx, *cluster)
 	if err != nil {
 		return err
 	}
@@ -62,38 +57,6 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrFastReturn
-}
-
-// TODO: @free6om dedup after model abstraction done
-// read all objects owned by our cluster
-func (t *ClusterDeletionTransformer) readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster) (clusterSnapshot, error) {
-	// list what kinds of object cluster owns
-	kinds := ownKinds()
-	snapshot := make(clusterSnapshot)
-	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
-	inNS := client.InNamespace(cluster.Namespace)
-	for _, list := range kinds {
-		if err := transCtx.Client.List(transCtx.Context, list, inNS, ml); err != nil {
-			return nil, err
-		}
-		// reflect get list.Items
-		items := reflect.ValueOf(list).Elem().FieldByName("Items")
-		l := items.Len()
-		for i := 0; i < l; i++ {
-			// get the underlying object
-			object := items.Index(i).Addr().Interface().(client.Object)
-			// put to snapshot if owned by our cluster
-			if isOwnerOf(&cluster, object, scheme) {
-				name, err := getGVKName(object, scheme)
-				if err != nil {
-					return nil, err
-				}
-				snapshot[*name] = object
-			}
-		}
-	}
-
-	return snapshot, nil
 }
 
 var _ graph.Transformer = &ClusterDeletionTransformer{}

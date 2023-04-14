@@ -38,7 +38,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
@@ -203,10 +202,6 @@ func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error
 		err = operation()
 	}
 	return err
-}
-
-func GenRequestID() string {
-	return uuid.New().String()
 }
 
 func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {

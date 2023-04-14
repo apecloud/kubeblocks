@@ -29,6 +29,9 @@ spec:
           templateRef: mongodb5.0-config-template
           namespace: {{ .Release.Namespace }}
           volumeName: mongodb-config
+          constraintRef: mongodb-config-constraints
+          keys:
+            - mongodb.conf
           defaultMode: 256
         - name: mongodb-metrics-config
           templateRef: mongodb-metrics-config

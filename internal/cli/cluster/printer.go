@@ -18,6 +18,7 @@ package cluster
 
 import (
 	"io"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -33,7 +34,7 @@ const (
 	PrintInstances  PrintType = "instances"
 	PrintComponents PrintType = "components"
 	PrintEvents     PrintType = "events"
-	PrintCustom     PrintType = "custom"
+	PrintLabels     PrintType = "label"
 )
 
 type PrinterOptions struct {
@@ -87,9 +88,9 @@ var mapTblInfo = map[PrintType]tblInfo{
 		addRow:     AddEventRow,
 		getOptions: GetOptions{WithClusterDef: true, WithPod: true, WithEvent: true},
 	},
-	PrintCustom: {
+	PrintLabels: {
 		header:     []interface{}{"NAME", "NAMESPACE"},
-		addRow:     AddCustomRow,
+		addRow:     AddLabelRow,
 		getOptions: GetOptions{},
 	},
 }
@@ -130,13 +131,15 @@ func (p *Printer) GetterOptions() GetOptions {
 	return p.getOptions
 }
 
-func AddCustomRow(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions) {
+func AddLabelRow(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions) {
 	c := objs.GetClusterInfo()
 	info := []interface{}{c.Name, c.Namespace}
 	if opt.ShowLabels {
-		info = append(info, c.Labels)
+		labels := strings.Split(c.Labels, ",")
+		for _, label := range labels {
+			tbl.AddRow(append(info, label)...)
+		}
 	}
-	tbl.AddRow(info...)
 }
 
 func AddComponentRow(tbl *printer.TablePrinter, objs *ClusterObjects, opt *PrinterOptions) {

@@ -256,7 +256,7 @@ func (o *LabelOptions) run() error {
 			ShowLabels: true,
 		}
 
-		p := cluster.NewPrinter(o.IOStreams.Out, cluster.PrintCustom, opt)
+		p := cluster.NewPrinter(o.IOStreams.Out, cluster.PrintLabels, opt)
 		for _, info := range infos {
 			if err = addRow(dynamic, client, info.Namespace, info.Name, p); err != nil {
 				return err

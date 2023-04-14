@@ -11,6 +11,9 @@ kbcli cluster label NAME [flags]
 ### Examples
 
 ```
+  # list label for clusters with specified name
+  kbcli cluster label mycluster --list
+  
   # add label 'env' and value 'dev' for clusters with specified name
   kbcli cluster label mycluster env=dev
   
@@ -24,7 +27,7 @@ kbcli cluster label NAME [flags]
   kbcli cluster label mycluster --overwrite env=test
   
   # delete label env for clusters with specified name
-  kbcli cluster label cluster1 env-
+  kbcli cluster label mycluster env-
 ```
 
 ### Options
@@ -33,6 +36,7 @@ kbcli cluster label NAME [flags]
       --all                            Select all cluster
       --dry-run string[="unchanged"]   Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
   -h, --help                           help for label
+      --list                           If true, display the labels of the clusters
       --overwrite                      If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.
   -l, --selector string                Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
 ```

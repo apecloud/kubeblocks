@@ -38,6 +38,9 @@ import (
 
 var (
 	labelExample = templates.Examples(`
+		# list label for clusters with specified name
+		kbcli cluster label mycluster --list
+
 		# add label 'env' and value 'dev' for clusters with specified name
 		kbcli cluster label mycluster env=dev
 
@@ -61,6 +64,7 @@ type LabelOptions struct {
 	// Common user flags
 	overwrite bool
 	all       bool
+	list      bool
 	selector  string
 
 	// results of arg parsing
@@ -102,6 +106,7 @@ func NewLabelCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 
 	cmd.Flags().BoolVar(&o.overwrite, "overwrite", o.overwrite, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
 	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all cluster")
+	cmd.Flags().BoolVar(&o.list, "list", o.list, "If true, display the labels of the clusters")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.selector)
 
@@ -150,13 +155,15 @@ func (o *LabelOptions) validate() error {
 		return fmt.Errorf("at least one cluster is required")
 	}
 
-	if len(o.newLabels) < 1 && len(o.removeLabels) < 1 {
+	if len(o.newLabels) < 1 && len(o.removeLabels) < 1 && !o.list {
 		return fmt.Errorf("at least one label update is required")
 	}
 	return nil
 }
 
 func (o *LabelOptions) run() error {
+	one := false
+
 	r := o.builder.
 		Unstructured().
 		NamespaceParam(o.namespace).DefaultNamespace().
@@ -165,7 +172,7 @@ func (o *LabelOptions) run() error {
 		ContinueOnError().
 		Latest().
 		Flatten().
-		Do()
+		Do().IntoSingleItemImplied(&one)
 
 	if err := r.Err(); err != nil {
 		return err
@@ -176,17 +183,19 @@ func (o *LabelOptions) run() error {
 			return err
 		}
 
+		var outputObj runtime.Object
 		obj := info.Object
 		oldData, err := json.Marshal(obj)
 		if err != nil {
 			return err
 		}
 
-		if o.dryRunStrategy == cmdutil.DryRunClient {
+		if o.dryRunStrategy == cmdutil.DryRunClient || o.list {
 			err = labelFunc(obj, o.overwrite, o.newLabels, o.removeLabels)
 			if err != nil {
 				return err
 			}
+			outputObj = info.Object
 		} else {
 			name, namespace := info.Name, info.Namespace
 			if err != nil {
@@ -198,7 +207,7 @@ func (o *LabelOptions) run() error {
 			}
 			for _, label := range o.removeLabels {
 				if _, ok := accessor.GetLabels()[label]; !ok {
-					fmt.Printf("label %q not found.\n", label)
+					fmt.Fprintf(o.Out, "label %q not found.\n", label)
 				}
 			}
 
@@ -220,12 +229,31 @@ func (o *LabelOptions) run() error {
 			helper := resource.NewHelper(client, mapping).
 				DryRun(o.dryRunStrategy == cmdutil.DryRunServer)
 			if createPatch {
-				_, err = helper.Patch(namespace, name, ktypes.MergePatchType, patchBytes, nil)
+				outputObj, err = helper.Patch(namespace, name, ktypes.MergePatchType, patchBytes, nil)
 			} else {
-				_, err = helper.Replace(namespace, name, false, obj)
+				outputObj, err = helper.Replace(namespace, name, false, obj)
 			}
 			if err != nil {
 				return err
+			}
+		}
+
+		if o.list {
+			accessor, err := meta.Accessor(outputObj)
+			if err != nil {
+				return err
+			}
+
+			indent := ""
+			if !one {
+				indent = " "
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(o.Out, "Listing labels for cluster:%s\n", info.Name)
+			}
+			for k, v := range accessor.GetLabels() {
+				fmt.Fprintf(o.Out, "%s%s=%s\n", indent, k, v)
 			}
 		}
 

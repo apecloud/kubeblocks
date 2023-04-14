@@ -100,20 +100,6 @@ spec:
               runAsUser: 0
             command:
               - /kb-scripts/setup.sh
-            readinessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 10
-              periodSeconds: 30
-              successThreshold: 1
-              timeoutSeconds: 5
-              exec:
-                command:
-                  - /bin/sh
-                  - -c
-                  - -ee
-                  - |
-                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
-                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm

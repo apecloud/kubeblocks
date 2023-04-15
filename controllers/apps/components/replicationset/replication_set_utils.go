@@ -285,40 +285,23 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 		return err
 	}
 	// pod is old primary and newRole is secondary, it means that the old primary needs to be changed to secondary,
-	// we do not deal with this situation because We will only change the old primary to secondary when the new primary changes from secondary to primary,
+	// we do not deal with this situation because only change the old primary to secondary when the new primary
+	// changes from secondary to primary,
 	// this is to avoid simultaneous occurrence of two primary or no primary at the same time
 	if oldPrimaryPod.Name == pod.Name {
-		reqCtx.Log.Info("pod is old primary and new role is secondary, do not deal with this situation", "podName", pod.Name, "newRole", newRole)
+		reqCtx.Log.Info("pod is old primary and new role is secondary, do not deal with this situation",
+			"podName", pod.Name, "newRole", newRole)
 		return nil
 	}
 
-	// pod is old secondary and newRole is primary
-	oldPrimarySts, err := util.GetPodOwnerReferencesSts(reqCtx.Ctx, cli, oldPrimaryPod)
-	if err != nil {
-		return err
-	}
 	// update old primary pod to secondary
 	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimaryPod, string(Secondary)); err != nil {
 		return err
 	}
-	// update old primary sts to secondary
-	if oldPrimarySts != nil {
-		if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimarySts, string(Secondary)); err != nil {
-			return err
-		}
-	}
 
-	newPrimarySts, err := util.GetPodOwnerReferencesSts(reqCtx.Ctx, cli, pod)
-	if err != nil {
-		return err
-	}
 	// update secondary pod to primary
 	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, string(Primary)); err != nil {
 		return err
-	}
-	// update secondary sts to primary
-	if newPrimarySts != nil {
-		return updateObjRoleLabel(reqCtx.Ctx, cli, *newPrimarySts, string(Primary))
 	}
 	return nil
 }

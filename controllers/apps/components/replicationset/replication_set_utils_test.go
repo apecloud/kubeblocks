@@ -22,7 +22,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -212,57 +211,46 @@ var _ = Describe("ReplicationSet Util", func() {
 			Image:           testapps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		stsList := make([]*appsv1.StatefulSet, 0)
-		secondaryName := clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-1"
-		for k, v := range map[string]string{
-			string(Primary):   clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-0",
-			string(Secondary): secondaryName,
-		} {
-			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
-				AddContainer(container).
-				AddAppInstanceLabel(clusterObj.Name).
-				AddAppComponentLabel(testapps.DefaultRedisCompName).
-				AddAppManangedByLabel().
-				AddRoleLabel(k).
-				SetReplicas(1).
-				Create(&testCtx).GetObject()
-			isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
-			if k == string(Primary) {
-				Expect(err).To(Succeed())
-				Expect(isStsPrimary).Should(BeTrue())
-			} else {
-				Expect(err).To(Succeed())
-				Expect(isStsPrimary).ShouldNot(BeTrue())
-			}
-			stsList = append(stsList, sts)
-		}
+		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+			clusterObj.Name+"-"+testapps.DefaultRedisCompName, clusterObj.Name, testapps.DefaultRedisCompName).
+			AddContainer(container).
+			AddAppInstanceLabel(clusterObj.Name).
+			AddAppComponentLabel(testapps.DefaultRedisCompName).
+			AddAppManangedByLabel().
+			SetReplicas(2).
+			Create(&testCtx).GetObject()
 
 		By("Creating Pods of replication workloadType.")
 		var (
-			primaryPod   *corev1.Pod
-			secondaryPod *corev1.Pod
+			primaryPod    *corev1.Pod
+			secondaryPods []*corev1.Pod
 		)
-		for _, sts := range stsList {
-			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+		for i := int32(0); i < *sts.Spec.Replicas; i++ {
+			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
 				AddContainer(container).
 				AddLabelsInMap(sts.Labels).
+				AddRoleLabel(DefaultRole(i)).
 				Create(&testCtx).GetObject()
-			if sts.Labels[constant.RoleLabelKey] == string(Primary) {
+			if pod.Labels[constant.RoleLabelKey] == string(Primary) {
 				primaryPod = pod
 			} else {
-				secondaryPod = pod
+				secondaryPods = append(secondaryPods, pod)
 			}
 		}
+		Expect(primaryPod).ShouldNot(BeNil())
+		Expect(secondaryPods).ShouldNot(BeEmpty())
+
 		By("Test update replicationSet pod role label with event driver, secondary change to primary.")
 		reqCtx := intctrlutil.RequestCtx{
 			Ctx: testCtx.Ctx,
 			Log: log.FromContext(ctx).WithValues("event", testCtx.DefaultNamespace),
 		}
-		err := HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName, secondaryPod, string(Primary))
-		Expect(err).Should(Succeed())
+		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName,
+			secondaryPods[0], string(Primary))).ShouldNot(HaveOccurred())
+
 		By("Test when secondary change to primary, the old primary label has been updated at the same time, so return nil directly.")
-		err = HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName, primaryPod, string(Secondary))
-		Expect(err).Should(BeNil())
+		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName,
+			primaryPod, string(Secondary))).ShouldNot(HaveOccurred())
 	}
 
 	// Scenarios

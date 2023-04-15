@@ -58,9 +58,9 @@ func newFailAnalyzeResult(titile string, outcome *troubleshoot.Outcome) *analyze
 func newWarnAnalyzeResult(titile string, outcome *troubleshoot.Outcome) *analyze.AnalyzeResult {
 	return &analyze.AnalyzeResult{
 		Title:   titile,
-		IsPass:  true,
-		Message: outcome.Fail.Message,
-		URI:     outcome.Fail.URI,
+		IsWarn:  true,
+		Message: outcome.Warn.Message,
+		URI:     outcome.Warn.URI,
 	}
 }
 
@@ -68,8 +68,8 @@ func newPassAnalyzeResult(titile string, outcome *troubleshoot.Outcome) *analyze
 	return &analyze.AnalyzeResult{
 		Title:   titile,
 		IsPass:  true,
-		Message: outcome.Fail.Message,
-		URI:     outcome.Fail.URI,
+		Message: outcome.Pass.Message,
+		URI:     outcome.Pass.URI,
 	}
 }
 

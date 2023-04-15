@@ -53,8 +53,8 @@ func mockClusterObject(clusterDefObj *appsv1alpha1.ClusterDefinition, renderedOp
 		factory.AddComponent(component.CharacterType+"-"+RandomString(3), component.Name)
 		factory.SetReplicas(renderedOpts.Replicas)
 		if renderedOpts.DataVolumeName != "" {
-			pvc := testapps.NewPVC("10Gi")
-			factory.AddVolumeClaimTemplate(renderedOpts.DataVolumeName, &pvc)
+			pvcSpec := testapps.NewPVCSpec("10Gi")
+			factory.AddVolumeClaimTemplate(renderedOpts.DataVolumeName, pvcSpec)
 		}
 		if renderedOpts.CPU != "" || renderedOpts.Memory != "" {
 			factory.SetResources(fromResource(renderedOpts))

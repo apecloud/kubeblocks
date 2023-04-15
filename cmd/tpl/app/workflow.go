@@ -98,7 +98,7 @@ func (w *templateRenderWorkflow) Do(outputDir string) error {
 
 func (w *templateRenderWorkflow) Prepare(ctx intctrlutil.RequestCtx, componentType string, cluster *appsv1alpha1.Cluster) (*component.SynthesizedComponent, error) {
 	clusterCompDef := w.clusterDefObj.GetComponentDefByName(componentType)
-	clusterCompSpecMap := cluster.GetDefNameMappingComponents()
+	clusterCompSpecMap := cluster.Spec.GetDefNameMappingComponents()
 	clusterCompSpec := clusterCompSpecMap[componentType]
 
 	if clusterCompDef == nil || len(clusterCompSpec) == 0 {
@@ -206,7 +206,7 @@ func checkAndFillPortProtocol(clusterDefComponents []appsv1alpha1.ClusterCompone
 }
 
 func renderTemplates(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir string, task *intctrltypes.ReconcileTask) error {
-	cfgName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, configSpec.VolumeName)
+	cfgName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, configSpec.Name)
 	output := filepath.Join(outputDir, cfgName)
 	log.Log.Info(fmt.Sprintf("dump rendering template spec: %s, output directory: %s", configSpec.Name, output))
 

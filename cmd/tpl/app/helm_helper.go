@@ -109,7 +109,7 @@ func createObjectsFromYaml(yamlBytes []byte) ([]client.Object, error) {
 			objects = append(objects, CreateTypedObjectFromYamlByte(doc, generics.ClusterDefinitionSignature))
 		case kindFromResource(appsv1alpha1.ClusterVersion{}):
 			objects = append(objects, CreateTypedObjectFromYamlByte(doc, generics.ClusterVersionSignature))
-		case kindFromResource(dataprotectionv1alpha1.BackupPolicyTemplate{}):
+		case kindFromResource(appsv1alpha1.BackupPolicyTemplate{}):
 			objects = append(objects, CreateTypedObjectFromYamlByte(doc, generics.BackupPolicyTemplateSignature))
 		case kindFromResource(dataprotectionv1alpha1.BackupTool{}):
 			objects = append(objects, CreateTypedObjectFromYamlByte(doc, generics.BackupToolSignature))

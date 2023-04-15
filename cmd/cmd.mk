@@ -31,23 +31,23 @@ reloader: test-go-generate build-checks ## Build reloader related binaries
 clean-reloader: ## Clean bin/reloader.
 	rm -f bin/reloader
 
-## ctool cmd
+## tpltool cmd
 
 CONFIG_TOOL_LD_FLAGS = "-s -w"
 
-bin/ctool.%: ## Cross build bin/ctool.$(OS).$(ARCH) .
+bin/tpltool.%: ## Cross build bin/tpltool.$(OS).$(ARCH) .
 	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CONFIG_TOOL_LD_FLAGS} -o $@ ./cmd/tpl/main.go
 
-.PHONY: ctool
-ctool: OS=$(shell $(GO) env GOOS)
-ctool: ARCH=$(shell $(GO) env GOARCH)
-ctool: build-checks ## Build ctool related binaries
-	$(MAKE) bin/ctool.${OS}.${ARCH}
-	mv bin/ctool.${OS}.${ARCH} bin/ctool
+.PHONY: tpltool
+tpltool: OS=$(shell $(GO) env GOOS)
+tpltool: ARCH=$(shell $(GO) env GOARCH)
+tpltool: build-checks ## Build tpltool related binaries
+	$(MAKE) bin/tpltool.${OS}.${ARCH}
+	mv bin/tpltool.${OS}.${ARCH} bin/tpltool
 
-.PHONY: clean-ctool
-clean-ctool: ## Clean bin/ctool.
-	rm -f bin/ctool
+.PHONY: clean-tpltool
+clean-tpltool: ## Clean bin/tpltool.
+	rm -f bin/tpltool
 
 ## cue-helper cmd
 

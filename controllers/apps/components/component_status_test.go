@@ -39,8 +39,8 @@ import (
 
 var _ = Describe("ComponentStatusSynchronizer", func() {
 	const (
-		compName = "comp"
-		compType = "comp"
+		compName    = "comp"
+		compDefName = "comp"
 	)
 
 	var (
@@ -85,11 +85,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, compType).
+				AddComponentDef(testapps.StatelessNginxComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(1).
 				GetObject()
 
@@ -198,11 +198,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, compType).
+				AddComponentDef(testapps.StatefulMySQLComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				GetObject()
 
@@ -324,11 +324,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ConsensusMySQLComponent, compType).
+				AddComponentDef(testapps.ConsensusMySQLComponent, compDefName).
 				Create(&testCtx).GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				Create(&testCtx).GetObject()
 
@@ -450,11 +450,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, compType).
+				AddComponentDef(testapps.ReplicationRedisComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(2).
 				GetObject()
 

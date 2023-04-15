@@ -44,9 +44,9 @@ var _ = Describe("Deployment Controller", func() {
 	)
 
 	const (
-		namespace         = "default"
-		statelessCompName = "stateless"
-		statelessCompType = "stateless"
+		namespace            = "default"
+		statelessCompName    = "stateless"
+		statelessCompDefName = "stateless"
 	)
 
 	cleanAll := func() {
@@ -74,11 +74,11 @@ var _ = Describe("Deployment Controller", func() {
 	Context("test controller", func() {
 		It("", func() {
 			testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, statelessCompType).
+				AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
 				Create(&testCtx).GetObject()
 
 			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(statelessCompName, statelessCompType).SetReplicas(2).Create(&testCtx).GetObject()
+				AddComponent(statelessCompName, statelessCompDefName).SetReplicas(2).Create(&testCtx).GetObject()
 
 			By("patch cluster to Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {

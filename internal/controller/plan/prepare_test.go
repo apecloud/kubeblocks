@@ -34,6 +34,15 @@ import (
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
+const (
+	mysqlCompDefName = "replicasets"
+	mysqlCompName    = "mysql"
+	nginxCompDefName = "nginx"
+	nginxCompName    = "nginx"
+	redisCompDefName = "replicasets"
+	redisCompName    = "redis"
+)
+
 var _ = Describe("Cluster Controller", func() {
 
 	cleanEnv := func() {
@@ -73,21 +82,17 @@ var _ = Describe("Cluster Controller", func() {
 	)
 
 	Context("with Deployment workload", func() {
-		const (
-			nginxCompType = "nginx"
-			nginxCompName = "nginx"
-		)
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(nginxCompType).
+				AddComponent(nginxCompDefName).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(nginxCompType, nginxCompName).
+				AddComponent(nginxCompDefName, nginxCompName).
 				GetObject()
 		})
 
@@ -116,22 +121,18 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	Context("with Stateful workload and without config template", func() {
-		const (
-			mysqlCompType = "replicasets"
-			mysqlCompName = "mysql"
-		)
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompType).
+				AddComponent(mysqlCompDefName).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
@@ -165,10 +166,6 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	Context("with Stateful workload and with config template", func() {
-		const (
-			mysqlCompType = "replicasets"
-			mysqlCompName = "mysql"
-		)
 		BeforeEach(func() {
 			cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
@@ -177,17 +174,17 @@ var _ = Describe("Cluster Controller", func() {
 				&appsv1alpha1.ConfigConstraint{})
 
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config").
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompType).
+				AddComponent(mysqlCompDefName).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
@@ -217,10 +214,6 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	Context("with Stateful workload and with config template and with config volume mount", func() {
-		const (
-			mysqlCompType = "replicasets"
-			mysqlCompName = "mysql"
-		)
 		BeforeEach(func() {
 			cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
@@ -229,12 +222,12 @@ var _ = Describe("Cluster Controller", func() {
 				&appsv1alpha1.ConfigConstraint{})
 
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config").
 				AddContainerVolumeMounts("mysql", []corev1.VolumeMount{{Name: "mysql-config", MountPath: "/mnt/config"}}).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompType).
+				AddComponent(mysqlCompDefName).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
@@ -278,12 +271,6 @@ var _ = Describe("Cluster Controller", func() {
 
 	// for test GetContainerWithVolumeMount
 	Context("with Consensus workload and with external service", func() {
-		const (
-			mysqlCompType = "replicasets"
-			mysqlCompName = "mysql"
-			nginxCompType = "proxy"
-		)
-
 		var (
 			clusterDef     *appsv1alpha1.ClusterDefinition
 			clusterVersion *appsv1alpha1.ClusterVersion
@@ -292,13 +279,13 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
-				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
+				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompType).
+				AddComponent(mysqlCompDefName).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				AddComponent(nginxCompType).
+				AddComponent(nginxCompDefName).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
@@ -335,12 +322,6 @@ var _ = Describe("Cluster Controller", func() {
 
 	// for test GetContainerWithVolumeMount
 	Context("with Replications workload without pvc", func() {
-		const (
-			redisCompType = "replicasets"
-			redisCompName = "redis"
-			nginxCompType = "proxy"
-		)
-
 		var (
 			clusterDef     *appsv1alpha1.ClusterDefinition
 			clusterVersion *appsv1alpha1.ClusterVersion
@@ -349,18 +330,18 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, redisCompType).
-				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+				AddComponentDef(testapps.ReplicationRedisComponent, redisCompDefName).
+				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(redisCompType).
+				AddComponent(redisCompDefName).
 				AddContainerShort("redis", testapps.DefaultRedisImageName).
-				AddComponent(nginxCompType).
+				AddComponent(nginxCompDefName).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(redisCompName, redisCompType).
+				AddComponent(redisCompName, redisCompDefName).
 				SetReplicas(2).
 				SetPrimaryIndex(0).
 				GetObject()
@@ -395,12 +376,6 @@ var _ = Describe("Cluster Controller", func() {
 
 	// for test GetContainerWithVolumeMount
 	Context("with Replications workload with pvc", func() {
-		const (
-			redisCompType = "replicasets"
-			redisCompName = "redis"
-			nginxCompType = "proxy"
-		)
-
 		var (
 			clusterDef     *appsv1alpha1.ClusterDefinition
 			clusterVersion *appsv1alpha1.ClusterVersion
@@ -409,13 +384,13 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, redisCompType).
-				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+				AddComponentDef(testapps.ReplicationRedisComponent, redisCompDefName).
+				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(redisCompType).
+				AddComponent(redisCompDefName).
 				AddContainerShort("redis", testapps.DefaultRedisImageName).
-				AddComponent(nginxCompType).
+				AddComponent(nginxCompDefName).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")

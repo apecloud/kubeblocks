@@ -45,8 +45,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
-
-	const mysqlCompType = "consensus"
+	const mysqlCompDefName = "consensus"
 	const mysqlCompName = "mysql"
 	const defaultMinReadySeconds = 10
 
@@ -127,7 +126,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			})()).ShouldNot(HaveOccurred())
 	}
 
-	testVerticalScaleCPUAndMemory := func(workloadType testapps.ComponentTplType) {
+	testVerticalScaleCPUAndMemory := func(workloadType testapps.ComponentDefTplType) {
 		const opsName = "mysql-verticalscaling"
 
 		By("Create a cluster obj")
@@ -143,7 +142,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(mysqlCompName, mysqlCompType).
+			AddComponent(mysqlCompName, mysqlCompDefName).
 			SetReplicas(1).
 			SetResources(resources).
 			Create(&testCtx).GetObject()
@@ -239,12 +238,12 @@ var _ = Describe("OpsRequest Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
@@ -257,7 +256,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
 				AddHorizontalScalePolicy(appsv1alpha1.HorizontalScalePolicy{
 					Type:                     appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
 					BackupPolicyTemplateName: backupPolicyTPLName,
@@ -265,7 +264,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
@@ -288,7 +287,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				SetReplicas(replicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).GetObject()
@@ -380,12 +379,12 @@ var _ = Describe("OpsRequest Controller", func() {
 			storageClassName := "standard"
 			testapps.CreateStorageClass(testCtx, storageClassName, true)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompType).
+				AddComponentDef(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompDefName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication workloadType.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(testapps.DefaultRedisCompType).AddContainerShort(testapps.DefaultRedisContainerName,
+				AddComponent(testapps.DefaultRedisCompDefName).AddContainerShort(testapps.DefaultRedisContainerName,
 				testapps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 
@@ -394,7 +393,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			pvcSpec.StorageClassName = &storageClassName
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
+				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).SetPrimaryIndex(0).
 				SetReplicas(testapps.DefaultReplicationReplicas).
 				Create(&testCtx).GetObject()

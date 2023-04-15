@@ -36,16 +36,11 @@ var _ = Describe("Reconfigure Controller", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const clusterName = "test-cluster"
-
-	const statefulCompType = "replicasets"
+	const statefulCompDefName = "replicasets"
 	const statefulCompName = "mysql"
-
 	const statefulSetName = "mysql-statefulset"
-
 	const configSpecName = "mysql-config-tpl"
-
 	const configVolumeName = "mysql-config"
-
 	const cmName = "mysql-tree-node-template-8.0"
 
 	var ctx = context.Background()
@@ -96,7 +91,7 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			By("Create a clusterDefinition obj")
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
@@ -104,7 +99,7 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).
+				AddComponent(statefulCompDefName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()
@@ -112,7 +107,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			By("Creating a cluster")
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponent(statefulCompName, statefulCompType).Create(&testCtx).GetObject()
+				AddComponent(statefulCompName, statefulCompDefName).Create(&testCtx).GetObject()
 
 			container := corev1.Container{
 				Name: "mock-container",

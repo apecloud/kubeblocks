@@ -146,20 +146,20 @@ func TestRenderJob(t *testing.T) {
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
 		clusterNamePrefix  = "test-cluster"
-		mysqlCompType      = "replicasets"
+		mysqlCompDefName   = "replicasets"
 		mysqlCompName      = "mysql"
 	)
 
 	systemAccount := mockSystemAccountsSpec()
 	clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-		AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+		AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 		AddSystemAccountSpec(systemAccount).
 		GetObject()
 	assert.NotNil(t, clusterDef)
 	assert.NotNil(t, clusterDef.Spec.ComponentDefs[0].SystemAccounts)
 
 	cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDef.Name, clusterVersionName).
-		AddComponent(mysqlCompType, mysqlCompName).GetObject()
+		AddComponent(mysqlCompDefName, mysqlCompName).GetObject()
 	assert.NotNil(t, cluster)
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string, 0)
@@ -306,20 +306,20 @@ func TestAccountDebugMode(t *testing.T) {
 
 func TestRenderCreationStmt(t *testing.T) {
 	var (
-		clusterDefName = "test-clusterdef"
-		clusterName    = "test-cluster"
-		mysqlCompType  = "replicasets"
-		mysqlCompName  = "mysql"
+		clusterDefName   = "test-clusterdef"
+		clusterName      = "test-cluster"
+		mysqlCompDefName = "replicasets"
+		mysqlCompName    = "mysql"
 	)
 
 	systemAccount := mockSystemAccountsSpec()
 	clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-		AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+		AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 		AddSystemAccountSpec(systemAccount).
 		GetObject()
 	assert.NotNil(t, clusterDef)
 
-	compDef := clusterDef.GetComponentDefByName(mysqlCompType)
+	compDef := clusterDef.GetComponentDefByName(mysqlCompDefName)
 	assert.NotNil(t, compDef.SystemAccounts)
 
 	accountsSetting := compDef.SystemAccounts

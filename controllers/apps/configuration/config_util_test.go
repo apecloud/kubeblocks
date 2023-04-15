@@ -38,11 +38,8 @@ import (
 var _ = Describe("ConfigWrapper util test", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
-
-	const statefulCompType = "replicasets"
-
+	const statefulCompDefName = "replicasets"
 	const configSpecName = "mysql-config-tpl"
-
 	const configVolumeName = "mysql-config"
 
 	var (
@@ -98,13 +95,13 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 			AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, configVolumeName).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
 		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(statefulCompType).
+			AddComponent(statefulCompDefName).
 			Create(&testCtx).GetObject()
 	})
 

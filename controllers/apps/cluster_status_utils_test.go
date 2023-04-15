@@ -61,36 +61,36 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	AfterEach(cleanEnv)
 
-	const statefulMySQLCompType = "stateful"
+	const statefulMySQLCompDefName = "stateful"
 	const statefulMySQLCompName = "mysql1"
 
-	const consensusMySQLCompType = "consensus"
+	const consensusMySQLCompDefName = "consensus"
 	const consensusMySQLCompName = "mysql2"
 
-	const nginxCompType = "stateless"
+	const statelessCompDefName = "stateless"
 	const nginxCompName = "nginx"
 
 	createClusterDef := func() {
 		_ = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, statefulMySQLCompType).
-			AddComponent(testapps.ConsensusMySQLComponent, consensusMySQLCompType).
-			AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+			AddComponentDef(testapps.StatefulMySQLComponent, statefulMySQLCompDefName).
+			AddComponentDef(testapps.ConsensusMySQLComponent, consensusMySQLCompDefName).
+			AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
 			Create(&testCtx)
 	}
 
 	createClusterVersion := func() {
 		_ = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(statefulMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-			AddComponent(consensusMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-			AddComponent(nginxCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
+			AddComponent(statefulMySQLCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			AddComponent(consensusMySQLCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			AddComponent(statelessCompDefName).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
 			Create(&testCtx)
 	}
 
 	createCluster := func() *appsv1alpha1.Cluster {
 		return testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-			AddComponent(statefulMySQLCompName, statefulMySQLCompType).SetReplicas(3).
-			AddComponent(consensusMySQLCompName, consensusMySQLCompType).SetReplicas(3).
-			AddComponent(nginxCompName, nginxCompType).SetReplicas(3).
+			AddComponent(statefulMySQLCompName, statefulMySQLCompDefName).SetReplicas(3).
+			AddComponent(consensusMySQLCompName, consensusMySQLCompDefName).SetReplicas(3).
+			AddComponent(nginxCompName, statelessCompDefName).SetReplicas(3).
 			Create(&testCtx).GetObject()
 	}
 
@@ -278,7 +278,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			By("test the cluster phase when cluster only contains a component of Stateful workload, and the component is Failed or Abnormal")
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(statefulMySQLCompName, statefulMySQLCompType).SetReplicas(3).GetObject()
+				AddComponent(statefulMySQLCompName, statefulMySQLCompDefName).SetReplicas(3).GetObject()
 			// mock Stateful component is Failed and expect cluster phase is FailedPhase
 			testHandleClusterPhaseWhenCompsNotReady(clusterObj, appsv1alpha1.FailedClusterCompPhase, appsv1alpha1.FailedClusterPhase)
 

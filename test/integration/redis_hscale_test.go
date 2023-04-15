@@ -91,7 +91,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
+			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
 			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 			SetReplicas(replicas).AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
@@ -191,7 +191,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			By("Create a clusterDefinition obj with replication workloadType.")
 			mode := int32(0755)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompType).
+				AddComponentDef(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompDefName).
 				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
 				AddConfigTemplate(primaryConfigName, primaryConfigName, "", testCtx.DefaultNamespace, string(replicationset.Primary)).
 				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", testCtx.DefaultNamespace, string(replicationset.Secondary)).
@@ -201,7 +201,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 			By("Create a clusterVersion obj with replication workloadType.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(testapps.DefaultRedisCompType).
+				AddComponent(testapps.DefaultRedisCompDefName).
 				AddInitContainerShort(testapps.DefaultRedisInitContainerName, testapps.DefaultRedisImageName).
 				AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()

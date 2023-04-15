@@ -39,15 +39,15 @@ import (
 var _ = Describe("SystemAccount Controller", func() {
 
 	const (
-		clusterDefName         = "test-clusterdef"
-		clusterVersionName     = "test-clusterversion"
-		clusterNamePrefix      = "test-cluster"
-		mysqlCompType          = "replicasets"
-		mysqlCompTypeWOSysAcct = "wo-sysacct"
-		mysqlCompName          = "mysql"
-		mysqlCompNameWOSysAcct = "wo-sysacct"
-		orphanFinalizerName    = "orphan"
-		clusterEndPointsSize   = 3
+		clusterDefName                = "test-clusterdef"
+		clusterVersionName            = "test-clusterversion"
+		clusterNamePrefix             = "test-cluster"
+		mysqlCompDefName              = "replicasets"
+		mysqlCompTypeWOSysAcctDefName = "wo-sysacct"
+		mysqlCompName                 = "mysql"
+		mysqlCompNameWOSysAcct        = "wo-sysacct"
+		orphanFinalizerName           = "orphan"
+		clusterEndPointsSize          = 3
 	)
 
 	/**
@@ -190,14 +190,14 @@ var _ = Describe("SystemAccount Controller", func() {
 		By("Create a clusterDefinition obj")
 		systemAccount := mockSystemAccountsSpec()
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 			AddSystemAccountSpec(systemAccount).
-			AddComponent(testapps.StatefulMySQLComponent, mysqlCompTypeWOSysAcct).
+			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompTypeWOSysAcctDefName).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
 		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+			AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 			AddComponent(mysqlCompNameWOSysAcct).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 			Create(&testCtx).GetObject()
 
@@ -285,12 +285,12 @@ var _ = Describe("SystemAccount Controller", func() {
 			mysqlTestCases = map[string]*sysAcctTestCase{
 				"wesql-no-accts": {
 					componentName:   mysqlCompNameWOSysAcct,
-					componentDefRef: mysqlCompTypeWOSysAcct,
+					componentDefRef: mysqlCompTypeWOSysAcctDefName,
 					accounts:        []appsv1alpha1.AccountName{},
 				},
 				"wesql-with-accts": {
 					componentName:   mysqlCompName,
-					componentDefRef: mysqlCompType,
+					componentDefRef: mysqlCompDefName,
 					accounts:        getAllSysAccounts(),
 				},
 			}
@@ -486,12 +486,12 @@ var _ = Describe("SystemAccount Controller", func() {
 			mysqlTestCases = map[string]*sysAcctTestCase{
 				"wesql-with-accts": {
 					componentName:   mysqlCompName,
-					componentDefRef: mysqlCompType,
+					componentDefRef: mysqlCompDefName,
 					accounts:        getAllSysAccounts(),
 				},
 				"wesql-with-accts-dup": {
 					componentName:   mysqlCompName,
-					componentDefRef: mysqlCompType,
+					componentDefRef: mysqlCompDefName,
 					accounts:        getAllSysAccounts(),
 				},
 			}
@@ -590,12 +590,12 @@ var _ = Describe("SystemAccount Controller", func() {
 			mysqlTestCases = map[string]*sysAcctTestCase{
 				"wesql-with-accts": {
 					componentName:   mysqlCompName,
-					componentDefRef: mysqlCompType,
+					componentDefRef: mysqlCompDefName,
 					accounts:        getAllSysAccounts(),
 				},
 				"wesql-with-accts-dup": {
 					componentName:   mysqlCompName,
-					componentDefRef: mysqlCompType,
+					componentDefRef: mysqlCompDefName,
 					accounts:        getAllSysAccounts(),
 				},
 			}

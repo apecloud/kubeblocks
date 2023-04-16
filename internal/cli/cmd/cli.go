@@ -19,11 +19,13 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
+	cmd2 "k8s.io/kubectl/pkg/cmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -41,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -48,6 +51,40 @@ import (
 const (
 	cliName = "kbcli"
 )
+
+func NewDefaultCliCmd() *cobra.Command {
+	cmd := NewCliCmd()
+
+	pluginHandler := cmd2.NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes)
+
+	if len(os.Args) > 1 {
+		cmdPathPieces := os.Args[1:]
+
+		// only look for suitable extension executables if
+		// the specified command does not already exist
+		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
+			var cmdName string
+			for _, arg := range cmdPathPieces {
+				if !strings.HasPrefix(arg, "-") {
+					cmdName = arg
+					break
+				}
+			}
+
+			switch cmdName {
+			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+				// Don't search for a plugin
+			default:
+				if err := cmd2.HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					os.Exit(1)
+				}
+			}
+		}
+	}
+
+	return cmd
+}
 
 func NewCliCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -104,6 +141,7 @@ A Command Line Interface for KubeBlocks`,
 		alert.NewAlertCmd(f, ioStreams),
 		addon.NewAddonCmd(f, ioStreams),
 		migration.NewMigrationCmd(f, ioStreams),
+		plugin.NewPluginCmd(ioStreams),
 	)
 
 	filters := []string{"options"}

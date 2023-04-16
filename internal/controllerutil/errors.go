@@ -42,8 +42,7 @@ const (
 
 	// ErrorTypeBackupNotCompleted is used to report backup not completed.
 	ErrorTypeBackupNotCompleted ErrorType = "BackupNotCompleted"
-	// ErrorTypeBackupPolicyFailed backup policy failed.
-	ErrorTypeBackupPolicyFailed = "BackupPolicyFailed"
+
 	// ErrorTypeNotFound not found any resource.
 	ErrorTypeNotFound = "NotFound"
 )

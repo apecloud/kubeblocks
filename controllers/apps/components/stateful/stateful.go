@@ -33,11 +33,11 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type Stateful types.ComponentBase
+type StatefulComponent types.ComponentBase
 
-var _ types.Component = &Stateful{}
+var _ types.Component = &StatefulComponent{}
 
-func (r *Stateful) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (r *StatefulComponent) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
@@ -49,7 +49,7 @@ func (r *Stateful) IsRunning(ctx context.Context, obj client.Object) (bool, erro
 	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
 }
 
-func (r *Stateful) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+func (r *StatefulComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
@@ -57,7 +57,7 @@ func (r *Stateful) PodsReady(ctx context.Context, obj client.Object) (bool, erro
 	return util.StatefulSetPodsAreReady(sts, r.Component.Replicas), nil
 }
 
-func (r *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (r *StatefulComponent) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if pod == nil {
 		return false
 	}
@@ -65,12 +65,12 @@ func (r *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 }
 
 // HandleProbeTimeoutWhenPodsReady the Stateful component has no role detection, empty implementation here.
-func (r *Stateful) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
+func (r *StatefulComponent) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
 	return false, nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
+func (r *StatefulComponent) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
@@ -86,7 +86,7 @@ func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName s
 		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil
 }
 
-func (r *Stateful) HandleUpdate(ctx context.Context, obj client.Object) error {
+func (r *StatefulComponent) HandleUpdate(ctx context.Context, obj client.Object) error {
 	return nil
 }
 
@@ -99,7 +99,7 @@ func NewStatefulComponent(
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
-	return &Stateful{
+	return &StatefulComponent{
 		Cli:          cli,
 		Cluster:      cluster,
 		Component:    component,

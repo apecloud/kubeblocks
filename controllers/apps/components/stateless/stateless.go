@@ -42,18 +42,18 @@ import (
 // is at least the minimum available pods that need to run for the deployment.
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
-type Stateless types.ComponentBase
+type StatelessComponent types.ComponentBase
 
-var _ types.Component = &Stateless{}
+var _ types.Component = &StatelessComponent{}
 
-func (stateless *Stateless) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (stateless *StatelessComponent) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if stateless == nil {
 		return false, nil
 	}
 	return stateless.PodsReady(ctx, obj)
 }
 
-func (stateless *Stateless) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+func (stateless *StatelessComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if stateless == nil {
 		return false, nil
 	}
@@ -64,7 +64,7 @@ func (stateless *Stateless) PodsReady(ctx context.Context, obj client.Object) (b
 	return deploymentIsReady(deploy, &stateless.Component.Replicas), nil
 }
 
-func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (stateless *StatelessComponent) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if stateless == nil || pod == nil {
 		return false
 	}
@@ -72,13 +72,13 @@ func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int3
 }
 
 // HandleProbeTimeoutWhenPodsReady the stateless component has no role detection, empty implementation here.
-func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(ctx context.Context,
+func (stateless *StatelessComponent) HandleProbeTimeoutWhenPodsReady(ctx context.Context,
 	recorder record.EventRecorder) (bool, error) {
 	return false, nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
+func (stateless *StatelessComponent) GetPhaseWhenPodsNotReady(ctx context.Context,
 	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	deployList := &appsv1.DeploymentList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, stateless.Cli, *stateless.Cluster, componentName, deployList)
@@ -95,7 +95,7 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil
 }
 
-func (stateless *Stateless) HandleUpdate(ctx context.Context, obj client.Object) error {
+func (stateless *StatelessComponent) HandleUpdate(ctx context.Context, obj client.Object) error {
 	return nil
 }
 
@@ -107,7 +107,7 @@ func NewStatelessComponent(
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
-	return &Stateless{
+	return &StatelessComponent{
 		Cli:          cli,
 		Cluster:      cluster,
 		Component:    component,

@@ -233,7 +233,7 @@ var _ = Describe("Cluster Controller", func() {
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
@@ -291,7 +291,7 @@ var _ = Describe("Cluster Controller", func() {
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
@@ -396,7 +396,7 @@ var _ = Describe("Cluster Controller", func() {
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(redisCompName, redisCompType).
+				AddComponent(redisCompName, redisCompDefName).
 				SetReplicas(2).
 				SetPrimaryIndex(0).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).

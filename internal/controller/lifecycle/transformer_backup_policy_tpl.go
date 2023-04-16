@@ -74,7 +74,7 @@ func (r *backupPolicyTPLTransformer) transformBackupPolicy(policyTPL appsv1alpha
 	cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
 	tplName string) *dataprotectionv1alpha1.BackupPolicy {
-	backupPolicyName := GenerateBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef)
+	backupPolicyName := DeriveBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef)
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
 	if err := r.cli.Get(r.ctx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: backupPolicyName}, backupPolicy); err != nil && !apierrors.IsNotFound(err) {
 		return nil
@@ -158,7 +158,7 @@ func (r *backupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 	tplName string) *dataprotectionv1alpha1.BackupPolicy {
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      GenerateBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef),
+			Name:      DeriveBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef),
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
 				constant.AppInstanceLabelKey:          cluster.Name,
@@ -312,7 +312,7 @@ func (r *backupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.Common
 	}
 }
 
-// GenerateBackupPolicyName generates the backup policy name which is created from backup policy template.
-func GenerateBackupPolicyName(clusterName, componentDef string) string {
+// DeriveBackupPolicyName generates the backup policy name which is created from backup policy template.
+func DeriveBackupPolicyName(clusterName, componentDef string) string {
 	return fmt.Sprintf("%s-%s-backup-policy", clusterName, componentDef)
 }

@@ -599,26 +599,73 @@ var _ = Describe("Cluster Controller", func() {
 		}).Should(BeEquivalentTo(updatedReplicas))
 	}
 
-	horizontalScale := func(updatedReplicas int) {
-
+	// @argument componentDefsWithHScalePolicy assign ClusterDefinition.spec.componentDefs[].horizontalScalePolicy for
+	// the matching names. If not provided, will set 1st ClusterDefinition.spec.componentDefs[0].horizontalScalePolicy.
+	horizontalScale := func(updatedReplicas int, componentDefsWithHScalePolicy ...string) {
 		viper.Set("VOLUMESNAPSHOT", true)
-
 		cluster := &appsv1alpha1.Cluster{}
 		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
 		initialGeneration := int(cluster.Status.ObservedGeneration)
 
-		By("Checking backup policy created from backup policy template")
-		policyName := lifecycle.GenerateBackupPolicyName(clusterKey.Name, replicationCompDefName)
-		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
-			&dataprotectionv1alpha1.BackupPolicy{}, true)).Should(Succeed())
+		// REVIEW/TODO: (chantu)
+		// ought to have HorizontalScalePolicy setup during ClusterDefinition object creation,
+		// following implementation is rather hack-ish.
 
 		By("Set HorizontalScalePolicy")
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 			func(clusterDef *appsv1alpha1.ClusterDefinition) {
-				clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
-					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
-						BackupPolicyTemplateName: backupPolicyTPLName}
+				// assign 1st component
+				if len(componentDefsWithHScalePolicy) == 0 && len(clusterDef.Spec.ComponentDefs) > 0 {
+					componentDefsWithHScalePolicy = []string{
+						clusterDef.Spec.ComponentDefs[0].Name,
+					}
+				}
+				for i, compDef := range clusterDef.Spec.ComponentDefs {
+					if !slices.Contains(componentDefsWithHScalePolicy, compDef.Name) {
+						continue
+					}
+
+					By("Checking backup policy created from backup policy template")
+					policyName := lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDef.Name)
+					// REVIEW/TODO: (chantu)
+					//  caught following error, it appears that BackupPolicy is statically setup or only work with 1st
+					//  componentDefs?
+					//
+					//       Unexpected error:
+					//          <*errors.StatusError | 0x140023b5b80>: {
+					//              ErrStatus: {
+					//                  TypeMeta: {Kind: "", APIVersion: ""},
+					//                  ListMeta: {
+					//                      SelfLink: "",
+					//                      ResourceVersion: "",
+					//                      Continue: "",
+					//                      RemainingItemCount: nil,
+					//                  },
+					//                  Status: "Failure",
+					//                  Message: "backuppolicies.dataprotection.kubeblocks.io \"test-clusterstqcba-consensus-backup-policy\" not found",
+					//                  Reason: "NotFound",
+					//                  Details: {
+					//                      Name: "test-clusterstqcba-consensus-backup-policy",
+					//                      Group: "dataprotection.kubeblocks.io",
+					//                      Kind: "backuppolicies",
+					//                      UID: "",
+					//                      Causes: nil,
+					//                      RetryAfterSeconds: 0,
+					//                  },
+					//                  Code: 404,
+					//              },
+					//          }
+					//          backuppolicies.dataprotection.kubeblocks.io "test-clusterstqcba-consensus-backup-policy" not found
+					//      occurred
+					Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
+						&dataprotectionv1alpha1.BackupPolicy{}, true)).Should(Succeed())
+
+					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
+						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
+							BackupPolicyTemplateName: backupPolicyTPLName}
+				}
 			})()).ShouldNot(HaveOccurred())
+		//
 
 		By("Mocking all components' PVCs to bound")
 		for _, comp := range clusterObj.Spec.ComponentSpecs {
@@ -628,7 +675,10 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      getPVCName(comp.Name, i),
 				}
 				createPVC(clusterKey.Name, pvcKey.Name, comp.Name)
-				Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, pvcKey,
+					&corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+				// REVIEW/TODO: (chantu)
+				//  why using Eventually for change object status?
 				Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 					pvc.Status.Phase = corev1.ClaimBound
 				})).Should(Succeed())
@@ -639,9 +689,11 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("Checking cluster status and the number of replicas changed")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initialGeneration + len(clusterObj.Spec.ComponentSpecs)))
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).
+			Should(BeEquivalentTo(initialGeneration + len(clusterObj.Spec.ComponentSpecs)))
 		for i := range clusterObj.Spec.ComponentSpecs {
-			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj),
+				clusterObj.Spec.ComponentSpecs[i].Name)
 			for _, v := range stsList.Items {
 				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
 					testk8s.MockStatefulSetReady(&v)
@@ -694,8 +746,11 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, statefulCompName, consensusCompName, replicationCompName)
 
-		// REVIEW: this test flow, wait for running phase?
-		horizontalScale(int(updatedReplicas))
+		// REVIEW: (chantu)
+		//  1. this test flow, wait for running phase?
+		//  2. following horizontalScale only work with statefulCompDefName?
+		// horizontalScale(int(updatedReplicas), statefulCompDefName, consensusCompDefName, replicationCompDefName)
+		horizontalScale(int(updatedReplicas), statefulCompDefName)
 	}
 
 	testVerticalScale := func() {
@@ -1092,7 +1147,7 @@ var _ = Describe("Cluster Controller", func() {
 				},
 			},
 			Spec: dataprotectionv1alpha1.BackupSpec{
-				BackupPolicyName: lifecycle.GenerateBackupPolicyName(clusterKey.Name, replicationCompDefName),
+				BackupPolicyName: lifecycle.DeriveBackupPolicyName(clusterKey.Name, replicationCompDefName),
 				BackupType:       "snapshot",
 			},
 		}
@@ -1196,7 +1251,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	Context("when creating cluster with workloadType=stateful component", func() {
+	When("when creating cluster with workloadType=stateful component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -1261,7 +1316,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	Context("when creating cluster with workloadType=consensus component", func() {
+	When("when creating cluster with workloadType=consensus component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDef obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -1383,7 +1438,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	Context("when creating cluster with workloadType=replication component", func() {
+	When("when creating cluster with workloadType=replication component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj with replication componentDefRef.")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).

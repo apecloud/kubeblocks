@@ -59,13 +59,13 @@ func NewComponentByType(
 	}
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
-		return consensusset.NewConsensusSet(cli, cluster, component, componentDef)
+		return consensusset.NewConsensusComponent(cli, cluster, component, componentDef)
 	case appsv1alpha1.Replication:
-		return replicationset.NewReplicationSet(cli, cluster, component, componentDef)
+		return replicationset.NewReplicationComponent(cli, cluster, component, componentDef)
 	case appsv1alpha1.Stateful:
-		return stateful.NewStateful(cli, cluster, component, componentDef)
+		return stateful.NewStatefulComponent(cli, cluster, component, componentDef)
 	case appsv1alpha1.Stateless:
-		return stateless.NewStateless(cli, cluster, component, componentDef)
+		return stateless.NewStatelessComponent(cli, cluster, component, componentDef)
 	default:
 		panic("unknown workload type")
 	}

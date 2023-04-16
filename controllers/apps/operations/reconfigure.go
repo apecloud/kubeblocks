@@ -94,21 +94,21 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 	switch phase {
 	case appsv1alpha1.OpsSucceedPhase:
 		// only update the condition of the opsRequest.
-		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureSucceed,
 				eventContext.ConfigSpecName,
 				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			appsv1alpha1.NewSucceedCondition(opsRequest))
 	case appsv1alpha1.OpsFailedPhase:
-		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureFailed,
 				eventContext.ConfigSpecName,
 				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			appsv1alpha1.NewReconfigureFailedCondition(opsRequest, cfgError))
 	default:
-		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureRunning,
 				eventContext.ConfigSpecName))

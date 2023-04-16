@@ -38,13 +38,13 @@ import (
 
 var _ = Describe("TLS self-signed cert function", func() {
 	const (
-		clusterDefName     = "test-clusterdef-tls"
-		clusterVersionName = "test-clusterversion-tls"
-		clusterNamePrefix  = "test-cluster"
-		statefulCompType   = "replicasets"
-		statefulCompName   = "mysql"
-		mysqlContainerName = "mysql"
-		configSpecName     = "mysql-config-tpl"
+		clusterDefName      = "test-clusterdef-tls"
+		clusterVersionName  = "test-clusterversion-tls"
+		clusterNamePrefix   = "test-cluster"
+		statefulCompDefName = "replicasets"
+		statefulCompName    = "mysql"
+		mysqlContainerName  = "mysql"
+		configSpecName      = "mysql-config-tpl"
 	)
 
 	ctx := context.Background()
@@ -89,14 +89,14 @@ var _ = Describe("TLS self-signed cert function", func() {
 			By("Create a clusterDef obj")
 			testapps.NewClusterDefFactory(clusterDefName).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
-				AddComponent(testapps.ConsensusMySQLComponent, statefulCompType).
+				AddComponentDef(testapps.ConsensusMySQLComponent, statefulCompDefName).
 				AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				CheckedCreate(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(statefulCompType).AddContainerShort(mysqlContainerName, testapps.ApeCloudMySQLImage).
+				AddComponent(statefulCompDefName).AddContainerShort(mysqlContainerName, testapps.ApeCloudMySQLImage).
 				CheckedCreate(&testCtx).GetObject()
 
 		})
@@ -124,7 +124,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 		// 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace,
 		// 			clusterNamePrefix, clusterDefName, clusterVersionName).
 		// 			WithRandomName().
-		// 			AddComponent(statefulCompName, statefulCompType).
+		// 			AddComponentDef(statefulCompName, statefulCompDefName).
 		// 			SetReplicas(3).
 		// 			SetTLS(true).
 		// 			SetIssuer(tlsIssuer).
@@ -230,7 +230,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				By("create cluster obj")
 				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
-					AddComponent(statefulCompName, statefulCompType).
+					AddComponent(statefulCompName, statefulCompDefName).
 					SetReplicas(3).
 					SetTLS(true).
 					SetIssuer(tlsIssuer).
@@ -258,7 +258,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 			// 	By("create cluster obj")
 			// 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 			// 		WithRandomName().
-			// 		AddComponent(statefulCompName, statefulCompType).
+			// 		AddComponentDef(statefulCompName, statefulCompDefName).
 			// 		SetReplicas(3).
 			// 		SetTLS(true).
 			// 		SetIssuer(tlsIssuer).
@@ -281,7 +281,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				By("create cluster with tls disabled")
 				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
-					AddComponent(statefulCompName, statefulCompType).
+					AddComponent(statefulCompName, statefulCompDefName).
 					SetReplicas(3).
 					SetTLS(false).
 					Create(&testCtx).

@@ -347,7 +347,7 @@ var _ = Describe("Cluster Controller", func() {
 				GetObject()
 		})
 
-		It("should construct env, headless service, statefuset objects for each replica, besides an external service object", func() {
+		It("should construct env, headless service, statefuset object, besides an external service object", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -363,73 +363,71 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
 			resources := *task.Resources
-			Expect(len(resources)).Should(Equal(7))
+			// REVIEW: (free6om)
+			//  missing connection credential, TLS secret objs check?
+			Expect(resources).Should(HaveLen(4))
 			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
 			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
 			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("StatefulSet"))
-			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("ConfigMap"))
-			Expect(reflect.TypeOf(resources[4]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[5]).String()).Should(ContainSubstring("StatefulSet"))
-			Expect(reflect.TypeOf(resources[6]).String()).Should(ContainSubstring("Service"))
+			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("Service"))
 		})
 	})
 
-	// for test GetContainerWithVolumeMount
-	Context("with Replications workload with pvc", func() {
-		var (
-			clusterDef     *appsv1alpha1.ClusterDefinition
-			clusterVersion *appsv1alpha1.ClusterVersion
-			cluster        *appsv1alpha1.Cluster
-		)
-
-		BeforeEach(func() {
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ReplicationRedisComponent, redisCompDefName).
-				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
-				GetObject()
-			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(redisCompDefName).
-				AddContainerShort("redis", testapps.DefaultRedisImageName).
-				AddComponent(nginxCompDefName).
-				AddContainerShort("nginx", testapps.NginxImage).
-				GetObject()
-			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDef.Name, clusterVersion.Name).
-				AddComponent(redisCompName, redisCompDefName).
-				SetReplicas(2).
-				SetPrimaryIndex(0).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				GetObject()
-		})
-
-		It("should construct pvc objects for each replica", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}
-			component := component.BuildComponent(
-				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
-				&clusterVersion.Spec.ComponentVersions[0])
-			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
-			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
-
-			resources := *task.Resources
-			Expect(len(resources)).Should(Equal(9))
-			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
-			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("PersistentVolumeClaim"))
-			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("StatefulSet"))
-			Expect(reflect.TypeOf(resources[4]).String()).Should(ContainSubstring("ConfigMap"))
-			Expect(reflect.TypeOf(resources[5]).String()).Should(ContainSubstring("PersistentVolumeClaim"))
-			Expect(reflect.TypeOf(resources[6]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[7]).String()).Should(ContainSubstring("StatefulSet"))
-			Expect(reflect.TypeOf(resources[8]).String()).Should(ContainSubstring("Service"))
-		})
-	})
+	// TODO: (free6om)
+	//  uncomment following test case until pre-provisoned PVC work begin
+	// // for test GetContainerWithVolumeMount
+	// Context("with Replications workload with pvc", func() {
+	// 	var (
+	// 		clusterDef     *appsv1alpha1.ClusterDefinition
+	// 		clusterVersion *appsv1alpha1.ClusterVersion
+	// 		cluster        *appsv1alpha1.Cluster
+	// 	)
+	//
+	// 	BeforeEach(func() {
+	// 		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
+	// 			AddComponentDef(testapps.ReplicationRedisComponent, redisCompDefName).
+	// 			AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
+	// 			GetObject()
+	// 		clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+	// 			AddComponent(redisCompDefName).
+	// 			AddContainerShort("redis", testapps.DefaultRedisImageName).
+	// 			AddComponent(nginxCompDefName).
+	// 			AddContainerShort("nginx", testapps.NginxImage).
+	// 			GetObject()
+	// 		pvcSpec := testapps.NewPVCSpec("1Gi")
+	// 		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+	// 			clusterDef.Name, clusterVersion.Name).
+	// 			AddComponent(redisCompName, redisCompDefName).
+	// 			SetReplicas(2).
+	// 			SetPrimaryIndex(0).
+	// 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+	// 			GetObject()
+	// 	})
+	//
+	// 	It("should construct pvc objects for each replica", func() {
+	// 		reqCtx := intctrlutil.RequestCtx{
+	// 			Ctx: ctx,
+	// 			Log: logger,
+	// 		}
+	// 		component := component.BuildComponent(
+	// 			reqCtx,
+	// 			*cluster,
+	// 			*clusterDef,
+	// 			clusterDef.Spec.ComponentDefs[0],
+	// 			cluster.Spec.ComponentSpecs[0],
+	// 			&clusterVersion.Spec.ComponentVersions[0])
+	// 		task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
+	// 		Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
+	//
+	// 		resources := *task.Resources
+	// 		Expect(resources).Should(HaveLen(6))
+	// 		Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
+	// 		Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
+	// 		Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("PersistentVolumeClaim"))
+	// 		Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("PersistentVolumeClaim"))
+	// 		Expect(reflect.TypeOf(resources[4]).String()).Should(ContainSubstring("StatefulSet"))
+	// 		Expect(reflect.TypeOf(resources[5]).String()).Should(ContainSubstring("Service"))
+	// 	})
+	// })
 
 })

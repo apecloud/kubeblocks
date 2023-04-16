@@ -657,12 +657,13 @@ var _ = Describe("Cluster Controller", func() {
 					//          }
 					//          backuppolicies.dataprotection.kubeblocks.io "test-clusterstqcba-consensus-backup-policy" not found
 					//      occurred
-					Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
-						&dataprotectionv1alpha1.BackupPolicy{}, true)).Should(Succeed())
-
 					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
 						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
 							BackupPolicyTemplateName: backupPolicyTPLName}
+
+					Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
+						&dataprotectionv1alpha1.BackupPolicy{}, true)).Should(Succeed())
+
 				}
 			})()).ShouldNot(HaveOccurred())
 		//
@@ -749,8 +750,7 @@ var _ = Describe("Cluster Controller", func() {
 		// REVIEW: (chantu)
 		//  1. this test flow, wait for running phase?
 		//  2. following horizontalScale only work with statefulCompDefName?
-		// horizontalScale(int(updatedReplicas), statefulCompDefName, consensusCompDefName, replicationCompDefName)
-		horizontalScale(int(updatedReplicas), statefulCompDefName)
+		horizontalScale(int(updatedReplicas), statefulCompDefName, consensusCompDefName, replicationCompDefName)
 	}
 
 	testVerticalScale := func() {
@@ -1592,10 +1592,17 @@ var _ = Describe("Cluster Controller", func() {
 
 func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 	By("Creating a BackupPolicyTemplate")
-	testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
+	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
 		AddLabels(clusterDefLabelKey, clusterDefObj.Name).
-		AddBackupPolicy(clusterDefObj.Spec.ComponentDefs[0].Name).
-		AddSnapshotPolicy().
-		SetClusterDefRef(clusterDefObj.Name).
-		SetTargetRole("leader").Create(&testCtx)
+		SetClusterDefRef(clusterDefObj.Name)
+	for _, v := range clusterDefObj.Spec.ComponentDefs {
+		bpt = bpt.AddBackupPolicy(v.Name).AddSnapshotPolicy()
+		switch v.WorkloadType {
+		case appsv1alpha1.Consensus:
+			bpt.SetTargetRole("leader")
+		case appsv1alpha1.Replication:
+			bpt.SetTargetRole("primary")
+		}
+	}
+	bpt.Create(&testCtx)
 }

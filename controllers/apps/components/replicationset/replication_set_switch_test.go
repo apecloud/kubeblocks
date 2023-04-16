@@ -17,10 +17,11 @@ limitations under the License.
 package replicationset
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -98,7 +99,7 @@ var _ = Describe("ReplicationSet Switch", func() {
 		By("Creating a cluster with replication workloadType.")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
+			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
 			SetReplicas(testapps.DefaultReplicationReplicas).
 			SetPrimaryIndex(DefaultPrimaryIndexDiffWithStsOrdinal).
 			SetSwitchPolicy(clusterSwitchPolicy).
@@ -110,38 +111,28 @@ var _ = Describe("ReplicationSet Switch", func() {
 			Image:           testapps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		stsList := make([]*appsv1.StatefulSet, 0)
-		for k, v := range map[string]string{
-			clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-0": string(Primary),
-			clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-1": string(Secondary),
-			clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-2": string(Secondary),
-			clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-3": string(Secondary),
-		} {
-			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, k, clusterObj.Name, testapps.DefaultRedisCompName).
-				AddContainer(container).
-				AddAppInstanceLabel(clusterObj.Name).
-				AddAppComponentLabel(testapps.DefaultRedisCompName).
-				AddAppManangedByLabel().
-				AddRoleLabel(v).
-				SetReplicas(1).
-				Create(&testCtx).GetObject()
-			isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
-			if v == string(Primary) {
-				Expect(err).To(Succeed())
-				Expect(isStsPrimary).Should(BeTrue())
-			} else {
-				Expect(err).To(Succeed())
-				Expect(isStsPrimary).ShouldNot(BeTrue())
-			}
-			stsList = append(stsList, sts)
-		}
+
+		replicationSetSts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+			clusterObj.Name+"-"+testapps.DefaultRedisCompName, clusterObj.Name, testapps.DefaultRedisCompName).
+			AddContainer(container).
+			AddAppInstanceLabel(clusterObj.Name).
+			AddAppComponentLabel(testapps.DefaultRedisCompName).
+			AddAppManangedByLabel().
+			SetReplicas(4).
+			Create(&testCtx).GetObject()
 
 		By("Creating Pods of replication workloadType.")
-		for _, sts := range stsList {
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+		for i := int32(0); i < *replicationSetSts.Spec.Replicas; i++ {
+			podBuilder := testapps.NewPodFactory(testCtx.DefaultNamespace,
+				fmt.Sprintf("%s-%d", replicationSetSts.Name, i)).
 				AddContainer(container).
-				AddLabelsInMap(sts.Labels).
-				Create(&testCtx).GetObject()
+				AddLabelsInMap(replicationSetSts.Labels)
+			if i == 0 {
+				podBuilder.AddRoleLabel(string(Primary))
+			} else {
+				podBuilder.AddRoleLabel(string(Secondary))
+			}
+			_ = podBuilder.Create(&testCtx).GetObject()
 		}
 		clusterComponentSpec := &clusterObj.Spec.ComponentSpecs[0]
 
@@ -162,7 +153,7 @@ var _ = Describe("ReplicationSet Switch", func() {
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusSucceed))
 
 		By("Test switch election with multi secondaries should be successful, and the candidate primary should be the priorityPod.")
-		priorityPod := clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-2-0"
+		priorityPod := clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-3"
 		for _, sri := range s.SwitchInstance.SecondariesRole {
 			if sri.Pod.Name != priorityPod {
 				sri.LagDetectInfo = &lagNotZero
@@ -289,13 +280,13 @@ var _ = Describe("ReplicationSet Switch", func() {
 			}
 			By("Create a clusterDefinition obj with replication workloadType.")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompType).
+				AddComponentDef(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompDefName).
 				AddReplicationSpec(mockReplicationSpec).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication workloadType.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(testapps.DefaultRedisCompType).AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
+				AddComponent(testapps.DefaultRedisCompDefName).AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 
 		})

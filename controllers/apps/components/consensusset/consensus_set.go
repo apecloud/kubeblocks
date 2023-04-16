@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
@@ -34,10 +35,7 @@ import (
 )
 
 type ConsensusSet struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
+	stateful.Stateful
 }
 
 var _ types.Component = &ConsensusSet{}
@@ -65,11 +63,7 @@ func (r *ConsensusSet) IsRunning(ctx context.Context, obj client.Object) (bool, 
 }
 
 func (r *ConsensusSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
-	if obj == nil {
-		return false, nil
-	}
-	sts := util.ConvertToStatefulSet(obj)
-	return util.StatefulSetPodsAreReady(sts, r.Component.Replicas), nil
+	return r.Stateful.PodsReady(ctx, obj)
 }
 
 func (r *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
@@ -95,7 +89,7 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 	if compStatus.PodsReadyTime == nil {
 		return true, nil
 	}
-	if !util.IsProbeTimeout(r.componentDef, compStatus.PodsReadyTime) {
+	if !util.IsProbeTimeout(r.ComponentDef, compStatus.PodsReadyTime) {
 		return true, nil
 	}
 
@@ -111,7 +105,7 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, pod := range podList.Items {
 		role := pod.Labels[constant.RoleLabelKey]
-		if role == r.componentDef.ConsensusSpec.Leader.Name {
+		if role == r.ComponentDef.ConsensusSpec.Leader.Name {
 			isFailed = false
 		}
 		if role == "" {
@@ -158,7 +152,7 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 	var (
 		existLatestRevisionFailedPod bool
 		leaderIsReady                bool
-		consensusSpec                = r.componentDef.ConsensusSpec
+		consensusSpec                = r.ComponentDef.ConsensusSpec
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
@@ -261,18 +255,20 @@ func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) erro
 	}
 	return nil
 }
-func NewConsensusSet(
+func NewConsensusComponent(
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (*ConsensusSet, error) {
+	componentDef appsv1alpha1.ClusterComponentDefinition) (types.Component, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
 	return &ConsensusSet{
-		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		componentDef: &componentDef,
+		Stateful: stateful.Stateful{
+			Cli:          cli,
+			Cluster:      cluster,
+			Component:    component,
+			ComponentDef: &componentDef,
+		},
 	}, nil
 }

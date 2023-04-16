@@ -481,20 +481,14 @@ func CheckPrimaryIndexChanged(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	compName string,
-	specPrimaryIndex int32) (bool, int32, error) {
+	currentPrimaryIndex int32) (bool, int32, error) {
 	// get the statefulSet object whose current role label is primary
-	primarySts, err := getReplicationSetPrimaryObj(ctx, cli, cluster, generics.StatefulSetSignature, compName)
+	pod, err := getReplicationSetPrimaryObj(ctx, cli, cluster, generics.PodSignature, compName)
 	if err != nil {
 		return false, -1, err
 	}
-
-	clusterCompName := fmt.Sprintf("%s-%s", cluster.GetName(), compName)
-	if primarySts.GetName() == clusterCompName {
-		return specPrimaryIndex != 0, 0, nil
-	}
-
-	currentPrimaryIndex := int32(util.GetOrdinalSts(primarySts))
-	return specPrimaryIndex != currentPrimaryIndex, currentPrimaryIndex, nil
+	_, o := util.ParseParentNameAndOrdinal(pod.Name)
+	return currentPrimaryIndex != o, o, nil
 }
 
 // syncPrimaryIndex syncs cluster.spec.componentSpecs.[x].primaryIndex when failover occurs and switchPolicy is Noop.

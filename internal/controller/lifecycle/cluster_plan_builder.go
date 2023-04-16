@@ -217,8 +217,6 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 		// stateful set pvc Update
 		&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
-		// replication set horizontal scaling
-		&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
 		newClusterStatusTransformer(c.ctx, c.cli, c.recorder, *cr),
 	}

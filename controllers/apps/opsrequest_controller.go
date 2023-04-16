@@ -63,7 +63,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	opsCtrlHandler := &opsControllerHandler{}
 	return opsCtrlHandler.Handle(reqCtx, &operations.OpsResource{Recorder: r.Recorder},
 		r.fetchOpsRequest,
-		r.handleDeleteEvent,
+		r.handleDeletion,
 		r.fetchCluster,
 		r.addClusterLabelAndSetOwnerReference,
 		r.handleOpsRequestByPhase,
@@ -85,7 +85,7 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
 		}
 		// if the opsRequest is not found, we need to check if this opsRequest is deleted abnormally
-		if err = r.handleOpsDeletedDuringRunning(reqCtx); err != nil {
+		if err = r.handleOpsReqDeletedDuringRunning(reqCtx); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
@@ -94,8 +94,8 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 	return nil, nil
 }
 
-// handleDeleteEvent handles the delete event of the OpsRequest.
-func (r *OpsRequestReconciler) handleDeleteEvent(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+// handleDeletion handles the delete event of the OpsRequest.
+func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
 	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsRunningPhase {
 		return nil, nil
 	}
@@ -223,8 +223,8 @@ func (r *OpsRequestReconciler) doOpsRequestAction(reqCtx intctrlutil.RequestCtx,
 	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }
 
-// handleOpsDeletedDuringRunning handles the cluster annotation if the OpsRequest is deleted during running.
-func (r *OpsRequestReconciler) handleOpsDeletedDuringRunning(reqCtx intctrlutil.RequestCtx) error {
+// handleOpsReqDeletedDuringRunning handles the cluster annotation if the OpsRequest is deleted during running.
+func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlutil.RequestCtx) error {
 	clusterList := &appsv1alpha1.ClusterList{}
 	if err := r.Client.List(reqCtx.Ctx, clusterList, client.InNamespace(reqCtx.Req.Namespace)); err != nil {
 		return err

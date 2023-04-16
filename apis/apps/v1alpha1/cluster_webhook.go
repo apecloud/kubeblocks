@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
@@ -174,7 +175,7 @@ func (r *Cluster) validate() error {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDefinitionRef"),
 			r.Spec.ClusterDefRef, err.Error()))
 	} else {
-		r.validateComponents(&allErrs, clusterDef)
+		r.validateComponents(&allErrs, webhookMgr.client, clusterDef)
 	}
 
 	if len(allErrs) > 0 {
@@ -199,7 +200,7 @@ func (r *Cluster) validateClusterVersionRef(allErrs *field.ErrorList) {
 }
 
 // ValidateComponents validate spec.components is legal
-func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *ClusterDefinition) {
+func (r *Cluster) validateComponents(allErrs *field.ErrorList, k8sClient client.Client, clusterDef *ClusterDefinition) {
 	var (
 		// invalid component slice
 		invalidComponentDefs = make([]string, 0)
@@ -213,7 +214,7 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		componentMap[v.Name] = v
 	}
 
-	compClasses, err := getClasses(clusterDef.Name)
+	compClasses, err := getClasses(context.Background(), k8sClient, clusterDef.Name)
 	if err != nil {
 		return
 	}

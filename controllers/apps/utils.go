@@ -64,7 +64,7 @@ func notifyClusterStatusChange(ctx context.Context, cli client.Client, recorder 
 		return err
 	}
 
-	if event != nil {
+	if recorder != nil && event != nil {
 		recorder.Eventf(cluster, corev1.EventTypeWarning, event.Reason, getFinalEventMessageForRecorder(event))
 	}
 	return nil

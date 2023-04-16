@@ -117,7 +117,6 @@ func StatefulSetOfComponentIsReady(sts *appsv1.StatefulSet, statefulStatusRevisi
 	if targetReplicas == nil {
 		targetReplicas = sts.Spec.Replicas
 	}
-	// judge whether statefulSet is ready
 	return StatefulSetPodsAreReady(sts, *targetReplicas) && statefulStatusRevisionIsEquals
 }
 

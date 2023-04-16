@@ -136,7 +136,7 @@ func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.
 		return err
 	}
 
-	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
+	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Create a new component")
 
 	return nil
 }
@@ -311,6 +311,6 @@ func (c *replicationComponent) updateWorkload(stsObj *appsv1.StatefulSet, idx in
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
 		c.WorkloadVertexs[idx].Obj = stsObjCopy
 		c.WorkloadVertexs[idx].Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase)
+		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload updated")
 	}
 }

@@ -24,12 +24,14 @@ import (
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -46,6 +48,7 @@ import (
 
 type ComponentBase struct {
 	Client          client.Client
+	Recorder        record.EventRecorder
 	Cluster         *appsv1alpha1.Cluster
 	ClusterVersion  *appsv1alpha1.ClusterVersion    // building config needs the cluster version
 	Component       *component.SynthesizedComponent // built synthesized component, replace it with component workload proto
@@ -226,8 +229,8 @@ func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.
 	return nil
 }
 
-// updateStatus updates the cluster component status by @updatefn.
-func (c *ComponentBase) updateStatus(updatefn func(status *appsv1alpha1.ClusterComponentStatus) error) error {
+// updateStatus updates the cluster component status by @updatefn, with additional message to explain the transition occurred.
+func (c *ComponentBase) updateStatus(updatefn func(status *appsv1alpha1.ClusterComponentStatus) error, message string) error {
 	if updatefn == nil {
 		return nil
 	}
@@ -240,40 +243,49 @@ func (c *ComponentBase) updateStatus(updatefn func(status *appsv1alpha1.ClusterC
 	}
 
 	status := c.Cluster.Status.Components[c.GetName()]
+	phase := status.Phase
 	err := updatefn(&status)
 	if err != nil {
 		return err
 	}
 	c.Cluster.Status.Components[c.GetName()] = status
+
+	if phase != status.Phase {
+		// TODO: logging the event
+		if c.Recorder != nil {
+			c.Recorder.Eventf(c.Cluster, corev1.EventTypeNormal, types.ComponentPhaseTransition, message)
+		}
+	}
+
 	return nil
 }
 
 // SetStatusPhase set the cluster component phase to @phase conditionally.
-func (c *ComponentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase) {
-	c.setStatusPhaseWithMsg(phase, "", "")
+func (c *ComponentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase, message string) {
+	c.setStatusPhaseWithMsg(phase, "", "", message)
 }
 
 // setStatusPhaseWithMsg set the cluster component phase and messages to specified conditionally.
-func (c *ComponentBase) setStatusPhaseWithMsg(phase appsv1alpha1.ClusterComponentPhase, msgKey, msg string) {
+func (c *ComponentBase) setStatusPhaseWithMsg(phase appsv1alpha1.ClusterComponentPhase, statusMsgKey, statusMsg, phaseTransitionMsg string) {
 	if err := c.updateStatus(func(status *appsv1alpha1.ClusterComponentStatus) error {
 		if status.Phase == phase {
 			return nil
 		}
 
-		// TODO(refactor): define the status phase transition diagram
+		// TODO(impl): define the status phase transition diagram
 		if phase == appsv1alpha1.SpecReconcilingClusterCompPhase && status.Phase != appsv1alpha1.RunningClusterCompPhase {
 			return nil
 		}
 
 		status.Phase = phase
-		if msgKey != "" {
+		if statusMsgKey != "" {
 			if status.Message == nil {
 				status.Message = map[string]string{}
 			}
-			status.Message[msgKey] = msg
+			status.Message[statusMsgKey] = statusMsg
 		}
 		return nil
-	}); err != nil {
+	}, phaseTransitionMsg); err != nil {
 		panic(fmt.Sprintf("unexpected error occurred: %s", err.Error()))
 	}
 }
@@ -285,17 +297,13 @@ func (c *ComponentBase) StatusImpl(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	//   @HorizontalScale - whether replicas to added or deleted have been done, and the cron job to delete PVCs have finished
 	//  With these changes, we can remove the manipulation to cluster and component status phase in ops controller.
 
-	if err := c.checkPVCDeletionJob(reqCtx, cli); err != nil {
-		return err
-	}
-
-	if err := c.checkStatusUpdateByEvent(reqCtx, cli); err != nil {
+	if err := c.status4HorizontalScale(reqCtx, cli); err != nil {
 		return err
 	}
 
 	// handle all other possible workload changes
 	for _, obj := range objs {
-		if err := c.checkWorkloadUpdate(reqCtx, cli, obj); err != nil {
+		if err := c.status4GeneralWorkloadUpdate(reqCtx, cli, obj); err != nil {
 			return err
 		}
 	}
@@ -310,47 +318,50 @@ func (c *ComponentBase) StatusImpl(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	return nil
 }
 
-func (c *ComponentBase) checkPVCDeletionJob(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *ComponentBase) status4HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	///// ClusterStatusHandler.handleDeletePVCCronJobEvent
-	// TODO(refactor): fix me
-	checkPVCDeletionJobFail := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
-		return false, nil
+	job := &batchv1.Job{}
+	checkPVCDeletionJobFail := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, string, error) {
+		// TODO(refactor): get the job.
+		for _, cond := range job.Status.Conditions {
+			if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+				return true, fmt.Sprintf("%s-%s", cond.Reason, cond.Message), nil
+			}
+		}
+		return false, "", nil
 	}
-	if failed, err := checkPVCDeletionJobFail(reqCtx, cli); err != nil {
+	if failed, msg, err := checkPVCDeletionJobFail(reqCtx, cli); err != nil {
 		return err
 	} else if failed {
-		// c.SetObjectMessage(object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), message)
-		// CronJob kind and name
-		// msgKey := fmt.Sprintf("%s/%s", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
-		c.setStatusPhaseWithMsg(appsv1alpha1.AbnormalClusterCompPhase, "", "")
+		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
+		c.setStatusPhaseWithMsg(appsv1alpha1.AbnormalClusterCompPhase, msgKey, msg, "PVC deletion job failed")
 	}
 	return nil
 }
 
-func (c *ComponentBase) checkStatusUpdateByEvent(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	/////// ClusterStatusHandler.handleClusterStatusByEvent
-	// TODO(refactor): the phase will be updated at rebuilding, but the status message will be lost
-	//	if phase == "" {
-	//		return
-	//	}
-	//	c.updateStatus(func(status *appsv1alpha1.ClusterComponentStatus) error {
-	//		if status.Phase != phase {
-	//			status.Phase = phase
-	//			updateComponentStatusMessage(c.GetCluster(), c.GetName(), status, event)
-	//			return nil
-	//		}
-	//		// check whether it is a new warning event and the component phase is running
-	//		if !isExistsEventMsg(status.Message, event) && phase != appsv1alpha1.RunningClusterCompPhase {
-	//			updateComponentStatusMessage(c.GetCluster(), c.GetName(), status, event)
-	//		}
-	//		return nil
-	//	})
-	return nil
-}
+//func (c *ComponentBase) checkStatusUpdateByEvent(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+//	/////// ClusterStatusHandler.handleClusterStatusByEvent
+//	// TODO(refactor): the phase will be updated at rebuilding, but the status message will be lost.
+//	//	if phase == "" {
+//	//		return
+//	//	}
+//	//	c.updateStatus(func(status *appsv1alpha1.ClusterComponentStatus) error {
+//	//		if status.Phase != phase {
+//	//			status.Phase = phase
+//	//			updateComponentStatusMessage(c.GetCluster(), c.GetName(), status, event)
+//	//			return nil
+//	//		}
+//	//		// check whether it is a new warning event and the component phase is running
+//	//		if !isExistsEventMsg(status.Message, event) && phase != appsv1alpha1.RunningClusterCompPhase {
+//	//			updateComponentStatusMessage(c.GetCluster(), c.GetName(), status, event)
+//	//		}
+//	//		return nil
+//	//	})
+//	return nil
+//}
 
-func (c *ComponentBase) checkWorkloadUpdate(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) error {
+func (c *ComponentBase) status4GeneralWorkloadUpdate(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) error {
 	///// WorkloadController.handleWorkloadUpdate
-	// patch role labels and update roles in component status
 	if vertexes, err := c.ComponentSet.HandleRoleChange(reqCtx.Ctx, obj); err != nil {
 		return err
 	} else {
@@ -359,7 +370,7 @@ func (c *ComponentBase) checkWorkloadUpdate(reqCtx intctrlutil.RequestCtx, cli c
 		}
 	}
 
-	// restart pod if needed
+	// TODO(impl): restart pod if needed, move it to @Update and restart pod directly.
 	if vertexes, err := c.ComponentSet.HandleRestart(reqCtx.Ctx, obj); err != nil {
 		return err
 	} else {
@@ -390,17 +401,36 @@ func (c *ComponentBase) rebuildLatestStatus(reqCtx intctrlutil.RequestCtx, cli c
 		podsReady = &podsReadyForComponent
 	}
 
-	return c.updateStatus(func(status *appsv1alpha1.ClusterComponentStatus) error {
-		hasFailedPodTimedOut := false
+	hasFailedPodTimedOut := false
+	statusMessage := appsv1alpha1.ComponentMessageMap{}
+	if !isRunning {
+		if podsReady == nil || !*podsReady {
+			hasFailedPodTimedOut, statusMessage, err = hasFailedAndTimedOutPod(pods)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	phaseTransitionMsg := ""
+	if podsReady == nil {
+		phaseTransitionMsg = fmt.Sprintf("Running: %v, PodsReady: nil, PodsTimedout: %v", isRunning, hasFailedPodTimedOut)
+	} else {
+		phaseTransitionMsg = fmt.Sprintf("Running: %v, PodsReady: %v, PodsTimedout: %v", isRunning, *podsReady, hasFailedPodTimedOut)
+	}
+
+	updatefn := func(status *appsv1alpha1.ClusterComponentStatus) error {
+		//hasFailedPodTimedOut := false
 		if !isRunning {
 			if podsReady != nil && *podsReady {
 				// check if the role probe timed out when component phase is not Running but all pods of component are ready.
 				// TODO(refactor): wait = true to requeue
 				c.ComponentSet.HandleProbeTimeoutWhenPodsReady(status, pods)
 			} else {
-				if hasFailedPodTimedOut, status.Message, err = hasFailedAndTimedOutPod(pods); err != nil {
-					return err
-				}
+				status.Message = statusMessage
+				//if hasFailedPodTimedOut, status.Message, err = hasFailedAndTimedOutPod(pods); err != nil {
+				//	return err
+				//}
 				// if !hasFailedPodTimedOut {
 				//	// TODO(refactor): wait = true to requeue
 				// }
@@ -410,7 +440,8 @@ func (c *ComponentBase) rebuildLatestStatus(reqCtx intctrlutil.RequestCtx, cli c
 			return err
 		}
 		return nil
-	})
+	}
+	return c.updateStatus(updatefn, phaseTransitionMsg)
 }
 
 // rebuildStatus updates the component status Phase etc. into the cluster.Status.Components map.
@@ -424,12 +455,13 @@ func (c *ComponentBase) rebuildStatus(reqCtx intctrlutil.RequestCtx,
 		//// means the component is Failed or Abnormal.
 		// if slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), c.Cluster.Status.Phase) || hasFailedPodTimedOut {
 		// TODO(refactor): should review and check this pre-condition carefully.
-		if phase, err := c.ComponentSet.GetPhaseWhenPodsNotReady(reqCtx.Ctx, c.GetName()); err != nil {
-			return err
-		} else if phase != "" {
-			status.Phase = phase
+		if hasFailedPodTimedOut {
+			if phase, err := c.ComponentSet.GetPhaseWhenPodsNotReady(reqCtx.Ctx, c.GetName()); err != nil {
+				return err
+			} else if phase != "" {
+				status.Phase = phase
+			}
 		}
-		// }
 	} else {
 		if c.Component.Replicas == 0 {
 			// if replicas number of component is zero, the component has stopped.
@@ -510,7 +542,7 @@ func (c *ComponentBase) removeStsInitContainerForRestore(backupName string) erro
 	}
 	if doRemoveInitContainers {
 		// if need to remove init container, reset component to Creating.
-		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
+		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Remove init container for restore")
 	}
 	return nil
 }

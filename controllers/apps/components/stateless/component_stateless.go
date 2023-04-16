@@ -144,7 +144,7 @@ func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
-	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase)
+	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Create a new component")
 
 	return nil
 }
@@ -237,6 +237,6 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
 		c.WorkloadVertexs[0].Obj = deployObjCopy
 		c.WorkloadVertexs[0].Action = ictrltypes.ActionUpdatePtr()
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase)
+		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload updated")
 	}
 }

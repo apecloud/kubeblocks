@@ -31,6 +31,9 @@ import (
 )
 
 const (
+	// ComponentPhaseTransition the event reason indicates that the component transits  to a new phase.
+	ComponentPhaseTransition = "ComponentPhaseTransition"
+
 	// RoleProbeTimeoutReason the event reason when all pods of the component role probe timed out.
 	RoleProbeTimeoutReason = "RoleProbeTimeout"
 

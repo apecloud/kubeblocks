@@ -131,10 +131,6 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.Clus
 	} else if isAbnormal {
 		status.Phase = appsv1alpha1.AbnormalClusterCompPhase
 	}
-	// TODO(refactor): event
-	// if recorder != nil {
-	//	recorder.Eventf(r.Cluster, corev1.EventTypeWarning, types.RoleProbeTimeoutReason, "pod role detection timed out in Component: "+r.Component.Name)
-	// }
 }
 
 func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,

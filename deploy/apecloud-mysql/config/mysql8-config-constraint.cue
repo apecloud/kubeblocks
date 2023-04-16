@@ -165,6 +165,9 @@
 	// Write a core file if mysqld dies.
 	"core-file"?: string & "0" | "1" | "OFF" | "ON"
 
+	// xengine enable
+	"xengine"?: string & "0" | "1" | "OFF" | "ON"
+
 	// Abort a recursive common table expression if it does more than this number of iterations.
 	cte_max_recursion_depth: int & >=0 & <=4294967295 | *1000
 
@@ -181,7 +184,7 @@
 	default_password_lifetime: int & >=0 & <=65535 | *0
 
 	// The default storage engine (table type).
-	default_storage_engine?: string & "InnoDB" | "MRG_MYISAM" | "BLACKHOLE" | "CSV" | "MEMORY" | "FEDERATED" | "ARCHIVE" | "MyISAM"
+	default_storage_engine?: string & "InnoDB" | "MRG_MYISAM" | "BLACKHOLE" | "CSV" | "MEMORY" | "FEDERATED" | "ARCHIVE" | "MyISAM" | "xengine"
 
 	// Server current time zone
 	default_time_zone?: string

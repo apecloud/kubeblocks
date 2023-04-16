@@ -286,7 +286,7 @@ var _ = Describe("builder", func() {
 			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
-			Expect(*sts.Spec.Replicas).Should(Equal(int32(1)))
+			Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(2))
 		})
 
 		It("builds Deploy correctly", func() {

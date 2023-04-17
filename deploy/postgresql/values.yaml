@@ -11,7 +11,7 @@
 image:
   registry: registry.cn-hangzhou.aliyuncs.com
   repository: apecloud/spilo
-  tag: 15.2.0
+  tag: 14.7.0
   digest: ""
   ## Specify a imagePullPolicy
   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'

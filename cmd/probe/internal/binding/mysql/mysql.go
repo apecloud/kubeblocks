@@ -97,7 +97,7 @@ const (
 var (
 	defaultDBPort = 3306
 	dbUser        = "root"
-	dbPasswd      = ""
+	dbPasswd      = "9qgdsqmk"
 )
 
 // NewMysql returns a new MySQL output binding.
@@ -276,15 +276,38 @@ func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.Invo
 
 func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	result := OpsResult{}
+	slaveStatus := make([]SlaveStatus, 0)
+	var err error
+
+	if mysqlOps.OriRole == "" {
+		mysqlOps.OriRole, err = mysqlOps.GetRole(ctx, req, resp)
+		if err != nil {
+			result["event"] = OperationFailed
+			result["message"] = err.Error()
+			return result, nil
+		}
+	}
+	if mysqlOps.OriRole == LEADER {
+		result["event"] = OperationSuccess
+		result["message"] = "This is leader instance, leader has no lag"
+		return result, nil
+	}
+
 	sql := "show slave status"
-	_, err := mysqlOps.query(ctx, sql)
+	data, err := mysqlOps.query(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("GetLagOps error: %v", err)
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = OperationSuccess
-		result["lag"] = 0
+		err = json.Unmarshal(data, &slaveStatus)
+		if err != nil {
+			result["event"] = OperationFailed
+			result["message"] = err.Error()
+		} else {
+			result["event"] = OperationSuccess
+			result["lag"] = slaveStatus[0].SecondsBehindMaster
+		}
 	}
 	return result, nil
 }
@@ -459,7 +482,22 @@ func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
 	}
 	values := make([]interface{}, len(columnTypes))
 	for i := range values {
-		values[i] = reflect.New(types[i]).Interface()
+		switch types[i].Kind() {
+		case reflect.String, reflect.Interface:
+			values[i] = &sql.NullString{}
+		case reflect.Bool:
+			values[i] = &sql.NullBool{}
+		case reflect.Float64:
+			values[i] = &sql.NullFloat64{}
+		case reflect.Int16, reflect.Uint16:
+			values[i] = &sql.NullInt16{}
+		case reflect.Int32, reflect.Uint32:
+			values[i] = &sql.NullInt32{}
+		case reflect.Int64, reflect.Uint64:
+			values[i] = &sql.NullInt64{}
+		default:
+			values[i] = reflect.New(types[i]).Interface()
+		}
 	}
 	return values
 }

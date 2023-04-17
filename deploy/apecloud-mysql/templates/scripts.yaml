@@ -60,8 +60,7 @@ data:
     done; 
     cluster_info="$cluster_info@$(($idx+1))"; 
     echo "cluster_info=$cluster_info"; 
-    mkdir -p /data/mysql/data;
-    mkdir -p /data/mysql/log;
+    mkdir -p /data/mysql/data /data/mysql/log
     chmod +777 -R /data/mysql; 
     echo "KB_MYSQL_RECREATE=$KB_MYSQL_RECREATE"
     if [ "$KB_MYSQL_RECREATE" == "true" ]; then 

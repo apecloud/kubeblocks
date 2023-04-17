@@ -52,12 +52,18 @@ spec:
       maxPerCPU: 8Gi
 `
 
-func TestResourceConstraints_ValidateResourceRequirements(t *testing.T) {
-	var cf ComponentResourceConstraint
-	err := yaml.Unmarshal([]byte(resourceConstraints), &cf)
-	if err != nil {
+var (
+	cf ComponentResourceConstraint
+)
+
+func init() {
+	if err := yaml.Unmarshal([]byte(resourceConstraints), &cf); err != nil {
 		panic("Failed to unmarshal resource constraints: %v" + err.Error())
 	}
+}
+
+func TestResourceConstraints(t *testing.T) {
+	var cf ComponentResourceConstraint
 	cases := []struct {
 		cpu    string
 		memory string
@@ -71,12 +77,24 @@ func TestResourceConstraints_ValidateResourceRequirements(t *testing.T) {
 	}
 
 	for _, item := range cases {
+		var (
+			cpu    = resource.MustParse(item.cpu)
+			memory = resource.MustParse(item.memory)
+		)
 		requirements := &corev1.ResourceRequirements{
 			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    resource.MustParse(item.cpu),
-				corev1.ResourceMemory: resource.MustParse(item.memory),
+				corev1.ResourceCPU:    cpu,
+				corev1.ResourceMemory: memory,
 			},
 		}
 		assert.Equal(t, item.expect, len(cf.FindMatchingConstraints(requirements)) > 0)
+
+		class := &ComponentClassInstance{
+			ComponentClass: ComponentClass{
+				CPU:    cpu,
+				Memory: memory,
+			},
+		}
+		assert.Equal(t, t, item.expect, cf.MatchClass(class))
 	}
 }

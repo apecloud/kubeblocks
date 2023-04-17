@@ -56,7 +56,9 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	var ml []client.ListOption
+	ml := []client.ListOption{
+		client.HasLabels{types.ResourceConstraintProviderLabelKey},
+	}
 	constraintsList := &appsv1alpha1.ComponentResourceConstraintList{}
 	if err := r.Client.List(reqCtx.Ctx, constraintsList, ml...); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package consensusset
+package consensus
 
 import (
 	"context"
@@ -34,13 +34,13 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type ConsensusSet struct {
-	stateful.Stateful
+type ConsensusComponent struct {
+	stateful.StatefulComponent
 }
 
-var _ types.Component = &ConsensusSet{}
+var _ types.Component = &ConsensusComponent{}
 
-func (r *ConsensusSet) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (r *ConsensusComponent) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
@@ -62,18 +62,18 @@ func (r *ConsensusSet) IsRunning(ctx context.Context, obj client.Object) (bool, 
 	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
 }
 
-func (r *ConsensusSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
-	return r.Stateful.PodsReady(ctx, obj)
+func (r *ConsensusComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+	return r.StatefulComponent.PodsReady(ctx, obj)
 }
 
-func (r *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (r *ConsensusComponent) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if pod == nil {
 		return false
 	}
 	return intctrlutil.PodIsReadyWithLabel(*pod)
 }
 
-func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
+func (r *ConsensusComponent) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
 	var (
 		compStatus    appsv1alpha1.ClusterComponentStatus
 		ok            bool
@@ -134,7 +134,7 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 	return false, opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Cli, cluster)
 }
 
-func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
+func (r *ConsensusComponent) GetPhaseWhenPodsNotReady(ctx context.Context,
 	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
@@ -172,7 +172,7 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), nil
 }
 
-func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) error {
+func (r *ConsensusComponent) HandleUpdate(ctx context.Context, obj client.Object) error {
 	if r == nil {
 		return nil
 	}
@@ -263,8 +263,8 @@ func NewConsensusComponent(
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
-	return &ConsensusSet{
-		Stateful: stateful.Stateful{
+	return &ConsensusComponent{
+		StatefulComponent: stateful.StatefulComponent{
 			Cli:          cli,
 			Cluster:      cluster,
 			Component:    component,

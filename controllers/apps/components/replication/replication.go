@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replicationset
+package replication
 
 import (
 	"context"
@@ -33,16 +33,16 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// ReplicationSet is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec
-type ReplicationSet struct {
-	stateful.Stateful
+// ReplicationComponent is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec
+type ReplicationComponent struct {
+	stateful.StatefulComponent
 }
 
-var _ types.Component = &ReplicationSet{}
+var _ types.Component = &ReplicationComponent{}
 
 // IsRunning is the implementation of the type Component interface method,
 // which is used to check whether the replicationSet component is running normally.
-func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (r *ReplicationComponent) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	var componentStatusIsRunning = true
 	sts := util.ConvertToStatefulSet(obj)
 	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
@@ -61,13 +61,13 @@ func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool
 
 // PodsReady is the implementation of the type Component interface method,
 // which is used to check whether all the pods of replicationSet component is ready.
-func (r *ReplicationSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
-	return r.Stateful.PodsReady(ctx, obj)
+func (r *ReplicationComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+	return r.StatefulComponent.PodsReady(ctx, obj)
 }
 
 // PodIsAvailable is the implementation of the type Component interface method,
 // Check whether the status of a Pod of the replicationSet is ready, including the role label on the Pod
-func (r *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (r *ReplicationComponent) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if pod == nil {
 		return false
 	}
@@ -76,14 +76,14 @@ func (r *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) 
 
 // HandleProbeTimeoutWhenPodsReady is the implementation of the type Component interface method,
 // and replicationSet does not need to do role probe detection, so it returns false directly.
-func (r *ReplicationSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
+func (r *ReplicationComponent) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
 	return false, nil
 }
 
 // GetPhaseWhenPodsNotReady is the implementation of the type Component interface method,
 // when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
 // if return an empty phase, means the pods of component are ready and skips it.
-func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
+func (r *ReplicationComponent) GetPhaseWhenPodsNotReady(ctx context.Context,
 	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
@@ -136,7 +136,7 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 }
 
 // HandleUpdate is the implementation of the type Component interface method, handles replicationSet workload Pod updates.
-func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) error {
+func (r *ReplicationComponent) HandleUpdate(ctx context.Context, obj client.Object) error {
 	sts := util.ConvertToStatefulSet(obj)
 	if sts.Generation != sts.Status.ObservedGeneration {
 		return nil
@@ -193,8 +193,8 @@ func NewReplicationComponent(
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
-	return &ReplicationSet{
-		Stateful: stateful.Stateful{
+	return &ReplicationComponent{
+		StatefulComponent: stateful.StatefulComponent{
 			Cli:          cli,
 			Cluster:      cluster,
 			Component:    component,

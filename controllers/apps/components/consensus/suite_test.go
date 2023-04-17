@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package consensusset
+package consensus
 
 import (
 	"context"
@@ -55,7 +55,7 @@ func init() {
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "ConsensusSet Controller Suite")
+	RunSpecs(t, "Consensus Controller Suite")
 }
 
 var _ = BeforeSuite(func() {

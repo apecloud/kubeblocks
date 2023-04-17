@@ -21,7 +21,7 @@ import (
 	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 )
 
-func NewAnalyzeResult(title string, resultType string, outcomes []*troubleshoot.Outcome) *analyze.AnalyzeResult {
+func newAnalyzeResult(title string, resultType string, outcomes []*troubleshoot.Outcome) *analyze.AnalyzeResult {
 	for _, outcome := range outcomes {
 		if outcome == nil {
 			continue
@@ -40,10 +40,10 @@ func NewAnalyzeResult(title string, resultType string, outcomes []*troubleshoot.
 				return newFailAnalyzeResult(title, outcome)
 			}
 		default:
-			return NewFailedResultWithMessage(title, IncorrectOutcomeType)
+			return newFailedResultWithMessage(title, IncorrectOutcomeType)
 		}
 	}
-	return NewFailedResultWithMessage(title, MissingOutcomeMessage)
+	return newFailedResultWithMessage(title, MissingOutcomeMessage)
 }
 
 func newFailAnalyzeResult(titile string, outcome *troubleshoot.Outcome) *analyze.AnalyzeResult {
@@ -73,6 +73,6 @@ func newPassAnalyzeResult(titile string, outcome *troubleshoot.Outcome) *analyze
 	}
 }
 
-func NewFailedResultWithMessage(title, message string) *analyze.AnalyzeResult {
+func newFailedResultWithMessage(title, message string) *analyze.AnalyzeResult {
 	return newFailAnalyzeResult(title, &troubleshoot.Outcome{Fail: &troubleshoot.SingleOutcome{Message: message}})
 }

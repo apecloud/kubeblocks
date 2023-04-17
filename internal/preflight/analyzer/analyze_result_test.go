@@ -46,7 +46,7 @@ var _ = Describe("kb_storage_class_test", func() {
 		})
 		It("AnalyzeResult test, and expected that fail is true", func() {
 			Eventually(func(g Gomega) {
-				res := NewAnalyzeResult("test", FailType, outcomes)
+				res := newAnalyzeResult("test", FailType, outcomes)
 				g.Expect(res.IsFail).Should(BeTrue())
 				g.Expect(res.Message).Should(Equal(outcomes[0].Fail.Message))
 			}).Should(Succeed())
@@ -54,14 +54,14 @@ var _ = Describe("kb_storage_class_test", func() {
 
 		It("AnalyzeResult test, and expected that warn is true", func() {
 			Eventually(func(g Gomega) {
-				res := NewAnalyzeResult("test", WarnType, outcomes)
+				res := newAnalyzeResult("test", WarnType, outcomes)
 				g.Expect(res.IsWarn).Should(BeTrue())
 				g.Expect(res.Message).Should(Equal(outcomes[0].Warn.Message))
 			}).Should(Succeed())
 		})
 		It("AnalyzeResult test, and expected that pass is true", func() {
 			Eventually(func(g Gomega) {
-				res := NewAnalyzeResult("test", PassType, outcomes)
+				res := newAnalyzeResult("test", PassType, outcomes)
 				g.Expect(res.IsPass).Should(BeTrue())
 				g.Expect(res.Message).Should(Equal(outcomes[0].Pass.Message))
 			}).Should(Succeed())
@@ -69,7 +69,7 @@ var _ = Describe("kb_storage_class_test", func() {
 		It("AnalyzeResult with message test, and expected that fail is true", func() {
 			Eventually(func(g Gomega) {
 				message := "test"
-				res := NewFailedResultWithMessage("test", message)
+				res := newFailedResultWithMessage("test", message)
 				g.Expect(res.IsFail).Should(BeTrue())
 				g.Expect(res.Message).Should(Equal(message))
 			}).Should(Succeed())

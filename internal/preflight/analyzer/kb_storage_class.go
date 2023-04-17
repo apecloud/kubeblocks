@@ -64,11 +64,11 @@ func (a *AnalyzeStorageClassByKb) Analyze(getFile GetCollectedFileContents, find
 func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2.KBStorageClassAnalyze, getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) (*analyze.AnalyzeResult, error) {
 	storageClassesData, err := getFile(StorageClassPath)
 	if err != nil {
-		return NewFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
+		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
 	}
 	var storageClasses storagev1beta1.StorageClassList
 	if err = json.Unmarshal(storageClassesData, &storageClasses); err != nil {
-		return NewFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
+		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
 	}
 
 	for _, storageClass := range storageClasses.Items {
@@ -76,10 +76,10 @@ func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2
 			continue
 		}
 		if storageClass.Provisioner == "" || (storageClass.Provisioner == analyzer.Provisioner) {
-			return NewAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
+			return newAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
 		}
 	}
-	return NewAnalyzeResult(a.Title(), FailType, a.analyzer.Outcomes), nil
+	return newAnalyzeResult(a.Title(), FailType, a.analyzer.Outcomes), nil
 }
 
 var _ KBAnalyzer = &AnalyzeStorageClassByKb{}

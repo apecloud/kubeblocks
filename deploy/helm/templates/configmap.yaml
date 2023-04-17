@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubeblocks-manager-config
+  name: {{ include "kubeblocks.fullname" . }}-manager-config
   labels:
-     app.kubernetes.io/name: kubeblocks
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 data:
    config.yaml: |
      # the global pvc name which persistent volume claim to store the backup data.

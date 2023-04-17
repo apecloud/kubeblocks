@@ -63,7 +63,6 @@ func init() {
 }
 
 func TestResourceConstraints(t *testing.T) {
-	var cf ComponentResourceConstraint
 	cases := []struct {
 		cpu    string
 		memory string

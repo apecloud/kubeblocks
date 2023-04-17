@@ -64,15 +64,15 @@ func UninstallKubeblocks() {
 	})
 	Context("KubeBlocks uninstall", func() {
 		It("delete mycluster", func() {
-			commond := "kbcli cluster delete mycluster --auto-approve"
-			log.Println(commond)
-			result := e2eutil.ExecuteCommand(commond)
+			command := "kbcli cluster delete mycluster --auto-approve"
+			log.Println(command)
+			result := e2eutil.ExecuteCommand(command)
 			Expect(result).Should(BeTrue())
 		})
 		It("check mycluster and pod", func() {
-			commond := "kbcli cluster list -A"
+			command := "kbcli cluster list -A"
 			Eventually(func(g Gomega) {
-				cluster := e2eutil.ExecCommand(commond)
+				cluster := e2eutil.ExecCommand(command)
 				g.Expect(e2eutil.StringStrip(cluster)).Should(Equal("Noclusterfound"))
 			}, time.Second*10, time.Second*1).Should(Succeed())
 			cmd := "kbcli cluster list-instances"
@@ -107,11 +107,11 @@ func PlaygroundDestroy() {
 }
 
 func checkPlaygroundCluster() {
-	commond := "kubectl get pod -n default -l 'app.kubernetes.io/instance in (mycluster)'| grep mycluster |" +
+	command := "kubectl get pod -n default -l 'app.kubernetes.io/instance in (mycluster)'| grep mycluster |" +
 		" awk '{print $3}'"
-	log.Println(commond)
+	log.Println(command)
 	Eventually(func(g Gomega) {
-		podStatus := e2eutil.ExecCommand(commond)
+		podStatus := e2eutil.ExecCommand(command)
 		log.Println(e2eutil.StringStrip(podStatus))
 		g.Expect(e2eutil.StringStrip(podStatus)).Should(Equal("Running"))
 	}, time.Second*180, time.Second*1).Should(Succeed())

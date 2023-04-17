@@ -44,7 +44,7 @@ var _ = Describe("affinity utils", func() {
 
 	Context("with PodAntiAffinity set to Required", func() {
 		const topologyKey = "testTopologyKey"
-		const lableKey = "testNodeLabelKey"
+		const labelKey = "testNodeLabelKey"
 		const labelValue = "testLabelValue"
 
 		BeforeEach(func() {
@@ -60,7 +60,7 @@ var _ = Describe("affinity utils", func() {
 				PodAntiAffinity: appsv1alpha1.Required,
 				TopologyKeys:    []string{topologyKey},
 				NodeLabels: map[string]string{
-					lableKey: labelValue,
+					labelKey: labelValue,
 				},
 			}
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
@@ -85,7 +85,7 @@ var _ = Describe("affinity utils", func() {
 
 		It("should have correct Affinity and TopologySpreadConstraints", func() {
 			affinity := buildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
-			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(lableKey))
+			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal(topologyKey))
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 
@@ -101,7 +101,7 @@ var _ = Describe("affinity utils", func() {
 
 	Context("with PodAntiAffinity set to Preferred", func() {
 		const topologyKey = "testTopologyKey"
-		const lableKey = "testNodeLabelKey"
+		const labelKey = "testNodeLabelKey"
 		const labelValue = "testLabelValue"
 
 		BeforeEach(func() {
@@ -117,7 +117,7 @@ var _ = Describe("affinity utils", func() {
 				PodAntiAffinity: appsv1alpha1.Preferred,
 				TopologyKeys:    []string{topologyKey},
 				NodeLabels: map[string]string{
-					lableKey: labelValue,
+					labelKey: labelValue,
 				},
 			}
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
@@ -143,7 +143,7 @@ var _ = Describe("affinity utils", func() {
 
 		It("should have correct Affinity and TopologySpreadConstraints", func() {
 			affinity := buildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
-			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(lableKey))
+			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal(topologyKey))

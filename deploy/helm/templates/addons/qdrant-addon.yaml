@@ -18,7 +18,7 @@ spec:
     chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/qdrant-standalone-{{ default .Chart.Version .Values.versionOverride }}.tgz
 
   installable:
-    autoInstall: false
+    autoInstall: true
 
   defaultInstallValues:
     - enabled: true

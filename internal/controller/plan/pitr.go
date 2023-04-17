@@ -206,12 +206,15 @@ func (p *PointInTimeRecoveryManager) listCompletedBackups() (backupItems []dpv1a
 }
 
 // getSortedBackups sorts by StopTime
-func (p *PointInTimeRecoveryManager) getSortedBackups() ([]dpv1alpha1.Backup, error) {
+func (p *PointInTimeRecoveryManager) getSortedBackups(reverse bool) ([]dpv1alpha1.Backup, error) {
 	backups, err := p.listCompletedBackups()
 	if err != nil {
 		return backups, err
 	}
 	sort.Slice(backups, func(i, j int) bool {
+		if reverse {
+			i, j = j, i
+		}
 		if backups[i].Status.Manifests.BackupLog.StopTime == nil && backups[j].Status.Manifests.BackupLog.StopTime != nil {
 			return false
 		}
@@ -226,32 +229,10 @@ func (p *PointInTimeRecoveryManager) getSortedBackups() ([]dpv1alpha1.Backup, er
 	return backups, nil
 }
 
-// getReverseSortedBackups sorts by reverse StopTime
-func (p *PointInTimeRecoveryManager) getReverseSortedBackups() ([]dpv1alpha1.Backup, error) {
-	backups, err := p.listCompletedBackups()
-	if err != nil {
-		return backups, err
-	}
-	sort.Slice(backups, func(i, j int) bool {
-		if backups[j].Status.Manifests.BackupLog.StopTime == nil && backups[i].Status.Manifests.BackupLog.StopTime != nil {
-			return false
-		}
-		if backups[j].Status.Manifests.BackupLog.StopTime != nil && backups[i].Status.Manifests.BackupLog.StopTime == nil {
-			return true
-		}
-		if backups[j].Status.Manifests.BackupLog.StopTime.Equal(backups[i].Status.Manifests.BackupLog.StopTime) {
-			return backups[j].Name < backups[i].Name
-		}
-		return backups[j].Status.Manifests.BackupLog.StopTime.Before(backups[i].Status.Manifests.BackupLog.StopTime)
-	})
-
-	return backups, nil
-}
-
 // getLatestBaseBackup gets the latest baseBackup
 func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, error) {
 	// 1. sort backups by completed timestamp
-	backups, err := p.getReverseSortedBackups()
+	backups, err := p.getSortedBackups(true)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +255,7 @@ func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, 
 
 func (p *PointInTimeRecoveryManager) getNextBackup() (*dpv1alpha1.Backup, error) {
 	// 1. sort backups by reverse completed timestamp
-	backups, err := p.getSortedBackups()
+	backups, err := p.getSortedBackups(false)
 	if err != nil {
 		return nil, err
 	}

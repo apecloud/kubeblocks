@@ -240,7 +240,7 @@ func (o *CreateOptions) Validate() error {
 		o.Name = name
 	}
 	if len(o.Name) > 16 {
-		return fmt.Errorf("cluster name must be no more than 16 characters")
+		return fmt.Errorf("cluster name should be less than 16 characters")
 	}
 	return nil
 }

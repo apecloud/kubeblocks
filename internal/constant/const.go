@@ -73,17 +73,20 @@ const (
 	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
 	KBManagedByKey                  = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
 	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
+	BackupToolTypeLabelKey          = "kubeblocks.io/backup-tool-type"
 
 	// kubeblocks.io annotations
-	OpsRequestAnnotationKey           = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	ReconcileAnnotationKey            = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
-	RestartAnnotationKey              = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	SnapShotForStartAnnotationKey     = "kubeblocks.io/snapshot-for-start"
-	RestoreFromBackUpAnnotationKey    = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
-	ClusterSnapshotAnnotationKey      = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
-	LeaderAnnotationKey               = "cs.apps.kubeblocks.io/leader"
-	DefaultBackupPolicyAnnotationKey  = "dataprotection.kubeblocks.io/is-default-policy"
-	BackupPolicyTemplateAnnotationKey = "apps.kubeblocks.io/backup-policy-template"
+	OpsRequestAnnotationKey            = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey             = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey               = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	SnapShotForStartAnnotationKey      = "kubeblocks.io/snapshot-for-start"
+	RestoreFromBackUpAnnotationKey     = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
+	ClusterSnapshotAnnotationKey       = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	LeaderAnnotationKey                = "cs.apps.kubeblocks.io/leader"
+	DefaultBackupPolicyAnnotationKey   = "dataprotection.kubeblocks.io/is-default-policy"
+	BackupPolicyTemplateAnnotationKey  = "apps.kubeblocks.io/backup-policy-template"
+	RestoreFromTimeAnnotationKey       = "kubeblocks.io/restore-from-time"           // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
+	RestoreFromSrcClusterAnnotationKey = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"

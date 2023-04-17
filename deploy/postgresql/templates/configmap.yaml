@@ -25,3 +25,9 @@ data:
       recovery_conf:
         restore_command: cp /home/postgres/pgdata/pgroot/arch/%f %p
         recovery_target_timeline: latest
+  kb_pitr.conf: |
+    method: kb_restore_from_time
+    kb_restore_from_time:
+      command: sh /home/postgres/pgdata/kb_restore/kb_restore.sh
+      keep_existing_recovery_conf: false
+      recovery_conf: {}

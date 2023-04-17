@@ -29,7 +29,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -302,14 +301,13 @@ func (o *updateOptions) reconfigureLogVariables(c *appsv1alpha1.Cluster, cd *app
 		if err != nil {
 			return err
 		}
-
 		logVariablesMap := util.CovertLineStrVariablesToMapFormat(buf.String())
 		opsRequest := createLogsReconfiguringOpsRequest(c.Name, c.Namespace, compSpec.Name, configSpec.Name, keyName, logVariablesMap)
 		unstructuredObj, err := util.ConvertObjToUnstructured(opsRequest)
 		if err != nil {
 			return err
 		}
-		if _, err = o.dynamic.Resource(types.OpsGVR()).Namespace(c.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+		if err = util.CreateResourceIfAbsent(o.dynamic, types.OpsGVR(), c.Namespace, unstructuredObj); err != nil {
 			return err
 		}
 	}

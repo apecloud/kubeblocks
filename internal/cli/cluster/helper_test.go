@@ -102,4 +102,16 @@ var _ = Describe("helper", func() {
 		Expect(latestVer).ShouldNot(BeNil())
 		Expect(latestVer.Name).Should(Equal("now-version"))
 	})
+
+	It("get configmap by name", func() {
+		cmName := "test-cm"
+		dynamic := testing.FakeDynamicClient(testing.FakeConfigMap(cmName))
+		cm, err := GetConfigMapByName(dynamic, testing.Namespace, cmName)
+		Expect(err).Should(Succeed())
+		Expect(cm).ShouldNot(BeNil())
+
+		cm, err = GetConfigMapByName(dynamic, testing.Namespace, cmName+cmName)
+		Expect(err).Should(HaveOccurred())
+		Expect(cm).Should(BeNil())
+	})
 })

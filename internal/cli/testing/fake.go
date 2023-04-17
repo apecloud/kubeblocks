@@ -470,3 +470,16 @@ func FakeAddon(name string) *extensionsv1alpha1.Addon {
 	addon.SetCreationTimestamp(metav1.Now())
 	return addon
 }
+
+func FakeConfigMap(cmName string) *corev1.ConfigMap {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: Namespace,
+		},
+		Data: map[string]string{
+			"fake": "fake",
+		},
+	}
+	return cm
+}

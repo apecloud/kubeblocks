@@ -23,12 +23,7 @@ KuebBlocks for Redis supports standalone clusters and primary-secondary clusters
 
 ### Steps
 
-1. Run the command below to list all the available kernel versions and choose the one that you need.
-   ```bash
-   kbcli clusterversion list
-   ```
-
-2. Run the command below to create a Redis cluster.
+Run the command below to create a Redis cluster.
    ```bash
    kbcli cluster create redis-cluster --cluster-definition='redis'
    ```

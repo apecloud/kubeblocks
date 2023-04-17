@@ -11,44 +11,7 @@ sidebar_label: Create and connect
 ### Before you start
 
 * `kbcli`: Install `kbcli` on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
-  1. Run the command below to install `kbcli`.
-   ```bash
-   curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
-   ```
-  2. Run the command below to check the version and verify whether `kbcli` is installed successfully.
-   ```bash
-   kbcli version
-   ```
 * KubeBlocks: Install KubeBlocks on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
-  1. Run the command below to install KubeBlocks.
-     ```bash
-     kbcli kubeblocks install
-     ```
-
-     :::note
-
-     If you want to specify a namespace for KubeBlocks, use `--namespace` or the abbreviated `-n` to name your namespace and configure `--create-namespace` as `true` to create a namespace if it does not exist. For example,
-     ```bash
-     kbcli kubeblocks install -n kubeblocks --create-namespace=true
-     ```
-
-     :::
-
-  2. Run the command below to verify whether KubeBlocks is installed successfully.
-     ```bash
-     kubectl get pod
-     ```
-
-     ***Result***
-
-     Four pods starting with `kubeblocks` are displayed. For example,
-     ```
-     NAME                                                  READY   STATUS    RESTARTS   AGE
-     kubeblocks-7d4c6fd684-9hjh7                           1/1     Running   0          3m33s
-     kubeblocks-grafana-b765d544f-wj6c6                    3/3     Running   0          3m33s
-     kubeblocks-prometheus-alertmanager-7c558865f5-hsfn5   2/2     Running   0          3m33s
-     kubeblocks-prometheus-server-5c89c8bc89-mwrx7         2/2     Running   0          3m33s
-     ```
 * Run the command below to view all the database types available for creating a cluster. 
   ```bash
   kbcli clusterdefinition list
@@ -56,12 +19,7 @@ sidebar_label: Create and connect
 
 ### Steps
 
-1. Run the command below to list all the available kernel versions and choose the one that you need.
-   ```bash
-   kbcli clusterversion list
-   ```
-
-2. Run the command below to create a PostgreSQL cluster.
+Run the command below to create a PostgreSQL cluster.
    ```bash
    kbcli cluster create pg-cluster --cluster-definition='postgresql'
    ```

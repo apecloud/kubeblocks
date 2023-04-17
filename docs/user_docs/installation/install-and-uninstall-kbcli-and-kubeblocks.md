@@ -23,17 +23,19 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 <TabItem value="cURL" label="cURL" default>
 
 1. Run the command below to install `kbcli`.
+
     ```bash
     curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
     ```
 
     :::note
-    
+
     Please try again if a time-out exception occurs during installation. It may relate to your network condition.
 
     :::
 
 2. Check the version and verify whether `kbcli` is installed successfully.
+
     ```bash
     kbcli version
     ```
@@ -42,6 +44,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 <TabItem value="Homebrew" label="Homebrew">
 
 1. Install the ApeCloud tap, a repository of all Homebrew packages of ApeCloud.
+
    ```bash
    brew tap apecloud/tap
    ```
@@ -62,7 +65,10 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
    Tapped 2 formulae (16 files, 37.8KB). 
    ```
 
+   </details>
+
 2. Install `kbcli`.
+
    ```bash
    brew install kbcli
    ```
@@ -87,6 +93,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
    </details>
 
 3. Verify whether `kbcli` is installed successfully.
+
    ```bash
    kbcli -h
    ```
@@ -133,19 +140,22 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 
    </details>
 
-
 If you have installed `kbcli` and want to upgrade it, run
+
 ```bash
 brew upgrade kbcli
 ```
 
-If you want to install a specified version, 
+If you want to install a specified version,
 
 1. Get a full list of versions.
+
    ```bash
    brew search kbcli
    ```
+
 2. Install a specified version of `kbcli`. For example, install v0.4.0.
+
    ```bash
    brew install kbcli@0.4.0
    ```
@@ -158,15 +168,20 @@ For the local environment, it is recommended to run `kbcli playground init` to i
 
 :::
 
+***Steps:***
+
 1. Run the command below to install KubeBlocks.
+
     ```bash
     kbcli kubeblocks install
     ```
+
     ***Result***
 
     * KubeBlocks is installed with built-in toleration which tolerates the node with the `kb-controller=true:NoSchedule` taint.
     * KubeBlocks is installed with built-in node affinity which first deploys the node with the `kb-controller:true` label.
     * This command installs the latest version in your Kubernetes environment under the default namespace `kb-system` since your `kubectl` can connect to your Kubernetes clusters. If you want to install KubeBlocks in a specified namespace, run the command below.
+
        ```bash
        kbcli kubeblocks install -n <name> --create-namespace=true
        ```
@@ -176,74 +191,19 @@ For the local environment, it is recommended to run `kbcli playground init` to i
        ```bash
        kbcli kubeblocks install -n kubeblocks --create-namespace=true
        ```
-   
+
     You can also run the command below to check the parameters that can be specified during installation.
 
     ```bash
     kbcli kubeblocks install --help
     ```
 
-    <details>
-
-    <summary>Installation guide</summary>
-
-    Install KubeBlocks
-
-    Examples:
-      # Install KubeBlocks
-      kbcli kubeblocks install
-
-      # Install KubeBlocks with specified version
-      kbcli kubeblocks install --version=0.4.0
-
-      # Install KubeBlocks with other settings, for example, set replicaCount to 3
-      kbcli kubeblocks install --set replicaCount=3
-
-    Options:
-       --check=true:
-	        Check kubernetes environment before install
-
-       --create-namespace=false:
-	        Create the namespace if not present
-
-       --monitor=true:
-	        Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)
-
-       --set=[]:
-	        Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
-
-       --set-file=[]:
-	        Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)
-
-       --set-json=[]:
-	        Set JSON values on the command line (can specify multiple or separate values with commas:
-	        key1=jsonval1,key2=jsonval2)
-
-       --set-string=[]:
-	        Set STRING values on the command line (can specify multiple or separate values with commas:
-	        key1=val1,key2=val2)
-
-       --timeout=30m0s:
-	        Time to wait for installing KubeBlocks
-
-       -f, --values=[]:
-	        Specify values in a YAML file or a URL (can specify multiple)
-
-       --version='0.4.0-beta.5':
-	        KubeBlocks version
-
-    Usage:
-       kbcli kubeblocks install [flags] [options]
-
-    Use "kbcli options" for a list of global command-line options (applies to all commands).
-
-    </details>
-   
    * `-namespace` and its abbreviated version `-n` is used to name a namespace. `--create-namespace` is used to specify whether to create a namespace if it does not exist. `-n` is a global command line option. For global command line options, run `kbcli options` to list all options (applies to all commands).
    * Use `monitor` to specify whether to install the add-ons relevant to database monitoring and visualization.
    * Use `version` to specify the version you want to install. Find the supported version in [KubeBlocks Helm Charts](https://github.com/apecloud/helm-charts).
 
 2. Run the command below to verify whether KubeBlocks is installed successfully.
+
     ```bash
     kubectl get pod -n <namespace>
     ```
@@ -289,6 +249,65 @@ There are three types of results:
 * `fail`: The environment requirements for installing KubeBlocks are not met, and KubeBlocks can only be installed after these requirements are met. It is required to check these items again and re-run the preflight checks.
 * `congratulation`: All checks pass and you can continue the following installation.
 
+## Enable add-ons
+
+An add-on provides extension capabilities, i.e., manifests or application software, to the KubeBlocks control plane.
+
+By default, all add-ons supported are automatically installed.
+
+To list supported add-ons, run `kbcli addon list` command.
+
+**Example**
+
+```
+kbcli addon list
+```
+
+:::note
+
+Some add-ons have an environment requirement. If a certain requirement is not met, the automatic installation is invalid.
+
+:::
+
+You can perform the following steps to check and enable the add-on.
+
+***Steps:***
+
+1. Check the *Installable* part in the output information.
+  
+    **Example**
+
+    ```
+    kbcli addon describe snapshot-controller
+    ```
+
+    For certain add-ons, the installable part might say when the kubeGitVersion content includes *eks* and *ack*, the auto-install is enabled.
+
+    In this case, you can check the version of the Kubernetes cluster, and run the following command.
+
+    ```
+    kubectl version -ojson | jq '.serverVersion.gitVersion'
+    >
+    "v1.24.4+eks"
+    >
+    ```
+
+    As the printed output suggested, *eks* is included. And you can go on with the next step. In case that *eks* is not included, it is invalid to enable the add-on.
+
+2. To enable the add-on, use `kbcli addon enable`.
+
+    **Example**
+
+    ```
+    kbcli addon enable snapshot-controller
+    ```
+
+3. List the add-ons again to check whether it is enabled.
+
+    ```
+    kbcli addon list
+    ```
+
 ## (Optional) Enable kbcli automatic command line completion
 
 `kbcli` supports automatic command line completion. You can run the command below to enable this function.
@@ -300,15 +319,22 @@ kbcli completion SHELL-TYPE -h
 
 Here we take zsh as an example.
 
+***Steps:***
+
 1. Run the command below.
+
     ```bash
     kbcli completion zsh -h
     ```
+
 2. Enable the completion function of your terminal first.
+
     ```bash
     echo "autoload -U compinit; compinit" >> ~/.zshrc
     ```
+
 3. Run the command below to enable the `kbcli` automatic completion function.
+
     ```bash
     echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
     ```
@@ -340,7 +366,7 @@ sudo rm /usr/local/bin/kbcli
 <TabItem value="Homebrew" label="Homebrew">
 
 ```bash
-brew cleanup kbcli
+brew uninstall kbcli
 ```
 
 </TabItem>

@@ -1,7 +1,7 @@
 ---
 title: Configure cluster parameters
 description: Configure cluster parameters
-keywords: [parameter, configuration, reconfiguration]
+keywords: [mysql, parameter, configuration, reconfiguration]
 sidebar_position: 1
 ---
 
@@ -18,16 +18,13 @@ The KubeBlocks configuration function provides a set of consistent default confi
 
 View the current configuration file of a cluster.
 ```bash
-kbcli cluster describe-config mysql-cluster
->
-ConfigSpecs Meta:
-CONFIG-SPEC-NAME            FILE     ENABLED   TEMPLATE                   CONSTRAINT                    RENDERED                                  COMPONENT   CLUSTER                
-mysql-consensusset-config   my.cnf   true      mysql8.0-config-template   mysql8.0-config-constraints   mysql-cluster-mysql-mysql-config          mysql       mysql-cluster   
+kbcli cluster describe-config mysql-cluster  
 ```
 
 From the meta information, the cluster `mysql-cluster` has a configuration file named `my.cnf`.
 
 You can also view the details of this configuration file and parameters.
+
 * View the details of the current configuration file.
 
    ```bash
@@ -43,6 +40,13 @@ You can also view the details of this configuration file and parameters.
   
   ```bash
   kbcli cluster explain-config mysql-cluster --param=innodb_buffer_pool_size
+  ```
+
+  <details>
+
+  <summary>Output</summary>
+
+  ```bash
   template meta:
     ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mysql-cluster
 
@@ -54,6 +58,8 @@ You can also view the details of this configuration file and parameters.
     Type:               integer
     Description:        The size in bytes of the memory buffer innodb uses to cache data and indexes of its tables  
   ```
+  
+  </details>
 
   * Allowed Values: It defines the valid value range of this parameter.
   * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. There are two different reconfiguration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**. 
@@ -117,7 +123,13 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
 
    ```bash
    kbcli cluster describe-ops mysql-cluster-reconfiguring-z2wvn -n default
-   >
+   ```
+
+   <details>
+
+   <summary>Output</summary>
+
+   ```bash
    Spec:
      Name: mysql-cluster-reconfiguring-z2wvn        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
 
@@ -129,7 +141,7 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
       Completion Time:    Mar 13,2023 02:55 UTC+0800
       Duration:           1s
       Status:             Succeed
-      Progress:           -/-
+      Progress:           1/1
 
     Conditions:
     LAST-TRANSITION-TIME         TYPE                 REASON                            STATUS   MESSAGE
@@ -140,6 +152,8 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
     Mar 13,2023 02:55 UTC+0800   ReconfigureSucceed   ReconfigureSucceed                True     Reconfiguring in Cluster: mysql-cluster, Component: mysql, ConfigTpl: mysql-consensusset-config, info: updated policy: <autoReload>, updated: map[my.cnf:{"mysqld":{"innodb_buffer_pool_size":"512M","max_connections":"600"}}], added: map[], deleted:map[]
     Mar 13,2023 02:55 UTC+0800   Succeed              OpsRequestProcessedSuccessfully   True     Successfully processed the OpsRequest: mysql-cluster-reconfiguring-z2wvn in Cluster: mysql-cluster
     ```
+
+    </details>
 
 4. Connect to the database to verify whether the parameters are modified. 
    
@@ -176,19 +190,9 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
 Static parameter reconfiguring requires restarting the pod. The following example reconfigures `ngram_token_size`.
 
 1. Search the current value of `ngram_token_size` and the default value is 2.
-   ```bash
-   kbcli cluster explain-config mysql-cluster --param=ngram_token_size
-   >
-   template meta:
-     ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mysql-cluster
 
-   Configure Constraint:
-     Parameter Name:     ngram_token_size
-     Allowed Values:     [1-10]
-     Scope:              Global
-     Dynamic:            false
-     Type:               integer
-     Description:        Defines the n-gram token size for the n-gram full-text parser.
+    ```bash
+    kbcli cluster explain-config mysql-cluster --param=ngram_token_size
     ```
 
     ```bash
@@ -209,10 +213,6 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
 2. Adjust the value of `ngram_token_size`.
    ```bash
    kbcli cluster configure mysql-cluster  --set=ngram_token_size=6
-   >
-   Will updated configure file meta:
-     TemplateName: mysql-consensusset-config          ConfigureFile: my.cnf        ComponentName: mysql        ClusterName: mysql-cluster
-   OpsRequest mysql-cluster-reconfiguring-nrnpf created
    ```
    
    :::note
@@ -222,6 +222,11 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
    :::
 
 3. Watch the progress of searching parameter reconfiguration and pay attention to the output of `Status.Progress` and `Status.Status`.
+   
+   <details>
+
+   <summary>Output</summary>
+
    ```bash
    # In progress
    kbcli cluster describe-ops mysql-cluster-reconfiguring-nrnpf -n default
@@ -259,17 +264,11 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
                          OBJECT-KEY   STATUS   DURATION   MESSAGE
    ```
 
+   </details>
+
 4. Connect to the database and verify the modifications after the reconfiguration is completed.
    ```bash
    kbcli cluster connect mysql-cluster
-
-   Copyright (c) 2000, 2022, Oracle and/or its affiliates.
-
-   Oracle is a registered trademark of Oracle Corporation and/or its
-   affiliates. Other names may be trademarks of their respective
-   owners.
-
-   Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
    ```
 
    ```bash

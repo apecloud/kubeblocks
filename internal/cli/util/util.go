@@ -318,7 +318,7 @@ func TimeTimeFormat(t time.Time) string {
 	return t.Format(layout)
 }
 
-func TimeTimeFormatWithDuration(t time.Time, precision time.Duration) string {
+func timeLayout(precision time.Duration) string {
 	layout := "Jan 02,2006 15:04 UTC-0700"
 	switch precision {
 	case time.Second:
@@ -326,7 +326,17 @@ func TimeTimeFormatWithDuration(t time.Time, precision time.Duration) string {
 	case time.Millisecond:
 		layout = "Jan 02,2006 15:04:05.000 UTC-0700"
 	}
+	return layout
+}
+
+func TimeTimeFormatWithDuration(t time.Time, precision time.Duration) string {
+	layout := timeLayout(precision)
 	return t.Format(layout)
+}
+
+func TimeParse(t string, precision time.Duration) (time.Time, error) {
+	layout := timeLayout(precision)
+	return time.Parse(layout, t)
 }
 
 // GetHumanReadableDuration returns a succinct representation of the provided startTime and endTime

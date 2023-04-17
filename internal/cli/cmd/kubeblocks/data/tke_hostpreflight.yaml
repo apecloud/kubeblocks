@@ -1,0 +1,20 @@
+apiVersion: troubleshoot.sh/v1beta2
+kind: HostPreflight
+metadata:
+  name: host-utility
+spec:
+  collectors:
+  analyzers:
+  extendCollectors:
+    - hostUtility :
+        collectorName: txcloud-cli
+        utilityName: tccli
+  extendAnalyzers:
+    - hostUtility:
+        checkName: txcloudCli-Check
+        collectorName: txcloud-cli
+        outcomes:
+          - pass:
+              message: txcloud-cli has been installed
+          - warn:
+              message: txcloud-cli isn't installed

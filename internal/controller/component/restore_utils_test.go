@@ -67,9 +67,7 @@ var _ = Describe("probe_utils", func() {
 		updateBackupStatus := func(backup *dataprotectionv1alpha1.Backup, backupToolName string, expectPhase dataprotectionv1alpha1.BackupPhase) {
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.BackupToolName = backupToolName
-				backup.Status.RemoteVolume = &corev1.Volume{
-					Name: "backup-pvc",
-				}
+				backup.Status.PersistentVolumeClaimName = "backup-pvc"
 				backup.Status.Phase = expectPhase
 			})).Should(Succeed())
 		}

@@ -1383,9 +1383,7 @@ var _ = Describe("Cluster Controller", func() {
 			By("mocking backup status completed, we don't need backup reconcile here")
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.BackupToolName = backupTool.Name
-				backup.Status.RemoteVolume = &corev1.Volume{
-					Name: "backup-pvc",
-				}
+				backup.Status.PersistentVolumeClaimName = "backup-pvc"
 				backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 			})).ShouldNot(HaveOccurred())
 			By("checking backup status completed")

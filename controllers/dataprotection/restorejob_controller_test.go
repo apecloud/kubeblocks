@@ -93,7 +93,7 @@ var _ = Describe("RestoreJob Controller", func() {
 			SetTTL("7d").
 			SetBackupToolName(backupTool).
 			SetTargetSecretName("mycluster-cluster-secret").
-			SetRemoteVolumePVC("backup-remote-volume", "backup-host-path-pvc").
+			SetPVC("backup-host-path-pvc").
 			Create(&testCtx).GetObject()
 	}
 

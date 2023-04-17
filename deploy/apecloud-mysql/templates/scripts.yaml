@@ -11,15 +11,13 @@ data:
     followers=$KB_MYSQL_FOLLOWERS
     echo "leader=$leader"
     echo "followers=$followers"
-    sub_follower=`echo "$followers" | grep "$KB_POD_NAME"`
     echo "KB_POD_NAME=$KB_POD_NAME"
-    echo "sub_follower=$sub_follower"
-    if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" -o ! -z "$sub_follower" ]; then
-      echo "no need to call add"
+    idx=${KB_POD_NAME##*-}
+    host=$(eval echo \$KB_MYSQL_"$idx"_HOSTNAME)
+    echo "host=$host"
+    if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" ]; then
+      echo "no leader or self is leader, no need to call add."
     else 
-      idx=${KB_POD_NAME##*-}
-      host=$(eval echo \$KB_MYSQL_"$idx"_HOSTNAME)
-      echo "host=$host"
       leader_idx=${leader##*-}
       leader_host=$(eval echo \$KB_MYSQL_"$leader_idx"_HOSTNAME)
       if [ ! -z $leader_host ]; then 
@@ -28,18 +26,24 @@ data:
       if [ ! -z $MYSQL_ROOT_PASSWORD ]; then 
         password_flag="-p$MYSQL_ROOT_PASSWORD"
       fi
-      echo "mysql $host_flag -uroot $password_flag -e \"call dbms_consensus.add_learner('$host:13306');\" >> /tmp/setup_error.log 2>&1 "
-      mysql $host_flag -uroot $password_flag -e "call dbms_consensus.add_learner('$host:13306');" >> /tmp/setup_error.log 2>&1 
-      code=$?
-      echo "exit code: $code" 
-      if [ $code -ne 0 ]; then
-        cat /tmp/setup_error.log
-        already_exists=`cat /tmp/setup_error.log | grep "Target node already exists"`
-        if [ -z "$already_exists" ]; then 
-          exit $code
-        fi
-      fi 
-      /scripts/upgrade-learner.sh &
+      echo "mysql $host_flag -uroot $password_flag -e \"select * from information_schema.wesql_cluster_global;\" 2>&1"
+      topology=`mysql $host_flag -uroot $password_flag -e "select * from information_schema.wesql_cluster_global;" 2>&1`
+      echo "topology=$topology"
+      in_topology=`echo $topology | grep "$KB_POD_NAME"`
+      if [ -z "$in_topology" ]; then
+        echo "mysql $host_flag -uroot $password_flag -e \"call dbms_consensus.add_learner('$host:13306');\" >> /tmp/setup_error.log 2>&1 "
+        mysql $host_flag -uroot $password_flag -e "call dbms_consensus.add_learner('$host:13306');" >> /tmp/setup_error.log 2>&1 
+        code=$?
+        echo "exit code: $code" 
+        if [ $code -ne 0 ]; then
+          cat /tmp/setup_error.log
+          already_exists=`cat /tmp/setup_error.log | grep "Target node already exists"`
+          if [ -z "$already_exists" ]; then 
+            exit $code
+          fi
+        fi 
+        /scripts/upgrade-learner.sh &
+      fi
     fi
     cluster_info="";
     for (( i=0; i< $KB_MYSQL_N; i++ )); do
@@ -54,13 +58,9 @@ data:
         cluster_info="$cluster_info$host:13306#1N";
       fi
     done; 
-    idx=${KB_POD_NAME##*-}
-    echo $idx
-    host=$(eval echo \$KB_MYSQL_"$idx"_HOSTNAME)
     cluster_info="$cluster_info@$(($idx+1))"; 
     echo "cluster_info=$cluster_info"; 
-    mkdir -p /data/mysql/data;
-    mkdir -p /data/mysql/log;
+    mkdir -p /data/mysql/data /data/mysql/log
     chmod +777 -R /data/mysql; 
     echo "KB_MYSQL_RECREATE=$KB_MYSQL_RECREATE"
     if [ "$KB_MYSQL_RECREATE" == "true" ]; then 

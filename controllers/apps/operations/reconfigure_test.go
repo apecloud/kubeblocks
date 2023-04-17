@@ -179,10 +179,13 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return opsRes, eventContext
 	}
 
-	Context("Test OpsRequest", func() {
+	Context("Test Reconfigure", func() {
 		It("Test Reconfigure OpsRequest with restart", func() {
 			opsRes, eventContext := assureMockReconfigureData("simple")
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: testCtx.Ctx,
+				Log: log.FromContext(ctx).WithValues("Reconfigure"),
+			}
 
 			By("mock reconfigure success")
 			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr, testCtx.DefaultNamespace,

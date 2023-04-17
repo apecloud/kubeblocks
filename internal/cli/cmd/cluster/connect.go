@@ -19,8 +19,8 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
@@ -172,7 +172,7 @@ func (o *ConnectOptions) validate(args []string) error {
 	if len(o.userName) > 0 {
 		// read password from stdin
 		fmt.Print("Password: ")
-		if bytePassword, err := terminal.ReadPassword(syscall.Stdin); err != nil {
+		if bytePassword, err := terminal.ReadPassword(int(os.Stdin.Fd())); err != nil {
 			return err
 		} else {
 			o.userPasswd = string(bytePassword)

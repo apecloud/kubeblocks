@@ -1,34 +1,50 @@
 ---
-title: kbcli cluster configure
+title: kbcli kubeblocks config
 ---
 
-Reconfigure parameters with the specified components in the cluster.
+KubeBlocks config.
 
 ```
-kbcli cluster configure [flags]
+kbcli kubeblocks config [flags]
 ```
 
 ### Examples
 
 ```
-  # update component params
-  kbcli cluster configure <cluster-name> --component=<component-name> --config-spec=<config-spec-name> --config-file=<config-file> --set max_connections=1000,general_log=OFF
+  # Enable the snapshot-controller and volume snapshot, to support snapshot backup.
+  kbcli kubeblocks config --set snapshot-controller.enabled=true
   
-  # if only one component, and one config spec, and one config file, simplify the use of configure. e.g:
-  # update mysql max_connections, cluster name is mycluster
-  kbcli cluster configure mycluster --set max_connections=2000
+  Options Parameters:
+  # If you have already installed a snapshot-controller, only enable the snapshot backup feature
+  dataProtection.enableVolumeSnapshot=true
+  
+  # the global pvc name which persistent volume claim to store the backup data.
+  # will replace the pvc name when it is empty in the backup policy.
+  dataProtection.backupPVCName=backup-data
+  
+  # the init capacity of pvc for creating the pvc, e.g. 10Gi.
+  # will replace the init capacity when it is empty in the backup policy.
+  dataProtection.backupPVCInitCapacity=100Gi
+  
+  # the pvc storage class name.
+  # will replace the storageClassName when it is nil in the backup policy.
+  dataProtection.backupPVCStorageClassName=csi-s3
+  
+  # the pvc create policy.
+  # if the storageClass supports dynamic provisioning, recommend "IfNotPresent" policy.
+  # otherwise, using "Never" policy. only affect the backupPolicy automatically created by Kubeblocks.
+  dataProtection.backupPVCCreatePolicy=Never
 ```
 
 ### Options
 
 ```
-      --component string             Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.
-      --config-file string           Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.
-      --config-spec string           Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.
-  -h, --help                         help for configure
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --set strings                  Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-config'.
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+  -h, --help                     help for config
+      --set stringArray          Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+      --set-file stringArray     Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)
+      --set-json stringArray     Set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)
+      --set-string stringArray   Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+  -f, --values strings           Specify values in a YAML file or a URL (can specify multiple)
 ```
 
 ### Options inherited from parent commands
@@ -57,7 +73,7 @@ kbcli cluster configure [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

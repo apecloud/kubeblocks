@@ -82,8 +82,8 @@ var _ = Describe("create", func() {
 
 		It("should succeed with required arguments", func() {
 			o.Constraint = generalResourceConstraint.Name
-			fillResources(o, "12", "48Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
-			Expect(o.validate([]string{"general-12c48g"})).ShouldNot(HaveOccurred())
+			fillResources(o, "2", "8Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
+			Expect(o.validate([]string{"general-2c8g"})).ShouldNot(HaveOccurred())
 			Expect(o.run()).ShouldNot(HaveOccurred())
 			Expect(out.String()).Should(ContainSubstring(o.ClassName))
 		})
@@ -100,10 +100,10 @@ var _ = Describe("create", func() {
 			o.File = testCustomClassDefsPath
 			Expect(o.run()).ShouldNot(HaveOccurred())
 			Expect(out.String()).Should(ContainSubstring("custom-1c1g"))
-			Expect(out.String()).Should(ContainSubstring("custom-200c400g"))
+			Expect(out.String()).Should(ContainSubstring("custom-4c16g"))
 			// memory optimized classes
-			Expect(out.String()).Should(ContainSubstring("custom-1c32g"))
-			Expect(out.String()).Should(ContainSubstring("custom-2c64g"))
+			Expect(out.String()).Should(ContainSubstring("custom-2c16g"))
+			Expect(out.String()).Should(ContainSubstring("custom-4c64g"))
 		})
 
 	})

@@ -365,7 +365,7 @@ var _ = Describe("create", func() {
 		Expect(setBackup(o, components).Error()).Should(ContainSubstring("is not completed"))
 
 		By("test backup is completed")
-		mockBackupInfo(dynamic, backupName, clusterName)
+		mockBackupInfo(dynamic, backupName, clusterName, nil)
 		Expect(setBackup(o, components)).Should(Succeed())
 	})
 })

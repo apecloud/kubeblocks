@@ -138,7 +138,7 @@ func (o *CreateOptions) run() error {
 	}
 
 	var (
-		classNames           []string
+		classInstances       []*v1alpha1.ComponentClassInstance
 		componentClassGroups []v1alpha1.ComponentClassGroup
 	)
 
@@ -157,14 +157,8 @@ func (o *CreateOptions) run() error {
 		if err != nil {
 			return err
 		}
-		for name, cls := range newClasses {
-			if _, ok = constraints[cls.ResourceConstraintRef]; !ok {
-				return fmt.Errorf("resource constraint %s is not found", cls.ResourceConstraintRef)
-			}
-			if _, ok = classes[name]; ok {
-				return fmt.Errorf("class name conflicted %s", name)
-			}
-			classNames = append(classNames, name)
+		for _, cls := range newClasses {
+			classInstances = append(classInstances, cls)
 		}
 	} else {
 		if _, ok = classes[o.ClassName]; ok {
@@ -187,7 +181,22 @@ func (o *CreateOptions) run() error {
 				},
 			},
 		}
-		classNames = append(classNames, o.ClassName)
+		classInstances = append(classInstances, &v1alpha1.ComponentClassInstance{ComponentClass: *cls, ResourceConstraintRef: o.Constraint})
+	}
+
+	var classNames []string
+	for _, item := range classInstances {
+		constraint, ok := constraints[item.ResourceConstraintRef]
+		if !ok {
+			return fmt.Errorf("resource constraint %s is not found", item.ResourceConstraintRef)
+		}
+		if _, ok = classes[item.Name]; ok {
+			return fmt.Errorf("class name conflicted %s", item.Name)
+		}
+		if !constraint.MatchClass(item) {
+			return fmt.Errorf("class %s not conform to constraint %s", item.Name, item.ResourceConstraintRef)
+		}
+		classNames = append(classNames, item.Name)
 	}
 
 	objName := class.GetCustomClassObjectName(o.ClusterDefRef, o.ComponentType)

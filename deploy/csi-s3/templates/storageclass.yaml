@@ -10,7 +10,7 @@ metadata:
 provisioner: ru.yandex.s3.csi
 parameters:
   mounter: "{{ .Values.storageClass.mounter }}"
-  options: "{{ .Values.storageClass.mountOptions }}"
+  options: "{{ include "storageClass.mountOptions" . }}"
 {{- if .Values.storageClass.singleBucket }}
   bucket: "{{ .Values.storageClass.singleBucket }}"
 {{- end }}

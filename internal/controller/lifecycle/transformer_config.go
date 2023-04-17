@@ -17,27 +17,23 @@ limitations under the License.
 package lifecycle
 
 import (
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	corev1 "k8s.io/api/core/v1"
 
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 // configTransformer makes all config related ConfigMaps immutable
 type configTransformer struct{}
 
 func (c *configTransformer) Transform(dag *graph.DAG) error {
-	cmVertices := ictrltypes.FindAll[*corev1.ConfigMap](dag)
-	isConfig := func(cm *corev1.ConfigMap) bool {
-		// TODO: we should find a way to know if cm is a true config
-		// TODO: the main problem is we can't separate script from config,
-		// TODO: as componentDef.ConfigSpec defines them in same way
-		return false
-	}
-	for _, vertex := range cmVertices {
+	for _, vertex := range ictrltypes.FindAll[*corev1.ConfigMap](dag) {
 		v, _ := vertex.(*ictrltypes.LifecycleVertex)
 		cm, _ := v.Obj.(*corev1.ConfigMap)
-		if isConfig(cm) {
+		// Note: Disable updating of the config resources.
+		// Labels and Annotations have the necessary meta information for controller.
+		if cfgcore.IsSchedulableConfigResource(cm) {
 			v.Immutable = true
 		}
 	}

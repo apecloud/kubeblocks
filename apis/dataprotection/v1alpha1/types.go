@@ -49,6 +49,16 @@ const (
 	BaseBackupTypeSnapshot BaseBackupType = "snapshot"
 )
 
+// CreatePVCPolicy the policy how to create the PersistentVolumeClaim for backup.
+// +enum
+// +kubebuilder:validation:Enum={IfNotPresent,Never}
+type CreatePVCPolicy string
+
+const (
+	CreatePVCPolicyNever        CreatePVCPolicy = "Never"
+	CreatePVCPolicyIfNotPresent CreatePVCPolicy = "IfNotPresent"
+)
+
 // BackupPolicyPhase defines phases for BackupPolicy CR.
 // +enum
 // +kubebuilder:validation:Enum={Available,Failed}

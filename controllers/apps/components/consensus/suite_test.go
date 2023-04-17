@@ -55,7 +55,7 @@ func init() {
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "ConsensusSet Controller Suite")
+	RunSpecs(t, "Consensus Controller Suite")
 }
 
 var _ = BeforeSuite(func() {

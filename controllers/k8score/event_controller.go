@@ -19,8 +19,6 @@ package k8score
 import (
 	"context"
 	"encoding/json"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"regexp"
 	"strings"
 
@@ -34,6 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"

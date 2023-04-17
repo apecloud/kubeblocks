@@ -271,8 +271,8 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 func newConsensusSet(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,
-	def appsv1alpha1.ClusterComponentDefinition) (*ConsensusSet, error) {
-	consensus := &ConsensusSet{
+	def appsv1alpha1.ClusterComponentDefinition) *ConsensusSet {
+	return &ConsensusSet{
 		Stateful: stateful.Stateful{
 			ComponentSetBase: types.ComponentSetBase{
 				Cli:           cli,
@@ -283,5 +283,4 @@ func newConsensusSet(cli client.Client,
 			},
 		},
 	}
-	return consensus, nil
 }

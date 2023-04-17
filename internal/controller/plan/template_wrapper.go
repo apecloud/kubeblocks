@@ -18,6 +18,8 @@ package plan
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -61,7 +63,7 @@ func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *a
 	}
 }
 
-func (wrapper *renderWrapper) enableRerenderTemplateSpec(cfgCMName string, task *intctrltypes.ReconcileTask) (bool, error) {
+func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, task *intctrltypes.ReconcileTask) (bool, *corev1.ConfigMap, error) {
 	cmKey := client.ObjectKey{
 		Name:      cfgCMName,
 		Namespace: wrapper.cluster.Namespace,
@@ -70,21 +72,23 @@ func (wrapper *renderWrapper) enableRerenderTemplateSpec(cfgCMName string, task 
 	cmObj := &corev1.ConfigMap{}
 	localObject := task.GetLocalResourceWithObjectKey(cmKey, generics.ToGVK(cmObj))
 	if localObject != nil {
-		return false, nil
+		if cm, ok := localObject.(*corev1.ConfigMap); ok {
+			return false, cm, nil
+		}
 	}
 
 	cmErr := wrapper.cli.Get(wrapper.ctx, cmKey, cmObj)
 	if cmErr != nil && !apierrors.IsNotFound(cmErr) {
 		// An unexpected error occurs
-		return false, cmErr
+		return false, nil, cmErr
 	}
 	if cmErr != nil {
 		// Config is not exists
-		return true, nil
+		return true, nil, nil
 	}
 
 	// Config is exists
-	return cfgcore.IsNotUserReconfigureOperation(cmObj), nil
+	return cfgcore.IsNotUserReconfigureOperation(cmObj), cmObj, nil
 }
 
 func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster,
@@ -92,25 +96,27 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, configSpec := range component.ConfigTemplates {
 		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpec.VolumeName)
-		enableRerender, err := wrapper.enableRerenderTemplateSpec(cmName, task)
+		enableRerender, origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, task)
 		if err != nil {
 			return err
 		}
 		if !enableRerender {
-			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, cmName)
+			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj)
 			continue
 		}
-
 		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef,
+		newCMObj, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef,
 			configSpec.ComponentTemplateSpec, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
 				return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
 			})
 		if err != nil {
 			return err
 		}
-		updateCMConfigSpecLabels(cm, configSpec)
-		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, cm, scheme); err != nil {
+		if err := wrapper.checkAndPatchConfigResource(origCMObj, newCMObj.Data); err != nil {
+			return err
+		}
+		updateCMConfigSpecLabels(newCMObj, configSpec)
+		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
 			return err
 		}
 	}
@@ -122,11 +128,12 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, templateSpec := range component.ScriptTemplates {
 		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, templateSpec.VolumeName)
-		if task.GetLocalResourceWithObjectKey(client.ObjectKey{
+		object := task.GetLocalResourceWithObjectKey(client.ObjectKey{
 			Name:      cmName,
 			Namespace: wrapper.cluster.Namespace,
-		}, generics.ToGVK(&corev1.ConfigMap{})) != nil {
-			wrapper.addVolumeMountMeta(templateSpec, cmName)
+		}, generics.ToGVK(&corev1.ConfigMap{}))
+		if object != nil {
+			wrapper.addVolumeMountMeta(templateSpec, object)
 			continue
 		}
 
@@ -150,14 +157,37 @@ func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.Compon
 	}
 
 	cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
-	wrapper.renderedObjs = append(wrapper.renderedObjs, cm)
-	wrapper.addVolumeMountMeta(templateSpec, cm.Name)
+	wrapper.addVolumeMountMeta(templateSpec, cm)
 	return nil
 }
 
-func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.ComponentTemplateSpec, cmName string) {
-	wrapper.volumes[cmName] = templateSpec
-	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = cmName
+func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.ComponentTemplateSpec, object client.Object) {
+	wrapper.volumes[object.GetName()] = templateSpec
+	wrapper.renderedObjs = append(wrapper.renderedObjs, object)
+	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = object.GetName()
+}
+
+func (wrapper *renderWrapper) checkAndPatchConfigResource(origCMObj *corev1.ConfigMap, newData map[string]string) error {
+	if origCMObj == nil {
+		return nil
+	}
+	if reflect.DeepEqual(origCMObj.Data, newData) {
+		return nil
+	}
+
+	patch := client.MergeFrom(origCMObj.DeepCopy())
+	origCMObj.Data = newData
+	if origCMObj.Annotations == nil {
+		origCMObj.Annotations = make(map[string]string)
+	}
+	cfgcore.SetParametersUpdateSource(origCMObj, constant.ReconfigureManagerSource)
+	rawData, err := json.Marshal(origCMObj.Data)
+	if err != nil {
+		return err
+	}
+
+	origCMObj.Annotations[corev1.LastAppliedConfigAnnotation] = string(rawData)
+	return wrapper.cli.Patch(wrapper.ctx, origCMObj, patch)
 }
 
 func updateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {

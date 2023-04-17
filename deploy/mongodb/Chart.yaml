@@ -4,7 +4,7 @@ description: MongoDB is a document database designed for ease of application dev
 
 type: application
 
-version: 0.5.0-alpha.3
+version: 0.5.0-alpha.8
 
 appVersion: "5.0.14"
 

@@ -18,7 +18,6 @@ package apps
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"

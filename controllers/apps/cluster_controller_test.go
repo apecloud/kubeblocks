@@ -18,7 +18,6 @@ package apps
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"reflect"
 	"strconv"
 	"strings"
@@ -43,6 +42,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
@@ -1383,9 +1383,7 @@ var _ = Describe("Cluster Controller", func() {
 			By("mocking backup status completed, we don't need backup reconcile here")
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.BackupToolName = backupTool.Name
-				backup.Status.RemoteVolume = &corev1.Volume{
-					Name: "backup-pvc",
-				}
+				backup.Status.PersistentVolumeClaimName = "backup-pvc"
 				backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 			})).ShouldNot(HaveOccurred())
 			By("checking backup status completed")

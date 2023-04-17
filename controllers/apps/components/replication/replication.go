@@ -18,7 +18,6 @@ package replication
 
 import (
 	"context"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -116,6 +115,8 @@ func (r *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) 
 	return intctrlutil.PodIsReadyWithLabel(*pod)
 }
 
+// HandleProbeTimeoutWhenPodsReady is the implementation of the type Component interface method,
+// and replicationSet does not need to do role probe detection, so it returns false directly.
 func (r *ReplicationSet) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
 }
 
@@ -244,8 +245,8 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 func newReplicationSet(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,
-	def appsv1alpha1.ClusterComponentDefinition) (*ReplicationSet, error) {
-	replication := &ReplicationSet{
+	def appsv1alpha1.ClusterComponentDefinition) *ReplicationSet {
+	return &ReplicationSet{
 		Stateful: stateful.Stateful{
 			ComponentSetBase: types.ComponentSetBase{
 				Cli:           cli,
@@ -256,7 +257,6 @@ func newReplicationSet(cli client.Client,
 			},
 		},
 	}
-	return replication, nil
 }
 
 func DefaultRole(i int32) string {

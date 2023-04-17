@@ -19,8 +19,10 @@ package lifecycle
 import (
 	"fmt"
 
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -29,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -48,11 +51,11 @@ func (r *backupPolicyTPLTransformer) Transform(dag *graph.DAG) error {
 	if len(backupPolicyTPLs.Items) == 0 {
 		return nil
 	}
-	rootVertex, err := findRootVertex(dag)
+	rootVertex, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
-	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+	origCluster, _ := rootVertex.ObjCopy.(*appsv1alpha1.Cluster)
 	for _, tpl := range backupPolicyTPLs.Items {
 		for _, v := range tpl.Spec.BackupPolicies {
 			compDef := r.cr.cd.GetComponentDefByName(v.ComponentDefRef)
@@ -61,7 +64,7 @@ func (r *backupPolicyTPLTransformer) Transform(dag *graph.DAG) error {
 			}
 			// build the backup policy from the template.
 			backupPolicy := r.transformBackupPolicy(v, origCluster, compDef.WorkloadType, tpl.Name)
-			vertex := &lifecycleVertex{obj: backupPolicy}
+			vertex := &ictrltypes.LifecycleVertex{Obj: backupPolicy}
 			dag.AddVertex(vertex)
 			dag.Connect(rootVertex, vertex)
 		}
@@ -306,9 +309,23 @@ func (r *backupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.Common
 	if bp == nil {
 		return nil
 	}
+	defaultCreatePolicy := dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent
+	globalCreatePolicy := viper.GetString(constant.CfgKeyBackupPVCCreatePolicy)
+	if len(globalCreatePolicy) != 0 {
+		defaultCreatePolicy = dataprotectionv1alpha1.CreatePVCPolicy(globalCreatePolicy)
+	}
+	defaultInitCapacity := constant.DefaultBackupPvcInitCapacity
+	globalInitCapacity := viper.GetString(constant.CfgKeyBackupPVCInitCapacity)
+	if len(globalInitCapacity) != 0 {
+		defaultInitCapacity = globalInitCapacity
+	}
 	return &dataprotectionv1alpha1.CommonBackupPolicy{
 		BackupToolName: bp.BackupToolName,
-		BasePolicy:     r.convertBasePolicy(bp.BasePolicy, clusterName, component, workloadType),
+		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
+			InitCapacity: resource.MustParse(defaultInitCapacity),
+			CreatePolicy: defaultCreatePolicy,
+		},
+		BasePolicy: r.convertBasePolicy(bp.BasePolicy, clusterName, component, workloadType),
 	}
 }
 

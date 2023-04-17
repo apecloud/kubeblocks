@@ -19,7 +19,6 @@ package configuration
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
 	"net"
 	"sort"
 	"strconv"
@@ -27,6 +26,7 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"

@@ -40,7 +40,6 @@ var _ = Describe("Backup Controller test", func() {
 	const componentName = "replicasets-primary"
 	const containerName = "mysql"
 	const backupPolicyName = "test-backup-policy"
-	const backupRemoteVolumeName = "backup-remote-volume"
 	const backupRemotePVCName = "backup-remote-pvc"
 	const defaultSchedule = "0 3 * * *"
 	const defaultTTL = "7d"
@@ -142,7 +141,7 @@ var _ = Describe("Backup Controller test", func() {
 				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 				AddMatchLabels(constant.RoleLabelKey, "leader").
 				SetTargetSecretName(clusterName).
-				SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+				SetPVC(backupRemotePVCName).
 				Create(&testCtx).GetObject()
 		})
 
@@ -350,7 +349,7 @@ var _ = Describe("Backup Controller test", func() {
 					SetTTL(defaultTTL).
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
-					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+					SetPVC(backupRemotePVCName).
 					Create(&testCtx).GetObject()
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
@@ -362,6 +361,13 @@ var _ = Describe("Backup Controller test", func() {
 			})
 
 			It("should succeed after job completes", func() {
+
+				By("Check pvc created by backup")
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
+					Name:      backupRemotePVCName,
+					Namespace: testCtx.DefaultNamespace,
+				}, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)
 
 				By("Check backup job completed")

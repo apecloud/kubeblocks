@@ -17,10 +17,11 @@ limitations under the License.
 package apps
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type MockBackupPolicyFactory struct {
@@ -96,13 +97,21 @@ func (factory *MockBackupPolicyFactory) AddSnapshotPolicy() *MockBackupPolicyFac
 }
 
 func (factory *MockBackupPolicyFactory) AddFullPolicy() *MockBackupPolicyFactory {
-	factory.get().Spec.Full = &dataprotectionv1alpha1.CommonBackupPolicy{}
+	factory.get().Spec.Full = &dataprotectionv1alpha1.CommonBackupPolicy{
+		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
+			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
+		},
+	}
 	factory.backupType = dataprotectionv1alpha1.BackupTypeFull
 	return factory
 }
 
 func (factory *MockBackupPolicyFactory) AddIncrementalPolicy() *MockBackupPolicyFactory {
-	factory.get().Spec.Incremental = &dataprotectionv1alpha1.CommonBackupPolicy{}
+	factory.get().Spec.Incremental = &dataprotectionv1alpha1.CommonBackupPolicy{
+		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
+			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
+		},
+	}
 	factory.backupType = dataprotectionv1alpha1.BackupTypeIncremental
 	return factory
 }
@@ -183,23 +192,10 @@ func (factory *MockBackupPolicyFactory) AddHookPostCommand(postCommand string) *
 	return factory
 }
 
-func (factory *MockBackupPolicyFactory) SetRemoteVolume(volume corev1.Volume) *MockBackupPolicyFactory {
+func (factory *MockBackupPolicyFactory) SetPVC(pvcName string) *MockBackupPolicyFactory {
 	factory.setCommonPolicyField(func(commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) {
-		commonPolicy.RemoteVolume = volume
-	})
-	return factory
-}
-
-func (factory *MockBackupPolicyFactory) SetRemoteVolumePVC(volumeName, pvcName string) *MockBackupPolicyFactory {
-	factory.setCommonPolicyField(func(commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) {
-		commonPolicy.RemoteVolume = corev1.Volume{
-			Name: volumeName,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvcName,
-				},
-			},
-		}
+		commonPolicy.PersistentVolumeClaim.Name = pvcName
+		commonPolicy.PersistentVolumeClaim.InitCapacity = resource.MustParse(constant.DefaultBackupPvcInitCapacity)
 	})
 	return factory
 }

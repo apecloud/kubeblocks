@@ -13,23 +13,3 @@ spec:
           - name: mongodb
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-    - componentDefRef: mongos
-      versionsContext:
-        containers:
-          - name: mongos
-            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-    - componentDefRef: configsvr
-      versionsContext:
-        containers:
-          - name: configsvr
-            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-    - componentDefRef: shard
-      versionsContext:
-        containers:
-          - name: shard
-            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-          - name: agent
-            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

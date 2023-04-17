@@ -25,6 +25,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -84,7 +85,15 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		opsRes *OpsResource,
 		pgRes progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, getExpectReplicas)
+		expectProgressCount, completedCount, err := handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, getExpectReplicas)
+		if err != nil {
+			return expectProgressCount, completedCount, err
+		}
+		// TODO: delete the configmaps of the cluster should be removed from the opsRequest after refactor.
+		if err := lifecycle.DeleteConfigMaps(reqCtx.Ctx, cli, opsRes.Cluster); err != nil {
+			return expectProgressCount, completedCount, err
+		}
+		return expectProgressCount, completedCount, nil
 	}
 	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
 }

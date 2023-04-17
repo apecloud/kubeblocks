@@ -85,6 +85,7 @@ func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int3
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
+// HandleProbeTimeoutWhenPodsReady the stateless component has no role detection, empty implementation here.
 func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
 }
 
@@ -118,7 +119,7 @@ func newStateless(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,
 	def appsv1alpha1.ClusterComponentDefinition) *Stateless {
-	stateless := &Stateless{
+	return &Stateless{
 		ComponentSetBase: types.ComponentSetBase{
 			Cli:           cli,
 			Cluster:       cluster,
@@ -127,7 +128,6 @@ func newStateless(cli client.Client,
 			Component:     nil,
 		},
 	}
-	return stateless
 }
 
 // deploymentIsReady check deployment is ready

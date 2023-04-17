@@ -31,6 +31,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -124,6 +125,15 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 			return err
 		}
 		c.cleanupAnnotationsAfterRunning(cluster)
+
+		if shouldRequeue, err := plan.DoPITRIfNeed(c.ctx.Ctx, c.cli, cluster); err != nil {
+			return err
+		} else if shouldRequeue {
+			return &realRequeueError{reason: "waiting pitr job", requeueAfter: requeueDuration}
+		}
+		if err = plan.DoPITRCleanup(c.ctx.Ctx, c.cli, cluster); err != nil {
+			return err
+		}
 	}
 
 	return nil

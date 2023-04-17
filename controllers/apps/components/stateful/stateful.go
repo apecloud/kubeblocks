@@ -110,8 +110,8 @@ func (r *Stateful) HandleRoleChange(context.Context, client.Object) ([]graph.Ver
 func newStateful(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,
-	def appsv1alpha1.ClusterComponentDefinition) (*Stateful, error) {
-	stateful := &Stateful{
+	def appsv1alpha1.ClusterComponentDefinition) *Stateful {
+	return &Stateful{
 		ComponentSetBase: types.ComponentSetBase{
 			Cli:           cli,
 			Cluster:       cluster,
@@ -120,5 +120,4 @@ func newStateful(cli client.Client,
 			Component:     nil,
 		},
 	}
-	return stateful, nil
 }

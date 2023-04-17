@@ -95,6 +95,6 @@ func TestResourceConstraints(t *testing.T) {
 				Memory: memory,
 			},
 		}
-		assert.Equal(t, t, item.expect, cf.MatchClass(class))
+		assert.Equal(t, item.expect, cf.MatchClass(class))
 	}
 }

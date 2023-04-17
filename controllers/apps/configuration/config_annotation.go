@@ -104,7 +104,6 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 
 	// delete reconfigure-policy
 	delete(config.ObjectMeta.Annotations, constant.UpgradePolicyAnnotationKey)
-	delete(config.ObjectMeta.Annotations, constant.KBParameterUpdateSourceAnnotationKey)
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return false, err
 	}

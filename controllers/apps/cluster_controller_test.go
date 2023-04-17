@@ -633,12 +633,6 @@ var _ = Describe("Cluster Controller", func() {
 					if !slices.Contains(componentDefsWithHScalePolicy, compDef.Name) {
 						continue
 					}
-					// nil backup policy test
-					// as stateful/replication/consensus share the same h-scale logic,
-					// this setup should cover all three of them with nil policy
-					if compDef.WorkloadType == appsv1alpha1.Stateful {
-						continue
-					}
 
 					By("Checking backup policy created from backup policy template")
 					policyName := lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDef.Name)
@@ -771,10 +765,11 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, statefulCompName, consensusCompName, replicationCompName)
 
+		// statefulCompDefName not in componentDefsWithHScalePolicy, for nil backup policy test
 		// REVIEW: (chantu)
 		//  1. this test flow, wait for running phase?
 		//  2. following horizontalScale only work with statefulCompDefName?
-		horizontalScale(int(updatedReplicas), statefulCompDefName, consensusCompDefName, replicationCompDefName)
+		horizontalScale(int(updatedReplicas), consensusCompDefName, replicationCompDefName)
 	}
 
 	testVerticalScale := func() {

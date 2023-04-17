@@ -36,11 +36,8 @@ import (
 var _ = Describe("ConfigConstraint Controller", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
-
-	const statefulCompType = "replicasets"
-
+	const statefulCompDefName = "replicasets"
 	const configSpecName = "mysql-config-tpl"
-
 	const configVolumeName = "mysql-config"
 
 	cleanEnv := func() {
@@ -56,10 +53,10 @@ var _ = Describe("ConfigConstraint Controller", func() {
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -81,7 +78,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 
 			By("Create a clusterDefinition obj")
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
@@ -89,7 +86,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).
+				AddComponent(statefulCompDefName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()

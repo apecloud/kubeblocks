@@ -73,8 +73,14 @@ var clusterCreateExample = templates.Examples(`
 	# the cluster, use termination policy WipeOut
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy WipeOut
 
-	# Create a cluster and set cpu to 1000m, memory to 1Gi, storage size to 10Gi and replicas to 3
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1000m,memory=1Gi,storage=10Gi,replicas=3
+	# Create a cluster and set cpu to 1 core, memory to 1Gi, storage size to 20Gi and replicas to 3
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1,memory=1Gi,storage=20Gi,replicas=3
+
+	# Create a cluster and set the class to general-1c1g, valid classes can be found by executing the command "kbcli class list --cluster-definition=<cluster-definition-name>"
+	kbcli cluster create myclsuter --cluster-definition apecloud-mysql --set class=general-1c1g
+
+	# Create a cluster with replicationSet workloadType and set switchPolicy to Noop
+	kbcli cluster create myclsuter --cluster-definition postgresql --set switchPolicy=Noop
 
 	# Create a cluster and use a URL to set cluster resource
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/my.yaml
@@ -104,12 +110,14 @@ const (
 type setKey string
 
 const (
-	keyType     setKey = "type"
-	keyCPU      setKey = "cpu"
-	keyMemory   setKey = "memory"
-	keyReplicas setKey = "replicas"
-	keyStorage  setKey = "storage"
-	keyUnknown  setKey = "unknown"
+	keyType         setKey = "type"
+	keyCPU          setKey = "cpu"
+	keyClass        setKey = "class"
+	keyMemory       setKey = "memory"
+	keyReplicas     setKey = "replicas"
+	keyStorage      setKey = "storage"
+	keySwitchPolicy setKey = "switchPolicy"
+	keyUnknown      setKey = "unknown"
 )
 
 type envSet struct {
@@ -120,7 +128,7 @@ type envSet struct {
 var setKeyEnvMap = map[setKey]envSet{
 	keyCPU:      {"CLUSTER_DEFAULT_CPU", "1000m"},
 	keyMemory:   {"CLUSTER_DEFAULT_MEMORY", "1Gi"},
-	keyStorage:  {"CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi"},
+	keyStorage:  {"CLUSTER_DEFAULT_STORAGE_SIZE", "20Gi"},
 	keyReplicas: {"CLUSTER_DEFAULT_REPLICAS", "1"},
 }
 
@@ -204,7 +212,7 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 
 func (o *CreateOptions) Validate() error {
 	if o.ClusterDefRef == "" {
-		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli cluster-definition list\" to show all cluster definition")
+		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli clusterdefinition list\" to show all cluster definition")
 	}
 
 	if o.TerminationPolicy == "" {
@@ -292,8 +300,16 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 			return nil, err
 		}
 
-		if components, err = buildClusterComp(cd, compSets); err != nil {
+		componentObjs, err := buildClusterComp(cd, compSets)
+		if err != nil {
 			return nil, err
+		}
+		for _, compObj := range componentObjs {
+			comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compObj)
+			if err != nil {
+				return nil, err
+			}
+			components = append(components, comp)
 		}
 	}
 	return components, nil
@@ -341,7 +357,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cd list\" to show all available cluster definitions")
 			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
 			cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
-			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1000m,memory=1Gi,replicas=3,storage=10Gi)")
+			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 
 			// add updatable flags
@@ -411,7 +427,7 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 	}
 }
 
-func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]map[string]interface{}, error) {
+func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	getVal := func(key setKey, sets map[setKey]string) string {
 		// get value from set values
 		if sets != nil {
@@ -419,7 +435,6 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				return v
 			}
 		}
-
 		// get value from environment variables
 		env := setKeyEnvMap[key]
 		val := viper.GetString(env.name)
@@ -429,9 +444,29 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		return val
 	}
 
-	var comps []map[string]interface{}
-	for _, c := range cd.Spec.ComponentDefs {
+	buildSwitchPolicy := func(c *appsv1alpha1.ClusterComponentDefinition, compObj *appsv1alpha1.ClusterComponentSpec, sets map[setKey]string) error {
+		if c.WorkloadType != appsv1alpha1.Replication {
+			return nil
+		}
+		var switchPolicyType appsv1alpha1.SwitchPolicyType
+		switch getVal(keySwitchPolicy, sets) {
+		case "Noop", "":
+			switchPolicyType = appsv1alpha1.Noop
+		case "MaximumAvailability":
+			switchPolicyType = appsv1alpha1.MaximumAvailability
+		case "MaximumPerformance":
+			switchPolicyType = appsv1alpha1.MaximumDataProtection
+		default:
+			return fmt.Errorf("switchPolicy is illegal, only support Noop, MaximumAvailability, MaximumPerformance")
+		}
+		compObj.SwitchPolicy = &appsv1alpha1.ClusterSwitchPolicy{
+			Type: switchPolicyType,
+		}
+		return nil
+	}
 
+	var comps []*appsv1alpha1.ClusterComponentSpec
+	for _, c := range cd.Spec.ComponentDefs {
 		sets := map[setKey]string{}
 		if setsMap != nil {
 			sets = setsMap[c.Name]
@@ -444,21 +479,28 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 		replicas := int32(setReplicas)
 
-		resourceList := corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
-			corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
-		}
 		compObj := &appsv1alpha1.ClusterComponentSpec{
 			Name:            c.Name,
 			ComponentDefRef: c.Name,
 			Replicas:        replicas,
-			Resources: corev1.ResourceRequirements{
+		}
+
+		// class has higher priority than other resource related parameters
+		className := getVal(keyClass, sets)
+		if className != "" {
+			compObj.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: className}
+		} else {
+			resourceList := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
+				corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
+			}
+			compObj.Resources = corev1.ResourceRequirements{
 				Requests: resourceList,
 				Limits:   resourceList,
-			},
-			VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
+			}
+			compObj.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
 				Name: "data",
-				Spec: &corev1.PersistentVolumeClaimSpec{
+				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						corev1.ReadWriteOnce,
 					},
@@ -468,13 +510,12 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 						},
 					},
 				},
-			}},
+			}}
 		}
-		comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compObj)
-		if err != nil {
+		if err := buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err
 		}
-		comps = append(comps, comp)
+		comps = append(comps, compObj)
 	}
 	return comps, nil
 }
@@ -483,7 +524,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 // specified in the set, use the cluster definition default component name.
 func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
-	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas)}
+	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keySwitchPolicy)}
 	parseKey := func(key string) setKey {
 		for _, k := range keys {
 			if strings.EqualFold(k, key) {

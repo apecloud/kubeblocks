@@ -31,7 +31,7 @@ spec:
 #          namespace: default
 #          key: values-kubeblocks-override.yaml
       # via YAML contents reside in secret.data.<key>
-      secretRef:
+      secretRefs:
       #        - name:
       #          namepsace:
       #          key:

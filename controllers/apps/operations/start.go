@@ -34,9 +34,10 @@ var _ OpsHandler = StartOpsHandler{}
 
 func init() {
 	stopBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.ClusterPhase{appsv1alpha1.StoppedClusterPhase},
-		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.StartingPhase,
-		OpsHandler:        StartOpsHandler{},
+		FromClusterPhases:                  []appsv1alpha1.ClusterPhase{appsv1alpha1.StoppedClusterPhase},
+		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.StartingPhase,
+		OpsHandler:                         StartOpsHandler{},
+		ProcessingReasonInClusterCondition: ProcessingReasonStarting,
 	}
 
 	opsMgr := GetOpsManager()
@@ -89,7 +90,7 @@ func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli 
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, getExpectReplicas)
 	}
-	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

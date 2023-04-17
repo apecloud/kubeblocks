@@ -14,18 +14,9 @@
 ################################################################################
 # Variables                                                                    #
 ################################################################################
-
-export GO111MODULE = auto
-# export GOPROXY = https://proxy.golang.org
-export GOPROXY = https://goproxy.cn
-export GOSUMDB = sum.golang.org
-export GONOPROXY = github.com/apecloud
-export GONOSUMDB = github.com/apecloud
-export GOPRIVATE = github.com/apecloud
-
-
-GITHUB_PROXY ?= https://github.91chi.fun/
-
+APP_NAME = kubeblocks
+VERSION ?= 0.5.0-alpha.0
+GITHUB_PROXY ?=
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)
 
@@ -37,19 +28,19 @@ SHELL = /usr/bin/env bash -o pipefail
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.25.0
-
 ENABLE_WEBHOOKS ?= false
-
 SKIP_GO_GEN ?= true
-
-APP_NAME = kubeblocks
-
-
-VERSION ?= 0.4.0
 CHART_PATH = deploy/helm
-
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
+# Go setup
+export GO111MODULE = auto
+# export GOPROXY = https://proxy.golang.org
+export GOPROXY = https://goproxy.cn
+export GOSUMDB = sum.golang.org
+export GONOPROXY = github.com/apecloud
+export GONOSUMDB = github.com/apecloud
+export GOPRIVATE = github.com/apecloud
 GO ?= go
 GOFMT ?= gofmt
 GOOS ?= $(shell $(GO) env GOOS)
@@ -60,7 +51,19 @@ GOBIN=$(shell $(GO) env GOPATH)/bin
 else
 GOBIN=$(shell $(GO) env GOBIN)
 endif
+LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X main.gitCommit=`git rev-parse HEAD`"
+# Which architecture to build - see $(ALL_ARCH) for options.
+# if the 'local' rule is being run, detect the ARCH from 'go env'
+# if it wasn't specified by the caller.
+local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
+ARCH ?= linux-amd64
 
+# docker build setup
+# BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
+BUILDX_PLATFORMS ?= linux/amd64,linux/arm64
+BUILDX_OUTPUT_TYPE ?= docker
+
+TAG_LATEST ?= false
 BUILDX_ENABLED ?= false
 ifneq ($(BUILDX_ENABLED), false)
 	ifeq ($(shell docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
@@ -73,21 +76,6 @@ endif
 define BUILDX_ERROR
 buildx not enabled, refusing to run this recipe
 endef
-
-# Which architecture to build - see $(ALL_ARCH) for options.
-# if the 'local' rule is being run, detect the ARCH from 'go env'
-# if it wasn't specified by the caller.
-local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
-ARCH ?= linux-amd64
-
-
-# BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
-BUILDX_PLATFORMS ?= linux/amd64,linux/arm64
-BUILDX_OUTPUT_TYPE ?= docker
-
-LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X main.gitCommit=`git rev-parse HEAD`"
-
-TAG_LATEST ?= false
 
 ifeq ($(TAG_LATEST), true)
 	IMAGE_TAGS ?= $(IMG):$(VERSION) $(IMG):latest
@@ -124,7 +112,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager kbcli probe reloader loadbalancer ## Make all cmd binaries.
+all: manager kbcli probe reloader ## Make all cmd binaries.
 
 ##@ Development
 
@@ -133,7 +121,6 @@ manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, Clu
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
-	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./cmd/loadbalancer/..." output:dir=config/loadbalancer
 
 .PHONY: preflight-manifests
 preflight-manifests: generate ## Generate external Preflight API
@@ -149,11 +136,7 @@ ifeq ($(SKIP_GO_GEN), false)
 	$(GO) generate -x ./internal/configuration/proto
 endif
 
-.PHONY: loadbalancer-go-generate
-loadbalancer-go-generate: ## Run go generate against loadbalancer code.
-ifeq ($(SKIP_GO_GEN), false)
-	$(GO) generate -x ./cmd/loadbalancer/internal/...
-endif
+
 
 .PHONY: test-go-generate
 test-go-generate: ## Run go generate against test code.
@@ -174,24 +157,20 @@ cue-fmt: cuetool ## Run cue fmt against code.
 	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fmt
 	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fix
 
-.PHONY: fast-lint
-fast-lint: golangci staticcheck vet  # [INTERNAL] fast lint
+.PHONY: lint-fast
+lint-fast: golangci staticcheck vet  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
 lint: test-go-generate generate ## Run golangci-lint against code.
-	$(MAKE) fast-lint
+	$(MAKE) lint-fast
 
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code.
 	$(STATICCHECK) ./...
 
-.PHONY: loggercheck
-loggercheck: loggerchecktool ## Run loggercheck against code.
-	$(LOGGERCHECK) ./...
-
 .PHONY: build-checks
-build-checks: generate fmt vet goimports fast-lint ## Run build checks.
+build-checks: generate fmt vet goimports lint-fast ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -203,7 +182,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.20
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
@@ -249,7 +228,6 @@ else
 	echo "open cover.html with a HTML viewer."
 endif
 
-
 .PHONY: goimports
 goimports: goimportstool ## Run goimports against code.
 	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$")
@@ -268,8 +246,6 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.K3sImageTag=$(K3S_IMG_TAG) \
 	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION) \
 	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
-
-
 
 bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
 	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
@@ -292,11 +268,6 @@ clean-kbcli: ## Clean bin/kbcli*.
 kbcli-doc: generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
-##@ Load Balancer
-
-.PHONY: loadbalancer
-loadbalancer: loadbalancer-go-generate test-go-generate build-checks  ## Build loadbalancer binary.
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer ./cmd/loadbalancer
 
 ##@ Operator Controller Manager
 
@@ -329,62 +300,6 @@ ARGUMENTS=
 DEBUG_PORT=2345
 run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
-
-##@ reloader cmd
-
-RELOADER_LD_FLAGS = "-s -w"
-
-bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${RELOADER_LD_FLAGS} -o $@ ./cmd/reloader/main.go
-
-.PHONY: reloader
-reloader: OS=$(shell $(GO) env GOOS)
-reloader: ARCH=$(shell $(GO) env GOARCH)
-reloader: test-go-generate build-checks ## Build reloader related binaries
-	$(MAKE) bin/reloader.${OS}.${ARCH}
-	mv bin/reloader.${OS}.${ARCH} bin/reloader
-
-.PHONY: clean
-clean-reloader: ## Clean bin/reloader.
-	rm -f bin/reloader
-
-##@ cue-helper
-
-CUE_HELPER_LD_FLAGS = "-s -w"
-
-bin/cue-helper.%: ## Cross build bin/cue-helper.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CUE_HELPER_LD_FLAGS} -o $@ ./cmd/reloader/tools/cue_auto_generator.go
-
-.PHONY: cue-helper
-cue-helper: OS=$(shell $(GO) env GOOS)
-cue-helper: ARCH=$(shell $(GO) env GOARCH)
-cue-helper: test-go-generate build-checks ## Build cue-helper related binaries
-	$(MAKE) bin/cue-helper.${OS}.${ARCH}
-	mv bin/cue-helper.${OS}.${ARCH} bin/cue-helper
-
-.PHONY: clean
-clean-cue-helper: ## Clean bin/cue-helper.
-	rm -f bin/cue-helper
-
-
-##@ probe cmd
-
-PROBE_LD_FLAGS = "-s -w"
-
-bin/probe.%: ## Cross build bin/probe.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${PROBE_LD_FLAGS} -o $@  ./cmd/probe/main.go
-
-.PHONY: probe
-probe: OS=$(shell $(GO) env GOOS)
-probe: ARCH=$(shell $(GO) env GOARCH)
-probe: test-go-generate build-checks ## Build probe related binaries
-	$(MAKE) bin/probe.${OS}.${ARCH}
-	mv bin/probe.${OS}.${ARCH} bin/probe
-
-.PHONY: clean
-clean-probe: ## Clean bin/probe.
-	rm -f bin/probe
-
 ##@ Deployment
 
 ifndef ignore-not-found
@@ -394,12 +309,10 @@ endif
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	($(KUSTOMIZE) build config/crd | kubectl replace -f -) || ($(KUSTOMIZE) build config/crd | kubectl create -f -)
-	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl apply -f -
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
-	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
@@ -416,28 +329,11 @@ dry-run: manifests kustomize ## Dry-run deploy job.
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
-##@ CI
-
-.PHONY:
-install-git-hooks: githookstool ## Install git hooks.
-	git hooks install
-	git hooks
-
-.PHONY: ci-test-pre
-ci-test-pre: kbcli ## Prepare CI test environment.
-	bin/kbcli playground destroy
-	bin/kbcli playground init
-
-.PHONY: ci-test
-ci-test: ci-test-pre test ## Run CI tests.
-	bin/kbcli playground destroy
-	$(GO) tool cover -html=cover.out -o cover.html
-
 ##@ Contributor
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.20
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -455,17 +351,50 @@ fix-license-header: ## Run license header fix.
 
 ##@ Helm Chart Tasks
 
-.PHONY: bump-chart-ver
-bump-chart-ver: ## Bump helm chart version.
+bump-single-chart-appver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-appver.%:
 ifeq ($(GOOS), darwin)
-	sed -i '' "s/^version:.*/version: $(VERSION)/" $(CHART_PATH)/Chart.yaml
-	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
+	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
 else
-	sed -i "s/^version:.*/version: $(VERSION)/" $(CHART_PATH)/Chart.yaml
-	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
+	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
 endif
 
-LOADBALANCER_CHART_VERSION=
+bump-single-chart-ver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-ver.%:
+ifeq ($(GOOS), darwin)
+	sed -i '' "s/^version:.*/version: $(VERSION)/" deploy/$(chart)/Chart.yaml
+else
+	sed -i "s/^version:.*/version: $(VERSION)/" deploy/$(chart)/Chart.yaml
+endif
+
+.PHONY: bump-chart-ver
+bump-chart-ver: \
+	bump-single-chart-ver.helm \
+	bump-single-chart-appver.helm \
+	bump-single-chart-ver.apecloud-mysql \
+	bump-single-chart-ver.apecloud-mysql-cluster \
+	bump-single-chart-ver.apecloud-mysql-scale \
+	bump-single-chart-ver.apecloud-mysql-scale-cluster \
+	bump-single-chart-ver.clickhouse \
+	bump-single-chart-ver.clickhouse-cluster \
+	bump-single-chart-ver.kafka \
+	bump-single-chart-ver.kafka-cluster \
+	bump-single-chart-ver.mongodb \
+	bump-single-chart-ver.mongodb-cluster \
+	bump-single-chart-ver.nyancat \
+	bump-single-chart-appver.nyancat \
+	bump-single-chart-ver.postgresql \
+	bump-single-chart-ver.postgresql-cluster \
+	bump-single-chart-ver.redis \
+	bump-single-chart-ver.redis-cluster \
+	bump-single-chart-ver.milvus \
+	bump-single-chart-ver.milvus-cluster \
+	bump-single-chart-ver.qdrant \
+	bump-single-chart-ver.qdrant-cluster \
+	bump-single-chart-ver.weaviate \
+	bump-single-chart-ver.weaviate-cluster \
+	bump-single-chart-ver.chatgpt-retrieval-plugin
+bump-chart-ver: ## Bump helm chart version.
 
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
@@ -474,8 +403,6 @@ helm-package: bump-chart-ver ## Do helm package.
 ## before dependency update.
 	# cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
 	#$(HELM) dependency update --skip-refresh $(CHART_PATH)
-	$(HELM) package deploy/loadbalancer
-	mv loadbalancer-*.tgz deploy/helm/depend-charts/
 	$(HELM) package deploy/apecloud-mysql
 	mv apecloud-mysql-*.tgz deploy/helm/depend-charts/
 	$(HELM) package deploy/postgresql
@@ -559,20 +486,6 @@ else
 STATICCHECK=$(shell which staticcheck)
 endif
 
-
-.PHONY: loggerchecktool
-loggerchecktool: ## Download loggercheck locally if necessary.
-ifeq (, $(shell which loggercheck))
-	@{ \
-	set -e ;\
-	echo 'installing github.com/timonwong/loggercheck/cmd/loggercheck' ;\
-	go install github.com/timonwong/loggercheck/cmd/loggercheck@latest;\
-	}
-LOGGERCHECK=$(GOBIN)/loggercheck
-else
-LOGGERCHECK=$(shell which loggercheck)
-endif
-
 .PHONY: goimportstool
 goimportstool: ## Download goimports locally if necessary.
 ifeq (, $(shell which goimports))
@@ -609,35 +522,6 @@ else
 HELM=$(shell which helm)
 endif
 
-.PHONY: githookstool
-githookstool: ## Download git-hooks locally if necessary.
-ifeq (, $(shell which git-hook))
-	@{ \
-	set -e ;\
-	go install github.com/git-hooks/git-hooks@latest;\
-	}
-endif
-
-
-
-.PHONY: oras
-oras: ORAS_VERSION=0.14.1
-oras: ## Download ORAS locally if necessary.
-ifeq (, $(shell which oras))
-	@{ \
-	set -e ;\
-	echo 'installing oras' ;\
-	curl -LO $(GITHUB_PROXY)https://github.com/oras-project/oras/releases/download/v$(ORAS_VERSION)/oras_$(ORAS_VERSION)_$(GOOS)_$(GOARCH).tar.gz && \
-	mkdir -p oras-install/ && \
-	tar -zxf oras_$(ORAS_VERSION)_*.tar.gz -C oras-install/ && \
-	sudo mv oras-install/oras /usr/local/bin/ && \
-	rm -rf oras_$(ORAS_VERSION)_*.tar.gz oras-install/ ;\
-	echo 'Successfully installed' ;\
-	}
-endif
-ORAS=$(shell which oras)
-
-
 .PHONY: minikube
 minikube: ## Download minikube locally if necessary.
 ifeq (, $(shell which minikube))
@@ -662,10 +546,6 @@ ifeq (, $(shell which kubectl))
 endif
 KUBECTL=$(shell which kubectl)
 
-
-.PHONY: brew-install-prerequisite
-brew-install-prerequisite: ## Use `brew install` to install required dependencies.
-	brew install go@1.19 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq git-hooks-go
 
 ##@ Minikube
 # using `minikube version: v1.29.0`, and use one of following k8s versions:
@@ -862,23 +742,22 @@ endif
 	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
 	$(HELM) upgrade --install kubeblocks deploy/helm --set versionOverride=$(VERSION),csi-hostpath-driver.enabled=true --reuse-values --wait --wait-for-jobs --atomic
 
-.PHONY: smoke-testdata-manifests
-smoke-testdata-manifests: ## Update E2E test dataset
+##@ End-to-end (E2E) tests
+.PHONY: render-smoke-testdata-manifests
+render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
-	$(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
 	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
 	$(HELM) template mycluster deploy/redis-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/mongodb > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+	$(HELM) template mycluster deploy/mongodb-cluster >> test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
 
-##@ Test E2E
-GINKGO=$(shell which ginkgo)
-ifeq ($(origin VERSION), command line)
-    VERSION ?= $(VERSION)
-endif
+
 .PHONY: test-e2e
-test-e2e: helm-package smoke-testdata-manifests ## Test End-to-end.
-	$(GINKGO) test -process -ginkgo.v test/e2e --junit-report=report.xml -- --VERSION=$(VERSION)
+test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
+	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
 
-# NOTE: include must be at the end
-##@ Docker containers
+# NOTE: include must be placed at the end
 include docker/docker.mk
+include cmd/cmd.mk
 

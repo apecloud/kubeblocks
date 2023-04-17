@@ -34,9 +34,12 @@ var _ OpsHandler = upgradeOpsHandler{}
 
 func init() {
 	upgradeBehaviour := OpsBehaviour{
-		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
-		ToClusterPhase:    appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.VersionUpgradingPhase,
-		OpsHandler:        upgradeOpsHandler{},
+		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
+		// TODO: we should add "force" flag for these opsRequest.
+		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
+		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
+		OpsHandler:                         upgradeOpsHandler{},
+		ProcessingReasonInClusterCondition: ProcessingReasonVersionUpgrading,
 	}
 
 	opsMgr := GetOpsManager()
@@ -57,12 +60,12 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for upgrade opsRequest.
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleComponentStatusProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleComponentStatusProgress)
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (u upgradeOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return opsRequest.GetUpgradeComponentNameMap()
+	return realAffectedComponentMap(opsRequest.GetUpgradeComponentNameSet())
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

@@ -1,0 +1,22 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: milvus-standalone-backup-policy-template
+  labels:
+    clusterdefinition.kubeblocks.io/name: milvus-standalone
+    {{- include "milvus.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: milvus-standalone
+  backupPolicies:
+  - componentDefRef: milvus
+    ttl: 7d
+    schedule:
+      baseBackup:
+        type: snapshot
+        enable: false
+        cronExpression: "0 18 * * 0"
+    snapshot:
+      target:
+        connectionCredentialKey:
+          passwordKey: password
+          usernameKey: username

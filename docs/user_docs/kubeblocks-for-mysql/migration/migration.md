@@ -30,7 +30,7 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
 2. Install ApeCloud MySQL. Refer to [Create an ApeCloud MySQL cluster on AWS](./../../quick-start/create-a-mysql-cluster-on-aws.md) for details.
 3. Fill in the cluster name and run the command below to expose the external IP of the cluster.
    ```bash
-   KBCLI_EXPERIMENTAL_EXPOSE="1" kbcli cluster expose ${mysql clustrName} --enable=true --type=vpc
+   kbcli cluster expose ${mysql clustrName} --enable=true --type=vpc
    ```
     
    Run the command below to view the external IP:Port address which can be accessed by the same VPC machine but outside the EKS cluster.
@@ -71,18 +71,18 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
            alb.ingress.kubernetes.io/scheme: internet-facing
            service.beta.kubernetes.io/aws-load-balancer-subnets: ${subnet name1},${subnet name2}
        labels:
-         app.kubernetes.io/component-name: mysql
+         apps.kubeblocks.io/component-name: mysql
          app.kubernetes.io/instance: ${mysql clustername}
          app.kubernetes.io/managed-by: kubeblocks
-         app.kubernetes.io/name: state.mysql-apecloud-mysql     
+         app.kubernetes.io/name: apecloud-mysql     
    spec:
        externalTrafficPolicy: Cluster 
        type: LoadBalancer
        selector:
-         app.kubernetes.io/component-name: mysql
+         apps.kubeblocks.io/component-name: mysql
          app.kubernetes.io/instance: ${mysql clustername}
          app.kubernetes.io/managed-by: kubeblocks
-         cs.dbaas.kubeblocks.io/role: leader
+         kubeblocks.io/role: leader
        ports:
            - name: http
              protocol: TCP

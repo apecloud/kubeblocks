@@ -36,11 +36,13 @@ var _ OpsHandler = restartOpsHandler{}
 
 func init() {
 	restartBehaviour := OpsBehaviour{
-		// REVIEW: can do opsrequest if not running?
-		FromClusterPhases:          appsv1alpha1.GetClusterTerminalPhases(),
-		ToClusterPhase:             appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.RebootingPhase,
-		OpsHandler:                 restartOpsHandler{},
-		MaintainClusterPhaseBySelf: true,
+		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
+		// TODO: we should add "force" flag for these opsRequest.
+		FromClusterPhases:                  appsv1alpha1.GetClusterTerminalPhases(),
+		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.RebootingPhase,
+		OpsHandler:                         restartOpsHandler{},
+		MaintainClusterPhaseBySelf:         true,
+		ProcessingReasonInClusterCondition: ProcessingReasonRestarting,
 	}
 
 	opsMgr := GetOpsManager()
@@ -57,7 +59,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
-	componentNameMap := opsRes.OpsRequest.GetRestartComponentNameMap()
+	componentNameMap := opsRes.OpsRequest.Spec.GetRestartComponentNameSet()
 	if err := restartDeployment(reqCtx, cli, opsRes, componentNameMap); err != nil {
 		return err
 	}
@@ -67,12 +69,12 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for volume expansion opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", handleComponentStatusProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", handleComponentStatusProgress)
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (r restartOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return opsRequest.GetRestartComponentNameMap()
+	return realAffectedComponentMap(opsRequest.Spec.GetRestartComponentNameSet())
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes in Cluster.spec.

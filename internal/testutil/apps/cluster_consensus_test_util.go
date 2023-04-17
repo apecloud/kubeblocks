@@ -59,16 +59,16 @@ func CreateConsensusMysqlCluster(
 	clusterName,
 	workloadType,
 	consensusCompName string) *appsv1alpha1.Cluster {
-	pvcSpec := NewPVC("2Gi")
+	pvcSpec := NewPVCSpec("2Gi")
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 		AddComponent(consensusCompName, workloadType).SetReplicas(3).SetEnabledLogs(errorLogName).
-		AddVolumeClaimTemplate("data", &pvcSpec).Create(&testCtx).GetObject()
+		AddVolumeClaimTemplate("data", pvcSpec).Create(&testCtx).GetObject()
 }
 
 // CreateConsensusMysqlClusterDef creates a mysql clusterDefinition with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName, workloadType string) *appsv1alpha1.ClusterDefinition {
+func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName, componentDefName string) *appsv1alpha1.ClusterDefinition {
 	filePathPattern := "/data/mysql/log/mysqld.err"
-	return NewClusterDefFactory(clusterDefName).AddComponent(ConsensusMySQLComponent, workloadType).
+	return NewClusterDefFactory(clusterDefName).AddComponentDef(ConsensusMySQLComponent, componentDefName).
 		AddLogConfig(errorLogName, filePathPattern).Create(&testCtx).GetObject()
 }
 

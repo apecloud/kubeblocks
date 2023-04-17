@@ -20,6 +20,8 @@ import (
 	"context"
 
 	"github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,23 +35,25 @@ func InitClusterWithHybridComps(
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
-	statelessComp,
-	statefulComp,
-	consensusComp string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
+	statelessCompDefName,
+	statefulCompDefName,
+	consensusCompDefName string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
 	clusterDef := NewClusterDefFactory(clusterDefName).
-		AddComponent(StatelessNginxComponent, statelessComp).
-		AddComponent(ConsensusMySQLComponent, consensusComp).
-		AddComponent(StatefulMySQLComponent, statefulComp).
+		AddComponentDef(StatelessNginxComponent, statelessCompDefName).
+		AddComponentDef(ConsensusMySQLComponent, consensusCompDefName).
+		AddComponentDef(StatefulMySQLComponent, statefulCompDefName).
 		Create(&testCtx).GetObject()
 	clusterVersion := NewClusterVersionFactory(clusterVersionName, clusterDefName).
-		AddComponent(statelessComp).AddContainerShort(DefaultNginxContainerName, NginxImage).
-		AddComponent(consensusComp).AddContainerShort(DefaultMySQLContainerName, NginxImage).
-		AddComponent(statefulComp).AddContainerShort(DefaultMySQLContainerName, NginxImage).
+		AddComponent(statelessCompDefName).AddContainerShort(DefaultNginxContainerName, NginxImage).
+		AddComponent(consensusCompDefName).AddContainerShort(DefaultMySQLContainerName, NginxImage).
+		AddComponent(statefulCompDefName).AddContainerShort(DefaultMySQLContainerName, NginxImage).
 		Create(&testCtx).GetObject()
+	pvcSpec := NewPVCSpec("1Gi")
 	cluster := NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-		AddComponent(statelessComp, statelessComp).SetReplicas(1).
-		AddComponent(consensusComp, consensusComp).SetReplicas(3).
-		AddComponent(statefulComp, statefulComp).SetReplicas(3).
+		AddComponent(statelessCompDefName, statelessCompDefName).SetReplicas(1).
+		AddComponent(consensusCompDefName, consensusCompDefName).SetReplicas(3).
+		AddComponent(statefulCompDefName, statefulCompDefName).SetReplicas(3).
+		AddVolumeClaimTemplate(DataVolumeName, pvcSpec).
 		Create(&testCtx).GetObject()
 	return clusterDef, clusterVersion, cluster
 }
@@ -95,5 +99,17 @@ func GetClusterObservedGeneration(testCtx *testutil.TestContext, clusterKey type
 		cluster := &appsv1alpha1.Cluster{}
 		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(gomega.Succeed())
 		return cluster.Status.ObservedGeneration
+	}
+}
+
+// NewPVCSpec create appsv1alpha1.PersistentVolumeClaimSpec.
+func NewPVCSpec(size string) appsv1alpha1.PersistentVolumeClaimSpec {
+	return appsv1alpha1.PersistentVolumeClaimSpec{
+		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse(size),
+			},
+		},
 	}
 }

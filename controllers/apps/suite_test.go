@@ -125,8 +125,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
-	viper.SetDefault("VOLUMESNAPSHOT", false)
-	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
+	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 
@@ -211,7 +210,16 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = (&ComponentClassReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("class-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
+
+	appsv1alpha1.RegisterWebhookManager(k8sManager)
 
 	go func() {
 		defer GinkgoRecover()

@@ -32,6 +32,12 @@ spec:
       serviceAccountName: {{ include "kubeblocks.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers: # only download tools image to local
+        - name: tools
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/true
       containers:
         - name: manager
           args:
@@ -63,21 +69,13 @@ spec:
             {{- end }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.image.pullPolicy }}
-            - name: KUBEBLOCKS_IMAGE
-              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: KUBEBLOCKS_TOOLS_IMAGE
+              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
             - name: VOLUMESNAPSHOT
               value: "true"
-            {{- end }}
-            {{- if .Values.dataProtection.backupSchedule }}
-            - name: DP_BACKUP_SCHEDULE
-              value: {{ .Values.dataProtection.backupSchedule }}
-            {{- end }}
-            {{- if .Values.dataProtection.backupTTL }}
-            - name: DP_BACKUP_TTL
-              value: {{ .Values.dataProtection.backupTTL }}
             {{- end }}
             {{- if .Values.admissionWebhooks.enabled }}
             - name: ENABLE_WEBHOOKS
@@ -125,6 +123,8 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
+          - mountPath: /etc/kubeblocks
+            name: manager-config
           {{- if .Values.admissionWebhooks.enabled }}
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
@@ -156,7 +156,7 @@ spec:
       volumes:
         - name: manager-config
           configMap:
-            name: manager-config
+            name: {{ include "kubeblocks.fullname" . }}-manager-config
         {{- if .Values.admissionWebhooks.enabled }}
         - name: cert
           secret:

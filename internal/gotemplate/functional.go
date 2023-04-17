@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -65,4 +66,16 @@ func regexStringSubmatch(regex string, s string) ([]string, error) {
 		return nil, err
 	}
 	return r.FindStringSubmatch(s), nil
+}
+
+func fromYAML(str string) (map[string]interface{}, error) {
+	m := map[string]interface{}{}
+	err := yaml.Unmarshal([]byte(str), &m)
+	return m, err
+}
+
+func fromYAMLArray(str string) ([]interface{}, error) {
+	var a []interface{}
+	err := yaml.Unmarshal([]byte(str), &a)
+	return a, err
 }

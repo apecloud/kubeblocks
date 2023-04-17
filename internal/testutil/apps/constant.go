@@ -25,15 +25,17 @@ import (
 )
 
 const (
-	KubeBlocks          = "kubeblocks"
-	LogVolumeName       = "log"
-	ConfVolumeName      = "conf"
-	DataVolumeName      = "data"
-	ScriptsVolumeName   = "scripts"
-	ServiceDefaultName  = ""
-	ServiceHeadlessName = "headless"
-	ServiceVPCName      = "a-vpc-lb-service-for-app"
-	ServiceInternetName = "a-internet-lb-service-for-app"
+	KubeBlocks                                   = "kubeblocks"
+	LogVolumeName                                = "log"
+	ConfVolumeName                               = "conf"
+	DataVolumeName                               = "data"
+	ScriptsVolumeName                            = "scripts"
+	ServiceDefaultName                           = ""
+	ServiceHeadlessName                          = "headless"
+	ServiceVPCName                               = "a-vpc-lb-service-for-app"
+	ServiceInternetName                          = "a-internet-lb-service-for-app"
+	DefaultGeneralResourceConstraintName         = "kb-resource-constraint-general"
+	DefaultMemoryOptimizedResourceConstraintName = "kb-resource-constraint-memory-optimized"
 
 	ReplicationPodRoleVolume       = "pod-role"
 	ReplicationRoleLabelFieldPath  = "metadata.labels['kubeblocks.io/role']"
@@ -48,7 +50,7 @@ const (
 	DefaultNginxContainerName = "nginx"
 
 	RedisType                     = "state.redis"
-	DefaultRedisCompType          = "redis"
+	DefaultRedisCompDefName       = "redis"
 	DefaultRedisCompName          = "redis-rsts"
 	DefaultRedisImageName         = "redis:7.0.5"
 	DefaultRedisContainerName     = "redis"
@@ -64,8 +66,8 @@ var (
 				Name: DefaultNginxContainerName,
 			}},
 		},
-		Service: &corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{
+		Service: &appsv1alpha1.ServiceSpec{
+			Ports: []appsv1alpha1.ServicePort{{
 				Protocol: corev1.ProtocolTCP,
 				Port:     80,
 			}},
@@ -73,21 +75,22 @@ var (
 	}
 
 	defaultConnectionCredential = map[string]string{
-		"username":      "root",
-		"SVC_FQDN":      "$(SVC_FQDN)",
-		"RANDOM_PASSWD": "$(RANDOM_PASSWD)",
-		"tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
-		"paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
-		"UUID":          "$(UUID)",
-		"UUID_B64":      "$(UUID_B64)",
-		"UUID_STR_B64":  "$(UUID_STR_B64)",
-		"UUID_HEX":      "$(UUID_HEX)",
+		"username":          "root",
+		"SVC_FQDN":          "$(SVC_FQDN)",
+		"HEADLESS_SVC_FQDN": "$(HEADLESS_SVC_FQDN)",
+		"RANDOM_PASSWD":     "$(RANDOM_PASSWD)",
+		"tcpEndpoint":       "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
+		"paxosEndpoint":     "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
+		"UUID":              "$(UUID)",
+		"UUID_B64":          "$(UUID_B64)",
+		"UUID_STR_B64":      "$(UUID_STR_B64)",
+		"UUID_HEX":          "$(UUID_HEX)",
 	}
 
 	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
 	// corresponding to defaultConnectionCredential variable placeholder
-	defaultSvcSpec = corev1.ServiceSpec{
-		Ports: []corev1.ServicePort{
+	defaultSvcSpec = appsv1alpha1.ServiceSpec{
+		Ports: []appsv1alpha1.ServicePort{
 			{
 				Name: "mysql",
 				TargetPort: intstr.IntOrString{
@@ -175,8 +178,8 @@ var (
 		UpdateStrategy: appsv1alpha1.BestEffortParallelStrategy,
 	}
 
-	defaultMySQLService = corev1.ServiceSpec{
-		Ports: []corev1.ServicePort{{
+	defaultMySQLService = appsv1alpha1.ServiceSpec{
+		Ports: []appsv1alpha1.ServicePort{{
 			Protocol: corev1.ProtocolTCP,
 			Port:     3306,
 		}},
@@ -187,7 +190,7 @@ var (
 		CharacterType: "mysql",
 		ConsensusSpec: &defaultConsensusSpec,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleChangedProbe: &appsv1alpha1.ClusterDefinitionProbe{
+			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 				FailureThreshold: 3,
 				PeriodSeconds:    1,
 				TimeoutSeconds:   5,
@@ -199,8 +202,8 @@ var (
 		},
 	}
 
-	defaultRedisService = corev1.ServiceSpec{
-		Ports: []corev1.ServicePort{{
+	defaultRedisService = appsv1alpha1.ServiceSpec{
+		Ports: []appsv1alpha1.ServicePort{{
 			Protocol: corev1.ProtocolTCP,
 			Port:     6379,
 		}},
@@ -283,6 +286,24 @@ var (
 			},
 			InitContainers: []corev1.Container{defaultRedisInitContainer},
 			Containers:     []corev1.Container{defaultRedisContainer},
+		},
+	}
+
+	classGroupTemplate = appsv1alpha1.ComponentClassGroup{
+		Template: `
+cpu: "{{ or .cpu 1 }}"
+memory: "{{ or .memory 4 }}Gi"
+volumes:
+- name: data
+  size: "{{ or .dataStorageSize 10 }}Gi"
+- name: log
+  size: "{{ or .logStorageSize 1 }}Gi"
+`,
+		Vars: []string{"cpu", "memory", "dataStorageSize", "logStorageSize"},
+		Series: []appsv1alpha1.ComponentClassSeries{
+			{
+				NamingTemplate: "custom-{{ .cpu }}c{{ .memory }}g",
+			},
 		},
 	}
 )

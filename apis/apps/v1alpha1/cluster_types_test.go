@@ -59,12 +59,12 @@ spec:
 	_ = yaml.Unmarshal([]byte(clusterByte), cluster)
 	_ = yaml.Unmarshal([]byte(clusterDefByte), clusterDef)
 	// normal case
-	if err := cluster.ValidateEnabledLogs(clusterDef); err != nil {
+	if err := cluster.Spec.ValidateEnabledLogs(clusterDef); err != nil {
 		t.Error("Expected empty conditionList")
 	}
 	// corner case
 	cluster.Spec.ComponentSpecs[0].EnabledLogs = []string{"error-test", "slow"}
-	if err := cluster.ValidateEnabledLogs(clusterDef); err == nil {
+	if err := cluster.Spec.ValidateEnabledLogs(clusterDef); err == nil {
 		t.Error("Expected one element conditionList")
 	}
 }
@@ -130,20 +130,20 @@ func TestGetComponentOrName(t *testing.T) {
 			},
 		},
 	}
-	compDefName := cluster.GetComponentDefRefName(componentName)
+	compDefName := cluster.Spec.GetComponentDefRefName(componentName)
 	if compDefName != componentDefName {
 		t.Errorf(`function GetComponentDefRefName should return %s`, componentDefName)
 	}
-	component := cluster.GetComponentByName(componentName)
+	component := cluster.Spec.GetComponentByName(componentName)
 	if component == nil {
 		t.Errorf("function GetComponentByName should not return nil")
 	}
 	componentName = "mysql1"
-	compDefName = cluster.GetComponentDefRefName(componentName)
+	compDefName = cluster.Spec.GetComponentDefRefName(componentName)
 	if compDefName != "" {
 		t.Errorf(`function GetComponentDefRefName should return ""`)
 	}
-	component = cluster.GetComponentByName(componentName)
+	component = cluster.Spec.GetComponentByName(componentName)
 	if component != nil {
 		t.Error("function GetComponentByName should return nil")
 	}

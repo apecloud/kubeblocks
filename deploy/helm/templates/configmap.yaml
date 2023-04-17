@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-manager-config
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+data:
+   config.yaml: |
+     # the global pvc name which persistent volume claim to store the backup data.
+     # will replace the pvc name when it is empty in the backup policy.
+     BACKUP_PVC_NAME: "{{ .Values.dataProtection.backupPVCName }}"
+
+     # the init capacity of pvc for creating the pvc, e.g. 10Gi.
+     # will replace the init capacity when it is empty in the backup policy.
+     BACKUP_PVC_INIT_CAPACITY: "{{ .Values.dataProtection.backupPVCInitCapacity }}"
+
+     # the pvc storage class name.
+     # will replace the storageClassName when it is nil in the backup policy.
+     BACKUP_PVC_STORAGE_CLASS: "{{ .Values.dataProtection.backupPVCStorageClassName }}"
+
+      # the pvc create policy.
+      # if the storageClass supports dynamic provisioning, recommend "IfNotPresent" policy.
+      # otherwise, using "Never" policy.
+      # only affect the backupPolicy automatically created by Kubeblocks.
+      BACKUP_PVC_CREATE_POLICY: "{{ .Values.dataProtection.backupPVCCreatePolicy }}"

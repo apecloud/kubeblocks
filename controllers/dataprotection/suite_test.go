@@ -22,6 +22,7 @@ import (
 	"go/build"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -39,6 +40,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -68,10 +70,11 @@ var _ = BeforeSuite(func() {
 			o.TimeEncoder = zapcore.ISO8601TimeEncoder
 		}))
 	}
+	reconcileInterval = time.Millisecond
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
+	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks:latest")
 	fmt.Printf("config settings: %v\n", viper.AllSettings())
 
 	By("bootstrapping test environment")
@@ -110,7 +113,6 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	uncachedObjects := []client.Object{
-		&dataprotectionv1alpha1.BackupPolicyTemplate{},
 		&dataprotectionv1alpha1.BackupPolicy{},
 		&dataprotectionv1alpha1.BackupTool{},
 		&dataprotectionv1alpha1.Backup{},

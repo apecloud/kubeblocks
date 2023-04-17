@@ -1,0 +1,412 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  name: backuppolicytemplates.apps.kubeblocks.io
+spec:
+  group: apps.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    kind: BackupPolicyTemplate
+    listKind: BackupPolicyTemplateList
+    plural: backuppolicytemplates
+    shortNames:
+    - bpt
+    singular: backuppolicytemplate
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - description: ClusterDefinition referenced by cluster.
+      jsonPath: .spec.clusterDefinitionRef
+      name: CLUSTER-DEFINITION
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: BackupPolicyTemplate is the Schema for the BackupPolicyTemplates
+          API (defined by provider)
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BackupPolicyTemplateSpec defines the desired state of BackupPolicyTemplate
+            properties:
+              backupPolicies:
+                description: backupPolicies is a list of backup policy template for
+                  the specified componentDefinition.
+                items:
+                  properties:
+                    componentDefRef:
+                      description: componentDefRef references componentDef defined
+                        in ClusterDefinition spec.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    full:
+                      description: the policy for full backup.
+                      properties:
+                        backupStatusUpdates:
+                          description: define how to update metadata for backup status.
+                          items:
+                            properties:
+                              containerName:
+                                description: which container name that kubectl can
+                                  execute.
+                                type: string
+                              path:
+                                description: 'specify the json path of backup object
+                                  for patch. example: manifests.backupLog -- means
+                                  patch the backup json path of status.manifests.backupLog.'
+                                type: string
+                              script:
+                                description: the shell Script commands to collect
+                                  backup status metadata. The script must exist in
+                                  the container of ContainerName and the output format
+                                  must be set to JSON. Note that outputting to stderr
+                                  may cause the result format to not be in JSON.
+                                type: string
+                              updateStage:
+                                description: 'when to update the backup status, pre:
+                                  before backup, post: after backup'
+                                enum:
+                                - pre
+                                - post
+                                type: string
+                            type: object
+                          type: array
+                        backupToolName:
+                          description: which backup tool to perform database backup,
+                            only support one tool.
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                        backupsHistoryLimit:
+                          default: 7
+                          description: the number of automatic backups to retain.
+                            Value must be non-negative integer. 0 means NO limit on
+                            the number of backups.
+                          format: int32
+                          type: integer
+                        onFailAttempted:
+                          description: count of backup stop retries on fail.
+                          format: int32
+                          type: integer
+                        target:
+                          description: target instance for backup.
+                          properties:
+                            account:
+                              description: refer to spec.componentDef.systemAccounts.accounts[*].name
+                                in ClusterDefinition. the secret created by this account
+                                will be used to connect the database. if not set,
+                                the secret created by spec.ConnectionCredential of
+                                the ClusterDefinition will be used. it will be transformed
+                                to a secret for BackupPolicy's target secret.
+                              type: string
+                            connectionCredentialKey:
+                              description: connectionCredentialKey defines connection
+                                credential key in secret which created by spec.ConnectionCredential
+                                of the ClusterDefinition. it will be ignored when
+                                "account" is set.
+                              properties:
+                                passwordKey:
+                                  description: the key of password in the ConnectionCredential
+                                    secret. if not set, the default key is "password".
+                                  type: string
+                                usernameKey:
+                                  description: the key of username in the ConnectionCredential
+                                    secret. if not set, the default key is "username".
+                                  type: string
+                              type: object
+                            role:
+                              description: 'select instance of corresponding role
+                                for backup, role are: - the name of Leader/Follower/Leaner
+                                for Consensus component. - primary or secondary for
+                                Replication component. finally, invalid role of the
+                                component will be ignored. such as if workload type
+                                is Replication and component''s replicas is 1, the
+                                secondary role is invalid. and it also will be ignored
+                                when component is Stateful/Stateless. the role will
+                                be transformed to a role LabelSelector for BackupPolicy''s
+                                target attribute.'
+                              type: string
+                          type: object
+                      type: object
+                    incremental:
+                      description: the policy for incremental backup.
+                      properties:
+                        backupStatusUpdates:
+                          description: define how to update metadata for backup status.
+                          items:
+                            properties:
+                              containerName:
+                                description: which container name that kubectl can
+                                  execute.
+                                type: string
+                              path:
+                                description: 'specify the json path of backup object
+                                  for patch. example: manifests.backupLog -- means
+                                  patch the backup json path of status.manifests.backupLog.'
+                                type: string
+                              script:
+                                description: the shell Script commands to collect
+                                  backup status metadata. The script must exist in
+                                  the container of ContainerName and the output format
+                                  must be set to JSON. Note that outputting to stderr
+                                  may cause the result format to not be in JSON.
+                                type: string
+                              updateStage:
+                                description: 'when to update the backup status, pre:
+                                  before backup, post: after backup'
+                                enum:
+                                - pre
+                                - post
+                                type: string
+                            type: object
+                          type: array
+                        backupToolName:
+                          description: which backup tool to perform database backup,
+                            only support one tool.
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                        backupsHistoryLimit:
+                          default: 7
+                          description: the number of automatic backups to retain.
+                            Value must be non-negative integer. 0 means NO limit on
+                            the number of backups.
+                          format: int32
+                          type: integer
+                        onFailAttempted:
+                          description: count of backup stop retries on fail.
+                          format: int32
+                          type: integer
+                        target:
+                          description: target instance for backup.
+                          properties:
+                            account:
+                              description: refer to spec.componentDef.systemAccounts.accounts[*].name
+                                in ClusterDefinition. the secret created by this account
+                                will be used to connect the database. if not set,
+                                the secret created by spec.ConnectionCredential of
+                                the ClusterDefinition will be used. it will be transformed
+                                to a secret for BackupPolicy's target secret.
+                              type: string
+                            connectionCredentialKey:
+                              description: connectionCredentialKey defines connection
+                                credential key in secret which created by spec.ConnectionCredential
+                                of the ClusterDefinition. it will be ignored when
+                                "account" is set.
+                              properties:
+                                passwordKey:
+                                  description: the key of password in the ConnectionCredential
+                                    secret. if not set, the default key is "password".
+                                  type: string
+                                usernameKey:
+                                  description: the key of username in the ConnectionCredential
+                                    secret. if not set, the default key is "username".
+                                  type: string
+                              type: object
+                            role:
+                              description: 'select instance of corresponding role
+                                for backup, role are: - the name of Leader/Follower/Leaner
+                                for Consensus component. - primary or secondary for
+                                Replication component. finally, invalid role of the
+                                component will be ignored. such as if workload type
+                                is Replication and component''s replicas is 1, the
+                                secondary role is invalid. and it also will be ignored
+                                when component is Stateful/Stateless. the role will
+                                be transformed to a role LabelSelector for BackupPolicy''s
+                                target attribute.'
+                              type: string
+                          type: object
+                      type: object
+                    schedule:
+                      description: schedule policy for backup.
+                      properties:
+                        baseBackup:
+                          description: schedule policy for base backup.
+                          properties:
+                            cronExpression:
+                              description: the cron expression for schedule, the timezone
+                                is in UTC. see https://en.wikipedia.org/wiki/Cron.
+                              type: string
+                            enable:
+                              description: enable or disable the schedule.
+                              type: boolean
+                            type:
+                              description: the type of base backup, only support full
+                                and snapshot.
+                              enum:
+                              - full
+                              - snapshot
+                              type: string
+                          required:
+                          - cronExpression
+                          - enable
+                          - type
+                          type: object
+                        incremental:
+                          description: schedule policy for incremental backup.
+                          properties:
+                            cronExpression:
+                              description: the cron expression for schedule, the timezone
+                                is in UTC. see https://en.wikipedia.org/wiki/Cron.
+                              type: string
+                            enable:
+                              description: enable or disable the schedule.
+                              type: boolean
+                          required:
+                          - cronExpression
+                          - enable
+                          type: object
+                      type: object
+                    snapshot:
+                      description: the policy for snapshot backup.
+                      properties:
+                        backupStatusUpdates:
+                          description: define how to update metadata for backup status.
+                          items:
+                            properties:
+                              containerName:
+                                description: which container name that kubectl can
+                                  execute.
+                                type: string
+                              path:
+                                description: 'specify the json path of backup object
+                                  for patch. example: manifests.backupLog -- means
+                                  patch the backup json path of status.manifests.backupLog.'
+                                type: string
+                              script:
+                                description: the shell Script commands to collect
+                                  backup status metadata. The script must exist in
+                                  the container of ContainerName and the output format
+                                  must be set to JSON. Note that outputting to stderr
+                                  may cause the result format to not be in JSON.
+                                type: string
+                              updateStage:
+                                description: 'when to update the backup status, pre:
+                                  before backup, post: after backup'
+                                enum:
+                                - pre
+                                - post
+                                type: string
+                            type: object
+                          type: array
+                        backupsHistoryLimit:
+                          default: 7
+                          description: the number of automatic backups to retain.
+                            Value must be non-negative integer. 0 means NO limit on
+                            the number of backups.
+                          format: int32
+                          type: integer
+                        hooks:
+                          description: execute hook commands for backup.
+                          properties:
+                            containerName:
+                              description: which container can exec command
+                              type: string
+                            image:
+                              description: exec command with image
+                              type: string
+                            postCommands:
+                              description: post backup to perform commands
+                              items:
+                                type: string
+                              type: array
+                            preCommands:
+                              description: pre backup to perform commands
+                              items:
+                                type: string
+                              type: array
+                          type: object
+                        onFailAttempted:
+                          description: count of backup stop retries on fail.
+                          format: int32
+                          type: integer
+                        target:
+                          description: target instance for backup.
+                          properties:
+                            account:
+                              description: refer to spec.componentDef.systemAccounts.accounts[*].name
+                                in ClusterDefinition. the secret created by this account
+                                will be used to connect the database. if not set,
+                                the secret created by spec.ConnectionCredential of
+                                the ClusterDefinition will be used. it will be transformed
+                                to a secret for BackupPolicy's target secret.
+                              type: string
+                            connectionCredentialKey:
+                              description: connectionCredentialKey defines connection
+                                credential key in secret which created by spec.ConnectionCredential
+                                of the ClusterDefinition. it will be ignored when
+                                "account" is set.
+                              properties:
+                                passwordKey:
+                                  description: the key of password in the ConnectionCredential
+                                    secret. if not set, the default key is "password".
+                                  type: string
+                                usernameKey:
+                                  description: the key of username in the ConnectionCredential
+                                    secret. if not set, the default key is "username".
+                                  type: string
+                              type: object
+                            role:
+                              description: 'select instance of corresponding role
+                                for backup, role are: - the name of Leader/Follower/Leaner
+                                for Consensus component. - primary or secondary for
+                                Replication component. finally, invalid role of the
+                                component will be ignored. such as if workload type
+                                is Replication and component''s replicas is 1, the
+                                secondary role is invalid. and it also will be ignored
+                                when component is Stateful/Stateless. the role will
+                                be transformed to a role LabelSelector for BackupPolicy''s
+                                target attribute.'
+                              type: string
+                          type: object
+                      type: object
+                    ttl:
+                      description: ttl is a time string ending with the 'd'|'D'|'h'|'H'
+                        character to describe how long the Backup should be retained.
+                        if not set, will be retained forever.
+                      pattern: ^\d+[d|D|h|H]$
+                      type: string
+                  required:
+                  - componentDefRef
+                  type: object
+                minItems: 1
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentDefRef
+                x-kubernetes-list-type: map
+              clusterDefinitionRef:
+                description: clusterDefinitionRef references ClusterDefinition name,
+                  this is an immutable attribute.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                type: string
+            required:
+            - backupPolicies
+            - clusterDefinitionRef
+            type: object
+          status:
+            description: BackupPolicyTemplateStatus defines the observed state of
+              BackupPolicyTemplate
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

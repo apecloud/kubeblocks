@@ -37,9 +37,10 @@ func init() {
 		// REVIEW: can do opsrequest if not running?
 		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
 		// TODO: add cluster reconcile Reconfiguring phase.
-		ToClusterPhase:             appsv1alpha1.SpecReconcilingClusterPhase, // appsv1alpha1.ReconfiguringPhase,
-		MaintainClusterPhaseBySelf: true,
-		OpsHandler:                 &reAction,
+		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
+		MaintainClusterPhaseBySelf:         true,
+		OpsHandler:                         &reAction,
+		ProcessingReasonInClusterCondition: ProcessingReasonReconfiguring,
 	}
 	cfgcore.ConfigEventHandlerMap["ops_status_reconfigure"] = &reAction
 	opsManager.RegisterOps(appsv1alpha1.ReconfiguringType, reconfigureBehaviour)
@@ -57,7 +58,7 @@ func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx,
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (r *reconfigureAction) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return opsRequest.GetReconfiguringComponentNameMap()
+	return realAffectedComponentMap(opsRequest.Spec.GetReconfiguringComponentNameSet())
 }
 
 func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.OpsPhase, cfgError error) error {
@@ -93,21 +94,21 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 	switch phase {
 	case appsv1alpha1.OpsSucceedPhase:
 		// only update the condition of the opsRequest.
-		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureSucceed,
 				eventContext.ConfigSpecName,
 				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			appsv1alpha1.NewSucceedCondition(opsRequest))
 	case appsv1alpha1.OpsFailedPhase:
-		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureFailed,
 				eventContext.ConfigSpecName,
 				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
-			appsv1alpha1.NewFailedCondition(opsRequest, cfgError))
+			appsv1alpha1.NewReconfigureFailedCondition(opsRequest, cfgError))
 	default:
-		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureRunning,
 				eventContext.ConfigSpecName))
@@ -254,15 +255,16 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		return err
 	}
 
-	tpls, err := cfgcore.GetConfigTemplatesFromComponent(
+	configSpecs, err := cfgcore.GetConfigTemplatesFromComponent(
 		cluster.Spec.ComponentSpecs,
 		clusterDefinition.Spec.ComponentDefs,
 		clusterVersion.Spec.ComponentVersions,
 		componentName)
 	if err != nil {
-		return cfgcore.WrapError(err, "failed to get config template[%s]", componentName)
+		return processMergedFailed(resource, true,
+			cfgcore.WrapError(err, "failed to get config template in the component[%s]", componentName))
 	}
-	return r.doMergeAndPersist(reqCtx, cli, clusterName, componentName, spec.Reconfigure, resource, tpls)
+	return r.doMergeAndPersist(reqCtx, cli, clusterName, componentName, spec.Reconfigure, resource, configSpecs)
 }
 
 func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
@@ -270,14 +272,14 @@ func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
 	clusterName, componentName string,
 	reconfigure *appsv1alpha1.Reconfigure,
 	resource *OpsResource,
-	tpls []appsv1alpha1.ComponentConfigSpec) error {
-	findTpl := func(tplName string) *appsv1alpha1.ComponentConfigSpec {
-		if len(tplName) == 0 && len(tpls) == 1 {
-			return &tpls[0]
+	configSpecs []appsv1alpha1.ComponentConfigSpec) error {
+	foundConfigSpec := func(configSpecName string) *appsv1alpha1.ComponentConfigSpec {
+		if len(configSpecName) == 0 && len(configSpecs) == 1 {
+			return &configSpecs[0]
 		}
-		for _, tpl := range tpls {
-			if tpl.Name == tplName {
-				return &tpl
+		for _, configSpec := range configSpecs {
+			if configSpec.Name == configSpecName {
+				return &configSpec
 			}
 		}
 		return nil
@@ -286,17 +288,17 @@ func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
 	// Update params to configmap
 	// TODO support multi tpl conditions merge
 	for _, config := range reconfigure.Configurations {
-		tpl := findTpl(config.Name)
-		if tpl == nil {
+		configSpec := foundConfigSpec(config.Name)
+		if configSpec == nil {
 			return processMergedFailed(resource, true,
-				cfgcore.MakeError("failed to reconfigure, not exist config[%s], all configs: %v", config.Name, tpls))
+				cfgcore.MakeError("failed to reconfigure, not exist config[%s], all configs: %v", config.Name, getConfigSpecName(configSpecs)))
 		}
-		if len(tpl.ConfigConstraintRef) == 0 {
+		if len(configSpec.ConfigConstraintRef) == 0 {
 			return processMergedFailed(resource, true,
-				cfgcore.MakeError("current tpl not support reconfigure, tpl: %v", tpl))
+				cfgcore.MakeError("current configSpec not support reconfigure, configSpec: %v", configSpec.Name))
 		}
-		result := updateCfgParams(config, *tpl, client.ObjectKey{
-			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName),
+		result := updateCfgParams(config, *configSpec, client.ObjectKey{
+			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, configSpec.Name),
 			Namespace: resource.Cluster.Namespace,
 		}, reqCtx.Ctx, cli, resource.OpsRequest.Name)
 		if result.err != nil {
@@ -304,11 +306,11 @@ func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
 		}
 
 		// merged successfully
-		if err := patchReconfigureOpsStatus(resource, tpl.Name,
+		if err := patchReconfigureOpsStatus(resource, configSpec.Name,
 			handleNewReconfigureRequest(result.configPatch, result.lastAppliedConfigs)); err != nil {
 			return err
 		}
-		condition := constructReconfiguringConditions(result, resource, tpl)
+		condition := constructReconfiguringConditions(result, resource, configSpec)
 		resource.OpsRequest.SetStatusCondition(*condition)
 	}
 	return nil

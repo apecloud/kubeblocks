@@ -17,32 +17,52 @@ limitations under the License.
 package dataprotection
 
 import (
+	"embed"
 	"runtime"
 	"time"
 
 	"github.com/spf13/viper"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	// name of our custom finalizer
 	dataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
-
-	reconcileInterval = time.Second
-
 	// settings keys
 	maxConcurDataProtectionReconKey = "MAXCONCURRENTRECONCILES_DATAPROTECTION"
 
 	// label keys
+	dataProtectionLabelBackupPolicyKey   = "dataprotection.kubeblocks.io/backup-policy"
 	dataProtectionLabelBackupTypeKey     = "dataprotection.kubeblocks.io/backup-type"
 	dataProtectionLabelAutoBackupKey     = "dataprotection.kubeblocks.io/autobackup"
 	dataProtectionLabelBackupNameKey     = "backups.dataprotection.kubeblocks.io/name"
 	dataProtectionLabelRestoreJobNameKey = "restorejobs.dataprotection.kubeblocks.io/name"
 
-	dataProtectionBackupTargetPodKey = "dataprotection.kubeblocks.io/target-pod-name"
+	dataProtectionBackupTargetPodKey          = "dataprotection.kubeblocks.io/target-pod-name"
+	dataProtectionAnnotationCreateByPolicyKey = "dataprotection.kubeblocks.io/created-by-policy"
 	// error status
 	errorJobFailed = "JobFailed"
 )
 
+var reconcileInterval = time.Second
+
 func init() {
 	viper.SetDefault(maxConcurDataProtectionReconKey, runtime.NumCPU()*2)
+}
+
+var (
+	//go:embed cue/*
+	cueTemplates embed.FS
+)
+
+type backupPolicyOptions struct {
+	Name             string          `json:"name"`
+	BackupPolicyName string          `json:"backupPolicyName"`
+	Namespace        string          `json:"namespace"`
+	MgrNamespace     string          `json:"mgrNamespace"`
+	Cluster          string          `json:"cluster"`
+	Schedule         string          `json:"schedule"`
+	BackupType       string          `json:"backupType"`
+	TTL              metav1.Duration `json:"ttl,omitempty"`
+	ServiceAccount   string          `json:"serviceAccount"`
 }

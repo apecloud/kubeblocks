@@ -52,6 +52,10 @@ type ConfigConstraintSpec struct {
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 
+	// selector is used to match the label on the pod,
+	// for example, a pod of the primary is match on the patroni cluster.
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+
 	// formatterConfig describes the format of the configuration file, the controller
 	// 1. parses configuration file
 	// 2. analyzes the modified parameters
@@ -126,6 +130,17 @@ type ShellTrigger struct {
 	// exec used to execute for reload.
 	// +kubebuilder:validation:Required
 	Exec string `json:"exec"`
+
+	// scriptConfigMapRef used to execute for reload.
+	// +kubebuilder:validation:Required
+	ScriptConfigMapRef string `json:"scriptConfigMapRef"`
+
+	// Specify the namespace of the referenced the tpl script ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
 
 type TPLScriptTrigger struct {
@@ -139,6 +154,10 @@ type TPLScriptTrigger struct {
 	// +kubebuilder:default="default"
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
+
+	// Specify synchronize updates parameters to the config manager.
+	// +optional
+	Sync *bool `json:"sync,omitempty"`
 }
 
 type FormatterConfig struct {

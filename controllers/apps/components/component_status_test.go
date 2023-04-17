@@ -39,8 +39,8 @@ import (
 
 var _ = Describe("ComponentStatusSynchronizer", func() {
 	const (
-		compName = "comp"
-		compType = "comp"
+		compName    = "comp"
+		compDefName = "comp"
 	)
 
 	var (
@@ -85,23 +85,23 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, compType).
+				AddComponentDef(testapps.StatelessNginxComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(1).
 				GetObject()
 
 			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+				cluster.Spec.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
 
 		It("should not change component if no deployment or pod exists", func() {
 			synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), component)
+				cluster.Spec.GetComponentByName(compName), component)
 			Expect(err).Should(Succeed())
 			Expect(synchronizer).ShouldNot(BeNil())
 
@@ -142,7 +142,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(mockContainerError(pod)).Should(Succeed())
 
 				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.GetComponentByName(compName), component)
+					cluster.Spec.GetComponentByName(compName), component)
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
@@ -167,7 +167,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				})).Should(Succeed())
 
 				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.GetComponentByName(compName), component)
+					cluster.Spec.GetComponentByName(compName), component)
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
@@ -198,23 +198,23 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, compType).
+				AddComponentDef(testapps.StatefulMySQLComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				GetObject()
 
 			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+				cluster.Spec.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
 
 		It("should not change component if no statefulset or pod exists", func() {
 			synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), component)
+				cluster.Spec.GetComponentByName(compName), component)
 			Expect(err).Should(Succeed())
 			Expect(synchronizer).ShouldNot(BeNil())
 
@@ -266,7 +266,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(mockContainerError(pods[1])).Should(Succeed())
 
 				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.GetComponentByName(compName), component)
+					cluster.Spec.GetComponentByName(compName), component)
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
@@ -293,7 +293,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				})).Should(Succeed())
 
 				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.GetComponentByName(compName), component)
+					cluster.Spec.GetComponentByName(compName), component)
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
@@ -324,23 +324,23 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ConsensusMySQLComponent, compType).
+				AddComponentDef(testapps.ConsensusMySQLComponent, compDefName).
 				Create(&testCtx).GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				Create(&testCtx).GetObject()
 
 			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+				cluster.Spec.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
 
 		It("should not change component if no statefulset or pod exists", func() {
 			synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), component)
+				cluster.Spec.GetComponentByName(compName), component)
 			Expect(err).Should(Succeed())
 			Expect(synchronizer).ShouldNot(BeNil())
 
@@ -390,7 +390,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(mockContainerError(pods[0])).Should(Succeed())
 
 				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.GetComponentByName(compName), component)
+					cluster.Spec.GetComponentByName(compName), component)
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
@@ -419,7 +419,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(setPodRole(pods[2], "follower")).Should(Succeed())
 
 				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.GetComponentByName(compName), component)
+					cluster.Spec.GetComponentByName(compName), component)
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
@@ -450,23 +450,23 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, compType).
+				AddComponentDef(testapps.ReplicationRedisComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(2).
 				GetObject()
 
 			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+				cluster.Spec.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
 
 		It("should not change component if no deployment or pod exists", func() {
 			synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-				cluster.GetComponentByName(compName), component)
+				cluster.Spec.GetComponentByName(compName), component)
 			Expect(err).Should(Succeed())
 			Expect(synchronizer).ShouldNot(BeNil())
 
@@ -519,7 +519,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(mockContainerError(pods[0])).Should(Succeed())
 
 				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.GetComponentByName(compName), component)
+					cluster.Spec.GetComponentByName(compName), component)
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
@@ -544,7 +544,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				})).Should(Succeed())
 
 				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.GetComponentByName(compName), component)
+					cluster.Spec.GetComponentByName(compName), component)
 				Expect(err).Should(Succeed())
 				Expect(synchronizer).ShouldNot(BeNil())
 
@@ -589,7 +589,7 @@ func mockContainerError(pod *corev1.Pod) error {
 }
 
 func setPodRole(pod *corev1.Pod, role string) error {
-	return testapps.ChangeObj(&testCtx, pod, func() {
-		pod.Labels[constant.RoleLabelKey] = role
+	return testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+		lpod.Labels[constant.RoleLabelKey] = role
 	})
 }

@@ -1,3 +1,5 @@
+## @param architecture define MongoDB cluster topology architecture ( `replicaset` or `sharding`)
+architecture: replicaset
 
 ## @param terminationPolicy define Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
 ##
@@ -84,6 +86,52 @@ shard:
     ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
     ##
     tolerations: [ ]
+
+replicaset:
+  ## @param replicaset.replicas Number of MongoDB replicas per replicaset to deploy
+  ##
+  replicas: 3
+  ## MongoDB workload pod resource requests and limits
+  ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+  ## @param replicaset.resources.limits The resources limits for the init container
+  ## @param replicaset.resources.requests The requested resources for the init container
+  ##
+  resources: { }
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+  ## Enable persistence using Persistent Volume Claims
+  ## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
+  ##
+  persistence:
+    ## @param replicaset.persistence.enabled Enable persistence using Persistent Volume Claims
+    ##
+    enabled: true
+    ## `data` volume settings
+    ##
+    data:
+      ## @param replicaset.persistence.data.storageClassName Storage class of backing PVC
+      ## If defined, storageClassName: <storageClass>
+      ## If set to "-", storageClassName: "", which disables dynamic provisioning
+      ## If undefined (the default) or set to null, no storageClassName spec is
+      ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+      ##   GKE, AWS & OpenStack)
+      ##
+      storageClassName: 
+      ## @param replicaset.persistence.size Size of data volume
+      ##
+      size: 20Gi
+  ## @param replicaset.tolerations Tolerations for MongoDB pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: [ ]
 
 configsvr:
   ## @param configsvr.replicas Number of MongoDB replicas per configsvr to deploy
@@ -260,3 +308,6 @@ ingress:
   ##             name: http
   ##
   extraRules: []
+
+enabledLogs:
+  - running

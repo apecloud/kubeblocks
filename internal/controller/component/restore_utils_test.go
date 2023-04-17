@@ -36,7 +36,6 @@ import (
 
 var _ = Describe("probe_utils", func() {
 	const backupPolicyName = "test-backup-policy"
-	const defaultTTL = "168h0m0s"
 	const backupName = "test-backup-job"
 	var backupToolName string
 
@@ -68,9 +67,7 @@ var _ = Describe("probe_utils", func() {
 		updateBackupStatus := func(backup *dataprotectionv1alpha1.Backup, backupToolName string, expectPhase dataprotectionv1alpha1.BackupPhase) {
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.BackupToolName = backupToolName
-				backup.Status.RemoteVolume = &corev1.Volume{
-					Name: "backup-pvc",
-				}
+				backup.Status.PersistentVolumeClaimName = "backup-pvc"
 				backup.Status.Phase = expectPhase
 			})).Should(Succeed())
 		}
@@ -81,7 +78,6 @@ var _ = Describe("probe_utils", func() {
 				Log: logger,
 			}
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-				SetTTL(defaultTTL).
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 				Create(&testCtx).GetObject()
@@ -107,7 +103,6 @@ var _ = Describe("probe_utils", func() {
 				Log: logger,
 			}
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-				SetTTL(defaultTTL).
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
 				Create(&testCtx).GetObject()

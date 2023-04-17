@@ -36,7 +36,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 
-	const statefulCompType = "replicasets"
+	const statefulCompDefName = "replicasets"
 
 	const configVolumeName = "mysql-config"
 
@@ -59,7 +59,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
 
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)
 	}
 
 	BeforeEach(func() {
@@ -80,12 +80,12 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
@@ -142,13 +142,13 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				AddConfigTemplate(cmName, cmName, cmName, testCtx.DefaultNamespace, configVolumeName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 

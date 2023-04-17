@@ -30,13 +30,14 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/backupconfig"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterdefinition"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dashboard"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
@@ -94,12 +95,13 @@ A Command Line Interface for KubeBlocks`,
 		bench.NewBenchCmd(),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
-		backupconfig.NewBackupConfigCmd(f, ioStreams),
 		dashboard.NewDashboardCmd(f, ioStreams),
 		clusterversion.NewClusterVersionCmd(f, ioStreams),
 		clusterdefinition.NewClusterDefinitionCmd(f, ioStreams),
+		class.NewClassCommand(f, ioStreams),
 		alert.NewAlertCmd(f, ioStreams),
 		addon.NewAddonCmd(f, ioStreams),
+		migration.NewMigrationCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}
@@ -118,11 +120,10 @@ func initConfig() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(fmt.Sprintf("/etc/%s/", cliName))
 	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s/", cliName))
-	viper.AddConfigPath(".")
 	viper.AutomaticEnv() // read in environment variables that match
 	viper.SetEnvPrefix(cliName)
 
-	viper.SetDefault("CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
+	viper.SetDefault("CLUSTER_DEFAULT_STORAGE_SIZE", "20Gi")
 	viper.SetDefault("CLUSTER_DEFAULT_REPLICAS", 1)
 	viper.SetDefault("CLUSTER_DEFAULT_CPU", "1000m")
 	viper.SetDefault("CLUSTER_DEFAULT_MEMORY", "1Gi")

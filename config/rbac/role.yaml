@@ -12,6 +12,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -27,6 +28,30 @@ rules:
   - apps
   resources:
   - deployments/status
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - pods/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - pods/status
   verbs:
   - get
 - apiGroups:
@@ -60,6 +85,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -77,6 +103,13 @@ rules:
   - statefulsets/status
   verbs:
   - get
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - backuppolicytemplates
+  verbs:
+  - get
+  - list
 - apiGroups:
   - apps.kubeblocks.io
   resources:
@@ -155,6 +188,40 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentclassdefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentclassdefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentclassdefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentresourceconstraints
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - apps.kubeblocks.io
   resources:
@@ -293,6 +360,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -397,6 +465,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -415,6 +484,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -455,32 +525,6 @@ rules:
   - dataprotection.kubeblocks.io
   resources:
   - backuppolicies/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicytemplates
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicytemplates/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicytemplates/status
   verbs:
   - get
   - patch
@@ -597,6 +641,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch

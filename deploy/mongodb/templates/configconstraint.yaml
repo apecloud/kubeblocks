@@ -1,0 +1,13 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: mongodb-config-constraints
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  configurationSchema:
+    cue: ""
+
+  # mysql configuration file format
+  formatterConfig:
+    format: yaml

@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,6 +46,7 @@ type GetOptions struct {
 	WithSecret         bool
 	WithPod            bool
 	WithEvent          bool
+	WithDataProtection bool
 }
 
 type ObjectsGetter struct {
@@ -60,6 +62,24 @@ func NewClusterObjects() *ClusterObjects {
 		Cluster: &appsv1alpha1.Cluster{},
 		Nodes:   []*corev1.Node{},
 	}
+}
+
+func listResources[T any](dynamic dynamic.Interface, gvr schema.GroupVersionResource, ns string, opts metav1.ListOptions, items *[]T) error {
+	if *items == nil {
+		*items = []T{}
+	}
+	obj, err := dynamic.Resource(gvr).Namespace(ns).List(context.TODO(), opts)
+	if err != nil {
+		return err
+	}
+	for _, i := range obj.Items {
+		var object T
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &object); err != nil {
+			return err
+		}
+		*items = append(*items, object)
+	}
+	return nil
 }
 
 // Get all kubernetes objects belonging to the database cluster
@@ -87,6 +107,12 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	// get cluster
 	if err = getResource(types.ClusterGVR(), o.Name, o.Namespace, objs.Cluster); err != nil {
 		return nil, err
+	}
+
+	// wrap the cluster phase if the latest ops request is processing
+	latestOpsProcessedCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
+	if latestOpsProcessedCondition != nil && latestOpsProcessedCondition.Status == metav1.ConditionFalse {
+		objs.Cluster.Status.Phase = appsv1alpha1.ClusterPhase(latestOpsProcessedCondition.Reason)
 	}
 
 	// get cluster definition
@@ -182,6 +208,18 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 			}
 		}
 	}
+	if o.WithDataProtection {
+		dplistOpts := metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s",
+				constant.AppInstanceLabelKey, o.Name),
+		}
+		if err := listResources(o.Dynamic, types.BackupPolicyGVR(), o.Namespace, dplistOpts, &objs.BackupPolicies); err != nil {
+			return nil, err
+		}
+		if err := listResources(o.Dynamic, types.BackupGVR(), o.Namespace, dplistOpts, &objs.Backups); err != nil {
+			return nil, err
+		}
+	}
 	return objs, nil
 }
 
@@ -197,6 +235,7 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 		CreatedTime:       util.TimeFormat(&c.CreationTimestamp),
 		InternalEP:        types.None,
 		ExternalEP:        types.None,
+		Labels:            util.CombineLabels(c.Labels),
 	}
 
 	if o.ClusterDef == nil {

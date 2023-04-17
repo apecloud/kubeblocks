@@ -18,7 +18,6 @@ package apps
 
 import (
 	"math/rand"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -147,20 +146,20 @@ func TestRenderJob(t *testing.T) {
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
 		clusterNamePrefix  = "test-cluster"
-		mysqlCompType      = "replicasets"
+		mysqlCompDefName   = "replicasets"
 		mysqlCompName      = "mysql"
 	)
 
 	systemAccount := mockSystemAccountsSpec()
 	clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-		AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+		AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 		AddSystemAccountSpec(systemAccount).
 		GetObject()
 	assert.NotNil(t, clusterDef)
 	assert.NotNil(t, clusterDef.Spec.ComponentDefs[0].SystemAccounts)
 
 	cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDef.Name, clusterVersionName).
-		AddComponent(mysqlCompType, mysqlCompName).GetObject()
+		AddComponent(mysqlCompDefName, mysqlCompName).GetObject()
 	assert.NotNil(t, cluster)
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string, 0)
@@ -230,8 +229,14 @@ func TestRenderJob(t *testing.T) {
 			assert.NotNil(t, job)
 			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			jobToleration := job.Spec.Template.Spec.Tolerations
-			assert.Equal(t, 1, len(jobToleration))
-			assert.True(t, reflect.DeepEqual(toleration[0], jobToleration[0]))
+			assert.Equal(t, 2, len(jobToleration))
+			// make sure the toleration is added to job and contains our built-in toleration
+			tolerationKeys := make([]string, 0)
+			for _, t := range jobToleration {
+				tolerationKeys = append(tolerationKeys, t.Key)
+			}
+			assert.Contains(t, tolerationKeys, constant.KubeBlocksDataNodeTolerationKey)
+			assert.Contains(t, tolerationKeys, toleration[0].Key)
 		case appsv1alpha1.ReferToExisting:
 			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.ConnCredentialPlaceHolder))
 		}
@@ -301,20 +306,20 @@ func TestAccountDebugMode(t *testing.T) {
 
 func TestRenderCreationStmt(t *testing.T) {
 	var (
-		clusterDefName = "test-clusterdef"
-		clusterName    = "test-cluster"
-		mysqlCompType  = "replicasets"
-		mysqlCompName  = "mysql"
+		clusterDefName   = "test-clusterdef"
+		clusterName      = "test-cluster"
+		mysqlCompDefName = "replicasets"
+		mysqlCompName    = "mysql"
 	)
 
 	systemAccount := mockSystemAccountsSpec()
 	clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-		AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+		AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 		AddSystemAccountSpec(systemAccount).
 		GetObject()
 	assert.NotNil(t, clusterDef)
 
-	compDef := clusterDef.GetComponentDefByName(mysqlCompType)
+	compDef := clusterDef.GetComponentDefByName(mysqlCompDefName)
 	assert.NotNil(t, compDef.SystemAccounts)
 
 	accountsSetting := compDef.SystemAccounts

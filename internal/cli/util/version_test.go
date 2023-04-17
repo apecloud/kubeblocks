@@ -20,12 +20,33 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
 const kbVersion = "0.3.0"
 
 var _ = Describe("version util", func() {
+	It("get version info when client is nil", func() {
+		info, err := GetVersionInfo(nil)
+		Expect(err).Should(Succeed())
+		Expect(info).ShouldNot(BeEmpty())
+		Expect(info[KubeBlocksApp]).Should(BeEmpty())
+		Expect(info[KubernetesApp]).Should(BeEmpty())
+		Expect(info[KBCLIApp]).ShouldNot(BeEmpty())
+	})
+
+	It("get version info when client variable is a nil pointer", func() {
+		var client *kubernetes.Clientset
+		info, err := GetVersionInfo(client)
+		Expect(err).Should(Succeed())
+		Expect(info).ShouldNot(BeEmpty())
+		Expect(info[KubeBlocksApp]).Should(BeEmpty())
+		Expect(info[KubernetesApp]).Should(BeEmpty())
+		Expect(info[KBCLIApp]).ShouldNot(BeEmpty())
+	})
+
 	It("get version info when KubeBlocks is deployed", func() {
 		client := testing.FakeClientSet(testing.FakeKBDeploy(kbVersion))
 		info, err := GetVersionInfo(client)
@@ -58,9 +79,9 @@ var _ = Describe("version util", func() {
 		Expect(err).Should(Succeed())
 	})
 
-	It("getK8sVersion", func() {
+	It("GetK8sVersion", func() {
 		client := testing.FakeClientSet()
-		v, err := getK8sVersion(client.Discovery())
+		v, err := GetK8sVersion(client.Discovery())
 		Expect(v).ShouldNot(BeEmpty())
 		Expect(err).Should(Succeed())
 	})

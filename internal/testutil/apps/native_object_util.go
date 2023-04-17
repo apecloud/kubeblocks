@@ -54,8 +54,6 @@ func SetConfigMapData(key string, value string) func(*corev1.ConfigMap) {
 	}
 }
 
-// PVC
-
 func NewPVC(size string) corev1.PersistentVolumeClaimSpec {
 	return corev1.PersistentVolumeClaimSpec{
 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -67,7 +65,8 @@ func NewPVC(size string) corev1.PersistentVolumeClaimSpec {
 	}
 }
 
-func CreateStorageClass(testCtx testutil.TestContext, storageClassName string, allowVolumeExpansion bool) *storagev1.StorageClass {
+func CreateStorageClass(testCtx testutil.TestContext, storageClassName string,
+	allowVolumeExpansion bool) *storagev1.StorageClass {
 	storageClass := &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: storageClassName,

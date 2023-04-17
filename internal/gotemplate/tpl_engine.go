@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 )
 
 const (
@@ -41,7 +42,9 @@ const (
 )
 
 const (
-	goTemplateExtendBuildInRegexSubString = "regexStringSubmatch"
+	goTemplateExtendBuildInRegexSubString      = "regexStringSubmatch"
+	goTemplateExtendBuildInFromYamlString      = "fromYaml"
+	goTemplateExtendBuildInFromYamlArrayString = "fromYamlArray"
 )
 
 type TplValues map[string]interface{}
@@ -63,7 +66,7 @@ type TplEngine struct {
 	importModules *set.LinkedHashSetString
 	importFuncs   map[string]functional
 
-	cli client.Client
+	cli types2.ReadonlyClient
 	ctx context.Context
 }
 
@@ -156,6 +159,8 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 
 	// Wrap regex.FindStringSubmatch
 	funcs[goTemplateExtendBuildInRegexSubString] = regexStringSubmatch
+	funcs[goTemplateExtendBuildInFromYamlString] = fromYAML
+	funcs[goTemplateExtendBuildInFromYamlArrayString] = fromYAMLArray
 
 	t.tpl.Option(DefaultTemplateOps)
 	t.tpl.Funcs(funcs)
@@ -174,7 +179,7 @@ func (t *TplEngine) importSelfModuleFuncs(funcs map[string]functional, fn func(t
 //
 // As it recurses, it also sets the values to be appropriate for the parameters of the called function,
 // it looks like it's calling a local function.
-func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, cli client.Client, ctx context.Context) *TplEngine {
+func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, cli types2.ReadonlyClient, ctx context.Context) *TplEngine {
 	coreBuiltinFuncs := sprig.TxtFuncMap()
 
 	// custom funcs

@@ -30,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
@@ -50,7 +51,6 @@ const (
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupToolName      = "fake-backup-tool"
-	BackupTemplateName  = "fake-backup-policy-template"
 )
 
 func GetRandomStr() string {
@@ -58,7 +58,7 @@ func GetRandomStr() string {
 	return seq
 }
 
-func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
+func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1alpha1.Cluster {
 	var replicas int32 = 1
 	return &appsv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
@@ -82,6 +82,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 					},
 				},
 			},
+			Conditions: conditions,
 		},
 		Spec: appsv1alpha1.ClusterSpec{
 			ClusterDefRef:     ClusterDefName,
@@ -105,7 +106,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 					VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 						{
 							Name: "data",
-							Spec: &corev1.PersistentVolumeClaimSpec{
+							Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 								AccessModes: []corev1.PersistentVolumeAccessMode{
 									corev1.ReadWriteOnce,
 								},
@@ -131,7 +132,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 					VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 						{
 							Name: "data",
-							Spec: &corev1.PersistentVolumeClaimSpec{
+							Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 								AccessModes: []corev1.PersistentVolumeAccessMode{
 									corev1.ReadWriteOnce,
 								},
@@ -251,6 +252,20 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 	return clusterDef
 }
 
+func FakeComponentClassDef(clusterDef *appsv1alpha1.ClusterDefinition, def []byte) *corev1.ConfigMapList {
+	result := &corev1.ConfigMapList{}
+	cm := &corev1.ConfigMap{}
+	cm.Name = fmt.Sprintf("fake-kubeblocks-classes-%s", ComponentName)
+	cm.SetLabels(map[string]string{
+		constant.KBAppComponentDefRefLabelKey: ComponentDefName,
+		types.ClassProviderLabelKey:           "kubeblocks",
+		constant.ClusterDefLabelKey:           clusterDef.Name,
+	})
+	cm.Data = map[string]string{"families-20230223162700": string(def)}
+	result.Items = append(result.Items, *cm)
+	return result
+}
+
 func FakeClusterVersion() *appsv1alpha1.ClusterVersion {
 	cv := &appsv1alpha1.ClusterVersion{}
 	cv.Name = ClusterVersionName
@@ -269,14 +284,24 @@ func FakeBackupTool() *dpv1alpha1.BackupTool {
 	return tool
 }
 
-func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
-	template := &dpv1alpha1.BackupPolicyTemplate{
+func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPolicy {
+	template := &dpv1alpha1.BackupPolicy{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
-			Kind:       types.KindBackupPolicyTemplate,
+			Kind:       types.KindBackupPolicy,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: BackupTemplateName,
+			Name:      backupPolicyName,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: clusterName,
+			},
+			Annotations: map[string]string{
+				constant.DefaultBackupPolicyAnnotationKey: "true",
+			},
+		},
+		Status: dpv1alpha1.BackupPolicyStatus{
+			Phase: dpv1alpha1.PolicyAvailable,
 		},
 	}
 	return template
@@ -338,7 +363,7 @@ func FakeServices() *corev1.ServiceList {
 			annotations[types.ServiceFloatingIPAnnotationKey] = item.floatingIP
 		}
 		if item.exposed {
-			annotations[types.ServiceLBTypeAnnotationKey] = types.ServiceLBTypeAnnotationValue
+			annotations[types.ServiceHAVIPTypeAnnotationKey] = types.ServiceHAVIPTypeAnnotationValue
 		}
 		svc.ObjectMeta.SetAnnotations(annotations)
 
@@ -425,4 +450,26 @@ func FakeKBDeploy(version string) *appsv1.Deployment {
 		deploy.Labels["app.kubernetes.io/version"] = version
 	}
 	return deploy
+}
+
+func FakeAddon(name string) *extensionsv1alpha1.Addon {
+	addon := &extensionsv1alpha1.Addon{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.ExtensionsAPIGroup, types.ExtensionsAPIVersion),
+			Kind:       "Addon",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: Namespace,
+		},
+		Spec: extensionsv1alpha1.AddonSpec{
+			Installable: &extensionsv1alpha1.InstallableSpec{
+				Selectors: []extensionsv1alpha1.SelectorRequirement{
+					{Key: extensionsv1alpha1.KubeGitVersion, Operator: extensionsv1alpha1.Contains, Values: []string{"k3s"}},
+				},
+			},
+		},
+	}
+	addon.SetCreationTimestamp(metav1.Now())
+	return addon
 }

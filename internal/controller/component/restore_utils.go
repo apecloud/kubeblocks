@@ -60,6 +60,14 @@ func BuildRestoredInfo(
 	if err != nil {
 		return err
 	}
+	return BuildRestoredInfo2(component, backup, backupTool)
+}
+
+// BuildRestoredInfo2 builds restore-related infos if it needs to restore from backup, such as init container/pvc dataSource.
+func BuildRestoredInfo2(
+	component *SynthesizedComponent,
+	backup *dataprotectionv1alpha1.Backup,
+	backupTool *dataprotectionv1alpha1.BackupTool) error {
 	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupNotCompleted, "backup %s is not completed", backup.Name)
 	}
@@ -85,8 +93,8 @@ func buildInitContainerWithFullBackup(
 	if component.PodSpec == nil || len(component.PodSpec.Containers) == 0 {
 		return nil
 	}
-	if backup.Status.RemoteVolume == nil {
-		return fmt.Errorf("remote volume can not be empty in Backup.status.remoteVolume")
+	if len(backup.Status.PersistentVolumeClaimName) == 0 {
+		return fmt.Errorf("persistentVolumeClaimName can not be empty in Backup.status")
 	}
 	container := corev1.Container{}
 	container.Name = GetRestoredInitContainerName(backup.Name)
@@ -98,10 +106,17 @@ func buildInitContainerWithFullBackup(
 	}
 	container.VolumeMounts = component.PodSpec.Containers[0].VolumeMounts
 	// add the volumeMounts with backup volume
-	randomVolumeName := fmt.Sprintf("%s-%s", component.Name, backup.Status.RemoteVolume.Name)
-	backup.Status.RemoteVolume.Name = randomVolumeName
+	backupVolumeName := fmt.Sprintf("%s-%s", component.Name, backup.Status.PersistentVolumeClaimName)
+	remoteVolume := corev1.Volume{
+		Name: backupVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: backup.Status.PersistentVolumeClaimName,
+			},
+		},
+	}
 	remoteVolumeMount := corev1.VolumeMount{}
-	remoteVolumeMount.Name = randomVolumeName
+	remoteVolumeMount.Name = backupVolumeName
 	remoteVolumeMount.MountPath = "/" + backup.Name
 	container.VolumeMounts = append(container.VolumeMounts, remoteVolumeMount)
 
@@ -123,7 +138,7 @@ func buildInitContainerWithFullBackup(
 	// merge env from backup tool.
 	container.Env = append(container.Env, backupTool.Spec.Env...)
 	// add volume of backup data
-	component.PodSpec.Volumes = append(component.PodSpec.Volumes, *backup.Status.RemoteVolume)
+	component.PodSpec.Volumes = append(component.PodSpec.Volumes, remoteVolume)
 	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, container)
 	return nil
 }

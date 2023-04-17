@@ -45,6 +45,7 @@ type BaseInternalOps interface {
 	InternalQuery(ctx context.Context, sql string) ([]byte, error)
 	InternalExec(ctx context.Context, sql string) (int64, error)
 	GetLogger() logger.Logger
+	GetRunningPort() int
 }
 
 type BaseOperations struct {
@@ -136,7 +137,6 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 		return nil, errors.Errorf("invoke request required")
 	}
 
-	ops.Logger.Debugf("request operation: %v", req.Operation)
 	startTime := time.Now()
 	resp := &bindings.InvokeResponse{
 		Metadata: map[string]string{

@@ -24,6 +24,10 @@ const (
 	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
 	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
 	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS" // accept time
+	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"            // the global pvc name which persistent volume claim to store the backup data
+	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"   // the init capacity of pvc for creating the pvc, e.g. 10Gi.
+	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"   // the pvc storage class name.
+	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"   // the pvc create policy. support "IfNotPresent" or "Never"
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
@@ -31,16 +35,18 @@ const (
 )
 
 const (
-	ConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	ConnCredentialPlaceHolder    = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBCompNamePlaceHolder        = "$(KB_COMP_NAME)"
+	KBClusterNamePlaceHolder     = "$(KB_CLUSTER_NAME)"
+	KBClusterCompNamePlaceHolder = "$(KB_CLUSTER_COMP_NAME)"
 )
 
 const (
 	KBPrefix = "KB"
 )
 
-const KBImage = "KUBEBLOCKS_IMAGE"
-
 const (
+	KBToolsImage      = "KUBEBLOCKS_TOOLS_IMAGE"
 	KBImagePullPolicy = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 )
 
@@ -59,6 +65,7 @@ const (
 	// kubeblocks.io labels
 	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
 	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
+	KBAppComponentDefRefLabelKey    = "apps.kubeblocks.io/component-def-ref"
 	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
 	AppConfigTypeLabelKey           = "apps.kubeblocks.io/config-type"
 	WorkloadTypeLabelKey            = "apps.kubeblocks.io/workload-type"
@@ -69,14 +76,21 @@ const (
 	ClusterAccountLabelKey          = "account.kubeblocks.io/name"
 	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
 	KBManagedByKey                  = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
+	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
+	BackupToolTypeLabelKey          = "kubeblocks.io/backup-tool-type"
 
 	// kubeblocks.io annotations
-	OpsRequestAnnotationKey        = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	ReconcileAnnotationKey         = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
-	RestartAnnotationKey           = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	SnapShotForStartAnnotationKey  = "kubeblocks.io/snapshot-for-start"
-	RestoreFromBackUpAnnotationKey = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
-	ClusterSnapshotAnnotationKey   = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	OpsRequestAnnotationKey            = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey             = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey               = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	SnapShotForStartAnnotationKey      = "kubeblocks.io/snapshot-for-start"
+	RestoreFromBackUpAnnotationKey     = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
+	ClusterSnapshotAnnotationKey       = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	LeaderAnnotationKey                = "cs.apps.kubeblocks.io/leader"
+	DefaultBackupPolicyAnnotationKey   = "dataprotection.kubeblocks.io/is-default-policy"
+	BackupPolicyTemplateAnnotationKey  = "apps.kubeblocks.io/backup-policy-template"
+	RestoreFromTimeAnnotationKey       = "kubeblocks.io/restore-from-time"           // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
+	RestoreFromSrcClusterAnnotationKey = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
@@ -87,6 +101,7 @@ const (
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
+	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
 
 	// CMConfigurationTypeLabelKey configmap is config template type, e.g: "tpl", "instance"
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
@@ -103,10 +118,17 @@ const (
 	// CMInsConfigurationLabelKey configmap is configuration file for component
 	// CMInsConfigurationLabelKey = "config.kubeblocks.io/ins-configure"
 
-	CMInsLastReconfigureMethodLabelKey = "config.kubeblocks.io/last-applied-reconfigure-policy"
+	// CMInsLastReconfigurePhaseKey defines the current phase
+	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
+
+	// CMInsEnableRerenderTemplateKey is used to enable rerender template
+	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
+
+	// ClassAnnotationKey is used to specify the class of components
+	ClassAnnotationKey = "cluster.kubeblocks.io/component-class"
 )
 
 const (
@@ -136,6 +158,7 @@ const (
 	ReplicaSetKind            = "ReplicaSetKind"
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
+	ConfigMapKind             = "ConfigMap"
 )
 
 const (
@@ -155,7 +178,7 @@ const (
 	ProbeGRPCPortName         = "probe-grpc-port"
 	RoleProbeContainerName    = "kb-checkrole"
 	StatusProbeContainerName  = "kb-checkstatus"
-	RunningProbeContainerName = "kb-runningcheck"
+	RunningProbeContainerName = "kb-checkrunning"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
@@ -173,17 +196,27 @@ const (
 )
 
 const (
-
-	// ConfigSidecarIMAGE for config manager sidecar
-	ConfigSidecarIMAGE       = "KUBEBLOCKS_IMAGE"
 	ConfigSidecarName        = "config-manager"
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
+	ConfigManagerLogLevel    = "CONFIG_MANAGER_LOG_LEVEL"
 
 	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"
 	ConfigTemplateType    = "tpl"
 	ConfigInstanceType    = "instance"
+
+	ReconfigureManagerSource  = "manager"
+	ReconfigureUserSource     = "ops"
+	ReconfigureTemplateSource = "external-template"
 )
 
 const (
 	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
 )
+
+// username and password are keys in created secrets for others to refer to.
+const (
+	AccountNameForSecret   = "username"
+	AccountPasswdForSecret = "password"
+)
+
+const DefaultBackupPvcInitCapacity = "100Gi"

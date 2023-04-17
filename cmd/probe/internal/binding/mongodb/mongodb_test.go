@@ -25,6 +25,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
+
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 
 func TestGetMongoDBMetadata(t *testing.T) {
@@ -200,9 +202,9 @@ func TestGetRole(t *testing.T) {
 			},
 		}},
 	})
-	m := &MongoDB{
-		database: mt.Client.Database(adminDatabase),
-		logger:   logger.NewLogger("mongodb-test"),
+	m := &MongoDBOperations{
+		database:       mt.Client.Database(adminDatabase),
+		BaseOperations: BaseOperations{Logger: logger.NewLogger("mongodb-test")},
 	}
 	role, err := m.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
 	if err != nil {

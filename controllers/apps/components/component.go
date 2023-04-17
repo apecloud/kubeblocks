@@ -17,15 +17,17 @@ limitations under the License.
 package components
 
 import (
+	"context"
 	"time"
 
+	"golang.org/x/exp/slices"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensusset"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
@@ -57,13 +59,13 @@ func NewComponentByType(
 	}
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
-		return consensusset.NewConsensusSet(cli, cluster, component, componentDef)
+		return consensus.NewConsensusComponent(cli, cluster, component, componentDef)
 	case appsv1alpha1.Replication:
-		return replicationset.NewReplicationSet(cli, cluster, component, componentDef)
+		return replication.NewReplicationComponent(cli, cluster, component, componentDef)
 	case appsv1alpha1.Stateful:
-		return stateful.NewStateful(cli, cluster, component, componentDef)
+		return stateful.NewStatefulComponent(cli, cluster, component, componentDef)
 	case appsv1alpha1.Stateless:
-		return stateless.NewStateless(cli, cluster, component, componentDef)
+		return stateless.NewStatelessComponent(cli, cluster, component, componentDef)
 	default:
 		panic("unknown workload type")
 	}
@@ -136,7 +138,7 @@ func workloadCompClusterReconcile(
 
 	// create a component object
 	componentName := operand.GetLabels()[constant.KBAppComponentLabelKey]
-	componentSpec := cluster.GetComponentByName(componentName)
+	componentSpec := cluster.Spec.GetComponentByName(componentName)
 	if componentSpec == nil {
 		return intctrlutil.Reconciled()
 	}
@@ -146,4 +148,36 @@ func workloadCompClusterReconcile(
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return processor(cluster, componentSpec, component)
+}
+
+// patchWorkloadCustomLabel patches workload custom labels.
+func patchWorkloadCustomLabel(
+	ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	componentSpec *appsv1alpha1.ClusterComponentSpec) error {
+	if cluster == nil || componentSpec == nil {
+		return nil
+	}
+	compDef, err := util.GetComponentDefByCluster(ctx, cli, *cluster, componentSpec.ComponentDefRef)
+	if err != nil {
+		return err
+	}
+	for _, customLabelSpec := range compDef.CustomLabelSpecs {
+		// TODO if the customLabelSpec.Resources is empty, we should add the label to the workload resources under the component.
+		for _, resource := range customLabelSpec.Resources {
+			gvk, err := util.ParseCustomLabelPattern(resource.GVK)
+			if err != nil {
+				return err
+			}
+			// only handle workload kind
+			if !slices.Contains(util.GetCustomLabelWorkloadKind(), gvk.Kind) {
+				continue
+			}
+			if err := util.PatchGVRCustomLabels(ctx, cli, cluster, resource, componentSpec.Name, customLabelSpec.Key, customLabelSpec.Value); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

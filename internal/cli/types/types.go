@@ -21,6 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -64,28 +65,42 @@ const (
 
 // Apps API group
 const (
-	AppsAPIGroup                     = "apps.kubeblocks.io"
-	AppsAPIVersion                   = "v1alpha1"
-	ResourceClusters                 = "clusters"
-	ResourceClusterDefs              = "clusterdefinitions"
-	ResourceClusterVersions          = "clusterversions"
-	ResourceOpsRequests              = "opsrequests"
-	ResourceConfigConstraintVersions = "configconstraints"
-	KindCluster                      = "Cluster"
-	KindClusterDef                   = "ClusterDefinition"
-	KindClusterVersion               = "ClusterVersion"
-	KindConfigConstraint             = "ConfigConstraint"
-	KindBackup                       = "Backup"
-	KindRestoreJob                   = "RestoreJob"
-	KindBackupPolicyTemplate         = "BackupPolicyTemplate"
-	KindOps                          = "OpsRequest"
+	AppsAPIGroup                        = "apps.kubeblocks.io"
+	AppsAPIVersion                      = "v1alpha1"
+	ResourceClusters                    = "clusters"
+	ResourceClusterDefs                 = "clusterdefinitions"
+	ResourceClusterVersions             = "clusterversions"
+	ResourceOpsRequests                 = "opsrequests"
+	ResourceConfigConstraintVersions    = "configconstraints"
+	ResourceComponentResourceConstraint = "componentresourceconstraints"
+	ResourceComponentClassDefinition    = "componentclassdefinitions"
+	KindCluster                         = "Cluster"
+	KindComponentClassDefinition        = "ComponentClassDefinition"
+	KindClusterDef                      = "ClusterDefinition"
+	KindClusterVersion                  = "ClusterVersion"
+	KindConfigConstraint                = "ConfigConstraint"
+	KindBackup                          = "Backup"
+	KindRestoreJob                      = "RestoreJob"
+	KindBackupPolicy                    = "BackupPolicy"
+	KindOps                             = "OpsRequest"
+)
+
+// K8S rbac API group
+const (
+	RBACAPIGroup        = rbacv1.GroupName
+	RBACAPIVersion      = "v1"
+	ClusterRoles        = "clusterroles"
+	ClusterRoleBindings = "clusterrolebindings"
 )
 
 // Annotations
 const (
-	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
-	ServiceLBTypeAnnotationValue   = "private-ip"
-	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"
+	ServiceHAVIPTypeAnnotationKey   = "service.kubernetes.io/kubeblocks-havip-type"
+	ServiceHAVIPTypeAnnotationValue = "private-ip"
+	ServiceFloatingIPAnnotationKey  = "service.kubernetes.io/kubeblocks-havip-floating-ip"
+
+	ClassProviderLabelKey              = "class.kubeblocks.io/provider"
+	ResourceConstraintProviderLabelKey = "resourceconstraint.kubeblocks.io/provider"
 )
 
 // DataProtection API group
@@ -104,6 +119,21 @@ const (
 	ExtensionsAPIGroup   = "extensions.kubeblocks.io"
 	ExtensionsAPIVersion = "v1alpha1"
 	ResourceAddons       = "addons"
+)
+
+// Migration API group
+const (
+	MigrationAPIGroup          = "datamigration.apecloud.io"
+	MigrationAPIVersion        = "v1alpha1"
+	ResourceMigrationTasks     = "migrationtasks"
+	ResourceMigrationTemplates = "migrationtemplates"
+)
+
+// Crd Api group
+const (
+	CustomResourceDefinitionAPIGroup   = "apiextensions.k8s.io"
+	CustomResourceDefinitionAPIVersion = "v1"
+	ResourceCustomResourceDefinition   = "customresourcedefinitions"
 )
 
 const (
@@ -171,8 +201,8 @@ func BackupGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackups}
 }
 
-func BackupPolicyTemplateGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupPolicyTemplates}
+func BackupPolicyGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupPolicies}
 }
 
 func BackupToolGVR() schema.GroupVersionResource {
@@ -185,6 +215,14 @@ func RestoreJobGVR() schema.GroupVersionResource {
 
 func AddonGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: ExtensionsAPIGroup, Version: ExtensionsAPIVersion, Resource: ResourceAddons}
+}
+
+func ComponentResourceConstraintGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceComponentResourceConstraint}
+}
+
+func ComponentClassDefinitionGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceComponentClassDefinition}
 }
 
 func CRDGVR() schema.GroupVersionResource {
@@ -256,5 +294,36 @@ func MutatingWebhookConfigurationGVR() schema.GroupVersionResource {
 		Group:    WebhookAPIGroup,
 		Version:  K8sWebhookAPIVersion,
 		Resource: ResourceMutatingWebhookConfigurations,
+	}
+}
+
+func ClusterRoleGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: ClusterRoles}
+}
+func ClusterRoleBindingGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: ClusterRoleBindings}
+}
+
+func MigrationTaskGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    MigrationAPIGroup,
+		Version:  MigrationAPIVersion,
+		Resource: ResourceMigrationTasks,
+	}
+}
+
+func MigrationTemplateGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    MigrationAPIGroup,
+		Version:  MigrationAPIVersion,
+		Resource: ResourceMigrationTemplates,
+	}
+}
+
+func CustomResourceDefinitionGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    CustomResourceDefinitionAPIGroup,
+		Version:  CustomResourceDefinitionAPIVersion,
+		Resource: ResourceCustomResourceDefinition,
 	}
 }

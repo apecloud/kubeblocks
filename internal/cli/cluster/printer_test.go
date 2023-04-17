@@ -33,20 +33,32 @@ var _ = Describe("printer", func() {
 			return nil
 		}
 
+		printerWithLabels := &PrinterOptions{
+			ShowLabels: true,
+		}
+
 		It("print cluster info", func() {
-			Expect(printObjs(NewPrinter(os.Stdout, PrintClusters), objs)).Should(Succeed())
+			Expect(printObjs(NewPrinter(os.Stdout, PrintClusters, nil), objs)).Should(Succeed())
+		})
+
+		It("print cluster info with label", func() {
+			Expect(printObjs(NewPrinter(os.Stdout, PrintClusters, printerWithLabels), objs)).Should(Succeed())
 		})
 
 		It("print cluster wide info", func() {
-			Expect(printObjs(NewPrinter(os.Stdout, PrintWide), objs)).Should(Succeed())
+			Expect(printObjs(NewPrinter(os.Stdout, PrintWide, nil), objs)).Should(Succeed())
+		})
+
+		It("print cluster wide info with label", func() {
+			Expect(printObjs(NewPrinter(os.Stdout, PrintWide, printerWithLabels), objs)).Should(Succeed())
 		})
 
 		It("print component info", func() {
-			Expect(printObjs(NewPrinter(os.Stdout, PrintComponents), objs)).Should(Succeed())
+			Expect(printObjs(NewPrinter(os.Stdout, PrintComponents, nil), objs)).Should(Succeed())
 		})
 
 		It("print instance info", func() {
-			Expect(printObjs(NewPrinter(os.Stdout, PrintInstances), objs)).Should(Succeed())
+			Expect(printObjs(NewPrinter(os.Stdout, PrintInstances, nil), objs)).Should(Succeed())
 		})
 	})
 })

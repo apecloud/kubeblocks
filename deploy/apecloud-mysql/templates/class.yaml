@@ -1,0 +1,63 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ComponentClassDefinition
+metadata:
+  name: kb.classes.default.apecloud-mysql.mysql
+  labels:
+    class.kubeblocks.io/provider: kubeblocks
+    apps.kubeblocks.io/component-def-ref: mysql
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+spec:
+  groups:
+  - resourceConstraintRef: kb-resource-constraint-general
+    template: |
+      cpu: {{ printf "{{ or .cpu 1 }}" }}
+      memory: {{ printf "{{ or .memory 4 }}Gi" }}
+      volumes:
+      - name: data
+        size: {{ printf "{{ or .dataStorageSize 10 }}Gi" }}
+      - name: log
+        size: {{ printf "{{ or .logStorageSize 1 }}Gi" }}
+    vars: [ cpu, memory, dataStorageSize, logStorageSize ]
+    series:
+    - namingTemplate: {{ printf "general-{{ .cpu }}c{{ .memory }}g" }}
+      classes:
+      - args: [ "0.5", "0.5", "10", "1" ]
+      - args: [ "1", "1", "10", "1" ]
+      - args: [ "2", "2", "10", "1" ]
+      - args: [ "2", "4", "10", "1" ]
+      - args: [ "2", "8", "10", "1" ]
+      - args: [ "4", "16", "10", "1" ]
+      - args: [ "8", "32", "10", "1" ]
+      - args: [ "16", "64", "20", "1" ]
+      - args: [ "32", "128", "20", "1" ]
+      - args: [ "64", "256", "20", "1" ]
+      - args: [ "128", "512", "20", "1" ]
+
+  - resourceConstraintRef: kb-resource-constraint-memory-optimized
+    template: |
+      cpu: {{ printf "{{ or .cpu 1 }}" }}
+      memory: {{ printf "{{ or .memory 8 }}Gi" }}
+      volumes:
+      - name: data
+        size: {{ printf "{{ or .dataStorageSize 10 }}Gi" }}
+      - name: log
+        size: {{ printf "{{ or .logStorageSize 1 }}Gi" }}
+    vars: [ cpu, memory, dataStorageSize, logStorageSize ]
+    series:
+    - namingTemplate: {{ printf "mo-{{ .cpu }}c{{ .memory }}g" }}
+      classes:
+      # 1:8
+      - args: [ "2", "16", "10", "1" ]
+      - args: [ "4", "32", "10", "1" ]
+      - args: [ "8", "64", "10", "1" ]
+      - args: [ "12", "96", "10", "1" ]
+      - args: [ "24", "192", "20", "1" ]
+      - args: [ "48", "384", "20", "1" ]
+      # 1:16
+      - args: [ "2", "32", "10", "1" ]
+      - args: [ "4", "64", "10", "1" ]
+      - args: [ "8", "128", "10", "1" ]
+      - args: [ "16", "256", "10", "1" ]
+      - args: [ "32", "512", "20", "1" ]
+      - args: [ "48", "768", "20", "1" ]
+      - args: [ "64", "1024", "20", "1" ]

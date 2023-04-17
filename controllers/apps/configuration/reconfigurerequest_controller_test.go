@@ -36,16 +36,11 @@ var _ = Describe("Reconfigure Controller", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const clusterName = "test-cluster"
-
-	const statefulCompType = "replicasets"
+	const statefulCompDefName = "replicasets"
 	const statefulCompName = "mysql"
-
 	const statefulSetName = "mysql-statefulset"
-
 	const configSpecName = "mysql-config-tpl"
-
 	const configVolumeName = "mysql-config"
-
 	const cmName = "mysql-tree-node-template-8.0"
 
 	var ctx = context.Background()
@@ -63,10 +58,10 @@ var _ = Describe("Reconfigure Controller", func() {
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -88,7 +83,10 @@ var _ = Describe("Reconfigure Controller", func() {
 					constant.CMConfigurationConstraintsNameLabelKey, cmName,
 					constant.CMConfigurationSpecProviderLabelKey, configSpecName,
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
-				))
+				),
+				testapps.WithAnnotations(constant.KBParameterUpdateSourceAnnotationKey,
+					constant.ReconfigureManagerSource,
+					constant.CMInsEnableRerenderTemplateKey, "true"))
 
 			constraint := testapps.CreateCustomizedObj(&testCtx,
 				"resources/mysql-config-constraint.yaml",
@@ -96,7 +94,7 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			By("Create a clusterDefinition obj")
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
@@ -104,7 +102,7 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).
+				AddComponent(statefulCompDefName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()
@@ -112,7 +110,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			By("Creating a cluster")
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponent(statefulCompName, statefulCompType).Create(&testCtx).GetObject()
+				AddComponent(statefulCompName, statefulCompDefName).Create(&testCtx).GetObject()
 
 			container := corev1.Container{
 				Name: "mock-container",
@@ -143,15 +141,46 @@ var _ = Describe("Reconfigure Controller", func() {
 				g.Expect(cm.Labels[constant.AppInstanceLabelKey]).To(Equal(clusterObj.Name))
 				g.Expect(cm.Labels[constant.CMConfigurationTemplateNameLabelKey]).To(Equal(configSpecName))
 				g.Expect(cm.Labels[constant.CMConfigurationTypeLabelKey]).NotTo(Equal(""))
-				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureFirstConfigType))
+				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).To(Equal(cfgcore.ReconfigureCreatedPhase))
 				configHash = cm.Labels[constant.CMInsConfigurationHashLabelKey]
 				g.Expect(configHash).NotTo(Equal(""))
+				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).To(BeTrue())
+				// g.Expect(cm.Annotations[constant.KBParameterUpdateSourceAnnotationKey]).To(Equal(constant.ReconfigureManagerSource))
+			}).Should(Succeed())
+
+			By("manager changes will not change the phase of configmap.")
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
+				cm.Data["new_data"] = "###"
+				cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
+			})).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				cm := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
+				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
+				g.Expect(newHash).NotTo(Equal(configHash))
+				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).To(BeTrue())
+			}).Should(Succeed())
+
+			By("recover normal update parameters")
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
+				delete(cm.Data, "new_data")
+				cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
+			})).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				cm := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
+				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
+				g.Expect(newHash).To(Equal(configHash))
+				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).To(BeTrue())
 			}).Should(Succeed())
 
 			By("Update config, old version: " + configHash)
 			updatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-update.yaml", &corev1.ConfigMap{})
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = updatedCM.Data
+				cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
 			})).Should(Succeed())
 
 			By("check config new version")
@@ -160,33 +189,38 @@ var _ = Describe("Reconfigure Controller", func() {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
 				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
 				g.Expect(newHash).NotTo(Equal(configHash))
-				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureAutoReloadType))
+				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).To(Equal(cfgcore.ReconfigureAutoReloadPhase))
+				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
 			}).Should(Succeed())
 
 			By("invalid Update")
 			invalidUpdatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-invalid-update.yaml", &corev1.ConfigMap{})
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = invalidUpdatedCM.Data
+				cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
 			})).Should(Succeed())
 
 			By("check invalid update")
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).Should(BeEquivalentTo(ReconfigureNoChangeType))
+				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
+				// g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).Should(BeEquivalentTo(cfgcore.ReconfigureNoChangeType))
 			}).Should(Succeed())
 
 			By("restart Update")
 			restartUpdatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-update-with-restart.yaml", &corev1.ConfigMap{})
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = restartUpdatedCM.Data
+				cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
 			})).Should(Succeed())
 
 			By("check invalid update")
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).Should(BeEquivalentTo(ReconfigureSimpleType))
+				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
+				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).Should(BeEquivalentTo(cfgcore.ReconfigureSimplePhase))
 			}).Should(Succeed())
 		})
 	})

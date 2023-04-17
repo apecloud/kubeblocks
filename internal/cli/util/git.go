@@ -20,18 +20,24 @@ import (
 	"os"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 // CloneGitRepo clone git repo to local path
-func CloneGitRepo(url string, path string) error {
+func CloneGitRepo(url, branch, path string) error {
 	pullFunc := func(repo *git.Repository) error {
 		// Get the working directory for the repository
 		w, err := repo.Worktree()
 		if err != nil {
 			return err
 		}
-		// Pull the latest changes from the origin remote and merge into the current branch
-		err = w.Pull(&git.PullOptions{RemoteName: "origin"})
+		// Pull the latest changes from the origin remote
+		err = w.Pull(&git.PullOptions{
+			RemoteName:    "origin",
+			Progress:      os.Stdout,
+			ReferenceName: plumbing.NewBranchReferenceName(branch),
+			SingleBranch:  true,
+		})
 		if err != git.NoErrAlreadyUpToDate && err != git.ErrUnstagedChanges {
 			return err
 		}
@@ -54,8 +60,10 @@ func CloneGitRepo(url string, path string) error {
 
 	// repo does not exists, clone it
 	_, err = git.PlainClone(path, false, &git.CloneOptions{
-		URL:      url,
-		Progress: os.Stdout,
+		URL:           url,
+		Progress:      os.Stdout,
+		ReferenceName: plumbing.NewBranchReferenceName(branch),
+		SingleBranch:  true,
 	})
 	return err
 }

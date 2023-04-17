@@ -1,0 +1,25 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupTool
+metadata:
+  name: backup-tool-
+spec:
+  image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
+  deployKind: job
+  type: pitr
+  env:
+    - name: DATA_DIR
+      value: /var/lib/mysql
+    - name: RECOVERY_TIME
+      value: $KB_RECOVERY_TIME
+  physical:
+    restoreCommands:
+      - |
+        echo $RECOVERY_TIME
+    incrementalRestoreCommands: []
+  logical:
+    restoreCommands:
+      - |
+        echo $RECOVERY_TIME
+    incrementalRestoreCommands: []
+  backupCommands: []
+  incrementalBackupCommands: []

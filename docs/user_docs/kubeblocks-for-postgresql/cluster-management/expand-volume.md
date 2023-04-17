@@ -1,6 +1,6 @@
 ---
 title: Expand volume
-description: How to expand the volume of a MySQL cluster
+description: How to expand the volume of a PostgreSQL cluster
 sidebar_position: 3
 sidebar_label: Expand volume
 ---
@@ -24,17 +24,17 @@ kbcli cluster list <name>
 ***Example***
 
 ```bash
-kbcli cluster list mysql-cluster
+kbcli cluster list pg-cluster
 >
-NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
+NAME                 NAMESPACE        CLUSTER-DEFINITION    VERSION                  TERMINATION-POLICY        STATUS         CREATED-TIME
+pg-cluster        default          postgresql            postgresql-14.7.0        Delete                    Running        Mar 3,2023 10:29 UTC+0800
 ```
    
 ## Option 1. Use kbcli
 
 Configure the values of `--component-names`, `--volume-claim-template-names`, and `--storage`, and run the command below to expand the volume.
 ```bash
-kbcli cluster volume-expand mysql-cluster --component-names="mysql" \
+kbcli cluster volume-expand pg-cluster --component-names="pg-replication" \
 --volume-claim-template-names="data" --storage="2Gi"
 ```
 
@@ -52,13 +52,13 @@ kind: OpsRequest
 metadata:
   name: ops-volume-expansion
 spec:
-  clusterRef: mysql-cluster
+  clusterRef: pg-cluster
   type: VolumeExpansion
   volumeExpansion:
-  - componentName: mysql
+  - componentName: pg-replication
     volumeClaimTemplates:
-  - name: data
-    storage: "2Gi"
+    - name: data
+      storage: "2Gi"
 EOF
 ```
 
@@ -70,14 +70,14 @@ Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mysql-cluster
+  name: pg-cluster
   namespace: default
 spec:
-  clusterDefinitionRef: apecloud-mysql
-  clusterVersionRef: ac-mysql-8.0.30
-  components:
-  - name: mysql
-    type: mysql
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-14.7.0
+  componentSpecs:
+  - name: pg-replication
+    componentDefRef: postgresql
     replicas: 1
     volumeClaimTemplates:
     - name: data
@@ -87,5 +87,5 @@ spec:
         resources:
           requests:
             storage: 1Gi # Change the volume storage size.
-terminationPolicy: Halt
+  terminationPolicy: Halt
 ```

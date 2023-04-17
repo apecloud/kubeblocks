@@ -1,0 +1,12 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: redis
+spec:
+  type: bindings.redis
+  version: v1
+  metadata:
+  - name: redisHost
+    value: 127.0.0.1:6379
+  - name: enableTLS
+    value: false

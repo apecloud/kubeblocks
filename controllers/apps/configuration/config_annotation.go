@@ -25,6 +25,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -71,14 +72,14 @@ func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCt
 
 	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotation]
 	if !ok {
-		return updateAppliedConfigs(client, ctx, cm, configData, ReconfigureFirstConfigType)
+		return updateAppliedConfigs(client, ctx, cm, configData, cfgcore.ReconfigureCreatedPhase)
 	}
 
 	return lastConfig == string(configData), nil
 }
 
 // updateAppliedConfigs update hash label and last applied config
-func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigureType string) (bool, error) {
+func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigurePhase string) (bool, error) {
 
 	patch := client.MergeFrom(config.DeepCopy())
 	if config.ObjectMeta.Annotations == nil {
@@ -86,12 +87,20 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 	}
 
 	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotation] = string(configData)
-	hash, err := cfgcore.ComputeHash(config.Data)
+	hash, err := util.ComputeHash(config.Data)
 	if err != nil {
 		return false, err
 	}
 	config.ObjectMeta.Labels[constant.CMInsConfigurationHashLabelKey] = hash
-	config.ObjectMeta.Labels[constant.CMInsLastReconfigureMethodLabelKey] = reconfigureType
+
+	newReconfigurePhase := config.ObjectMeta.Labels[constant.CMInsLastReconfigurePhaseKey]
+	if newReconfigurePhase == "" {
+		newReconfigurePhase = cfgcore.ReconfigureCreatedPhase
+	}
+	if cfgcore.ReconfigureNoChangeType != reconfigurePhase && !cfgcore.IsParametersUpdateFromManager(config) {
+		newReconfigurePhase = reconfigurePhase
+	}
+	config.ObjectMeta.Labels[constant.CMInsLastReconfigurePhaseKey] = newReconfigurePhase
 
 	// delete reconfigure-policy
 	delete(config.ObjectMeta.Annotations, constant.UpgradePolicyAnnotationKey)
@@ -118,7 +127,7 @@ func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
 
 func getUpgradePolicy(cm *corev1.ConfigMap) appsv1alpha1.UpgradePolicy {
 	const (
-		DefaultUpgradePolicy = appsv1alpha1.NormalPolicy
+		DefaultUpgradePolicy = appsv1alpha1.NonePolicy
 	)
 
 	annotations := cm.GetAnnotations()

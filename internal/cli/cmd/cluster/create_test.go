@@ -25,9 +25,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -133,12 +133,11 @@ var _ = Describe("create", func() {
 		})
 	})
 
-	checkComponent := func(comps []map[string]interface{}, storage string, replicas int32, cpu string, memory string) {
+	checkComponent := func(comps []*appsv1alpha1.ClusterComponentSpec, storage string, replicas int32, cpu string, memory string) {
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
 
-		comp := &appsv1alpha1.ClusterComponentSpec{}
-		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(comps[0], comp)
+		comp := comps[0]
 		Expect(getResource(comp.VolumeClaimTemplates[0].Spec.Resources, corev1.ResourceStorage)).Should(Equal(storage))
 		Expect(comp.Replicas).Should(BeEquivalentTo(replicas))
 
@@ -153,7 +152,7 @@ var _ = Describe("create", func() {
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		comps, err := buildClusterComp(cd, nil)
 		Expect(err).ShouldNot(HaveOccurred())
-		checkComponent(comps, "10Gi", 1, "1", "1Gi")
+		checkComponent(comps, "20Gi", 1, "1", "1Gi")
 	})
 
 	It("build default cluster component with environment", func() {
@@ -182,6 +181,11 @@ var _ = Describe("create", func() {
 		comps, err := buildClusterComp(cd, setsMap)
 		Expect(err).Should(Succeed())
 		checkComponent(comps, "10Gi", 10, "10", "2Gi")
+
+		setsMap[testing.ComponentDefName][keySwitchPolicy] = "invalid"
+		cd.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
+		_, err = buildClusterComp(cd, setsMap)
+		Expect(err).Should(HaveOccurred())
 	})
 
 	It("build component and set values map", func() {
@@ -190,7 +194,8 @@ var _ = Describe("create", func() {
 			var comps []appsv1alpha1.ClusterComponentDefinition
 			for _, n := range compDefNames {
 				comp := appsv1alpha1.ClusterComponentDefinition{
-					Name: n,
+					Name:         n,
+					WorkloadType: appsv1alpha1.Replication,
 				}
 				comps = append(comps, comp)
 			}
@@ -221,13 +226,14 @@ var _ = Describe("create", func() {
 				true,
 			},
 			{
-				[]string{"cpu=1,memory=2Gi,storage=10Gi"},
+				[]string{"cpu=1,memory=2Gi,storage=10Gi,class=general-1c2g"},
 				[]string{"my-comp"},
 				map[string]map[setKey]string{
 					"my-comp": {
 						keyCPU:     "1",
 						keyMemory:  "2Gi",
 						keyStorage: "10Gi",
+						keyClass:   "general-1c2g",
 					},
 				},
 				true,
@@ -286,18 +292,30 @@ var _ = Describe("create", func() {
 				true,
 			},
 			{
-				[]string{"type=comp1,cpu=1,memory=2Gi", "type=comp2,storage=10Gi,cpu=2"},
+				[]string{"type=comp1,cpu=1,memory=2Gi,class=general-2c4g", "type=comp2,storage=10Gi,cpu=2,class=mo-1c8g"},
 				[]string{"my-comp"},
 				map[string]map[setKey]string{
 					"comp1": {
 						keyType:   "comp1",
 						keyCPU:    "1",
 						keyMemory: "2Gi",
+						keyClass:  "general-2c4g",
 					},
 					"comp2": {
 						keyType:    "comp2",
 						keyCPU:     "2",
 						keyStorage: "10Gi",
+						keyClass:   "mo-1c8g",
+					},
+				},
+				true,
+			},
+			{
+				[]string{"switchPolicy=MaximumAvailability"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keySwitchPolicy: "MaximumAvailability",
 					},
 				},
 				true,
@@ -347,7 +365,7 @@ var _ = Describe("create", func() {
 		Expect(setBackup(o, components).Error()).Should(ContainSubstring("is not completed"))
 
 		By("test backup is completed")
-		mockBackupInfo(dynamic, backupName, clusterName)
+		mockBackupInfo(dynamic, backupName, clusterName, nil)
 		Expect(setBackup(o, components)).Should(Succeed())
 	})
 })

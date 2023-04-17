@@ -35,27 +35,41 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
+const (
+	ComponentNameEmpty = ""
+)
+
 // GetSimpleInstanceInfos return simple instance info that only contains instance name and role, the default
 // instance should be the first element in the returned array.
-func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace string) []*InstanceInfo {
+func GetSimpleInstanceInfos(dynamic dynamic.Interface, name, namespace string) []*InstanceInfo {
+	return GetSimpleInstanceInfosForComponent(dynamic, name, ComponentNameEmpty, namespace)
+}
+
+// GetSimpleInstanceInfosForComponent return simple instance info that only contains instance name and role,
+func GetSimpleInstanceInfosForComponent(dynamic dynamic.Interface, name, componentName, namespace string) []*InstanceInfo {
 	// if cluster status contains what we need, return directly
-	if infos := getInstanceInfoFromStatus(dynamic, name, namespace); len(infos) > 0 {
+	if infos := getInstanceInfoFromStatus(dynamic, name, componentName, namespace); len(infos) > 0 {
 		return infos
 	}
 
 	// if cluster status does not contain what we need, try to list all pods and build instance info
-	return getInstanceInfoByList(dynamic, name, namespace)
+	return getInstanceInfoByList(dynamic, name, componentName, namespace)
 }
 
 // getInstancesInfoFromCluster get instances info from cluster status
-func getInstanceInfoFromStatus(dynamic dynamic.Interface, name string, namespace string) []*InstanceInfo {
+func getInstanceInfoFromStatus(dynamic dynamic.Interface, name, componentName, namespace string) []*InstanceInfo {
 	var infos []*InstanceInfo
 	cluster, err := GetClusterByName(dynamic, name, namespace)
 	if err != nil {
 		return nil
 	}
 	// travel all components, check type
-	for _, c := range cluster.Status.Components {
+	for compName, c := range cluster.Status.Components {
+		// filter by component name
+		if len(componentName) > 0 && compName != componentName {
+			continue
+		}
+
 		var info *InstanceInfo
 		// workload type is Consensus
 		if c.ConsensusSetStatus != nil {
@@ -101,15 +115,22 @@ func getInstanceInfoFromStatus(dynamic dynamic.Interface, name string, namespace
 }
 
 // getInstanceInfoByList get instances info by list all pods
-func getInstanceInfoByList(dynamic dynamic.Interface, name string, namespace string) []*InstanceInfo {
+func getInstanceInfoByList(dynamic dynamic.Interface, name, componentName, namespace string) []*InstanceInfo {
 	var infos []*InstanceInfo
+	// filter by cluster name
+	lables := util.BuildLabelSelectorByNames("", []string{name})
+	// filter by component name
+	if len(componentName) > 0 {
+		lables = util.BuildComponentNameLables(lables, []string{componentName})
+	}
+
 	objs, err := dynamic.Resource(schema.GroupVersionResource{Group: corev1.GroupName, Version: types.K8sCoreAPIVersion, Resource: "pods"}).
-		Namespace(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: util.BuildLabelSelectorByNames("", []string{name}),
-	})
+		Namespace(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: lables})
+
 	if err != nil {
 		return nil
 	}
+
 	for _, o := range objs.Items {
 		infos = append(infos, &InstanceInfo{Name: o.GetName()})
 	}
@@ -190,7 +211,7 @@ func GetExternalAddr(svc *corev1.Service) string {
 			return ingress.IP
 		}
 	}
-	if svc.GetAnnotations()[types.ServiceLBTypeAnnotationKey] != types.ServiceLBTypeAnnotationValue {
+	if svc.GetAnnotations()[types.ServiceHAVIPTypeAnnotationKey] != types.ServiceHAVIPTypeAnnotationValue {
 		return ""
 	}
 	return svc.GetAnnotations()[types.ServiceFloatingIPAnnotationKey]
@@ -312,4 +333,96 @@ func findLatestVersion(versions *appsv1alpha1.ClusterVersionList) *appsv1alpha1.
 		}
 	}
 	return version
+}
+
+type CompInfo struct {
+	Component       *appsv1alpha1.ClusterComponentSpec
+	ComponentStatus *appsv1alpha1.ClusterComponentStatus
+	ComponentDef    *appsv1alpha1.ClusterComponentDefinition
+}
+
+func (info *CompInfo) InferPodName() (string, error) {
+	if info.ComponentStatus == nil {
+		return "", fmt.Errorf("component status is missing")
+	}
+	if info.ComponentStatus.Phase != appsv1alpha1.RunningClusterCompPhase || !*info.ComponentStatus.PodsReady {
+		return "", fmt.Errorf("component is not ready, please try later")
+	}
+	if info.ComponentStatus.ConsensusSetStatus != nil {
+		return info.ComponentStatus.ConsensusSetStatus.Leader.Pod, nil
+	}
+	if info.ComponentStatus.ReplicationSetStatus != nil {
+		return info.ComponentStatus.ReplicationSetStatus.Primary.Pod, nil
+	}
+	return "", fmt.Errorf("cannot infer the pod to connect, please specify the pod name explicitly by `--instance` flag")
+}
+
+func FillCompInfoByName(ctx context.Context, dynamic dynamic.Interface, namespace, clusterName, componentName string) (*CompInfo, error) {
+	cluster, err := GetClusterByName(dynamic, clusterName, namespace)
+	if err != nil {
+		return nil, err
+	}
+	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+		return nil, fmt.Errorf("cluster %s is not running, please try later", clusterName)
+	}
+
+	compInfo := &CompInfo{}
+	// fill component
+	if len(componentName) == 0 {
+		compInfo.Component = &cluster.Spec.ComponentSpecs[0]
+	} else {
+		compInfo.Component = cluster.Spec.GetComponentByName(componentName)
+	}
+
+	if compInfo.Component == nil {
+		return nil, fmt.Errorf("component %s not found in cluster %s", componentName, clusterName)
+	}
+	// fill component status
+	for name, compStatus := range cluster.Status.Components {
+		if name == compInfo.Component.Name {
+			compInfo.ComponentStatus = &compStatus
+			break
+		}
+	}
+	if compInfo.ComponentStatus == nil {
+		return nil, fmt.Errorf("componentStatus %s not found in cluster %s", componentName, clusterName)
+	}
+
+	// find cluster def
+	clusterDef, err := GetClusterDefByName(dynamic, cluster.Spec.ClusterDefRef)
+	if err != nil {
+		return nil, err
+	}
+	// find component def by reference
+	for _, compDef := range clusterDef.Spec.ComponentDefs {
+		if compDef.Name == compInfo.Component.ComponentDefRef {
+			compInfo.ComponentDef = &compDef
+			break
+		}
+	}
+	if compInfo.ComponentDef == nil {
+		return nil, fmt.Errorf("componentDef %s not found in clusterDef %s", compInfo.Component.ComponentDefRef, clusterDef.Name)
+	}
+	return compInfo, nil
+}
+
+func GetPodClusterName(pod *corev1.Pod) string {
+	if pod.Labels == nil {
+		return ""
+	}
+	return pod.Labels[constant.AppInstanceLabelKey]
+}
+
+func GetPodComponentName(pod *corev1.Pod) string {
+	if pod.Labels == nil {
+		return ""
+	}
+	return pod.Labels[constant.KBAppComponentLabelKey]
+}
+
+func GetPodWorkloadType(pod *corev1.Pod) string {
+	if pod.Labels == nil {
+		return ""
+	}
+	return pod.Labels[constant.WorkloadTypeLabelKey]
 }

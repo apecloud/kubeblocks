@@ -13,6 +13,7 @@ env:
   GITLAB_GO_CACHE_PROJECT_ID: 98800
   GO_CACHE: "go-cache"
   GO_CACHE_DIR: "/root/.cache"
+  GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
 
 
 jobs:
@@ -80,7 +81,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.19
+          go-version: "1.20"
 
       - name: Check cli doc
         id: check-cli-doc
@@ -116,7 +117,7 @@ jobs:
             --project-id ${{ env.GITLAB_GO_CACHE_PROJECT_ID }} \
             --tag-name ${{ env.GO_CACHE }} \
             --asset-name ${{ env.GO_CACHE }}.tar.gz \
-            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
+            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
       - name: Extract ${{ env.GO_CACHE }}
         if: ${{ github.ref_name != 'main' }}
@@ -175,7 +176,7 @@ jobs:
             --project-id ${{ env.GITLAB_GO_CACHE_PROJECT_ID }} \
             --tag-name ${{ env.GO_CACHE }} \
             --asset-path ${{ env.GO_CACHE }}.tar.gz \
-            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
+            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
   check-image:
     needs: trigger-mode
@@ -186,13 +187,26 @@ jobs:
       MAKE_OPS: "build-manager-image"
       IMG: "apecloud/kubeblocks"
       VERSION: "check"
-      GO_VERSION: 1.19
+      GO_VERSION: "1.20"
+    secrets: inherit
+
+  check-tools-image:
+    name: check image
+    needs: trigger-mode
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
+    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    with:
+      MAKE_OPS_PRE: "generate"
+      MAKE_OPS: "build-tools-image"
+      IMG: "apecloud/kubeblocks-tools"
+      VERSION: "check"
+      GO_VERSION: "1.20"
     secrets: inherit
 
   check-helm:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') && github.ref_name != 'main' }}
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.0
+    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.2
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"

@@ -64,19 +64,10 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("Test the functions in ops_util.go")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1)
-			Expect(PatchValidateErrorCondition(ctx, k8sClient, opsRes, "validate error")).Should(Succeed())
+			Expect(patchValidateErrorCondition(ctx, k8sClient, opsRes, "validate error")).Should(Succeed())
 			Expect(patchOpsHandlerNotSupported(ctx, k8sClient, opsRes)).Should(Succeed())
 			Expect(isOpsRequestFailedPhase(appsv1alpha1.OpsFailedPhase)).Should(BeTrue())
 			Expect(PatchClusterNotFound(ctx, k8sClient, opsRes)).Should(Succeed())
-			opsRecorder := []appsv1alpha1.OpsRecorder{
-				{
-					Name:           "mysql-restart",
-					ToClusterPhase: appsv1alpha1.SpecReconcilingClusterPhase,
-				},
-			}
-			Expect(patchClusterPhaseWhenExistsOtherOps(ctx, k8sClient, opsRes, opsRecorder)).Should(Succeed())
-			index, opsRecord := GetOpsRecorderFromSlice(opsRecorder, "mysql-restart")
-			Expect(index == 0 && opsRecord.Name == "mysql-restart").Should(BeTrue())
 		})
 
 	})

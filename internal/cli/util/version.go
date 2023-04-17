@@ -19,6 +19,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,11 +45,11 @@ func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
 		KBCLIApp: version.GetVersion(),
 	}
 
-	if client == nil {
+	if client == nil || reflect.ValueOf(client).IsNil() {
 		return versionInfo, nil
 	}
 
-	if versionInfo[KubernetesApp], err = getK8sVersion(client.Discovery()); err != nil {
+	if versionInfo[KubernetesApp], err = GetK8sVersion(client.Discovery()); err != nil {
 		return versionInfo, err
 	}
 
@@ -78,8 +79,8 @@ func getKubeBlocksVersion(client kubernetes.Interface) (string, error) {
 	return v, nil
 }
 
-// getK8sVersion get k8s server version
-func getK8sVersion(discoveryClient discovery.DiscoveryInterface) (string, error) {
+// GetK8sVersion get k8s server version
+func GetK8sVersion(discoveryClient discovery.DiscoveryInterface) (string, error) {
 	if discoveryClient == nil {
 		return "", nil
 	}

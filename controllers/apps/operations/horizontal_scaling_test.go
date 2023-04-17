@@ -93,26 +93,26 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("test GetOpsRequestAnnotation function")
-			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func() {
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(lcluster *appsv1alpha1.Cluster) {
 				opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"},{"name":"test-not-exists-ops","clusterPhase":"Updating"}]`,
 					opsRes.OpsRequest.Name)
-				opsRes.Cluster.Annotations = map[string]string{
+				lcluster.Annotations = map[string]string{
 					constant.OpsRequestAnnotationKey: opsAnnotationString,
 				}
 			})).ShouldNot(HaveOccurred())
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(err.Error()).Should(ContainSubstring("Existing OpsRequest:"))
+			Expect(err.Error()).Should(ContainSubstring("existing OpsRequest:"))
 
 			// reset cluster annotation
-			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func() {
-				opsRes.Cluster.Annotations = map[string]string{}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(lcluster *appsv1alpha1.Cluster) {
+				lcluster.Annotations = map[string]string{}
 			})).ShouldNot(HaveOccurred())
 
 			By("Test HorizontalScaling with scale up replicax")
 			initClusterForOps(opsRes)
 			expectClusterComponentReplicas := int32(2)
-			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func() {
-				opsRes.Cluster.Spec.ComponentSpecs[1].Replicas = expectClusterComponentReplicas
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(lcluster *appsv1alpha1.Cluster) {
+				lcluster.Spec.ComponentSpecs[1].Replicas = expectClusterComponentReplicas
 			})).ShouldNot(HaveOccurred())
 
 			// mock pod created according to horizontalScaling replicas

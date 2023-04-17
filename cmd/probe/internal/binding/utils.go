@@ -26,14 +26,18 @@ import (
 )
 
 type UserInfo struct {
-	UserName string        `json:"userName"`
-	Password string        `json:"password,omitempty"`
-	Expired  string        `json:"expired,omitempty"`
-	ExpireAt time.Duration `json:"expireAt,omitempty"`
-	RoleName string        `json:"roleName,omitempty"`
+	UserName string `json:"userName"`
+	Password string `json:"password,omitempty"`
+	Expired  string `json:"expired,omitempty"`
+	RoleName string `json:"roleName,omitempty"`
 }
 
-type OpsMetadata struct {
+type RedisEntry struct {
+	Key  string `json:"key"`
+	Data []byte `json:"data,omitempty"`
+}
+
+type opsMetadata struct {
 	Operation bindings.OperationKind `json:"operation,omitempty"`
 	StartTime string                 `json:"startTime,omitempty"`
 	EndTime   string                 `json:"endTime,omitempty"`
@@ -41,112 +45,167 @@ type OpsMetadata struct {
 }
 
 // UserDefinedObjectType defines the interface for User Defined Objects.
-type UserDefinedObjectType interface {
-	UserInfo
+type customizedObjType interface {
+	UserInfo | RedisEntry
 }
 
-// SQLRender defines the interface to render a SQL statement for given object.
-type SQLRender[T UserDefinedObjectType] func(object T) string
+// CmdRender defines the interface to render a statement from given object.
+type cmdRender[T customizedObjType] func(object T) string
 
-// SQLPostProcessor defines what to do after retrieving results from database.
-type SQLPostProcessor[T UserDefinedObjectType] func(object T) error
+// resultRender defines the interface to render the data from database.
+type resultRender[T customizedObjType] func(interface{}) (interface{}, error)
 
-// UserDefinedObjectValidator defines the interface to validate the User Defined Object.
-type UserDefinedObjectValidator[T UserDefinedObjectType] func(object T) error
+// objectValidator defines the interface to validate the User Defined Object.
+type objectValidator[T customizedObjType] func(object T) error
 
-// DataRender defines the interface to render the data from database.
-type DataRender func([]byte) (interface{}, error)
+// objectParser defines the interface to parse the User Defined Object from request.
+type objectParser[T customizedObjType] func(req *bindings.InvokeRequest, object *T) error
 
-func ParseObjectFromMetadata[T UserDefinedObjectType](metadata map[string]string, object *T, fn UserDefinedObjectValidator[T]) error {
-	if metadata == nil {
-		return fmt.Errorf("no metadata provided")
-	} else if jsonData, err := json.Marshal(metadata); err != nil {
-		return err
-	} else if err = json.Unmarshal(jsonData, object); err != nil {
-		return err
-	} else if fn != nil {
-		return fn(*object)
+func ExecuteObject[T customizedObjType](ctx context.Context, ops BaseInternalOps, req *bindings.InvokeRequest,
+	opsKind bindings.OperationKind, sqlTplRend cmdRender[T], msgTplRend cmdRender[T], object T) (OpsResult, error) {
+	var (
+		result = OpsResult{}
+		err    error
+	)
+
+	metadata := opsMetadata{Operation: opsKind, StartTime: getAndFormatNow()}
+
+	sql := sqlTplRend(object)
+	metadata.Extra = sql
+	ops.GetLogger().Debugf("ExecObject with cmd: %s", sql)
+
+	if _, err = ops.InternalExec(ctx, sql); err != nil {
+		return opsTerminateOnErr(result, metadata, err)
+	}
+	return opsTerminateOnSucc(result, metadata, msgTplRend(object))
+}
+
+func QueryObject[T customizedObjType](ctx context.Context, ops BaseInternalOps, req *bindings.InvokeRequest,
+	opsKind bindings.OperationKind, sqlTplRend cmdRender[T], dataProcessor resultRender[T], object T) (OpsResult, error) {
+	var (
+		result = OpsResult{}
+		err    error
+	)
+
+	metadata := opsMetadata{Operation: opsKind, StartTime: getAndFormatNow()}
+
+	sql := sqlTplRend(object)
+	metadata.Extra = sql
+	ops.GetLogger().Debugf("QueryObject() with cmd: %s", sql)
+
+	jsonData, err := ops.InternalQuery(ctx, sql)
+	if err != nil {
+		return opsTerminateOnErr(result, metadata, err)
+	}
+
+	if dataProcessor == nil {
+		return opsTerminateOnSucc(result, metadata, string(jsonData))
+	}
+
+	if ret, err := dataProcessor(jsonData); err != nil {
+		return opsTerminateOnErr(result, metadata, err)
+	} else {
+		return opsTerminateOnSucc(result, metadata, ret)
+	}
+}
+
+func ParseObjFromRequest[T customizedObjType](req *bindings.InvokeRequest, parse objectParser[T], validator objectValidator[T], object *T) error {
+	if req == nil {
+		return fmt.Errorf("no request provided")
+	}
+	if parse != nil {
+		if err := parse(req, object); err != nil {
+			return err
+		}
+	}
+	if validator != nil {
+		if err := validator(*object); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func GetAndFormatNow() string {
+func DefaultUserInfoParser(req *bindings.InvokeRequest, object *UserInfo) error {
+	if req == nil || req.Metadata == nil {
+		return fmt.Errorf("no metadata provided")
+	} else if jsonData, err := json.Marshal(req.Metadata); err != nil {
+		return err
+	} else if err = json.Unmarshal(jsonData, object); err != nil {
+		return err
+	}
+	return nil
+}
+
+func UserNameValidator(user UserInfo) error {
+	if len(user.UserName) == 0 {
+		return ErrNoUserName
+	}
+	return nil
+}
+
+func UserNameAndPasswdValidator(user UserInfo) error {
+	if len(user.UserName) == 0 {
+		return ErrNoUserName
+	}
+	if len(user.Password) == 0 {
+		return ErrNoPassword
+	}
+	return nil
+}
+
+func UserNameAndRoleValidator(user UserInfo) error {
+	if len(user.UserName) == 0 {
+		return ErrNoUserName
+	}
+	if len(user.RoleName) == 0 {
+		return ErrNoRoleName
+	}
+	roles := []RoleType{ReadOnlyRole, ReadWriteRole, SuperUserRole}
+	for _, role := range roles {
+		if role.EqualTo(user.RoleName) {
+			return nil
+		}
+	}
+	return ErrInvalidRoleName
+}
+
+func getAndFormatNow() string {
 	return time.Now().Format(time.RFC3339Nano)
 }
 
-func OpsTerminateOnSucc(result OpsResult, metadata OpsMetadata, msg interface{}) (OpsResult, error) {
-	metadata.EndTime = GetAndFormatNow()
+func opsTerminateOnSucc(result OpsResult, metadata opsMetadata, msg interface{}) (OpsResult, error) {
+	metadata.EndTime = getAndFormatNow()
 	result[RespTypEve] = RespEveSucc
 	result[RespTypMsg] = msg
 	result[RespTypMeta] = metadata
 	return result, nil
 }
 
-func OpsTerminateOnErr(result OpsResult, metadata OpsMetadata, err error) (OpsResult, error) {
-	metadata.EndTime = GetAndFormatNow()
+func opsTerminateOnErr(result OpsResult, metadata opsMetadata, err error) (OpsResult, error) {
+	metadata.EndTime = getAndFormatNow()
 	result[RespTypEve] = RespEveFail
 	result[RespTypMsg] = err.Error()
 	result[RespTypMeta] = metadata
 	return result, nil
 }
 
-func ExecuteObject[T UserDefinedObjectType](ctx context.Context, ops BaseInternalOps, req *bindings.InvokeRequest,
-	opsKind bindings.OperationKind,
-	validFn UserDefinedObjectValidator[T],
-	sqlTplRend SQLRender[T], msgTplRend SQLRender[T]) (OpsResult, error) {
-	var (
-		result   = OpsResult{}
-		userInfo = T{}
-		err      error
-	)
-
-	metadata := OpsMetadata{Operation: opsKind, StartTime: GetAndFormatNow()}
-	// parser userinfo from metadata
-	if err = ParseObjectFromMetadata(req.Metadata, &userInfo, validFn); err != nil {
-		return OpsTerminateOnErr(result, metadata, err)
-	}
-
-	sql := sqlTplRend(userInfo)
-	metadata.Extra = sql
-	ops.GetLogger().Debugf("MysqlOperations.execUser() with sql: %s", sql)
-	if _, err = ops.InternalExec(ctx, sql); err != nil {
-		return OpsTerminateOnErr(result, metadata, err)
-	}
-	return OpsTerminateOnSucc(result, metadata, msgTplRend(userInfo))
+func SortRoleByWeight(r1, r2 RoleType) bool {
+	return int(r1.GetWeight()) > int(r2.GetWeight())
 }
 
-func QueryObject[T UserDefinedObjectType](ctx context.Context, ops BaseInternalOps, req *bindings.InvokeRequest,
-	opsKind bindings.OperationKind,
-	validFn UserDefinedObjectValidator[T],
-	sqlTplRend SQLRender[T],
-	dataProcessor DataRender) (OpsResult, error) {
-	var (
-		result   = OpsResult{}
-		userInfo = T{}
-		err      error
-	)
-
-	metadata := OpsMetadata{Operation: opsKind, StartTime: GetAndFormatNow()}
-	// parser userinfo from metadata
-	if err := ParseObjectFromMetadata(req.Metadata, &userInfo, validFn); err != nil {
-		return OpsTerminateOnErr(result, metadata, err)
+func String2RoleType(roleName string) RoleType {
+	if SuperUserRole.EqualTo(roleName) {
+		return SuperUserRole
 	}
-
-	sql := sqlTplRend(userInfo)
-	metadata.Extra = sql
-	ops.GetLogger().Debugf("MysqlOperations.queryUser() with sql: %s", sql)
-
-	jsonData, err := ops.InternalQuery(ctx, sql)
-	if err != nil {
-		return OpsTerminateOnErr(result, metadata, err)
+	if ReadWriteRole.EqualTo(roleName) {
+		return ReadWriteRole
 	}
-
-	if dataProcessor == nil {
-		return OpsTerminateOnSucc(result, metadata, string(jsonData))
+	if ReadOnlyRole.EqualTo(roleName) {
+		return ReadOnlyRole
 	}
-	if ret, err := dataProcessor(jsonData); err != nil {
-		return OpsTerminateOnErr(result, metadata, err)
-	} else {
-		return OpsTerminateOnSucc(result, metadata, ret)
+	if NoPrivileges.EqualTo(roleName) {
+		return NoPrivileges
 	}
+	return CustomizedRole
 }

@@ -46,6 +46,7 @@ type GetOptions struct {
 	WithSecret         bool
 	WithPod            bool
 	WithEvent          bool
+	WithDataProtection bool
 }
 
 type ObjectsGetter struct {
@@ -61,6 +62,24 @@ func NewClusterObjects() *ClusterObjects {
 		Cluster: &appsv1alpha1.Cluster{},
 		Nodes:   []*corev1.Node{},
 	}
+}
+
+func listResources[T any](dynamic dynamic.Interface, gvr schema.GroupVersionResource, ns string, opts metav1.ListOptions, items *[]T) error {
+	if *items == nil {
+		*items = []T{}
+	}
+	obj, err := dynamic.Resource(gvr).Namespace(ns).List(context.TODO(), opts)
+	if err != nil {
+		return err
+	}
+	for _, i := range obj.Items {
+		var object T
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &object); err != nil {
+			return err
+		}
+		*items = append(*items, object)
+	}
+	return nil
 }
 
 // Get all kubernetes objects belonging to the database cluster
@@ -187,6 +206,18 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 			} else {
 				objs.Events.Items = append(objs.Events.Items, events.Items...)
 			}
+		}
+	}
+	if o.WithDataProtection {
+		dplistOpts := metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s",
+				constant.AppInstanceLabelKey, o.Name),
+		}
+		if err := listResources(o.Dynamic, types.BackupPolicyGVR(), o.Namespace, dplistOpts, &objs.BackupPolicies); err != nil {
+			return nil, err
+		}
+		if err := listResources(o.Dynamic, types.BackupGVR(), o.Namespace, dplistOpts, &objs.Backups); err != nil {
+			return nil, err
 		}
 	}
 	return objs, nil

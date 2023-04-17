@@ -67,9 +67,10 @@ Cluster command.
 * [kbcli cluster edit-backup-policy](kbcli_cluster_edit-backup-policy.md)	 - Edit backup policy
 * [kbcli cluster edit-config](kbcli_cluster_edit-config.md)	 - Edit the config file of the component.
 * [kbcli cluster explain-config](kbcli_cluster_explain-config.md)	 - List the constraint for supported configuration params.
-* [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster.
+* [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster with a new endpoint and the new endpoint can be found by executing the command 'kbcli cluster describe <cluster-name>'.
 * [kbcli cluster grant-role](kbcli_cluster_grant-role.md)	 - Grant role to account
 * [kbcli cluster hscale](kbcli_cluster_hscale.md)	 - Horizontally scale the specified components in the cluster.
+* [kbcli cluster label](kbcli_cluster_label.md)	 - Update the labels on cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters.
 * [kbcli cluster list-accounts](kbcli_cluster_list-accounts.md)	 - List accounts for a cluster
 * [kbcli cluster list-backup](kbcli_cluster_list-backup.md)	 - List backups.
@@ -124,6 +125,18 @@ KubeBlocks operation commands.
 * [kbcli kubeblocks status](kbcli_kubeblocks_status.md)	 - Show list of resource KubeBlocks uses or owns.
 * [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks.
 * [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks.
+
+
+## [migration](kbcli_migration.md)
+
+Data migration between two data sources.
+
+* [kbcli migration create](kbcli_migration_create.md)	 - Create a migration task.
+* [kbcli migration describe](kbcli_migration_describe.md)	 - Show details of a specific migration task.
+* [kbcli migration list](kbcli_migration_list.md)	 - List migration tasks.
+* [kbcli migration logs](kbcli_migration_logs.md)	 - Access migration task log file.
+* [kbcli migration templates](kbcli_migration_templates.md)	 - List migration templates.
+* [kbcli migration terminate](kbcli_migration_terminate.md)	 - Delete migration task.
 
 
 ## [options](kbcli_options.md)

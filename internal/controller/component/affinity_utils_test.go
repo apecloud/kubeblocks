@@ -33,9 +33,8 @@ var _ = Describe("affinity utils", func() {
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
 		clusterName        = "test-cluster"
-
-		mysqlCompType = "replicasets"
-		mysqlCompName = "mysql"
+		mysqlCompDefName   = "replicasets"
+		mysqlCompName      = "mysql"
 	)
 
 	var (
@@ -50,11 +49,11 @@ var _ = Describe("affinity utils", func() {
 
 		BeforeEach(func() {
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				GetObject()
 
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 
 			affinity := &appsv1alpha1.Affinity{
@@ -66,7 +65,7 @@ var _ = Describe("affinity utils", func() {
 			}
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				SetClusterAffinity(affinity).
 				GetObject()
 
@@ -107,11 +106,11 @@ var _ = Describe("affinity utils", func() {
 
 		BeforeEach(func() {
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				GetObject()
 
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 
 			affinity := &appsv1alpha1.Affinity{
@@ -123,7 +122,7 @@ var _ = Describe("affinity utils", func() {
 			}
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				SetClusterAffinity(affinity).
 				GetObject()
 

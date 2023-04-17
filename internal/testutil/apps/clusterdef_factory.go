@@ -22,13 +22,13 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-type ComponentTplType string
+type ComponentDefTplType string
 
 const (
-	StatefulMySQLComponent    ComponentTplType = "stateful-mysql"
-	ConsensusMySQLComponent   ComponentTplType = "consensus-mysql"
-	ReplicationRedisComponent ComponentTplType = "replication-redis"
-	StatelessNginxComponent   ComponentTplType = "stateless-nginx"
+	StatefulMySQLComponent    ComponentDefTplType = "stateful-mysql"
+	ConsensusMySQLComponent   ComponentDefTplType = "consensus-mysql"
+	ReplicationRedisComponent ComponentDefTplType = "replication-redis"
+	StatelessNginxComponent   ComponentDefTplType = "stateless-nginx"
 )
 
 type MockClusterDefFactory struct {
@@ -49,12 +49,12 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 
 func NewClusterDefFactoryWithConnCredential(name string) *MockClusterDefFactory {
 	f := NewClusterDefFactory(name)
-	f.AddComponent(StatefulMySQLComponent, "conn-cred")
+	f.AddComponentDef(StatefulMySQLComponent, "conn-cred")
 	f.SetConnectionCredential(defaultConnectionCredential, &defaultSvcSpec)
 	return f
 }
 
-func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, newName string) *MockClusterDefFactory {
+func (factory *MockClusterDefFactory) AddComponentDef(tplType ComponentDefTplType, compDefName string) *MockClusterDefFactory {
 	var component *appsv1alpha1.ClusterComponentDefinition
 	switch tplType {
 	case StatefulMySQLComponent:
@@ -68,7 +68,7 @@ func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, new
 	}
 	factory.get().Spec.ComponentDefs = append(factory.get().Spec.ComponentDefs, *component)
 	comp := factory.getLastCompDef()
-	comp.Name = newName
+	comp.Name = compDefName
 	return factory
 }
 

@@ -33,36 +33,31 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type Stateful struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
-}
+type StatefulComponent types.ComponentBase
 
-var _ types.Component = &Stateful{}
+var _ types.Component = &StatefulComponent{}
 
-func (stateful *Stateful) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (r *StatefulComponent) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, stateful.Cli, sts)
+	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
-	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &stateful.Component.Replicas), nil
+	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
 }
 
-func (stateful *Stateful) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+func (r *StatefulComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	return util.StatefulSetPodsAreReady(sts, stateful.Component.Replicas), nil
+	return util.StatefulSetPodsAreReady(sts, r.Component.Replicas), nil
 }
 
-func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (r *StatefulComponent) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if pod == nil {
 		return false
 	}
@@ -70,14 +65,14 @@ func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32)
 }
 
 // HandleProbeTimeoutWhenPodsReady the Stateful component has no role detection, empty implementation here.
-func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
+func (r *StatefulComponent) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
 	return false, nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (stateful *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
+func (r *StatefulComponent) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	stsList := &appsv1.StatefulSetList{}
-	podList, err := util.GetCompRelatedObjectList(ctx, stateful.Cli, *stateful.Cluster, componentName, stsList)
+	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
 		return "", err
 	}
@@ -87,27 +82,27 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componen
 		return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
 	}
 	stsObj := stsList.Items[0]
-	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, stateful.Component.Replicas,
+	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, r.Component.Replicas,
 		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil
 }
 
-func (stateful *Stateful) HandleUpdate(ctx context.Context, obj client.Object) error {
+func (r *StatefulComponent) HandleUpdate(ctx context.Context, obj client.Object) error {
 	return nil
 }
 
-func NewStateful(
+func NewStatefulComponent(
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
 	componentDef appsv1alpha1.ClusterComponentDefinition,
-) (*Stateful, error) {
+) (types.Component, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
-	return &Stateful{
+	return &StatefulComponent{
 		Cli:          cli,
 		Cluster:      cluster,
 		Component:    component,
-		componentDef: &componentDef,
+		ComponentDef: &componentDef,
 	}, nil
 }

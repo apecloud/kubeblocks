@@ -16,10 +16,10 @@ spec:
     - name: mysql
       characterType: mysql
       probes:
-        roleChangedProbe:
-          failureThreshold: {{ .Values.roleChangedProbe.failureThreshold }}
-          periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.roleChangedProbe.timeoutSeconds }}
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       monitor:
         builtIn: false
         exporterConfig:

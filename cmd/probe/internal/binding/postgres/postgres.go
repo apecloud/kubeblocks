@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +29,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	. "github.com/apecloud/kubeblocks/cmd/probe/util"
@@ -42,12 +42,12 @@ const (
 
 	listUserTpl = `
 	SELECT usename AS userName, valuntil <now() AS expired,  usesuper,
-	ARRAY(SELECT 
-		case 
+	ARRAY(SELECT
+		case
 			when b.rolname = 'pg_read_all_data' THEN 'readonly'
 			when b.rolname = 'pg_write_all_data' THEN 'readwrite'
 		else b.rolname
-		end 
+		end
 	FROM pg_catalog.pg_auth_members m
 	JOIN pg_catalog.pg_roles b ON (m.roleid = b.oid)
 	WHERE m.member = usesysid ) as roles
@@ -57,12 +57,12 @@ const (
 	`
 	descUserTpl = `
 	SELECT usename AS userName,  valuntil <now() AS expired, usesuper,
-	ARRAY(SELECT 
-	 case 
+	ARRAY(SELECT
+	 case
 		 when b.rolname = 'pg_read_all_data' THEN 'readonly'
 		 when b.rolname = 'pg_write_all_data' THEN 'readwrite'
 	 else b.rolname
-	 end 
+	 end
 	FROM pg_catalog.pg_auth_members m
 	JOIN pg_catalog.pg_roles b ON (m.roleid = b.oid)
 	WHERE m.member = usesysid ) as roles
@@ -428,14 +428,14 @@ func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *bind
 		object = UserInfo{}
 
 		sqlTplRend = func(user UserInfo) string {
-			if user.RoleName == SuperUserRole {
+			if SuperUserRole.EqualTo(user.RoleName) {
 				if op == GrantUserRoleOp {
 					return "ALTER USER " + user.UserName + " WITH SUPERUSER;"
 				} else {
 					return "ALTER USER " + user.UserName + " WITH NOSUPERUSER;"
 				}
 			}
-			roleDesc, _ := pgOps.renderRoleByName(user.RoleName)
+			roleDesc, _ := pgOps.role2PGRole(user.RoleName)
 			return fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
 		}
 
@@ -502,17 +502,29 @@ func pgUserRolesProcessor(data interface{}) (interface{}, error) {
 	// parse roles
 	users := make([]UserInfo, len(pgUsers))
 	for i := range pgUsers {
-		if pgUsers[i].Super {
-			pgUsers[i].Roles = append(pgUsers[i].Roles, "superuser")
-		}
 		users[i] = UserInfo{
 			UserName: pgUsers[i].UserName,
-			RoleName: strings.Join(pgUsers[i].Roles, ","),
 		}
+
 		if pgUsers[i].Expired {
 			users[i].Expired = "T"
 		} else {
 			users[i].Expired = "F"
+		}
+
+		// parse Super attribute
+		if pgUsers[i].Super {
+			pgUsers[i].Roles = append(pgUsers[i].Roles, string(SuperUserRole))
+		}
+
+		// convert to RoleType and sort by weight
+		roleTypes := make([]RoleType, 0)
+		for _, role := range pgUsers[i].Roles {
+			roleTypes = append(roleTypes, String2RoleType(role))
+		}
+		slices.SortFunc(roleTypes, SortRoleByWeight)
+		if len(roleTypes) > 0 {
+			users[i].RoleName = string(roleTypes[0])
 		}
 	}
 	if jsonData, err := json.Marshal(users); err != nil {
@@ -522,13 +534,13 @@ func pgUserRolesProcessor(data interface{}) (interface{}, error) {
 	}
 }
 
-func (pgOps *PostgresOperations) renderRoleByName(roleName string) (string, error) {
-	switch strings.ToLower(roleName) {
+func (pgOps *PostgresOperations) role2PGRole(roleName string) (string, error) {
+	roleType := String2RoleType(roleName)
+	switch roleType {
 	case ReadWriteRole:
 		return "pg_write_all_data", nil
 	case ReadOnlyRole:
 		return "pg_read_all_data", nil
-	default:
-		return "", fmt.Errorf("role name: %s is not supported", roleName)
 	}
+	return "", fmt.Errorf("role name: %s is not supported", roleName)
 }

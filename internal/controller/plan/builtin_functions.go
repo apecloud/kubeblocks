@@ -202,6 +202,15 @@ func getPVCByName(args []interface{}, volumeName string) (interface{}, error) {
 	return nil, nil
 }
 
+// getContainerCPU for general built-in
+func getContainerCPU(args interface{}) (int64, error) {
+	container, err := fromJSONObject[corev1.Container](args)
+	if err != nil {
+		return 0, err
+	}
+	return intctrlutil.GetCoreNum(*container), nil
+}
+
 // getContainerMemory for general built-in
 func getContainerMemory(args interface{}) (int64, error) {
 	container, err := fromJSONObject[corev1.Container](args)
@@ -209,6 +218,15 @@ func getContainerMemory(args interface{}) (int64, error) {
 		return 0, err
 	}
 	return intctrlutil.GetMemorySize(*container), nil
+}
+
+// getContainerRequestMemory for general built-in
+func getContainerRequestMemory(args interface{}) (int64, error) {
+	container, err := fromJSONObject[corev1.Container](args)
+	if err != nil {
+		return 0, err
+	}
+	return intctrlutil.GetRequestMemorySize(*container), nil
 }
 
 // getArgByName for general built-in

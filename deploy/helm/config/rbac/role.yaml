@@ -113,14 +113,6 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
-  - classfamilies
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
   - clusterdefinitions
   verbs:
   - create
@@ -196,6 +188,40 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentclassdefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentclassdefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentclassdefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentresourceconstraints
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - apps.kubeblocks.io
   resources:

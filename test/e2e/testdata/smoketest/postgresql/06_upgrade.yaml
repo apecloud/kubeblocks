@@ -1,0 +1,9 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-upgrade
+spec:
+  clusterRef: mycluster
+  type: Upgrade
+  upgrade:
+    clusterVersionRef: postgresql-15.2.0-latest

@@ -48,7 +48,7 @@ const (
 	DefaultNginxContainerName = "nginx"
 
 	RedisType                     = "state.redis"
-	DefaultRedisCompType          = "redis"
+	DefaultRedisCompDefName       = "redis"
 	DefaultRedisCompName          = "redis-rsts"
 	DefaultRedisImageName         = "redis:7.0.5"
 	DefaultRedisContainerName     = "redis"
@@ -73,15 +73,16 @@ var (
 	}
 
 	defaultConnectionCredential = map[string]string{
-		"username":      "root",
-		"SVC_FQDN":      "$(SVC_FQDN)",
-		"RANDOM_PASSWD": "$(RANDOM_PASSWD)",
-		"tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
-		"paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
-		"UUID":          "$(UUID)",
-		"UUID_B64":      "$(UUID_B64)",
-		"UUID_STR_B64":  "$(UUID_STR_B64)",
-		"UUID_HEX":      "$(UUID_HEX)",
+		"username":          "root",
+		"SVC_FQDN":          "$(SVC_FQDN)",
+		"HEADLESS_SVC_FQDN": "$(HEADLESS_SVC_FQDN)",
+		"RANDOM_PASSWD":     "$(RANDOM_PASSWD)",
+		"tcpEndpoint":       "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
+		"paxosEndpoint":     "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
+		"UUID":              "$(UUID)",
+		"UUID_B64":          "$(UUID_B64)",
+		"UUID_STR_B64":      "$(UUID_STR_B64)",
+		"UUID_HEX":          "$(UUID_HEX)",
 	}
 
 	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
@@ -187,7 +188,7 @@ var (
 		CharacterType: "mysql",
 		ConsensusSpec: &defaultConsensusSpec,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleChangedProbe: &appsv1alpha1.ClusterDefinitionProbe{
+			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 				FailureThreshold: 3,
 				PeriodSeconds:    1,
 				TimeoutSeconds:   5,

@@ -114,6 +114,9 @@ const (
 	// CMInsLastReconfigurePhaseKey defines the current phase
 	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
 
+	// CMInsEnableRerenderTemplateKey is used to enable rerender template
+	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
+
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
 
@@ -168,7 +171,7 @@ const (
 	ProbeGRPCPortName         = "probe-grpc-port"
 	RoleProbeContainerName    = "kb-checkrole"
 	StatusProbeContainerName  = "kb-checkstatus"
-	RunningProbeContainerName = "kb-runningcheck"
+	RunningProbeContainerName = "kb-checkrunning"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"

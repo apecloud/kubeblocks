@@ -35,23 +35,23 @@ func InitClusterWithHybridComps(
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
-	statelessComp,
-	statefulComp,
-	consensusComp string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
+	statelessCompDefName,
+	statefulCompDefName,
+	consensusCompDefName string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
 	clusterDef := NewClusterDefFactory(clusterDefName).
-		AddComponent(StatelessNginxComponent, statelessComp).
-		AddComponent(ConsensusMySQLComponent, consensusComp).
-		AddComponent(StatefulMySQLComponent, statefulComp).
+		AddComponentDef(StatelessNginxComponent, statelessCompDefName).
+		AddComponentDef(ConsensusMySQLComponent, consensusCompDefName).
+		AddComponentDef(StatefulMySQLComponent, statefulCompDefName).
 		Create(&testCtx).GetObject()
 	clusterVersion := NewClusterVersionFactory(clusterVersionName, clusterDefName).
-		AddComponent(statelessComp).AddContainerShort(DefaultNginxContainerName, NginxImage).
-		AddComponent(consensusComp).AddContainerShort(DefaultMySQLContainerName, NginxImage).
-		AddComponent(statefulComp).AddContainerShort(DefaultMySQLContainerName, NginxImage).
+		AddComponent(statelessCompDefName).AddContainerShort(DefaultNginxContainerName, NginxImage).
+		AddComponent(consensusCompDefName).AddContainerShort(DefaultMySQLContainerName, NginxImage).
+		AddComponent(statefulCompDefName).AddContainerShort(DefaultMySQLContainerName, NginxImage).
 		Create(&testCtx).GetObject()
 	cluster := NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-		AddComponent(statelessComp, statelessComp).SetReplicas(1).
-		AddComponent(consensusComp, consensusComp).SetReplicas(3).
-		AddComponent(statefulComp, statefulComp).SetReplicas(3).
+		AddComponent(statelessCompDefName, statelessCompDefName).SetReplicas(1).
+		AddComponent(consensusCompDefName, consensusCompDefName).SetReplicas(3).
+		AddComponent(statefulCompDefName, statefulCompDefName).SetReplicas(3).
 		Create(&testCtx).GetObject()
 	return clusterDef, clusterVersion, cluster
 }

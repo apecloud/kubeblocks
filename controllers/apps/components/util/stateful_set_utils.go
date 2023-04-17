@@ -123,40 +123,19 @@ func ConvertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 	return nil
 }
 
-// Len is the implementation of the sort.Interface, calculate the length of the list of DescendingOrdinalSts.
-func (dos DescendingOrdinalSts) Len() int {
-	return len(dos)
-}
-
-// Swap is the implementation of the sort.Interface, exchange two items in DescendingOrdinalSts.
-func (dos DescendingOrdinalSts) Swap(i, j int) {
-	dos[i], dos[j] = dos[j], dos[i]
-}
-
-// Less is the implementation of the sort.Interface, sort the size of the statefulSet ordinal in descending order.
-func (dos DescendingOrdinalSts) Less(i, j int) bool {
-	return GetOrdinalSts(dos[i]) > GetOrdinalSts(dos[j])
-}
-
-// GetOrdinalSts gets StatefulSet's ordinal. If StatefulSet has no ordinal, -1 is returned.
-func GetOrdinalSts(sts *appsv1.StatefulSet) int {
-	_, ordinal := getParentNameAndOrdinalSts(sts)
-	return ordinal
-}
-
-// getParentNameAndOrdinalSts gets the name of cluster-component and StatefulSet's ordinal as extracted from its Name. If
+// ParseParentNameAndOrdinal gets the name of cluster-component and StatefulSet's ordinal as extracted from its Name. If
 // the StatefulSet's Name was not match a statefulSetRegex, its parent is considered to be empty string,
 // and its ordinal is considered to be -1.
-func getParentNameAndOrdinalSts(sts *appsv1.StatefulSet) (string, int) {
+func ParseParentNameAndOrdinal(s string) (string, int32) {
 	parent := ""
-	ordinal := -1
-	subMatches := statefulSetRegex.FindStringSubmatch(sts.Name)
+	ordinal := int32(-1)
+	subMatches := statefulSetRegex.FindStringSubmatch(s)
 	if len(subMatches) < 3 {
 		return parent, ordinal
 	}
 	parent = subMatches[1]
 	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
-		ordinal = int(i)
+		ordinal = int32(i)
 	}
 	return parent, ordinal
 }

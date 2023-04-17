@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
@@ -369,7 +369,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			for i := int32(0); i < *sts.Spec.Replicas; i++ {
 				podName := fmt.Sprintf("%s-%d", sts.Name, i)
 				pod := testapps.MockReplicationComponentStsPod(nil, testCtx, sts, clusterObj.Name,
-					testapps.DefaultRedisCompName, podName, replicationset.DefaultRole(i))
+					testapps.DefaultRedisCompName, podName, replication.DefaultRole(i))
 				podList = append(podList, pod)
 			}
 		}

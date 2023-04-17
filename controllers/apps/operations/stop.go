@@ -89,6 +89,7 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		if err != nil {
 			return expectProgressCount, completedCount, err
 		}
+		// TODO: delete the configmaps of the cluster should be removed from the opsRequest after refactor.
 		if err := lifecycle.DeleteConfigMaps(reqCtx.Ctx, cli, opsRes.Cluster); err != nil {
 			return expectProgressCount, completedCount, err
 		}

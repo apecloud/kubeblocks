@@ -89,7 +89,7 @@ var (
 		kbcli cluster restore new-cluster-name --backup backup-name
 
 		# restore a new cluster from point in time
-		kbcli cluster restore --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --source-cluster-name mycluster
+		kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --source-cluster mycluster
 	`)
 )
 
@@ -525,7 +525,7 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 		return nil
 	}
 	if o.RestoreTimeStr == "" && o.SourceCluster == "" {
-		return fmt.Errorf("--source-cluster-name must be specified if specified --restore-to-time")
+		return fmt.Errorf("--source-cluster must be specified if specified --restore-to-time")
 	}
 	restoreTime, err := util.TimeParse(o.RestoreTimeStr, time.Second)
 	if err != nil {
@@ -540,6 +540,7 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 	if err != nil {
 		return err
 	}
+	backups := make([]dataprotectionv1alpha1.Backup, 0)
 	for _, i := range objs.Items {
 		obj := dataprotectionv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &obj); err != nil {
@@ -549,8 +550,11 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 			obj.Status.Manifests == nil || obj.Status.Manifests.BackupLog == nil {
 			continue
 		}
-		logInfo := obj.Status.Manifests.BackupLog
-		if isTimeInRange(restoreTime, logInfo.StartTime.Time, logInfo.StopTime.Time) {
+		backups = append(backups, obj)
+	}
+	recoverableTime := dataprotectionv1alpha1.GetRecoverableTimeRange(backups)
+	for _, i := range recoverableTime {
+		if isTimeInRange(restoreTime, i.StartTime.Time, i.StopTime.Time) {
 			return nil
 		}
 	}
@@ -600,7 +604,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
 	cmd.Flags().StringVar(&o.RestoreTimeStr, "restore-to-time", "", "point in time recovery(PITR)")
-	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster-name", "", "source cluster name")
+	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "source cluster name")
 	return cmd
 }
 

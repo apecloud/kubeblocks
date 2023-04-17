@@ -19,7 +19,6 @@ package cluster
 import (
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 	"time"
 
@@ -54,8 +53,6 @@ var (
 		return tbl
 	}
 )
-
-const nilStr = "<none>"
 
 type describeOptions struct {
 	factory   cmdutil.Factory
@@ -255,9 +252,9 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 		if policy.Status.Phase != dpv1alpha1.PolicyAvailable {
 			continue
 		}
-		ttlString := nilStr
-		backupSchedule := nilStr
-		backupType := nilStr
+		ttlString := printer.NoneString
+		backupSchedule := printer.NoneString
+		backupType := printer.NoneString
 		scheduleEnable := "Disabled"
 		if policy.Spec.Schedule.BaseBackup != nil {
 			if policy.Spec.Schedule.BaseBackup.Enable {
@@ -270,7 +267,7 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 		if policy.Spec.TTL != nil {
 			ttlString = *policy.Spec.TTL
 		}
-		lastScheduleTime := nilStr
+		lastScheduleTime := printer.NoneString
 		if policy.Status.LastScheduleTime != nil {
 			lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
 		}
@@ -282,51 +279,15 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 
 // getBackupRecoverableTime return the recoverable time range string
 func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
-	// filter backups with backupLog
-	backupsWithLog := make([]dpv1alpha1.Backup, 0)
-	for _, b := range backups {
-		if b.Status.Phase == dpv1alpha1.BackupCompleted &&
-			b.Status.Manifests != nil && b.Status.Manifests.BackupLog != nil {
-			backupsWithLog = append(backupsWithLog, b)
-		}
-	}
-	if len(backupsWithLog) == 0 {
-		return nilStr
-	}
-	sortByStartTime(backupsWithLog)
-
+	recoverabelTime := dpv1alpha1.GetRecoverableTimeRange(backups)
 	var result string
-	start, end := backupsWithLog[0].Status.Manifests.BackupLog.StopTime, backupsWithLog[0].Status.Manifests.BackupLog.StopTime
-
-	for i := 1; i < len(backupsWithLog); i++ {
-		b := backupsWithLog[i].Status.Manifests.BackupLog
-		if b.StartTime.Before(end) || b.StartTime.Equal(end) {
-			if b.StopTime.After(end.Time) {
-				end = b.StopTime
-			}
-		} else {
-			result = addTimeRange(result, start, end)
-			start, end = b.StartTime, b.StopTime
-		}
+	for _, i := range recoverabelTime {
+		result = addTimeRange(result, i.StartTime, i.StopTime)
 	}
-	result = addTimeRange(result, start, end)
-
+	if result == "" {
+		return printer.NoneString
+	}
 	return result
-}
-
-func sortByStartTime(backups []dpv1alpha1.Backup) {
-	sort.Slice(backups, func(i, j int) bool {
-		if backups[i].Status.StartTimestamp == nil && backups[j].Status.StartTimestamp != nil {
-			return false
-		}
-		if backups[i].Status.StartTimestamp != nil && backups[j].Status.StartTimestamp == nil {
-			return true
-		}
-		if backups[i].Status.StartTimestamp.Equal(backups[j].Status.StartTimestamp) {
-			return backups[i].Name < backups[j].Name
-		}
-		return backups[i].Status.StartTimestamp.Before(backups[j].Status.StartTimestamp)
-	})
 }
 
 func addTimeRange(result string, start, end *metav1.Time) string {

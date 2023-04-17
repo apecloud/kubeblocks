@@ -117,6 +117,7 @@ var _ = Describe("Replication Component", func() {
 				AddAppManangedByLabel().
 				SetReplicas(replicas).
 				Create(&testCtx).GetObject()
+			stsObjectKey := client.ObjectKey{Name: replicationSetSts.Name, Namespace: testCtx.DefaultNamespace}
 
 			Expect(replicationSetSts.Spec.VolumeClaimTemplates).Should(BeEmpty())
 
@@ -190,20 +191,22 @@ var _ = Describe("Replication Component", func() {
 				})).Should(Succeed())
 
 			By("Checking if the pod is not updated when statefulset is not updated")
+			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())
 			vertexes, err := replicationComponent.HandleRestart(ctx, replicationSetSts)
 			Expect(err).To(Succeed())
 			Expect(len(vertexes) == 0).To(BeTrue())
-			primaryStsPodList, err := util.GetPodListByStatefulSet(ctx, k8sClient, replicationSetSts)
+			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, replicationSetSts)
 			Expect(err).To(Succeed())
-			Expect(len(primaryStsPodList)).To(Equal(1))
+			Expect(len(pods)).To(Equal(int(replicas)))
 			Expect(util.IsStsAndPodsRevisionConsistent(ctx, k8sClient, replicationSetSts)).Should(BeTrue())
 
 			By("Checking if the pod is deleted when statefulset is updated")
 			status.UpdateRevision = "new-mock-revision"
 			testk8s.PatchStatefulSetStatus(&testCtx, replicationSetSts.Name, status)
+			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())
 			vertexes, err = replicationComponent.HandleRestart(ctx, replicationSetSts)
 			Expect(err).To(Succeed())
-			Expect(len(vertexes) == 1).To(BeTrue())
+			Expect(len(vertexes)).To(Equal(int(replicas)))
 			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.DELETE).To(BeTrue())
 		})
 	})

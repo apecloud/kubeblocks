@@ -34,7 +34,7 @@ func NewStatefulComponent(cli client.Client,
 	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *statefulComponent {
 	comp := &statefulComponent{
-		StatefulsetComponentBase: internal.StatefulsetComponentBase{
+		StatefulComponentBase: internal.StatefulComponentBase{
 			ComponentBase: internal.ComponentBase{
 				Client:         cli,
 				Cluster:        cluster,
@@ -59,7 +59,7 @@ func NewStatefulComponent(cli client.Client,
 }
 
 type statefulComponent struct {
-	internal.StatefulsetComponentBase
+	internal.StatefulComponentBase
 }
 
 var _ types.Component = &statefulComponent{}
@@ -74,8 +74,8 @@ func (c *statefulComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client
 			DefaultAction: action,
 			Error:         nil,
 			EnvConfig:     nil,
+			Workload:      nil,
 		},
-		workload: nil,
 	}
 	builder.ConcreteBuilder = builder
 	return builder
@@ -86,14 +86,9 @@ func (c *statefulComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *statefulComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulsetComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
-}
-
-func (c *statefulComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	// TODO(refactor): delete component owned resources
-	return nil
+	return c.StatefulComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *statefulComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulsetComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
+	return c.StatefulComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }

@@ -18,6 +18,7 @@ package replication
 
 import (
 	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,17 +45,6 @@ func (r *ReplicationSet) getName() string {
 		return r.Component.GetName()
 	}
 	return r.ComponentSpec.Name
-}
-
-func (r *ReplicationSet) getNamespace() string {
-	return r.Cluster.GetNamespace()
-}
-
-func (r *ReplicationSet) getMatchingLabels() client.MatchingLabels {
-	if r.Component != nil {
-		return r.Component.GetMatchingLabels()
-	}
-	return util.GetComponentMatchLabels(r.Cluster.GetName(), r.getName())
 }
 
 func (r *ReplicationSet) getWorkloadType() appsv1alpha1.WorkloadType {
@@ -208,7 +198,7 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 
 	vertexes := make([]graph.Vertex, 0)
 	podsToSyncStatus := make([]*corev1.Pod, 0)
-	for i, _ := range podList {
+	for i := range podList {
 		pod := &podList[i]
 		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
 		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
@@ -225,9 +215,9 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 				Action:  ictrltypes.ActionPatchPtr(),
 			})
 		}
-		//else {
+		// else {
 		//	podsToSyncStatus = append(podsToSyncStatus, pod)
-		//}
+		// }
 		podsToSyncStatus = append(podsToSyncStatus, pod)
 	}
 	// sync cluster.spec.componentSpecs.[x].primaryIndex when failover occurs and switchPolicy is Noop.

@@ -84,23 +84,23 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	// Testcases
 
-	//checkLatestOpsIsProcessing := func(clusterKey client.ObjectKey, opsType appsv1alpha1.OpsType) {
+	// checkLatestOpsIsProcessing := func(clusterKey client.ObjectKey, opsType appsv1alpha1.OpsType) {
 	//	Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
 	//		con := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
 	//		g.Expect(con).ShouldNot(BeNil())
 	//		g.Expect(con.Status).Should(Equal(metav1.ConditionFalse))
 	//		g.Expect(con.Reason).Should(Equal(appsv1alpha1.OpsRequestBehaviourMapper[opsType].ProcessingReasonInClusterCondition))
 	//	})).Should(Succeed())
-	//}
+	// }
 	//
-	//checkLatestOpsHasProcessed := func(clusterKey client.ObjectKey) {
+	// checkLatestOpsHasProcessed := func(clusterKey client.ObjectKey) {
 	//	Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
 	//		con := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
 	//		g.Expect(con).ShouldNot(BeNil())
 	//		g.Expect(con.Status).Should(Equal(metav1.ConditionTrue))
 	//		g.Expect(con.Reason).Should(Equal(lifecycle.ReasonOpsRequestProcessed))
 	//	})).Should(Succeed())
-	//}
+	// }
 
 	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) {
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, namespacedName,
@@ -189,13 +189,13 @@ var _ = Describe("OpsRequest Controller", func() {
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
 		// TODO(refactor): try to check some ephemeral states?
-		//checkLatestOpsIsProcessing(clusterKey, verticalScalingOpsRequest.Spec.Type)
+		// checkLatestOpsIsProcessing(clusterKey, verticalScalingOpsRequest.Spec.Type)
 
-		//By("check Cluster and changed component phase is VerticalScaling")
-		//Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+		// By("check Cluster and changed component phase is VerticalScaling")
+		// Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 		//	g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterPhase))                               // VerticalScalingPhase
 		//	g.Expect(cluster.Status.Components[mysqlCompName].Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // VerticalScalingPhase
-		//})).Should(Succeed())
+		// })).Should(Succeed())
 
 		By("mock bring Cluster and changed component back to running status")
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(&mysqlSts), func(tmpSts *appsv1.StatefulSet) {
@@ -203,7 +203,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
-		//checkLatestOpsHasProcessed(clusterKey)
+		// checkLatestOpsHasProcessed(clusterKey)
 
 		By("patch opsrequest controller to run")
 		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {
@@ -403,7 +403,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 
 		// TODO(refactor): support the start/stop ops
-		//It("delete Running opsRequest", func() {
+		// It("delete Running opsRequest", func() {
 		//	By("Create a volume-expand ops")
 		//	opsName := "volume-expand" + testCtx.GetRandomStr()
 		//	volumeExpandOps := testapps.NewOpsRequestObj(opsName, clusterObj.Namespace,
@@ -441,6 +441,6 @@ var _ = Describe("OpsRequest Controller", func() {
 		//		opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(tmlCluster)
 		//		g.Expect(opsSlice).Should(HaveLen(0))
 		//	})).Should(Succeed())
-		//})
+		// })
 	})
 })

@@ -36,7 +36,7 @@ import (
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
-//var _ = Describe("Deployment Controller", func() {
+// var _ = Describe("Deployment Controller", func() {
 //	var (
 //		randomStr          = testCtx.GetRandomStr()
 //		clusterDefName     = "stateless-definition1-" + randomStr
@@ -145,7 +145,7 @@ import (
 //			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 //		})
 //	})
-//})
+// })
 
 var _ = Describe("Deployment Controller", func() {
 	var (

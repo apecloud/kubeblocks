@@ -294,7 +294,7 @@ func (c *ComponentBase) setStatusPhaseWithMsg(phase appsv1alpha1.ClusterComponen
 	}
 }
 
-func (c *ComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Client, objs []client.Object) error {
+func (c *ComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) error {
 	// TODO(impl): check the operation result of @Restart, @ExpandVolume, @HorizontalScale, and update component status if needed.
 	//   @Restart - whether pods are available, covered by @rebuildLatestStatus
 	//   @ExpandVolume - whether PVCs have been expand finished
@@ -306,20 +306,13 @@ func (c *ComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	}
 
 	// handle all other possible workload changes
-	for _, obj := range objs {
-		if err := c.status4GeneralWorkloadUpdate(reqCtx, cli, obj); err != nil {
-			return err
-		}
+	if err := c.status4GeneralWorkloadUpdate(reqCtx, cli, obj); err != nil {
+		return err
 	}
 
 	// TODO(refactor): wait & requeue
 	// rebuild the latest component status
-	for _, obj := range objs {
-		if err := c.rebuildLatestStatus(reqCtx, cli, obj); err != nil {
-			return err
-		}
-	}
-	return nil
+	return c.rebuildLatestStatus(reqCtx, cli, obj)
 }
 
 func (c *ComponentBase) status4HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -343,7 +336,7 @@ func (c *ComponentBase) status4HorizontalScale(reqCtx intctrlutil.RequestCtx, cl
 	return nil
 }
 
-//func (c *ComponentBase) checkStatusUpdateByEvent(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+// func (c *ComponentBase) checkStatusUpdateByEvent(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 //	/////// ClusterStatusHandler.handleClusterStatusByEvent
 //	// TODO(refactor): the phase will be updated at rebuilding, but the status message will be lost.
 //	//	if phase == "" {
@@ -362,7 +355,7 @@ func (c *ComponentBase) status4HorizontalScale(reqCtx intctrlutil.RequestCtx, cl
 //	//		return nil
 //	//	})
 //	return nil
-//}
+// }
 
 func (c *ComponentBase) status4GeneralWorkloadUpdate(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) error {
 	///// WorkloadController.handleWorkloadUpdate
@@ -424,7 +417,7 @@ func (c *ComponentBase) rebuildLatestStatus(reqCtx intctrlutil.RequestCtx, cli c
 	}
 
 	updatefn := func(status *appsv1alpha1.ClusterComponentStatus) error {
-		//hasFailedPodTimedOut := false
+		// hasFailedPodTimedOut := false
 		if !isRunning {
 			if podsReady != nil && *podsReady {
 				// check if the role probe timed out when component phase is not Running but all pods of component are ready.
@@ -432,9 +425,9 @@ func (c *ComponentBase) rebuildLatestStatus(reqCtx intctrlutil.RequestCtx, cli c
 				c.ComponentSet.HandleProbeTimeoutWhenPodsReady(status, pods)
 			} else {
 				status.Message = statusMessage
-				//if hasFailedPodTimedOut, status.Message, err = hasFailedAndTimedOutPod(pods); err != nil {
+				// if hasFailedPodTimedOut, status.Message, err = hasFailedAndTimedOutPod(pods); err != nil {
 				//	return err
-				//}
+				// }
 				// if !hasFailedPodTimedOut {
 				//	// TODO(refactor): wait = true to requeue
 				// }

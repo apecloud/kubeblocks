@@ -17,7 +17,6 @@ limitations under the License.
 package stateless
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
@@ -26,22 +25,17 @@ import (
 
 type statelessComponentWorkloadBuilder struct {
 	internal.ComponentWorkloadBuilderBase
-	workload *appsv1.Deployment
 }
 
-func (b *statelessComponentWorkloadBuilder) MutableWorkload(_ int32) client.Object {
-	return b.workload
-}
+var _ internal.ComponentWorkloadBuilder = &statelessComponentWorkloadBuilder{}
 
-func (b *statelessComponentWorkloadBuilder) BuildWorkload(_ int32) internal.ComponentWorkloadBuilder {
+func (b *statelessComponentWorkloadBuilder) BuildWorkload() internal.ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		deploy, err := builder.BuildDeployLow(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}
-
-		b.workload = deploy
-
+		b.Workload = deploy
 		return nil, nil // don't return deployment here
 	}
 	return b.BuildWrapper(buildfn)

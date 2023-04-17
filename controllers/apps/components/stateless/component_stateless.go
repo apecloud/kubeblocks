@@ -80,8 +80,8 @@ func (c *statelessComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli clien
 			DefaultAction: action,
 			Error:         nil,
 			EnvConfig:     nil,
+			Workload:      nil,
 		},
-		workload: nil,
 	}
 	builder.ConcreteBuilder = builder
 	return builder
@@ -91,11 +91,11 @@ func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	var err error
 	if builder != nil {
 		if err = builder.BuildEnv().
-			BuildWorkload(0).
+			BuildWorkload().
 			BuildHeadlessService().
-			BuildConfig(0).
-			BuildTLSVolume(0).
-			BuildVolumeMount(0).
+			BuildConfig().
+			BuildTLSVolume().
+			BuildVolumeMount().
 			BuildService().
 			BuildTLSCert().
 			Complete(); err != nil {
@@ -196,7 +196,7 @@ func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		}
 		return err
 	}
-	return c.ComponentBase.Status(reqCtx, cli, []client.Object{c.runningWorkload})
+	return c.ComponentBase.Status(reqCtx, cli, c.runningWorkload)
 }
 
 func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {

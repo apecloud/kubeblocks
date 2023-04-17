@@ -30,7 +30,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -243,8 +242,9 @@ func createComponentParams(w *templateRenderWorkflow, ctx intctrlutil.RequestCtx
 	}
 	// must make sure secret resources are created before workloads resources
 	task.AppendResource(secret)
-	if err := plan.PrepareComponentResources(ctx, cli, task); err != nil {
-		return nil, err
-	}
+	// TODO(refactor): wtf
+	// if err := plan.PrepareComponentResources(ctx, cli, task); err != nil {
+	//	return nil, err
+	// }
 	return task, nil
 }

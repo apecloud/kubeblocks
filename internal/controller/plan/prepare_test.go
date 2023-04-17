@@ -16,7 +16,7 @@ limitations under the License.
 
 package plan
 
-//import (
+// import (
 //	"reflect"
 //
 //	. "github.com/onsi/ginkgo/v2"
@@ -34,7 +34,7 @@ package plan
 //	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 //)
 //
-//const (
+// const (
 //	mysqlCompDefName = "replicasets"
 //	mysqlCompName    = "mysql"
 //	nginxCompDefName = "nginx"
@@ -43,7 +43,7 @@ package plan
 //	redisCompName    = "redis"
 //)
 //
-//var _ = Describe("Cluster Controller", func() {
+// var _ = Describe("Cluster Controller", func() {
 //
 //	cleanEnv := func() {
 //		// must wait until resources deleted and no longer exist before the testcases start,
@@ -430,4 +430,4 @@ package plan
 //	// 	})
 //	// })
 //
-//})
+// })

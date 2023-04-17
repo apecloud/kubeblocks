@@ -379,13 +379,13 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
-				statefulset := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 					SetReplicas(int32(replicas)).
 					AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 					Create(&testCtx).GetObject()
 				testk8s.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
 				for i := 0; i < replicas; i++ {
-					podName := fmt.Sprintf("%s-%d", stsName, 0)
+					podName := fmt.Sprintf("%s-%d", stsName, i)
 					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
 						SetOwnerReferences("apps/v1", constant.StatefulSetKind, statefulset).
 						AddAppInstanceLabel(clusterName).

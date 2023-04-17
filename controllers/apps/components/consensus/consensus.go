@@ -107,12 +107,12 @@ func (r *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bo
 }
 
 func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
-	//if status.PodsReadyTime == nil {
+	// if status.PodsReadyTime == nil {
 	//	return true, nil
-	//}
-	//if !util.IsProbeTimeout(r.ComponentDef, status.PodsReadyTime) {
+	// }
+	// if !util.IsProbeTimeout(r.ComponentDef, status.PodsReadyTime) {
 	//	return true, nil
-	//}
+	// }
 	var (
 		isAbnormal bool
 		isFailed   = true

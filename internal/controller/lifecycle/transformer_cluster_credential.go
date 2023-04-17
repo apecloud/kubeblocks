@@ -50,7 +50,7 @@ func (c *clusterCredentialTransformer) Transform(dag *graph.DAG) error {
 
 		component := &component.SynthesizedComponent{
 			Services: []corev1.Service{
-				{Spec: *compDef.Service},
+				{Spec: compDef.Service.ToSVCSpec()},
 			},
 		}
 		if secret, err = builder.BuildConnCredentialLow(&c.cc.cd, cluster, component); err != nil {

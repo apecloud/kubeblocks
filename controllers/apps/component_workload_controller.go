@@ -129,7 +129,7 @@ func workloadCompClusterReconcile(reqCtx intctrlutil.RequestCtx,
 	}
 
 	componentName := operand.GetLabels()[constant.KBAppComponentLabelKey]
-	componentSpec := cluster.GetComponentByName(componentName)
+	componentSpec := cluster.Spec.GetComponentByName(componentName)
 	if componentSpec == nil {
 		return intctrlutil.Reconciled()
 	}

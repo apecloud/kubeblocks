@@ -238,7 +238,6 @@ func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
 }
 
 // ComposeRolePriorityMap generates a priority map based on roles.
-// TODO(refactor): why the function changes the component definition?
 func ComposeRolePriorityMap(consensusSpec *appsv1alpha1.ConsensusSetSpec) map[string]int {
 	if consensusSpec == nil {
 		consensusSpec = &appsv1alpha1.ConsensusSetSpec{Leader: appsv1alpha1.DefaultLeader}

@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -161,38 +160,6 @@ var _ = Describe("ReplicationSet Util", func() {
 		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus.Secondaries).Should(HaveLen(2))
 	}
 
-	testGeneratePVCFromVolumeClaimTemplates := func() {
-		By("Creating a cluster with replication workloadType.")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
-			SetReplicas(testapps.DefaultReplicationReplicas).
-			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
-			Create(&testCtx).GetObject()
-
-		By("Creating a statefulSet of replication workloadType.")
-		mockStsName := "mock-stateful-set-0"
-		mockSts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, mockStsName, clusterObj.Name, testapps.DefaultRedisCompName).
-			AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-			Create(&testCtx).GetObject()
-
-		mockVCTList := []corev1.PersistentVolumeClaimTemplate{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "mock-vct",
-					Namespace: testCtx.DefaultNamespace,
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					VolumeName: "data",
-				},
-			},
-		}
-		pvcMap := GeneratePVCFromVolumeClaimTemplates(mockSts, mockVCTList)
-		for _, pvc := range pvcMap {
-			Expect(pvc.Name).Should(BeEquivalentTo("mock-vct-mock-stateful-set-0-0"))
-		}
-	}
-
 	testHandleReplicationSetRoleChangeEvent := func() {
 		By("Creating a cluster with replication workloadType.")
 		clusterSwitchPolicy := &appsv1alpha1.ClusterSwitchPolicy{
@@ -276,10 +243,6 @@ var _ = Describe("ReplicationSet Util", func() {
 
 		It("Test need update replicationSet status when horizontal scaling adds pod or removes pod", func() {
 			testNeedUpdateReplicationSetStatus()
-		})
-
-		It("Test generatePVC from volume claim templates", func() {
-			testGeneratePVCFromVolumeClaimTemplates()
 		})
 
 		It("Test update pod role label by roleChangedEvent when ha switch", func() {

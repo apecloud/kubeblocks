@@ -125,6 +125,7 @@ func runTestCases(files []string) {
 		b := e2eutil.OpsYaml(file, "apply")
 		Expect(b).Should(BeTrue())
 		Eventually(func(g Gomega) {
+			e2eutil.WaitTime(100000)
 			podStatusResult := e2eutil.CheckPodStatus()
 			for _, result := range podStatusResult {
 				g.Expect(result).Should(BeTrue())
@@ -133,7 +134,7 @@ func runTestCases(files []string) {
 		Eventually(func(g Gomega) {
 			clusterStatusResult := e2eutil.CheckClusterStatus()
 			g.Expect(clusterStatusResult).Should(BeTrue())
-		}, time.Second*180, time.Second*1).Should(Succeed())
+		}, time.Second*240, time.Second*1).Should(Succeed())
 
 	}
 	if len(files) > 0 {

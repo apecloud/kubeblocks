@@ -156,22 +156,20 @@ var _ = Describe("Cluster", func() {
 			Expect(o.ClusterDefRef).ShouldNot(BeEmpty())
 			err := o.Validate()
 			Expect(err).Should(Succeed())
-
 			o.ClusterDefRef = ""
 			Expect(o.ClusterDefRef).Should(BeEmpty())
 			err = o.Validate()
-			Expect(err).ShouldNot(Succeed())
+			Expect(err).Should(HaveOccurred())
 		})
 
 		It("can validate whether the TerminationPolicy is null when create a new cluster ", func() {
 			Expect(o.TerminationPolicy).ShouldNot(BeEmpty())
 			err := o.Validate()
 			Expect(err).Should(Succeed())
-
 			o.TerminationPolicy = ""
 			Expect(o.TerminationPolicy).Should(BeEmpty())
 			err = o.Validate()
-			Expect(err).ShouldNot(Succeed())
+			Expect(err).Should(HaveOccurred())
 		})
 
 		It("can validate whether the ClusterVersionRef is null and can't get latest version from client when create a new cluster ", func() {
@@ -185,7 +183,7 @@ var _ = Describe("Cluster", func() {
 			if errGetVersion == nil {
 				Expect(err).Should(Succeed())
 			} else {
-				Expect(err).ShouldNot(Succeed())
+				Expect(err).Should(HaveOccurred())
 			}
 		})
 
@@ -197,7 +195,7 @@ var _ = Describe("Cluster", func() {
 			o.Values = []string{"notEmpty"}
 			Expect(o.Values).ShouldNot(BeNil())
 			err = o.Validate()
-			Expect(err).ShouldNot(Succeed())
+			Expect(err).Should(HaveOccurred())
 		})
 
 		It("can validate whether the name is not specified and fail to generate a random cluster name when create a new cluster ", func() {
@@ -211,7 +209,7 @@ var _ = Describe("Cluster", func() {
 			if errGenerateName == nil {
 				Expect(err).Should(Succeed())
 			} else {
-				Expect(err).ShouldNot(Succeed())
+				Expect(err).Should(HaveOccurred())
 			}
 		})
 
@@ -229,7 +227,7 @@ var _ = Describe("Cluster", func() {
 			Expect(len(clusterNameMoreThan16)).Should(BeNumerically(">", 16))
 			o.Name = clusterNameMoreThan16
 			err = o.Validate()
-			Expect(err).ShouldNot(Succeed())
+			Expect(err).Should(HaveOccurred())
 		})
 	})
 

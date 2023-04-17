@@ -172,12 +172,6 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 		return err
 	}
 
-	dryRunStrategy, err := cmdutil.GetDryRunStrategy(inputs.Cmd)
-	if err != nil {
-		return err
-	}
-	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
-
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
 		return o.PrintFlags.ToPrinter()
@@ -243,16 +237,16 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	}
 
 	previewObj := unstructuredObj
-	dryRunStrategy, err := cmdutil.GetDryRunStrategy(inputs.Cmd)
+	dryRunStrategy, err := GetDryRunStrategy(inputs.Cmd)
 	if err != nil {
 		return err
 	}
 
-	if dryRunStrategy != cmdutil.DryRunClient {
+	if dryRunStrategy != DryRunClient {
 		gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
 		createOptions := metav1.CreateOptions{}
 
-		if dryRunStrategy == cmdutil.DryRunServer {
+		if dryRunStrategy == DryRunServer {
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		// create k8s resource
@@ -260,7 +254,7 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 		if err != nil {
 			return err
 		}
-		if dryRunStrategy != cmdutil.DryRunServer {
+		if dryRunStrategy != DryRunServer {
 			o.Name = unstructuredObj.GetName()
 			if o.Quiet {
 				return nil
@@ -382,4 +376,29 @@ func convertContentToUnstructured(cueValue cue.Value) (*unstructured.Unstructure
 		return nil, err
 	}
 	return unstructuredObj, nil
+}
+
+type DryRunStrategy int
+
+const (
+	// DryRunNone indicates the client will make all mutating calls
+	DryRunNone DryRunStrategy = iota
+	DryRunClient
+	DryRunServer
+)
+
+func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
+	dryRunFlag, _ := cmd.Flags().GetString("dry-run")
+	switch dryRunFlag {
+	case cmd.Flag("dry-run").NoOptDefVal:
+		return DryRunClient, nil
+	case "client":
+		return DryRunClient, nil
+	case "server":
+		return DryRunServer, nil
+	case "none":
+		return DryRunNone, nil
+	default:
+		return DryRunNone, fmt.Errorf(`invalid dry-run value (%v). Must be "none", "server", or "client"`, dryRunFlag)
+	}
 }

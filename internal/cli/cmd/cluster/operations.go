@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -85,7 +86,7 @@ func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType appsv
 	return &OperationsOptions{
 		// nil cannot be set to a map struct in CueLang, so init the map of KeyValues.
 		KeyValues:             map[string]string{},
-		BaseOptions:           create.BaseOptions{IOStreams: streams},
+		BaseOptions:           create.BaseOptions{IOStreams: streams, PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme)},
 		OpsType:               opsType,
 		HasComponentNamesFlag: hasComponentNamesFlag,
 		RequireConfirm:        true,
@@ -94,8 +95,12 @@ func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType appsv
 
 // buildCommonFlags build common flags for operations command
 func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
+	// add print flags
+	o.PrintFlags.AddFlags(cmd)
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
+	cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	if o.HasComponentNamesFlag {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "components", nil, " Component names to this operations")
 	}
@@ -193,6 +198,12 @@ func (o *OperationsOptions) Validate() error {
 // buildOperationsInputs builds operations inputs
 func buildOperationsInputs(f cmdutil.Factory, o *OperationsOptions) create.Inputs {
 	o.OpsTypeLower = strings.ToLower(string(o.OpsType))
+	o.OutputOperation = func(didPatch bool) string {
+		if didPatch {
+			return "created"
+		}
+		return "created (no change)"
+	}
 	customOutPut := func(opt *create.BaseOptions) {
 		output := fmt.Sprintf("OpsRequest %s created successfully, you can view the progress:", opt.Name)
 		printer.PrintLine(output)

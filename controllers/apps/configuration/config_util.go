@@ -380,12 +380,10 @@ func usingComponentConfigSpec(annotations map[string]string, key, value string) 
 	return len(annotations) != 0 && annotations[key] == value
 }
 
-func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx, configConstraint *appsv1alpha1.ConfigConstraint, phase appsv1alpha1.ConfigConstraintPhase, statusHandler ...func(status *appsv1alpha1.ConfigConstraintStatus)) error {
+func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx, configConstraint *appsv1alpha1.ConfigConstraint, phase appsv1alpha1.ConfigConstraintPhase) error {
 	patch := client.MergeFrom(configConstraint.DeepCopy())
 	configConstraint.Status.Phase = phase
-	for _, handler := range statusHandler {
-		handler(&configConstraint.Status)
-	}
+	configConstraint.Status.ObservedGeneration = configConstraint.Generation
 	return cli.Status().Patch(ctx.Ctx, configConstraint, patch)
 }
 

@@ -6,4 +6,4 @@ spec:
   clusterRef: mycluster
   type: Upgrade
   upgrade:
-    clusterVersionRef: postgresql-14.7.0-latest
+    clusterVersionRef: redis-7.0.6-latest

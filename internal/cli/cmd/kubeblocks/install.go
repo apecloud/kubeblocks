@@ -160,8 +160,8 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
-	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
-		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v)
+	if versionInfo.KubeBlocks != "" {
+		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", versionInfo.KubeBlocks)
 		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
 		return nil
 	}
@@ -181,8 +181,9 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
-	// add monitor parameters
-	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
+	if err = o.setDefaultValues(versionInfo); err != nil {
+		return err
+	}
 
 	// add helm repo
 	spinner := printer.Spinner(o.Out, "%-50s", "Add and update repo "+types.KubeBlocksRepoName)
@@ -216,6 +217,37 @@ func (o *InstallOptions) Install() error {
 			o.Version, o.HelmCfg.Namespace())
 		o.printNotes()
 	}
+	return nil
+}
+
+func (o *InstallOptions) setDefaultValues(version util.VersionInfo) error {
+	// add monitor parameters
+	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
+
+	// set default values based on the kubernetes provider
+	provider, err := util.GetK8sProvider(version.Kubernetes, o.Client)
+	if err != nil {
+		return err
+	}
+
+	if provider.IsCloud() {
+		return nil
+	}
+
+	// if provider is not a cloud provider, we guess it is a local environment
+	o.ValueOpts.Values = append(o.ValueOpts.Values,
+		// use hostpath csi driver to support snapshot
+		"snapshot-controller.enabled=true",
+		"csi-hostpath-driver.enabled=true",
+
+		// disable the persistent volume of prometheus, if not, the prometheus
+		// will dependent the hostpath csi driver ready to create persistent
+		// volume, but the order of addon installation is not guaranteed that
+		// will cause the prometheus PVC pending forever.
+		"prometheus.server.persistentVolume.enabled=false",
+		"prometheus.server.statefulSet.enabled=false",
+		"prometheus.alertmanager.persistentVolume.enabled=false",
+		"prometheus.alertmanager.statefulSet.enabled=false")
 	return nil
 }
 
@@ -341,7 +373,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	return nil
 }
 
-func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
+func (o *InstallOptions) preCheck(versionInfo util.VersionInfo) error {
 	if !o.Check {
 		return nil
 	}
@@ -355,8 +387,8 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	}
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")
-	k8sVersionStr, ok := versionInfo[util.KubernetesApp]
-	if !ok {
+	k8sVersionStr := versionInfo.Kubernetes
+	if k8sVersionStr == "" {
 		return versionErr
 	}
 
@@ -378,7 +410,7 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	}
 
 	// check kbcli version, now do nothing
-	fmt.Fprintf(o.Out, "kbcli version %s\n", versionInfo[util.KBCLIApp])
+	fmt.Fprintf(o.Out, "kbcli version %s\n", versionInfo.Cli)
 
 	return nil
 }

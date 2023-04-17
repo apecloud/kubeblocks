@@ -120,18 +120,15 @@ var _ = Describe("kubeblocks install", func() {
 			Check: true,
 		}
 		By("kubernetes version is empty")
-		versionInfo := map[util.AppName]string{}
-		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("failed to get kubernetes version"))
-
-		versionInfo[util.KubernetesApp] = ""
+		versionInfo := util.VersionInfo{}
 		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("failed to get kubernetes version"))
 
 		By("kubernetes is provided by cloud provider")
-		versionInfo[util.KubernetesApp] = "v1.25.0-eks"
+		versionInfo.Kubernetes = "v1.25.0-eks"
 		Expect(o.preCheck(versionInfo)).Should(Succeed())
 
 		By("kubernetes is not provided by cloud provider")
-		versionInfo[util.KubernetesApp] = "v1.25.0"
+		versionInfo.Kubernetes = "v1.25.0"
 		Expect(o.preCheck(versionInfo)).Should(Succeed())
 	})
 })

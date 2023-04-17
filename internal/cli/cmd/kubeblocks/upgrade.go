@@ -92,8 +92,8 @@ func (o *InstallOptions) Upgrade() error {
 		return err
 	}
 
-	v := versionInfo[util.KubeBlocksApp]
-	if len(v) == 0 {
+	v := versionInfo.KubeBlocks
+	if v == "" {
 		return errors.New("KubeBlocks does not exist, try to run \"kbcli kubeblocks install\" to install")
 	}
 

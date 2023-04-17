@@ -89,6 +89,8 @@ func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[
 
 	return componentClasses, nil
 }
+
+// GetResourceConstraints get all resource constraints
 func GetResourceConstraints(dynamic dynamic.Interface) (map[string]*v1alpha1.ComponentResourceConstraint, error) {
 	objs, err := dynamic.Resource(types.ComponentResourceConstraintGVR()).List(context.TODO(), metav1.ListOptions{
 		//LabelSelector: types.ResourceConstraintProviderLabelKey,
@@ -112,7 +114,7 @@ func GetResourceConstraints(dynamic dynamic.Interface) (map[string]*v1alpha1.Com
 	return result, nil
 }
 
-// ListClassesByClusterDefinition Get all classes, including kubeblocks default classes and user custom classes
+// ListClassesByClusterDefinition get all classes, including kubeblocks default classes and user custom classes
 func ListClassesByClusterDefinition(client dynamic.Interface, cdName string) (map[string]map[string]*v1alpha1.ComponentClassInstance, error) {
 	selector := fmt.Sprintf("%s=%s,%s", constant.ClusterDefLabelKey, cdName, types.ClassProviderLabelKey)
 	objs, err := client.Resource(types.ComponentClassDefinitionGVR()).Namespace("").List(context.TODO(), metav1.ListOptions{

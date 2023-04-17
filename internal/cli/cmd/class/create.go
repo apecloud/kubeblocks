@@ -194,7 +194,7 @@ func (o *CreateOptions) run() error {
 			return fmt.Errorf("class name conflicted %s", item.Name)
 		}
 		if !constraint.MatchClass(item) {
-			return fmt.Errorf("class %s not conform to constraint %s", item.Name, item.ResourceConstraintRef)
+			return fmt.Errorf("class %s does not conform to constraint %s", item.Name, item.ResourceConstraintRef)
 		}
 		classNames = append(classNames, item.Name)
 	}

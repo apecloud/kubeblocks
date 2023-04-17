@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -77,7 +76,7 @@ type BackupStatus struct {
 
 	// remoteVolume saves the backup data.
 	// +optional
-	RemoteVolume *corev1.Volume `json:"remoteVolume,omitempty"`
+	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"`
 
 	// backupToolName referenced backup tool name.
 	// +optional

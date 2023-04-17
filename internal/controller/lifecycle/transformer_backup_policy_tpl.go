@@ -19,8 +19,10 @@ package lifecycle
 import (
 	"fmt"
 
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -306,9 +308,23 @@ func (r *backupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.Common
 	if bp == nil {
 		return nil
 	}
+	defaultCreatePolicy := dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent
+	globalCreatePolicy := viper.GetString(constant.CfgKeyBackupPVCCreatePolicy)
+	if len(globalCreatePolicy) != 0 {
+		defaultCreatePolicy = dataprotectionv1alpha1.CreatePVCPolicy(globalCreatePolicy)
+	}
+	defaultInitCapacity := constant.DefaultBackupPvcInitCapacity
+	globalInitCapacity := viper.GetString(constant.CfgKeyBackupPVCInitCapacity)
+	if len(globalInitCapacity) != 0 {
+		defaultInitCapacity = globalInitCapacity
+	}
 	return &dataprotectionv1alpha1.CommonBackupPolicy{
 		BackupToolName: bp.BackupToolName,
-		BasePolicy:     r.convertBasePolicy(bp.BasePolicy, clusterName, component, workloadType),
+		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
+			InitCapacity: resource.MustParse(defaultInitCapacity),
+			CreatePolicy: defaultCreatePolicy,
+		},
+		BasePolicy: r.convertBasePolicy(bp.BasePolicy, clusterName, component, workloadType),
 	}
 }
 

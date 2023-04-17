@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -88,14 +88,35 @@ type SnapshotPolicy struct {
 type CommonBackupPolicy struct {
 	BasePolicy `json:",inline"`
 
-	// array of remote volumes from CSI driver definition.
+	// refer to PersistentVolumeClaim and the backup data will be stored in the corresponding persistent volume.
 	// +kubebuilder:validation:Required
-	RemoteVolume corev1.Volume `json:"remoteVolume"`
+	PersistentVolumeClaim PersistentVolumeClaim `json:"persistentVolumeClaim"`
 
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupToolName string `json:"backupToolName,omitempty"`
+}
+
+type PersistentVolumeClaim struct {
+	// the name of the PersistentVolumeClaim.
+	Name string `json:"name"`
+
+	// storageClassName is the name of the StorageClass required by the claim.
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty"`
+
+	// initCapacity represents the init storage size of the PersistentVolumeClaim which should be created if not exist.
+	// and the default value is 100Gi if it is empty.
+	// +optional
+	InitCapacity resource.Quantity `json:"initCapacity,omitempty"`
+
+	// createPolicy defines the policy for creating the PersistentVolumeClaim, enum values:
+	// - Never: do nothing if the PersistentVolumeClaim not exist.
+	// - IfNotPresent: create the PersistentVolumeClaim if not present and the accessModes only contains 'ReadWriteMany'.
+	// +kubebuilder:default=IfNotPresent
+	// +optional
+	CreatePolicy CreatePVCPolicy `json:"createPolicy"`
 }
 
 type BasePolicy struct {

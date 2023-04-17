@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backupconfig
+package kubeblocks
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -25,7 +25,6 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -60,8 +59,8 @@ var _ = Describe("backupconfig", func() {
 			return deploy
 		}
 
-		o := &kubeblocks.InstallOptions{
-			Options: kubeblocks.Options{
+		o := &InstallOptions{
+			Options: Options{
 				IOStreams: streams,
 				HelmCfg:   helm.NewFakeConfig(testing.Namespace),
 				Namespace: "default",
@@ -72,7 +71,7 @@ var _ = Describe("backupconfig", func() {
 			Monitor:   true,
 			ValueOpts: values.Options{Values: []string{"snapshot-controller.enabled=true"}},
 		}
-		cmd := NewBackupConfigCmd(tf, streams)
+		cmd := NewConfigCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(o.Install()).Should(Succeed())
 	})

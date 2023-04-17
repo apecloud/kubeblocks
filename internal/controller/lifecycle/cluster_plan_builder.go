@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -218,8 +219,6 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 		// stateful set pvc Update
 		&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
-		// replication set horizontal scaling
-		&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
 		newClusterStatusTransformer(c.ctx, c.cli, c.recorder, *cr),
 	}
@@ -508,6 +507,9 @@ func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster
 		if err := c.deletePVCs(cluster); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
+		if err := c.deleteConfigMaps(cluster); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
 		// The backup policy must be cleaned up when the cluster is deleted.
 		// Automatic backup scheduling needs to be stopped at this point.
 		if err := c.deleteBackupPolicies(cluster); err != nil && !apierrors.IsNotFound(err) {
@@ -544,6 +546,10 @@ func (c *clusterPlanBuilder) deletePVCs(cluster *appsv1alpha1.Cluster) error {
 		}
 	}
 	return nil
+}
+
+func (c *clusterPlanBuilder) deleteConfigMaps(cluster *appsv1alpha1.Cluster) error {
+	return DeleteConfigMaps(c.ctx.Ctx, c.cli, cluster)
 }
 
 func (c *clusterPlanBuilder) deleteBackupPolicies(cluster *appsv1alpha1.Cluster) error {
@@ -594,4 +600,13 @@ func (c *clusterPlanBuilder) deleteJobs(cluster *appsv1alpha1.Cluster) error {
 		}
 	}
 	return nil
+}
+
+func DeleteConfigMaps(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:  cluster.GetName(),
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+	return cli.DeleteAllOf(ctx, &corev1.ConfigMap{}, inNS, ml)
 }

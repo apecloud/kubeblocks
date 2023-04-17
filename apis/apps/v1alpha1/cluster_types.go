@@ -112,6 +112,10 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
+	// classDefRef reference class defined in ComponentClassDefinition.
+	// +optional
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
+
 	// monitor which is a switch to enable monitoring, default is false
 	// KubeBlocks provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
@@ -273,11 +277,10 @@ type ClusterSwitchPolicy struct {
 }
 
 type ClusterComponentVolumeClaimTemplate struct {
-	// Ref ClusterVersion.spec.components.containers.volumeMounts.name
+	// Reference `ClusterDefinition.spec.componentDefs.containers.volumeMounts.name`.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 	// spec defines the desired characteristics of a volume requested by a pod author.
-	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
@@ -292,6 +295,7 @@ func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.Per
 type PersistentVolumeClaimSpec struct {
 	// accessModes contains the desired access modes the volume should have.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// resources represents the minimum resources the volume should have.
@@ -299,6 +303,7 @@ type PersistentVolumeClaimSpec struct {
 	// that are lower than previous value but must still be higher than capacity recorded in the
 	// status field of the claim.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	// storageClassName is the name of the StorageClass required by the claim.
@@ -425,6 +430,16 @@ type ClusterComponentService struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type ClassDefRef struct {
+	// name refers to the name of the ComponentClassDefinition.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// class refers to the name of the class that is defined in the ComponentClassDefinition.
+	// +kubebuilder:validation:Required
+	Class string `json:"class"`
 }
 
 // +kubebuilder:object:root=true

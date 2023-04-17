@@ -1,0 +1,29 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: mongodb-sharding-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: mongodb-sharding
+  componentVersions:
+    - componentDefRef: mongos
+      versionsContext:
+        containers:
+          - name: mongos
+            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+    - componentDefRef: configsvr
+      versionsContext:
+        containers:
+          - name: configsvr
+            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+    - componentDefRef: shard
+      versionsContext:
+        containers:
+          - name: shard
+            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+          - name: agent
+            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

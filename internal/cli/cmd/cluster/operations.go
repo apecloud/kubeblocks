@@ -229,7 +229,11 @@ func (o *OperationsOptions) validateExpose() error {
 }
 
 func (o *OperationsOptions) fillExpose() error {
-	provider, err := util.GetK8SProvider(o.Client)
+	version, err := util.GetK8sVersion(o.Client.Discovery())
+	if err != nil {
+		return err
+	}
+	provider, err := util.GetK8sProvider(version, o.Client)
 	if err != nil {
 		return err
 	}
@@ -343,6 +347,9 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 var verticalScalingExample = templates.Examples(`
 		# scale the computing resources of specified components, separate with commas when <component-name> more than one
 		kbcli cluster vscale <my-cluster> --components=<component-name> --cpu=500m --memory=500Mi 
+
+		# scale the computing resources of specified components by class, available classes can be get by executing the command "kbcli class list --cluster-definition <cluster-definition-name>"
+		kbcli cluster vscale <my-cluster> --components=<component-name> --set class=general-1c4g
 `)
 
 // NewVerticalScalingCmd creates a vertical scaling command
@@ -423,7 +430,7 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := newBaseOperationsOptions(streams, appsv1alpha1.ExposeType, true)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "expose"
-	inputs.Short = "Expose a cluster."
+	inputs.Short = "Expose a cluster with a new endpoint and the new endpoint can be found by executing the command 'kbcli cluster describe <cluster-name>'."
 	inputs.Example = exposeExamples
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)

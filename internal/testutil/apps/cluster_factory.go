@@ -59,10 +59,10 @@ func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Tolera
 	return factory
 }
 
-func (factory *MockClusterFactory) AddComponent(compName string, compType string) *MockClusterFactory {
+func (factory *MockClusterFactory) AddComponent(compName string, compDefName string) *MockClusterFactory {
 	comp := appsv1alpha1.ClusterComponentSpec{
 		Name:            compName,
-		ComponentDefRef: compType,
+		ComponentDefRef: compDefName,
 	}
 	factory.get().Spec.ComponentSpecs = append(factory.get().Spec.ComponentSpecs, comp)
 	return factory

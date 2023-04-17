@@ -23,11 +23,11 @@ import (
 
 var (
 	clusterNotExistErrMessage          = "cluster[name=%s] is not exist. Please check that <cluster name> is spelled correctly."
-	componentNotExistErrMessage        = "cluster[name=%s] does not has this component[name=%s]. Please check that --component-name is spelled correctly."
+	componentNotExistErrMessage        = "cluster[name=%s] does not has this component[name=%s]. Please check that --component is spelled correctly."
 	missingClusterArgErrMassage        = "cluster name should be specified, using --help."
 	missingUpdatedParametersErrMessage = "missing updated parameters, using --help."
 
-	multiComponentsErrorMessage     = "when multi component exist, must specify which component to use. Please using --component-name"
+	multiComponentsErrorMessage     = "when multi component exist, must specify which component to use. Please using --component"
 	multiConfigTemplateErrorMessage = "when multi config template exist, must specify which config template to use. Please using --config-spec"
 	multiConfigFileErrorMessage     = "when multi config files exist, must specify which config file to update. Please using --config-file"
 

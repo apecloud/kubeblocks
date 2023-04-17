@@ -69,7 +69,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for volume expansion opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", handleComponentStatusProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", handleComponentStatusProgress)
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation

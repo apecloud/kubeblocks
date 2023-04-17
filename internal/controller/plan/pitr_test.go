@@ -92,8 +92,8 @@ var _ = Describe("PITR Functions", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
-				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatelessNginxComponent, nginxCompType).
 				Create(&testCtx).GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 				AddComponent(mysqlCompType).

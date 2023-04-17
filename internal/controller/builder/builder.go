@@ -343,12 +343,13 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 	uuidStrB64 := base64.RawStdEncoding.EncodeToString([]byte(strings.ReplaceAll(uuidStr, "-", "")))
 	uuidHex := hex.EncodeToString(uuidBytes)
 	m := map[string]string{
-		"$(RANDOM_PASSWD)": randomString(8),
-		"$(UUID)":          uuidStr,
-		"$(UUID_B64)":      uuidB64,
-		"$(UUID_STR_B64)":  uuidStrB64,
-		"$(UUID_HEX)":      uuidHex,
-		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+		"$(RANDOM_PASSWD)":     randomString(8),
+		"$(UUID)":              uuidStr,
+		"$(UUID_B64)":          uuidB64,
+		"$(UUID_STR_B64)":      uuidStrB64,
+		"$(UUID_HEX)":          uuidHex,
+		"$(SVC_FQDN)":          fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+		"$(HEADLESS_SVC_FQDN)": fmt.Sprintf("%s-%s-headless.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
 	}
 	if len(params.Component.Services) > 0 {
 		for _, p := range params.Component.Services[0].Spec.Ports {

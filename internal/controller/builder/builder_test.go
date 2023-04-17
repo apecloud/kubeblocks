@@ -59,17 +59,15 @@ var _ = Describe("builder", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const clusterName = "test-cluster"
-
-	const mysqlCompType = "replicasets"
+	const mysqlCompDefName = "replicasets"
 	const mysqlCompName = "mysql"
-
-	const nginxCompType = "proxy"
+	const proxyCompDefName = "proxy"
 
 	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
-			AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+			AddComponentDef(testapps.StatelessNginxComponent, proxyCompDefName).
 			GetObject()
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterDefObj)).Should(Succeed())
@@ -80,9 +78,9 @@ var _ = Describe("builder", func() {
 	allFieldsClusterVersionObj := func(needCreate bool) *appsv1alpha1.ClusterVersion {
 		By("By assure an clusterVersion obj")
 		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(mysqlCompType).
+			AddComponent(mysqlCompDefName).
 			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponent(nginxCompType).
+			AddComponent(proxyCompDefName).
 			AddInitContainerShort("nginx-init", testapps.NginxImage).
 			AddContainerShort("nginx", testapps.NginxImage).
 			GetObject()
@@ -108,7 +106,7 @@ var _ = Describe("builder", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
+			AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
 			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
@@ -239,11 +237,14 @@ var _ = Describe("builder", func() {
 				"UUID_B64",
 				"UUID_STR_B64",
 				"UUID_HEX",
+				"HEADLESS_SVC_FQDN",
 			} {
 				Expect(credential.StringData[v]).ShouldNot(BeEquivalentTo(fmt.Sprintf("$(%s)", v)))
 			}
 			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
 			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name,
+				params.Cluster.Namespace)
+			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless.%s.svc", params.Cluster.Name, params.Component.Name,
 				params.Cluster.Namespace)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
@@ -256,6 +257,7 @@ var _ = Describe("builder", func() {
 				}
 			}
 			Expect(credential.StringData["SVC_FQDN"]).Should(Equal(svcFQDN))
+			Expect(credential.StringData["HEADLESS_SVC_FQDN"]).Should(Equal(headlessSvcFQDN))
 			Expect(credential.StringData["tcpEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, mysqlPort.Port)))
 			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("paxos:%s:%d", svcFQDN, paxosPort.Port)))
 
@@ -288,7 +290,7 @@ var _ = Describe("builder", func() {
 			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
-			Expect(*sts.Spec.Replicas).Should(Equal(int32(1)))
+			Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(2))
 		})
 
 		It("builds Deploy correctly", func() {

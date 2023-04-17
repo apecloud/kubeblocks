@@ -46,7 +46,7 @@ func TestIsProbeTimeout(t *testing.T) {
 	podsReadyTime := &metav1.Time{Time: time.Now().Add(-10 * time.Minute)}
 	compDef := &appsv1alpha1.ClusterComponentDefinition{
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleChangedProbe:               &appsv1alpha1.ClusterDefinitionProbe{},
+			RoleProbe:                      &appsv1alpha1.ClusterDefinitionProbe{},
 			RoleProbeTimeoutAfterPodsReady: appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady,
 		},
 	}

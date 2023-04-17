@@ -1,6 +1,6 @@
 module github.com/apecloud/kubeblocks
 
-go 1.19
+go 1.20
 
 require (
 	cuelang.org/go v0.4.3
@@ -39,6 +39,7 @@ require (
 	github.com/hashicorp/terraform-exec v0.18.0
 	github.com/jackc/pgx/v5 v5.2.0
 	github.com/jedib0t/go-pretty/v6 v6.4.4
+	github.com/json-iterator/go v1.1.12
 	github.com/k3d-io/k3d/v5 v5.4.4
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.2.0
 	github.com/leaanthony/debme v1.2.1
@@ -224,7 +225,6 @@ require (
 	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/klauspost/pgzip v1.2.6-0.20220930104621-17e8dac29df8 // indirect
@@ -342,7 +342,7 @@ require (
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
-	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
+	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230221090011-e4bae7ad2296 // indirect
 	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/oauth2 v0.4.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
@@ -369,11 +369,7 @@ require (
 )
 
 replace (
-	// github.com/google/certificate-transparency-go => github.com/google/certificate-transparency-go v1.1.3
-	// github.com/coreos/etcd => github.com/coreos/etcd v3.5.5+incompatible
-	github.com/hashicorp/terraform => github.com/apecloud/terraform v1.3.0-20220927
 	github.com/spf13/afero => github.com/spf13/afero v1.2.2
 	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.10.0
 	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.10.0
-// go.etcd.io/etcd/v3 => go.etcd.io/etcd/v3 v3.5.5+incompatible
 )

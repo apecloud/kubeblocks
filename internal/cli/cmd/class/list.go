@@ -23,10 +23,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -35,7 +36,7 @@ import (
 type ListOptions struct {
 	ClusterDefRef string
 	Factory       cmdutil.Factory
-	client        *kubernetes.Clientset
+	dynamic       dynamic.Interface
 	genericclioptions.IOStreams
 }
 
@@ -55,59 +56,56 @@ func NewListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 			util.CheckErr(o.run())
 		},
 	}
-	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cluster-definition list\" to show all available cluster definition")
+	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli clusterdefinition list\" to show all available cluster definition")
 	util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
 	return cmd
 }
 
 func (o *ListOptions) complete(f cmdutil.Factory) error {
 	var err error
-	o.client, err = f.KubernetesClientSet()
-	if err != nil {
-		return err
-	}
+	o.dynamic, err = f.DynamicClient()
 	return err
 }
 
 func (o *ListOptions) run() error {
-	componentClasses, err := class.GetClasses(o.client, o.ClusterDefRef)
+	componentClasses, err := class.ListClassesByClusterDefinition(o.dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
-	familyClassMap := make(map[string]map[string][]*class.ComponentClass)
+	constraintClassMap := make(map[string]map[string][]*appsv1alpha1.ComponentClassInstance)
 	for compName, items := range componentClasses {
 		for _, item := range items {
-			if _, ok := familyClassMap[item.Family]; !ok {
-				familyClassMap[item.Family] = make(map[string][]*class.ComponentClass)
+			if _, ok := constraintClassMap[item.ResourceConstraintRef]; !ok {
+				constraintClassMap[item.ResourceConstraintRef] = make(map[string][]*appsv1alpha1.ComponentClassInstance)
 			}
-			familyClassMap[item.Family][compName] = append(familyClassMap[item.Family][compName], item)
+			constraintClassMap[item.ResourceConstraintRef][compName] = append(constraintClassMap[item.ResourceConstraintRef][compName], item)
 		}
 	}
-	var familyNames []string
-	for name := range familyClassMap {
-		familyNames = append(familyNames, name)
+	var constraintNames []string
+	for name := range constraintClassMap {
+		constraintNames = append(constraintNames, name)
 	}
-	sort.Strings(familyNames)
-	for _, family := range familyNames {
-		for compName, classes := range familyClassMap[family] {
-			o.printClassFamily(family, compName, classes)
+	sort.Strings(constraintNames)
+	for _, constraintName := range constraintNames {
+		for compName, classes := range constraintClassMap[constraintName] {
+			o.printClass(constraintName, compName, classes)
 		}
 		_, _ = fmt.Fprint(o.Out, "\n")
 	}
 	return nil
 }
 
-func (o *ListOptions) printClassFamily(family string, compName string, classes []*class.ComponentClass) {
+func (o *ListOptions) printClass(constraintName string, compName string, classes []*appsv1alpha1.ComponentClassInstance) {
 	tbl := printer.NewTablePrinter(o.Out)
-	_, _ = fmt.Fprintf(o.Out, "\nFamily %s:\n", family)
+	_, _ = fmt.Fprintf(o.Out, "\nConstraint %s:\n", constraintName)
 	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY", "STORAGE")
 	sort.Sort(class.ByClassCPUAndMemory(classes))
-	for _, class := range classes {
-		var disks []string
-		for _, disk := range class.Storage {
-			disks = append(disks, disk.String())
+	for _, cls := range classes {
+		var volumes []string
+		for _, volume := range cls.Volumes {
+			volumes = append(volumes, fmt.Sprintf("%s=%s", volume.Name, volume.Size.String()))
 		}
-		tbl.AddRow(compName, class.Name, class.CPU.String(), class.Memory.String(), strings.Join(disks, ","))
+		tbl.AddRow(compName, cls.Name, cls.CPU.String(), cls.Memory.String(), strings.Join(volumes, ","))
 	}
 	tbl.Print()
 }

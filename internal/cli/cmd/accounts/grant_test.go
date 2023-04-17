@@ -94,7 +94,7 @@ var _ = Describe("Grant Account Options", func() {
 				o := NewGrantOptions(tf, streams, op)
 				Expect(o).ShouldNot(BeNil())
 				args := []string{}
-				Expect(o.Validate(args)).Should(MatchError(errClusterNameNum))
+				Expect(o.Validate(args)).Should(MatchError(errClusterNameorInstName))
 
 				// add one element
 				By("add one more args, should fail")

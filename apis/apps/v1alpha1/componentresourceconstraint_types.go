@@ -186,3 +186,16 @@ func (c *ComponentResourceConstraint) FindMatchingConstraints(r *corev1.Resource
 	}
 	return constraints
 }
+
+func (c *ComponentResourceConstraint) MatchClass(class *ComponentClassInstance) bool {
+	request := corev1.ResourceList{
+		corev1.ResourceCPU:    class.CPU,
+		corev1.ResourceMemory: class.Memory,
+	}
+	resource := &corev1.ResourceRequirements{
+		Limits:   request,
+		Requests: request,
+	}
+	constraints := c.FindMatchingConstraints(resource)
+	return len(constraints) > 0
+}

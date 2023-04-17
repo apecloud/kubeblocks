@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: apecloud-mysql-backup-policy-template
+  name: apecloud-mysql-scale-backup-policy-template
   labels:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql-scale
     {{- include "apecloud-mysql.labels" . | nindent 4 }}

@@ -499,7 +499,7 @@ func TestMySQLAccounts(t *testing.T) {
 		assert.Equal(t, 1, len(users))
 		assert.Equal(t, userName, users[0].UserName)
 		assert.NotEmpty(t, users[0].RoleName)
-		assert.Equal(t, users[0].RoleName, ReadOnlyRole)
+		assert.True(t, ReadOnlyRole.EqualTo(users[0].RoleName))
 	})
 
 	t.Run("List accounts", func(t *testing.T) {
@@ -550,7 +550,7 @@ func TestMySQLAccounts(t *testing.T) {
 		assert.Equal(t, ErrNoRoleName.Error(), result[RespTypMsg])
 
 		req.Metadata["roleName"] = roleName
-		roleDesc, err := mysqlOps.renderRoleByName(req.Metadata["roleName"])
+		roleDesc, err := mysqlOps.role2Priv(req.Metadata["roleName"])
 		assert.Nil(t, err)
 		grantRoleCmd := fmt.Sprintf("GRANT %s TO '%s'@'%%';", roleDesc, req.Metadata["userName"])
 
@@ -580,7 +580,7 @@ func TestMySQLAccounts(t *testing.T) {
 		assert.Equal(t, ErrNoRoleName.Error(), result[RespTypMsg])
 
 		req.Metadata["roleName"] = roleName
-		roleDesc, err := mysqlOps.renderRoleByName(req.Metadata["roleName"])
+		roleDesc, err := mysqlOps.role2Priv(req.Metadata["roleName"])
 		assert.Nil(t, err)
 		revokeRoleCmd := fmt.Sprintf("REVOKE %s FROM '%s'@'%%';", roleDesc, req.Metadata["userName"])
 

@@ -49,3 +49,29 @@ Selector labels
 app.kubernetes.io/name: {{ include "mongodb.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+
+{{/*
+Return MongoDB service port
+*/}}
+{{- define "mongodb.service.port" -}}
+{{- .Values.primary.service.ports.mongodb -}}
+{{- end -}}
+
+{{/*
+Return the name for a custom database to create
+*/}}
+{{- define "mongodb.database" -}}
+{{- .Values.auth.database -}}
+{{- end -}}
+
+{{/*
+Get the password key.
+*/}}
+{{- define "mongodb.password" -}}
+{{- if or (.Release.IsInstall) (not (lookup "apps.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "mongodb")) -}}
+{{ .Values.auth.password | default "$(RANDOM_PASSWD)"}}
+{{- else -}}
+{{ index (lookup "apps.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "mongodb").spec.connectionCredential "password"}}
+{{- end }}
+{{- end }}

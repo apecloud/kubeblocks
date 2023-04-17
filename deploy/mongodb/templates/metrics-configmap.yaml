@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-metrics-config
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+data:
+  metrics-config.yaml: {{ toYaml .Values.metrics.config | quote }}

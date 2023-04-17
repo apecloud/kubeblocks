@@ -15,23 +15,23 @@ kbcli cluster describe-config [flags]
   kbcli cluster describe-config mycluster
   
   # describe a component, e.g. cluster name is mycluster, component name is mysql
-  kbcli cluster describe-config mycluster --component-name=mysql
+  kbcli cluster describe-config mycluster --component=mysql
   
   # describe all configuration files.
-  kbcli cluster describe-config mycluster --component-name=mysql --show-detail
+  kbcli cluster describe-config mycluster --component=mysql --show-detail
   
   # describe a content of configuration file.
-  kbcli cluster describe-config mycluster --component-name=mysql --config-file=my.cnf --show-detail
+  kbcli cluster describe-config mycluster --component=mysql --config-file=my.cnf --show-detail
 ```
 
 ### Options
 
 ```
-      --component-name string   Specify the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter."
-      --config-file strings     Specify the name of the configuration file to be describe (e.g. for mysql: --config-file=my.cnf). If unset, all files.
-      --config-specs strings    Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)
-  -h, --help                    help for describe-config
-      --show-detail             If true, the content of the files specified by config-file will be printed.
+      --component string       Specify the name of Component to be describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter."
+      --config-file strings    Specify the name of the configuration file to be describe (e.g. for mysql: --config-file=my.cnf). If unset, all files.
+      --config-specs strings   Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)
+  -h, --help                   help for describe-config
+      --show-detail            If true, the content of the files specified by config-file will be printed.
 ```
 
 ### Options inherited from parent commands

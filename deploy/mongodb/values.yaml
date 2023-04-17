@@ -13,7 +13,82 @@ nameOverride: ""
 fullnameOverride: ""
 
 replicaset:
-  roleChangedProbe:
+  roleProbe:
     failureThreshold: 2
     periodSeconds: 1
     timeoutSeconds: 1
+
+## Authentication parameters
+##
+auth:
+  ## @param auth.password Password for the "mongodb" admin user, leave empty 
+  ## for random generated password.
+  ##
+  password:
+  ## @param auth.database Name for a custom database to create
+  ##
+  database: "admin"
+
+logConfigs:
+  running: /data/mongodb/log/mongodb.log*
+
+metrics:
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/agamotto
+    tag: 0.0.4
+    pullPolicy: IfNotPresent
+  config:
+    extensions:
+      memory_ballast:
+        size_mib: 512
+      health_check:
+        endpoint: 0.0.0.0:13133
+        path: /health/status
+        check_collector_pipeline:
+          enabled: true
+          interval: 2m
+          exporter_failure_threshold: 5
+
+    receivers:
+      apecloudmongodb:
+        uri: mongodb://${env:MONGODB_ROOT_USER}:${env:MONGODB_ROOT_PASSWORD}@127.0.0.1:27017/admin?ssl=false&authSource=admin
+        # uri: mongodb://127.0.0.1:27017
+        collect-all: true
+        collection_interval: 15s
+        direct-connect: true
+        global-conn-pool: false
+        log-level: info
+        compatible-mode: true
+
+    processors:
+      batch:
+        timeout: 5s
+      memory_limiter:
+        limit_mib: 1024
+        spike_limit_mib: 256
+        check_interval: 10s
+
+    exporters:
+      prometheus:
+        endpoint: 0.0.0.0:9216
+        const_labels: [ ]
+        send_timestamps: false
+        metric_expiration: 30s
+        enable_open_metrics: false
+        resource_to_telemetry_conversion:
+          enabled: true
+
+    service:
+      telemetry:
+        logs:
+          level: info
+        metrics:
+          address: 0.0.0.0:8888
+      pipelines:
+        metrics:
+          receivers: [apecloudmongodb]
+          processors: [memory_limiter]
+          exporters: [prometheus]
+
+      extensions: [memory_ballast, health_check]

@@ -281,9 +281,9 @@ var _ = Describe("clusterDefinition webhook", func() {
 
 	It("test mutating webhook", func() {
 		clusterDef, _ := createTestClusterDefinitionObj3(clusterDefinitionName + "-mutating")
-		By("test set the default value to RoleProbeTimeoutAfterPodsReady when roleChangedProbe is not nil")
+		By("test set the default value to RoleProbeTimeoutAfterPodsReady when roleProbe is not nil")
 		clusterDef.Spec.ComponentDefs[0].Probes = &ClusterDefinitionProbes{
-			RoleChangedProbe: &ClusterDefinitionProbe{},
+			RoleProbe: &ClusterDefinitionProbe{},
 		}
 		Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 		Eventually(func(g Gomega) int32 {
@@ -291,7 +291,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			return clusterDef.Spec.ComponentDefs[0].Probes.RoleProbeTimeoutAfterPodsReady
 		}).Should(Equal(DefaultRoleProbeTimeoutAfterPodsReady))
 
-		By("test set zero to RoleProbeTimeoutAfterPodsReady when roleChangedProbe is nil")
+		By("test set zero to RoleProbeTimeoutAfterPodsReady when roleProbe is nil")
 		clusterDef.Spec.ComponentDefs[0].Probes = &ClusterDefinitionProbes{
 			RoleProbeTimeoutAfterPodsReady: 60,
 		}

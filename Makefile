@@ -182,7 +182,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.20
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
@@ -333,7 +333,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.20
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -388,6 +388,7 @@ bump-chart-ver: \
 	bump-single-chart-ver.redis \
 	bump-single-chart-ver.redis-cluster \
 	bump-single-chart-ver.milvus \
+	bump-single-chart-ver.milvus-cluster \
 	bump-single-chart-ver.qdrant \
 	bump-single-chart-ver.qdrant-cluster \
 	bump-single-chart-ver.weaviate \

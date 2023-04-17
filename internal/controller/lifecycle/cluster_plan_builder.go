@@ -505,6 +505,9 @@ func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster
 		if err := c.deletePVCs(cluster); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
+		if err := c.deleteConfigMaps(cluster); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
 		// The backup policy must be cleaned up when the cluster is deleted.
 		// Automatic backup scheduling needs to be stopped at this point.
 		if err := c.deleteBackupPolicies(cluster); err != nil && !apierrors.IsNotFound(err) {
@@ -538,6 +541,15 @@ func (c *clusterPlanBuilder) deletePVCs(cluster *appsv1alpha1.Cluster) error {
 		}
 	}
 	return nil
+}
+
+func (c *clusterPlanBuilder) deleteConfigMaps(cluster *appsv1alpha1.Cluster) error {
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:  cluster.GetName(),
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+	return c.cli.DeleteAllOf(c.ctx.Ctx, &corev1.ConfigMap{}, inNS, ml)
 }
 
 func (c *clusterPlanBuilder) deleteBackupPolicies(cluster *appsv1alpha1.Cluster) error {

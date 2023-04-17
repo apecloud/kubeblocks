@@ -49,6 +49,8 @@ type ClusterDefinitionSpec struct {
 	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string``.
 	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded``.
 	// `$(UUID_HEX)` - generate a random UUID v4 wth HEX representation``.
+	// `$(HEADLESS_SVC_FQDN)` - headless service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
+	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
 	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
 	// `$(SVC_PORT_<PORT-NAME>)` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
@@ -493,13 +495,13 @@ type ClusterDefinitionProbes struct {
 
 	// Probe for DB role changed check.
 	// +optional
-	RoleChangedProbe *ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
+	RoleProbe *ClusterDefinitionProbe `json:"roleProbe,omitempty"`
 
 	// roleProbeTimeoutAfterPodsReady(in seconds), when all pods of the component are ready,
 	// it will detect whether the application is available in the pod.
 	// if pods exceed the InitializationTimeoutSeconds time without a role label,
 	// this component will enter the Failed/Abnormal phase.
-	// Note that this configuration will only take effect if the component supports RoleChangedProbe
+	// Note that this configuration will only take effect if the component supports RoleProbe
 	// and will not affect the life cycle of the pod. default values are 60 seconds.
 	// +optional
 	// +kubebuilder:validation:Minimum=30

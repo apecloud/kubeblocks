@@ -237,11 +237,14 @@ var _ = Describe("builder", func() {
 				"UUID_B64",
 				"UUID_STR_B64",
 				"UUID_HEX",
+				"HEADLESS_SVC_FQDN",
 			} {
 				Expect(credential.StringData[v]).ShouldNot(BeEquivalentTo(fmt.Sprintf("$(%s)", v)))
 			}
 			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
 			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name,
+				params.Cluster.Namespace)
+			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless.%s.svc", params.Cluster.Name, params.Component.Name,
 				params.Cluster.Namespace)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
@@ -254,6 +257,7 @@ var _ = Describe("builder", func() {
 				}
 			}
 			Expect(credential.StringData["SVC_FQDN"]).Should(Equal(svcFQDN))
+			Expect(credential.StringData["HEADLESS_SVC_FQDN"]).Should(Equal(headlessSvcFQDN))
 			Expect(credential.StringData["tcpEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, mysqlPort.Port)))
 			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("paxos:%s:%d", svcFQDN, paxosPort.Port)))
 

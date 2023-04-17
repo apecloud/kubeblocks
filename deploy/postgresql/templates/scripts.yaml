@@ -32,6 +32,19 @@ data:
             if line and not line.startswith('#'):
                 ret.append(line)
         return ret
+    def postgresql_conf_to_dict(file_path):
+        with open(file_path, 'r') as f:
+            content = f.read()
+        lines = content.splitlines()
+        result = {}
+        for line in lines:
+            if line.startswith('#'):
+                continue
+            if '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            result[key.strip()] = value.strip()
+        return result
     def main(filename):
         restore_dir = os.environ.get('RESTORE_DATA_DIR', '')
         local_config = yaml.safe_load(
@@ -52,6 +65,14 @@ data:
                 local_config['bootstrap'] = {}
             with open('/home/postgres/conf/kb_restore.conf', 'r') as f:
                 local_config['bootstrap'].update(yaml.safe_load(f))
+        # point in time recovery(PITR)
+        data_dir = os.environ.get('PGDATA', '')
+        if os.path.isfile("/home/postgres/pgdata/conf/recovery.conf"):
+            with open('/home/postgres/conf/kb_pitr.conf', 'r') as f:
+                pitr_config = yaml.safe_load(f)
+                re_config = postgresql_conf_to_dict("/home/postgres/pgdata/conf/recovery.conf")
+                pitr_config[pitr_config['method']]['recovery_conf'].update(re_config)
+                local_config['bootstrap'].update(pitr_config)
         write_file(yaml.dump(local_config, default_flow_style=False), filename, True)
     if __name__ == '__main__':
         main(sys.argv[1])
@@ -70,3 +91,12 @@ data:
     export SPILO_CONFIGURATION=$(cat tmp_patroni.yaml)
     # export SCOPE="$KB_CLUSTER_NAME-$KB_CLUSTER_NAME"
     exec /launch.sh init
+  backup-log-collector.sh: |
+    #!/bin/bash
+    set -o errexit
+    set -o nounset
+    LOG_START_TIME=$(pg_waldump $(ls -tr $PGDATA/pg_wal/ | grep '[[:digit:]]$'|head -n 1) --rmgr=Transaction 2>/dev/null |head -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
+    LOG_STOP_TIME=$(pg_waldump $(ls -t $PGDATA/pg_wal/ | grep '[[:digit:]]$'|head -n 1) --rmgr=Transaction 2>/dev/null |tail -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
+    LOG_START_TIME=$(date -d "$LOG_START_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
+    LOG_STOP_TIME=$(date -d "$LOG_STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
+    printf "{\"startTime\": \"$LOG_START_TIME\" ,\"stopTime\": \"$LOG_STOP_TIME\"}"

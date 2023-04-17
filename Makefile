@@ -182,7 +182,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.20
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
@@ -333,7 +333,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.20
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -388,6 +388,7 @@ bump-chart-ver: \
 	bump-single-chart-ver.redis \
 	bump-single-chart-ver.redis-cluster \
 	bump-single-chart-ver.milvus \
+	bump-single-chart-ver.milvus-cluster \
 	bump-single-chart-ver.qdrant \
 	bump-single-chart-ver.qdrant-cluster \
 	bump-single-chart-ver.weaviate \
@@ -748,6 +749,9 @@ render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
 	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
 	$(HELM) template mycluster deploy/redis-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/mongodb > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+	$(HELM) template mycluster deploy/mongodb-cluster >> test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.

@@ -438,9 +438,7 @@ func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
 // if the component can affect and be Failed, the cluster will be Failed too.
 func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDefinition) bool {
 	switch componentDef.WorkloadType {
-	case appsv1alpha1.Consensus:
-		return true
-	case appsv1alpha1.Replication:
+	case appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		return true
 	default:
 		return componentDef.MaxUnavailable != nil

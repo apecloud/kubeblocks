@@ -1,0 +1,8 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: Backup
+metadata:
+  name: backup-full
+  namespace: default
+spec:
+  backupPolicyName: mycluster-postgresql-backup-policy
+  backupType: full

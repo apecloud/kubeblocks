@@ -38,7 +38,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
@@ -205,10 +204,6 @@ func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error
 	return err
 }
 
-func GenRequestID() string {
-	return uuid.New().String()
-}
-
 func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
 	tmpl, err := template.New("output").Parse(tpl)
 	if err != nil {
@@ -307,14 +302,30 @@ func OpenBrowser(url string) error {
 }
 
 func TimeFormat(t *metav1.Time) string {
+	return TimeFormatWithDuration(t, time.Minute)
+}
+
+// TimeFormatWithDuration format time with specified precision
+func TimeFormatWithDuration(t *metav1.Time, duration time.Duration) string {
 	if t == nil || t.IsZero() {
 		return ""
 	}
-	return TimeTimeFormat(t.Time)
+	return TimeTimeFormatWithDuration(t.Time, duration)
 }
 
 func TimeTimeFormat(t time.Time) string {
 	const layout = "Jan 02,2006 15:04 UTC-0700"
+	return t.Format(layout)
+}
+
+func TimeTimeFormatWithDuration(t time.Time, precision time.Duration) string {
+	layout := "Jan 02,2006 15:04 UTC-0700"
+	switch precision {
+	case time.Second:
+		layout = "Jan 02,2006 15:04:05 UTC-0700"
+	case time.Millisecond:
+		layout = "Jan 02,2006 15:04:05.000 UTC-0700"
+	}
 	return t.Format(layout)
 }
 
@@ -651,9 +662,32 @@ func BuildAddonReleaseName(addon string) string {
 
 // CombineLabels combines labels into a string
 func CombineLabels(labels map[string]string) string {
-	var labelStr string
+	var labelStr []string
 	for k, v := range labels {
-		labelStr += fmt.Sprintf("%s=%s,", k, v)
+		labelStr = append(labelStr, fmt.Sprintf("%s=%s", k, v))
 	}
-	return strings.TrimSuffix(labelStr, ",")
+
+	// sort labelStr to make sure the order is stable
+	sort.Strings(labelStr)
+
+	return strings.Join(labelStr, ",")
+}
+
+func BuildComponentNameLables(prefix string, names []string) string {
+	return buildLableSelectors(prefix, constant.KBAppComponentLabelKey, names)
+}
+
+// BuildLableSelectors build the label selector by given lable key, the label selector is
+// like "label-key in (name1, name2)"
+func buildLableSelectors(prefix string, key string, names []string) string {
+	if len(names) == 0 {
+		return prefix
+	}
+
+	label := fmt.Sprintf("%s in (%s)", key, strings.Join(names, ","))
+	if len(prefix) == 0 {
+		return label
+	} else {
+		return prefix + "," + label
+	}
 }

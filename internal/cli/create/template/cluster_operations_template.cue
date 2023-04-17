@@ -24,6 +24,7 @@ options: {
 	componentNames: [...string]
 	cpu:      string
 	memory:   string
+	class: 	  string
 	replicas: int
 	storage:  string
 	vctNames: [...string]
@@ -88,6 +89,9 @@ content: {
 		if options.type == "VerticalScaling" {
 			verticalScaling: [ for _, cName in options.componentNames {
 				componentName: cName
+				if options.class != "" {
+					class: options.class
+				}
 				requests: {
 					if options.memory != "" {
 						memory: options.memory

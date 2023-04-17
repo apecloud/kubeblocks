@@ -48,6 +48,7 @@ const (
 	builtInGetArgFunctionName                    = "getArgByName"
 	builtInGetPortFunctionName                   = "getPortByName"
 	builtInGetContainerFunctionName              = "getContainerByName"
+	builtInGetContainerCPUFunctionName           = "getContainerCPU"
 	builtInGetContainerMemoryFunctionName        = "getContainerMemory"
 	builtInGetContainerRequestMemoryFunctionName = "getContainerRequestMemory"
 
@@ -180,6 +181,7 @@ func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.Synt
 		builtInGetPortFunctionName:                   getPortByName,
 		builtInGetArgFunctionName:                    getArgByName,
 		builtInGetContainerFunctionName:              getPodContainerByName,
+		builtInGetContainerCPUFunctionName:           getContainerCPU,
 		builtInGetContainerMemoryFunctionName:        getContainerMemory,
 		builtInGetContainerRequestMemoryFunctionName: getContainerRequestMemory,
 		builtInGetCAFile:                             getCAFile,

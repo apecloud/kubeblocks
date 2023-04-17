@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -217,8 +218,6 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 		// stateful set pvc Update
 		&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
-		// replication set horizontal scaling
-		&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
 		newClusterStatusTransformer(c.ctx, c.cli, c.recorder, *cr),
 	}
@@ -546,12 +545,7 @@ func (c *clusterPlanBuilder) deletePVCs(cluster *appsv1alpha1.Cluster) error {
 }
 
 func (c *clusterPlanBuilder) deleteConfigMaps(cluster *appsv1alpha1.Cluster) error {
-	inNS := client.InNamespace(cluster.Namespace)
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey:  cluster.GetName(),
-		constant.AppManagedByLabelKey: constant.AppName,
-	}
-	return c.cli.DeleteAllOf(c.ctx.Ctx, &corev1.ConfigMap{}, inNS, ml)
+	return DeleteConfigMaps(c.ctx.Ctx, c.cli, cluster)
 }
 
 func (c *clusterPlanBuilder) deleteBackupPolicies(cluster *appsv1alpha1.Cluster) error {
@@ -584,4 +578,13 @@ func (c *clusterPlanBuilder) deleteBackups(cluster *appsv1alpha1.Cluster) error 
 		}
 	}
 	return nil
+}
+
+func DeleteConfigMaps(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:  cluster.GetName(),
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+	return cli.DeleteAllOf(ctx, &corev1.ConfigMap{}, inNS, ml)
 }

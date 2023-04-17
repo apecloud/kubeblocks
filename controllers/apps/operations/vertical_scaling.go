@@ -55,10 +55,16 @@ func (vs verticalScalingHandler) ActionStartedCondition(opsRequest *appsv1alpha1
 func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	verticalScalingMap := opsRes.OpsRequest.Spec.ToVerticalScalingListToMap()
 	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
-		if verticalScaling, ok := verticalScalingMap[component.Name]; ok {
-			component.Resources = verticalScaling.ResourceRequirements
-			opsRes.Cluster.Spec.ComponentSpecs[index] = component
+		verticalScaling, ok := verticalScalingMap[component.Name]
+		if !ok {
+			continue
 		}
+		if verticalScaling.Class != "" {
+			component.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: verticalScaling.Class}
+		} else {
+			component.Resources = verticalScaling.ResourceRequirements
+		}
+		opsRes.Cluster.Spec.ComponentSpecs[index] = component
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
@@ -66,7 +72,7 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for vertical scaling opsRequest.
 func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
@@ -77,9 +83,13 @@ func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.Reques
 		if _, ok := componentNameSet[v.Name]; !ok {
 			continue
 		}
-		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
+		lastConfiguration := appsv1alpha1.LastComponentConfiguration{
 			ResourceRequirements: v.Resources,
 		}
+		if v.ClassDefRef != nil {
+			lastConfiguration.Class = v.ClassDefRef.Class
+		}
+		lastComponentInfo[v.Name] = lastConfiguration
 	}
 	opsRes.OpsRequest.Status.LastConfiguration.Components = lastComponentInfo
 	return nil

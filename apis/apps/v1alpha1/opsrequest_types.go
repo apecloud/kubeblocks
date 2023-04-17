@@ -106,9 +106,12 @@ type VerticalScaling struct {
 	ComponentOps `json:",inline"`
 
 	// resources specifies the computing resource size of verticalScaling.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
+
+	// class specifies the class name of the component
+	// +optional
+	Class string `json:"class,omitempty"`
 }
 
 // VolumeExpansion defines the variables of volume expansion operation.
@@ -299,6 +302,10 @@ type LastComponentConfiguration struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	corev1.ResourceRequirements `json:",inline,omitempty"`
+
+	// the last class name of the component.
+	// +optional
+	Class string `json:"class,omitempty"`
 
 	// volumeClaimTemplates records the last volumeClaimTemplates of the component.
 	// +optional

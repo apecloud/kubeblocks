@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-stop
+spec:
+  clusterRef: mycluster
+  ttlSecondsAfterSucceed: 3600
+  type: Stop
+  restart:
+    - componentName: mysql

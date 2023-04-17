@@ -428,7 +428,7 @@ func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *bind
 		object = UserInfo{}
 
 		sqlTplRend = func(user UserInfo) string {
-			if SuperUserRole.EqualTo(user.UserName) {
+			if SuperUserRole.EqualTo(user.RoleName) {
 				if op == GrantUserRoleOp {
 					return "ALTER USER " + user.UserName + " WITH SUPERUSER;"
 				} else {

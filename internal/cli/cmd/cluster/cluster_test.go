@@ -178,7 +178,6 @@ var _ = Describe("Cluster", func() {
 			Expect(o.ClusterVersionRef).ShouldNot(BeEmpty())
 			err := o.Validate()
 			Expect(err).Should(Succeed())
-
 			o.ClusterVersionRef = ""
 			Expect(o.ClusterVersionRef).Should(BeEmpty())
 			_, errGetVersion := cluster.GetLatestVersion(o.Dynamic, o.ClusterDefRef)
@@ -191,7 +190,6 @@ var _ = Describe("Cluster", func() {
 		})
 
 		It("can validate whether --set and --set-file both are specified when create a new cluster ", func() {
-
 			Expect(o.SetFile).ShouldNot(BeEmpty())
 			Expect(o.Values).Should(BeNil())
 			err := o.Validate()
@@ -206,7 +204,6 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Name).ShouldNot(BeEmpty())
 			err := o.Validate()
 			Expect(err).Should(Succeed())
-
 			o.Name = ""
 			Expect(o.Name).Should(BeEmpty())
 			_, errGenerateName := generateClusterName(o.Dynamic, o.ClusterDefRef)
@@ -222,7 +219,6 @@ var _ = Describe("Cluster", func() {
 			Expect(len(o.Name)).Should(BeNumerically("<=", 16))
 			err := o.Validate()
 			Expect(err).Should(Succeed())
-
 			moreThan16 := 17
 			bytes := make([]byte, 0)
 			var clusterNameMoreThan16 string
@@ -234,9 +230,7 @@ var _ = Describe("Cluster", func() {
 			o.Name = clusterNameMoreThan16
 			err = o.Validate()
 			Expect(err).ShouldNot(Succeed())
-
 		})
-
 	})
 
 	It("delete", func() {

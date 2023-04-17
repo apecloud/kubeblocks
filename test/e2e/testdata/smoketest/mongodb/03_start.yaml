@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-start
+spec:
+  clusterRef: mycluster
+  ttlSecondsAfterSucceed: 27017
+  type: Start
+  restart:
+    - componentName: replicaset

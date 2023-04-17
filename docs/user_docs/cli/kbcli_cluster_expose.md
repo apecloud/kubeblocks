@@ -2,7 +2,7 @@
 title: kbcli cluster expose
 ---
 
-Expose a cluster.
+Expose a cluster with a new endpoint and the new endpoint can be found by executing the command 'kbcli cluster describe <cluster-name>'.
 
 ```
 kbcli cluster expose [flags]

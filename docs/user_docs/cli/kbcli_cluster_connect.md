@@ -14,8 +14,14 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
   # connect to a specified cluster, default connect to the leader or primary instance
   kbcli cluster connect mycluster
   
+  # connect to cluster as user
+  kbcli cluster connect mycluster --as-user myuser
+  
   # connect to a specified instance
   kbcli cluster connect -i mycluster-instance-0
+  
+  # connect to a specified component
+  kbcli cluster connect mycluster --component mycomponent
   
   # show cli connection example
   kbcli cluster connect mycluster --show-example --client=cli
@@ -30,10 +36,12 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
 ### Options
 
 ```
-      --client string     Which client connection example should be output, only valid if --show-example is true.
-  -h, --help              help for connect
-  -i, --instance string   The instance name to connect.
-      --show-example      Show how to connect to cluster or instance from different client.
+      --as-user string     Connect to cluster as user
+      --client string      Which client connection example should be output, only valid if --show-example is true.
+      --component string   The component to connect. If not specified, the first component will be used.
+  -h, --help               help for connect
+  -i, --instance string    The instance name to connect.
+      --show-example       Show how to connect to cluster or instance from different client.
 ```
 
 ### Options inherited from parent commands

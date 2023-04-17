@@ -73,7 +73,7 @@ jobs:
       MAKE_OPS: "build-manager-image"
       IMG: "apecloud/kubeblocks"
       VERSION: "check"
-      GO_VERSION: 1.19
+      GO_VERSION: "1.20"
     secrets: inherit
 
   check-tools-image:
@@ -86,7 +86,7 @@ jobs:
       MAKE_OPS: "build-tools-image"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "check"
-      GO_VERSION: 1.19
+      GO_VERSION: "1.20"
     secrets: inherit
 
   check-helm:

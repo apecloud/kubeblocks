@@ -169,11 +169,10 @@ type OperationHTTPClient struct {
 	httpRequestPrefix string
 	RequestTimeout    time.Duration
 	containerName     string
-	exec              *exec.ExecOptions
 }
 
-// NewHTTPClientWithPod create a new OperationHTTPClient with pod
-func NewHTTPClientWithPod(exec *exec.ExecOptions, pod *corev1.Pod, characterType string) (*OperationHTTPClient, error) {
+// NewHTTPClientWithChannelPod create a new OperationHTTPClient with sqlchannel container
+func NewHTTPClientWithChannelPod(pod *corev1.Pod, characterType string) (*OperationHTTPClient, error) {
 	var (
 		err error
 	)
@@ -199,13 +198,12 @@ func NewHTTPClientWithPod(exec *exec.ExecOptions, pod *corev1.Pod, characterType
 		httpRequestPrefix: fmt.Sprintf(HTTPRequestPrefx, port, characterType),
 		RequestTimeout:    10 * time.Second,
 		containerName:     container,
-		exec:              exec,
 	}
 	return client, nil
 }
 
 // SendRequest exec sql operation, this is a blocking operation and it will use pod EXEC subresource to send an http request to the probe pod
-func (cli *OperationHTTPClient) SendRequest(request SQLChannelRequest) (SQLChannelResponse, error) {
+func (cli *OperationHTTPClient) SendRequest(exec *exec.ExecOptions, request SQLChannelRequest) (SQLChannelResponse, error) {
 	var (
 		response  = SQLChannelResponse{}
 		strBuffer bytes.Buffer
@@ -216,12 +214,12 @@ func (cli *OperationHTTPClient) SendRequest(request SQLChannelRequest) (SQLChann
 	if jsonData, err := json.Marshal(request); err != nil {
 		return response, err
 	} else {
-		cli.exec.ContainerName = cli.containerName
-		cli.exec.Command = []string{"sh", "-c", cli.httpRequestPrefix + " -d '" + string(jsonData) + "'"}
+		exec.ContainerName = cli.containerName
+		exec.Command = []string{"sh", "-c", cli.httpRequestPrefix + " -d '" + string(jsonData) + "'"}
 	}
 
 	// redirect output to strBuffer to be parsed later
-	if err = cli.exec.RunWithRedirect(&strBuffer, &errBuffer); err != nil {
+	if err = exec.RunWithRedirect(&strBuffer, &errBuffer); err != nil {
 		return response, err
 	}
 

@@ -85,6 +85,10 @@ type OpsRequestSpec struct {
 	// +listType=map
 	// +listMapKey=componentName
 	ExposeList []Expose `json:"expose,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// cluster RestoreFrom backup or point in time
+	// +optional
+	RestoreFrom *RestoreFromSpec `json:"restoreFrom,omitempty"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -221,6 +225,42 @@ type Expose struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minitems=0
 	Services []ClusterComponentService `json:"services"`
+}
+
+type RestoreFromSpec struct {
+	// use the backup name and component name for restore, support for multiple components' recovery.
+	// +optional
+	Backup []BackupRefSpec `json:"backup,omitempty"`
+
+	// specified the point in time to recovery
+	// +optional
+	PointInTime *PointInTimeRefSpec `json:"pointInTime,omitempty"`
+}
+
+type RefNamespaceName struct {
+	// specified the name
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// specified the namespace
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type BackupRefSpec struct {
+	// specify a reference backup to restore
+	// +optional
+	Ref RefNamespaceName `json:"ref,omitempty"`
+}
+
+type PointInTimeRefSpec struct {
+	// specify the time point to restore, with UTC as the time zone.
+	// +optional
+	Time *metav1.Time `json:"time,omitempty"`
+
+	// specify a reference source cluster to restore
+	// +optional
+	Ref RefNamespaceName `json:"ref,omitempty"`
 }
 
 // OpsRequestStatus defines the observed state of OpsRequest

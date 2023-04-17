@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: csi-provisioner-sa
+  name: csi-provisioner-sa-{{ .Values.storageClass.name }}
   namespace: {{ .Release.Namespace }}
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: external-provisioner-runner
+  name: external-provisioner-runner-{{ .Values.storageClass.name }}
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -28,14 +28,14 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-provisioner-role
+  name: csi-provisioner-role-{{ .Values.storageClass.name }}
 subjects:
   - kind: ServiceAccount
-    name: csi-provisioner-sa
+    name: csi-provisioner-sa-{{ .Values.storageClass.name }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
-  name: external-provisioner-runner
+  name: external-provisioner-runner-{{ .Values.storageClass.name }}
   apiGroup: rbac.authorization.k8s.io
 ---
 kind: Service
@@ -68,7 +68,7 @@ spec:
       labels:
         app: csi-provisioner-s3
     spec:
-      serviceAccount: csi-provisioner-sa
+      serviceAccount: csi-provisioner-sa-{{ .Values.storageClass.name }}
       {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}

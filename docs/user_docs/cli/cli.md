@@ -23,12 +23,6 @@ Manage alert receiver, include add, list and delete receiver.
 * [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
 
 
-## [backup-config](kbcli_backup-config.md)
-
-KubeBlocks backup config.
-
-
-
 ## [bench](kbcli_bench.md)
 
 Run a benchmark.
@@ -67,9 +61,10 @@ Cluster command.
 * [kbcli cluster edit-backup-policy](kbcli_cluster_edit-backup-policy.md)	 - Edit backup policy
 * [kbcli cluster edit-config](kbcli_cluster_edit-config.md)	 - Edit the config file of the component.
 * [kbcli cluster explain-config](kbcli_cluster_explain-config.md)	 - List the constraint for supported configuration params.
-* [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster.
+* [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster with a new endpoint and the new endpoint can be found by executing the command 'kbcli cluster describe <cluster-name>'.
 * [kbcli cluster grant-role](kbcli_cluster_grant-role.md)	 - Grant role to account
 * [kbcli cluster hscale](kbcli_cluster_hscale.md)	 - Horizontally scale the specified components in the cluster.
+* [kbcli cluster label](kbcli_cluster_label.md)	 - Update the labels on cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters.
 * [kbcli cluster list-accounts](kbcli_cluster_list-accounts.md)	 - List accounts for a cluster
 * [kbcli cluster list-backup](kbcli_cluster_list-backup.md)	 - List backups.
@@ -118,6 +113,7 @@ List and open the KubeBlocks dashboards.
 
 KubeBlocks operation commands.
 
+* [kbcli kubeblocks config](kbcli_kubeblocks_config.md)	 - KubeBlocks config.
 * [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks.
 * [kbcli kubeblocks list-versions](kbcli_kubeblocks_list-versions.md)	 - List KubeBlocks versions.
 * [kbcli kubeblocks preflight](kbcli_kubeblocks_preflight.md)	 - Run and retrieve preflight checks for KubeBlocks.

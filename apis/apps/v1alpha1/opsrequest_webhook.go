@@ -176,7 +176,7 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 	case UpgradeType:
 		return r.validateUpgrade(ctx, k8sClient)
 	case VerticalScalingType:
-		return r.validateVerticalScaling(cluster)
+		return r.validateVerticalScaling(ctx, k8sClient, cluster)
 	case HorizontalScalingType:
 		return r.validateHorizontalScaling(ctx, k8sClient, cluster)
 	case VolumeExpansionType:
@@ -219,13 +219,13 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 }
 
 // validateVerticalScaling validates api when spec.type is VerticalScaling
-func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
+func (r *OpsRequest) validateVerticalScaling(ctx context.Context, k8sCLient client.Client, cluster *Cluster) error {
 	verticalScalingList := r.Spec.VerticalScalingList
 	if len(verticalScalingList) == 0 {
 		return notEmptyError("spec.verticalScaling")
 	}
 
-	compClasses, err := getClasses(cluster.Spec.ClusterDefRef)
+	compClasses, err := getClasses(ctx, k8sCLient, cluster.Spec.ClusterDefRef)
 	if err != nil {
 		return nil
 	}
@@ -486,12 +486,12 @@ func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.
 	return "", nil
 }
 
-func getClasses(clusterDef string) (map[string]map[string]*ComponentClassInstance, error) {
+func getClasses(ctx context.Context, k8sClient client.Client, clusterDef string) (map[string]map[string]*ComponentClassInstance, error) {
 	ml := []client.ListOption{
 		client.MatchingLabels{"clusterdefinition.kubeblocks.io/name": clusterDef},
 	}
 	var classDefinitionList ComponentClassDefinitionList
-	if err := webhookMgr.client.List(context.Background(), &classDefinitionList, ml...); err != nil {
+	if err := k8sClient.List(ctx, &classDefinitionList, ml...); err != nil {
 		return nil, err
 	}
 	var (

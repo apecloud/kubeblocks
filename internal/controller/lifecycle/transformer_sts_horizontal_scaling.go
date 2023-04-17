@@ -164,6 +164,10 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 				return err
 			}
 			if !allPVCsExist {
+				if comp.HorizontalScalePolicy == nil {
+					vertex.immutable = false
+					return nil
+				}
 				// do backup according to component's horizontal scale policy
 				if err := doBackup(s.ctx, s.cli, comp, snapshotKey, dag, rootVertex, vertex); err != nil {
 					return err

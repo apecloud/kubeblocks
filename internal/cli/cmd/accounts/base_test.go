@@ -91,7 +91,7 @@ var _ = Describe("Base Account Options", func() {
 			o := NewAccountBaseOptions(tf, streams, sqlchannel.CreateUserOp)
 			Expect(o).ShouldNot(BeNil())
 			args := []string{}
-			Expect(o.Validate(args)).Should(MatchError(errClusterNameNum))
+			Expect(o.Validate(args)).Should(MatchError(errClusterNameorInstName))
 
 			// add two elements
 			By("add two args")
@@ -105,7 +105,7 @@ var _ = Describe("Base Account Options", func() {
 
 			// set pod name
 			o.PodName = "testpod"
-			Expect(o.Validate(args)).Should(Succeed())
+			Expect(o.Validate(args)).Should(MatchError(errClusterNameorInstName))
 			// set component name as well
 			o.ComponentName = "testcomponent"
 			Expect(o.Validate(args)).Should(MatchError(errCompNameOrInstName))

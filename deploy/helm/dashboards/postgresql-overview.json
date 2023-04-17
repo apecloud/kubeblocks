@@ -1495,8 +1495,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "dark-green",
-                "value": null
+                "color": "dark-green"
               }
             ]
           },
@@ -1709,7 +1708,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 31
+            "y": 2
           },
           "id": 413,
           "links": [],
@@ -1818,7 +1817,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 31
+            "y": 2
           },
           "id": 414,
           "links": [],
@@ -1941,7 +1940,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 32
+            "y": 3
           },
           "id": 394,
           "links": [],
@@ -2050,7 +2049,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 32
+            "y": 3
           },
           "id": 395,
           "links": [],
@@ -2159,7 +2158,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 40
+            "y": 11
           },
           "id": 396,
           "links": [],
@@ -2268,7 +2267,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 40
+            "y": 11
           },
           "id": 397,
           "links": [],
@@ -2377,7 +2376,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 48
+            "y": 19
           },
           "id": 398,
           "links": [],
@@ -2500,7 +2499,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 33
+            "y": 4
           },
           "id": 432,
           "links": [],
@@ -2611,7 +2610,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 33
+            "y": 4
           },
           "id": 434,
           "links": [],
@@ -2722,7 +2721,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 41
+            "y": 12
           },
           "id": 433,
           "links": [],
@@ -2833,7 +2832,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 41
+            "y": 12
           },
           "id": 435,
           "links": [],
@@ -2944,7 +2943,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 49
+            "y": 20
           },
           "id": 436,
           "links": [],
@@ -3055,7 +3054,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 49
+            "y": 20
           },
           "id": 437,
           "links": [],
@@ -3180,7 +3179,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 34
+            "y": 5
           },
           "id": 389,
           "links": [],
@@ -3289,7 +3288,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 34
+            "y": 5
           },
           "id": 390,
           "links": [],
@@ -3398,7 +3397,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 42
+            "y": 13
           },
           "id": 391,
           "links": [],
@@ -3507,7 +3506,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 42
+            "y": 13
           },
           "id": 423,
           "links": [],
@@ -3652,7 +3651,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 35
+            "y": 6
           },
           "id": 92,
           "links": [],
@@ -3761,7 +3760,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 35
+            "y": 6
           },
           "id": 384,
           "links": [],
@@ -3870,7 +3869,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 43
+            "y": 14
           },
           "id": 385,
           "links": [],
@@ -3979,7 +3978,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 43
+            "y": 14
           },
           "id": 386,
           "links": [],
@@ -4186,7 +4185,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 36
+            "y": 7
           },
           "id": 408,
           "links": [],
@@ -4295,7 +4294,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 36
+            "y": 7
           },
           "id": 409,
           "links": [],
@@ -4404,7 +4403,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 44
+            "y": 15
           },
           "id": 401,
           "links": [],
@@ -4513,7 +4512,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 44
+            "y": 15
           },
           "id": 402,
           "links": [],
@@ -4622,7 +4621,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 52
+            "y": 23
           },
           "id": 403,
           "links": [],
@@ -4807,7 +4806,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 52
+            "y": 23
           },
           "id": 410,
           "links": [],
@@ -4935,7 +4934,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 60
+            "y": 31
           },
           "id": 415,
           "links": [],
@@ -5077,7 +5076,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 37
+            "y": 16
           },
           "id": 406,
           "links": [],
@@ -5186,7 +5185,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 37
+            "y": 16
           },
           "id": 407,
           "links": [],
@@ -5309,7 +5308,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 38
+            "y": 17
           },
           "id": 418,
           "links": [],
@@ -5356,6 +5355,530 @@
         }
       ],
       "title": "Database Size",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 38
+      },
+      "id": 459,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 10
+          },
+          "id": 486,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "calculatedInterval": "2m",
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "datasourceErrors": {},
+              "editorMode": "code",
+              "errors": {},
+              "expr": "sum(pg_replication_is_master{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace, app_kubernetes_io_instance, pod)",
+              "format": "time_series",
+              "interval": "1m",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} ",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "title": "Master Role",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 10
+          },
+          "id": 484,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "calculatedInterval": "2m",
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "datasourceErrors": {},
+              "editorMode": "code",
+              "errors": {},
+              "expr": "sum (pg_replication_slots_pg_wal_lsn_diff{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\"}) by (namespace, app_kubernetes_io_instance, slot_name)",
+              "format": "time_series",
+              "interval": "1m",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{slot_name}} ",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "title": "Replication Lag Size",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 18
+          },
+          "id": 483,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "calculatedInterval": "2m",
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "datasourceErrors": {},
+              "editorMode": "code",
+              "errors": {},
+              "expr": "sum(pg_replication_lag{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace, app_kubernetes_io_instance, pod) * 1000",
+              "format": "time_series",
+              "interval": "1m",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} ",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "title": "Replication Lag Time",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 18
+          },
+          "id": 463,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "sum(pg_replication_slots_active{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\"}) by (namespace, app_kubernetes_io_instance)",
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Replication Slots",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 26
+          },
+          "id": 485,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "calculatedInterval": "2m",
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "datasourceErrors": {},
+              "editorMode": "code",
+              "errors": {},
+              "expr": "(time() - sum(pg_stat_replication_reply_time{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\"}) by (namespace, app_kubernetes_io_instance, application_name)) < bool 2000",
+              "format": "time_series",
+              "interval": "1m",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{application_name}} ",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "title": "Replication Status",
+          "type": "timeseries"
+        }
+      ],
+      "title": "Replication",
       "type": "row"
     }
   ],

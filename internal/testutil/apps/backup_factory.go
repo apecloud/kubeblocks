@@ -42,3 +42,8 @@ func (factory *MockBackupFactory) SetBackupType(backupType dataprotectionv1alpha
 	factory.get().Spec.BackupType = backupType
 	return factory
 }
+
+func (factory *MockBackupFactory) SetLabels(labels map[string]string) *MockBackupFactory {
+	factory.get().SetLabels(labels)
+	return factory
+}

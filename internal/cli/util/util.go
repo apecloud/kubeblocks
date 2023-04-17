@@ -38,7 +38,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
@@ -203,10 +202,6 @@ func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error
 		err = operation()
 	}
 	return err
-}
-
-func GenRequestID() string {
-	return uuid.New().String()
 }
 
 func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
@@ -663,9 +658,32 @@ func BuildAddonReleaseName(addon string) string {
 
 // CombineLabels combines labels into a string
 func CombineLabels(labels map[string]string) string {
-	var labelStr string
+	var labelStr []string
 	for k, v := range labels {
-		labelStr += fmt.Sprintf("%s=%s,", k, v)
+		labelStr = append(labelStr, fmt.Sprintf("%s=%s", k, v))
 	}
-	return strings.TrimSuffix(labelStr, ",")
+
+	// sort labelStr to make sure the order is stable
+	sort.Strings(labelStr)
+
+	return strings.Join(labelStr, ",")
+}
+
+func BuildComponentNameLables(prefix string, names []string) string {
+	return buildLableSelectors(prefix, constant.KBAppComponentLabelKey, names)
+}
+
+// BuildLableSelectors build the label selector by given lable key, the label selector is
+// like "label-key in (name1, name2)"
+func buildLableSelectors(prefix string, key string, names []string) string {
+	if len(names) == 0 {
+		return prefix
+	}
+
+	label := fmt.Sprintf("%s in (%s)", key, strings.Join(names, ","))
+	if len(prefix) == 0 {
+		return label
+	} else {
+		return prefix + "," + label
+	}
 }

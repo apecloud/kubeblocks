@@ -202,3 +202,8 @@ func (factory *MockBackupPolicyTemplateFactory) SetTargetAccount(account string)
 	})
 	return factory
 }
+
+func (factory *MockBackupPolicyTemplateFactory) SetLabels(labels map[string]string) *MockBackupPolicyTemplateFactory {
+	factory.get().SetLabels(labels)
+	return factory
+}

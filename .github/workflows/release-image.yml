@@ -44,7 +44,7 @@ jobs:
       MAKE_OPS: "push-manager-image"
       IMG: "apecloud/kubeblocks"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
-      GO_VERSION: 1.20
+      GO_VERSION: "1.20"
     secrets: inherit
 
   release-tools-image:
@@ -55,5 +55,5 @@ jobs:
       MAKE_OPS: "push-tools-image"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
-      GO_VERSION: 1.20
+      GO_VERSION: "1.20"
     secrets: inherit

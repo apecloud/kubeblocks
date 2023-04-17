@@ -17,13 +17,19 @@ limitations under the License.
 package cluster
 
 import (
+	"bytes"
+	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
+	"text/template"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -36,6 +42,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 var clusterUpdateExample = templates.Examples(`
@@ -232,21 +240,21 @@ func (o *updateOptions) buildComponents(field string, val string) error {
 
 	switch field {
 	case "monitor":
-		return o.setMonitor(val)
+		return o.updateMonitor(val)
 	case "enable-all-logs":
-		return o.setEnabledLog(val)
+		return o.updateEnabledLog(val)
 	default:
 		return nil
 	}
 }
 
-func (o *updateOptions) setEnabledLog(val string) error {
+func (o *updateOptions) updateEnabledLog(val string) error {
 	boolVal, err := strconv.ParseBool(val)
 	if err != nil {
 		return err
 	}
 
-	// disable all monitor
+	// update --enabled-all-logs=false for all components
 	if !boolVal {
 		for _, c := range o.cluster.Spec.ComponentSpecs {
 			c.EnabledLogs = nil
@@ -254,16 +262,147 @@ func (o *updateOptions) setEnabledLog(val string) error {
 		return nil
 	}
 
-	// enable all monitor
+	// update --enabled-all-logs=true for all components
 	cd, err := cluster.GetClusterDefByName(o.dynamic, o.cluster.Spec.ClusterDefRef)
 	if err != nil {
 		return err
 	}
+	// set --enabled-all-logs at cluster components
 	setEnableAllLogs(o.cluster, cd)
+	if err = o.reconfigureLogVariables(o.cluster, cd); err != nil {
+		return errors.Wrap(err, "reconfigure log variables of target cluster failed")
+	}
 	return nil
 }
 
-func (o *updateOptions) setMonitor(val string) error {
+// reconfigureLogVariables reconfigures the log variables of db kernel
+func (o *updateOptions) reconfigureLogVariables(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinition) error {
+	if c == nil || cd == nil {
+		return errors.New("both cluster and cluster definition are required")
+	}
+	for _, compSpec := range c.Spec.ComponentSpecs {
+		configSpec, err := findFirstConfigSpec(c.Spec.ComponentSpecs, cd.Spec.ComponentDefs, compSpec.Name)
+		if err != nil {
+			return err
+		}
+		configTemplate, err := cluster.GetConfigMapByName(o.dynamic, configSpec.Namespace, configSpec.TemplateRef)
+		if err != nil {
+			return err
+		}
+		keyName, logTPL, err := findLogsBlockTemplate(configTemplate.Data)
+		if err != nil {
+			return err
+		}
+		var buf bytes.Buffer
+		tplValue, err := buildTPLLogsValues(&compSpec)
+		if err != nil {
+			return err
+		}
+		err = logTPL.Execute(&buf, tplValue)
+		if err != nil {
+			return err
+		}
+
+		logVariablesMap := util.CovertLineStrVariablesToMapFormat(buf.String())
+		opsRequest := createLogsReconfiguringOpsRequest(c.Name, c.Namespace, compSpec.Name, configSpec.Name, keyName, logVariablesMap)
+		unstructuredObj, err := util.ConvertObjToUnstructured(opsRequest)
+		if err != nil {
+			return err
+		}
+		if _, err = o.dynamic.Resource(types.OpsGVR()).Namespace(c.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func buildTPLLogsValues(compSpec *appsv1alpha1.ClusterComponentSpec) (*gotemplate.TplValues, error) {
+	var value gotemplate.TplValues
+	compMap := map[string]interface{}{}
+	bytesData, err := json.Marshal(compSpec)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(bytesData, &compMap)
+	if err != nil {
+		return nil, err
+	}
+	value = map[string]interface{}{
+		topTPLLogsObject: compMap,
+	}
+	return &value, nil
+}
+
+func createLogsReconfiguringOpsRequest(clusterName, namespace, compName, configName, keyName string, variables map[string]string) *appsv1alpha1.OpsRequest {
+	opsRequest := util.NewOpsRequestForReconfiguring("ops-reconfigure-logs", namespace, clusterName)
+	parameterPairs := make([]appsv1alpha1.ParameterPair, 0, len(variables))
+	for key, value := range variables {
+		v := value
+		parameterPairs = append(parameterPairs, appsv1alpha1.ParameterPair{
+			Key:   key,
+			Value: &v,
+		})
+	}
+	var keys []appsv1alpha1.ParameterConfig
+	keys = append(keys, appsv1alpha1.ParameterConfig{
+		Key:        keyName,
+		Parameters: parameterPairs,
+	})
+	var configurations []appsv1alpha1.Configuration
+	configurations = append(configurations, appsv1alpha1.Configuration{
+		Keys: keys,
+		Name: configName,
+	})
+	reconfigure := opsRequest.Spec.Reconfigure
+	reconfigure.ComponentName = compName
+	reconfigure.Configurations = append(reconfigure.Configurations, configurations...)
+	return opsRequest
+}
+
+const logsBlockName = "logsBlock"
+const logsTemplateName = "template-logs-block"
+const topTPLLogsObject = "component"
+
+func findLogsBlockTemplate(confData map[string]string) (string, *template.Template, error) {
+	engine := NewConfigTemplateEngine()
+	for key, value := range confData {
+		if strings.Index(value, logsBlockName) == -1 {
+			continue
+		}
+		tpl, err := engine.Parse(value)
+		if err != nil {
+			return key, nil, err
+		}
+		logTPL := tpl.Lookup(logsBlockName)
+		// find target logs template
+		if logTPL != nil {
+			return key, logTPL, nil
+		}
+	}
+	return "", nil, errors.New("no logs block template found")
+}
+
+func findFirstConfigSpec(
+	compSpecs []appsv1alpha1.ClusterComponentSpec,
+	cdCompSpecs []appsv1alpha1.ClusterComponentDefinition,
+	compName string) (*appsv1alpha1.ComponentConfigSpec, error) {
+	configSpecs, err := util.GetConfigTemplateListWithResource(compSpecs, cdCompSpecs, nil, compName, true)
+	if err != nil {
+		return nil, err
+	}
+	if len(configSpecs) == 0 {
+		return nil, errors.Errorf("no config template for component %s", compName)
+	}
+	return &configSpecs[0], nil
+}
+
+func NewConfigTemplateEngine() *template.Template {
+	customizedFuncMap := plan.BuiltInCustomFunctions(nil, nil)
+	engine := gotemplate.NewTplEngine(nil, customizedFuncMap, logsTemplateName, nil, context.TODO())
+	return engine.GetTplEngine()
+}
+
+func (o *updateOptions) updateMonitor(val string) error {
 	boolVal, err := strconv.ParseBool(val)
 	if err != nil {
 		return err

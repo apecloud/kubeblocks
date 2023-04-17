@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -686,4 +687,57 @@ func buildLableSelectors(prefix string, key string, names []string) string {
 	} else {
 		return prefix + "," + label
 	}
+}
+
+// CovertLineStrVariablesToMapFormat converts string format `key1=value1\nkey2=value2...` to KeyValue format
+func CovertLineStrVariablesToMapFormat(variablesStr string) map[string]string {
+	keyValues := make(map[string]string)
+	if len(variablesStr) == 0 {
+		return keyValues
+	}
+	lines := strings.Split(variablesStr, "\n")
+	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+		strList := strings.Split(line, "=")
+		if len(strList) == 2 {
+			keyValues[strList[0]] = strList[1]
+		}
+	}
+	return keyValues
+}
+
+// NewOpsRequestForReconfiguring returns a new common OpsRequest for Reconfiguring operation
+func NewOpsRequestForReconfiguring(opsName, namespace, clusterName string) *appsv1alpha1.OpsRequest {
+	return &appsv1alpha1.OpsRequest{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: types.AppsAPIGroup + "/" + types.AppsAPIVersion,
+			Kind:       types.KindOps,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opsName,
+			Namespace: namespace,
+		},
+		Spec: appsv1alpha1.OpsRequestSpec{
+			ClusterRef:  clusterName,
+			Type:        appsv1alpha1.ReconfiguringType,
+			Reconfigure: &appsv1alpha1.Reconfigure{},
+		},
+	}
+}
+func ConvertObjToUnstructured(obj any) (*unstructured.Unstructured, error) {
+	var (
+		contentBytes    []byte
+		err             error
+		unstructuredObj = &unstructured.Unstructured{}
+	)
+
+	if contentBytes, err = json.Marshal(obj); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(contentBytes, unstructuredObj); err != nil {
+		return nil, err
+	}
+	return unstructuredObj, nil
 }

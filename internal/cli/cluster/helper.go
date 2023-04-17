@@ -426,3 +426,11 @@ func GetPodWorkloadType(pod *corev1.Pod) string {
 	}
 	return pod.Labels[constant.WorkloadTypeLabelKey]
 }
+
+func GetConfigMapByName(dynamic dynamic.Interface, namespace, name string) (*corev1.ConfigMap, error) {
+	configMapObj := &corev1.ConfigMap{}
+	if err := GetK8SClientObject(dynamic, configMapObj, types.ConfigmapGVR(), namespace, name); err != nil {
+		return nil, err
+	}
+	return configMapObj, nil
+}

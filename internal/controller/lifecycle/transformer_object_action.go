@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -133,8 +134,40 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 			v.action = actionPtr(UPDATE)
 		}
 	}
+	filterHScalePVCs := func(originSet sets.Set[gvkName]) sets.Set[gvkName] {
+		stsToBeDeleted := make([]*appsv1.StatefulSet, 0)
+		// list sts to be deleted
+		for name := range originSet {
+			obj := oldSnapshot[name]
+			if sts, ok := obj.(*appsv1.StatefulSet); ok {
+				stsToBeDeleted = append(stsToBeDeleted, sts)
+			}
+		}
+		// compose all pvc names that owned by sts to be deleted
+		pvcNameSet := sets.New[string]()
+		for _, sts := range stsToBeDeleted {
+			for _, template := range sts.Spec.VolumeClaimTemplates {
+				for i := 0; i < int(*sts.Spec.Replicas); i++ {
+					name := fmt.Sprintf("%s-%s-%d", template.Name, sts.Name, i)
+					pvcNameSet.Insert(name)
+				}
+			}
+		}
+		// pvcs that not owned by any deleting sts should be filtered
+		orphanSet := originSet.Clone()
+		for name := range orphanSet {
+			obj := oldSnapshot[name]
+			if pvc, ok := obj.(*corev1.PersistentVolumeClaim); ok {
+				if !pvcNameSet.Has(pvc.Name) {
+					orphanSet.Delete(name)
+				}
+			}
+		}
+		return orphanSet
+	}
 	deleteOrphanVertices := func() {
-		for name := range deleteSet {
+		orphanSet := filterHScalePVCs(deleteSet)
+		for name := range orphanSet {
 			v := &lifecycleVertex{
 				obj:      oldSnapshot[name],
 				oriObj:   oldSnapshot[name],

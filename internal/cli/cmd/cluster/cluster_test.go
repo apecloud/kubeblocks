@@ -26,7 +26,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -154,69 +153,43 @@ var _ = Describe("Cluster", func() {
 
 		It("can validate whether the ClusterDefRef is null when create a new cluster ", func() {
 			Expect(o.ClusterDefRef).ShouldNot(BeEmpty())
-			err := o.Validate()
-			Expect(err).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 			o.ClusterDefRef = ""
-			Expect(o.ClusterDefRef).Should(BeEmpty())
-			err = o.Validate()
-			Expect(err).Should(HaveOccurred())
+			Expect(o.Validate()).Should(HaveOccurred())
 		})
 
 		It("can validate whether the TerminationPolicy is null when create a new cluster ", func() {
 			Expect(o.TerminationPolicy).ShouldNot(BeEmpty())
-			err := o.Validate()
-			Expect(err).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 			o.TerminationPolicy = ""
-			Expect(o.TerminationPolicy).Should(BeEmpty())
-			err = o.Validate()
-			Expect(err).Should(HaveOccurred())
+			Expect(o.Validate()).Should(HaveOccurred())
 		})
 
 		It("can validate whether the ClusterVersionRef is null and can't get latest version from client when create a new cluster ", func() {
 			Expect(o.ClusterVersionRef).ShouldNot(BeEmpty())
-			err := o.Validate()
-			Expect(err).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 			o.ClusterVersionRef = ""
-			Expect(o.ClusterVersionRef).Should(BeEmpty())
-			_, errGetVersion := cluster.GetLatestVersion(o.Dynamic, o.ClusterDefRef)
-			err = o.Validate()
-			if errGetVersion == nil {
-				Expect(err).Should(Succeed())
-			} else {
-				Expect(err).Should(HaveOccurred())
-			}
+			Expect(o.Validate()).Should(Succeed())
 		})
 
 		It("can validate whether --set and --set-file both are specified when create a new cluster ", func() {
 			Expect(o.SetFile).ShouldNot(BeEmpty())
 			Expect(o.Values).Should(BeNil())
-			err := o.Validate()
-			Expect(err).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 			o.Values = []string{"notEmpty"}
-			Expect(o.Values).ShouldNot(BeNil())
-			err = o.Validate()
-			Expect(err).Should(HaveOccurred())
+			Expect(o.Validate()).Should(HaveOccurred())
 		})
 
 		It("can validate whether the name is not specified and fail to generate a random cluster name when create a new cluster ", func() {
 			Expect(o.Name).ShouldNot(BeEmpty())
-			err := o.Validate()
-			Expect(err).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 			o.Name = ""
-			Expect(o.Name).Should(BeEmpty())
-			_, errGenerateName := generateClusterName(o.Dynamic, o.ClusterDefRef)
-			err = o.Validate()
-			if errGenerateName == nil {
-				Expect(err).Should(Succeed())
-			} else {
-				Expect(err).Should(HaveOccurred())
-			}
+			Expect(o.Validate()).Should(Succeed())
 		})
 
 		It("can validate whether the name is not longer than 16 characters when create a new cluster", func() {
 			Expect(len(o.Name)).Should(BeNumerically("<=", 16))
-			err := o.Validate()
-			Expect(err).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 			moreThan16 := 17
 			bytes := make([]byte, 0)
 			var clusterNameMoreThan16 string
@@ -226,8 +199,7 @@ var _ = Describe("Cluster", func() {
 			clusterNameMoreThan16 = string(bytes)
 			Expect(len(clusterNameMoreThan16)).Should(BeNumerically(">", 16))
 			o.Name = clusterNameMoreThan16
-			err = o.Validate()
-			Expect(err).Should(HaveOccurred())
+			Expect(o.Validate()).Should(HaveOccurred())
 		})
 	})
 

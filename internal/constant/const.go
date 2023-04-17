@@ -114,6 +114,9 @@ const (
 	// CMInsLastReconfigurePhaseKey defines the current phase
 	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
 
+	// CMInsEnableRerenderTemplateKey is used to enable rerender template
+	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
+
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
 

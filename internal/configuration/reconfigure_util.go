@@ -23,6 +23,7 @@ import (
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
@@ -123,10 +124,17 @@ func IsParametersUpdateFromManager(cm *corev1.ConfigMap) bool {
 // IsNotUserReconfigureOperation is used to check whether the parameters are updated from operation
 func IsNotUserReconfigureOperation(cm *corev1.ConfigMap) bool {
 	labels := cm.GetLabels()
-	if labels == nil {
-		return true
+	annotations := cm.GetAnnotations()
+	if labels == nil || annotations == nil {
+		return false
+	}
+	if _, ok := annotations[constant.CMInsEnableRerenderTemplateKey]; !ok {
+		return false
 	}
 	lastReconfigurePhase := labels[constant.CMInsLastReconfigurePhaseKey]
+	if annotations[constant.KBParameterUpdateSourceAnnotationKey] != constant.ReconfigureManagerSource {
+		return false
+	}
 	return lastReconfigurePhase == "" || ReconfigureCreatedPhase == lastReconfigurePhase
 }
 
@@ -141,4 +149,26 @@ func SetParametersUpdateSource(cm *corev1.ConfigMap, source string) {
 	}
 	annotation[constant.KBParameterUpdateSourceAnnotationKey] = source
 	cm.SetAnnotations(annotation)
+}
+
+func IsSchedulableConfigResource(object client.Object) bool {
+	var requiredLabels = []string{
+		constant.AppNameLabelKey,
+		constant.AppInstanceLabelKey,
+		constant.KBAppComponentLabelKey,
+		constant.CMConfigurationTemplateNameLabelKey,
+		constant.CMConfigurationTypeLabelKey,
+		constant.CMConfigurationSpecProviderLabelKey,
+	}
+
+	labels := object.GetLabels()
+	if len(labels) == 0 {
+		return false
+	}
+	for _, label := range requiredLabels {
+		if _, ok := labels[label]; !ok {
+			return false
+		}
+	}
+	return true
 }

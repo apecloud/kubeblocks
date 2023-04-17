@@ -17,13 +17,18 @@ limitations under the License.
 package operations
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -170,7 +175,61 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 		}
 		return appsv1alpha1.OpsFailedPhase, 0, nil
 	}
-	return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+	if !isRunningPhase(condition) {
+		return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+	}
+
+	ops := &opsRes.OpsRequest.Spec
+	if ops.Reconfigure == nil || len(ops.Reconfigure.Configurations) == 0 {
+		return appsv1alpha1.OpsFailedPhase, 0, nil
+	}
+	phase, err := r.syncReconfigureOperatorStatus(reqCtx, cli, opsRes)
+	switch {
+	default:
+		return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+	case err != nil:
+		return "", 30 * time.Second, err
+	case phase == appsv1alpha1.OpsSucceedPhase:
+		return appsv1alpha1.OpsSucceedPhase, 0, nil
+	}
+}
+
+func (r *reconfigureAction) syncReconfigureOperatorStatus(ctx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, error) {
+	var (
+		ops        = &opsRes.OpsRequest.Spec
+		ns         = opsRes.Cluster.Namespace
+		name       = opsRes.OpsRequest.Name
+		configSpec = ops.Reconfigure.Configurations[0]
+	)
+
+	cmKey := client.ObjectKey{
+		Name:      cfgcore.GetComponentCfgName(ops.ClusterRef, ops.Reconfigure.ComponentName, configSpec.Name),
+		Namespace: ns,
+	}
+	cm := &corev1.ConfigMap{}
+	if err := cli.Get(ctx.Ctx, cmKey, cm); err != nil {
+		return appsv1alpha1.OpsRunningPhase, err
+	}
+
+	if checkFinishedReconfigure(cm, name, ctx.Log) {
+		return appsv1alpha1.OpsSucceedPhase, nil
+	}
+	return appsv1alpha1.OpsRunningPhase, nil
+}
+
+func checkFinishedReconfigure(cm *corev1.ConfigMap, opsRequestName string, logger logr.Logger) bool {
+	labels := cm.GetLabels()
+	annotations := cm.GetAnnotations()
+	if len(annotations) == 0 || len(labels) == 0 {
+		return false
+	}
+
+	hash, _ := util.ComputeHash(cm.Data)
+	logger.V(1).Info(fmt.Sprintf("current opsrqeust: %s, current version: %s, last applied: %s, finish version: %s",
+		opsRequestName, hash,
+		annotations[constant.LastAppliedOpsCRAnnotation],
+		labels[constant.CMInsConfigurationHashLabelKey]))
+	return labels[constant.CMInsConfigurationHashLabelKey] == hash
 }
 
 func (r *reconfigureAction) syncReconfigureComponentStatus(reqCtx intctrlutil.RequestCtx,
@@ -231,6 +290,10 @@ func isNoChange(condition metav1.Condition) bool {
 
 func isFailedPhase(condition metav1.Condition) bool {
 	return isExpectedPhase(condition, []string{appsv1alpha1.ConditionTypeFailed, appsv1alpha1.ReasonReconfigureFailed}, metav1.ConditionFalse)
+}
+
+func isRunningPhase(condition metav1.Condition) bool {
+	return isExpectedPhase(condition, []string{appsv1alpha1.ReasonReconfigureRunning}, metav1.ConditionTrue)
 }
 
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) error {

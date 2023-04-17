@@ -85,12 +85,6 @@ const (
 	kbAccountEndPointEnvName = "KB_ACCOUNT_ENDPOINT"
 )
 
-// username and password are keys in created secrets for others to refer to.
-const (
-	accountNameForSecret   = "username"
-	accountPasswdForSecret = "password"
-)
-
 // ENABLE_DEBUG_SYSACCOUNTS is used for debug only.
 const (
 	systemAccountsDebugMode string = "ENABLE_DEBUG_SYSACCOUNTS"

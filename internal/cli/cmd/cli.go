@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dashboard"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
@@ -102,6 +103,7 @@ A Command Line Interface for KubeBlocks`,
 		class.NewClassCommand(f, ioStreams),
 		alert.NewAlertCmd(f, ioStreams),
 		addon.NewAddonCmd(f, ioStreams),
+		migration.NewMigrationCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}
@@ -120,7 +122,6 @@ func initConfig() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(fmt.Sprintf("/etc/%s/", cliName))
 	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s/", cliName))
-	viper.AddConfigPath(".")
 	viper.AutomaticEnv() // read in environment variables that match
 	viper.SetEnvPrefix(cliName)
 

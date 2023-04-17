@@ -89,7 +89,7 @@ func (c *StatefulsetComponentBase) loadRunningWorkload(reqCtx intctrlutil.Reques
 	return sts, nil
 }
 
-func (c *StatefulsetComponentBase) CreateImpl(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
+func (c *StatefulsetComponentBase) Create(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
 	if err := c.init(reqCtx, cli, builder, false); err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (c *StatefulsetComponentBase) CreateImpl(reqCtx intctrlutil.RequestCtx, cli
 	return nil
 }
 
-func (c *StatefulsetComponentBase) UpdateImpl(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
+func (c *StatefulsetComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
 	if err := c.init(reqCtx, cli, builder, true); err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func (c *StatefulsetComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli cli
 		}
 		return err
 	}
-	if err := c.StatusImpl(reqCtx, cli, []client.Object{c.runningWorkload}); err != nil {
+	if err := c.ComponentBase.Status(reqCtx, cli, []client.Object{c.runningWorkload}); err != nil {
 		return err
 	}
 	return c.HandleGarbageOfRestoreBeforeRunning()

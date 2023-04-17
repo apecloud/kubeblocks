@@ -20,8 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -41,11 +41,16 @@ func NewConsensusComponent(cli client.Client,
 				Cluster:        cluster,
 				ClusterVersion: clusterVersion,
 				Component:      synthesizedComponent,
-				ComponentSet: &consensusset.ConsensusSet{
-					Cli:           cli,
-					Cluster:       cluster,
-					ComponentSpec: nil,
-					ComponentDef:  nil,
+				ComponentSet: &ConsensusSet{
+					Stateful: stateful.Stateful{
+						ComponentSetBase: types.ComponentSetBase{
+							Cli:           cli,
+							Cluster:       cluster,
+							ComponentSpec: nil,
+							ComponentDef:  nil,
+							Component:     nil,
+						},
+					},
 				},
 				Dag:             dag,
 				WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
@@ -84,7 +89,7 @@ func (c *consensusComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *consensusComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.CreateImpl(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.StatefulsetComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *consensusComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -93,5 +98,5 @@ func (c *consensusComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Cl
 }
 
 func (c *consensusComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.UpdateImpl(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
+	return c.StatefulsetComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }

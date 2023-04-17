@@ -93,6 +93,14 @@ func (c *ComponentBase) GetReplicas() int32 {
 	return c.Component.Replicas
 }
 
+func (c *ComponentBase) GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec {
+	return c.Component.ConsensusSpec
+}
+
+func (c *ComponentBase) GetPrimaryIndex() int32 {
+	return *c.Component.PrimaryIndex
+}
+
 func (c *ComponentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {
 	if c.Cluster.Status.Components == nil {
 		return ""
@@ -101,10 +109,6 @@ func (c *ComponentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {
 		return ""
 	}
 	return c.Cluster.Status.Components[c.GetName()].Phase
-}
-
-func (c *ComponentBase) GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec {
-	return c.Component.ConsensusSpec
 }
 
 func (c *ComponentBase) AddResource(obj client.Object, action *ictrltypes.LifecycleAction,
@@ -290,7 +294,7 @@ func (c *ComponentBase) setStatusPhaseWithMsg(phase appsv1alpha1.ClusterComponen
 	}
 }
 
-func (c *ComponentBase) StatusImpl(reqCtx intctrlutil.RequestCtx, cli client.Client, objs []client.Object) error {
+func (c *ComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Client, objs []client.Object) error {
 	// TODO(impl): check the operation result of @Restart, @ExpandVolume, @HorizontalScale, and update component status if needed.
 	//   @Restart - whether pods are available, covered by @rebuildLatestStatus
 	//   @ExpandVolume - whether PVCs have been expand finished

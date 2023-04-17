@@ -43,7 +43,7 @@ var _ = Describe("Stateful Component", func() {
 	)
 	const (
 		statelessCompName      = "stateless"
-		statelessCompDefRef    = "stateless"
+		statelessCompDefName   = "stateless"
 		defaultMinReadySeconds = 10
 	)
 
@@ -71,15 +71,14 @@ var _ = Describe("Stateful Component", func() {
 		It("Stateless Component test", func() {
 			By(" init cluster, deployment")
 			clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, statelessCompDefRef).
+				AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
 				Create(&testCtx).GetObject()
 			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(statelessCompName, statelessCompDefRef).SetReplicas(2).Create(&testCtx).GetObject()
+				AddComponent(statelessCompName, statelessCompDefName).SetReplicas(2).Create(&testCtx).GetObject()
 			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
-			clusterComponent := cluster.GetComponentByName(statelessCompName)
+			clusterComponent := cluster.Spec.GetComponentByName(statelessCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-			statelessComponent, err := newStateless(k8sClient, cluster, clusterComponent, *componentDef)
-			Expect(err).Should(Succeed())
+			statelessComponent := newStateless(k8sClient, cluster, clusterComponent, *componentDef)
 			By("test pods number of deploy is 0 ")
 			phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
 			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())

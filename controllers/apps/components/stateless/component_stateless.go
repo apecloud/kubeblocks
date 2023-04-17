@@ -47,9 +47,13 @@ func NewStatelessComponent(cli client.Client,
 			ClusterVersion: clusterVersion,
 			Component:      synthesizedComponent,
 			ComponentSet: &Stateless{
-				Cli:           cli,
-				Cluster:       cluster,
-				ComponentSpec: nil,
+				ComponentSetBase: types.ComponentSetBase{
+					Cli:           cli,
+					Cluster:       cluster,
+					ComponentSpec: nil,
+					ComponentDef:  nil,
+					Component:     nil,
+				},
 			},
 			Dag:             dag,
 			WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
@@ -192,7 +196,7 @@ func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		}
 		return err
 	}
-	return c.StatusImpl(reqCtx, cli, []client.Object{c.runningWorkload})
+	return c.ComponentBase.Status(reqCtx, cli, []client.Object{c.runningWorkload})
 }
 
 func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {

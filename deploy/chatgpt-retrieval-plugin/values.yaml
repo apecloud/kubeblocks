@@ -9,7 +9,7 @@ image:
   repository: apecloud/chatgpt-retrieval-plugin
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "arm64-latest"
+  tag: "0.1.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -40,6 +40,15 @@ securityContext: {}
 service:
   type: ClusterIP
   port: 8080
+
+servers:
+  url: https://your-app-url.com
+
+website:
+  url: https://your-app-url.com/.well-known/openapi.yaml
+  logo_url: https://your-app-url.com/.well-known/logo.png
+  contact_email: hello@contact.com
+  legal_info_url: hello@legal.com
 
 datastore:
   # in list of (pinecone, weaviate, zilliz, milvus, qdrant, redis)

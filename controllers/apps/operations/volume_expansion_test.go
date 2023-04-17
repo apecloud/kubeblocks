@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/storage"
@@ -176,7 +177,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
 			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
 			g.Expect(len(progressDetails) > 0).Should(BeTrue())
-			progressDetail := FindStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
+			progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
 			g.Expect(progressDetail.Status == appsv1alpha1.FailedProgressStatus).Should(BeTrue())
 		})).Should(Succeed())
 	}
@@ -213,7 +214,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
 			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
-			progressDetail := FindStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
+			progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
 			g.Expect(progressDetail != nil && progressDetail.Status == appsv1alpha1.ProcessingProgressStatus).Should(BeTrue())
 		})).Should(Succeed())
 
@@ -261,8 +262,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 				clusterVersionName, clusterName, "consensus", consensusCompName)
 			// init storageClass
 			sc := testapps.CreateStorageClass(testCtx, storageClassName, true)
-			Expect(testapps.ChangeObj(&testCtx, sc, func() {
-				sc.Annotations = map[string]string{storage.IsDefaultStorageClassAnnotation: "true"}
+			Expect(testapps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {
+				lsc.Annotations = map[string]string{storage.IsDefaultStorageClassAnnotation: "true"}
 			})).ShouldNot(HaveOccurred())
 
 			opsRes := &OpsResource{

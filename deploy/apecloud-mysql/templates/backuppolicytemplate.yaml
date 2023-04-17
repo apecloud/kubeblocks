@@ -1,21 +1,28 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: backup-policy-template-mysql
+  name: apecloud-mysql-backup-policy-template
   labels:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
-  # which backup tool to perform database backup, only support one tool.
-  backupToolName: xtrabackup-mysql
-  ttl: 168h0m0s
-  hooks:
-    containerName: mysql
-    preCommands:
-    - "touch /data/mysql/data/.restore_new_cluster; sync"
-    postCommands:
-    - "rm -f /data/mysql/data/.restore_new_cluster; sync"
-
-  credentialKeyword:
-    userKeyword: username
-    passwordKeyword: password
+  clusterDefinitionRef: apecloud-mysql
+  backupPolicies:
+  - componentDefRef: mysql
+    ttl: 7d
+    schedule:
+      baseBackup:
+        type: snapshot
+        enable: false
+        cronExpression: "0 18 * * 0"
+    snapshot:
+      hooks:
+        containerName: mysql
+        preCommands:
+        - "touch /data/mysql/data/.restore_new_cluster; sync"
+        postCommands:
+        - "rm -f /data/mysql/data/.restore_new_cluster; sync"
+      target:
+        role: leader
+    full:
+      backupToolName: xtrabackup-apecloud-mysql

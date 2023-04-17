@@ -1,0 +1,268 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package replication
+
+import (
+	"context"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+// ReplicationSet is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec
+type ReplicationSet struct {
+	stateful.Stateful
+}
+
+var _ types.ComponentSet = &ReplicationSet{}
+
+func (r *ReplicationSet) getName() string {
+	if r.Component != nil {
+		return r.Component.GetName()
+	}
+	return r.ComponentSpec.Name
+}
+
+func (r *ReplicationSet) getNamespace() string {
+	return r.Cluster.GetNamespace()
+}
+
+func (r *ReplicationSet) getMatchingLabels() client.MatchingLabels {
+	if r.Component != nil {
+		return r.Component.GetMatchingLabels()
+	}
+	return util.GetComponentMatchLabels(r.Cluster.GetName(), r.getName())
+}
+
+func (r *ReplicationSet) getWorkloadType() appsv1alpha1.WorkloadType {
+	if r.Component != nil {
+		return r.Component.GetWorkloadType()
+	}
+	return r.ComponentDef.WorkloadType
+}
+
+func (r *ReplicationSet) getReplicas() int32 {
+	if r.Component != nil {
+		return r.Component.GetReplicas()
+	}
+	return r.ComponentSpec.Replicas
+}
+func (r *ReplicationSet) getPrimaryIndex() int32 {
+	if r.Component != nil {
+		return r.Component.GetPrimaryIndex()
+	}
+	return r.ComponentSpec.GetPrimaryIndex()
+}
+
+func (r *ReplicationSet) SetComponent(comp types.Component) {
+	r.Component = comp
+}
+
+// IsRunning is the implementation of the type Component interface method,
+// which is used to check whether the replicationSet component is running normally.
+func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+	var componentStatusIsRunning = true
+	sts := util.ConvertToStatefulSet(obj)
+	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
+	if err != nil {
+		return false, err
+	}
+	stsIsReady := util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, nil)
+	if !stsIsReady {
+		return false, nil
+	}
+	if sts.Status.AvailableReplicas < r.getReplicas() {
+		componentStatusIsRunning = false
+	}
+	return componentStatusIsRunning, nil
+}
+
+// PodsReady is the implementation of the type Component interface method,
+// which is used to check whether all the pods of replicationSet component is ready.
+func (r *ReplicationSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+	return r.Stateful.PodsReady(ctx, obj)
+}
+
+// PodIsAvailable is the implementation of the type Component interface method,
+// Check whether the status of a Pod of the replicationSet is ready, including the role label on the Pod
+func (r *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
+	return intctrlutil.PodIsReadyWithLabel(*pod)
+}
+
+func (r *ReplicationSet) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
+}
+
+// GetPhaseWhenPodsNotReady is the implementation of the type Component interface method,
+// when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
+// if return an empty phase, means the pods of component are ready and skips it.
+func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
+	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
+	stsList := &appsv1.StatefulSetList{}
+	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
+		componentName, stsList)
+	if err != nil || len(stsList.Items) == 0 {
+		return "", err
+	}
+	stsObj := stsList.Items[0]
+	podCount := len(podList.Items)
+	componentReplicas := r.getReplicas()
+	if podCount == 0 || stsObj.Status.AvailableReplicas == 0 {
+		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
+	}
+	// get the statefulSet of component
+	var (
+		existLatestRevisionFailedPod bool
+		primaryIsReady               bool
+		needPatch                    bool
+		compStatus                   = r.Cluster.Status.Components[componentName]
+	)
+	for _, v := range podList.Items {
+		// if the pod is terminating, ignore it
+		if v.DeletionTimestamp != nil {
+			return "", nil
+		}
+		labelValue := v.Labels[constant.RoleLabelKey]
+		if labelValue == string(Primary) && intctrlutil.PodIsReady(&v) {
+			primaryIsReady = true
+			continue
+		}
+		if labelValue == "" {
+			compStatus.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
+			needPatch = true
+		}
+		if !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
+			existLatestRevisionFailedPod = true
+		}
+	}
+	// REVIEW: this isn't a get function, where r.Cluster.Status.Components is being updated.
+	// patch abnormal reason to cluster.status.ComponentDefs.
+	if needPatch {
+		// TODO(refactor): remove these
+		patch := client.MergeFrom(r.Cluster.DeepCopy())
+		r.Cluster.Status.SetComponentStatus(componentName, compStatus)
+		if err = r.Cli.Status().Patch(ctx, r.Cluster, patch); err != nil {
+			return "", err
+		}
+	}
+	return util.GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryIsReady,
+		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), nil
+}
+
+func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	sts := util.ConvertToStatefulSet(obj)
+	if sts.Generation != sts.Status.ObservedGeneration {
+		return nil, nil
+	}
+	vertexes := make([]graph.Vertex, 0)
+	pods, err := util.GetPods4Delete(ctx, r.Cli, sts)
+	if err != nil {
+		return nil, err
+	}
+	for _, pod := range pods {
+		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+			Obj:    pod,
+			Action: ictrltypes.ActionDeletePtr(),
+			Orphan: true,
+		})
+	}
+	return vertexes, nil
+}
+
+func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	sts := util.ConvertToStatefulSet(obj)
+	if sts.Generation != sts.Status.ObservedGeneration {
+		return nil, nil
+	}
+	podList, err := util.GetPodListByStatefulSet(ctx, r.Cli, sts)
+	if err != nil {
+		return nil, err
+	}
+
+	vertexes := make([]graph.Vertex, 0)
+	podsToSyncStatus := make([]*corev1.Pod, 0)
+	for i, _ := range podList {
+		pod := &podList[i]
+		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
+		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
+			_, o := util.ParseParentNameAndOrdinal(pod.Name)
+			role := string(Secondary)
+			if o == r.getPrimaryIndex() {
+				role = string(Primary)
+			}
+			podCopy := pod.DeepCopy()
+			pod.GetLabels()[constant.RoleLabelKey] = role
+			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+				Obj:     pod,
+				ObjCopy: podCopy,
+				Action:  ictrltypes.ActionPatchPtr(),
+			})
+		}
+		//else {
+		//	podsToSyncStatus = append(podsToSyncStatus, pod)
+		//}
+		podsToSyncStatus = append(podsToSyncStatus, pod)
+	}
+	// sync cluster.spec.componentSpecs.[x].primaryIndex when failover occurs and switchPolicy is Noop.
+	// TODO(refactor): syncPrimaryIndex will update cluster spec...
+	if err := syncPrimaryIndex(ctx, r.Cli, r.Cluster, r.getName()); err != nil {
+		return nil, err
+	}
+	// sync cluster.status.components.replicationSet.status
+	if err := syncReplicationSetClusterStatus(r.Cluster, r.getWorkloadType(), r.getName(), podsToSyncStatus); err != nil {
+		return nil, err
+	}
+	return vertexes, nil
+}
+
+func newReplicationSet(cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	spec *appsv1alpha1.ClusterComponentSpec,
+	def appsv1alpha1.ClusterComponentDefinition) (*ReplicationSet, error) {
+	replication := &ReplicationSet{
+		Stateful: stateful.Stateful{
+			ComponentSetBase: types.ComponentSetBase{
+				Cli:           cli,
+				Cluster:       cluster,
+				ComponentSpec: spec,
+				ComponentDef:  &def,
+				Component:     nil,
+			},
+		},
+	}
+	return replication, nil
+}
+
+func DefaultRole(i int32) string {
+	role := string(Secondary)
+	if i == 0 {
+		role = string(Primary)
+	}
+	return role
+}

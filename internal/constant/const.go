@@ -75,13 +75,15 @@ const (
 	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
 
 	// kubeblocks.io annotations
-	OpsRequestAnnotationKey        = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	ReconcileAnnotationKey         = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
-	RestartAnnotationKey           = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	SnapShotForStartAnnotationKey  = "kubeblocks.io/snapshot-for-start"
-	RestoreFromBackUpAnnotationKey = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
-	ClusterSnapshotAnnotationKey   = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
-	LeaderAnnotationKey            = "cs.apps.kubeblocks.io/leader"
+	OpsRequestAnnotationKey           = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey            = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey              = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	SnapShotForStartAnnotationKey     = "kubeblocks.io/snapshot-for-start"
+	RestoreFromBackUpAnnotationKey    = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
+	ClusterSnapshotAnnotationKey      = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	LeaderAnnotationKey               = "cs.apps.kubeblocks.io/leader"
+	DefaultBackupPolicyAnnotationKey  = "dataprotection.kubeblocks.io/is-default-policy"
+	BackupPolicyTemplateAnnotationKey = "apps.kubeblocks.io/backup-policy-template"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
@@ -92,6 +94,7 @@ const (
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
+	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
 
 	// CMConfigurationTypeLabelKey configmap is config template type, e.g: "tpl", "instance"
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
@@ -108,7 +111,8 @@ const (
 	// CMInsConfigurationLabelKey configmap is configuration file for component
 	// CMInsConfigurationLabelKey = "config.kubeblocks.io/ins-configure"
 
-	CMInsLastReconfigureMethodLabelKey = "config.kubeblocks.io/last-applied-reconfigure-policy"
+	// CMInsLastReconfigurePhaseKey defines the current phase
+	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
 
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
@@ -164,7 +168,7 @@ const (
 	ProbeGRPCPortName         = "probe-grpc-port"
 	RoleProbeContainerName    = "kb-checkrole"
 	StatusProbeContainerName  = "kb-checkstatus"
-	RunningProbeContainerName = "kb-runningcheck"
+	RunningProbeContainerName = "kb-checkrunning"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
@@ -189,8 +193,18 @@ const (
 	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"
 	ConfigTemplateType    = "tpl"
 	ConfigInstanceType    = "instance"
+
+	ReconfigureManagerSource  = "manager"
+	ReconfigureUserSource     = "ops"
+	ReconfigureTemplateSource = "external-template"
 )
 
 const (
 	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
+)
+
+// username and password are keys in created secrets for others to refer to.
+const (
+	AccountNameForSecret   = "username"
+	AccountPasswdForSecret = "password"
 )

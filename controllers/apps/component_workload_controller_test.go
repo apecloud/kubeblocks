@@ -36,6 +36,117 @@ import (
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
+//var _ = Describe("Deployment Controller", func() {
+//	var (
+//		randomStr          = testCtx.GetRandomStr()
+//		clusterDefName     = "stateless-definition1-" + randomStr
+//		clusterVersionName = "stateless-cluster-version1-" + randomStr
+//		clusterName        = "stateless1-" + randomStr
+//	)
+//
+//	const (
+//		namespace            = "default"
+//		statelessCompName    = "stateless"
+//		statelessCompDefName = "stateless"
+//	)
+//
+//	cleanAll := func() {
+//		// must wait until resources deleted and no longer exist before the testcases start,
+//		// otherwise if later it needs to create some new resource objects with the same name,
+//		// in race conditions, it will find the existence of old objects, resulting failure to
+//		// create the new objects.
+//		By("clean resources")
+//
+//		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+//		testapps.ClearClusterResources(&testCtx)
+//
+//		// clear rest resources
+//		inNS := client.InNamespace(testCtx.DefaultNamespace)
+//		ml := client.HasLabels{testCtx.TestObjLabelKey}
+//		// namespaced resources
+//		testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
+//		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+//	}
+//
+//	BeforeEach(cleanAll)
+//
+//	AfterEach(cleanAll)
+//
+//	Context("test controller", func() {
+//		It("", func() {
+//			testapps.NewClusterDefFactory(clusterDefName).
+//				AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
+//				Create(&testCtx).GetObject()
+//
+//			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+//				AddComponent(statelessCompName, statelessCompDefName).SetReplicas(2).Create(&testCtx).GetObject()
+//
+//			By("patch cluster to Running")
+//			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+//				cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
+//			}))
+//
+//			By("create the deployment of the stateless component")
+//			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
+//			newDeploymentKey := client.ObjectKey{Name: deploy.Name, Namespace: namespace}
+//			Eventually(testapps.CheckObj(&testCtx, newDeploymentKey, func(g Gomega, deploy *appsv1.Deployment) {
+//				g.Expect(deploy.Generation == 1).Should(BeTrue())
+//			})).Should(Succeed())
+//
+//			By("check stateless component phase is Failed")
+//			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
+//
+//			By("mock error message and PodCondition about some pod's failure")
+//			podName := fmt.Sprintf("%s-%s-%s", clusterName, statelessCompName, testCtx.GetRandomStr())
+//			pod := testapps.MockStatelessPod(testCtx, deploy, clusterName, statelessCompName, podName)
+//			// mock pod container is failed
+//			errMessage := "Back-off pulling image nginx:latest"
+//			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+//				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+//					{
+//						State: corev1.ContainerState{
+//							Waiting: &corev1.ContainerStateWaiting{
+//								Reason:  "ImagePullBackOff",
+//								Message: errMessage,
+//							},
+//						},
+//					},
+//				}
+//			})).Should(Succeed())
+//			// mock failed container timed out
+//			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+//				pod.Status.Conditions = []corev1.PodCondition{
+//					{
+//						Type:               corev1.ContainersReady,
+//						Status:             corev1.ConditionFalse,
+//						LastTransitionTime: metav1.NewTime(time.Now().Add(-2 * time.Minute)),
+//					},
+//				}
+//			})).Should(Succeed())
+//			// mark deployment to reconcile
+//			Expect(testapps.ChangeObj(&testCtx, deploy, func(ldeploy *appsv1.Deployment) {
+//				ldeploy.Annotations = map[string]string{
+//					"reconcile": "1",
+//				}
+//			})).Should(Succeed())
+//
+//			By("check component.Status.Message contains pod error message")
+//			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+//				compStatus := tmpCluster.Status.Components[statelessCompName]
+//				g.Expect(compStatus.GetObjectMessage("Pod", pod.Name)).Should(Equal(errMessage))
+//			})).Should(Succeed())
+//
+//			By("mock deployment is ready")
+//			Expect(testapps.ChangeObjStatus(&testCtx, deploy, func() {
+//				testk8s.MockDeploymentReady(deploy, stateless.NewRSAvailableReason, deploy.Name+"-5847cb795c")
+//			})).Should(Succeed())
+//
+//			By("waiting for the component to be running")
+//			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+//		})
+//	})
+//})
+
 var _ = Describe("Deployment Controller", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()
@@ -75,7 +186,7 @@ var _ = Describe("Deployment Controller", func() {
 	Context("test controller", func() {
 		It("", func() {
 			testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, statelessCompType).
+				AddComponentDef(testapps.StatelessNginxComponent, statelessCompType).
 				Create(&testCtx).GetObject()
 
 			testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
@@ -128,8 +239,8 @@ var _ = Describe("Deployment Controller", func() {
 				}
 			})).Should(Succeed())
 			// mark deployment to reconcile
-			Expect(testapps.ChangeObj(&testCtx, deploy, func() {
-				deploy.Annotations = map[string]string{
+			Expect(testapps.ChangeObj(&testCtx, deploy, func(lobj *appsv1.Deployment) {
+				lobj.Annotations = map[string]string{
 					"reconcile": "1",
 				}
 			})).Should(Succeed())
@@ -221,16 +332,16 @@ var _ = Describe("StatefulSet Controller", func() {
 
 		By("Mock a pod without role label and it will wait for HandleProbeTimeoutWhenPodsReady")
 		leaderPod := pods[0]
-		Expect(testapps.ChangeObj(&testCtx, leaderPod, func() {
-			delete(leaderPod.Labels, constant.RoleLabelKey)
+		Expect(testapps.ChangeObj(&testCtx, leaderPod, func(lpod *corev1.Pod) {
+			delete(lpod.Labels, constant.RoleLabelKey)
 		})).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(leaderPod), func(g Gomega, pod *corev1.Pod) {
 			g.Expect(pod.Labels[constant.RoleLabelKey] == "").Should(BeTrue())
 		})).Should(Succeed())
 
 		By("mock restart component to trigger reconcile of StatefulSet controller")
-		Expect(testapps.ChangeObj(&testCtx, sts, func() {
-			sts.Spec.Template.Annotations = map[string]string{
+		Expect(testapps.ChangeObj(&testCtx, sts, func(lsts *appsv1.StatefulSet) {
+			lsts.Spec.Template.Annotations = map[string]string{
 				constant.RestartAnnotationKey: time.Now().Format(time.RFC3339),
 			}
 		})).Should(Succeed())
@@ -250,8 +361,8 @@ var _ = Describe("StatefulSet Controller", func() {
 		})).Should(Succeed())
 
 		By("add leader role label for leaderPod and update sts as ready to mock consensus component to be Running")
-		Expect(testapps.ChangeObj(&testCtx, leaderPod, func() {
-			leaderPod.Labels[constant.RoleLabelKey] = "leader"
+		Expect(testapps.ChangeObj(&testCtx, leaderPod, func(lpod *corev1.Pod) {
+			lpod.Labels[constant.RoleLabelKey] = "leader"
 		})).Should(Succeed())
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 			sts.Status.UpdateRevision = updateRevision
@@ -283,8 +394,8 @@ var _ = Describe("StatefulSet Controller", func() {
 				}
 			})).Should(Succeed())
 			_ = testapps.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{consensusCompName})
-			Expect(testapps.ChangeObj(&testCtx, cluster, func() {
-				cluster.Annotations = map[string]string{
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
+				lcluster.Annotations = map[string]string{
 					constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"}]`, opsRequestName),
 				}
 			})).Should(Succeed())
@@ -305,12 +416,12 @@ var _ = Describe("StatefulSet Controller", func() {
 			})()).Should(Succeed())
 
 			By("mock stop operation and processed successfully")
-			Expect(testapps.ChangeObj(&testCtx, cluster, func() {
-				cluster.Spec.ComponentSpecs[0].Replicas = 0
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
+				lcluster.Spec.ComponentSpecs[0].Replicas = 0
 			})).Should(Succeed())
-			Expect(testapps.ChangeObj(&testCtx, sts, func() {
+			Expect(testapps.ChangeObj(&testCtx, sts, func(lsts *appsv1.StatefulSet) {
 				replicas := int32(0)
-				sts.Spec.Replicas = &replicas
+				lsts.Spec.Replicas = &replicas
 			})).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				testk8s.MockStatefulSetReady(sts)

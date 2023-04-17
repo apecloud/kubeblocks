@@ -38,11 +38,8 @@ import (
 var _ = Describe("ConfigWrapper util test", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
-
-	const statefulCompType = "replicasets"
-
+	const statefulCompDefName = "replicasets"
 	const configSpecName = "mysql-config-tpl"
-
 	const configVolumeName = "mysql-config"
 
 	var (
@@ -98,13 +95,13 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 			AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, configVolumeName).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
 		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(statefulCompType).
+			AddComponent(statefulCompDefName).
 			Create(&testCtx).GetObject()
 	})
 
@@ -363,7 +360,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}, testutil.WithMaxTimes(len(tests))))
 
 			for _, tt := range tests {
-				got, err := GetReloadOptions(k8sMockClient.Client(), ctx, tt.tpls)
+				got, _, err := GetReloadOptions(k8sMockClient.Client(), ctx, tt.tpls)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 				Expect(reflect.DeepEqual(got, tt.want)).Should(BeTrue())
 			}

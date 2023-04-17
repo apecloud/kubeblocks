@@ -42,8 +42,8 @@ import (
 
 var _ = Describe("ComponentStatusSynchronizer", func() {
 	const (
-		compName = "comp"
-		compType = "comp"
+		compName    = "comp"
+		compDefName = "comp"
 	)
 
 	var (
@@ -90,11 +90,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, compType).
+				AddComponentDef(testapps.StatelessNginxComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(1).
 				GetObject()
 
@@ -167,11 +167,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, compType).
+				AddComponentDef(testapps.StatefulMySQLComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				GetObject()
 
@@ -255,11 +255,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ConsensusMySQLComponent, compType).
+				AddComponentDef(testapps.ConsensusMySQLComponent, compDefName).
 				Create(&testCtx).GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				Create(&testCtx).GetObject()
 
@@ -345,11 +345,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, compType).
+				AddComponentDef(testapps.ReplicationRedisComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(2).
 				GetObject()
 
@@ -373,27 +373,21 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				replicas = 2
 			)
 			var (
-				statefulsets []*appsv1.StatefulSet
-				pods         []*corev1.Pod
+				statefulset *appsv1.StatefulSet
+				pods        []*corev1.Pod
 			)
 
 			BeforeEach(func() {
-				stsNamePrefix := clusterName + "-" + compName
+				stsName := clusterName + "-" + compName
+				statefulset := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+					SetReplicas(int32(replicas)).
+					AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
+					Create(&testCtx).GetObject()
+				testk8s.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
 				for i := 0; i < replicas; i++ {
-					stsName := stsNamePrefix
-					if i != 0 {
-						stsName = fmt.Sprintf("%s-%d", stsNamePrefix, i)
-					}
-					sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
-						SetReplicas(int32(1)).
-						AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-						Create(&testCtx).GetObject()
-					testk8s.InitStatefulSetStatus(testCtx, sts, controllerRevision)
-					statefulsets = append(statefulsets, sts)
-
 					podName := fmt.Sprintf("%s-%d", stsName, 0)
 					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
-						SetOwnerReferences("apps/v1", constant.StatefulSetKind, sts).
+						SetOwnerReferences("apps/v1", constant.StatefulSetKind, statefulset).
 						AddAppInstanceLabel(clusterName).
 						AddAppComponentLabel(compName).
 						AddAppManangedByLabel().
@@ -421,11 +415,9 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			})
 
 			It("should set component status to running if container is ready", func() {
-				for i := 0; i < replicas; i++ {
-					Expect(testapps.ChangeObjStatus(&testCtx, statefulsets[i], func() {
-						testk8s.MockStatefulSetReady(statefulsets[i])
-					})).Should(Succeed())
-				}
+				Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
+					testk8s.MockStatefulSetReady(statefulset)
+				})).Should(Succeed())
 
 				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
@@ -457,7 +449,7 @@ func mockContainerError(pod *corev1.Pod) error {
 }
 
 func setPodRole(pod *corev1.Pod, role string) error {
-	return testapps.ChangeObj(&testCtx, pod, func() {
-		pod.Labels[constant.RoleLabelKey] = role
+	return testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+		lpod.Labels[constant.RoleLabelKey] = role
 	})
 }

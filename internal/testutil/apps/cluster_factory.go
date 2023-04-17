@@ -55,10 +55,10 @@ func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Tolera
 	return factory
 }
 
-func (factory *MockClusterFactory) AddComponent(compName string, compType string) *MockClusterFactory {
+func (factory *MockClusterFactory) AddComponent(compName string, compDefName string) *MockClusterFactory {
 	comp := appsv1alpha1.ClusterComponentSpec{
 		Name:            compName,
-		ComponentDefRef: compType,
+		ComponentDefRef: compDefName,
 	}
 	factory.get().Spec.ComponentSpecs = append(factory.get().Spec.ComponentSpecs, comp)
 	return factory
@@ -117,7 +117,7 @@ func (factory *MockClusterFactory) AddComponentToleration(toleration corev1.Tole
 }
 
 func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string,
-	pvcSpec *corev1.PersistentVolumeClaimSpec) *MockClusterFactory {
+	pvcSpec appsv1alpha1.PersistentVolumeClaimSpec) *MockClusterFactory {
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]

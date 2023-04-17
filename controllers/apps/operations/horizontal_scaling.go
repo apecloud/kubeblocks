@@ -52,7 +52,7 @@ func (hs horizontalScalingOpsHandler) ActionStartedCondition(opsRequest *appsv1a
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
 func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
-		horizontalScalingMap = opsRes.OpsRequest.ConvertHorizontalScalingListToMap()
+		horizontalScalingMap = opsRes.OpsRequest.Spec.ToHorizontalScalingListToMap()
 		horizontalScaling    appsv1alpha1.HorizontalScaling
 		ok                   bool
 	)
@@ -79,13 +79,13 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, hs.getExpectReplicas)
 	}
-	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
 	realChangedMap := realAffectedComponentMap{}
-	hsMap := opsRequest.ConvertHorizontalScalingListToMap()
+	hsMap := opsRequest.Spec.ToHorizontalScalingListToMap()
 	for k, v := range opsRequest.Status.LastConfiguration.Components {
 		currHs, ok := hsMap[k]
 		if !ok {
@@ -102,7 +102,7 @@ func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *ap
 func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
-	componentNameMap := opsRequest.ConvertHorizontalScalingListToMap()
+	componentNameMap := opsRequest.Spec.ToHorizontalScalingListToMap()
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
 		hsInfo, ok := componentNameMap[v.Name]
 		if !ok {

@@ -30,10 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -45,6 +42,8 @@ import (
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list
 
 // owned K8s core API resources controller-gen RBAC marker
 // full access on core API resources
@@ -90,11 +89,11 @@ import (
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
 // dataprotection get list and delete
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;delete;deletecollection
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
 
-// classfamily get list
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=classfamilies,verbs=get;list;watch
+// componentresourceconstraint get list
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentresourceconstraints,verbs=get;list;watch
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
@@ -122,12 +121,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if re, ok := err.(lifecycle.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
 	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req, r.Recorder)
 	if err := planBuilder.Init(); err != nil {
-		return requeueError(err)
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if err := planBuilder.Validate(); err != nil {
 		return requeueError(err)
 	} else if plan, err := planBuilder.Build(); err != nil {
@@ -156,9 +155,5 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
 	}
-	b.Watches(&source.Kind{Type: &appsv1alpha1.ClassFamily{}},
-		&handler.EnqueueRequestForObject{},
-		builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool { return true })),
-	)
 	return b.Complete(r)
 }

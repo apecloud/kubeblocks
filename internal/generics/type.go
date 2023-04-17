@@ -17,12 +17,15 @@ limitations under the License.
 package generics
 
 import (
+	"reflect"
+
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -81,7 +84,7 @@ var OpsRequestSignature = func(_ appsv1alpha1.OpsRequest, _ appsv1alpha1.OpsRequ
 var ConfigConstraintSignature = func(_ appsv1alpha1.ConfigConstraint, _ appsv1alpha1.ConfigConstraintList) {
 }
 
-var BackupPolicyTemplateSignature = func(_ dataprotectionv1alpha1.BackupPolicyTemplate, _ dataprotectionv1alpha1.BackupPolicyTemplateList) {
+var BackupPolicyTemplateSignature = func(_ appsv1alpha1.BackupPolicyTemplate, _ appsv1alpha1.BackupPolicyTemplateList) {
 }
 var BackupPolicySignature = func(_ dataprotectionv1alpha1.BackupPolicy, _ dataprotectionv1alpha1.BackupPolicyList) {
 }
@@ -92,4 +95,16 @@ var BackupToolSignature = func(_ dataprotectionv1alpha1.BackupTool, _ dataprotec
 var RestoreJobSignature = func(_ dataprotectionv1alpha1.RestoreJob, _ dataprotectionv1alpha1.RestoreJobList) {
 }
 var AddonSignature = func(_ extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList) {
+}
+var ComponentResourceConstraintSignature = func(_ appsv1alpha1.ComponentResourceConstraint, _ appsv1alpha1.ComponentResourceConstraintList) {}
+var ComponentClassDefinitionSignature = func(_ appsv1alpha1.ComponentClassDefinition, _ appsv1alpha1.ComponentClassDefinitionList) {}
+
+func ToGVK(object client.Object) schema.GroupVersionKind {
+	t := reflect.TypeOf(object)
+	if t.Kind() != reflect.Pointer {
+		// Shouldn't ever get here.
+		return schema.GroupVersionKind{}
+	}
+	t = t.Elem()
+	return corev1.SchemeGroupVersion.WithKind(t.Name())
 }

@@ -51,8 +51,6 @@ type Component interface {
 	GetClusterName() string
 	GetWorkloadType() appsv1alpha1.WorkloadType
 
-	// GetDefinition() *appsv1alpha1.ClusterDefinition
-	// GetVersion() *appsv1alpha1.ClusterVersion
 	GetCluster() *appsv1alpha1.Cluster
 	GetClusterVersion() *appsv1alpha1.ClusterVersion
 	GetSynthesizedComponent() *component.SynthesizedComponent
@@ -62,6 +60,7 @@ type Component interface {
 	GetReplicas() int32
 
 	GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec
+	GetPrimaryIndex() int32
 
 	GetPhase() appsv1alpha1.ClusterComponentPhase
 	// GetStatus() appsv1alpha1.ClusterComponentStatus
@@ -117,4 +116,13 @@ type ComponentSet interface {
 	HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 
 	HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
+}
+
+// ComponentSetBase is a common component set base struct
+type ComponentSetBase struct {
+	Cli           client.Client
+	Cluster       *appsv1alpha1.Cluster
+	ComponentSpec *appsv1alpha1.ClusterComponentSpec
+	ComponentDef  *appsv1alpha1.ClusterComponentDefinition
+	Component     Component
 }

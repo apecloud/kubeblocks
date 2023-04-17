@@ -22,13 +22,6 @@ import (
 	"strings"
 	"time"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,6 +30,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // TODO: handle unfinished jobs from previous scale in
@@ -225,7 +226,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				snapshotKey,
 				stsObj,
 				vcts,
-				component.HorizontalScalePolicy.BackupTemplateSelector); err != nil {
+				component.ComponentDef,
+				component.HorizontalScalePolicy.BackupPolicyTemplateName); err != nil {
 				return nil, err
 			} else {
 				objs = append(objs, snapshots...)
@@ -311,19 +313,18 @@ func doSnapshot(cli types2.ReadonlyClient,
 	snapshotKey types.NamespacedName,
 	stsObj *appsv1.StatefulSet,
 	vcts []corev1.PersistentVolumeClaimTemplate,
-	backupTemplateSelector map[string]string) ([]client.Object, error) {
-	ml := client.MatchingLabels(backupTemplateSelector)
-	backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
-	// find backuppolicytemplate by clusterdefinition
-	if err := cli.List(reqCtx.Ctx, &backupPolicyTemplateList, ml); err != nil {
+	componentDef,
+	backupPolicyTemplateName string) ([]client.Object, error) {
+	backupPolicyTemplate := &appsv1alpha1.BackupPolicyTemplate{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupPolicyTemplateName}, backupPolicyTemplate); err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
 	objs := make([]client.Object, 0)
-	if len(backupPolicyTemplateList.Items) > 0 {
+	if len(backupPolicyTemplate.Name) > 0 {
 		// if there is backuppolicytemplate created by provider
 		// create backupjob CR, will ignore error if already exists
-		backups, err := createBackup(reqCtx, cli, stsObj, &backupPolicyTemplateList.Items[0], snapshotKey, cluster)
+		backups, err := createBackup(reqCtx, cli, stsObj, componentDef, backupPolicyTemplateName, snapshotKey, cluster)
 		if err != nil {
 			return nil, err
 		}
@@ -404,32 +405,11 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 func createBackup(reqCtx intctrlutil.RequestCtx,
 	cli types2.ReadonlyClient,
 	sts *appsv1.StatefulSet,
-	backupPolicyTemplate *dataprotectionv1alpha1.BackupPolicyTemplate,
+	componentDef,
+	backupPolicyTemplateName string,
 	backupKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster) ([]client.Object, error) {
-
 	objs := make([]client.Object, 0)
-
-	createBackupPolicy := func() (backupPolicyName string, err error) {
-		backupPolicyName = ""
-		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[constant.KBAppComponentLabelKey])
-		if err = cli.List(reqCtx.Ctx, &backupPolicyList, ml); err != nil {
-			return
-		}
-		if len(backupPolicyList.Items) > 0 {
-			backupPolicyName = backupPolicyList.Items[0].Name
-			return
-		}
-		backupPolicy, err := builder.BuildBackupPolicy(sts, backupPolicyTemplate, backupKey)
-		if err != nil {
-			return
-		}
-		backupPolicyName = backupPolicy.Name
-		objs = append(objs, backupPolicy)
-		return
-	}
-
 	createBackup := func(backupPolicyName string) error {
 		backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
 		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: backupKey.Namespace, Name: backupPolicyName}, backupPolicy); err != nil && !apierrors.IsNotFound(err) {
@@ -461,17 +441,41 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		objs = append(objs, backup)
 		return nil
 	}
-
-	backupPolicyName, err := createBackupPolicy()
+	backupPolicy, err := getBackupPolicyFromTemplate(reqCtx, cli, cluster, componentDef, backupPolicyTemplateName)
 	if err != nil {
 		return nil, err
 	}
-	if err := createBackup(backupPolicyName); err != nil {
+	if backupPolicy == nil {
+		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTemplateName)
+	}
+	if err = createBackup(backupPolicy.Name); err != nil {
 		return nil, err
 	}
 
 	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupJob/%s", backupKey.Name)
 	return objs, nil
+}
+
+// getBackupPolicyFromTemplate gets backup policy from template policy template.
+func getBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
+	cli types2.ReadonlyClient,
+	cluster *appsv1alpha1.Cluster,
+	componentDef, backupPolicyTemplateName string) (*dataprotectionv1alpha1.BackupPolicy, error) {
+	backupPolicyList := &dataprotectionv1alpha1.BackupPolicyList{}
+	if err := cli.List(reqCtx.Ctx, backupPolicyList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{
+			constant.AppInstanceLabelKey:          cluster.Name,
+			constant.KBAppComponentDefRefLabelKey: componentDef,
+		}); err != nil {
+		return nil, err
+	}
+	for _, backupPolicy := range backupPolicyList.Items {
+		if backupPolicy.Annotations[constant.BackupPolicyTemplateAnnotationKey] == backupPolicyTemplateName {
+			return &backupPolicy, nil
+		}
+	}
+	return nil, nil
 }
 
 func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,

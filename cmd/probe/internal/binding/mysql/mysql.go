@@ -80,8 +80,8 @@ const (
 	listUserTpl  = "SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired FROM mysql.user WHERE host = '%' and user <> 'root' and user not like 'kb%';"
 	showGrantTpl = "SHOW GRANTS FOR '%s'@'%%';"
 	getUserTpl   = `
-	SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired 
-	FROM mysql.user 
+	SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired
+	FROM mysql.user
 	WHERE host = '%%' and user <> 'root' and user not like 'kb%%' and user ='%s';"
 	`
 	createUserTpl = "CREATE USER '%s'@'%%' IDENTIFIED BY '%s';"
@@ -137,7 +137,11 @@ func (mysqlOps *MysqlOperations) initIfNeed() bool {
 	if mysqlOps.db == nil {
 		go func() {
 			err := mysqlOps.InitDelay()
-			mysqlOps.Logger.Errorf("MySQl connection init failed: %v", err)
+			if err != nil {
+				mysqlOps.Logger.Errorf("MySQL connection init failed: %v", err)
+			} else {
+				mysqlOps.Logger.Info("MySQL connection init success.")
+			}
 		}()
 		return true
 	}
@@ -496,161 +500,163 @@ func (mysqlOps *MysqlOperations) GetLogger() logger.Logger {
 }
 
 func (mysqlOps *MysqlOperations) listUsersOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	const (
-		opsKind = ListUsersOp
-	)
 	sqlTplRend := func(user UserInfo) string {
 		return listUserTpl
 	}
-	return QueryObject(ctx, mysqlOps, req, opsKind, nil, sqlTplRend, nil)
+
+	return QueryObject(ctx, mysqlOps, req, ListUsersOp, sqlTplRend, nil, UserInfo{})
 }
 
 func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	const (
-		opsKind = DescribeUserOp
-	)
+	var (
+		object = UserInfo{}
 
-	validFn := func(user UserInfo) error {
-		if len(user.UserName) == 0 {
-			return ErrNoUserName
+		// get user grants
+		sqlTplRend = func(user UserInfo) string {
+			return fmt.Sprintf(showGrantTpl, user.UserName)
 		}
-		return nil
-	}
 
-	// get user grants
-	sqlTplRend := func(user UserInfo) string {
-		return fmt.Sprintf(showGrantTpl, user.UserName)
-	}
-
-	dataProcessor := func(data []byte) (interface{}, error) {
-		roles := make([]map[string]string, 0)
-		err := json.Unmarshal(data, &roles)
-		if err != nil {
-			return nil, err
-		}
-		user := UserInfo{}
-		userRoles := make([]string, 0)
-		for _, roleMap := range roles {
-			for k, v := range roleMap {
-				if len(user.UserName) == 0 {
-					user.UserName = strings.TrimPrefix(strings.TrimSuffix(k, "@%"), "Grants for ")
+		dataProcessor = func(data interface{}) (interface{}, error) {
+			roles := make([]map[string]string, 0)
+			err := json.Unmarshal(data.([]byte), &roles)
+			if err != nil {
+				return nil, err
+			}
+			user := UserInfo{}
+			// only keep one role name of the highest privilege
+			userRoles := make([]RoleType, 0)
+			for _, roleMap := range roles {
+				for k, v := range roleMap {
+					if len(user.UserName) == 0 {
+						user.UserName = strings.TrimPrefix(strings.TrimSuffix(k, "@%"), "Grants for ")
+					}
+					mysqlRoleType := mysqlOps.priv2Role(strings.TrimPrefix(v, "GRANT "))
+					userRoles = append(userRoles, mysqlRoleType)
 				}
-				userRoles = append(userRoles, mysqlOps.inferRoleFromPriv(strings.TrimPrefix(v, "GRANT ")))
+			}
+			// sort roles by weight
+			slices.SortFunc(userRoles, SortRoleByWeight)
+			if len(userRoles) > 0 {
+				user.RoleName = (string)(userRoles[0])
+			}
+			if jsonData, err := json.Marshal([]UserInfo{user}); err != nil {
+				return nil, err
+			} else {
+				return string(jsonData), nil
 			}
 		}
-		user.RoleName = strings.Join(userRoles, ",")
-		if jsonData, err := json.Marshal([]UserInfo{user}); err != nil {
-			return nil, err
-		} else {
-			return string(jsonData), nil
-		}
+	)
+
+	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameValidator, &object); err != nil {
+		result := OpsResult{}
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
 	}
 
-	return QueryObject(ctx, mysqlOps, req, opsKind, validFn, sqlTplRend, dataProcessor)
+	return QueryObject(ctx, mysqlOps, req, DescribeUserOp, sqlTplRend, dataProcessor, object)
 }
 
 func (mysqlOps *MysqlOperations) createUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	const (
-		opsKind = CreateUserOp
+	var (
+		object = UserInfo{}
+
+		sqlTplRend = func(user UserInfo) string {
+			return fmt.Sprintf(createUserTpl, user.UserName, user.Password)
+		}
+
+		msgTplRend = func(user UserInfo) string {
+			return fmt.Sprintf("created user: %s, with password: %s", user.UserName, user.Password)
+		}
 	)
 
-	validFn := func(user UserInfo) error {
-		if len(user.UserName) == 0 {
-			return ErrNoUserName
-		}
-		if len(user.Password) == 0 {
-			return ErrNoPassword
-		}
-		return nil
+	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameAndPasswdValidator, &object); err != nil {
+		result := OpsResult{}
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
 	}
 
-	sqlTplRend := func(user UserInfo) string {
-		return fmt.Sprintf(createUserTpl, user.UserName, user.Password)
-	}
-
-	msgTplRend := func(user UserInfo) string {
-		return fmt.Sprintf("created user: %s, with password: %s", user.UserName, user.Password)
-	}
-
-	return ExecuteObject(ctx, mysqlOps, req, opsKind, validFn, sqlTplRend, msgTplRend)
+	return ExecuteObject(ctx, mysqlOps, req, CreateUserOp, sqlTplRend, msgTplRend, object)
 }
 
 func (mysqlOps *MysqlOperations) deleteUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	const (
-		opsKind = DeleteUserOp
-	)
-
-	validFn := func(user UserInfo) error {
-		if len(user.UserName) == 0 {
-			return ErrNoUserName
+	var (
+		object  = UserInfo{}
+		validFn = func(user UserInfo) error {
+			if len(user.UserName) == 0 {
+				return ErrNoUserName
+			}
+			return nil
 		}
-		return nil
+		sqlTplRend = func(user UserInfo) string {
+			return fmt.Sprintf(deleteUserTpl, user.UserName)
+		}
+		msgTplRend = func(user UserInfo) string {
+			return fmt.Sprintf("deleted user: %s", user.UserName)
+		}
+	)
+	if err := ParseObjFromRequest(req, DefaultUserInfoParser, validFn, &object); err != nil {
+		result := OpsResult{}
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
 	}
-	sqlTplRend := func(user UserInfo) string {
-		return fmt.Sprintf(deleteUserTpl, user.UserName)
-	}
-	msgTplRend := func(user UserInfo) string {
-		return fmt.Sprintf("deleted user: %s", user.UserName)
-	}
-	return ExecuteObject(ctx, mysqlOps, req, opsKind, validFn, sqlTplRend, msgTplRend)
+
+	return ExecuteObject(ctx, mysqlOps, req, DeleteUserOp, sqlTplRend, msgTplRend, object)
 }
 
 func (mysqlOps *MysqlOperations) grantUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	const (
+	var (
 		succMsgTpl = "role %s granted to user: %s"
 	)
 	return mysqlOps.managePrivillege(ctx, req, GrantUserRoleOp, grantTpl, succMsgTpl)
 }
 
 func (mysqlOps *MysqlOperations) revokeUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	const (
+	var (
 		succMsgTpl = "role %s revoked from user: %s"
 	)
 	return mysqlOps.managePrivillege(ctx, req, RevokeUserRoleOp, revokeTpl, succMsgTpl)
 }
 
 func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *bindings.InvokeRequest, op bindings.OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
-	validFn := func(user UserInfo) error {
-		if len(user.UserName) == 0 {
-			return ErrNoUserName
+	var (
+		object     = UserInfo{}
+		sqlTplRend = func(user UserInfo) string {
+			// render sql stmts
+			roleDesc, _ := mysqlOps.role2Priv(user.RoleName)
+			// update privilege
+			sql := fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
+			return sql
 		}
-		if len(user.RoleName) == 0 {
-			return ErrNoRoleName
+		msgTplRend = func(user UserInfo) string {
+			return fmt.Sprintf(succMsgTpl, user.RoleName, user.UserName)
 		}
-		roles := []string{ReadOnlyRole, ReadWriteRole, SuperUserRole}
-		if !slices.Contains(roles, strings.ToLower(user.RoleName)) {
-			return ErrInvalidRoleName
-		}
-		return nil
+	)
+	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameAndRoleValidator, &object); err != nil {
+		result := OpsResult{}
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
 	}
-	sqlTplRend := func(user UserInfo) string {
-		// render sql stmts
-		roleDesc, _ := mysqlOps.renderRoleByName(user.RoleName)
-		// update privilege
-		sql := fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
-		return sql
-	}
-	msgTplRend := func(user UserInfo) string {
-		return fmt.Sprintf(succMsgTpl, user.RoleName, user.UserName)
-	}
-
-	return ExecuteObject(ctx, mysqlOps, req, op, validFn, sqlTplRend, msgTplRend)
+	return ExecuteObject(ctx, mysqlOps, req, op, sqlTplRend, msgTplRend, object)
 }
 
-func (mysqlOps *MysqlOperations) renderRoleByName(roleName string) (string, error) {
-	switch strings.ToLower(roleName) {
+func (mysqlOps *MysqlOperations) role2Priv(roleName string) (string, error) {
+	roleType := String2RoleType(roleName)
+	switch roleType {
 	case SuperUserRole:
 		return superUserPriv, nil
 	case ReadWriteRole:
 		return readWritePriv, nil
 	case ReadOnlyRole:
 		return readOnlyRPriv, nil
-	default:
-		return "", fmt.Errorf("role name: %s is not supported", roleName)
 	}
+	return "", fmt.Errorf("role name: %s is not supported", roleName)
 }
 
-func (mysqlOps *MysqlOperations) inferRoleFromPriv(priv string) string {
+func (mysqlOps *MysqlOperations) priv2Role(priv string) RoleType {
 	if strings.HasPrefix(priv, readOnlyRPriv) {
 		return ReadOnlyRole
 	}

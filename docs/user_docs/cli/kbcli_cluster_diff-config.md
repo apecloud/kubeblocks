@@ -12,7 +12,7 @@ kbcli cluster diff-config [flags]
 
 ```
   # compare config files
-  kbcli cluster diff-configure opsrequest1 opsrequest2
+  kbcli cluster diff-config opsrequest1 opsrequest2
 ```
 
 ### Options

@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -84,7 +85,7 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test pods number of sts is 0")
 			sts := &stsList.Items[0]
-			clusterComponent := cluster.GetComponentByName(statefulCompName)
+			clusterComponent := cluster.Spec.GetComponentByName(statefulCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			stateful, err := newStateful(k8sClient, cluster, clusterComponent, *componentDef)
 			Expect(err).Should(Succeed())
@@ -92,14 +93,14 @@ var _ = Describe("Stateful Component", func() {
 			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("test pods are not ready")
-			updateRevison := fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "6fdd48d9cd")
+			updateRevision := fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "6fdd48d9cd")
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				availableReplicas := *sts.Spec.Replicas - 1
 				sts.Status.AvailableReplicas = availableReplicas
 				sts.Status.ReadyReplicas = availableReplicas
 				sts.Status.Replicas = availableReplicas
 				sts.Status.ObservedGeneration = 1
-				sts.Status.UpdateRevision = updateRevison
+				sts.Status.UpdateRevision = updateRevision
 			})).Should(Succeed())
 			podsReady, _ := stateful.PodsReady(ctx, sts)
 			Expect(podsReady == false).Should(BeTrue())
@@ -121,14 +122,14 @@ var _ = Describe("Stateful Component", func() {
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision
-			Expect(testapps.ChangeObj(&testCtx, pod, func() {
-				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "5wdsd8d9fs")
+			Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+				lpod.Labels[appsv1.ControllerRevisionHashLabelKey] = fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "5wdsd8d9fs")
 			})).Should(Succeed())
 			phase, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
 			Expect(len(phase) == 0).Should(BeTrue())
 			// reset updateRevision
-			Expect(testapps.ChangeObj(&testCtx, pod, func() {
-				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevison
+			Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+				lpod.Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevision
 			})).Should(Succeed())
 
 			By("test pod is available")

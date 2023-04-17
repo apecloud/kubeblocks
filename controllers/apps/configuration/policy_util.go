@@ -19,12 +19,14 @@ package configuration
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
+	"net"
 	"sort"
+	"strconv"
 
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
@@ -36,40 +38,55 @@ type createReconfigureClient func(addr string) (cfgproto.ReconfigureClient, erro
 
 type GetPodsFunc func(params reconfigureParams) ([]corev1.Pod, error)
 
-type RestartContainerFunc func(pod *corev1.Pod, containerName []string, createConnFn createReconfigureClient) error
+type RestartContainerFunc func(pod *corev1.Pod, ctx context.Context, containerName []string, createConnFn createReconfigureClient) error
+type OnlineUpdatePodFunc func(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, updatedParams map[string]string) error
 
 type RollingUpgradeFuncs struct {
 	GetPodsFunc          GetPodsFunc
 	RestartContainerFunc RestartContainerFunc
+	OnlineUpdatePodFunc  OnlineUpdatePodFunc
 }
 
 func GetConsensusRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
 		GetPodsFunc:          getConsensusPods,
-		RestartContainerFunc: commonStopContainer,
+		RestartContainerFunc: commonStopContainerWithPod,
+		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
 	}
 }
 
 func GetStatefulSetRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
 		GetPodsFunc:          getStatefulSetPods,
-		RestartContainerFunc: commonStopContainer,
+		RestartContainerFunc: commonStopContainerWithPod,
+		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
 	}
 }
 
 func GetReplicationRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
 		GetPodsFunc:          getReplicationSetPods,
-		RestartContainerFunc: commonStopContainer,
+		RestartContainerFunc: commonStopContainerWithPod,
+		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
 	}
 }
 
-func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
-	var (
-		ctx     = params.Ctx
-		cluster = params.Cluster
-	)
+func GetDeploymentRollingUpgradeFuncs() RollingUpgradeFuncs {
+	return RollingUpgradeFuncs{
+		GetPodsFunc:          getDeploymentRollingPods,
+		RestartContainerFunc: commonStopContainerWithPod,
+		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
+	}
+}
 
+func getDeploymentRollingPods(params reconfigureParams) ([]corev1.Pod, error) {
+	// util.GetComponentPodList support deployment
+	return getReplicationSetPods(params)
+}
+
+func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
+	var ctx = params.Ctx
+	var cluster = params.Cluster
 	podList, err := util.GetComponentPodList(ctx.Ctx, params.Client, *cluster, params.ClusterComponent.Name)
 	if err != nil {
 		return nil, err
@@ -141,7 +158,7 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	// sort pods
-	consensusset.SortPods(pods, consensusset.ComposeRolePriorityMap(params.Component.ConsensusSpec))
+	consensus.SortPods(pods, consensus.ComposeRolePriorityMap(params.Component.ConsensusSpec))
 	r := make([]corev1.Pod, 0, len(pods))
 	for i := len(pods); i > 0; i-- {
 		r = append(r, pods[i-1:i]...)
@@ -149,7 +166,33 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	return r, nil
 }
 
-func commonStopContainer(pod *corev1.Pod, containerNames []string, createClient createReconfigureClient) error {
+// TODO commonOnlineUpdateWithPod migrate to sql command pipeline
+func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, updatedParams map[string]string) error {
+	address, err := cfgManagerGrpcURL(pod)
+	if err != nil {
+		return err
+	}
+	client, err := createClient(address)
+	if err != nil {
+		return err
+	}
+
+	response, err := client.OnlineUpgradeParams(ctx, &cfgproto.OnlineUpgradeParamsRequest{
+		ConfigSpec: configSpec,
+		Params:     updatedParams,
+	})
+	if err != nil {
+		return err
+	}
+
+	errMessage := response.GetErrMessage()
+	if errMessage != "" {
+		return cfgcore.MakeError(errMessage)
+	}
+	return nil
+}
+
+func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerNames []string, createClient createReconfigureClient) error {
 	containerIDs := make([]string, 0, len(containerNames))
 	for _, name := range containerNames {
 		containerID := intctrlutil.GetContainerID(pod, name)
@@ -159,13 +202,17 @@ func commonStopContainer(pod *corev1.Pod, containerNames []string, createClient 
 		containerIDs = append(containerIDs, containerID)
 	}
 
+	address, err := cfgManagerGrpcURL(pod)
+	if err != nil {
+		return err
+	}
 	// stop container
-	client, err := createClient(generateManagerSidecarAddr(pod))
+	client, err := createClient(address)
 	if err != nil {
 		return err
 	}
 
-	response, err := client.StopContainer(context.Background(), &cfgproto.StopContainerRequest{
+	response, err := client.StopContainer(ctx, &cfgproto.StopContainerRequest{
 		ContainerIDs: containerIDs,
 	})
 	if err != nil {
@@ -179,10 +226,20 @@ func commonStopContainer(pod *corev1.Pod, containerNames []string, createClient 
 	return nil
 }
 
-func generateManagerSidecarAddr(pod *corev1.Pod) string {
-	var (
-		podAddress = pod.Status.PodIP
-		podPort    = viper.GetInt32(constant.ConfigManagerGPRCPortEnv)
-	)
-	return fmt.Sprintf("%s:%d", podAddress, podPort)
+func cfgManagerGrpcURL(pod *corev1.Pod) (string, error) {
+	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
+	return getURLFromPod(pod, podPort)
+}
+
+func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
+	ip := net.ParseIP(pod.Status.PodIP)
+	if ip == nil {
+		return "", cfgcore.MakeError("%s is not a valid IP", pod.Status.PodIP)
+	}
+
+	// Sanity check PodIP
+	if ip.To4() == nil && ip.To16() == nil {
+		return "", fmt.Errorf("%s is not a valid IPv4/IPv6 address", pod.Status.PodIP)
+	}
+	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
 }

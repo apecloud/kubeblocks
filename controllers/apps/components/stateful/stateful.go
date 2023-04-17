@@ -18,10 +18,12 @@ package stateful
 
 import (
 	"context"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -32,57 +34,58 @@ import (
 )
 
 type Stateful struct {
-	Cli           client.Client
-	Cluster       *appsv1alpha1.Cluster
-	Component     types.Component
-	ComponentSpec *appsv1alpha1.ClusterComponentSpec
+	types.ComponentSetBase
 }
 
 var _ types.ComponentSet = &Stateful{}
 
-func (stateful *Stateful) getReplicas() int32 {
-	if stateful.Component != nil {
-		return stateful.Component.GetReplicas()
+func (r *Stateful) getReplicas() int32 {
+	if r.Component != nil {
+		return r.Component.GetReplicas()
 	}
-	return stateful.ComponentSpec.Replicas
+	return r.ComponentSpec.Replicas
 }
 
-func (stateful *Stateful) SetComponent(comp types.Component) {
-	stateful.Component = comp
+func (r *Stateful) SetComponent(comp types.Component) {
+	r.Component = comp
 }
 
-func (stateful *Stateful) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (r *Stateful) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, stateful.Cli, sts)
+	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
-	targetReplicas := stateful.getReplicas()
+	targetReplicas := r.getReplicas()
 	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &targetReplicas), nil
 }
 
-func (stateful *Stateful) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+func (r *Stateful) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	return util.StatefulSetPodsAreReady(sts, stateful.getReplicas()), nil
+	return util.StatefulSetPodsAreReady(sts, r.getReplicas()), nil
 }
 
-func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	return util.PodIsAvailable(appsv1alpha1.Stateful, pod, minReadySeconds)
+func (r *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
+	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
-func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
+// HandleProbeTimeoutWhenPodsReady the Stateful component has no role detection, empty implementation here.
+func (r *Stateful) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (stateful *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
+func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	stsList := &appsv1.StatefulSetList{}
-	podList, err := util.GetCompRelatedObjectList(ctx, stateful.Cli, *stateful.Cluster, componentName, stsList)
+	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
 		return "", err
 	}
@@ -92,27 +95,30 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componen
 		return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
 	}
 	stsObj := stsList.Items[0]
-	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, stateful.getReplicas(),
+	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, r.getReplicas(),
 		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil
 }
 
-func (stateful *Stateful) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {
+func (r *Stateful) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {
 	return nil, nil
 }
 
-func (stateful *Stateful) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
+func (r *Stateful) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
 	return nil, nil
 }
 
 func newStateful(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec,
-	_ appsv1alpha1.ClusterComponentDefinition) (*Stateful, error) {
+	spec *appsv1alpha1.ClusterComponentSpec,
+	def appsv1alpha1.ClusterComponentDefinition) (*Stateful, error) {
 	stateful := &Stateful{
-		Cli:           cli,
-		Cluster:       cluster,
-		Component:     nil,
-		ComponentSpec: component,
+		ComponentSetBase: types.ComponentSetBase{
+			Cli:           cli,
+			Cluster:       cluster,
+			ComponentSpec: spec,
+			ComponentDef:  &def,
+			Component:     nil,
+		},
 	}
 	return stateful, nil
 }

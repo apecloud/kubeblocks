@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -30,6 +31,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 type templateRenderValidator = func(map[string]string) error
@@ -58,10 +61,45 @@ func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *a
 	}
 }
 
-func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
+func (wrapper *renderWrapper) enableRerenderTemplateSpec(cfgCMName string, task *intctrltypes.ReconcileTask) (bool, error) {
+	cmKey := client.ObjectKey{
+		Name:      cfgCMName,
+		Namespace: wrapper.cluster.Namespace,
+	}
+
+	cmObj := &corev1.ConfigMap{}
+	localObject := task.GetLocalResourceWithObjectKey(cmKey, generics.ToGVK(cmObj))
+	if localObject != nil {
+		return false, nil
+	}
+
+	cmErr := wrapper.cli.Get(wrapper.ctx, cmKey, cmObj)
+	if cmErr != nil && !apierrors.IsNotFound(cmErr) {
+		// An unexpected error occurs
+		return false, cmErr
+	}
+	if cmErr != nil {
+		// Config is not exists
+		return true, nil
+	}
+
+	// Config is exists
+	return cfgcore.IsNotUserReconfigureOperation(cmObj), nil
+}
+
+func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent, task *intctrltypes.ReconcileTask) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, configSpec := range component.ConfigTemplates {
 		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpec.VolumeName)
+		enableRerender, err := wrapper.enableRerenderTemplateSpec(cmName, task)
+		if err != nil {
+			return err
+		}
+		if !enableRerender {
+			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, cmName)
+			continue
+		}
 
 		// Generate ConfigMap objects for config files
 		cm, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef,
@@ -72,43 +110,54 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 			return err
 		}
 		updateCMConfigSpecLabels(cm, configSpec)
-
-		if err := wrapper.addRenderObject(configSpec.ComponentTemplateSpec, cm, scheme); err != nil {
+		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, cm, scheme); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
+func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
+	task *intctrltypes.ReconcileTask) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, templateSpec := range component.ScriptTemplates {
 		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, templateSpec.VolumeName)
+		if task.GetLocalResourceWithObjectKey(client.ObjectKey{
+			Name:      cmName,
+			Namespace: wrapper.cluster.Namespace,
+		}, generics.ToGVK(&corev1.ConfigMap{})) != nil {
+			wrapper.addVolumeMountMeta(templateSpec, cmName)
+			continue
+		}
 
 		// Generate ConfigMap objects for config files
 		cm, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, "", templateSpec, wrapper.ctx, wrapper.cli, nil)
 		if err != nil {
 			return err
 		}
-		if err := wrapper.addRenderObject(templateSpec, cm, scheme); err != nil {
+		if err := wrapper.addRenderedObject(templateSpec, cm, scheme); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (wrapper *renderWrapper) addRenderObject(tpl appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, scheme *runtime.Scheme) error {
+func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, scheme *runtime.Scheme) error {
 	// The owner of the configmap object is a cluster of users,
 	// in order to manage the life cycle of configmap
 	if err := controllerutil.SetOwnerReference(wrapper.cluster, cm, scheme); err != nil {
 		return err
 	}
 
-	cmName := cm.Name
-	wrapper.volumes[cmName] = tpl
+	cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
 	wrapper.renderedObjs = append(wrapper.renderedObjs, cm)
-	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
+	wrapper.addVolumeMountMeta(templateSpec, cm.Name)
 	return nil
+}
+
+func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.ComponentTemplateSpec, cmName string) {
+	wrapper.volumes[cmName] = templateSpec
+	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = cmName
 }
 
 func updateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {

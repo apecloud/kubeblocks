@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -82,9 +83,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	createClusterDef := func() {
 		_ = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, statefulMySQLCompType).
-			AddComponent(testapps.ConsensusMySQLComponent, consensusMySQLCompType).
-			AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+			AddComponentDef(testapps.StatefulMySQLComponent, statefulMySQLCompType).
+			AddComponentDef(testapps.ConsensusMySQLComponent, consensusMySQLCompType).
+			AddComponentDef(testapps.StatelessNginxComponent, nginxCompType).
 			Create(&testCtx)
 	}
 
@@ -308,9 +309,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				g.Expect(tmpCluster.Status.Components).Should(HaveLen(len(tmpCluster.Spec.ComponentSpecs)))
 			})).Should(Succeed())
 
-			changeAndCheckComponents := func(changeFunc func(), expectObservedGeneration int64, checkFun func(Gomega, *appsv1alpha1.Cluster)) {
-				Expect(testapps.ChangeObj(&testCtx, cluster, func() {
-					changeFunc()
+			changeAndCheckComponents := func(changeFunc func(cluster2 *appsv1alpha1.Cluster), expectObservedGeneration int64, checkFun func(Gomega, *appsv1alpha1.Cluster)) {
+				Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
+					changeFunc(lcluster)
 				})).ShouldNot(HaveOccurred())
 				// wait for cluster controller reconciles to complete.
 				Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(cluster))).Should(Equal(expectObservedGeneration))
@@ -320,8 +321,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("delete consensus component")
 			consensusClusterComponent := cluster.Spec.ComponentSpecs[2]
 			changeAndCheckComponents(
-				func() {
-					cluster.Spec.ComponentSpecs = cluster.Spec.ComponentSpecs[:2]
+				func(lcluster *appsv1alpha1.Cluster) {
+					lcluster.Spec.ComponentSpecs = lcluster.Spec.ComponentSpecs[:2]
 				}, 2,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					g.Expect(tmpCluster.Status.Components).Should(HaveLen(2))
@@ -331,8 +332,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("add consensus component")
 			consensusClusterComponent.Name = "consensus1"
 			changeAndCheckComponents(
-				func() {
-					cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, consensusClusterComponent)
+				func(lcluster *appsv1alpha1.Cluster) {
+					lcluster.Spec.ComponentSpecs = append(lcluster.Spec.ComponentSpecs, consensusClusterComponent)
 				}, 3,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					_, isExist := tmpCluster.Status.Components[consensusClusterComponent.Name]
@@ -343,8 +344,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("modify consensus component name")
 			modifyConsensusName := "consensus2"
 			changeAndCheckComponents(
-				func() {
-					cluster.Spec.ComponentSpecs[2].Name = modifyConsensusName
+				func(lcluster *appsv1alpha1.Cluster) {
+					lcluster.Spec.ComponentSpecs[2].Name = modifyConsensusName
 				}, 4,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					_, isExist := tmpCluster.Status.Components[modifyConsensusName]

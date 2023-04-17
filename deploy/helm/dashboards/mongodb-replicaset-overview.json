@@ -1,0 +1,5684 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Dashboard for MongoDB ReplicaSet managed by KubeBlocks",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "gnetId": 7359,
+  "graphTooltip": 1,
+  "id": 10,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "cloud",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "ApeCloud",
+      "tooltip": "Improved productivity, cost-efficiency and business continuity.",
+      "type": "link",
+      "url": "https://kubeblocks.io/"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "KubeBlocks",
+      "tooltip": "An open-source and cloud-neutral DBaaS with Kubernetes.",
+      "type": "link",
+      "url": "https://github.com/apecloud/kubeblocks"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 117,
+      "panels": [],
+      "title": "Summary",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 1
+      },
+      "id": 119,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "colorMode": "value",
+        "fieldOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "count(sum by(namespace)(mongodb_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}))",
+          "format": "time_series",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "__auto",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Total Namespaces",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 1
+      },
+      "id": 121,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "colorMode": "value",
+        "fieldOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "count(sum by(namespace, app_kubernetes_io_instance)(mongodb_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}))",
+          "format": "time_series",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "{{label_name}}",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Total Clusters",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 1
+      },
+      "id": 123,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "colorMode": "value",
+        "fieldOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "count(mongodb_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"} > 0)",
+          "format": "time_series",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "__auto",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Total Ups",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              },
+              {
+                "color": "dark-red",
+                "value": 0.5
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 1
+      },
+      "id": 125,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "colorMode": "value",
+        "fieldOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "(count(mongodb_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"} <= 0)) or vector(0)",
+          "format": "time_series",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "__auto",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Total Downs",
+      "transformations": [],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "displayMode": "auto",
+            "filterable": false,
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "index": 2,
+                  "text": "STARTUP"
+                },
+                "1": {
+                  "index": 1,
+                  "text": "PRIMARY"
+                },
+                "2": {
+                  "index": 0,
+                  "text": "SECONDARY"
+                },
+                "3": {
+                  "index": 3,
+                  "text": "RECOVERING"
+                },
+                "5": {
+                  "index": 4,
+                  "text": "STARTUP2"
+                },
+                "6": {
+                  "index": 5,
+                  "text": "UNKNOWN"
+                },
+                "7": {
+                  "index": 6,
+                  "text": "ARBITER"
+                },
+                "8": {
+                  "index": 7,
+                  "text": "DOWN"
+                },
+                "9": {
+                  "index": 8,
+                  "text": "ROLLBACK"
+                },
+                "10": {
+                  "index": 9,
+                  "text": "REMOVED"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "MongoDBInstance: ${__data.fields.cluster} | ${__data.fields.instance}",
+                    "url": "/d/pMEd7m0Mz/cadvisor-exporter?orgId=1&var-node=All&var-namespace=${__data.fields.namespace}﻿&var-pod=﻿${__data.fields.instance}﻿&var-container=All"
+                  }
+                ]
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              },
+              {
+                "id": "custom.filterable",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "uptime"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "dark-red",
+                      "value": null
+                    },
+                    {
+                      "color": "dark-yellow",
+                      "value": 60
+                    },
+                    {
+                      "color": "dark-green",
+                      "value": 120
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "lcd-gauge"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "namespace"
+            },
+            "properties": [
+              {
+                "id": "custom.filterable",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cluster"
+            },
+            "properties": [
+              {
+                "id": "custom.filterable",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 130,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "footer": {
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "instance"
+          }
+        ]
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "sum by(namespace, app_kubernetes_io_instance, pod) (mongodb_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "format": "table",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "__auto",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        },
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "sum by(namespace, app_kubernetes_io_instance, pod) (mongodb_instance_uptime_seconds{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "__auto",
+          "metric": "",
+          "range": false,
+          "refId": "B",
+          "step": 20
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum by(namespace, app_kubernetes_io_instance, pod) (mongodb_mongod_replset_my_state{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "C"
+        }
+      ],
+      "title": "Instance Resource",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "pod",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "Value #A": true,
+              "Value #B": false,
+              "app_kubernetes_io_instance 2": true,
+              "app_kubernetes_io_instance 3": true,
+              "app_kubernetes_io_instance 4": true,
+              "namespace 2": true,
+              "namespace 3": true,
+              "namespace 4": true
+            },
+            "indexByName": {
+              "Time 1": 3,
+              "Time 2": 5,
+              "Time 3": 10,
+              "Value #A": 4,
+              "Value #B": 9,
+              "Value #C": 8,
+              "app_kubernetes_io_instance 1": 1,
+              "app_kubernetes_io_instance 2": 6,
+              "app_kubernetes_io_instance 3": 11,
+              "namespace 1": 0,
+              "namespace 2": 7,
+              "namespace 3": 12,
+              "pod": 2
+            },
+            "renameByName": {
+              "Value #B": "uptime",
+              "Value #C": "ReplSet State",
+              "app_kubernetes_io_instance 1": "cluster",
+              "namespace 1": "namespace",
+              "pod": "instance"
+            }
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [],
+            "fields": {}
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "displayMode": "auto",
+            "filterable": false,
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instances"
+            },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "lcd-gauge"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 5
+      },
+      "id": 127,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "count by(mongodb)(mongodb_version_info{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "format": "table",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "{{short_version}}",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Cluster Versions",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "Value": "instances",
+              "short_version": "version"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "displayMode": "auto",
+            "filterable": false,
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instances"
+            },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "lcd-gauge"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 5
+      },
+      "id": 128,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "count by(engine)(mongodb_mongod_storage_engine{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "format": "table",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "{{short_version}}",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Cluster Engines",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "Value": "instances",
+              "short_version": "version"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "leftMin": 0,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 11
+      },
+      "hiddenSeries": false,
+      "id": 155,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "show": true,
+        "sort": "avg",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "max by(namespace, app_kubernetes_io_instance, pod) (mongodb_mongod_replset_member_replication_lag{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "metric": "",
+          "range": true,
+          "refId": "J",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "ReplSet Lag",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "s",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "s",
+          "label": "",
+          "logBase": 1,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "leftMin": 0,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 11
+      },
+      "hiddenSeries": false,
+      "id": 156,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "show": true,
+        "sort": "avg",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "time() - mongodb_mongod_replset_member_election_date{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "metric": "",
+          "range": true,
+          "refId": "J",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "ReplSet Last Election",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "s",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "s",
+          "label": "",
+          "logBase": 1,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 104,
+      "panels": [],
+      "title": "Memory & Network",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "mbytes"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "leftMin": 0,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "hiddenSeries": false,
+      "id": 75,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "show": true,
+        "sort": "avg",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "mongodb_memory{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\", type=~\"resident|virtual\"}",
+          "hide": false,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}-{{type}}",
+          "metric": "",
+          "range": true,
+          "refId": "J",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "MongoDB Memory",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "s",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "mbytes",
+          "label": "",
+          "logBase": 1,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "leftMin": 0,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "hiddenSeries": false,
+      "id": 105,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "show": true,
+        "sort": "avg",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mongodb_network_metrics_num_requests_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval])",
+          "hide": false,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "metric": "",
+          "range": true,
+          "refId": "J",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "MongoDB NetworkRequests",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "s",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "none",
+          "label": "",
+          "logBase": 1,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "leftMin": 0,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "hiddenSeries": false,
+      "id": 131,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "show": true,
+        "sort": "avg",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mongodb_ss_network_bytesOut{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_ss_network_bytesOut{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+          "hide": false,
+          "interval": "$__rate_interval",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "metric": "",
+          "range": true,
+          "refId": "J",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "MongoDB NetWorkOut",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "s",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "bytes",
+          "label": "",
+          "logBase": 1,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "leftMin": 0,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "hiddenSeries": false,
+      "id": 132,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "show": true,
+        "sort": "avg",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mongodb_ss_network_bytesIn{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_ss_network_bytesIn{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+          "hide": false,
+          "interval": "$__rate_interval",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "metric": "",
+          "range": true,
+          "refId": "J",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "MongoDB NetworkIn",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "s",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "bytes",
+          "label": "",
+          "logBase": 1,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 93,
+      "panels": [],
+      "title": "Operations",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "leftMin": 0,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 34
+      },
+      "hiddenSeries": false,
+      "id": 27,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "show": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mongodb_op_counters_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_op_counters_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+          "format": "time_series",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} - {{type}}",
+          "metric": "",
+          "range": true,
+          "refId": "A",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Query Operations",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "s",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "none",
+          "label": "",
+          "logBase": 1,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "leftMin": 0,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 34
+      },
+      "hiddenSeries": false,
+      "id": 133,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "show": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mongodb_mongod_op_counters_repl_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_op_counters_repl_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+          "format": "time_series",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} - {{type}}",
+          "metric": "",
+          "range": true,
+          "refId": "A",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Replica Query Operations",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "s",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "none",
+          "label": "",
+          "logBase": 1,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 41
+      },
+      "hiddenSeries": false,
+      "id": 76,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "rightSide": false,
+        "show": true,
+        "sort": "avg",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mongodb_mongod_metrics_document_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} - {{state}}",
+          "metric": "",
+          "range": true,
+          "refId": "J",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Document Operations",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "short",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "none",
+          "label": "",
+          "logBase": 10,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 41
+      },
+      "hiddenSeries": false,
+      "id": 163,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "rightSide": false,
+        "show": true,
+        "sort": "avg",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mongodb_mongod_metrics_query_executor_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_metrics_query_executor_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} - {{state}}",
+          "metric": "",
+          "range": true,
+          "refId": "J",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Document Query Executor",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "short",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "ops",
+          "label": "",
+          "logBase": 10,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      },
+      "hiddenSeries": false,
+      "id": 134,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "rightSide": false,
+        "show": true,
+        "sort": "avg",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mongodb_mongod_op_latencies_ops_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_op_latencies_ops_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} - {{type}}",
+          "metric": "",
+          "range": true,
+          "refId": "J",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "OpLatencies Operations",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "short",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "ops",
+          "label": "",
+          "logBase": 10,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 48
+      },
+      "hiddenSeries": false,
+      "id": 135,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "rightSide": false,
+        "show": true,
+        "sort": "avg",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mongodb_mongod_op_latencies_latency_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{type}}",
+          "metric": "",
+          "range": true,
+          "refId": "J",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "OpLatencies Latency",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "short",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "ms",
+          "label": "",
+          "logBase": 10,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "mongodb_mongod_metrics_ttl_deleted_documents_total",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "fill": 2,
+      "fillGradient": 0,
+      "grid": {
+        "leftLogBase": 1,
+        "rightLogBase": 1
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 55
+      },
+      "hiddenSeries": false,
+      "id": 160,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": true,
+        "min": true,
+        "rightSide": false,
+        "show": true,
+        "sort": "avg",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mongodb_mongod_metrics_ttl_deleted_documents_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_metrics_ttl_deleted_documents_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "metric": "",
+          "range": true,
+          "refId": "J",
+          "step": 300
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "TTL Delete Operations",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "x-axis": true,
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "y-axis": true,
+      "y_formats": [
+        "short",
+        "short"
+      ],
+      "yaxes": [
+        {
+          "format": "ops",
+          "label": "",
+          "logBase": 10,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 62
+      },
+      "id": 137,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 21
+          },
+          "hiddenSeries": false,
+          "id": 81,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_connections{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\", state=~\"(current|available|totalCreated)\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} - {{state}}",
+              "metric": "mongodb_mongod_metrics_repl_preload_indexes_num_total",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Collections",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "none",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 21
+          },
+          "hiddenSeries": false,
+          "id": 138,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_mongod_metrics_cursor_open{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} - {{state}}",
+              "metric": "mongodb_mongod_metrics_repl_preload_indexes_num_total",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Cursors",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "none",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        }
+      ],
+      "title": "Connections & Cursors",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 63
+      },
+      "id": 97,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 80
+          },
+          "hiddenSeries": false,
+          "id": 98,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_dbstats_dataSize{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\", database=~\"$database\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{database}}",
+              "metric": "mongodb_mongod_metrics_repl_preload_indexes_num_total",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "DataBase Size",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "bytes",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 80
+          },
+          "hiddenSeries": false,
+          "id": 101,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_dbstats_indexSize{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\", database=~\"$database\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{database}}",
+              "metric": "mongodb_mongod_metrics_repl_preload_indexes_num_total",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Index Size",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "bytes",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 87
+          },
+          "hiddenSeries": false,
+          "id": 99,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_dbstats_storageSize{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\", database=~\"$database\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{database}}",
+              "metric": "mongodb_mongod_metrics_repl_preload_indexes_num_total",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Storage Size",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "bytes",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 87
+          },
+          "hiddenSeries": false,
+          "id": 102,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_dbstats_totalSize{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\", database=~\"$database\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{database}}",
+              "metric": "mongodb_mongod_metrics_repl_preload_indexes_num_total",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Total Size",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "bytes",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 94
+          },
+          "hiddenSeries": false,
+          "id": 100,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_dbstats_indexes{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\", database=~\"$database\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{database}}",
+              "metric": "mongodb_mongod_metrics_repl_preload_indexes_num_total",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Indexes Num",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "none",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 94
+          },
+          "hiddenSeries": false,
+          "id": 139,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_dbstats_collections{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\", database=~\"$database\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{database}}",
+              "metric": "mongodb_mongod_metrics_repl_preload_indexes_num_total",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Collections Num",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "none",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        }
+      ],
+      "title": "DB Stat",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 64
+      },
+      "id": 95,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 23
+          },
+          "hiddenSeries": false,
+          "id": 85,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_oplog_stats_size{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Oplog Size",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "bytes",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 23
+          },
+          "hiddenSeries": false,
+          "id": 162,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_mongod_replset_oplog_head_timestamp{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_replset_oplog_head_timestamp{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Oplog Lag",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "s",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 30
+          },
+          "hiddenSeries": false,
+          "id": 80,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_mongod_metrics_repl_buffer_size_bytes{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} - Used",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_mongod_metrics_repl_buffer_max_size_bytes{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} - Max",
+              "range": true,
+              "refId": "B",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Oplog Buffer Capacity",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "bytes",
+              "label": "",
+              "logBase": 10,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 30
+          },
+          "hiddenSeries": false,
+          "id": 161,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_mongod_metrics_repl_buffer_count{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_metrics_repl_buffer_count{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Oplog Buffered Operations",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "ops",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 37
+          },
+          "hiddenSeries": false,
+          "id": 84,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_mongod_replset_oplog_head_timestamp{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_metrics_repl_preload_docs_total_milliseconds{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Oplog Processing Time",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "ms",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 37
+          },
+          "hiddenSeries": false,
+          "id": 79,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_mongod_metrics_repl_network_getmores_total_milliseconds{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_metrics_repl_network_getmores_total_milliseconds{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Oplog Getmore Time",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "ms",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Shows the time range in the oplog and the oldest backed up operation.",
+          "editable": true,
+          "error": false,
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 44
+          },
+          "hiddenSeries": false,
+          "id": 165,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "time()-mongodb_mongod_replset_oplog_tail_timestamp{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | Now to End",
+              "metric": "",
+              "range": true,
+              "refId": "J",
+              "step": 300
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_mongod_replset_oplog_head_timestamp{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}-mongodb_mongod_replset_oplog_tail_timestamp{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | Oplog Range",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Oplog Recovery Window",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "s",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "s",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        }
+      ],
+      "title": "Oplog",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 65
+      },
+      "id": 107,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 40
+          },
+          "hiddenSeries": false,
+          "id": 110,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_asserts_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_asserts_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{type}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Assert Events",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "ops",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        }
+      ],
+      "title": "Assert",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 66
+      },
+      "id": 141,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 41
+          },
+          "hiddenSeries": false,
+          "id": 112,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_ss_globalLock_activeClients_readers{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_ss_globalLock_activeClients_readers{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | readers",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_ss_globalLock_activeClients_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_ss_globalLock_activeClients_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "hide": false,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | total",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_ss_globalLock_activeClients_writers{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_ss_globalLock_activeClients_writers{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "hide": false,
+              "interval": "",
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | writers",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Active Clients",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "ops",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 41
+          },
+          "hiddenSeries": false,
+          "id": 144,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_ss_globalLock_currentQueue{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_ss_globalLock_currentQueue{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{count_type}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Current Queue",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "ops",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        }
+      ],
+      "title": "GlobalLock",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 67
+      },
+      "id": 143,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "This is useful for write-heavy workloads to understand how long it takes to verify writes and how many concurrent writes are occurring.",
+          "editable": true,
+          "error": false,
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 42
+          },
+          "hiddenSeries": false,
+          "id": 146,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_mongod_metrics_get_last_error_wtime_total_milliseconds{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_metrics_get_last_error_wtime_total_milliseconds{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} ",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Write Time",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "ops",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "This is useful for write-heavy workloads to understand how long it takes to verify writes and how many concurrent writes are occurring.",
+          "editable": true,
+          "error": false,
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 42
+          },
+          "hiddenSeries": false,
+          "id": 159,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_mongod_metrics_get_last_error_wtimeouts_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_metrics_get_last_error_wtimeouts_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | Timeouts",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_mongod_metrics_get_last_error_wtime_num_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_metrics_get_last_error_wtime_num_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "hide": false,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | Total",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Write Operations",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "ops",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        }
+      ],
+      "title": "GetLastError",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      },
+      "id": 148,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 43
+          },
+          "hiddenSeries": false,
+          "id": 113,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "mongodb_mongod_wiredtiger_cache_bytes{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Cache UsedSize",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "bytes",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 43
+          },
+          "hiddenSeries": false,
+          "id": 115,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_mongod_wiredtiger_cache_bytes_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_wiredtiger_cache_bytes_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{type}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Cache R/W Size",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "bytes",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 50
+          },
+          "hiddenSeries": false,
+          "id": 153,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate (mongodb_mongod_wiredtiger_cache_evicted_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Cache Evicted Page Num",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "none",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 50
+          },
+          "hiddenSeries": false,
+          "id": 149,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_mongod_wiredtiger_log_operations_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_mongod_wiredtiger_log_operations_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{type}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Log Operations",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "ops",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        }
+      ],
+      "title": "WiredTiger",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 69
+      },
+      "id": 151,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops"
+            },
+            "overrides": []
+          },
+          "fill": 2,
+          "fillGradient": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMin": 0,
+            "rightLogBase": 1
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 44
+          },
+          "hiddenSeries": false,
+          "id": 152,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "9.2.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(mongodb_extra_info_page_faults_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[$__rate_interval]) or irate(mongodb_extra_info_page_faults_total{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\", pod=~\"$instance\"}[5m])",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{type}}",
+              "range": true,
+              "refId": "A",
+              "step": 300
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Page Faults",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "y-axis": true,
+          "y_formats": [
+            "ms",
+            "short"
+          ],
+          "yaxes": [
+            {
+              "format": "ops",
+              "label": "",
+              "logBase": 1,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        }
+      ],
+      "title": "Extra Info",
+      "type": "row"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 37,
+  "style": "dark",
+  "tags": [
+    "MongoDB",
+    "KubeBlocks"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "Prometheus",
+          "value": "Prometheus"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Data Source",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(mongodb_mongod_replset_my_state, namespace)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Namespace",
+        "multi": true,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(mongodb_mongod_replset_my_state, namespace)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 5,
+        "type": "query"
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(mongodb_mongod_replset_my_state, app_kubernetes_io_instance)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Cluster",
+        "multi": true,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "query": "label_values(mongodb_mongod_replset_my_state, app_kubernetes_io_instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(mongodb_mongod_replset_my_state{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\"}, pod)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Instance",
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "query": "label_values(mongodb_mongod_replset_my_state{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\"}, pod)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 5,
+        "type": "query"
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(mongodb_dbstats_ok{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}, database)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Database",
+        "multi": true,
+        "name": "database",
+        "options": [],
+        "query": {
+          "query": "label_values(mongodb_dbstats_ok{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}, database)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 5,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {
+    "hidden": false,
+    "now": true,
+    "refresh_intervals": [
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
+  },
+  "timezone": "browser",
+  "title": "MongoDB-ReplSet-KubeBlocks",
+  "uid": "7lzrQGNikKB",
+  "version": 1,
+  "weekStart": ""
+}

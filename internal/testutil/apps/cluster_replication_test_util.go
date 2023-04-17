@@ -32,6 +32,7 @@ import (
 
 // MockReplicationComponentStsPod mocks to create pod of the replication StatefulSet, just using in envTest
 func MockReplicationComponentStsPod(
+	g gomega.Gomega,
 	testCtx testutil.TestContext,
 	sts *appsv1.StatefulSet,
 	clusterName,
@@ -54,20 +55,35 @@ func MockReplicationComponentStsPod(
 			Status: corev1.ConditionTrue,
 		},
 	}
-	gomega.Expect(testCtx.Cli.Status().Patch(context.Background(), pod, patch)).Should(gomega.Succeed())
+	if g != nil {
+		g.Expect(testCtx.Cli.Status().Patch(context.Background(), pod, patch)).Should(gomega.Succeed())
+	} else {
+		gomega.Expect(testCtx.Cli.Status().Patch(context.Background(), pod, patch)).Should(gomega.Succeed())
+	}
 	return pod
 }
 
-// MockReplicationComponentPods mocks to create pods of the component, just using in envTest
+// MockReplicationComponentPods mocks to create pods of the component, just using in envTest. If roleByIdx is empty,
+// will have implicit pod-0 being "primary" role and others to "secondary" role.
 func MockReplicationComponentPods(
+	g gomega.Gomega,
 	testCtx testutil.TestContext,
 	sts *appsv1.StatefulSet,
 	clusterName,
 	compName string,
-	podRole string) []*corev1.Pod {
+	roleByIdx map[int32]string) []*corev1.Pod {
+
 	var pods []*corev1.Pod
-	podName := fmt.Sprintf("%s-0", sts.Name)
-	pods = append(pods, MockReplicationComponentStsPod(testCtx, sts, clusterName, compName, podName, podRole))
+	for i := int32(0); i < *sts.Spec.Replicas; i++ {
+		podName := fmt.Sprintf("%s-%d", sts.Name, i)
+		role := "secondary"
+		if podRole, ok := roleByIdx[i]; ok && podRole != "" {
+			role = podRole
+		} else if i == 0 {
+			role = "primary"
+		}
+		pods = append(pods, MockReplicationComponentStsPod(g, testCtx, sts, clusterName, compName, podName, role))
+	}
 	return pods
 }
 

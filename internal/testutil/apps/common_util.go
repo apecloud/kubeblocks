@@ -61,9 +61,9 @@ func ResetToIgnoreFinalizers() {
 // })).Should(Succeed())
 
 func ChangeObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
-	pobj PT, action func()) error {
+	pobj PT, action func(PT)) error {
 	patch := client.MergeFrom(PT(pobj.DeepCopy()))
-	action()
+	action(pobj)
 	return testCtx.Cli.Patch(testCtx.Ctx, pobj, patch)
 }
 
@@ -95,7 +95,9 @@ func GetAndChangeObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 		if err := testCtx.Cli.Get(testCtx.Ctx, namespacedName, pobj); err != nil {
 			return err
 		}
-		return ChangeObj(testCtx, pobj, func() { action(pobj) })
+		return ChangeObj(testCtx, pobj, func(lobj PT) {
+			action(lobj)
+		})
 	}
 }
 
@@ -322,7 +324,7 @@ func ClearResourcesWithRemoveFinalizerOption[T intctrlutil.Object, PT intctrluti
 			finalizers := pobj.GetFinalizers()
 			if len(finalizers) > 0 {
 				if removeFinalizer {
-					g.Expect(ChangeObj(testCtx, pobj, func() {
+					g.Expect(ChangeObj(testCtx, pobj, func(lobj PT) {
 						pobj.SetFinalizers([]string{})
 					})).To(gomega.Succeed())
 				} else {

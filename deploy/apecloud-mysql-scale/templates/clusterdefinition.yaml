@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
+  type: mysql
   connectionCredential:
     username: root
     password: root  #"$(RANDOM_PASSWD)"
@@ -19,10 +20,10 @@ spec:
     - name: mysql
       characterType: mysql
       probes:
-        roleChangedProbe:
-          failureThreshold: {{ .Values.roleChangedProbe.failureThreshold }}
-          periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.roleChangedProbe.timeoutSeconds }}
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       monitor:
         builtIn: false
         exporterConfig:
@@ -53,28 +54,26 @@ spec:
         followers:
           - name: follower
             accessMode: Readonly
+        learner:
+          name: learner
+          accessMode: Readonly
       service:
         ports:
-          - protocol: TCP
+          - name: mysql
             port: 3306
             targetPort: mysql
-            name: mysql
-          - protocol: TCP
-            port: 15100  
+          - name: vttabletport
+            port: 15100
             targetPort: vttabletport
-            name: vttabletport
-          - protocol: TCP
+          - name: vttabletgrpc
             port: 16100
             targetPort: vttabletgrpc
-            name: vttabletgrpc
-          - protocol: TCP
+          - name: delvedebug
             port: 40000
             targetPort: delvedebug
-            name: delvedebug   
       horizontalScalePolicy:
         type: Snapshot
-        backupTemplateSelector:
-          "clusterdefinition.kubeblocks.io/name": apecloud-mysql-scale
+        backupPolicyTemplateName: apecloud-mysql-backup-policy-template
       podSpec:
         containers:
           - name: mysql
@@ -173,21 +172,14 @@ spec:
             imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }} 
             ports:
               - containerPort: 15100
-                protocol: TCP
-                name: vttabletport 
+                name: vttabletport
               - containerPort: 16100
-                protocol: TCP
                 name: vttabletgrpc
               - containerPort: 40000
-                protocol: TCP
-                name: delvedebug  
+                name: delvedebug
             env:
               - name: CELL
                 value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
-              - name: KEYSPACE
-                value: {{ .Values.wesqlscale.keySpace | default "commerce" | quote }}
-              - name: SHARD
-                value: {{ .Values.wesqlscale.shard | default "0" | quote }}
               - name: ETCD_SERVER
                 value: "$(KB_CLUSTER_NAME)-etcd-headless"
               - name: ETCD_PORT
@@ -217,8 +209,6 @@ spec:
               - -c
               - |
                 cell=${CELL:-'zone1'}
-                keyspace=${KEYSPACE:-'commerce'}
-                shard=${SHARD:-'0'}
                 uid="${KB_POD_NAME##*-}"
                 mysql_root=${MYSQL_ROOT_USER:-'root'}
                 mysql_root_passwd=${MYSQL_ROOT_PASSWORD:-'123456'}
@@ -245,8 +235,6 @@ spec:
                 --log_queries_to_file $VTDATAROOT/$tablet_logfile \
                 --tablet-path $alias \
                 --tablet_hostname "$tablet_hostname" \
-                --init_keyspace $keyspace \
-                --init_shard $shard \
                 --init_tablet_type $tablet_type \
                 --health_check_interval 1s \
                 --shard_sync_retry_delay 1s \
@@ -340,17 +328,15 @@ spec:
       workloadType: Stateful
       service:
         ports:
-          - protocol: TCP
+          - name: client
             port: 2379
             targetPort: client 
-            name: client
       podSpec:
         containers:
           - name: etcd
             imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 2379
-                protocol: TCP
                 name: client
             env:
               - name: CELL
@@ -411,31 +397,25 @@ spec:
       workloadType: Stateful
       service:
         ports:
-          - protocol: TCP
+          - name: webport
             port: 15000
             targetPort: webport
-            name: webport 
-          - protocol: TCP
+          - name: grpcport
             port: 15999
             targetPort: grpcport
-            name: grpcport
-          - protocol: TCP
+          - name: delvedebug
             port: 40000
             targetPort: delvedebug
-            name: delvedebug  
       podSpec:
         containers:
           - name: vtctld
             imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 15000
-                protocol: TCP
                 name: webport
               - containerPort: 15999
-                protocol: TCP
                 name: grpcport
               - containerPort: 40000
-                protocol: TCP
                 name: delvedebug
             env:
               - name: CELL
@@ -480,24 +460,20 @@ spec:
       workloadType: Stateful
       service:
         ports:
-          - protocol: TCP
+          - name: port
             port: 16000
             targetPort: port
-            name: port
-          - protocol: TCP
+          - name: delvedebug
             port: 40000
             targetPort: delvedebug
-            name: delvedebug
       podSpec:
         containers:
           - name: vtconsensus
             imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 16000
-                protocol: TCP
                 name: port
               - containerPort: 40000
-                protocol: TCP
                 name: delvedebug
             env:
               - name: CELL
@@ -526,8 +502,6 @@ spec:
               - |
                 echo "starting vtconsensus"
                 cell=${CELL:-'zone1'}
-                keyspace=${KEYSPACE:-'commerce'}
-                shard=${SHARD:-'0'}
 
                 vtconsensusport=${VTCONSENSUS_PORT:-'16000'}
                 topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
@@ -536,7 +510,6 @@ spec:
                 exec vtconsensus \
                   $topology_fags \
                   --alsologtostderr \
-                  --clusters_to_watch "$keyspace/$shard" \
                   --refresh_interval 1s \
                   --scan_repair_timeout 1s \
                   --log_dir ${VTDATAROOT} \
@@ -548,39 +521,31 @@ spec:
       workloadType: Stateful
       service:
         ports:
-          - protocol: TCP
+          - name: webport
             port: 15001
             targetPort: webport
-            name: webport 
-          - protocol: TCP
+          - name: grpcport
             port: 15991
             targetPort: grpcport
-            name: grpcport
-          - protocol: TCP
+          - name: serverport
             port: 15306
             targetPort: serverport
-            name: serverport     
-          - protocol: TCP
+          - name: delvedebug
             port: 40000
             targetPort: delvedebug
-            name: delvedebug       
       podSpec:
         containers:
           - name: vtgate
             imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 15001
-                protocol: TCP
                 name: webport
               - containerPort: 15991
-                protocol: TCP
                 name: grpcport
               - containerPort: 15306
-                protocol: TCP
-                name: serverport 
+                name: serverport
               - containerPort: 40000
-                protocol: TCP
-                name: delvedebug 
+                name: delvedebug
             env:
               - name: MYSQL_ROOT_USER
                 valueFrom:

@@ -20,11 +20,13 @@ import (
 	"context"
 	"math"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -41,10 +43,7 @@ import (
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
 type Stateless struct {
-	Cli           client.Client
-	Cluster       *appsv1alpha1.Cluster
-	Component     types.Component
-	ComponentSpec *appsv1alpha1.ClusterComponentSpec
+	types.ComponentSetBase
 }
 
 var _ types.ComponentSet = &Stateless{}
@@ -80,7 +79,10 @@ func (stateless *Stateless) PodsReady(ctx context.Context, obj client.Object) (b
 }
 
 func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	return util.PodIsAvailable(appsv1alpha1.Stateless, pod, minReadySeconds)
+	if stateless == nil || pod == nil {
+		return false
+	}
+	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
 func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
@@ -114,15 +116,18 @@ func (stateless *Stateless) HandleRoleChange(context.Context, client.Object) ([]
 
 func newStateless(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec,
-	_ appsv1alpha1.ClusterComponentDefinition) (*Stateless, error) {
+	spec *appsv1alpha1.ClusterComponentSpec,
+	def appsv1alpha1.ClusterComponentDefinition) *Stateless {
 	stateless := &Stateless{
-		Cli:           cli,
-		Cluster:       cluster,
-		Component:     nil,
-		ComponentSpec: component,
+		ComponentSetBase: types.ComponentSetBase{
+			Cli:           cli,
+			Cluster:       cluster,
+			ComponentSpec: spec,
+			ComponentDef:  &def,
+			Component:     nil,
+		},
 	}
-	return stateless, nil
+	return stateless
 }
 
 // deploymentIsReady check deployment is ready

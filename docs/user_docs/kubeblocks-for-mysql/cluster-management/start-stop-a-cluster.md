@@ -30,10 +30,11 @@ kbcli cluster stop mysql-cluster
 Run the command below to stop a cluster.
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: apps.infracreate.com/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generate-name: stop-
+  name: mysql-cluster
+  generateName: stop-
 spec:
   # cluster ref
   clusterRef: mysql-cluster
@@ -53,9 +54,9 @@ spec:
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
   terminationPolicy: WipeOut
-  components:
+  componentSpecs:
   - name: mysql
-    type: mysql
+    componentDefRef: mysql
     monitor: false  
     replicas: 0
     volumeClaimTemplates:
@@ -91,10 +92,11 @@ Run the command below to start a cluster.
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: apps.infracreate.com/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generate-name: start-
+  name: mysql-cluster
+  generateName: start-
 spec:
   # cluster ref
   clusterRef: mysql-cluster
@@ -115,9 +117,9 @@ spec:
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
   terminationPolicy: WipeOut
-  components:
+  componentSpecs:
   - name: mysql
-    type: mysql
+    componentDefRef: mysql
     monitor: false  
     replicas: 3
     volumeClaimTemplates:

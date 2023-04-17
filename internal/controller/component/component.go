@@ -77,6 +77,7 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 		Issuer:                clusterCompSpec.Issuer,
 		VolumeTypes:           clusterCompDefObj.VolumeTypes,
 		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
+		ComponentDef:          clusterCompSpec.ComponentDefRef,
 	}
 
 	// resolve component.ConfigTemplates
@@ -113,7 +114,7 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	if len(clusterCompSpec.Tolerations) != 0 {
 		tolerations = clusterCompSpec.Tolerations
 	}
-	component.PodSpec.Tolerations = patchBuiltInToleration(tolerations)
+	component.PodSpec.Tolerations = PatchBuiltInToleration(tolerations)
 
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
@@ -124,7 +125,7 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	if clusterCompDefObj.Service != nil {
-		service := corev1.Service{Spec: *clusterCompDefObj.Service}
+		service := corev1.Service{Spec: clusterCompDefObj.Service.ToSVCSpec()}
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 		component.Services = append(component.Services, service)
 
@@ -134,7 +135,7 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 					Name:        item.Name,
 					Annotations: item.Annotations,
 				},
-				Spec: *clusterCompDefObj.Service,
+				Spec: service.Spec,
 			}
 			service.Spec.Type = item.ServiceType
 			component.Services = append(component.Services, service)

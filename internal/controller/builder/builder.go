@@ -362,12 +362,13 @@ func BuildConnCredentialLow(clusterDefiniiton *appsv1alpha1.ClusterDefinition, c
 	uuidStrB64 := base64.RawStdEncoding.EncodeToString([]byte(strings.ReplaceAll(uuidStr, "-", "")))
 	uuidHex := hex.EncodeToString(uuidBytes)
 	m := map[string]string{
-		"$(RANDOM_PASSWD)": randomString(8),
-		"$(UUID)":          uuidStr,
-		"$(UUID_B64)":      uuidB64,
-		"$(UUID_STR_B64)":  uuidStrB64,
-		"$(UUID_HEX)":      uuidHex,
-		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", cluster.Name, component.Name, cluster.Namespace),
+		"$(RANDOM_PASSWD)":     randomString(8),
+		"$(UUID)":              uuidStr,
+		"$(UUID_B64)":          uuidB64,
+		"$(UUID_STR_B64)":      uuidStrB64,
+		"$(UUID_HEX)":          uuidHex,
+		"$(SVC_FQDN)":          fmt.Sprintf("%s-%s.%s.svc", cluster.Name, component.Name, cluster.Namespace),
+		"$(HEADLESS_SVC_FQDN)": fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name, component.Name, cluster.Namespace),
 	}
 	if len(component.Services) > 0 {
 		for _, p := range component.Services[0].Spec.Ports {
@@ -568,22 +569,6 @@ func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 	return &config, nil
 }
 
-func BuildBackupPolicy(sts *appsv1.StatefulSet,
-	template *dataprotectionv1alpha1.BackupPolicyTemplate,
-	backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
-	backupKey.Name = backupKey.Name + "-" + randomString(6)
-	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
-	if err := buildFromCUE("backup_policy_template.cue", map[string]any{
-		"sts":        sts,
-		"backup_key": backupKey,
-		"template":   template.Name,
-	}, "backup_policy", &backupPolicy); err != nil {
-		return nil, err
-	}
-
-	return &backupPolicy, nil
-}
-
 func BuildBackup(sts *appsv1.StatefulSet,
 	backupPolicyName string,
 	backupKey types.NamespacedName) (*dataprotectionv1alpha1.Backup, error) {
@@ -701,7 +686,7 @@ func BuildConfigMapWithTemplateLow(cluster *appsv1alpha1.Cluster,
 	return &cm, nil
 }
 
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.ConfigManagerParams) (*corev1.Container, error) {
+func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams) (*corev1.Container, error) {
 	const tplFile = "config_manager_sidecar.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -745,4 +730,21 @@ func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secre
 		return nil, err
 	}
 	return secret, nil
+}
+
+func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) (*batchv1.Job, error) {
+	const tplFile = "backup_manifests_template.cue"
+
+	job := &batchv1.Job{}
+	if err := buildFromCUE(tplFile,
+		map[string]any{
+			"job.metadata.name":      key.Name,
+			"job.metadata.namespace": key.Namespace,
+			"backup":                 backup,
+			"podSpec":                podSpec,
+		},
+		"job", job); err != nil {
+		return nil, err
+	}
+	return job, nil
 }

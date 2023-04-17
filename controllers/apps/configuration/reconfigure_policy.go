@@ -29,6 +29,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -130,16 +131,11 @@ func GetClientFactory() createReconfigureClient {
 }
 
 func (param *reconfigureParams) getConfigKey() string {
-	for _, configSpec := range param.Component.ConfigSpecs {
-		if configSpec.Name == param.ConfigSpecName {
-			return configSpec.VolumeName
-		}
-	}
-	return ""
+	return param.ConfigSpecName
 }
 
 func (param *reconfigureParams) getTargetVersionHash() string {
-	hash, err := cfgcore.ComputeHash(param.ConfigMap.Data)
+	hash, err := util.ComputeHash(param.ConfigMap.Data)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to cal configuration version!")
 		return ""
@@ -168,9 +164,9 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 	if isPercent {
 		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
 	} else {
-		r = int32(cfgcore.Min(v, param.getTargetReplicas()))
+		r = int32(util.Min(v, param.getTargetReplicas()))
 	}
-	return cfgcore.Max(r, defaultRolling)
+	return util.Max(r, defaultRolling)
 }
 
 func (param *reconfigureParams) getTargetReplicas() int {
@@ -179,7 +175,7 @@ func (param *reconfigureParams) getTargetReplicas() int {
 
 func (param *reconfigureParams) podMinReadySeconds() int32 {
 	minReadySeconds := param.ComponentUnits[0].Spec.MinReadySeconds
-	return cfgcore.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
+	return util.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
 }
 
 func RegisterPolicy(policy appsv1alpha1.UpgradePolicy, action reconfigurePolicy) {
@@ -197,23 +193,44 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 
 func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgcore.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
 	if !cfgPatch.IsModify {
-		// not exec here
+		// not walk here
 		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfgPatch)
 	}
 
-	actionType := policy
-	if !restart {
+	if enableAutoDecision(restart, policy) {
 		if dynamicUpdate, err := cfgcore.IsUpdateDynamicParameters(cc, cfgPatch); err != nil {
 			return nil, err
 		} else if dynamicUpdate {
-			actionType = appsv1alpha1.AutoReload
+			policy = appsv1alpha1.AutoReload
+		}
+		if enableSyncReload(policy, cc.ReloadOptions) {
+			policy = appsv1alpha1.OperatorSyncUpdate
 		}
 	}
-
-	if action, ok := upgradePolicyMap[actionType]; ok {
+	if policy == appsv1alpha1.NonePolicy {
+		policy = appsv1alpha1.NormalPolicy
+	}
+	if action, ok := upgradePolicyMap[policy]; ok {
 		return action, nil
 	}
-	return nil, cfgcore.MakeError("not support upgrade policy:[%s]", actionType)
+	return nil, cfgcore.MakeError("not support upgrade policy:[%s]", policy)
+}
+
+func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
+	return !restart && policy == appsv1alpha1.NonePolicy
+}
+
+func enableSyncReload(policyType appsv1alpha1.UpgradePolicy, options *appsv1alpha1.ReloadOptions) bool {
+	return policyType == appsv1alpha1.AutoReload && enableSyncTrigger(options)
+}
+
+func enableSyncTrigger(options *appsv1alpha1.ReloadOptions) bool {
+	if options == nil || options.TPLScriptTrigger == nil {
+		return false
+	}
+
+	trigger := options.TPLScriptTrigger
+	return trigger.Sync != nil && *trigger.Sync
 }
 
 func withSucceed(succeedCount int32) func(status *ReturnedStatus) {

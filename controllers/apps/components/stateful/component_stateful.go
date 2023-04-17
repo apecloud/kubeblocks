@@ -41,9 +41,13 @@ func NewStatefulComponent(cli client.Client,
 				ClusterVersion: clusterVersion,
 				Component:      synthesizedComponent,
 				ComponentSet: &Stateful{
-					Cli:           cli,
-					Cluster:       cluster,
-					ComponentSpec: nil,
+					ComponentSetBase: types.ComponentSetBase{
+						Cli:           cli,
+						Cluster:       cluster,
+						ComponentSpec: nil,
+						ComponentDef:  nil,
+						Component:     nil,
+					},
 				},
 				Dag:             dag,
 				WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
@@ -82,7 +86,7 @@ func (c *statefulComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *statefulComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.CreateImpl(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.StatefulsetComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *statefulComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -91,5 +95,5 @@ func (c *statefulComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Cli
 }
 
 func (c *statefulComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.UpdateImpl(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
+	return c.StatefulsetComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }

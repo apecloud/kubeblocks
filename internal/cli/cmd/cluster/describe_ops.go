@@ -61,8 +61,7 @@ type describeOpsOptions struct {
 }
 
 type opsObject interface {
-	appsv1alpha1.VerticalScaling | appsv1alpha1.HorizontalScaling |
-		appsv1alpha1.OpsRequestVolumeClaimTemplate | appsv1alpha1.VolumeExpansion
+	appsv1alpha1.VerticalScaling | appsv1alpha1.HorizontalScaling | appsv1alpha1.OpsRequestVolumeClaimTemplate | appsv1alpha1.VolumeExpansion
 }
 
 func newDescribeOpsOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *describeOpsOptions {
@@ -232,7 +231,7 @@ func (o *describeOpsOptions) getRestartCommand(spec appsv1alpha1.OpsRequestSpec)
 		componentNames[i] = v.ComponentName
 	}
 	return []string{
-		fmt.Sprintf("kbcli cluster restart %s --component-names=%s", spec.ClusterRef,
+		fmt.Sprintf("kbcli cluster restart %s --components=%s", spec.ClusterRef,
 			strings.Join(componentNames, ",")),
 	}
 }
@@ -269,7 +268,7 @@ func (o *describeOpsOptions) getVerticalScalingCommand(spec appsv1alpha1.OpsRequ
 	commands := make([]string, len(componentNameSlice))
 	for i := range componentNameSlice {
 		resource := resourceSlice[i].(corev1.ResourceRequirements)
-		commands[i] = fmt.Sprintf("kbcli cluster vertical-scale %s --component-names=%s",
+		commands[i] = fmt.Sprintf("kbcli cluster vertical-scale %s --components=%s",
 			spec.ClusterRef, strings.Join(componentNameSlice[i], ","))
 		commands[i] += o.addResourceFlag("requests.cpu", resource.Requests.Cpu())
 		commands[i] += o.addResourceFlag("requests.memory", resource.Requests.Memory())
@@ -294,7 +293,7 @@ func (o *describeOpsOptions) getHorizontalScalingCommand(spec appsv1alpha1.OpsRe
 		spec.HorizontalScalingList, convertObject, getCompName)
 	commands := make([]string, len(componentNameSlice))
 	for i := range componentNameSlice {
-		commands[i] = fmt.Sprintf("kbcli cluster horizontal-scale %s --component-names=%s --replicas=%d",
+		commands[i] = fmt.Sprintf("kbcli cluster horizontal-scale %s --components=%s --replicas=%d",
 			spec.ClusterRef, strings.Join(componentNameSlice[i], ","), replicasSlice[i].(int32))
 	}
 	return commands
@@ -314,7 +313,7 @@ func (o *describeOpsOptions) getVolumeExpansionCommand(spec appsv1alpha1.OpsRequ
 			v.VolumeClaimTemplates, convertObject, getVCTName)
 		for i := range vctNameSlice {
 			storage := storageSlice[i].(resource.Quantity)
-			commands = append(commands, fmt.Sprintf("kbcli cluster volume-expand %s --component-names=%s --volume-claim-template-names=%s --storage=%s",
+			commands = append(commands, fmt.Sprintf("kbcli cluster volume-expand %s --components=%s --volume-claim-template-names=%s --storage=%s",
 				spec.ClusterRef, v.ComponentName, strings.Join(vctNameSlice[i], ","), storage.String()))
 		}
 	}
@@ -342,8 +341,8 @@ func (o *describeOpsOptions) getReconfiguringCommand(spec appsv1alpha1.OpsReques
 	commandArgs = append(commandArgs, "cluster")
 	commandArgs = append(commandArgs, "configure")
 	commandArgs = append(commandArgs, spec.ClusterRef)
-	commandArgs = append(commandArgs, fmt.Sprintf("--component-names=%s", componentName))
-	commandArgs = append(commandArgs, fmt.Sprintf("--template-name=%s", configuration.Name))
+	commandArgs = append(commandArgs, fmt.Sprintf("--components=%s", componentName))
+	commandArgs = append(commandArgs, fmt.Sprintf("--config-spec=%s", configuration.Name))
 
 	config := configuration.Keys[0]
 	commandArgs = append(commandArgs, fmt.Sprintf("--config-file=%s", config.Key))

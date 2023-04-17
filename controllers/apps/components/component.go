@@ -49,7 +49,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	dag *graph.DAG) (types.Component, error) {
 	var compDef *appsv1alpha1.ClusterComponentDefinition
 	var compVer *appsv1alpha1.ClusterComponentVersion
-	compSpec := cluster.GetComponentByName(compName)
+	compSpec := cluster.Spec.GetComponentByName(compName)
 	if compSpec != nil {
 		compDef = definition.GetComponentDefByName(compSpec.ComponentDefRef)
 		if compDef == nil {
@@ -57,7 +57,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 				cluster.Name, compSpec.Name, compSpec.ComponentDefRef)
 		}
 		if version != nil {
-			compVer = version.GetDefNameMappingComponents()[compSpec.ComponentDefRef]
+			compVer = version.Spec.GetDefNameMappingComponents()[compSpec.ComponentDefRef]
 		}
 	}
 
@@ -81,8 +81,8 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	case appsv1alpha1.Stateless:
 		return stateless.NewStatelessComponent(cli, cluster, version, synthesizedComp, dag), nil
 	}
-	return nil, fmt.Errorf("unknown workload type: %s, cluster: %s, component: %s, component definition ref: %s",
-		compDef.WorkloadType, cluster.Name, compSpec.Name, compSpec.ComponentDefRef)
+	panic(fmt.Sprintf("unknown workload type: %s, cluster: %s, component: %s, component definition ref: %s",
+		compDef.WorkloadType, cluster.Name, compSpec.Name, compSpec.ComponentDefRef))
 }
 
 func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,

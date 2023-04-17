@@ -10,6 +10,7 @@ spec:
   # tplRef: mysql-3node-tpl-8.0
   reloadOptions:
     tplScriptTrigger:
+      sync: true
       scriptConfigMapRef: mysql-reload-script
       namespace: {{ .Release.Namespace }}
 

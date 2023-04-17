@@ -12,11 +12,11 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      {{ include "csi-hostpath-driver.labels" . | nindent 6 }}
+      {{ include "csi-hostpath-driver.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{ include "csi-hostpath-driver.labels" . | nindent 8 }}
+        {{ include "csi-hostpath-driver.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "csi-hostpath-driver.serviceAccountName" . }}
       {{ with .Values.imagePullSecrets }}

@@ -217,8 +217,8 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, statement []str
 
 func renderSecretWithPwd(key componentUniqueKey, username, passwd string) *corev1.Secret {
 	secretData := map[string][]byte{}
-	secretData[accountNameForSecret] = []byte(username)
-	secretData[accountPasswdForSecret] = []byte(passwd)
+	secretData[constant.AccountNameForSecret] = []byte(username)
+	secretData[constant.AccountPasswdForSecret] = []byte(passwd)
 
 	ml := getLabelsForSecretsAndJobs(key)
 	ml[constant.ClusterAccountLabelKey] = username
@@ -369,9 +369,16 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 		defaultTTLZero := (int32)(0)
 		job.Spec.TTLSecondsAfterFinished = &defaultTTLZero
 	}
+
 	// add toleration
 	tolerations := cluster.Spec.Tolerations
-	if len(tolerations) > 0 {
-		job.Spec.Template.Spec.Tolerations = cluster.Spec.Tolerations
+	clusterComp := cluster.Spec.GetComponentByName(compKey.componentName)
+	if clusterComp != nil {
+		if len(clusterComp.Tolerations) != 0 {
+			tolerations = clusterComp.Tolerations
+		}
 	}
+	// add built-in toleration
+	tolerations = componetutil.PatchBuiltInToleration(tolerations)
+	job.Spec.Template.Spec.Tolerations = tolerations
 }

@@ -6,6 +6,7 @@ metadata:
   labels:
     {{- include "qdrant.labels" . | nindent 4 }}
 spec:
+  type: qdrant
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
@@ -31,11 +32,9 @@ spec:
       service:
         ports:
           - name: tcp-qdrant
-            protocol: TCP
             port: 6333
             targetPort: tcp-qdrant
           - name: grpc-qdrant
-            protocol: TCP
             port: 6334
             targetPort: grpc-qdrant
       volumeTypes:
@@ -89,6 +88,8 @@ spec:
             ports:
               - name: tcp-qdrant
                 containerPort: 6333
+              - name: grpc-qdrant
+                containerPort: 6334
               - name: tcp-metrics
                 containerPort: 9091
             command:

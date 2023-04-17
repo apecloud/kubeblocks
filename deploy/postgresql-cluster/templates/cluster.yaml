@@ -16,10 +16,12 @@ spec:
   {{- end }}
   componentSpecs:
     - name: postgresql # user-defined
-      componentDefRef: pg-replication # ref clusterdefinition components.name
+      componentDefRef: postgresql # ref clusterdefinition components.name
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 2 }}
       primaryIndex: {{ .Values.primaryIndex | default 0 }}
+      switchPolicy:
+        type: {{ .Values.switchPolicy.type}}
       enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
       {{- with  .Values.resources }}
       resources:

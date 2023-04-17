@@ -215,7 +215,7 @@ var _ = Describe("sts horizontal scaling test", func() {
 	//
 	//			By("creating a backup as user do")
 	//			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-	//				SetTTL("168h0m0s").
+	//				SetTTL("7d").
 	//				SetBackupPolicyName(backupPolicyName).
 	//				SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
 	//				AddAppInstanceLabel(clusterName).

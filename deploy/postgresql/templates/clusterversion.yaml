@@ -7,8 +7,12 @@ metadata:
 spec:
   clusterDefinitionRef: postgresql
   componentVersions:
-  - componentDefRef: pg-replication
+  - componentDefRef: postgresql
     versionsContext:
+      initContainers:
+        - name: pg-init-container
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
       containers:
       - name: postgresql
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+---

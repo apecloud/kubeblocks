@@ -31,6 +31,23 @@ reloader: test-go-generate build-checks ## Build reloader related binaries
 clean-reloader: ## Clean bin/reloader.
 	rm -f bin/reloader
 
+## tpltool cmd
+
+CONFIG_TOOL_LD_FLAGS = "-s -w"
+
+bin/tpltool.%: ## Cross build bin/tpltool.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CONFIG_TOOL_LD_FLAGS} -o $@ ./cmd/tpl/main.go
+
+.PHONY: tpltool
+tpltool: OS=$(shell $(GO) env GOOS)
+tpltool: ARCH=$(shell $(GO) env GOARCH)
+tpltool: build-checks ## Build tpltool related binaries
+	$(MAKE) bin/tpltool.${OS}.${ARCH}
+	mv bin/tpltool.${OS}.${ARCH} bin/tpltool
+
+.PHONY: clean-tpltool
+clean-tpltool: ## Clean bin/tpltool.
+	rm -f bin/tpltool
 
 ## cue-helper cmd
 
@@ -61,6 +78,13 @@ bin/probe.%: ## Cross build bin/probe.$(OS).$(ARCH) .
 probe: OS=$(shell $(GO) env GOOS)
 probe: ARCH=$(shell $(GO) env GOARCH)
 probe: test-go-generate build-checks ## Build probe related binaries
+	$(MAKE) bin/probe.${OS}.${ARCH}
+	mv bin/probe.${OS}.${ARCH} bin/probe
+
+.PHONY: probe-fast
+probe-fast: OS=$(shell $(GO) env GOOS)
+probe-fast: ARCH=$(shell $(GO) env GOARCH)
+probe-fast:
 	$(MAKE) bin/probe.${OS}.${ARCH}
 	mv bin/probe.${OS}.${ARCH} bin/probe
 

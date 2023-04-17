@@ -18,11 +18,10 @@ kbcli cluster backup [flags]
 ### Options
 
 ```
-      --backup-name string   Backup name
-      --backup-type string   Backup type (default "snapshot")
-  -h, --help                 help for backup
-      --role string          backup on cluster role
-      --ttl string           Time to live (default "168h0m0s")
+      --backup-name string     Backup name
+      --backup-policy string   Backup policy name, this flag will be ignored when backup-type is snapshot
+      --backup-type string     Backup type (default "snapshot")
+  -h, --help                   help for backup
 ```
 
 ### Options inherited from parent commands

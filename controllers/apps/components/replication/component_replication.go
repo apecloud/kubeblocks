@@ -28,7 +28,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -48,11 +48,16 @@ func NewReplicationComponent(cli client.Client,
 			Cluster:        cluster,
 			ClusterVersion: clusterVersion,
 			Component:      synthesizedComponent,
-			ComponentSet: &replicationset.ReplicationSet{
-				Cli:           cli,
-				Cluster:       cluster,
-				ComponentSpec: nil,
-				ComponentDef:  nil,
+			ComponentSet: &ReplicationSet{
+				Stateful: stateful.Stateful{
+					ComponentSetBase: types.ComponentSetBase{
+						Cli:           cli,
+						Cluster:       cluster,
+						ComponentSpec: nil,
+						ComponentDef:  nil,
+						Component:     nil,
+					},
+				},
 			},
 			Dag:             dag,
 			WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
@@ -188,7 +193,7 @@ func (c *replicationComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.
 	for _, w := range c.RunningWorkloads {
 		objs = append(objs, w)
 	}
-	if err := c.StatusImpl(reqCtx, cli, objs); err != nil {
+	if err := c.ComponentBase.Status(reqCtx, cli, objs); err != nil {
 		return err
 	}
 	return c.HandleGarbageOfRestoreBeforeRunning()
@@ -201,7 +206,7 @@ func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli c
 			pvc := &corev1.PersistentVolumeClaim{}
 			key := client.ObjectKey{
 				Namespace: sts.GetNamespace(),
-				Name:      replicationset.GetPersistentVolumeClaimName(sts, &vct, 0),
+				Name:      GetPersistentVolumeClaimName(sts, &vct, 0),
 			}
 			if err = cli.Get(reqCtx.Ctx, key, pvc); err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -226,25 +231,25 @@ func (c *replicationComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli c
 }
 
 func (c *replicationComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	ret := c.horizontalScaling(c.RunningWorkloads)
-	if ret == 0 {
-		return nil
-	}
-	if ret < 0 {
-		if err := c.scaleIn(reqCtx, cli, c.RunningWorkloads); err != nil {
-			return err
-		}
-	} else {
-		if err := c.scaleOut(reqCtx, cli, c.RunningWorkloads); err != nil {
-			return err
-		}
-	}
-
-	reqCtx.Recorder.Eventf(c.Cluster,
-		corev1.EventTypeNormal,
-		"HorizontalScale",
-		"start horizontal scale component %s of cluster %s from %d to %d",
-		c.GetName(), c.GetClusterName(), int(c.Component.Replicas)-ret, c.Component.Replicas)
+	////ret := c.horizontalScaling(c.RunningWorkloads)
+	////if ret == 0 {
+	////	return nil
+	////}
+	////if ret < 0 {
+	////	if err := c.scaleIn(reqCtx, cli, c.RunningWorkloads); err != nil {
+	////		return err
+	////	}
+	////} else {
+	////	if err := c.scaleOut(reqCtx, cli, c.RunningWorkloads); err != nil {
+	////		return err
+	////	}
+	////}
+	//
+	//reqCtx.Recorder.Eventf(c.Cluster,
+	//	corev1.EventTypeNormal,
+	//	"HorizontalScale",
+	//	"start horizontal scale component %s of cluster %s from %d to %d",
+	//	c.GetName(), c.GetClusterName(), int(c.Component.Replicas)-ret, c.Component.Replicas)
 
 	return nil
 }
@@ -262,29 +267,29 @@ func (c *replicationComponent) Reconfigure(reqCtx intctrlutil.RequestCtx, cli cl
 	return nil // TODO(impl)
 }
 
-// TODO: fix stale cache problem
-// TODO: if sts created in last reconcile-loop not present in cache, hasReplicationSetHScaling return false positive
-// < 0 for scale in, > 0 for scale out, and == 0 for nothing
-func (c *replicationComponent) horizontalScaling(stsList []*appsv1.StatefulSet) int {
-	// TODO(refactor): should use a more stable status
-	return int(c.Component.Replicas) - len(stsList)
-}
-
-func (c *replicationComponent) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsList []*appsv1.StatefulSet) error {
-	stsToDelete, err := replicationset.HandleComponentHorizontalScaleIn(reqCtx.Ctx, cli, c.Cluster, c.GetSynthesizedComponent(), stsList)
-	if err != nil {
-		return err
-	}
-	for _, sts := range stsToDelete {
-		c.DeleteResource(sts, nil)
-	}
-
-	return nil
-}
-
-func (c *replicationComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsList []*appsv1.StatefulSet) error {
-	return nil
-}
+//// TODO: fix stale cache problem
+//// TODO: if sts created in last reconcile-loop not present in cache, hasReplicationSetHScaling return false positive
+//// < 0 for scale in, > 0 for scale out, and == 0 for nothing
+//func (c *replicationComponent) horizontalScaling(stsList []*appsv1.StatefulSet) int {
+//	// TODO(refactor): should use a more stable status
+//	return int(c.Component.Replicas) - len(stsList)
+//}
+//
+//func (c *replicationComponent) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsList []*appsv1.StatefulSet) error {
+//	stsToDelete, err := HandleComponentHorizontalScaleIn(reqCtx.Ctx, cli, c.Cluster, c.GetSynthesizedComponent(), stsList)
+//	if err != nil {
+//		return err
+//	}
+//	for _, sts := range stsToDelete {
+//		c.DeleteResource(sts, nil)
+//	}
+//
+//	return nil
+//}
+//
+//func (c *replicationComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsList []*appsv1.StatefulSet) error {
+//	return nil
+//}
 
 func (c *replicationComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObjList []*appsv1.StatefulSet) error {
 	for i, stsObj := range stsObjList {

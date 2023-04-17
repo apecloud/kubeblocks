@@ -46,7 +46,7 @@ func TestIsProbeTimeout(t *testing.T) {
 	podsReadyTime := &metav1.Time{Time: time.Now().Add(-10 * time.Minute)}
 	compDef := &appsv1alpha1.ClusterComponentDefinition{
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleChangedProbe:               &appsv1alpha1.ClusterDefinitionProbe{},
+			RoleProbe:                      &appsv1alpha1.ClusterDefinitionProbe{},
 			RoleProbeTimeoutAfterPodsReady: appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady,
 		},
 	}
@@ -283,7 +283,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(err).ShouldNot(Succeed())
 
 			By("test GetComponentPhaseWhenPodsNotReady function")
-			consensusComp := cluster.GetComponentByName(consensusCompName)
+			consensusComp := cluster.Spec.GetComponentByName(consensusCompName)
 			checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
 				sts := workload.(*appsv1.StatefulSet)
 				return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)

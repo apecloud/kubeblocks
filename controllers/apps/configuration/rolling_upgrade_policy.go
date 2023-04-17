@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"context"
 	"os"
 
 	"github.com/spf13/viper"
@@ -25,6 +26,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -95,15 +97,6 @@ func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) 
 		configVersion   = params.getTargetVersionHash()
 	)
 
-	updatePodLabelsVersion := func(pod *corev1.Pod, labelKey, labelValue string) error {
-		patch := client.MergeFrom(pod.DeepCopy())
-		if pod.Labels == nil {
-			pod.Labels = make(map[string]string, 1)
-		}
-		pod.Labels[labelKey] = labelValue
-		return params.Client.Patch(params.Ctx.Ctx, pod, patch)
-	}
-
 	if !canPerformUpgrade(pods, params) {
 		return makeReturnedStatus(ESRetry), nil
 	}
@@ -125,10 +118,10 @@ func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) 
 			params.Ctx.Log.Info("pod is rolling updating.", "pod name", pod.Name)
 			continue
 		}
-		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
+		if err := funcs.RestartContainerFunc(&pod, params.Ctx.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
 			return makeReturnedStatus(ESAndRetryFailed), err
 		}
-		if err := updatePodLabelsVersion(&pod, configKey, configVersion); err != nil {
+		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx.Ctx); err != nil {
 			return makeReturnedStatus(ESAndRetryFailed), err
 		}
 	}
@@ -171,7 +164,7 @@ func markDynamicCursor(pods []corev1.Pod, podsStats *componentPodStats, configKe
 		podsStats.updated[pod.Name] = pod
 	}
 
-	podWindows.begin = cfgcore.Max[int](podWindows.end-int(rollingReplicas), 0)
+	podWindows.begin = util.Max[int](podWindows.end-int(rollingReplicas), 0)
 	for i := podWindows.begin; i < podWindows.end; i++ {
 		pod := &pods[i]
 		if podutil.IsMatchConfigVersion(pod, configKey, currentVersion) {
@@ -241,4 +234,13 @@ type switchWindow struct {
 
 func (w *switchWindow) getWaitRollingPods() []corev1.Pod {
 	return w.pods[w.begin:w.end]
+}
+
+func updatePodLabelsWithConfigVersion(pod *corev1.Pod, labelKey, configVersion string, cli client.Client, ctx context.Context) error {
+	patch := client.MergeFrom(pod.DeepCopy())
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string, 1)
+	}
+	pod.Labels[labelKey] = configVersion
+	return cli.Patch(ctx, pod, patch)
 }

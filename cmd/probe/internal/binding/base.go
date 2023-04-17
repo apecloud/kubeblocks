@@ -137,7 +137,6 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 		return nil, errors.Errorf("invoke request required")
 	}
 
-	ops.Logger.Debugf("request operation: %v", req.Operation)
 	startTime := time.Now()
 	resp := &bindings.InvokeResponse{
 		Metadata: map[string]string{

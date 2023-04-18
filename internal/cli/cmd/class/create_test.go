@@ -83,15 +83,15 @@ var _ = Describe("create", func() {
 		})
 
 		It("should succeed with required arguments", func() {
-			fillResources(createOptions, "2", "8Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
-			Expect(createOptions.validate([]string{"general-2c8g"})).ShouldNot(HaveOccurred())
+			fillResources(createOptions, "96", "384Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
+			Expect(createOptions.validate([]string{"general-96c384g"})).ShouldNot(HaveOccurred())
 			Expect(createOptions.run()).ShouldNot(HaveOccurred())
 			Expect(out.String()).Should(ContainSubstring(createOptions.ClassName))
 		})
 
 		It("should fail if constraint not exist", func() {
-			createOptions.Constraint = "constraint-not-exist"
 			fillResources(createOptions, "2", "8Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
+			createOptions.Constraint = "constraint-not-exist"
 			Expect(createOptions.run()).Should(HaveOccurred())
 		})
 

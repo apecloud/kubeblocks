@@ -32,7 +32,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// TODO(refactor): define a custom workload to encapsulate all the resources.
+// TODO(impl): define a custom workload to encapsulate all the resources.
 
 type ComponentWorkloadBuilder interface {
 	//	runtime, config, script, env, volume, service, monitor, probe

@@ -53,22 +53,6 @@ var (
 	ErrReqClusterComponentSpecObj = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
 )
 
-// TODO(refactor): should define this somewhere
-
-func IsClusterDeleting(cluster appsv1alpha1.Cluster) bool {
-	return !cluster.GetDeletionTimestamp().IsZero()
-}
-
-func IsClusterUpdating(cluster appsv1alpha1.Cluster) bool {
-	return cluster.Status.ObservedGeneration != cluster.Generation
-}
-
-func IsClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
-	return !IsClusterDeleting(cluster) && !IsClusterUpdating(cluster)
-	// return cluster.Status.ObservedGeneration == cluster.Generation &&
-	//	slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
-}
-
 func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
 	ctx context.Context, cli client.Client, _ func(T, L), namespace string, labels client.MatchingLabels) ([]PT, error) {
 	var objList L

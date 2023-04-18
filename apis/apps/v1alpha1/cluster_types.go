@@ -474,6 +474,20 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
+func (r Cluster) IsDeleting() bool {
+	return !r.GetDeletionTimestamp().IsZero()
+}
+
+func (r Cluster) IsUpdating() bool {
+	return r.Status.ObservedGeneration != r.Generation
+}
+
+func (r Cluster) IsStatusUpdating() bool {
+	return !r.IsDeleting() && !r.IsUpdating()
+	// return r.Status.ObservedGeneration == r.Generation &&
+	//	slices.Contains(GetClusterTerminalPhases(), r.Status.Phase)
+}
+
 // GetComponentByName gets component by name.
 func (r ClusterSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
 	for _, v := range r.ComponentSpecs {

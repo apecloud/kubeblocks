@@ -19,7 +19,6 @@ package internal
 import (
 	"fmt"
 	"reflect"
-	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -39,6 +38,7 @@ import (
 // StatefulComponentBase as a base class for single stateful-set based component (stateful & consensus)
 type StatefulComponentBase struct {
 	ComponentBase
+	// runningWorkload can be nil, and the replicas of workload can be nil (zero)
 	runningWorkload *appsv1.StatefulSet
 }
 
@@ -71,23 +71,16 @@ func (c *StatefulComponentBase) loadRunningWorkload(reqCtx intctrlutil.RequestCt
 	if err != nil {
 		return nil, err
 	}
-
 	cnt := len(stsList)
+	if cnt == 1 {
+		return stsList[0], nil
+	}
 	if cnt == 0 {
-		return nil, fmt.Errorf("no workload found for the component, cluster: %s, component: %s",
-			c.GetClusterName(), c.GetName())
-	} else if cnt > 1 {
+		return nil, nil
+	} else {
 		return nil, fmt.Errorf("more than one workloads found for the component, cluster: %s, component: %s, cnt: %d",
 			c.GetClusterName(), c.GetName(), cnt)
 	}
-
-	sts := stsList[0]
-	if sts.Spec.Replicas == nil {
-		return nil, fmt.Errorf("running workload for the component has no replica, cluster: %s, component: %s",
-			c.GetClusterName(), c.GetName())
-	}
-
-	return sts, nil
 }
 
 func (c *StatefulComponentBase) GetBuiltObjects(builder ComponentWorkloadBuilder) ([]client.Object, error) {
@@ -125,7 +118,7 @@ func (c *StatefulComponentBase) Create(reqCtx intctrlutil.RequestCtx, cli client
 }
 
 func (c *StatefulComponentBase) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	// TODO(refactor): delete component owned resources
+	// TODO(impl): delete component owned resources
 	return nil
 }
 
@@ -161,10 +154,6 @@ func (c *StatefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client
 
 func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	if err := c.init(reqCtx, cli, nil, true); err != nil {
-		// TODO(refactor): fix me
-		if strings.Contains(err.Error(), "no workload found for the component") {
-			return nil
-		}
 		return err
 	}
 	if err := c.ComponentBase.Status(reqCtx, cli, c.runningWorkload); err != nil {
@@ -174,6 +163,9 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 }
 
 func (c *StatefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	if c.runningWorkload == nil {
+		return nil
+	}
 	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
 		var vctProto *corev1.PersistentVolumeClaimSpec
 		for _, v := range c.Component.VolumeClaimTemplates {
@@ -188,7 +180,7 @@ func (c *StatefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli 
 			continue
 		}
 
-		// TODO(refactor):
+		// TODO(fix):
 		//   1. check that can't decrease the storage size.
 		//   2. since we can't update the storage size of stateful set, so we can't use it to determine the expansion.
 		if vct.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Resources.Requests[corev1.ResourceStorage] {
@@ -212,6 +204,9 @@ func (c *StatefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli 
 }
 
 func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	if c.runningWorkload == nil {
+		return nil
+	}
 	ret := c.horizontalScaling(c.runningWorkload)
 	if ret == 0 {
 		return nil
@@ -236,6 +231,9 @@ func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, c
 }
 
 func (c *StatefulComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	if c.runningWorkload == nil {
+		return nil
+	}
 	return util.RestartPod(&c.runningWorkload.Spec.Template)
 }
 
@@ -393,23 +391,34 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 }
 
 func (c *StatefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
-	c.updateWorkload(stsObj, 0)
+	if stsObj == nil {
+		c.createWorkload()
+	} else {
+		c.updateWorkload(stsObj)
 
-	if err := c.UpdateService(reqCtx, cli); err != nil {
-		return err
+		// to work around that the scaled PVC will be deleted at object action.
+		if err := c.updatePVC(reqCtx, cli, stsObj); err != nil {
+			return err
+		}
 	}
 
-	// to work around that the scaled PVC will be deleted at object action.
-	if err := c.updatePVC(reqCtx, cli, stsObj); err != nil {
+	if err := c.UpdateService(reqCtx, cli); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet, idx int32) {
+func (c *StatefulComponentBase) createWorkload() {
+	stsProto := c.WorkloadVertexs[0].Obj.(*appsv1.StatefulSet)
+	c.WorkloadVertexs[0].Obj = stsProto
+	c.WorkloadVertexs[0].Action = ictrltypes.ActionCreatePtr()
+	c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload created")
+}
+
+func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) {
 	stsObjCopy := stsObj.DeepCopy()
-	stsProto := c.WorkloadVertexs[idx].Obj.(*appsv1.StatefulSet)
+	stsProto := c.WorkloadVertexs[0].Obj.(*appsv1.StatefulSet)
 
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the statefulSet will be updated.
@@ -418,8 +427,8 @@ func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet, idx i
 	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
 	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
-		c.WorkloadVertexs[idx].Obj = stsObjCopy
-		c.WorkloadVertexs[idx].Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
+		c.WorkloadVertexs[0].Obj = stsObjCopy
+		c.WorkloadVertexs[0].Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
 		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload updated")
 	}
 }

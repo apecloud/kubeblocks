@@ -38,7 +38,7 @@ func (c *clusterCredentialTransformer) Transform(dag *graph.DAG) error {
 	}
 
 	cluster, _ := rootVertex.Obj.(*appsv1alpha1.Cluster)
-	if isClusterDeleting(*cluster) {
+	if cluster.IsDeleting() {
 		return nil
 	}
 

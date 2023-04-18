@@ -62,8 +62,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	if compSpec == nil || compDef == nil {
-		// TODO(refactor): fix me
-		return nil, fmt.Errorf("NotSupported")
+		return nil, nil
 	}
 
 	synthesizedComp, err := composeSynthesizedComponent(reqCtx, cli, cluster, definition, compDef, compSpec, compVer)

@@ -182,13 +182,12 @@ var _ = Describe("Replication Component", func() {
 			Expect(testapps.ChangeObj(&testCtx, primaryPod, func(lpod *corev1.Pod) {
 				lpod.Labels[constant.RoleLabelKey] = ""
 			})).Should(Succeed())
-			_, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj),
-				func(g Gomega, cluster *appsv1alpha1.Cluster) {
-					compStatus := cluster.Status.Components[testapps.DefaultRedisCompName]
-					g.Expect(compStatus.GetObjectMessage(primaryPod.Kind, primaryPod.Name)).
-						Should(ContainSubstring("empty label for pod, please check"))
-				})).Should(Succeed())
+			Eventually(func(g Gomega) {
+				_, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
+				compStatus := replicationComponent.Cluster.Status.Components[testapps.DefaultRedisCompName]
+				Expect(compStatus.GetObjectMessage(primaryPod.Kind, primaryPod.Name)).
+					Should(ContainSubstring("empty label for pod, please check"))
+			}).Should(Succeed())
 
 			By("Checking if the pod is not updated when statefulset is not updated")
 			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())

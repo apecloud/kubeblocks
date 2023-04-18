@@ -19,7 +19,6 @@ package stateless
 import (
 	"fmt"
 	"reflect"
-	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -65,6 +64,7 @@ func NewStatelessComponent(cli client.Client,
 
 type statelessComponent struct {
 	internal.ComponentBase
+	// runningWorkload can be nil, and the replicas of workload can be nil (zero)
 	runningWorkload *appsv1.Deployment
 }
 
@@ -116,23 +116,16 @@ func (c *statelessComponent) loadRunningWorkload(reqCtx intctrlutil.RequestCtx, 
 	if err != nil {
 		return nil, err
 	}
-
 	cnt := len(deployList)
+	if cnt == 1 {
+		return deployList[0], nil
+	}
 	if cnt == 0 {
-		return nil, fmt.Errorf("no workload found for the component, cluster: %s, component: %s",
-			c.GetClusterName(), c.GetName())
-	} else if cnt > 1 {
+		return nil, nil
+	} else {
 		return nil, fmt.Errorf("more than one workloads found for the stateless component, cluster: %s, component: %s, cnt: %d",
 			c.GetClusterName(), c.GetName(), cnt)
 	}
-
-	deploy := deployList[0]
-	if deploy.Spec.Replicas == nil {
-		return nil, fmt.Errorf("running workload for the stateless component has no replica, cluster: %s, component: %s",
-			c.GetClusterName(), c.GetName())
-	}
-
-	return deploy, nil
 }
 
 func (c *statelessComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
@@ -173,6 +166,11 @@ func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	return nil
 }
 
+func (c *statelessComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	// TODO(impl): delete component owned resources
+	return nil
+}
+
 func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	if err := c.init(reqCtx, cli, c.newBuilder(reqCtx, cli, nil), true); err != nil {
 		return err
@@ -203,17 +201,8 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	return c.ResolveObjectsAction(reqCtx, cli)
 }
 
-func (c *statelessComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	// TODO(refactor): delete component owned resources
-	return nil
-}
-
 func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	if err := c.init(reqCtx, cli, nil, true); err != nil {
-		// TODO(refactor): fix me
-		if strings.Contains(err.Error(), "no workload found for the component") {
-			return nil
-		}
 		return err
 	}
 	return c.ComponentBase.Status(reqCtx, cli, c.runningWorkload)
@@ -224,7 +213,16 @@ func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli cli
 }
 
 func (c *statelessComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if *c.runningWorkload.Spec.Replicas != c.Component.Replicas {
+	if c.runningWorkload == nil {
+		return nil
+	}
+	if c.runningWorkload.Spec.Replicas == nil && c.Component.Replicas > 0 {
+		reqCtx.Recorder.Eventf(c.Cluster,
+			corev1.EventTypeNormal,
+			"HorizontalScale",
+			"start horizontal scale component %s of cluster %s from %d to %d",
+			c.GetName(), c.GetClusterName(), 0, c.Component.Replicas)
+	} else if c.runningWorkload.Spec.Replicas != nil && *c.runningWorkload.Spec.Replicas != c.Component.Replicas {
 		reqCtx.Recorder.Eventf(c.Cluster,
 			corev1.EventTypeNormal,
 			"HorizontalScale",
@@ -235,6 +233,9 @@ func (c *statelessComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli 
 }
 
 func (c *statelessComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	if c.runningWorkload == nil {
+		return nil
+	}
 	return util.RestartPod(&c.runningWorkload.Spec.Template)
 }
 
@@ -243,13 +244,24 @@ func (c *statelessComponent) Reconfigure(reqCtx intctrlutil.RequestCtx, cli clie
 }
 
 func (c *statelessComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, deployObj *appsv1.Deployment) error {
-	c.updateWorkload(deployObj)
+	if deployObj == nil {
+		c.createWorkload()
+	} else {
+		c.updateWorkload(deployObj)
+	}
 
 	if err := c.UpdateService(reqCtx, cli); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (c *statelessComponent) createWorkload() {
+	deployProto := c.WorkloadVertexs[0].Obj.(*appsv1.Deployment)
+	c.WorkloadVertexs[0].Obj = deployProto
+	c.WorkloadVertexs[0].Action = ictrltypes.ActionCreatePtr()
+	c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload created")
 }
 
 func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {

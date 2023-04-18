@@ -148,13 +148,19 @@ func (c *ComponentBase) NoopResource(obj client.Object, parent *ictrltypes.Lifec
 	return ictrltypes.LifecycleObjectNoop(c.Dag, obj, parent)
 }
 
-// ValidateObjectsAction validates the action of all objects in dag has been determined
+// ValidateObjectsAction validates the action of objects in dag has been determined.
 func (c *ComponentBase) ValidateObjectsAction() error {
 	for _, v := range c.Dag.Vertices() {
-		if node, ok := v.(*ictrltypes.LifecycleVertex); !ok {
+		node, ok := v.(*ictrltypes.LifecycleVertex)
+		if !ok {
 			return fmt.Errorf("unexpected vertex type, cluster: %s, component: %s, vertex: %T",
 				c.GetClusterName(), c.GetName(), v)
-		} else if node.Action == nil {
+		}
+		if node.Obj == nil {
+			return fmt.Errorf("unexpected nil vertex object, cluster: %s, component: %s, vertex: %T",
+				c.GetClusterName(), c.GetName(), v)
+		}
+		if node.Action == nil {
 			return fmt.Errorf("unexpected nil vertex action, cluster: %s, component: %s, vertex: %T",
 				c.GetClusterName(), c.GetName(), v)
 		}
@@ -162,17 +168,19 @@ func (c *ComponentBase) ValidateObjectsAction() error {
 	return nil
 }
 
-// ResolveObjectsAction resolves the action of objects in dag to guarantee that all object actions will be determined
+// ResolveObjectsAction resolves the action of objects in dag to guarantee that all object actions will be determined.
 func (c *ComponentBase) ResolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	snapshot, err := readCacheSnapshot(reqCtx, cli, c.GetCluster())
 	if err != nil {
 		return err
 	}
 	for _, v := range c.Dag.Vertices() {
-		if node, ok := v.(*ictrltypes.LifecycleVertex); !ok {
+		node, ok := v.(*ictrltypes.LifecycleVertex)
+		if !ok {
 			return fmt.Errorf("unexpected vertex type, cluster: %s, component: %s, vertex: %T",
 				c.GetClusterName(), c.GetName(), v)
-		} else if node.Action == nil {
+		}
+		if node.Action == nil {
 			if action, err := resolveObjectAction(snapshot, node); err != nil {
 				return err
 			} else {
@@ -180,10 +188,10 @@ func (c *ComponentBase) ResolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli 
 			}
 		}
 	}
-	if util.IsClusterStatusUpdating(*c.GetCluster()) {
+	if c.GetCluster().IsStatusUpdating() {
 		for _, vertex := range c.Dag.Vertices() {
 			v, _ := vertex.(*ictrltypes.LifecycleVertex)
-			// TODO(refactor): fix me, workaround for h-scaling to update stateful set
+			// TODO(refactor): fix me, this is a workaround for h-scaling to update stateful set.
 			if _, ok := v.Obj.(*appsv1.StatefulSet); !ok {
 				v.Immutable = true
 			}
@@ -359,6 +367,10 @@ func (c *ComponentBase) status4HorizontalScale(reqCtx intctrlutil.RequestCtx, cl
 
 func (c *ComponentBase) status4GeneralWorkloadUpdate(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) error {
 	///// WorkloadController.handleWorkloadUpdate
+	if hasNilObject(obj) {
+		return nil
+	}
+
 	if vertexes, err := c.ComponentSet.HandleRoleChange(reqCtx.Ctx, obj); err != nil {
 		return err
 	} else {
@@ -379,6 +391,11 @@ func (c *ComponentBase) status4GeneralWorkloadUpdate(reqCtx intctrlutil.RequestC
 }
 
 func (c *ComponentBase) rebuildLatestStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) error {
+	// TODO(refactor): should review it again
+	if hasNilObject(obj) {
+		return nil
+	}
+
 	pods, err := util.ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return err
@@ -630,6 +647,10 @@ func isContainerFailedAndTimedOut(pod *corev1.Pod, podConditionType corev1.PodCo
 //	}
 //
 // }
+
+func hasNilObject(obj client.Object) bool {
+	return reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil()
+}
 
 type gvkName struct {
 	gvk      schema.GroupVersionKind

@@ -18,8 +18,6 @@ package lifecycle
 
 import (
 	"time"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 func newRequeueError(after time.Duration, reason string) error {
@@ -27,18 +25,4 @@ func newRequeueError(after time.Duration, reason string) error {
 		reason:       reason,
 		requeueAfter: after,
 	}
-}
-
-func isClusterDeleting(cluster appsv1alpha1.Cluster) bool {
-	return !cluster.GetDeletionTimestamp().IsZero()
-}
-
-func isClusterUpdating(cluster appsv1alpha1.Cluster) bool {
-	return cluster.Status.ObservedGeneration != cluster.Generation
-}
-
-func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
-	return !isClusterDeleting(cluster) && !isClusterUpdating(cluster)
-	// return cluster.Status.ObservedGeneration == cluster.Generation &&
-	//	slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
 }

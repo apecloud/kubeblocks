@@ -45,7 +45,7 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 	cluster, _ := rootVertex.Obj.(*appsv1alpha1.Cluster)
 
 	// return fast when cluster is deleting
-	if isClusterDeleting(*origCluster) {
+	if origCluster.IsDeleting() {
 		return nil
 	}
 
@@ -103,9 +103,7 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 	for compName := range deleteSet {
 		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
-			if err.Error() != "NotSupported" {
-				return err
-			}
+			return err
 		}
 		if comp != nil {
 			if err := comp.Delete(c.ctx, c.cli); err != nil {

@@ -84,7 +84,7 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 	cluster, _ := rootVertex.Obj.(*appsv1alpha1.Cluster)
 
 	switch {
-	case isClusterDeleting(*origCluster):
+	case origCluster.IsDeleting():
 		// if cluster is deleting, set root(cluster) vertex.action to DELETE
 		rootVertex.Action = ictrltypes.ActionPtr(ictrltypes.DELETE)
 		// TODO(refactor): move from object action, check it again
@@ -97,7 +97,7 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 			}
 		}
 		// TODO(refactor): delete orphan resources which are not in dag?
-	case isClusterUpdating(*origCluster):
+	case origCluster.IsUpdating():
 		c.ctx.Log.Info("update cluster status after applying resources ")
 		defer func() {
 			rootVertex.Action = ictrltypes.ActionPtr(ictrltypes.STATUS)
@@ -115,7 +115,7 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 			c.recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
 			return nil
 		})
-	case isClusterStatusUpdating(*origCluster):
+	case origCluster.IsStatusUpdating():
 		defer func() {
 			rootVertex.Action = ictrltypes.ActionPtr(ictrltypes.STATUS)
 			rootVertex.Immutable = reflect.DeepEqual(cluster.Status, origCluster.Status)

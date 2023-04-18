@@ -81,7 +81,7 @@ func (c *clusterPlanBuilder) Init() error {
 // updateClusterPhase handles the cluster phase and ops condition first to indicates what the current cluster is doing.
 func (c *clusterPlanBuilder) handleClusterPhase() {
 	clusterPhase := c.cluster.Status.Phase
-	if isClusterUpdating(*c.cluster) {
+	if c.cluster.IsUpdating() {
 		if clusterPhase == "" {
 			c.cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
 		} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {

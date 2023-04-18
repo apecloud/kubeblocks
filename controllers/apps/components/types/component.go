@@ -41,10 +41,6 @@ const (
 	PodContainerFailedTimeout = time.Minute
 )
 
-// TODO(refactor):
-//  1. status management
-//  2. component workload
-
 type Component interface {
 	GetName() string
 	GetNamespace() string
@@ -81,12 +77,12 @@ type Component interface {
 
 	Reconfigure(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 
-	// TODO(refactor): impl-related, will replace it with component workload
+	// TODO(impl): impl-related, replace them with component workload
 	AddResource(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex
 	AddWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex)
 }
 
-// TODO(refactor): copied from controllers/apps/components/types/Component, should replica it with ComponentWorkload and *Set implementation
+// TODO(impl): replace it with ComponentWorkload and <*>Set implementation.
 
 type ComponentSet interface {
 	SetComponent(component Component)
@@ -121,7 +117,7 @@ type ComponentSet interface {
 	HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 }
 
-// ComponentSetBase is a common component set base struct
+// ComponentSetBase is a common component set base struct.
 type ComponentSetBase struct {
 	Cli           client.Client
 	Cluster       *appsv1alpha1.Cluster

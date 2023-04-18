@@ -145,22 +145,17 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 			continue
 		}
 		if labelValue == "" {
-			compStatus.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
+			// REVIEW: this isn't a get function, where r.Cluster.Status.Components is being updated.
+			// patch abnormal reason to cluster.status.ComponentDefs.
 			needPatch = true
+			compStatus.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
 		}
 		if !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
 			existLatestRevisionFailedPod = true
 		}
 	}
-	// REVIEW: this isn't a get function, where r.Cluster.Status.Components is being updated.
-	// patch abnormal reason to cluster.status.ComponentDefs.
 	if needPatch {
-		// TODO(refactor): remove these
-		patch := client.MergeFrom(r.Cluster.DeepCopy())
 		r.Cluster.Status.SetComponentStatus(componentName, compStatus)
-		if err = r.Cli.Status().Patch(ctx, r.Cluster, patch); err != nil {
-			return "", err
-		}
 	}
 	return util.GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryIsReady,
 		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), nil

@@ -130,7 +130,7 @@ func handleDeletePVCCronJobEvent(ctx context.Context, cli client.Client, recorde
 	)
 	matches := re.FindStringSubmatch(event.Message)
 	if len(matches) == 0 {
-		// TODO(refactor): introduce a one-shot delayed job to delete the pvc object.
+		// TODO(impl): introduce a one-shot delayed job to delete the pvc object.
 		// delete pvc success, then delete cronjob
 		return checkedDeleteDeletePVCCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
 	}

@@ -361,11 +361,18 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 }
 
 func validateConfigConstraintStatus(ccStatus appsv1alpha1.ConfigConstraintStatus) bool {
-	return ccStatus.Phase == appsv1alpha1.AvailablePhase
+	return ccStatus.Phase == appsv1alpha1.CCAvailablePhase
 }
 
 func usingComponentConfigSpec(annotations map[string]string, key, value string) bool {
 	return len(annotations) != 0 && annotations[key] == value
+}
+
+func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx, configConstraint *appsv1alpha1.ConfigConstraint, phase appsv1alpha1.ConfigConstraintPhase) error {
+	patch := client.MergeFrom(configConstraint.DeepCopy())
+	configConstraint.Status.Phase = phase
+	configConstraint.Status.ObservedGeneration = configConstraint.Generation
+	return cli.Status().Patch(ctx.Ctx, configConstraint, patch)
 }
 
 func getAssociatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.ObjectKey, configSpecName string) ([]appv1.StatefulSet, []string) {

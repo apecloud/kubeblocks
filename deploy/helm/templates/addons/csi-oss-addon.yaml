@@ -1,0 +1,27 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: csi-oss
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: Container Storage Interface (CSI) driver for oss volumes
+  type: Helm
+
+  helm:
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/csi-oss-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    installValues:
+      configMapRefs:
+        - name: csi-oss-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+  defaultInstallValues:
+    - enabled: true
+
+  installable:
+    autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "csi-oss" ) "enabled" }}

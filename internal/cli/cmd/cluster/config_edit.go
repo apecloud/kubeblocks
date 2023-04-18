@@ -34,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 )
 
 type editConfigOptions struct {
@@ -114,7 +115,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	}
 
 	confirmPrompt := confirmApplyReconfigurePrompt
-	if !dynamicUpdated {
+	if !dynamicUpdated || !cfgcm.IsSupportReload(configConstraint.Spec.ReloadOptions) {
 		confirmPrompt = restartConfirmPrompt
 	}
 	yes, err := o.confirmReconfigure(confirmPrompt)
@@ -123,6 +124,14 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	}
 	if !yes {
 		return nil
+	}
+
+	validatedData := map[string]string{
+		o.CfgFile: cfgEditContext.getEdited(),
+	}
+	options := cfgcore.WithKeySelector(wrapper.ConfigSpec().Keys)
+	if err = cfgcore.NewConfigValidator(&configConstraint.Spec, options).Validate(validatedData); err != nil {
+		return cfgcore.WrapError(err, "failed to validate edited config")
 	}
 	return fn(configPatch, &configConstraint.Spec)
 }

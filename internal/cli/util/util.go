@@ -321,7 +321,7 @@ func TimeTimeFormat(t time.Time) string {
 	return t.Format(layout)
 }
 
-func TimeTimeFormatWithDuration(t time.Time, precision time.Duration) string {
+func timeLayout(precision time.Duration) string {
 	layout := "Jan 02,2006 15:04 UTC-0700"
 	switch precision {
 	case time.Second:
@@ -329,7 +329,17 @@ func TimeTimeFormatWithDuration(t time.Time, precision time.Duration) string {
 	case time.Millisecond:
 		layout = "Jan 02,2006 15:04:05.000 UTC-0700"
 	}
+	return layout
+}
+
+func TimeTimeFormatWithDuration(t time.Time, precision time.Duration) string {
+	layout := timeLayout(precision)
 	return t.Format(layout)
+}
+
+func TimeParse(t string, precision time.Duration) (time.Time, error) {
+	layout := timeLayout(precision)
+	return time.Parse(layout, t)
 }
 
 // GetHumanReadableDuration returns a succinct representation of the provided startTime and endTime
@@ -672,13 +682,13 @@ func CombineLabels(labels map[string]string) string {
 	return strings.Join(labelStr, ",")
 }
 
-func BuildComponentNameLables(prefix string, names []string) string {
-	return buildLableSelectors(prefix, constant.KBAppComponentLabelKey, names)
+func BuildComponentNameLabels(prefix string, names []string) string {
+	return buildLabelSelectors(prefix, constant.KBAppComponentLabelKey, names)
 }
 
-// BuildLableSelectors build the label selector by given lable key, the label selector is
+// buildLabelSelectors build the label selector by given label key, the label selector is
 // like "label-key in (name1, name2)"
-func buildLableSelectors(prefix string, key string, names []string) string {
+func buildLabelSelectors(prefix string, key string, names []string) string {
 	if len(names) == 0 {
 		return prefix
 	}

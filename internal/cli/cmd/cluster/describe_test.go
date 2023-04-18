@@ -20,10 +20,12 @@ import (
 	"bytes"
 	"net/http"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -32,6 +34,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -110,5 +113,40 @@ var _ = Describe("Expose", func() {
 		firstEvent := strs[3]
 		secondEvent := strs[4]
 		Expect(strings.Compare(firstEvent, secondEvent) < 0).Should(BeTrue())
+	})
+
+	It("showDataProtections", func() {
+		out := &bytes.Buffer{}
+		fakeBackupPolicies := []dpv1alpha1.BackupPolicy{
+			*testing.FakeBackupPolicy("backup-policy-test", "test-cluster"),
+		}
+		fakeBackups := []dpv1alpha1.Backup{
+			*testing.FakeBackup("backup-test"),
+			*testing.FakeBackup("backup-test2"),
+		}
+		now := metav1.Now()
+		fakeBackups[0].Status = dpv1alpha1.BackupStatus{
+			Phase: dpv1alpha1.BackupCompleted,
+			Manifests: &dpv1alpha1.ManifestsStatus{
+				BackupLog: &dpv1alpha1.BackupLogStatus{
+					StartTime: &now,
+					StopTime:  &now,
+				},
+			},
+		}
+		after := metav1.Time{Time: now.Add(time.Hour)}
+		fakeBackups[1].Status = dpv1alpha1.BackupStatus{
+			Phase: dpv1alpha1.BackupCompleted,
+			Manifests: &dpv1alpha1.ManifestsStatus{
+				BackupLog: &dpv1alpha1.BackupLogStatus{
+					StartTime: &now,
+					StopTime:  &after,
+				},
+			},
+		}
+		showDataProtection(fakeBackupPolicies, fakeBackups, out)
+		strs := strings.Split(out.String(), "\n")
+
+		Expect(strs).ShouldNot(BeEmpty())
 	})
 })

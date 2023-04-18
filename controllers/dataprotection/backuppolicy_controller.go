@@ -28,6 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -84,6 +85,8 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	originBackupPolicy := backupPolicy.DeepCopy()
+
 	// handle finalizer
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupPolicy, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, backupPolicy)
@@ -109,7 +112,7 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.patchStatusFailed(reqCtx, backupPolicy, "HandleIncrementalPolicyFailed", err)
 	}
 
-	return r.patchStatusAvailable(reqCtx, backupPolicy)
+	return r.patchStatusAvailable(reqCtx, originBackupPolicy, backupPolicy)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -153,7 +156,13 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 
 // patchStatusAvailable patches backup policy status phase to available.
 func (r *BackupPolicyReconciler) patchStatusAvailable(reqCtx intctrlutil.RequestCtx,
+	originBackupPolicy,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy) (ctrl.Result, error) {
+	if !reflect.DeepEqual(originBackupPolicy.Spec, backupPolicy.Spec) {
+		if err := r.Client.Update(reqCtx.Ctx, backupPolicy); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+	}
 	// update status phase
 	if backupPolicy.Status.Phase != dataprotectionv1alpha1.PolicyAvailable ||
 		backupPolicy.Status.ObservedGeneration != backupPolicy.Generation {
@@ -401,6 +410,7 @@ func (r *BackupPolicyReconciler) handleFullPolicy(
 	if schedule != nil && schedule.Enable && schedule.Type == dataprotectionv1alpha1.BaseBackupTypeFull {
 		cronExpression = schedule.CronExpression
 	}
+	r.setGlobalPersistentVolumeClaim(backupPolicy.Spec.Full)
 	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Full.BasePolicy,
 		cronExpression, dataprotectionv1alpha1.BackupTypeFull)
 }
@@ -418,6 +428,26 @@ func (r *BackupPolicyReconciler) handleIncrementalPolicy(
 	if schedule != nil && schedule.Enable {
 		cronExpression = schedule.CronExpression
 	}
+	r.setGlobalPersistentVolumeClaim(backupPolicy.Spec.Incremental)
 	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Incremental.BasePolicy,
 		cronExpression, dataprotectionv1alpha1.BackupTypeIncremental)
+}
+
+// setGlobalPersistentVolumeClaim sets global config of pvc to common policy.
+func (r *BackupPolicyReconciler) setGlobalPersistentVolumeClaim(backupPolicy *dataprotectionv1alpha1.CommonBackupPolicy) {
+	pvcCfg := backupPolicy.PersistentVolumeClaim
+	globalPVCName := viper.GetString(constant.CfgKeyBackupPVCName)
+	if len(pvcCfg.Name) == 0 && globalPVCName != "" {
+		backupPolicy.PersistentVolumeClaim.Name = globalPVCName
+	}
+
+	globalStorageClass := viper.GetString(constant.CfgKeyBackupPVCStorageClass)
+	if pvcCfg.StorageClassName == nil && globalStorageClass != "" {
+		backupPolicy.PersistentVolumeClaim.StorageClassName = &globalStorageClass
+	}
+
+	globalInitCapacity := viper.GetString(constant.CfgKeyBackupPVCInitCapacity)
+	if pvcCfg.InitCapacity.IsZero() && globalInitCapacity != "" {
+		backupPolicy.PersistentVolumeClaim.InitCapacity = resource.MustParse(globalInitCapacity)
+	}
 }

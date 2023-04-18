@@ -118,14 +118,14 @@ func getInstanceInfoFromStatus(dynamic dynamic.Interface, name, componentName, n
 func getInstanceInfoByList(dynamic dynamic.Interface, name, componentName, namespace string) []*InstanceInfo {
 	var infos []*InstanceInfo
 	// filter by cluster name
-	lables := util.BuildLabelSelectorByNames("", []string{name})
+	labels := util.BuildLabelSelectorByNames("", []string{name})
 	// filter by component name
 	if len(componentName) > 0 {
-		lables = util.BuildComponentNameLables(lables, []string{componentName})
+		labels = util.BuildComponentNameLabels(labels, []string{componentName})
 	}
 
 	objs, err := dynamic.Resource(schema.GroupVersionResource{Group: corev1.GroupName, Version: types.K8sCoreAPIVersion, Resource: "pods"}).
-		Namespace(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: lables})
+		Namespace(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labels})
 
 	if err != nil {
 		return nil

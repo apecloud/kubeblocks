@@ -13,7 +13,7 @@ spec:
       cpu: "1"
       memory: 2Gi
     requests:
-      cpu: "1"
+      cpu: "500m"
       memory: 128Mi
   env:
     - name: DATA_DIR
@@ -42,5 +42,8 @@ spec:
     restoreCommands: []
     incrementalRestoreCommands: []
   backupCommands:
-    - xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > /${BACKUP_DIR}/${BACKUP_NAME}.xbstream
+    - |
+      set -e
+      mkdir -p ${BACKUP_DIR}
+      xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
   incrementalBackupCommands: []

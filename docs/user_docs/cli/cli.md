@@ -23,12 +23,6 @@ Manage alert receiver, include add, list and delete receiver.
 * [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
 
 
-## [backup-config](kbcli_backup-config.md)
-
-KubeBlocks backup config.
-
-
-
 ## [bench](kbcli_bench.md)
 
 Run a benchmark.
@@ -119,6 +113,8 @@ List and open the KubeBlocks dashboards.
 
 KubeBlocks operation commands.
 
+* [kbcli kubeblocks config](kbcli_kubeblocks_config.md)	 - KubeBlocks config.
+* [kbcli kubeblocks describe-config](kbcli_kubeblocks_describe-config.md)	 - describe KubeBlocks config.
 * [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks.
 * [kbcli kubeblocks list-versions](kbcli_kubeblocks_list-versions.md)	 - List KubeBlocks versions.
 * [kbcli kubeblocks preflight](kbcli_kubeblocks_preflight.md)	 - Run and retrieve preflight checks for KubeBlocks.

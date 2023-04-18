@@ -63,7 +63,6 @@ var _ = Describe("DataProtection", func() {
 	})
 
 	Context("backup", func() {
-
 		initClient := func(policies ...*dataprotectionv1alpha1.BackupPolicy) {
 			clusterDef := testing.FakeClusterDef()
 			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
@@ -78,7 +77,7 @@ var _ = Describe("DataProtection", func() {
 			for _, v := range policies {
 				objects = append(objects, v)
 			}
-			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, objects...)
+			tf.FakeDynamicClient = testing.FakeDynamicClient(objects...)
 		}
 
 		It("list-backup-policy", func() {
@@ -242,7 +241,7 @@ var _ = Describe("DataProtection", func() {
 
 		By("restore new cluster from source cluster which is not deleted")
 		// mock backup is ok
-		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName)
+		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName, nil)
 		cmdRestore := NewCreateRestoreCmd(tf, streams)
 		Expect(cmdRestore != nil).To(BeTrue())
 		_ = cmdRestore.Flags().Set("backup", backupName)
@@ -250,7 +249,7 @@ var _ = Describe("DataProtection", func() {
 
 		By("restore new cluster from source cluster which is deleted")
 		// mock cluster is not lived in kubernetes
-		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster")
+		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster", nil)
 		cmdRestore.Run(nil, []string{newClusterName + "1"})
 
 		By("run restore cmd with cluster spec.affinity=nil")
@@ -259,21 +258,72 @@ var _ = Describe("DataProtection", func() {
 			k8sapitypes.MergePatchType, patchCluster, metav1.PatchOptions{})
 		cmdRestore.Run(nil, []string{newClusterName + "-with-nil-affinity"})
 	})
+
+	It("restore-to-time", func() {
+		timestamp := time.Now().Format("20060102150405")
+		backupName := "backup-test-" + timestamp
+		clusterName := "source-cluster-" + timestamp
+		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
+		clusterDef := testing.FakeClusterDef()
+		cluster := testing.FakeCluster(clusterName, testing.Namespace)
+		clusterDefLabel := map[string]string{
+			constant.ClusterDefLabelKey: clusterDef.Name,
+		}
+		cluster.SetLabels(clusterDefLabel)
+		backupPolicy := testing.FakeBackupPolicy("backPolicy", cluster.Name)
+		backup := testing.FakeBackup("backup-base")
+
+		pods := testing.FakePods(1, testing.Namespace, clusterName)
+		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy, backup)
+		tf.Client = &clientfake.RESTClient{}
+		// create backup
+		cmd := NewCreateBackupCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+		_ = cmd.Flags().Set("backup-type", "snapshot")
+		_ = cmd.Flags().Set("backup-name", backupName)
+		cmd.Run(nil, []string{clusterName})
+
+		By("restore new cluster from source cluster which is not deleted")
+		// mock backup is ok
+		now := metav1.Now()
+		baseManifests := map[string]any{
+			"backupLog": map[string]any{
+				"startTime": now.Add(-time.Minute).Format(time.RFC3339),
+				"stopTime":  now.Add(-time.Second).Format(time.RFC3339),
+			},
+		}
+		mockBackupInfo(tf.FakeDynamicClient, backup.Name, clusterName, baseManifests)
+
+		manifests := map[string]any{
+			"backupLog": map[string]any{
+				"startTime": now.Add(-time.Minute).Format(time.RFC3339),
+				"stopTime":  now.Add(time.Minute).Format(time.RFC3339),
+			},
+		}
+		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName, manifests)
+		cmdRestore := NewCreateRestoreCmd(tf, streams)
+		Expect(cmdRestore != nil).To(BeTrue())
+		_ = cmdRestore.Flags().Set("restore-to-time", util.TimeFormatWithDuration(&now, time.Second))
+		_ = cmdRestore.Flags().Set("source-cluster", clusterName)
+		cmdRestore.Run(nil, []string{})
+	})
 })
 
-func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string) {
+func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, manifests map[string]any) {
 	clusterString := fmt.Sprintf(`{"metadata":{"name":"deleted-cluster","namespace":"%s"},"spec":{"clusterDefinitionRef":"apecloud-mysql","clusterVersionRef":"ac-mysql-8.0.30","componentSpecs":[{"name":"mysql","componentDefRef":"mysql","replicas":1}]}}`, testing.Namespace)
 	backupStatus := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"status": map[string]interface{}{
-				"phase": "Completed",
+		Object: map[string]any{
+			"status": map[string]any{
+				"phase":     "Completed",
+				"manifests": manifests,
 			},
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": backupName,
-				"annotations": map[string]interface{}{
+				"annotations": map[string]any{
 					constant.ClusterSnapshotAnnotationKey: clusterString,
 				},
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					constant.AppInstanceLabelKey:    clusterName,
 					constant.KBAppComponentLabelKey: "test",
 				},

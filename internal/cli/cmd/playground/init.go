@@ -272,7 +272,7 @@ func (o *initOptions) confirmInitNewKubeCluster() error {
 `)
 
 	fmt.Fprintf(o.Out, `
-The whole process wll take about %s, please wait patiently,
+The whole process will take about %s, please wait patiently,
 if it takes a long time, please check the network environment and try again.
 `, printer.BoldRed("20 minutes"))
 
@@ -416,10 +416,6 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			// use hostpath csi driver to support snapshot
 			"snapshot-controller.enabled=true",
 			"csi-hostpath-driver.enabled=true",
-
-			// enable aws loadbalancer controller addon automatically on playground
-			"aws-loadbalancer-controller.enabled=true",
-			fmt.Sprintf("aws-loadbalancer-controller.clusterName=%s", k8sClusterName),
 
 			// disable the persistent volume of prometheus, if not, the prometheus
 			// will dependent the hostpath csi driver ready to create persistent

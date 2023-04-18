@@ -123,6 +123,9 @@ func (m ResourceConstraint) ValidateCPU(cpu resource.Quantity) bool {
 	if m.CPU.Max != nil && m.CPU.Max.Cmp(cpu) < 0 {
 		return false
 	}
+	if m.CPU.Step != nil && inf.NewDec(1, 0).QuoExact(cpu.AsDec(), m.CPU.Step.AsDec()).Scale() != 0 {
+		return false
+	}
 	if m.CPU.Slots != nil && slices.Index(m.CPU.Slots, cpu) < 0 {
 		return false
 	}

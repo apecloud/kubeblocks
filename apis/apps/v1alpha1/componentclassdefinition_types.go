@@ -140,6 +140,8 @@ type ComponentClassDefinitionStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// classes is the list of classes that have been observed for this ComponentClassDefinition
+	// +listType=map
+	// +listMapKey=name
 	Classes []ComponentClassInstance `json:"classes,omitempty"`
 }
 

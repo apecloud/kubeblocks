@@ -78,13 +78,13 @@ var clusterCreateExample = templates.Examples(`
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1,memory=1Gi,storage=20Gi,replicas=3
 
 	# Create a cluster and set the class to general-1c1g, valid classes can be found by executing the command "kbcli class list --cluster-definition=<cluster-definition-name>"
-	kbcli cluster create myclsuter --cluster-definition apecloud-mysql --set class=general-1c1g
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set class=general-1c1g
 
 	# Create a cluster with replicationSet workloadType and set switchPolicy to Noop
-	kbcli cluster create myclsuter --cluster-definition postgresql --set switchPolicy=Noop
+	kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
 
 	# Create a cluster and use a URL to set cluster resource
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/my.yaml
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/apecloud-mysql.yaml
 
 	# Create a cluster and load cluster resource set from stdin
 	cat << EOF | kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file -
@@ -100,7 +100,7 @@ var clusterCreateExample = templates.Examples(`
 	kbcli cluster create --cluster-definition apecloud-mysql --tolerations '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
 
     # Create a cluster, with each pod runs on their own dedicated node
-    kbcli cluster create --tenancy=DedicatedNode
+    kbcli cluster create --cluster-definition apecloud-mysql --tenancy=DedicatedNode
 `)
 
 const (
@@ -243,6 +243,9 @@ func (o *CreateOptions) Validate() error {
 			return fmt.Errorf("failed to generate a random cluster name")
 		}
 		o.Name = name
+	}
+	if len(o.Name) > 16 {
+		return fmt.Errorf("cluster name should be less than 16 characters")
 	}
 	return nil
 }

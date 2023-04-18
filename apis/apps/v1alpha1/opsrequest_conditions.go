@@ -48,7 +48,7 @@ const (
 	ReasonReconfigureNoChanged = "ReconfigureNoChanged"
 	ReasonReconfigureSucceed   = "ReconfigureSucceed"
 	ReasonReconfigureRunning   = "ReconfigureRunning"
-	ReasonClusterPhaseMisMatch = "ClusterPhaseMisMatch"
+	ReasonClusterPhaseMismatch = "ClusterPhaseMismatch"
 	ReasonOpsTypeNotSupported  = "OpsTypeNotSupported"
 	ReasonValidateFailed       = "ValidateFailed"
 	ReasonClusterNotFound      = "ClusterNotFound"

@@ -234,7 +234,7 @@ func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
 		if _, exists := accountName[sysAccount.Name]; exists {
 			*allErrs = append(*allErrs,
 				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts"),
-					sysAccount.Name, "duplicated system account names are not allowd."))
+					sysAccount.Name, "duplicated system account names are not allowed."))
 			continue
 		} else {
 			accountName[sysAccount.Name] = true

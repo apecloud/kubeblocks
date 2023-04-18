@@ -23,7 +23,7 @@ spec:
         set -e
         mkdir -p ${DATA_DIR}
         res=`ls -A ${DATA_DIR}`
-        if [ ! -z ${res} ]; then
+        if [ ! -z "${res}" ]; then
           echo "${DATA_DIR} is not empty! Please make sure that the directory is empty before restoring the backup."
           exit 1
         fi

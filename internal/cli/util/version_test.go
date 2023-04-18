@@ -29,42 +29,38 @@ const kbVersion = "0.3.0"
 
 var _ = Describe("version util", func() {
 	It("get version info when client is nil", func() {
-		info, err := GetVersionInfo(nil)
+		v, err := GetVersionInfo(nil)
 		Expect(err).Should(Succeed())
-		Expect(info).ShouldNot(BeEmpty())
-		Expect(info[KubeBlocksApp]).Should(BeEmpty())
-		Expect(info[KubernetesApp]).Should(BeEmpty())
-		Expect(info[KBCLIApp]).ShouldNot(BeEmpty())
+		Expect(v.KubeBlocks).Should(BeEmpty())
+		Expect(v.Kubernetes).Should(BeEmpty())
+		Expect(v.Cli).ShouldNot(BeEmpty())
 	})
 
 	It("get version info when client variable is a nil pointer", func() {
 		var client *kubernetes.Clientset
-		info, err := GetVersionInfo(client)
+		v, err := GetVersionInfo(client)
 		Expect(err).Should(Succeed())
-		Expect(info).ShouldNot(BeEmpty())
-		Expect(info[KubeBlocksApp]).Should(BeEmpty())
-		Expect(info[KubernetesApp]).Should(BeEmpty())
-		Expect(info[KBCLIApp]).ShouldNot(BeEmpty())
+		Expect(v.KubeBlocks).Should(BeEmpty())
+		Expect(v.Kubernetes).Should(BeEmpty())
+		Expect(v.Cli).ShouldNot(BeEmpty())
 	})
 
-	It("get version info when KubeBlocks is deployed", func() {
+	It("get vsion info when KubeBlocks is deployed", func() {
 		client := testing.FakeClientSet(testing.FakeKBDeploy(kbVersion))
-		info, err := GetVersionInfo(client)
+		v, err := GetVersionInfo(client)
 		Expect(err).Should(Succeed())
-		Expect(info).ShouldNot(BeEmpty())
-		Expect(info[KubeBlocksApp]).Should(Equal(kbVersion))
-		Expect(info[KubernetesApp]).ShouldNot(BeEmpty())
-		Expect(info[KBCLIApp]).ShouldNot(BeEmpty())
+		Expect(v.KubeBlocks).Should(Equal(kbVersion))
+		Expect(v.Kubernetes).ShouldNot(BeEmpty())
+		Expect(v.Cli).ShouldNot(BeEmpty())
 	})
 
 	It("get version info when KubeBlocks is not deployed", func() {
 		client := testing.FakeClientSet()
-		info, err := GetVersionInfo(client)
+		v, err := GetVersionInfo(client)
 		Expect(err).Should(Succeed())
-		Expect(info).ShouldNot(BeEmpty())
-		Expect(info[KubeBlocksApp]).Should(BeEmpty())
-		Expect(info[KubernetesApp]).ShouldNot(BeEmpty())
-		Expect(info[KBCLIApp]).ShouldNot(BeEmpty())
+		Expect(v.KubeBlocks).Should(BeEmpty())
+		Expect(v.Kubernetes).ShouldNot(BeEmpty())
+		Expect(v.Cli).ShouldNot(BeEmpty())
 	})
 
 	It("getKubeBlocksVersion", func() {

@@ -11,7 +11,6 @@
 {{- $mongodb_port = $mongodb_port_info.containerPort }}
 {{- end }}
 
-set -e
 PORT={{ $mongodb_port }}
 MONGODB_ROOT={{ $mongodb_root }}
 INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+\$");

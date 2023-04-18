@@ -107,7 +107,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) {
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, namespacedName,
 			func(fetched *appsv1alpha1.Cluster) {
-				// TODO: whould be better to have hint for cluster.status.phase is mocked,
+				// TODO: would be better to have hint for cluster.status.phase is mocked,
 				// i.e., add annotation info for the mocked context
 				fetched.Status.Phase = appsv1alpha1.RunningClusterPhase
 				if len(fetched.Status.Components) == 0 {

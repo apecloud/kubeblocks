@@ -219,13 +219,13 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 }
 
 // validateVerticalScaling validates api when spec.type is VerticalScaling
-func (r *OpsRequest) validateVerticalScaling(ctx context.Context, k8sCLient client.Client, cluster *Cluster) error {
+func (r *OpsRequest) validateVerticalScaling(ctx context.Context, k8sClient client.Client, cluster *Cluster) error {
 	verticalScalingList := r.Spec.VerticalScalingList
 	if len(verticalScalingList) == 0 {
 		return notEmptyError("spec.verticalScaling")
 	}
 
-	compClasses, err := getClasses(ctx, k8sCLient, cluster.Spec.ClusterDefRef)
+	compClasses, err := getClasses(ctx, k8sClient, cluster.Spec.ClusterDefRef)
 	if err != nil {
 		return nil
 	}

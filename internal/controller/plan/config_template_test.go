@@ -133,7 +133,7 @@ single_thread_memory = 294912
 					},
 				},
 				{
-					Name: "invalid_contaienr",
+					Name: "invalid_container",
 				},
 			},
 			Volumes: []corev1.Volume{

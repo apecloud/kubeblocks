@@ -63,7 +63,6 @@ var _ = Describe("DataProtection", func() {
 	})
 
 	Context("backup", func() {
-
 		initClient := func(policies ...*dataprotectionv1alpha1.BackupPolicy) {
 			clusterDef := testing.FakeClusterDef()
 			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
@@ -78,7 +77,7 @@ var _ = Describe("DataProtection", func() {
 			for _, v := range policies {
 				objects = append(objects, v)
 			}
-			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, objects...)
+			tf.FakeDynamicClient = testing.FakeDynamicClient(objects...)
 		}
 
 		It("list-backup-policy", func() {

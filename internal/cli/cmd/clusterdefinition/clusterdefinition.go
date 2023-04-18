@@ -56,6 +56,6 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 			util.CheckErr(err)
 		},
 	}
-	o.AddFlags(cmd)
+	o.AddFlags(cmd, true)
 	return cmd
 }

@@ -147,6 +147,17 @@ const (
 	UnavailablePhase Phase = "Unavailable"
 )
 
+// ConfigConstraintPhase defines the ConfigConstraint  CR .status.phase
+// +enum
+// +kubebuilder:validation:Enum={Available,Unavailable, Deleting}
+type ConfigConstraintPhase string
+
+const (
+	CCAvailablePhase   ConfigConstraintPhase = "Available"
+	CCUnavailablePhase ConfigConstraintPhase = "Unavailable"
+	CCDeletingPhase    ConfigConstraintPhase = "Deleting"
+)
+
 // OpsPhase defines opsRequest phase.
 // +enum
 // +kubebuilder:validation:Enum={Pending,Creating,Running,Failed,Succeed}
@@ -298,7 +309,7 @@ type OpsRecorder struct {
 type ProvisionPolicyType string
 
 const (
-	// CreateByStmt will create account w.r.t. deleteion and creation statement given by provider.
+	// CreateByStmt will create account w.r.t. deletion and creation statement given by provider.
 	CreateByStmt ProvisionPolicyType = "CreateByStmt"
 	// ReferToExisting will not create account, but create a secret by copying data from referred secret file.
 	ReferToExisting ProvisionPolicyType = "ReferToExisting"

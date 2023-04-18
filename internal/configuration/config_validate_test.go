@@ -57,6 +57,14 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args args
 		err  error
 	}{{
+		name: "mongod_test",
+		args: args{
+			cueFile:    "cue_testdata/mongod.cue",
+			configFile: "cue_testdata/mongod.conf",
+			format:     appsv1alpha1.YAML,
+		},
+		err: nil,
+	}, {
 		name: "test_wesql",
 		args: args{
 			cueFile:    "cue_testdata/wesql.cue",

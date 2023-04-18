@@ -26,6 +26,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -163,7 +164,7 @@ func markDynamicCursor(pods []corev1.Pod, podsStats *componentPodStats, configKe
 		podsStats.updated[pod.Name] = pod
 	}
 
-	podWindows.begin = cfgcore.Max[int](podWindows.end-int(rollingReplicas), 0)
+	podWindows.begin = util.Max[int](podWindows.end-int(rollingReplicas), 0)
 	for i := podWindows.begin; i < podWindows.end; i++ {
 		pod := &pods[i]
 		if podutil.IsMatchConfigVersion(pod, configKey, currentVersion) {

@@ -9,7 +9,7 @@ image:
   repository: apecloud/chatgpt-retrieval-plugin
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "arm64-latest"
+  tag: "0.1.0"
 
 imagePullSecrets: []
 nameOverride: ""

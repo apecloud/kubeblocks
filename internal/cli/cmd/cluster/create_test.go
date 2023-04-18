@@ -181,6 +181,11 @@ var _ = Describe("create", func() {
 		comps, err := buildClusterComp(cd, setsMap)
 		Expect(err).Should(Succeed())
 		checkComponent(comps, "10Gi", 10, "10", "2Gi")
+
+		setsMap[testing.ComponentDefName][keySwitchPolicy] = "invalid"
+		cd.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
+		_, err = buildClusterComp(cd, setsMap)
+		Expect(err).Should(HaveOccurred())
 	})
 
 	It("build component and set values map", func() {
@@ -189,7 +194,8 @@ var _ = Describe("create", func() {
 			var comps []appsv1alpha1.ClusterComponentDefinition
 			for _, n := range compDefNames {
 				comp := appsv1alpha1.ClusterComponentDefinition{
-					Name: n,
+					Name:         n,
+					WorkloadType: appsv1alpha1.Replication,
 				}
 				comps = append(comps, comp)
 			}
@@ -304,6 +310,16 @@ var _ = Describe("create", func() {
 				},
 				true,
 			},
+			{
+				[]string{"switchPolicy=MaximumAvailability"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keySwitchPolicy: "MaximumAvailability",
+					},
+				},
+				true,
+			},
 		}
 
 		for _, t := range testCases {
@@ -349,7 +365,7 @@ var _ = Describe("create", func() {
 		Expect(setBackup(o, components).Error()).Should(ContainSubstring("is not completed"))
 
 		By("test backup is completed")
-		mockBackupInfo(dynamic, backupName, clusterName)
+		mockBackupInfo(dynamic, backupName, clusterName, nil)
 		Expect(setBackup(o, components)).Should(Succeed())
 	})
 })

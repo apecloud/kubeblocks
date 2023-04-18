@@ -50,6 +50,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewListInstancesCmd(f, streams),
 				NewListComponentsCmd(f, streams),
 				NewListEventsCmd(f, streams),
+				NewLabelCmd(f, streams),
 				NewDeleteCmd(f, streams),
 			},
 		},
@@ -67,9 +68,14 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewDescribeOpsCmd(f, streams),
 				NewListOpsCmd(f, streams),
 				NewDeleteOpsCmd(f, streams),
+				NewExposeCmd(f, streams),
+			},
+		},
+		{
+			Message: "Cluster Configuration Operation Commands:",
+			Commands: []*cobra.Command{
 				NewReconfigureCmd(f, streams),
 				NewEditConfigureCmd(f, streams),
-				NewExposeCmd(f, streams),
 				NewDescribeReconfigureCmd(f, streams),
 				NewExplainReconfigureCmd(f, streams),
 				NewDiffConfigureCmd(f, streams),
@@ -78,6 +84,8 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		{
 			Message: "Backup/Restore Commands:",
 			Commands: []*cobra.Command{
+				NewListBackupPolicyCmd(f, streams),
+				NewEditBackupPolicyCmd(f, streams),
 				NewCreateBackupCmd(f, streams),
 				NewListBackupCmd(f, streams),
 				NewDeleteBackupCmd(f, streams),

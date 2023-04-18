@@ -41,8 +41,7 @@ var _ = Describe("MySQL Scaling function", func() {
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 	const scriptConfigName = "test-cluster-mysql-scripts"
-
-	const mysqlCompType = "replicasets"
+	const mysqlCompDefName = "replicasets"
 	const mysqlCompName = "mysql"
 
 	// Cleanups
@@ -93,7 +92,7 @@ var _ = Describe("MySQL Scaling function", func() {
 		}
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(mysqlCompName, mysqlCompType).
+			AddComponent(mysqlCompName, mysqlCompDefName).
 			SetResources(resources).SetReplicas(1).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -135,8 +134,8 @@ var _ = Describe("MySQL Scaling function", func() {
 		})).Should(Succeed())
 
 		By("check OpsRequest reclaimed after ttl")
-		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
-			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
+		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {
+			lopsReq.Spec.TTLSecondsAfterSucceed = 1
 		})).Should(Succeed())
 
 		By("OpsRequest reclaimed after ttl")
@@ -163,7 +162,7 @@ var _ = Describe("MySQL Scaling function", func() {
 		logPvcSpec.StorageClassName = &defaultStorageClass.Name
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(mysqlCompName, mysqlCompType).
+			AddComponent(mysqlCompName, mysqlCompDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, dataPvcSpec).
 			AddVolumeClaimTemplate(testapps.LogVolumeName, logPvcSpec).
 			Create(&testCtx).GetObject()
@@ -226,13 +225,13 @@ var _ = Describe("MySQL Scaling function", func() {
 			By("Create a clusterDef obj")
 			mode := int32(0755)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(mysqlCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+				AddComponent(mysqlCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
@@ -254,13 +253,13 @@ var _ = Describe("MySQL Scaling function", func() {
 			By("Create a clusterDef obj")
 			mode := int32(0755)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
 				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(mysqlCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+				AddComponent(mysqlCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 

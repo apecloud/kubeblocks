@@ -40,9 +40,9 @@ var _ = Describe("component module", func() {
 			clusterDefName           = "test-clusterdef"
 			clusterVersionName       = "test-clusterversion"
 			clusterName              = "test-cluster"
-			mysqlCompType            = "replicasets"
+			mysqlCompDefName         = "replicasets"
 			mysqlCompName            = "mysql"
-			nginxCompType            = "proxy"
+			proxyCompDefName         = "proxy"
 			mysqlSecretUserEnvName   = "MYSQL_ROOT_USER"
 			mysqlSecretPasswdEnvName = "MYSQL_ROOT_PASSWORD"
 		)
@@ -55,20 +55,20 @@ var _ = Describe("component module", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
-				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+				AddComponentDef(testapps.StatelessNginxComponent, proxyCompDefName).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompType).
+				AddComponent(mysqlCompDefName).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				AddComponent(nginxCompType).
+				AddComponent(proxyCompDefName).
 				AddInitContainerShort("nginx-init", testapps.NginxImage).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
@@ -88,7 +88,7 @@ var _ = Describe("component module", func() {
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(component).ShouldNot(BeNil())
 
-			By("leave clusterVersion.versionCtx empty initContains and conainers")
+			By("leave clusterVersion.versionCtx empty initContains and containers")
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.Containers = nil
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.InitContainers = nil
 			component = BuildComponent(

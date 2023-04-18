@@ -53,6 +53,7 @@ type SynthesizedComponent struct {
 	Issuer                *v1alpha1.Issuer                       `json:"issuer,omitempty"`
 	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"VolumeTypes,omitempty"`
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
+	ComponentDef          string                                 `json:"componentDef,omitempty"`
 }
 
 // GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is

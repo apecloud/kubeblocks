@@ -27,7 +27,7 @@ spec:
               selector:
                 app.kubernetes.io/managed-by: kubeblocks
       probes:
-        roleChangedProbe:
+        roleProbe:
           failureThreshold: 2
           periodSeconds: 1
           timeoutSeconds: 1
@@ -100,20 +100,6 @@ spec:
               runAsUser: 0
             command:
               - /kb-scripts/setup.sh
-            readinessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 10
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              exec:
-                command:
-                  - /bin/sh
-                  - -c
-                  - -ee
-                  - |
-                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
-                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm
@@ -182,6 +168,8 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+              - name: PGUSER_STANDBY
+                value: standby
               - name: PGPASSWORD_STANDBY
                 valueFrom:
                   secretKeyRef:

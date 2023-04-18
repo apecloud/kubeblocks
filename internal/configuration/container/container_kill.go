@@ -34,6 +34,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 const (
@@ -73,7 +74,7 @@ func (d *dockerContainer) Kill(ctx context.Context, containerIDs []string, signa
 	}
 
 	errs := make([]error, 0, len(containerIDs))
-	d.logger.Debugf("all docker container: %v", cfgcore.ToSet(allContainer).AsSlice())
+	d.logger.Debugf("all docker container: %v", util.ToSet(allContainer).AsSlice())
 	for _, containerID := range containerIDs {
 		d.logger.Infof("stopping docker container: %s", containerID)
 		container, ok := allContainer[containerID]

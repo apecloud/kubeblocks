@@ -96,6 +96,10 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 				return err
 			}
 		}
+		if err = plan.DoPITRPrepare(c.ctx.Ctx, c.cli, cluster, synthesizedComp); err != nil {
+			return err
+		}
+
 		return plan.PrepareComponentResources(c.ctx, c.cli, &iParams)
 	}
 

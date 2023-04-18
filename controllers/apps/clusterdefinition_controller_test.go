@@ -36,7 +36,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 
-	const statefulCompType = "replicasets"
+	const statefulCompDefName = "replicasets"
 
 	const configVolumeName = "mysql-config"
 
@@ -80,12 +80,12 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
@@ -133,7 +133,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{})
 		Expect(testapps.ChangeObjStatus(&testCtx, cfgTpl, func() {
-			cfgTpl.Status.Phase = appsv1alpha1.AvailablePhase
+			cfgTpl.Status.Phase = appsv1alpha1.CCAvailablePhase
 		})).Should(Succeed())
 		return cm
 	}
@@ -142,13 +142,13 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				AddConfigTemplate(cmName, cmName, cmName, testCtx.DefaultNamespace, configVolumeName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 

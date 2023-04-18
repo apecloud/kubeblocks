@@ -58,6 +58,14 @@ type Component interface {
 	HandleUpdate(ctx context.Context, obj client.Object) error
 }
 
+// ComponentBase is a common component base struct
+type ComponentBase struct {
+	Cli          client.Client
+	Cluster      *appsv1alpha1.Cluster
+	Component    *appsv1alpha1.ClusterComponentSpec
+	ComponentDef *appsv1alpha1.ClusterComponentDefinition
+}
+
 const (
 	// RoleProbeTimeoutReason the event reason when all pods of the component role probe timed out.
 	RoleProbeTimeoutReason = "RoleProbeTimeout"

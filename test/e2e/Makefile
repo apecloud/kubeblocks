@@ -33,7 +33,7 @@ endif
 .PHONY: run
 run: ginkgo ## Run end-to-end tests.
 	#ACK_GINKGO_DEPRECATIONS=$(GINKGO_VERSION) $(GINKGO) run .
-	$(GINKGO) test -process -ginkgo.v . --json-report=report.json -- --VERSION=$(VERSION)
+	$(GINKGO) test -process -ginkgo.v . -- --VERSION=$(VERSION) --ginkgo.json-report=report.json
 
 build: ginkgo ## Run ginkgo build e2e test suite binary.
 	$(GINKGO) build .

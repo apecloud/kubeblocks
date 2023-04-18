@@ -244,18 +244,19 @@ admissionWebhooks:
 ##
 dataProtection:
   ## @param dataProtection.enableVolumeSnapshot - set this to true if cluster does have snapshot.storage.k8s.io API installed
-  ##
+  ## @param dataProtection.backupPVCName - set the default pvc to store the file for backup
+  ## @param dataProtection.backupPVCInitCapacity - set the default pvc initCapacity if the pvc need to be created by backup controller
+  ## @param dataProtection.backupPVCStorageClassName - set the default pvc storageClassName if the pvc need to be created by backup controller
+  ## @param dataProtection.backupPVCCreatePolicy - set the default create policy of the pvc, optional values: IfNotPresent, Never
+  ## @param dataProtection.backupPVConfigMapName - set the default configmap name which contains key "persistentVolume" and value of the persistentVolume struct.
+  ## @param dataProtection.backupPVConfigMapNamespace - set the default configmap namespace of pv template.
   enableVolumeSnapshot: false
-  ## @param dataProtection.backupSchedule -- set backup policy schedule time
-  ## backupSchedule is in Cron format, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
-  ## Example: 0 2 * * *  -- backup job will be scheduled to start at 2:00 each day.
-  ##
-  backupSchedule: ""
-  ## @param dataProtection.backupTTL -- set backup time to live.
-  ## backupTTL is a time.Duration-parseable string describing how long.
-  ## Example: 168h0m0s  -- the backup will expire in 7 days.
-  ##
-  backupTTL: ""
+  backupPVCName: ""
+  backupPVCInitCapacity: ""
+  backupPVCStorageClassName: ""
+  backupPVCCreatePolicy: ""
+  backupPVConfigMapName: ""
+  backupPVConfigMapNamespace: ""
 
 ## Addon controller settings, this will require cluster-admin clusterrole.
 addonController:
@@ -1085,6 +1086,82 @@ prometheus:
                 summary: 'Redis replication broken'
                 description: 'Redis instance lost a slave. (instance: {{ $labels.pod }})'
 
+    mongodb_replicaset_alert_rules.yaml: |-
+      groups:
+        - name: MongodbExporter
+          rules:
+            - alert: MongodbDown
+              expr: 'max_over_time(mongodb_up[1m]) == 0'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: 'MongoDB is Down'
+                description: 'MongoDB instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
+      
+            - alert: MongodbReplicaMemberUnhealthy
+              expr: 'max_over_time(mongodb_rs_members_health[1m]) == 0'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: 'Mongodb replica member is unhealthy'
+                description: 'MongoDB replica member is not healthy\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
+      
+            - alert: MongodbReplicationLag
+              expr: '(mongodb_rs_members_optimeDate{member_state="PRIMARY"} - on (pod) group_right mongodb_rs_members_optimeDate{member_state="SECONDARY"}) / 1000 > 10'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: 'MongoDB replication lag (> 10s)'
+                description: 'Mongodb replication lag is more than 10s\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
+      
+            - alert: MongodbReplicationHeadroom
+              expr: 'sum(avg(mongodb_mongod_replset_oplog_head_timestamp - mongodb_mongod_replset_oplog_tail_timestamp)) - sum(avg(mongodb_rs_members_optimeDate{member_state="PRIMARY"} - on (pod) group_right mongodb_rs_members_optimeDate{member_state="SECONDARY"})) <= 0'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: 'MongoDB replication headroom (< 0)'
+                description: 'MongoDB replication headroom is <= 0\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
+      
+            - alert: MongodbNumberCursorsOpen
+              expr: 'mongodb_ss_metrics_cursor_open{csr_type="total"} > 10 * 1000'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: 'MongoDB opened cursors num (> 10k)'
+                description: 'Too many cursors opened by MongoDB for clients (> 10k)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
+      
+            - alert: MongodbCursorsTimeouts
+              expr: 'increase(mongodb_ss_metrics_cursor_timedOut[1m]) > 100'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: 'MongoDB cursors timeouts (>100/minute)' 
+                description: 'Too many cursors are timing out (> 100/minute)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
+      
+            - alert: MongodbTooManyConnections
+              expr: 'avg by(pod) (rate(mongodb_ss_connections{conn_type="current"}[1m])) / avg by(pod) (sum (mongodb_ss_connections) by(pod)) * 100 > 80'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: 'MongoDB too many connections (> 80%)'
+                description: 'Too many connections (> 80%)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
+      
+            - alert: MongodbVirtualMemoryUsage
+              expr: '(sum(mongodb_ss_mem_virtual) BY (pod) / sum(mongodb_ss_mem_resident) BY (pod)) > 100'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: MongoDB virtual memory usage high
+                description: "High memory usage: the quotient of (mem_virtual / mem_resident) is more than 100\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
     kafka_alert_rules.yaml: |-
       group:
         - name: KafkaExporter
@@ -1124,6 +1201,7 @@ prometheus:
         - /etc/config/postgresql_alert_rules.yml
         - /etc/config/redis_alert_rules.yml
         - /etc/config/kafka_alert_rules.yml
+        - /etc/config/mongodb_replicaset_alert_rules.yaml
 
       scrape_configs:
         - job_name: prometheus

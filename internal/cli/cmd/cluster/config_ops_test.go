@@ -66,14 +66,14 @@ var _ = Describe("reconfigure test", func() {
 
 	It("check params for reconfiguring operations", func() {
 		const (
-			ns                 = "default"
-			clusterDefName     = "test-clusterdef"
-			clusterVersionName = "test-clusterversion"
-			clusterName        = "test-cluster"
-			statefulCompType   = "replicasets"
-			statefulCompName   = "mysql"
-			configSpecName     = "mysql-config-tpl"
-			configVolumeName   = "mysql-config"
+			ns                  = "default"
+			clusterDefName      = "test-clusterdef"
+			clusterVersionName  = "test-clusterversion"
+			clusterName         = "test-cluster"
+			statefulCompDefName = "replicasets"
+			statefulCompName    = "mysql"
+			configSpecName      = "mysql-config-tpl"
+			configVolumeName    = "mysql-config"
 		)
 
 		By("Create configmap and config constraint obj")
@@ -83,17 +83,17 @@ var _ = Describe("reconfigure test", func() {
 		componentConfig := testapps.NewConfigMap(ns, cfgcore.GetComponentCfgName(clusterName, statefulCompName, configSpecName), testapps.SetConfigMapData("my.cnf", ""))
 		By("Create a clusterDefinition obj")
 		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 			AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, ns, configVolumeName).
 			GetObject()
 		By("Create a clusterVersion obj")
 		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(statefulCompType).
+			AddComponent(statefulCompDefName).
 			GetObject()
 		By("creating a cluster")
 		clusterObj := testapps.NewClusterFactory(ns, clusterName,
 			clusterDefObj.Name, "").
-			AddComponent(statefulCompName, statefulCompType).GetObject()
+			AddComponent(statefulCompName, statefulCompDefName).GetObject()
 
 		objs := []runtime.Object{configmap, constraint, clusterDefObj, clusterVersionObj, clusterObj, componentConfig}
 		ttf, ops := NewFakeOperationsOptions(ns, clusterObj.Name, appsv1alpha1.ReconfiguringType, objs...)

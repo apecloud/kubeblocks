@@ -19,8 +19,11 @@ package dataprotection
 import (
 	"strings"
 
+	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -40,10 +43,9 @@ var _ = Describe("Backup Controller test", func() {
 	const componentName = "replicasets-primary"
 	const containerName = "mysql"
 	const backupPolicyName = "test-backup-policy"
-	const backupRemoteVolumeName = "backup-remote-volume"
 	const backupRemotePVCName = "backup-remote-pvc"
 	const defaultSchedule = "0 3 * * *"
-	const defaultTTL = "168h0m0s"
+	const defaultTTL = "7d"
 	const backupName = "test-backup-job"
 
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
@@ -65,7 +67,7 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS)
 		//
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
@@ -129,15 +131,20 @@ var _ = Describe("Backup Controller test", func() {
 
 			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
 			_ = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-				SetBackupToolName(backupTool.Name).
-				SetSchedule(defaultSchedule).
 				SetTTL(defaultTTL).
+				AddSnapshotPolicy().
+				SetSchedule(defaultSchedule, true).
 				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 				AddMatchLabels(constant.RoleLabelKey, "leader").
 				SetTargetSecretName(clusterName).
 				AddHookPreCommand("touch /data/mysql/.restore;sync").
 				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-				SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+				AddFullPolicy().
+				SetBackupToolName(backupTool.Name).
+				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+				AddMatchLabels(constant.RoleLabelKey, "leader").
+				SetTargetSecretName(clusterName).
+				SetPVC(backupRemotePVCName).
 				Create(&testCtx).GetObject()
 		})
 
@@ -147,7 +154,6 @@ var _ = Describe("Backup Controller test", func() {
 			BeforeEach(func() {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
@@ -198,7 +204,6 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
 					Create(&testCtx).GetObject()
@@ -297,7 +302,6 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
 					Create(&testCtx).GetObject()
@@ -312,7 +316,6 @@ var _ = Describe("Backup Controller test", func() {
 			It("should fail without pvc", func() {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
 					Create(&testCtx).GetObject()
@@ -329,9 +332,18 @@ var _ = Describe("Backup Controller test", func() {
 		})
 	})
 
-	When("without backupTool resources", func() {
+	When("with backupTool resources", func() {
 		Context("creates a full backup", func() {
 			var backupKey types.NamespacedName
+			var backupPolicy *dataprotectionv1alpha1.BackupPolicy
+			createBackup := func(backupName string) {
+				By("By creating a backup from backupPolicy: " + backupPolicyName)
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+					Create(&testCtx).GetObject()
+				backupKey = client.ObjectKeyFromObject(backup)
+			}
 
 			BeforeEach(func() {
 				By("By creating a backupTool")
@@ -342,33 +354,108 @@ var _ = Describe("Backup Controller test", func() {
 					})
 
 				By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-				_ = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddFullPolicy().
 					SetBackupToolName(backupTool.Name).
-					SetSchedule(defaultSchedule).
+					SetSchedule(defaultSchedule, true).
 					SetTTL(defaultTTL).
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
-					AddHookPreCommand("touch /data/mysql/.restore;sync").
-					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+					SetPVC(backupRemotePVCName).
 					Create(&testCtx).GetObject()
 
-				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
-					SetBackupPolicyName(backupPolicyName).
-					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
-					Create(&testCtx).GetObject()
-				backupKey = client.ObjectKeyFromObject(backup)
 			})
 
 			It("should succeed after job completes", func() {
+				createBackup(backupName)
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)
-
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
 				})).Should(Succeed())
+			})
+
+			It("creates pvc if the specified pvc not exists", func() {
+				createBackup(backupName)
+				By("Check pvc created by backup controller")
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
+					Name:      backupRemotePVCName,
+					Namespace: testCtx.DefaultNamespace,
+				}, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+			})
+
+			It("creates pvc if the specified pvc not exists", func() {
+				By("set persistentVolumeConfigmap")
+				configMapName := "pv-template-configmap"
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(tmpObj *dataprotectionv1alpha1.BackupPolicy) {
+					tmpObj.Spec.Full.PersistentVolumeClaim.PersistentVolumeConfigMap = &dataprotectionv1alpha1.PersistentVolumeConfigMap{
+						Name:      configMapName,
+						Namespace: testCtx.DefaultNamespace,
+					}
+				})).Should(Succeed())
+
+				By("create backup with non existent configmap of pv template")
+				createBackup(backupName)
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
+					g.Expect(fetched.Status.FailureReason).To(ContainSubstring("not found"))
+				})).Should(Succeed())
+				configMap := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      configMapName,
+						Namespace: testCtx.DefaultNamespace,
+					},
+					Data: map[string]string{},
+				}
+				Expect(testCtx.CreateObj(ctx, configMap)).Should(Succeed())
+
+				By("create backup with the configmap not contains the key 'persistentVolume'")
+				createBackup(backupName + "1")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
+					g.Expect(fetched.Status.FailureReason).To(ContainSubstring("the persistentVolume template is empty in the configMap"))
+				})).Should(Succeed())
+
+				By("create backup with the configmap contains the key 'persistentVolume'")
+				Expect(testapps.ChangeObj(&testCtx, configMap, func(tmpObj *corev1.ConfigMap) {
+					pv := corev1.PersistentVolume{
+						Spec: corev1.PersistentVolumeSpec{
+							AccessModes: []corev1.PersistentVolumeAccessMode{
+								corev1.ReadWriteMany,
+							},
+							Capacity: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Gi"),
+							},
+							PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
+							PersistentVolumeSource: corev1.PersistentVolumeSource{
+								CSI: &corev1.CSIPersistentVolumeSource{
+									Driver:       "kubeblocks.com",
+									FSType:       "ext4",
+									VolumeHandle: pvcName,
+								},
+							},
+						},
+					}
+					pvString, _ := yaml.Marshal(pv)
+					tmpObj.Data = map[string]string{
+						"persistentVolume": string(pvString),
+					}
+				})).Should(Succeed())
+				createBackup(backupName + "2")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupInProgress))
+				})).Should(Succeed())
+
+				By("check pvc and pv created by backup controller")
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
+					Name:      backupRemotePVCName,
+					Namespace: testCtx.DefaultNamespace,
+				}, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
+					Name:      backupRemotePVCName + "-" + testCtx.DefaultNamespace,
+					Namespace: testCtx.DefaultNamespace,
+				}, &corev1.PersistentVolume{}, true)).Should(Succeed())
+
 			})
 		})
 	})
@@ -378,7 +465,6 @@ var _ = Describe("Backup Controller test", func() {
 			BeforeEach(func() {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
@@ -410,7 +496,7 @@ func patchVolumeSnapshotStatus(key types.NamespacedName, readyToUse bool) {
 
 func patchBackupPolicySpecBackupStatusUpdates(key types.NamespacedName) {
 	Eventually(testapps.GetAndChangeObj(&testCtx, key, func(fetched *dataprotectionv1alpha1.BackupPolicy) {
-		fetched.Spec.BackupStatusUpdates = []dataprotectionv1alpha1.BackupStatusUpdate{
+		fetched.Spec.Snapshot.BackupStatusUpdates = []dataprotectionv1alpha1.BackupStatusUpdate{
 			{
 				Path:          "manifests.backupLog",
 				ContainerName: "postgresql",

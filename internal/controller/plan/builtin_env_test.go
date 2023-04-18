@@ -188,7 +188,7 @@ bootstrap:
 					},
 				},
 				{
-					Name: "invalid_contaienr",
+					Name: "invalid_container",
 				},
 			},
 		}

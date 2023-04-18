@@ -33,9 +33,8 @@ var _ = Describe("affinity utils", func() {
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
 		clusterName        = "test-cluster"
-
-		mysqlCompType = "replicasets"
-		mysqlCompName = "mysql"
+		mysqlCompDefName   = "replicasets"
+		mysqlCompName      = "mysql"
 	)
 
 	var (
@@ -45,28 +44,28 @@ var _ = Describe("affinity utils", func() {
 
 	Context("with PodAntiAffinity set to Required", func() {
 		const topologyKey = "testTopologyKey"
-		const lableKey = "testNodeLabelKey"
+		const labelKey = "testNodeLabelKey"
 		const labelValue = "testLabelValue"
 
 		BeforeEach(func() {
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				GetObject()
 
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 
 			affinity := &appsv1alpha1.Affinity{
 				PodAntiAffinity: appsv1alpha1.Required,
 				TopologyKeys:    []string{topologyKey},
 				NodeLabels: map[string]string{
-					lableKey: labelValue,
+					labelKey: labelValue,
 				},
 			}
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				SetClusterAffinity(affinity).
 				GetObject()
 
@@ -86,7 +85,7 @@ var _ = Describe("affinity utils", func() {
 
 		It("should have correct Affinity and TopologySpreadConstraints", func() {
 			affinity := buildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
-			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(lableKey))
+			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal(topologyKey))
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 
@@ -102,28 +101,28 @@ var _ = Describe("affinity utils", func() {
 
 	Context("with PodAntiAffinity set to Preferred", func() {
 		const topologyKey = "testTopologyKey"
-		const lableKey = "testNodeLabelKey"
+		const labelKey = "testNodeLabelKey"
 		const labelValue = "testLabelValue"
 
 		BeforeEach(func() {
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				GetObject()
 
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 
 			affinity := &appsv1alpha1.Affinity{
 				PodAntiAffinity: appsv1alpha1.Preferred,
 				TopologyKeys:    []string{topologyKey},
 				NodeLabels: map[string]string{
-					lableKey: labelValue,
+					labelKey: labelValue,
 				},
 			}
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				SetClusterAffinity(affinity).
 				GetObject()
 
@@ -144,7 +143,7 @@ var _ = Describe("affinity utils", func() {
 
 		It("should have correct Affinity and TopologySpreadConstraints", func() {
 			affinity := buildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
-			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(lableKey))
+			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal(topologyKey))

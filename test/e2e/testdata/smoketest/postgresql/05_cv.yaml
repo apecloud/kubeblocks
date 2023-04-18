@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: postgresql-15.2.0-latest
+spec:
+  clusterDefinitionRef: postgresql
+  componentVersions:
+    - componentDefRef: postgresql
+      versionsContext:
+        containers:
+          - name: postgresql
+            image: docker.io/apecloud/postgresql:15.2.0

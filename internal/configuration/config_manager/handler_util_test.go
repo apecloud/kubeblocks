@@ -92,7 +92,7 @@ func TestIsSupportReload(t *testing.T) {
 	}
 }
 
-var _ = Describe("Hander Util Test", func() {
+var _ = Describe("Handler Util Test", func() {
 
 	var mockK8sCli *testutil.K8sClientMockHelper
 

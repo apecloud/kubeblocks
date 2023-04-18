@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -30,35 +31,35 @@ import (
 )
 
 const (
-	namespace                          = "test"
-	testDefaultClassDefsPath           = "../../testing/testdata/class.yaml"
-	testCustomClassDefsPath            = "../../testing/testdata/custom_class.yaml"
-	testGeneralClassFamilyPath         = "../../testing/testdata/classfamily-general.yaml"
-	testMemoryOptimizedClassFamilyPath = "../../testing/testdata/classfamily-memory-optimized.yaml"
+	namespace                                 = "test"
+	testDefaultClassDefsPath                  = "../../testing/testdata/class.yaml"
+	testCustomClassDefsPath                   = "../../testing/testdata/custom_class.yaml"
+	testGeneralResourceConstraintPath         = "../../testing/testdata/resource-constraint-general.yaml"
+	testMemoryOptimizedResourceConstraintPath = "../../testing/testdata/resource-constraint-memory-optimized.yaml"
 )
 
 var (
-	classDef                   []byte
-	generalFamilyDef           []byte
-	memoryOptimizedFamilyDef   []byte
-	generalClassFamily         appsv1alpha1.ClassFamily
-	memoryOptimizedClassFamily appsv1alpha1.ClassFamily
+	classDef                          appsv1alpha1.ComponentClassDefinition
+	generalResourceConstraint         appsv1alpha1.ComponentResourceConstraint
+	memoryOptimizedResourceConstraint appsv1alpha1.ComponentResourceConstraint
 )
 
 var _ = BeforeSuite(func() {
 	var err error
 
-	classDef, err = os.ReadFile(testDefaultClassDefsPath)
+	classDefBytes, err := os.ReadFile(testDefaultClassDefsPath)
+	Expect(err).ShouldNot(HaveOccurred())
+	err = yaml.Unmarshal(classDefBytes, &classDef)
 	Expect(err).ShouldNot(HaveOccurred())
 
-	generalFamilyDef, err = os.ReadFile(testGeneralClassFamilyPath)
+	generalResourceConstraintBytes, err := os.ReadFile(testGeneralResourceConstraintPath)
 	Expect(err).ShouldNot(HaveOccurred())
-	err = yaml.Unmarshal(generalFamilyDef, &generalClassFamily)
+	err = yaml.Unmarshal(generalResourceConstraintBytes, &generalResourceConstraint)
 	Expect(err).ShouldNot(HaveOccurred())
 
-	memoryOptimizedFamilyDef, err = os.ReadFile(testMemoryOptimizedClassFamilyPath)
+	memoryOptimizedResourceConstraintBytes, err := os.ReadFile(testMemoryOptimizedResourceConstraintPath)
 	Expect(err).ShouldNot(HaveOccurred())
-	err = yaml.Unmarshal(memoryOptimizedFamilyDef, &memoryOptimizedClassFamily)
+	err = yaml.Unmarshal(memoryOptimizedResourceConstraintBytes, &memoryOptimizedResourceConstraint)
 	Expect(err).ShouldNot(HaveOccurred())
 
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)

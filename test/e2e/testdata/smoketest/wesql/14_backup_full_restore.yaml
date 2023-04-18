@@ -1,0 +1,28 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: snapshot-mycluster
+  annotations:
+    kubeblocks.io/restore-from-backup: "{\"mysql\":\"backup-full-mycluster\"}"
+spec:
+  clusterDefinitionRef: apecloud-mysql
+  clusterVersionRef: ac-mysql-8.0.30
+  terminationPolicy: WipeOut
+  affinity:
+    topologyKeys:
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: mysql
+      componentDefRef: mysql
+      monitor: false
+      replicas: 3
+      enabledLogs: [ "slow","error" ]
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 2Gi

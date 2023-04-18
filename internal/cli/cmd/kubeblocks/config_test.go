@@ -1,0 +1,127 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package kubeblocks
+
+import (
+	"fmt"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"helm.sh/helm/v3/pkg/cli/values"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	clientfake "k8s.io/client-go/rest/fake"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/version"
+)
+
+var _ = Describe("backupconfig", func() {
+	var streams genericclioptions.IOStreams
+	var tf *cmdtesting.TestFactory
+
+	mockDeploy := func() *appsv1.Deployment {
+		deploy := &appsv1.Deployment{}
+		deploy.SetLabels(map[string]string{
+			"app.kubernetes.io/name":    types.KubeBlocksChartName,
+			"app.kubernetes.io/version": "0.3.0",
+		})
+		deploy.Spec.Template.Spec.Containers = []corev1.Container{
+			{
+				Name: "kb",
+				Env: []corev1.EnvVar{
+					{
+						Name:  "CM_NAMESPACE",
+						Value: "default",
+					},
+					{
+						Name:  "VOLUMESNAPSHOT",
+						Value: "true",
+					},
+				},
+			},
+		}
+		return deploy
+	}
+
+	mockConfigMap := func() *corev1.ConfigMap {
+		configmap := &corev1.ConfigMap{}
+		configmap.Name = fmt.Sprintf("%s-manager-config", types.KubeBlocksChartName)
+		configmap.SetLabels(map[string]string{
+			"app.kubernetes.io/name": types.KubeBlocksChartName,
+		})
+		configmap.Data = map[string]string{
+			"config.yaml": `BACKUP_PVC_NAME: "test-pvc"`,
+		}
+		return configmap
+	}
+
+	BeforeEach(func() {
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
+		tf.Client = &clientfake.RESTClient{}
+
+		// use a fake URL to test
+		types.KubeBlocksChartName = testing.KubeBlocksChartName
+		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
+	})
+
+	AfterEach(func() {
+		tf.Cleanup()
+	})
+
+	It("run config cmd", func() {
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+				HelmCfg:   helm.NewFakeConfig(testing.Namespace),
+				Namespace: "default",
+				Client:    testing.FakeClientSet(mockDeploy()),
+				Dynamic:   testing.FakeDynamicClient(),
+			},
+			Version:   version.DefaultKubeBlocksVersion,
+			Monitor:   true,
+			ValueOpts: values.Options{Values: []string{"snapshot-controller.enabled=true"}},
+		}
+		cmd := NewConfigCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+		Expect(o.Install()).Should(Succeed())
+	})
+
+	It("run describe config cmd", func() {
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+				HelmCfg:   helm.NewFakeConfig(testing.Namespace),
+				Namespace: "default",
+				Client:    testing.FakeClientSet(mockDeploy(), mockConfigMap()),
+			},
+		}
+		cmd := NewDescribeConfigCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+		done := testing.Capture()
+		Expect(describeConfig(o)).Should(Succeed())
+		capturedOutput, err := done()
+		Expect(err).Should(Succeed())
+		Expect(capturedOutput).Should(ContainSubstring("VOLUMESNAPSHOT=true"))
+		Expect(capturedOutput).Should(ContainSubstring("BACKUP_PVC_NAME=test-pvc"))
+	})
+})

@@ -217,8 +217,8 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, statement []str
 
 func renderSecretWithPwd(key componentUniqueKey, username, passwd string) *corev1.Secret {
 	secretData := map[string][]byte{}
-	secretData[accountNameForSecret] = []byte(username)
-	secretData[accountPasswdForSecret] = []byte(passwd)
+	secretData[constant.AccountNameForSecret] = []byte(username)
+	secretData[constant.AccountPasswdForSecret] = []byte(passwd)
 
 	ml := getLabelsForSecretsAndJobs(key)
 	ml[constant.ClusterAccountLabelKey] = username
@@ -306,7 +306,7 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 	accountConfig appsv1alpha1.SystemAccountConfig) ([]string, *corev1.Secret) {
 	// generated password with mixedcases = true
 	passwd, _ := password.Generate((int)(passConfig.Length), (int)(passConfig.NumDigits), (int)(passConfig.NumSymbols), false, false)
-	// refine pasword to upper or lower cases w.r.t configuration
+	// refine password to upper or lower cases w.r.t configuration
 	switch passConfig.LetterCase {
 	case appsv1alpha1.UpperCases:
 		passwd = strings.ToUpper(passwd)

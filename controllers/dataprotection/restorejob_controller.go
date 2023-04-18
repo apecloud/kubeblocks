@@ -18,6 +18,7 @@ package dataprotection
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
@@ -239,26 +240,19 @@ func (r *RestoreJobReconciler) buildPodSpec(reqCtx intctrlutil.RequestCtx, resto
 		return podSpec, err
 	}
 
-	// get backup policy
-	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
-	backupPolicyNameSpaceName := types.NamespacedName{
-		Namespace: reqCtx.Req.Namespace,
-		Name:      backup.Spec.BackupPolicyName,
-	}
-	if err := r.Client.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
-		logger.Error(err, "Unable to get backupPolicy for backup.", "BackupPolicy", backupPolicyNameSpaceName)
-		return podSpec, err
-	}
-
 	// get backup tool
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
 	backupToolNameSpaceName := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,
-		Name:      backupPolicy.Spec.BackupToolName,
+		Name:      backup.Status.BackupToolName,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, backupToolNameSpaceName, backupTool); err != nil {
 		logger.Error(err, "Unable to get backupTool for backup.", "BackupTool", backupToolNameSpaceName)
 		return podSpec, err
+	}
+
+	if len(backup.Status.PersistentVolumeClaimName) == 0 {
+		return podSpec, nil
 	}
 
 	container := corev1.Container{}
@@ -272,9 +266,19 @@ func (r *RestoreJobReconciler) buildPodSpec(reqCtx intctrlutil.RequestCtx, resto
 
 	container.VolumeMounts = restoreJob.Spec.TargetVolumeMounts
 
+	// add the volumeMounts with backup volume
+	restoreVolumeName := fmt.Sprintf("restore-%s", backup.Status.PersistentVolumeClaimName)
+	remoteVolume := corev1.Volume{
+		Name: restoreVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: backup.Status.PersistentVolumeClaimName,
+			},
+		},
+	}
 	// add remote volumeMounts
 	remoteVolumeMount := corev1.VolumeMount{}
-	remoteVolumeMount.Name = backupPolicy.Spec.RemoteVolume.Name
+	remoteVolumeMount.Name = restoreVolumeName
 	remoteVolumeMount.MountPath = "/data"
 	container.VolumeMounts = append(container.VolumeMounts, remoteVolumeMount)
 
@@ -299,7 +303,7 @@ func (r *RestoreJobReconciler) buildPodSpec(reqCtx intctrlutil.RequestCtx, resto
 	podSpec.Volumes = restoreJob.Spec.TargetVolumes
 
 	// add remote volumes
-	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolume)
+	podSpec.Volumes = append(podSpec.Volumes, remoteVolume)
 
 	// TODO(dsj): mount readonly remote volumes for restore.
 	// podSpec.Volumes[0].PersistentVolumeClaim.ReadOnly = true

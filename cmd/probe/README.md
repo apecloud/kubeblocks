@@ -17,7 +17,7 @@ You can get started with Probe, by any of the following methods:
 
 ## 2.1 Build
 
-Compiler `Go 1.19+` (Generics Programming Support), checking the [Go Installation](https://go.dev/doc/install) to see how to install Go on your platform.
+Compiler `Go 1.20+` (Generics Programming Support), checking the [Go Installation](https://go.dev/doc/install) to see how to install Go on your platform.
 
 Use `go build` to build and produce the `probe` binary file. The executable is produced under current directory.
 

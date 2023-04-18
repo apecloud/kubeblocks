@@ -309,7 +309,7 @@ spec:
 	return cluster, err
 }
 
-func createTestReplicationSetCluster(clusterDefinitionName, clusterVerisonName, clusterName string) (*Cluster, error) {
+func createTestReplicationSetCluster(clusterDefinitionName, clusterVersionName, clusterName string) (*Cluster, error) {
 	clusterYaml := fmt.Sprintf(`
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
@@ -333,7 +333,7 @@ spec:
         resources:
           requests:
             storage: 1Gi
-`, clusterName, clusterDefinitionName, clusterVerisonName)
+`, clusterName, clusterDefinitionName, clusterVersionName)
 	cluster := &Cluster{}
 	err := yaml.Unmarshal([]byte(clusterYaml), cluster)
 	cluster.Spec.TerminationPolicy = WipeOut

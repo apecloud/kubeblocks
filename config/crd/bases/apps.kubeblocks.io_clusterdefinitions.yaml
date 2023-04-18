@@ -94,6 +94,7 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: set
                           name:
                             description: Specify the name of configuration template.
                             maxLength: 63
@@ -286,12 +287,10 @@ spec:
                       description: horizontalScalePolicy controls the behavior of
                         horizontal scale.
                       properties:
-                        backupTemplateSelector:
-                          additionalProperties:
-                            type: string
-                          description: backupTemplateSelector defines the label selector
-                            for finding associated BackupTemplate API object.
-                          type: object
+                        backupPolicyTemplateName:
+                          description: BackupPolicyTemplateName reference the backup
+                            policy template.
+                          type: string
                         type:
                           default: None
                           description: 'type controls what kind of data synchronization
@@ -299,10 +298,10 @@ spec:
                             Snapshot}. The default policy is `None`. None: Default
                             policy, do nothing. Snapshot: Do native volume snapshot
                             before scaling and restore to newly scaled pods. Prefer
-                            backup job to create snapshot if `BackupTemplateSelector`
-                            can find a template. Notice that ''Snapshot'' policy will
-                            only take snapshot on one volumeMount, default is the
-                            first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
+                            backup job to create snapshot if can find a backupPolicy
+                            from ''BackupPolicyTemplateName''. Notice that ''Snapshot''
+                            policy will only take snapshot on one volumeMount, default
+                            is the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
                             since take multiple snapshots at one time might cause
                             consistency problem.'
                           enum:
@@ -373,12 +372,12 @@ spec:
                               maxLength: 128
                               type: string
                             scrapePort:
+                              anyOf:
+                              - type: integer
+                              - type: string
                               description: scrapePort is exporter port for Time Series
                                 Database to scrape metrics.
-                              format: int32
-                              maximum: 65535
-                              minimum: 0
-                              type: integer
+                              x-kubernetes-int-or-string: true
                           required:
                           - scrapePort
                           type: object
@@ -7916,7 +7915,7 @@ spec:
                     probes:
                       description: probes setting for healthy checks.
                       properties:
-                        roleChangedProbe:
+                        roleProbe:
                           description: Probe for DB role changed check.
                           properties:
                             commands:
@@ -7963,9 +7962,8 @@ spec:
                             exceed the InitializationTimeoutSeconds time without a
                             role label, this component will enter the Failed/Abnormal
                             phase. Note that this configuration will only take effect
-                            if the component supports RoleChangedProbe and will not
-                            affect the life cycle of the pod. default values are 60
-                            seconds.
+                            if the component supports RoleProbe and will not affect
+                            the life cycle of the pod. default values are 60 seconds.
                           format: int32
                           minimum: 30
                           type: integer
@@ -8685,8 +8683,13 @@ spec:
                             - data
                             - log
                             type: string
+                        required:
+                        - name
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     workloadType:
                       description: workloadType defines type of the workload. Stateless
                         is a stateless workload type used to describe stateless applications.
@@ -8715,14 +8718,17 @@ spec:
                 additionalProperties:
                   type: string
                 description: 'Connection credential template used for creating a connection
-                  credential secret for cluster.apps.kubeblock.io object. Built-in
+                  credential secret for cluster.apps.kubeblocks.io object. Built-in
                   objects are: `$(RANDOM_PASSWD)` - random 8 characters. `$(UUID)`
                   - generate a random UUID v4 string. `$(UUID_B64)` - generate a random
                   UUID v4 BASE64 encoded string``. `$(UUID_STR_B64)` - generate a
                   random UUID v4 string then BASE64 encoded``. `$(UUID_HEX)` - generate
-                  a random UUID v4 wth HEX representation``. `$(SVC_FQDN)` - service
-                  FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+                  a random UUID v4 HEX representation``. `$(HEADLESS_SVC_FQDN)` -
+                  headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
                   where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
+                  attribute; `$(SVC_FQDN)` - service FQDN  placeholder, value pattern
+                  - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME
+                  is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
                   attribute; `$(SVC_PORT_<PORT-NAME>)` - a ServicePort''s port value
                   with specified port name, i.e, a servicePort JSON struct: { "name":
                   "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and

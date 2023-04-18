@@ -28,12 +28,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("RestoreJob Controller", func() {
-
+	const (
+		clusterName = "mycluster"
+		compName    = "cluster"
+	)
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -46,6 +50,7 @@ var _ = Describe("RestoreJob Controller", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
@@ -75,7 +80,6 @@ var _ = Describe("RestoreJob Controller", func() {
 		return testapps.NewBackupFactory(testCtx.DefaultNamespace, "backup-job-").
 			WithRandomName().SetBackupPolicyName(backupPolicy).
 			SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
-			SetTTL("168h0m0s").
 			Create(&testCtx).GetObject()
 	}
 
@@ -83,12 +87,13 @@ var _ = Describe("RestoreJob Controller", func() {
 		By("By assure an backupPolicy obj")
 		return testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, "backup-policy-").
 			WithRandomName().
-			SetSchedule("0 3 * * *").
-			SetTTL("168h0m0s").
+			AddFullPolicy().
+			AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+			SetSchedule("0 3 * * *", true).
+			SetTTL("7d").
 			SetBackupToolName(backupTool).
-			SetBackupPolicyTplName("backup-config-mysql").
 			SetTargetSecretName("mycluster-cluster-secret").
-			SetRemoteVolumePVC("backup-remote-volume", "backup-host-path-pvc").
+			SetPVC("backup-host-path-pvc").
 			Create(&testCtx).GetObject()
 	}
 
@@ -110,8 +115,9 @@ var _ = Describe("RestoreJob Controller", func() {
 
 	assureStatefulSetObj := func() *appsv1.StatefulSet {
 		By("By assure an stateful obj")
-		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mycluster", "mycluster", "replicasets").
-			AddAppInstanceLabel("mycluster").
+		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName, clusterName, compName).
+			SetReplicas(3).
+			AddAppInstanceLabel(clusterName).
 			AddContainer(corev1.Container{Name: "mysql", Image: testapps.ApeCloudMySQLImage}).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
@@ -144,73 +150,51 @@ var _ = Describe("RestoreJob Controller", func() {
 		Expect(k8sClient.Status().Patch(ctx, &k8sJob, patch)).Should(Succeed())
 	}
 
+	testRestoreJob := func(withResources ...bool) {
+		By("By creating a statefulset and pod")
+		sts := assureStatefulSetObj()
+		testapps.MockConsensusComponentPods(testCtx, sts, clusterName, compName)
+
+		By("By creating a backupTool")
+		backupTool := assureBackupToolObj(withResources...)
+
+		By("By creating a backupPolicy from backupTool: " + backupTool.Name)
+		backupPolicy := assureBackupPolicyObj(backupTool.Name)
+
+		By("By creating a backup from backupPolicy: " + backupPolicy.Name)
+		backup := assureBackupObj(backupPolicy.Name)
+
+		By("By creating a restoreJob from backup: " + backup.Name)
+		toCreate := assureRestoreJobObj(backup.Name)
+		key := types.NamespacedName{
+			Name:      toCreate.Name,
+			Namespace: toCreate.Namespace,
+		}
+		backupKey := types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace}
+		Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+			g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupInProgress))
+		})).Should(Succeed())
+
+		patchBackupStatus(dataprotectionv1alpha1.BackupCompleted, backupKey)
+
+		patchK8sJobStatus(batchv1.JobComplete, key)
+
+		result := &dataprotectionv1alpha1.RestoreJob{}
+		Eventually(func() bool {
+			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+			return result.Status.Phase == dataprotectionv1alpha1.RestoreJobCompleted ||
+				result.Status.Phase == dataprotectionv1alpha1.RestoreJobFailed
+		}).Should(BeTrue())
+		Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.RestoreJobCompleted))
+	}
+
 	Context("When creating restoreJob", func() {
 		It("Should success with no error", func() {
-
-			By("By creating a statefulset")
-			_ = assureStatefulSetObj()
-
-			By("By creating a backupTool")
-			backupTool := assureBackupToolObj()
-
-			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-			backupPolicy := assureBackupPolicyObj(backupTool.Name)
-
-			By("By creating a backup from backupPolicy: " + backupPolicy.Name)
-			backup := assureBackupObj(backupPolicy.Name)
-
-			By("By creating a restoreJob from backup: " + backup.Name)
-			toCreate := assureRestoreJobObj(backup.Name)
-			key := types.NamespacedName{
-				Name:      toCreate.Name,
-				Namespace: toCreate.Namespace,
-			}
-
-			patchBackupStatus(dataprotectionv1alpha1.BackupCompleted, types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace})
-
-			patchK8sJobStatus(batchv1.JobComplete, types.NamespacedName{Name: toCreate.Name, Namespace: toCreate.Namespace})
-
-			result := &dataprotectionv1alpha1.RestoreJob{}
-			Eventually(func() bool {
-				Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
-				return result.Status.Phase == dataprotectionv1alpha1.RestoreJobCompleted ||
-					result.Status.Phase == dataprotectionv1alpha1.RestoreJobFailed
-			}).Should(BeTrue())
-			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.RestoreJobCompleted))
+			testRestoreJob()
 		})
 
 		It("Without backupTool resources should success with no error", func() {
-
-			By("By creating a statefulset")
-			_ = assureStatefulSetObj()
-
-			By("By creating a backupTool")
-			backupTool := assureBackupToolObj(true)
-
-			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-			backupPolicy := assureBackupPolicyObj(backupTool.Name)
-
-			By("By creating a backup from backupPolicy: " + backupPolicy.Name)
-			backup := assureBackupObj(backupPolicy.Name)
-
-			By("By creating a restoreJob from backup: " + backup.Name)
-			toCreate := assureRestoreJobObj(backup.Name)
-			key := types.NamespacedName{
-				Name:      toCreate.Name,
-				Namespace: toCreate.Namespace,
-			}
-
-			patchBackupStatus(dataprotectionv1alpha1.BackupCompleted, types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace})
-
-			patchK8sJobStatus(batchv1.JobComplete, types.NamespacedName{Name: toCreate.Name, Namespace: toCreate.Namespace})
-
-			result := &dataprotectionv1alpha1.RestoreJob{}
-			Eventually(func() bool {
-				Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
-				return result.Status.Phase == dataprotectionv1alpha1.RestoreJobCompleted ||
-					result.Status.Phase == dataprotectionv1alpha1.RestoreJobFailed
-			}).Should(BeTrue())
-			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.RestoreJobCompleted))
+			testRestoreJob(true)
 		})
 	})
 

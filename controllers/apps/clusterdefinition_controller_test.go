@@ -133,7 +133,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{})
 		Expect(testapps.ChangeObjStatus(&testCtx, cfgTpl, func() {
-			cfgTpl.Status.Phase = appsv1alpha1.AvailablePhase
+			cfgTpl.Status.Phase = appsv1alpha1.CCAvailablePhase
 		})).Should(Succeed())
 		return cm
 	}

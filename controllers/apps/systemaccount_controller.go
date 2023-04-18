@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
@@ -39,6 +40,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/sqlchannel"
 )
 
 // SystemAccountReconciler reconciles a SystemAccount object.
@@ -69,7 +71,16 @@ type componentUniqueKey struct {
 	namespace     string
 	clusterName   string
 	componentName string
+	characterType string
 }
+
+// updateStrategy is used to specify the update strategy for a component.
+type updateStrategy int8
+
+const (
+	inPlaceUpdate updateStrategy = 1
+	reCreate      updateStrategy = 2
+)
 
 // SysAccountDeletion and SysAccountCreation are used as event reasons.
 const (
@@ -160,27 +171,35 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	processAccountsForComponent := func(compDef *appsv1alpha1.ClusterComponentDefinition, compDecl *appsv1alpha1.ClusterComponentSpec,
 		svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) error {
 		var (
-			err           error
-			toCreate      appsv1alpha1.KBAccountType
-			detectedFacts appsv1alpha1.KBAccountType
-			engine        *customizedEngine
-			compKey       = componentUniqueKey{
+			err                 error
+			toCreate            appsv1alpha1.KBAccountType
+			detectedK8SFacts    appsv1alpha1.KBAccountType
+			detectedEngineFacts appsv1alpha1.KBAccountType
+			engine              *customizedEngine
+			compKey             = componentUniqueKey{
 				namespace:     cluster.Namespace,
 				clusterName:   cluster.Name,
 				componentName: compDecl.Name,
+				characterType: compDef.CharacterType,
 			}
 		)
 
 		// expectations: collect accounts from default setting, cluster and cluster definition.
 		toCreate = getDefaultAccounts()
-		// facts: accounts have been created.
-		detectedFacts, err = r.getAccountFacts(reqCtx, compKey)
-		if err != nil {
+		// facts: accounts have been created, in form of k8s secrets.
+		if detectedK8SFacts, err = r.getAccountFacts(reqCtx, compKey); err != nil {
 			reqCtx.Log.Error(err, "failed to get secrets")
 			return err
 		}
+		// facts: accounts have been created in engine.
+		if detectedEngineFacts, err = r.getEngineFacts(reqCtx, compKey); err != nil {
+			reqCtx.Log.Error(err, "failed to get accounts", "cluster", cluster.Name, "component", compDecl.Name)
+			// we don't return error here, because we can still create accounts in k8s and will give it a try.
+		}
+
 		// toCreate = account to create - account exists
-		toCreate &= toCreate ^ detectedFacts
+		// (toCreate \intersect detectedEngineFacts) means the set of account exists in engine but not in k8s, and should be updated or altered, not re-created.
+		toCreate &= toCreate ^ detectedK8SFacts
 		if toCreate == 0 {
 			return nil
 		}
@@ -194,13 +213,18 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				continue
 			}
 
+			strategy := reCreate
+			if detectedEngineFacts&accountID != 0 {
+				strategy = inPlaceUpdate
+			}
+
 			switch account.ProvisionPolicy.Type {
 			case appsv1alpha1.CreateByStmt:
 				if engine == nil {
 					execConfig := compDef.SystemAccounts.CmdExecutorConfig
 					engine = newCustomizedEngine(execConfig, cluster, compDecl.Name)
 				}
-				if err := r.createByStmt(reqCtx, cluster, compDef, compKey, engine, account, svcEP, headlessEP); err != nil {
+				if err := r.createByStmt(reqCtx, cluster, compDef, compKey, engine, account, svcEP, headlessEP, strategy); err != nil {
 					return err
 				}
 			case appsv1alpha1.ReferToExisting:
@@ -265,12 +289,12 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	compKey componentUniqueKey,
 	engine *customizedEngine,
 	account appsv1alpha1.SystemAccountConfig,
-	svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) error {
+	svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints, strategy updateStrategy) error {
 	// render statements
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	policy := account.ProvisionPolicy
 
-	stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account)
+	stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, strategy)
 
 	uprefErr := controllerutil.SetOwnerReference(cluster, secret, scheme)
 	if uprefErr != nil {
@@ -367,6 +391,42 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 
 	detectedFacts := getAccountFacts(secrets, jobs)
 	return detectedFacts, nil
+}
+
+func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
+	// get pods for this cluster-component, by lable
+	ml := getLabelsForSecretsAndJobs(key)
+	pods := &corev1.PodList{}
+	if err := r.Client.List(reqCtx.Ctx, pods, client.InNamespace(key.namespace), ml); err != nil {
+		return appsv1alpha1.KBAccountInvalid, err
+	}
+	if len(pods.Items) == 0 {
+		return appsv1alpha1.KBAccountInvalid, fmt.Errorf("no pods available for cluster: %s, component %s", key.clusterName, key.componentName)
+	}
+	// find the first running pod
+	var target *corev1.Pod
+	for _, pod := range pods.Items {
+		if pod.Status.Phase == corev1.PodRunning {
+			target = &pod
+		}
+	}
+	if target == nil {
+		return appsv1alpha1.KBAccountInvalid, fmt.Errorf("no pod is running for cluster: %s, component %s", key.clusterName, key.componentName)
+	}
+
+	sqlChanClient, err := sqlchannel.NewClientWithPod(target, key.characterType)
+	if err != nil {
+		return appsv1alpha1.KBAccountInvalid, err
+	}
+	accounts, err := sqlChanClient.GetSystemAccounts()
+	if err != nil {
+		return appsv1alpha1.KBAccountInvalid, err
+	}
+	accountsID := appsv1alpha1.KBAccountInvalid
+	for _, acc := range accounts {
+		updateFacts((appsv1alpha1.AccountName(acc)), &accountsID)
+	}
+	return accountsID, nil
 }
 
 // Delete implements default DeleteEvent filter on job deletion.

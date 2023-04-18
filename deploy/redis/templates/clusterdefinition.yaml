@@ -154,30 +154,35 @@ spec:
               scope: AllPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbdataprotection
             provisionPolicy:
               type: CreateByStmt
               scope: AllPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
               scope: AllPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbprobe
             provisionPolicy:
               type: CreateByStmt
               scope: AllPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
               scope: AllPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) +psync +replconf +ping
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
     - name: redis-sentinel
       workloadType: Stateful
       characterType: redis

@@ -89,6 +89,7 @@ func (r *Redis) Init(meta bindings.Metadata) (err error) {
 	r.RegisterOperation(DescribeUserOp, r.describeUserOps)
 	r.RegisterOperation(GrantUserRoleOp, r.grantUserRoleOps)
 	r.RegisterOperation(RevokeUserRoleOp, r.revokeUserRoleOps)
+	r.RegisterOperation(ListSystemAccountsOp, r.listSystemAccountsOps)
 
 	return nil
 }
@@ -272,6 +273,14 @@ func (r *Redis) listUsersOps(ctx context.Context, req *bindings.InvokeRequest, r
 	}
 
 	return QueryObject(ctx, r, req, ListUsersOp, cmdRender, dataProcessor, UserInfo{})
+}
+
+func (r *Redis) listSystemAccountsOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	cmdRender := func(user UserInfo) string {
+		return "ACL USERS"
+	}
+
+	return QueryObject(ctx, r, req, ListUsersOp, cmdRender, nil, UserInfo{})
 }
 
 func (r *Redis) describeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

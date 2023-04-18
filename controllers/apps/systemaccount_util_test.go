@@ -81,6 +81,7 @@ func mockCreateByStmtSystemAccount(name appsv1alpha1.AccountName) appsv1alpha1.S
 			Type: appsv1alpha1.CreateByStmt,
 			Statements: &appsv1alpha1.ProvisionStatements{
 				CreationStatement: "CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY \"$(PASSWD)\";",
+				UpdateStatement:   "ALTER USER $(USERNAME) IDENTIFIED BY \"$(PASSWD)\";",
 				DeletionStatement: "DROP USER IF EXISTS $(USERNAME);",
 			},
 		},
@@ -195,7 +196,7 @@ func TestRenderJob(t *testing.T) {
 	for _, acc := range accountsSetting.Accounts {
 		switch acc.ProvisionPolicy.Type {
 		case appsv1alpha1.CreateByStmt:
-			creationStmt, secrets := getCreationStmtForAccount(compKey, accountsSetting.PasswordConfig, acc)
+			creationStmt, secrets := getCreationStmtForAccount(compKey, accountsSetting.PasswordConfig, acc, reCreate)
 			// make sure all variables have been replaced
 			for _, stmt := range creationStmt {
 				assert.False(t, strings.Contains(stmt, "$(USERNAME)"))
@@ -340,12 +341,16 @@ func TestRenderCreationStmt(t *testing.T) {
 				account.ProvisionPolicy.Statements.DeletionStatement = ""
 			}
 
-			stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account)
+			stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, reCreate)
 			if toss == 1 {
 				assert.Equal(t, 1, len(stmts))
 			} else {
 				assert.Equal(t, 2, len(stmts))
 			}
+			assert.NotNil(t, secret)
+
+			stmts, secret = getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, inPlaceUpdate)
+			assert.Equal(t, 1, len(stmts))
 			assert.NotNil(t, secret)
 		}
 	}

@@ -44,7 +44,8 @@ func (r *fillClass) Transform(dag *graph.DAG) error {
 		return err
 	}
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-	return r.fillClass(r.ctx, cluster, r.cc.cd)
+	_ = r.fillClass(r.ctx, cluster, r.cc.cd)
+	return nil
 }
 
 func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, clusterDefinition appsv1alpha1.ClusterDefinition) error {

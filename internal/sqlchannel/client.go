@@ -21,6 +21,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"sort"
 	"time"
 
@@ -46,12 +49,6 @@ type OperationResult struct {
 	respTime time.Time
 }
 
-type Order struct {
-	OrderID  int     `json:"orderid"`
-	Customer string  `json:"customer"`
-	Price    float64 `json:"price"`
-}
-
 func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, error) {
 	if characterType == "" {
 		return nil, fmt.Errorf("pod %v chacterType must be set", pod.Name)
@@ -61,6 +58,7 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 	if ip == "" {
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
+
 	port, err := intctrlutil.GetProbeGRPCPort(pod)
 	if err != nil {
 		return nil, err
@@ -93,6 +91,7 @@ func (cli *OperationClient) GetRole() (string, error) {
 		Data:      []byte(""),
 		Metadata:  map[string]string{},
 	}
+
 	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
 	if err != nil {
 		return "", err
@@ -104,6 +103,37 @@ func (cli *OperationClient) GetRole() (string, error) {
 	}
 
 	return result["role"], nil
+}
+
+// GetSystemAccounts list all system accounts created
+func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
+	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
+	defer cancel()
+
+	// Request sql channel via Dapr SDK
+	req := &dapr.InvokeBindingRequest{
+		Name:      cli.CharacterType,
+		Operation: string(ListSystemAccountsOp),
+	}
+
+	if resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req); err != nil {
+		return nil, err
+	} else {
+		sqlResponse := SQLChannelResponse{}
+		if err = json.Unmarshal(resp.Data, &sqlResponse); err != nil {
+			return nil, err
+		}
+		if sqlResponse.Event == RespEveFail {
+			return nil, fmt.Errorf("get system accounts error: %s", sqlResponse.Message)
+		} else {
+			result := []string{}
+			if err = json.Unmarshal(([]byte)(sqlResponse.Message), &result); err != nil {
+				return nil, err
+			} else {
+				return result, err
+			}
+		}
+	}
 }
 
 func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {
@@ -167,8 +197,11 @@ func GetMapKeyFromRequest(req *dapr.InvokeBindingRequest) string {
 // OperationHTTPClient is a mock client for operation, mainly used to hide curl command details.
 type OperationHTTPClient struct {
 	httpRequestPrefix string
+	httpPostPrefix    string
 	RequestTimeout    time.Duration
 	containerName     string
+	ip                string
+	port              int32
 }
 
 // NewHTTPClientWithChannelPod create a new OperationHTTPClient with sqlchannel container
@@ -196,8 +229,11 @@ func NewHTTPClientWithChannelPod(pod *corev1.Pod, characterType string) (*Operat
 
 	client := &OperationHTTPClient{
 		httpRequestPrefix: fmt.Sprintf(HTTPRequestPrefx, port, characterType),
+		httpPostPrefix:    fmt.Sprintf(HTTPPostRequest, ip, port, characterType),
 		RequestTimeout:    10 * time.Second,
 		containerName:     container,
+		ip:                ip,
+		port:              port,
 	}
 	return client, nil
 }
@@ -227,4 +263,64 @@ func (cli *OperationHTTPClient) SendRequest(exec *exec.ExecOptions, request SQLC
 		return response, err
 	}
 	return response, nil
+}
+
+func (cli *OperationHTTPClient) SendHTTPRequest(request SQLChannelRequest) (SQLChannelResponse, error) {
+	response := SQLChannelResponse{}
+	client := newHTTPClient()
+	if result, err := httpCall(client, "POST", cli.httpPostPrefix, request); err != nil {
+		return response, err
+	} else {
+		if err = json.Unmarshal(result, &response); err != nil {
+			return response, nil
+		}
+	}
+	return response, nil
+}
+
+// NewHTTPClient returns a HTTP client configured
+func newHTTPClient() *http.Client {
+	dialer := &net.Dialer{ //nolint:exhaustivestruct
+		Timeout: 5 * time.Second,
+	}
+	netTransport := &http.Transport{ //nolint:exhaustivestruct
+		DialContext:         dialer.DialContext,
+		TLSHandshakeTimeout: 5 * time.Second,
+	}
+
+	return &http.Client{ //nolint:exhaustivestruct
+		Timeout:   30 * time.Second,
+		Transport: netTransport,
+	}
+}
+
+func httpCall(httpClient *http.Client, method string, url string, requestBody interface{}) ([]byte, error) {
+	var body []byte
+	var err error
+
+	if requestBody != nil {
+		body, err = json.Marshal(requestBody)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	req, err := http.NewRequest(method, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer res.Body.Close()
+
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return resBody, nil
 }

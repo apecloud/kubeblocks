@@ -1,3 +1,6 @@
+param (
+    [string]$v
+)
 # kbcli filename
 $CLI_FILENAME = "kbcli"
 
@@ -23,7 +26,7 @@ function verifySupported {
         Write-Output "AMD64 is supported..."
         return
     }
-    Write-Output "No support to your pc $arch ARCH"
+    Write-Output "No support for x86 systems"
     exit 1
 }
 
@@ -63,7 +66,7 @@ function getLatestRelease {
 $webClient = New-Object System.Net.WebClient
 $isDownLoaded = $False
 $Data =
-$timeout = New-TimeSpan -Seconds 60 
+
 function downloadFile {
     param (
         $LATEST_RELEASE_TAG
@@ -74,9 +77,8 @@ function downloadFile {
         $DOWNLOAD_BASE = "$GITLAB/$GITLAB_REPO/packages/generic/kubeblocks"
     }
     $DOWNLOAD_URL = "${DOWNLOAD_BASE}/${LATEST_RELEASE_TAG}/${CLI_ARTIFACT}"
+   
     # Check the Resource 
-    # Write-Host DOWNLOAD_URL = $DOWNLOAD_URL
-    
     $webRequest = [System.Net.HttpWebRequest]::Create($DOWNLOAD_URL)
     $webRequest.Method = "HEAD"
     try {
@@ -86,6 +88,7 @@ function downloadFile {
         Write-Host "Resource not found."
         exit 1
     }
+    
     # Create the temp directory
     $CLI_TMP_ROOT = New-Item -ItemType Directory -Path (Join-Path $env:TEMP "kbcli-install-$(Get-Date -Format 'yyyyMMddHHmmss')") 
     $Global:ARTIFACT_TMP_FILE = Join-Path $CLI_TMP_ROOT $CLI_ARTIFACT
@@ -107,10 +110,10 @@ function downloadFile {
     $timer.Interval = 500
     
     Register-ObjectEvent -InputObject $timer -EventName Elapsed -SourceIdentifier "TimerElapsed" -Action {
-        $percent = $Global:Data.SourceArgs.ProgressPercentage
+        $precent = $Global:Data.SourceArgs.ProgressPercentage
         $totalBytes = $Global:Data.SourceArgs.TotalBytesToReceive
         $receivedBytes = $Global:Data.SourceArgs.BytesReceived
-        if ($percent -ne $null) {
+        if ($precent -ne $null) {
             $downloadProgress = [Math]::Round(($receivedBytes / $totalBytes) * 100, 2)
             $status = "Downloaded {0} of {1} bytes" -f $receivedBytes, $totalBytes
             Write-Progress -Activity "Downloading kbcli..." -Status $status -PercentComplete $downloadProgress
@@ -186,20 +189,22 @@ function installCompleted {
 # main
 # ---------------------------------------
 
+
+
 verifySupported
 checkExistingCLI
 $COUNTRY_CODE = getCountryCode
 $ret_val
 
-if (-not $args) {
+if (-not $v) {
     Write-Host "Getting the latest kbcli ..."
     $ret_val = getLatestRelease
 }
-elseif ($args[0] -match "^v.*$") {
-    $ret_val = $args[0]
+elseif ($v -match "^v.*$") {
+    $ret_val = $v
 }
 else {
-    $ret_val = "v" + $args[0]
+    $ret_val = "v" + $v
 }
 
 $CLI_TMP_ROOT = downloadFile $ret_val

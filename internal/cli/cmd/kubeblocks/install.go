@@ -181,9 +181,8 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
-	if err = o.setDefaultValues(versionInfo); err != nil {
-		return err
-	}
+	// add monitor parameters
+	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// add helm repo
 	spinner := printer.Spinner(o.Out, "%-50s", "Add and update repo "+types.KubeBlocksRepoName)
@@ -217,37 +216,6 @@ func (o *InstallOptions) Install() error {
 			o.Version, o.HelmCfg.Namespace())
 		o.printNotes()
 	}
-	return nil
-}
-
-func (o *InstallOptions) setDefaultValues(version util.VersionInfo) error {
-	// add monitor parameters
-	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
-
-	// set default values based on the kubernetes provider
-	provider, err := util.GetK8sProvider(version.Kubernetes, o.Client)
-	if err != nil {
-		return err
-	}
-
-	if provider.IsCloud() {
-		return nil
-	}
-
-	// if provider is not a cloud provider, we guess it is a local environment
-	o.ValueOpts.Values = append(o.ValueOpts.Values,
-		// use hostpath csi driver to support snapshot
-		"snapshot-controller.enabled=true",
-		"csi-hostpath-driver.enabled=true",
-
-		// disable the persistent volume of prometheus, if not, the prometheus
-		// will dependent the hostpath csi driver ready to create persistent
-		// volume, but the order of addon installation is not guaranteed that
-		// will cause the prometheus PVC pending forever.
-		"prometheus.server.persistentVolume.enabled=false",
-		"prometheus.server.statefulSet.enabled=false",
-		"prometheus.alertmanager.persistentVolume.enabled=false",
-		"prometheus.alertmanager.statefulSet.enabled=false")
 	return nil
 }
 

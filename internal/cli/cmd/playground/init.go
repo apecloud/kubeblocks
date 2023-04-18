@@ -411,7 +411,21 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 		Check:   true,
 	}
 
-	if o.cloudProvider == cp.AWS {
+	if o.cloudProvider == cp.Local {
+		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
+			// use hostpath csi driver to support snapshot
+			"snapshot-controller.enabled=true",
+			"csi-hostpath-driver.enabled=true",
+
+			// disable the persistent volume of prometheus, if not, the prometheus
+			// will dependent the hostpath csi driver ready to create persistent
+			// volume, but the order of addon installation is not guaranteed that
+			// will cause the prometheus PVC pending forever.
+			"prometheus.server.persistentVolume.enabled=false",
+			"prometheus.server.statefulSet.enabled=false",
+			"prometheus.alertmanager.persistentVolume.enabled=false",
+			"prometheus.alertmanager.statefulSet.enabled=false")
+	} else if o.cloudProvider == cp.AWS {
 		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
 			// enable aws loadbalancer controller addon automatically on playground
 			"aws-loadbalancer-controller.enabled=true",

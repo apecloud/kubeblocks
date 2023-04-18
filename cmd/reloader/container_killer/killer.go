@@ -42,17 +42,17 @@ var logger logr.Logger
 func main() {
 	var containerRuntime cfgutil.CRIType
 	var runtimeEndpoint string
-	var contaienrID []string
+	var containerID []string
 
 	pflag.StringVar((*string)(&containerRuntime),
 		"container-runtime", "auto", "the config set cri runtime type.")
 	pflag.StringVar(&runtimeEndpoint,
 		"runtime-endpoint", runtimeEndpoint, "the config set cri runtime endpoint.")
-	pflag.StringArrayVar(&contaienrID,
-		"container-id", contaienrID, "the container-id killed.")
+	pflag.StringArrayVar(&containerID,
+		"container-id", containerID, "the container-id killed.")
 	pflag.Parse()
 
-	if len(contaienrID) == 0 {
+	if len(containerID) == 0 {
 		fmt.Fprintf(os.Stderr, "require container-id!\n\n")
 		pflag.Usage()
 		os.Exit(-1)
@@ -76,7 +76,7 @@ func main() {
 		logger.Error(err, "failed to init killer")
 	}
 
-	if err := killer.Kill(context.Background(), contaienrID, viper.GetString(cfgutil.KillContainerSignalEnvName), nil); err != nil {
-		logger.Error(err, fmt.Sprintf("failed to kill container[%s]", contaienrID))
+	if err := killer.Kill(context.Background(), containerID, viper.GetString(cfgutil.KillContainerSignalEnvName), nil); err != nil {
+		logger.Error(err, fmt.Sprintf("failed to kill container[%s]", containerID))
 	}
 }

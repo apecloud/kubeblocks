@@ -341,6 +341,9 @@ func findFirstConfigSpec(
 }
 
 func findConfigTemplateInfo(dynamic dynamic.Interface, configSpec *appsv1alpha1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1alpha1.FormatterConfig, error) {
+	if configSpec == nil {
+		return nil, nil, errors.New("configSpec is nil")
+	}
 	configTemplate, err := cluster.GetConfigMapByName(dynamic, configSpec.Namespace, configSpec.TemplateRef)
 	if err != nil {
 		return nil, nil, err

@@ -5,7 +5,7 @@ title: kbcli cluster create
 Create a cluster.
 
 ```
-kbcli cluster create [CLUSTER_NAME] [flags]
+kbcli cluster create [NAME] [flags]
 ```
 
 ### Examples

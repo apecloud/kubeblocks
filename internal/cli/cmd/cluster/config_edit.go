@@ -45,7 +45,7 @@ type editConfigOptions struct {
 }
 
 var (
-	editConfigUse = "edit-config NAME [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file] "
+	editConfigUse = "edit-config NAME [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file]"
 
 	editConfigExample = templates.Examples(`
 		# update mysql max_connections, cluster name is mycluster

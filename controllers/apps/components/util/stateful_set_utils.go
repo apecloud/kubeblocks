@@ -49,7 +49,7 @@ func IsMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name
 }
 
-// IsStsAndPodsRevisionConsistent checks if StatefulSet and pods of the StatefuleSet have the same revison,
+// IsStsAndPodsRevisionConsistent checks if StatefulSet and pods of the StatefulSet have the same revision.
 func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) (bool, error) {
 	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
 	if err != nil {

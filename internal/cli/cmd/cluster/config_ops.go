@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 )
 
 type configOpsOptions struct {
@@ -52,8 +53,9 @@ var (
 		# update component params 
 		kbcli cluster configure <cluster-name> --component=<component-name> --config-spec=<config-spec-name> --config-file=<config-file> --set max_connections=1000,general_log=OFF
 
+		# if only one component, and one config spec, and one config file, simplify the use of configure. e.g:
 		# update mysql max_connections, cluster name is mycluster
-		kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=2000
+		kbcli cluster configure mycluster --set max_connections=2000
 	`)
 )
 
@@ -126,6 +128,10 @@ func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.C
 			r[key] = ""
 		}
 		return r
+	}
+
+	if !cfgcm.IsSupportReload(cc.ReloadOptions) {
+		return o.confirmReconfigureWithRestart()
 	}
 
 	configPatch, _, err := cfgcore.CreateConfigPatch(mockEmptyData(data), data, cc.FormatterConfig.Format, tpl.Keys, false)

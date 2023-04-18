@@ -96,10 +96,13 @@ func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next fasthtt
 			code := ctx.Response.Header.Peek(statusCodeHeader)
 			statusCode, err := strconv.Atoi(string(code))
 			if err == nil {
+				// header has a statusCodeHeader
 				ctx.Response.Header.SetStatusCode(statusCode)
 				m.logger.Infof("response abnormal: %v", ctx.Response.String())
+			} else {
+				// header has no statusCodeHeader
+				m.logger.Infof("response: %v", ctx.Response.String())
 			}
-			m.logger.Infof("response: %v", ctx.Response.String())
 		}
 	}, nil
 }

@@ -1,6 +1,5 @@
 [default.extend-identifiers]
 # *sigh* this just isn't worth the cost of fixing
-ClusterPhaseMisMatch = "ClusterPhaseMisMatch"
 
 [default.extend-words]
 # Don't correct the "AKS"

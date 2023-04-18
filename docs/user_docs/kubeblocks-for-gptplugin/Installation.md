@@ -6,7 +6,7 @@ The Plugin authorities from OpenAI, if none, you can join the [waiting list here
 An OPENAI_API_KEY for the Plugin to call OpenAI embedding APIs. 
 
 ### Requirements from KubeBlocks
-Kbcli & the lastest KubeBlocks edition are installed.
+Kbcli & the latest KubeBlocks edition are installed.
 TODO: the installation part of kbcli & kb.
 
 ### Installation

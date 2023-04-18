@@ -33,7 +33,7 @@ func TestNewAllCondition(t *testing.T) {
 	NewSucceedCondition(opsRequest)
 	NewVerticalScalingCondition(opsRequest)
 	NewUpgradingCondition(opsRequest)
-	NewValidateFailedCondition(ReasonClusterPhaseMisMatch, "fail")
+	NewValidateFailedCondition(ReasonClusterPhaseMismatch, "fail")
 	NewFailedCondition(opsRequest, nil)
 	NewFailedCondition(opsRequest, errors.New("opsRequest run failed"))
 

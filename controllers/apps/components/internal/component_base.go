@@ -545,7 +545,7 @@ func (c *ComponentBase) removeStsInitContainerForRestore(backupName string) erro
 }
 
 // hasFailedAndTimedOutPod returns whether the pod of components is still failed after a PodFailedTimeout period.
-// if return ture, component phase will be set to Failed/Abnormal.
+// if return true, component phase will be set to Failed/Abnormal.
 func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, error) {
 	hasTimedoutPod := false
 	messages := appsv1alpha1.ComponentMessageMap{}

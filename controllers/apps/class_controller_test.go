@@ -52,14 +52,23 @@ var _ = Describe("", func() {
 	It("Class should exist in status", func() {
 		var (
 			clsName = "test"
+			class   = v1alpha1.ComponentClass{
+				Name:   clsName,
+				CPU:    resource.MustParse("1"),
+				Memory: resource.MustParse("1Gi"),
+			}
 		)
-		class := v1alpha1.ComponentClass{
-			Name:   clsName,
-			CPU:    resource.MustParse("1"),
-			Memory: resource.MustParse("2Gi"),
-		}
+
+		constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultGeneralResourceConstraintName).
+			AddConstraints(testapps.ResourceConstraintNormal).
+			AddConstraints(testapps.ResourceConstraintSpecial).
+			Create(&testCtx).GetObject()
+
 		componentClassDefinition = testapps.NewComponentClassDefinitionFactory("custom", "apecloud-mysql", "mysql").
-			AddClass(class).Create(&testCtx).GetObject()
+			AddClassGroup(constraint.Name).
+			AddClasses([]v1alpha1.ComponentClass{class}).
+			Create(&testCtx).GetObject()
+
 		key := client.ObjectKeyFromObject(componentClassDefinition)
 		Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *v1alpha1.ComponentClassDefinition) {
 			g.Expect(pobj.Status.Classes).ShouldNot(BeEmpty())

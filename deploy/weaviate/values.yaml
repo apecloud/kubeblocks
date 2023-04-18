@@ -61,7 +61,7 @@ resources: {}
 #   memory: '1Gi'
 
 
-# Add a service account ot the Weaviate pods if you need Weaviate to have permissions to
+# Add a service account to the Weaviate pods if you need Weaviate to have permissions to
 # access kubernetes resources or cloud provider resources. For example for it to have
 # access to a backup up bucket, or if you want to restrict Weaviate pod in any way.
 # By default, use the default ServiceAccount

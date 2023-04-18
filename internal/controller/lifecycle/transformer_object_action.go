@@ -17,7 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"reflect"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -28,7 +27,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -50,37 +48,6 @@ func ownKinds() []client.ObjectList {
 		&policyv1.PodDisruptionBudgetList{},
 		&dataprotectionv1alpha1.BackupPolicyList{},
 	}
-}
-
-// read all objects owned by our cluster
-func (c *objectActionTransformer) readCacheSnapshot(cluster appsv1alpha1.Cluster) (clusterSnapshot, error) {
-	// list what kinds of object cluster owns
-	kinds := ownKinds()
-	snapshot := make(clusterSnapshot)
-	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
-	inNS := client.InNamespace(cluster.Namespace)
-	for _, list := range kinds {
-		if err := c.cli.List(c.ctx.Ctx, list, inNS, ml); err != nil {
-			return nil, err
-		}
-		// reflect get list.Items
-		items := reflect.ValueOf(list).Elem().FieldByName("Items")
-		l := items.Len()
-		for i := 0; i < l; i++ {
-			// get the underlying object
-			object := items.Index(i).Addr().Interface().(client.Object)
-			// put to snapshot if owned by our cluster
-			if isOwnerOf(&cluster, object, scheme) {
-				name, err := getGVKName(object, scheme)
-				if err != nil {
-					return nil, err
-				}
-				snapshot[*name] = object
-			}
-		}
-	}
-
-	return snapshot, nil
 }
 
 func (c *objectActionTransformer) Transform(dag *graph.DAG) error {

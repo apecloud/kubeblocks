@@ -30,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -40,12 +42,20 @@ import (
 	preflightTesting "github.com/apecloud/kubeblocks/internal/preflight/testing"
 )
 
+var tf *cmdtesting.TestFactory
+
+type mockBuilder struct{}
+
+func (m *mockBuilder) NewForConfig(c *rest.Config) (*kubernetes.Clientset, error) {
+	return tf.KubernetesClientSet()
+}
+
 var _ = Describe("collect_test", func() {
 	var (
-		timeOut       = 10 * time.Second
-		namespace     = "test"
-		clusterName   = "test"
-		tf            *cmdtesting.TestFactory
+		timeOut     = 10 * time.Second
+		namespace   = "test"
+		clusterName = "test"
+
 		cluster       = testing.FakeCluster(clusterName, namespace)
 		pods          = testing.FakePods(3, namespace, clusterName)
 		preflight     *preflightv1beta2.Preflight
@@ -97,7 +107,7 @@ var _ = Describe("collect_test", func() {
 					g.Expect(<-progressCh).NotTo(BeNil())
 				}
 			}()
-			results, err := CollectPreflight(context.TODO(), preflight, hostPreflight, progressCh)
+			results, err := doCollectPreflight(context.TODO(), preflight, hostPreflight, progressCh, &mockBuilder{})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(len(results)).Should(BeNumerically(">=", 3))
 		}).WithTimeout(timeOut).Should(Succeed())

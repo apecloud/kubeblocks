@@ -33,19 +33,34 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	kbcollector "github.com/apecloud/kubeblocks/internal/preflight/collector"
 )
 
+type K8sClientSetBuilder interface {
+	NewForConfig(c *rest.Config) (*kubernetes.Clientset, error)
+}
+
+type builder struct{}
+
+func (b *builder) NewForConfig(c *rest.Config) (*kubernetes.Clientset, error) {
+	return kubernetes.NewForConfig(c)
+}
+
 func CollectPreflight(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, kbHostPreflight *preflightv1beta2.HostPreflight, progressCh chan interface{}) ([]preflight.CollectResult, error) {
+	return doCollectPreflight(ctx, kbPreflight, kbHostPreflight, progressCh, &builder{})
+}
+
+func doCollectPreflight(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, kbHostPreflight *preflightv1beta2.HostPreflight, progressCh chan interface{}, builder K8sClientSetBuilder) ([]preflight.CollectResult, error) {
 	var (
 		collectResults []preflight.CollectResult
 		err            error
 	)
 	// deal with preflight
 	if kbPreflight != nil && (len(kbPreflight.Spec.ExtendCollectors) > 0 || len(kbPreflight.Spec.Collectors) > 0) {
-		res, err := CollectClusterData(ctx, kbPreflight, progressCh)
+		res, err := CollectClusterData(ctx, kbPreflight, progressCh, builder)
 		if err != nil {
 			return collectResults, errors.Wrap(err, "failed to collect data in cluster")
 		}
@@ -126,7 +141,7 @@ func CollectHost(ctx context.Context, opts preflight.CollectOpts, collectors []p
 }
 
 // CollectClusterData transforms the specs of Preflight to Collector, and sets the collectOpts, such as restConfig, Namespace, and ProgressChan
-func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, progressCh chan interface{}) (*preflight.CollectResult, error) {
+func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, progressCh chan interface{}, builder K8sClientSetBuilder) (*preflight.CollectResult, error) {
 	v := viper.GetViper()
 
 	restConfig, err := k8sutil.GetRESTConfig()
@@ -163,7 +178,7 @@ func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Prefl
 	collectOpts.KubernetesRestConfig.Burst = constants.DEFAULT_CLIENT_BURST
 	// collectOpts.KubernetesRestConfig.UserAgent = fmt.Sprintf("%s/%s", constants.DEFAULT_CLIENT_USER_AGENT, version.Version())
 
-	k8sClient, err := kubernetes.NewForConfig(collectOpts.KubernetesRestConfig)
+	k8sClient, err := builder.NewForConfig(collectOpts.KubernetesRestConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to instantiate Kubernetes client")
 	}

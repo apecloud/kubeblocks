@@ -103,7 +103,7 @@ func TestGPRC(t *testing.T) {
 	resp, _ := cli.InvokeBinding(context.Background(), req)
 	t.Logf("probe response metadata: %v", resp.Metadata)
 	result := map[string]string{}
-	json.Unmarshal(resp.Data, &result)
+	_ = json.Unmarshal(resp.Data, &result)
 	t.Logf("probe response data: %v", result)
 
 }

@@ -155,13 +155,13 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 func (o *InstallOptions) Install() error {
 	// check if KubeBlocks has been installed
-	versionInfo, err := util.GetVersionInfo(o.Client)
+	v, err := util.GetVersionInfo(o.Client)
 	if err != nil {
 		return err
 	}
 
-	if versionInfo.KubeBlocks != "" {
-		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", versionInfo.KubeBlocks)
+	if v.KubeBlocks != "" {
+		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v.KubeBlocks)
 		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
 		return nil
 	}
@@ -177,7 +177,7 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
-	if err = o.preCheck(versionInfo); err != nil {
+	if err = o.preCheck(v); err != nil {
 		return err
 	}
 

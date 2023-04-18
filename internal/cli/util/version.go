@@ -36,7 +36,7 @@ type Version struct {
 	Cli        string
 }
 
-// GetVersionInfo get application version include KubeBlocks, CLI and kubernetes
+// GetVersionInfo get version include KubeBlocks, CLI and kubernetes
 func GetVersionInfo(client kubernetes.Interface) (Version, error) {
 	var err error
 	version := Version{

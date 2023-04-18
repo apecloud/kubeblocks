@@ -29,38 +29,38 @@ const kbVersion = "0.3.0"
 
 var _ = Describe("version util", func() {
 	It("get version info when client is nil", func() {
-		ver, err := GetVersionInfo(nil)
+		v, err := GetVersionInfo(nil)
 		Expect(err).Should(Succeed())
-		Expect(ver.KubeBlocks).Should(BeEmpty())
-		Expect(ver.Kubernetes).Should(BeEmpty())
-		Expect(ver.Cli).ShouldNot(BeEmpty())
+		Expect(v.KubeBlocks).Should(BeEmpty())
+		Expect(v.Kubernetes).Should(BeEmpty())
+		Expect(v.Cli).ShouldNot(BeEmpty())
 	})
 
 	It("get version info when client variable is a nil pointer", func() {
 		var client *kubernetes.Clientset
-		ver, err := GetVersionInfo(client)
+		v, err := GetVersionInfo(client)
 		Expect(err).Should(Succeed())
-		Expect(ver.KubeBlocks).Should(BeEmpty())
-		Expect(ver.Kubernetes).Should(BeEmpty())
-		Expect(ver.Cli).ShouldNot(BeEmpty())
+		Expect(v.KubeBlocks).Should(BeEmpty())
+		Expect(v.Kubernetes).Should(BeEmpty())
+		Expect(v.Cli).ShouldNot(BeEmpty())
 	})
 
-	It("get version info when KubeBlocks is deployed", func() {
+	It("get vsion info when KubeBlocks is deployed", func() {
 		client := testing.FakeClientSet(testing.FakeKBDeploy(kbVersion))
-		ver, err := GetVersionInfo(client)
+		v, err := GetVersionInfo(client)
 		Expect(err).Should(Succeed())
-		Expect(ver.KubeBlocks).Should(Equal(kbVersion))
-		Expect(ver.Kubernetes).ShouldNot(BeEmpty())
-		Expect(ver.Cli).ShouldNot(BeEmpty())
+		Expect(v.KubeBlocks).Should(Equal(kbVersion))
+		Expect(v.Kubernetes).ShouldNot(BeEmpty())
+		Expect(v.Cli).ShouldNot(BeEmpty())
 	})
 
 	It("get version info when KubeBlocks is not deployed", func() {
 		client := testing.FakeClientSet()
-		ver, err := GetVersionInfo(client)
+		v, err := GetVersionInfo(client)
 		Expect(err).Should(Succeed())
-		Expect(ver.KubeBlocks).Should(BeEmpty())
-		Expect(ver.Kubernetes).ShouldNot(BeEmpty())
-		Expect(ver.Cli).ShouldNot(BeEmpty())
+		Expect(v.KubeBlocks).Should(BeEmpty())
+		Expect(v.Kubernetes).ShouldNot(BeEmpty())
+		Expect(v.Cli).ShouldNot(BeEmpty())
 	})
 
 	It("getKubeBlocksVersion", func() {

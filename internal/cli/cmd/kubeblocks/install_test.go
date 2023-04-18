@@ -120,15 +120,15 @@ var _ = Describe("kubeblocks install", func() {
 			Check: true,
 		}
 		By("kubernetes version is empty")
-		versionInfo := util.Version{}
-		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("failed to get kubernetes version"))
+		v := util.Version{}
+		Expect(o.preCheck(v).Error()).Should(ContainSubstring("failed to get kubernetes version"))
 
 		By("kubernetes is provided by cloud provider")
-		versionInfo.Kubernetes = "v1.25.0-eks"
-		Expect(o.preCheck(versionInfo)).Should(Succeed())
+		v.Kubernetes = "v1.25.0-eks"
+		Expect(o.preCheck(v)).Should(Succeed())
 
 		By("kubernetes is not provided by cloud provider")
-		versionInfo.Kubernetes = "v1.25.0"
-		Expect(o.preCheck(versionInfo)).Should(Succeed())
+		v.Kubernetes = "v1.25.0"
+		Expect(o.preCheck(v)).Should(Succeed())
 	})
 })

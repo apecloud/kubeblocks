@@ -39,15 +39,15 @@ import (
 var _ = Describe("SystemAccount Controller", func() {
 
 	const (
-		clusterDefName         = "test-clusterdef"
-		clusterVersionName     = "test-clusterversion"
-		clusterNamePrefix      = "test-cluster"
-		mysqlCompType          = "replicasets"
-		mysqlCompTypeWOSysAcct = "wo-sysacct"
-		mysqlCompName          = "mysql"
-		mysqlCompNameWOSysAcct = "wo-sysacct"
-		orphanFinalizerName    = "orphan"
-		clusterEndPointsSize   = 3
+		clusterDefName                = "test-clusterdef"
+		clusterVersionName            = "test-clusterversion"
+		clusterNamePrefix             = "test-cluster"
+		mysqlCompDefName              = "replicasets"
+		mysqlCompTypeWOSysAcctDefName = "wo-sysacct"
+		mysqlCompName                 = "mysql"
+		mysqlCompNameWOSysAcct        = "wo-sysacct"
+		orphanFinalizerName           = "orphan"
+		clusterEndPointsSize          = 3
 	)
 
 	/**
@@ -190,14 +190,14 @@ var _ = Describe("SystemAccount Controller", func() {
 		By("Create a clusterDefinition obj")
 		systemAccount := mockSystemAccountsSpec()
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 			AddSystemAccountSpec(systemAccount).
-			AddComponent(testapps.StatefulMySQLComponent, mysqlCompTypeWOSysAcct).
+			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompTypeWOSysAcctDefName).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
 		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+			AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 			AddComponent(mysqlCompNameWOSysAcct).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 			Create(&testCtx).GetObject()
 
@@ -285,12 +285,12 @@ var _ = Describe("SystemAccount Controller", func() {
 			mysqlTestCases = map[string]*sysAcctTestCase{
 				"wesql-no-accts": {
 					componentName:   mysqlCompNameWOSysAcct,
-					componentDefRef: mysqlCompTypeWOSysAcct,
+					componentDefRef: mysqlCompTypeWOSysAcctDefName,
 					accounts:        []appsv1alpha1.AccountName{},
 				},
 				"wesql-with-accts": {
 					componentName:   mysqlCompName,
-					componentDefRef: mysqlCompType,
+					componentDefRef: mysqlCompDefName,
 					accounts:        getAllSysAccounts(),
 				},
 			}
@@ -436,7 +436,9 @@ var _ = Describe("SystemAccount Controller", func() {
 					jobs := &batchv1.JobList{}
 					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					for _, job := range jobs.Items {
-						g.Expect(testapps.ChangeObj(&testCtx, &job, func() { controllerutil.RemoveFinalizer(&job, orphanFinalizerName) })).To(Succeed())
+						g.Expect(testapps.ChangeObj(&testCtx, &job, func(ljob *batchv1.Job) {
+							controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
+						})).To(Succeed())
 					}
 					g.Expect(len(jobs.Items)).To(Equal(0), "Verify all jobs completed and deleted")
 				}).Should(Succeed())
@@ -484,12 +486,12 @@ var _ = Describe("SystemAccount Controller", func() {
 			mysqlTestCases = map[string]*sysAcctTestCase{
 				"wesql-with-accts": {
 					componentName:   mysqlCompName,
-					componentDefRef: mysqlCompType,
+					componentDefRef: mysqlCompDefName,
 					accounts:        getAllSysAccounts(),
 				},
 				"wesql-with-accts-dup": {
 					componentName:   mysqlCompName,
-					componentDefRef: mysqlCompType,
+					componentDefRef: mysqlCompDefName,
 					accounts:        getAllSysAccounts(),
 				},
 			}
@@ -588,12 +590,12 @@ var _ = Describe("SystemAccount Controller", func() {
 			mysqlTestCases = map[string]*sysAcctTestCase{
 				"wesql-with-accts": {
 					componentName:   mysqlCompName,
-					componentDefRef: mysqlCompType,
+					componentDefRef: mysqlCompDefName,
 					accounts:        getAllSysAccounts(),
 				},
 				"wesql-with-accts-dup": {
 					componentName:   mysqlCompName,
-					componentDefRef: mysqlCompType,
+					componentDefRef: mysqlCompDefName,
 					accounts:        getAllSysAccounts(),
 				},
 			}
@@ -672,7 +674,9 @@ var _ = Describe("SystemAccount Controller", func() {
 					tmpJob := &batchv1.Job{}
 					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())
 					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
-					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func() { controllerutil.RemoveFinalizer(tmpJob, orphanFinalizerName) })).To(Succeed())
+					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func(ljob *batchv1.Job) {
+						controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
+					})).To(Succeed())
 				}).Should(Succeed())
 
 				By("Verify jobs size decreased and secrets size increased")
@@ -710,7 +714,9 @@ var _ = Describe("SystemAccount Controller", func() {
 					err := k8sClient.Get(ctx, jobKey, tmpJob)
 					g.Expect(err).To(Succeed())
 					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
-					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func() { controllerutil.RemoveFinalizer(tmpJob, orphanFinalizerName) })).To(Succeed())
+					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func(ljob *batchv1.Job) {
+						controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
+					})).To(Succeed())
 				}).Should(Succeed())
 
 				By("Verify jobs size decreased and secrets size increased")

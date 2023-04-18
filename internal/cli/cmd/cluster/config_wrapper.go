@@ -26,6 +26,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 type configWrapper struct {
@@ -92,7 +93,7 @@ func (w *configWrapper) ValidateRequiredParam() error {
 
 	// step3: validate fileKey exist.
 	if _, ok := cmObj.Data[w.configKey]; !ok {
-		return makeNotFoundConfigFileErr(w.configKey, w.configSpecName, cfgcore.ToSet(cmObj.Data).AsSlice())
+		return makeNotFoundConfigFileErr(w.configKey, w.configSpecName, cfgutil.ToSet(cmObj.Data).AsSlice())
 	}
 
 	// TODO support all config file update.

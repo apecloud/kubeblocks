@@ -71,6 +71,14 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			r.Recorder.Event(configConstraint, corev1.EventTypeWarning, "ExistsReferencedResources",
 				"cannot be deleted because of existing referencing ClusterDefinition or ClusterVersion.")
 		}
+		if configConstraint.Status.Phase != appsv1alpha1.CCDeletingPhase {
+			err := updateConfigConstraintStatus(r.Client, reqCtx, configConstraint, appsv1alpha1.CCDeletingPhase)
+			// if fail to update ConfigConstraint status, return error,
+			// so that it can be retried
+			if err != nil {
+				return nil, err
+			}
+		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configConstraint,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configConstraint.GetName()),
 			recordEvent, &appsv1alpha1.ClusterDefinitionList{},
@@ -83,7 +91,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return *res, err
 	}
 
-	if configConstraint.Status.ObservedGeneration == configConstraint.Generation {
+	if configConstraint.Status.ObservedGeneration == configConstraint.Generation && configConstraint.Status.IsConfigConstraintTerminalPhases() {
 		return intctrlutil.Reconciled()
 	}
 
@@ -96,14 +104,11 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate openAPISchema")
 	}
 
-	statusPatch := client.MergeFrom(configConstraint.DeepCopy())
-	configConstraint.Status.ObservedGeneration = configConstraint.Generation
-	configConstraint.Status.Phase = appsv1alpha1.AvailablePhase
-	if err = r.Client.Status().Patch(reqCtx.Ctx, configConstraint, statusPatch); err != nil {
+	err = updateConfigConstraintStatus(r.Client, reqCtx, configConstraint, appsv1alpha1.CCAvailablePhase)
+	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	intctrlutil.RecordCreatedEvent(r.Recorder, configConstraint)
-
 	return ctrl.Result{}, nil
 }
 

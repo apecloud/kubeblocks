@@ -38,11 +38,8 @@ import (
 var _ = Describe("ConfigWrapper util test", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
-
-	const statefulCompType = "replicasets"
-
+	const statefulCompDefName = "replicasets"
 	const configSpecName = "mysql-config-tpl"
-
 	const configVolumeName = "mysql-config"
 
 	var (
@@ -98,13 +95,13 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 			AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, configVolumeName).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
 		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(statefulCompType).
+			AddComponent(statefulCompDefName).
 			Create(&testCtx).GetObject()
 	})
 
@@ -118,7 +115,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 	Context("clusterdefinition CR test", func() {
 		It("Should success without error", func() {
 			availableTPL := configConstraintObj.DeepCopy()
-			availableTPL.Status.Phase = appsv1alpha1.AvailablePhase
+			availableTPL.Status.Phase = appsv1alpha1.CCAvailablePhase
 
 			k8sMockClient.MockPatchMethod(testutil.WithSucceed())
 			k8sMockClient.MockListMethod(testutil.WithSucceed())
@@ -190,7 +187,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			Expect(err).Should(Succeed())
 
 			availableTPL := configConstraintObj.DeepCopy()
-			availableTPL.Status.Phase = appsv1alpha1.AvailablePhase
+			availableTPL.Status.Phase = appsv1alpha1.CCAvailablePhase
 
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSequenceResult(
 				map[client.ObjectKey][]testutil.MockGetReturned{
@@ -233,7 +230,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 		It("Should success without error", func() {
 			updateAVTemplates()
 			availableTPL := configConstraintObj.DeepCopy()
-			availableTPL.Status.Phase = appsv1alpha1.AvailablePhase
+			availableTPL.Status.Phase = appsv1alpha1.CCAvailablePhase
 
 			k8sMockClient.MockPatchMethod(testutil.WithSucceed())
 			k8sMockClient.MockListMethod(testutil.WithSucceed())

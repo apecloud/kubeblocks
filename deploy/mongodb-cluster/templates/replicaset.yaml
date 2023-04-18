@@ -1,0 +1,47 @@
+{{- if eq .Values.architecture "replicaset" }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "mongodb-cluster.labels" . | nindent 4}}
+spec:
+  clusterDefinitionRef: mongodb
+  clusterVersionRef: mongodb-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  affinity:
+    {{- with $.Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  componentSpecs:
+    - name: replicaset
+      componentDefRef: replicaset
+      monitor: {{ $.Values.monitor.enabled }}
+      replicas: {{ $.Values.replicaset.replicas }}
+      {{- with $.Values.replicaset.tolerations }}
+      tolerations: {{ .| toYaml | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.replicaset.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- if $.Values.replicaset.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ $.Values.replicaset.persistence.data.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ $.Values.replicaset.persistence.data.size }}
+      {{- end }}
+{{- end }}

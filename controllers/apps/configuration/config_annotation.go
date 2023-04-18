@@ -25,6 +25,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -86,7 +87,7 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 	}
 
 	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotation] = string(configData)
-	hash, err := cfgcore.ComputeHash(config.Data)
+	hash, err := util.ComputeHash(config.Data)
 	if err != nil {
 		return false, err
 	}
@@ -103,7 +104,6 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 
 	// delete reconfigure-policy
 	delete(config.ObjectMeta.Annotations, constant.UpgradePolicyAnnotationKey)
-	delete(config.ObjectMeta.Annotations, constant.KBParameterUpdateSourceAnnotationKey)
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return false, err
 	}

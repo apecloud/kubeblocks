@@ -31,37 +31,37 @@ import (
 var (
 	createUserExamples = templates.Examples(`
 		# create account
-		kbcli cluster create-account NAME --component-name COMPNAME --username NAME --password PASSWD
+		kbcli cluster create-account NAME --component COMPNAME --username NAME --password PASSWD
 		# create account without password
-		kbcli cluster create-account NAME --component-name COMPNAME --username NAME
+		kbcli cluster create-account NAME --component COMPNAME --username NAME
 		# create account with expired interval
-		kbcli cluster create-account NAME --component-name COMPNAME --username NAME --password PASSWD --expiredAt 2046-01-02T15:04:05Z
+		kbcli cluster create-account NAME --component COMPNAME --username NAME --password PASSWD --expiredAt 2046-01-02T15:04:05Z
  `)
 
 	deleteUserExamples = templates.Examples(`
 		# delete account by name
-		kbcli cluster delete-account NAME --component-name COMPNAME --username NAME
+		kbcli cluster delete-account NAME --component COMPNAME --username NAME
  `)
 
 	descUserExamples = templates.Examples(`
 		# describe account and show role information
-		kbcli cluster describe-account NAME --component-name COMPNAME--username NAME
+		kbcli cluster describe-account NAME --component COMPNAME--username NAME
  `)
 
 	listUsersExample = templates.Examples(`
 		# list all users from specified component of a cluster
-		kbcli cluster list-accounts NAME --component-name COMPNAME --show-connected-users
+		kbcli cluster list-accounts NAME --component COMPNAME --show-connected-users
 
 		# list all users from cluster's one particular instance
 		kbcli cluster list-accounts NAME -i INSTANCE
 	`)
 	grantRoleExamples = templates.Examples(`
 		# grant role to user
-		kbcli cluster grant-role NAME --component-name COMPNAME --username NAME --role ROLENAME
+		kbcli cluster grant-role NAME --component COMPNAME --username NAME --role ROLENAME
 	`)
 	revokeRoleExamples = templates.Examples(`
 		# revoke role from user
-		kbcli cluster revoke-role NAME --component-name COMPNAME --role ROLENAME
+		kbcli cluster revoke-role NAME --component COMPNAME --role ROLENAME
 	`)
 )
 

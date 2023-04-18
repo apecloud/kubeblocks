@@ -20,10 +20,7 @@ set -ex
   {{- end }}
 {{- end }}
 {{- /* build primary pod message, because currently does not support cross-component acquisition of environment variables, the service of the redis master node is assembled here through specific rules  */}}
-{{- $primary_pod = printf "%s-%s-0.%s-%s-headless.%s.svc" $clusterName $redis_component.name $clusterName $redis_component.name $namespace }}
-{{- if ne $primary_index 0 }}
-  {{- $primary_pod = printf "%s-%s-%d-0.%s-%s-headless.%s.svc" $clusterName $redis_component.name $primary_index $clusterName $redis_component.name $namespace }}
-{{- end }}
+{{- $primary_pod = printf "%s-%s-%d.%s-%s-headless.%s.svc" $clusterName $redis_component.name $primary_index $clusterName $redis_component.name $namespace }}
 {{- $sentinel_monitor := printf "%s-%s %s" $clusterName $sentinel_component.name $primary_pod }}
 cat>/etc/sentinel/redis-sentinel.conf<<EOF
 port 26379

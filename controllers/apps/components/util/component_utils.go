@@ -115,7 +115,7 @@ func IsProbeTimeout(componentDef *appsv1alpha1.ClusterComponentDefinition, podsR
 		return false
 	}
 	probes := componentDef.Probes
-	if probes == nil || probes.RoleChangedProbe == nil {
+	if probes == nil || probes.RoleProbe == nil {
 		return false
 	}
 	roleProbeTimeout := time.Duration(appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady) * time.Second
@@ -136,20 +136,23 @@ func GetComponentPhase(isFailed, isAbnormal bool) appsv1alpha1.ClusterComponentP
 }
 
 // GetObjectListByComponentName gets k8s workload list with component
-func GetObjectListByComponentName(ctx context.Context, cli client2.ReadonlyClient, cluster appsv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
+func GetObjectListByComponentName(ctx context.Context, cli client2.ReadonlyClient, cluster appsv1alpha1.Cluster,
+	objectList client.ObjectList, componentName string) error {
 	matchLabels := GetComponentMatchLabels(cluster.Name, componentName)
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, client.MatchingLabels(matchLabels), inNamespace)
 }
 
 // GetObjectListByCustomLabels gets k8s workload list with custom labels
-func GetObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, objectList client.ObjectList, matchLabels client.ListOption) error {
+func GetObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster,
+	objectList client.ObjectList, matchLabels client.ListOption) error {
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
 // GetComponentDefByCluster gets component from ClusterDefinition with compDefName
-func GetComponentDefByCluster(ctx context.Context, cli client2.ReadonlyClient, cluster appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
+func GetComponentDefByCluster(ctx context.Context, cli client2.ReadonlyClient, cluster appsv1alpha1.Cluster,
+	compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err

@@ -17,11 +17,6 @@ limitations under the License.
 package apps
 
 import (
-	"time"
-
-	"github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
@@ -48,12 +43,7 @@ func (factory *MockBackupFactory) SetBackupType(backupType dataprotectionv1alpha
 	return factory
 }
 
-func (factory *MockBackupFactory) SetTTL(duration string) *MockBackupFactory {
-	du, err := time.ParseDuration(duration)
-	gomega.Expect(err).Should(gomega.Succeed())
-
-	var d metav1.Duration
-	d.Duration = du
-	factory.get().Spec.TTL = &d
+func (factory *MockBackupFactory) SetLabels(labels map[string]string) *MockBackupFactory {
+	factory.get().SetLabels(labels)
 	return factory
 }

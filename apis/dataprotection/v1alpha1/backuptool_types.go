@@ -32,6 +32,11 @@ type BackupToolSpec struct {
 	// +kubebuilder:default=job
 	DeployKind string `json:"deployKind,omitempty"`
 
+	// the type of backup tool, file or pitr
+	// +kubebuilder:validation:Enum={file,pitr}
+	// +kubebuilder:default=file
+	Type string `json:"type,omitempty"`
+
 	// Compute Resources required by this container.
 	// Cannot be updated.
 	// +kubebuilder:pruning:PreserveUnknownFields

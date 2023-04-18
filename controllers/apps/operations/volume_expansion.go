@@ -309,7 +309,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 			completedCount += 1
 			message := fmt.Sprintf("Successfully expand volume: %s in Component: %s ", objectKey, componentName)
 			progressDetail.SetStatusAndMessage(appsv1alpha1.SucceedProgressStatus, message)
-			SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
+			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 			continue
 		}
 		if ve.pvcIsResizing(&v) {
@@ -319,7 +319,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 			message := fmt.Sprintf("Waiting for an external controller to process the pvc: %s in Component: %s ", objectKey, componentName)
 			progressDetail.SetStatusAndMessage(appsv1alpha1.PendingProgressStatus, message)
 		}
-		SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
+		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 		if ve.isExpansionCompleted(progressDetail.Status) {
 			completedCount += 1
 		}

@@ -26,8 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensusset"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
@@ -59,13 +59,13 @@ func NewComponentByType(
 	}
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
-		return consensusset.NewConsensusSet(cli, cluster, component, componentDef)
+		return consensus.NewConsensusComponent(cli, cluster, component, componentDef)
 	case appsv1alpha1.Replication:
-		return replicationset.NewReplicationSet(cli, cluster, component, componentDef)
+		return replication.NewReplicationComponent(cli, cluster, component, componentDef)
 	case appsv1alpha1.Stateful:
-		return stateful.NewStateful(cli, cluster, component, componentDef)
+		return stateful.NewStatefulComponent(cli, cluster, component, componentDef)
 	case appsv1alpha1.Stateless:
-		return stateless.NewStateless(cli, cluster, component, componentDef)
+		return stateless.NewStatelessComponent(cli, cluster, component, componentDef)
 	default:
 		panic("unknown workload type")
 	}

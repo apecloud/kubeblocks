@@ -17,12 +17,14 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -201,6 +203,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&clusterTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
 		// tls certs secret
 		&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
+		// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
+		&backupPolicyTPLTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
 		// add our finalizer to all objects
 		&ownershipTransformer{finalizer: dbClusterFinalizerName},
 		// make all workload objects depending on credential secret
@@ -215,8 +219,6 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 		// stateful set pvc Update
 		&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
-		// replication set horizontal scaling
-		&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
 		newClusterStatusTransformer(c.ctx, c.cli, c.recorder, *cr),
 	}
@@ -505,6 +507,9 @@ func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster
 		if err := c.deletePVCs(cluster); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
+		if err := c.deleteConfigMaps(cluster); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
 		// The backup policy must be cleaned up when the cluster is deleted.
 		// Automatic backup scheduling needs to be stopped at this point.
 		if err := c.deleteBackupPolicies(cluster); err != nil && !apierrors.IsNotFound(err) {
@@ -516,6 +521,9 @@ func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster
 			if err := c.deleteBackups(cluster); err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
+		}
+		if err := c.deleteJobs(cluster); err != nil && !apierrors.IsNotFound(err) {
+			return err
 		}
 	}
 	return nil
@@ -538,6 +546,10 @@ func (c *clusterPlanBuilder) deletePVCs(cluster *appsv1alpha1.Cluster) error {
 		}
 	}
 	return nil
+}
+
+func (c *clusterPlanBuilder) deleteConfigMaps(cluster *appsv1alpha1.Cluster) error {
+	return DeleteConfigMaps(c.ctx.Ctx, c.cli, cluster)
 }
 
 func (c *clusterPlanBuilder) deleteBackupPolicies(cluster *appsv1alpha1.Cluster) error {
@@ -570,4 +582,31 @@ func (c *clusterPlanBuilder) deleteBackups(cluster *appsv1alpha1.Cluster) error 
 		}
 	}
 	return nil
+}
+
+func (c *clusterPlanBuilder) deleteJobs(cluster *appsv1alpha1.Cluster) error {
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.GetName(),
+	}
+	// clean jobs
+	jobList := batchv1.JobList{}
+	if err := c.cli.List(c.ctx.Ctx, &jobList, inNS, ml); err != nil {
+		return err
+	}
+	for _, job := range jobList.Items {
+		if err := intctrlutil.BackgroundDeleteObject(c.cli, c.ctx.Ctx, &job); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func DeleteConfigMaps(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:  cluster.GetName(),
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+	return cli.DeleteAllOf(ctx, &corev1.ConfigMap{}, inNS, ml)
 }

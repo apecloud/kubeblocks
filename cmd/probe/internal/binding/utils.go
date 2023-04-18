@@ -20,11 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/dapr/components-contrib/bindings"
-	"golang.org/x/exp/slices"
 )
 
 type UserInfo struct {
@@ -163,11 +161,13 @@ func UserNameAndRoleValidator(user UserInfo) error {
 	if len(user.RoleName) == 0 {
 		return ErrNoRoleName
 	}
-	roles := []string{ReadOnlyRole, ReadWriteRole, SuperUserRole}
-	if !slices.Contains(roles, strings.ToLower(user.RoleName)) {
-		return ErrInvalidRoleName
+	roles := []RoleType{ReadOnlyRole, ReadWriteRole, SuperUserRole}
+	for _, role := range roles {
+		if role.EqualTo(user.RoleName) {
+			return nil
+		}
 	}
-	return nil
+	return ErrInvalidRoleName
 }
 
 func getAndFormatNow() string {
@@ -188,4 +188,24 @@ func opsTerminateOnErr(result OpsResult, metadata opsMetadata, err error) (OpsRe
 	result[RespTypMsg] = err.Error()
 	result[RespTypMeta] = metadata
 	return result, nil
+}
+
+func SortRoleByWeight(r1, r2 RoleType) bool {
+	return int(r1.GetWeight()) > int(r2.GetWeight())
+}
+
+func String2RoleType(roleName string) RoleType {
+	if SuperUserRole.EqualTo(roleName) {
+		return SuperUserRole
+	}
+	if ReadWriteRole.EqualTo(roleName) {
+		return ReadWriteRole
+	}
+	if ReadOnlyRole.EqualTo(roleName) {
+		return ReadOnlyRole
+	}
+	if NoPrivileges.EqualTo(roleName) {
+		return NoPrivileges
+	}
+	return CustomizedRole
 }

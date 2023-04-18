@@ -20,10 +20,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -35,6 +37,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
@@ -45,10 +48,12 @@ import (
 )
 
 var _ = Describe("DataProtection", func() {
+	const policyName = "policy"
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
+	var out *bytes.Buffer
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, out, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 		tf.Client = &clientfake.RESTClient{}
 	})
@@ -58,6 +63,39 @@ var _ = Describe("DataProtection", func() {
 	})
 
 	Context("backup", func() {
+
+		initClient := func(policies ...*dataprotectionv1alpha1.BackupPolicy) {
+			clusterDef := testing.FakeClusterDef()
+			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
+			clusterDefLabel := map[string]string{
+				constant.ClusterDefLabelKey: clusterDef.Name,
+			}
+			cluster.SetLabels(clusterDefLabel)
+			pods := testing.FakePods(1, testing.Namespace, testing.ClusterName)
+			objects := []runtime.Object{
+				cluster, clusterDef, &pods.Items[0],
+			}
+			for _, v := range policies {
+				objects = append(objects, v)
+			}
+			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, objects...)
+		}
+
+		It("list-backup-policy", func() {
+			By("fake client")
+			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
+			policy2 := testing.FakeBackupPolicy("policy1", testing.ClusterName)
+			initClient(defaultBackupPolicy, policy2)
+
+			By("test list-backup-policy cmd")
+			cmd := NewListBackupPolicyCmd(tf, streams)
+			Expect(cmd).ShouldNot(BeNil())
+			cmd.Run(cmd, nil)
+			Expect(out.String()).Should(ContainSubstring(defaultBackupPolicy.Name))
+			Expect(out.String()).Should(ContainSubstring("true"))
+			Expect(len(strings.Split(strings.Trim(out.String(), "\n"), "\n"))).Should(Equal(3))
+		})
+
 		It("validate create backup", func() {
 			By("without cluster name")
 			o := &CreateBackupOptions{
@@ -69,34 +107,35 @@ var _ = Describe("DataProtection", func() {
 			o.IOStreams = streams
 			Expect(o.Validate()).To(MatchError("missing cluster name"))
 
-			By("not found connection secret")
+			By("test without default backupPolicy")
 			o.Name = testing.ClusterName
-			Expect(o.Validate()).Should(HaveOccurred())
+			o.Namespace = testing.Namespace
+			initClient()
+			o.Dynamic = tf.FakeDynamicClient
+			Expect(o.Validate()).Should(MatchError(fmt.Errorf(`not found any backup policy for cluster "%s"`, testing.ClusterName)))
+
+			By("test with two default backupPolicy")
+			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
+			initClient(defaultBackupPolicy, testing.FakeBackupPolicy("policy2", testing.ClusterName))
+			o.Dynamic = tf.FakeDynamicClient
+			Expect(o.Validate()).Should(MatchError(fmt.Errorf(`cluster "%s" has multiple default backup policies`, o.Name)))
+
+			By("test with one default backupPolicy")
+			initClient(defaultBackupPolicy)
+			o.Dynamic = tf.FakeDynamicClient
+			Expect(o.Validate()).Should(Succeed())
 		})
 
 		It("run backup command", func() {
-			clusterDef := testing.FakeClusterDef()
-			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
-			clusterDefLabel := map[string]string{
-				constant.ClusterDefLabelKey: clusterDef.Name,
-			}
-			cluster.SetLabels(clusterDefLabel)
-
-			template := testing.FakeBackupPolicyTemplate()
-			template.SetLabels(clusterDefLabel)
-
-			secrets := testing.FakeSecrets(testing.Namespace, testing.ClusterName)
-			pods := testing.FakePods(1, testing.Namespace, testing.ClusterName)
-			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-				scheme.Scheme, &secrets.Items[0], cluster, clusterDef, template, &pods.Items[0])
-			tf.Client = &clientfake.RESTClient{}
+			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
+			initClient(defaultBackupPolicy)
+			By("test with specified backupPolicy")
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
-			_ = cmd.Flags().Set("backup-type", "snapshot")
+			_ = cmd.Flags().Set("backup-policy", defaultBackupPolicy.Name)
 			cmd.Run(cmd, []string{testing.ClusterName})
 		})
-
 	})
 
 	It("delete-backup", func() {
@@ -129,7 +168,7 @@ var _ = Describe("DataProtection", func() {
 		Expect(cmd).ShouldNot(BeNil())
 		By("test list-backup cmd with no backup")
 		tf.FakeDynamicClient = testing.FakeDynamicClient()
-		o := list.NewListOptions(tf, streams, types.BackupGVR())
+		o := ListBackupOptions{ListOptions: list.NewListOptions(tf, streams, types.BackupGVR())}
 		Expect(printBackupList(o)).Should(Succeed())
 		Expect(o.ErrOut.(*bytes.Buffer).String()).Should(ContainSubstring("No backups found"))
 
@@ -186,15 +225,13 @@ var _ = Describe("DataProtection", func() {
 			constant.ClusterDefLabelKey: clusterDef.Name,
 		}
 		cluster.SetLabels(clusterDefLabel)
-
-		template := testing.FakeBackupPolicyTemplate()
-		template.SetLabels(clusterDefLabel)
+		backupPolicy := testing.FakeBackupPolicy("backPolicy", cluster.Name)
 
 		pods := testing.FakePods(1, testing.Namespace, clusterName)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, template)
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterDef, cluster, template)
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterDef, cluster, backupPolicy)
 		tf.Client = &clientfake.RESTClient{}
 		// create backup
 		cmd := NewCreateBackupCmd(tf, streams)
@@ -205,7 +242,7 @@ var _ = Describe("DataProtection", func() {
 
 		By("restore new cluster from source cluster which is not deleted")
 		// mock backup is ok
-		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName)
+		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName, nil)
 		cmdRestore := NewCreateRestoreCmd(tf, streams)
 		Expect(cmdRestore != nil).To(BeTrue())
 		_ = cmdRestore.Flags().Set("backup", backupName)
@@ -213,7 +250,7 @@ var _ = Describe("DataProtection", func() {
 
 		By("restore new cluster from source cluster which is deleted")
 		// mock cluster is not lived in kubernetes
-		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster")
+		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster", nil)
 		cmdRestore.Run(nil, []string{newClusterName + "1"})
 
 		By("run restore cmd with cluster spec.affinity=nil")
@@ -222,21 +259,72 @@ var _ = Describe("DataProtection", func() {
 			k8sapitypes.MergePatchType, patchCluster, metav1.PatchOptions{})
 		cmdRestore.Run(nil, []string{newClusterName + "-with-nil-affinity"})
 	})
+
+	It("restore-to-time", func() {
+		timestamp := time.Now().Format("20060102150405")
+		backupName := "backup-test-" + timestamp
+		clusterName := "source-cluster-" + timestamp
+		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
+		clusterDef := testing.FakeClusterDef()
+		cluster := testing.FakeCluster(clusterName, testing.Namespace)
+		clusterDefLabel := map[string]string{
+			constant.ClusterDefLabelKey: clusterDef.Name,
+		}
+		cluster.SetLabels(clusterDefLabel)
+		backupPolicy := testing.FakeBackupPolicy("backPolicy", cluster.Name)
+		backup := testing.FakeBackup("backup-base")
+
+		pods := testing.FakePods(1, testing.Namespace, clusterName)
+		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy, backup)
+		tf.Client = &clientfake.RESTClient{}
+		// create backup
+		cmd := NewCreateBackupCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+		_ = cmd.Flags().Set("backup-type", "snapshot")
+		_ = cmd.Flags().Set("backup-name", backupName)
+		cmd.Run(nil, []string{clusterName})
+
+		By("restore new cluster from source cluster which is not deleted")
+		// mock backup is ok
+		now := metav1.Now()
+		baseManifests := map[string]any{
+			"backupLog": map[string]any{
+				"startTime": now.Add(-time.Minute).Format(time.RFC3339),
+				"stopTime":  now.Add(-time.Second).Format(time.RFC3339),
+			},
+		}
+		mockBackupInfo(tf.FakeDynamicClient, backup.Name, clusterName, baseManifests)
+
+		manifests := map[string]any{
+			"backupLog": map[string]any{
+				"startTime": now.Add(-time.Minute).Format(time.RFC3339),
+				"stopTime":  now.Add(time.Minute).Format(time.RFC3339),
+			},
+		}
+		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName, manifests)
+		cmdRestore := NewCreateRestoreCmd(tf, streams)
+		Expect(cmdRestore != nil).To(BeTrue())
+		_ = cmdRestore.Flags().Set("restore-to-time", util.TimeFormatWithDuration(&now, time.Second))
+		_ = cmdRestore.Flags().Set("source-cluster", clusterName)
+		cmdRestore.Run(nil, []string{})
+	})
 })
 
-func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string) {
+func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, manifests map[string]any) {
 	clusterString := fmt.Sprintf(`{"metadata":{"name":"deleted-cluster","namespace":"%s"},"spec":{"clusterDefinitionRef":"apecloud-mysql","clusterVersionRef":"ac-mysql-8.0.30","componentSpecs":[{"name":"mysql","componentDefRef":"mysql","replicas":1}]}}`, testing.Namespace)
 	backupStatus := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"status": map[string]interface{}{
-				"phase": "Completed",
+		Object: map[string]any{
+			"status": map[string]any{
+				"phase":     "Completed",
+				"manifests": manifests,
 			},
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": backupName,
-				"annotations": map[string]interface{}{
+				"annotations": map[string]any{
 					constant.ClusterSnapshotAnnotationKey: clusterString,
 				},
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					constant.AppInstanceLabelKey:    clusterName,
 					constant.KBAppComponentLabelKey: "test",
 				},

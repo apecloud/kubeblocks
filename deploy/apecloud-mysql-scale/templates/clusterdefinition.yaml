@@ -20,10 +20,10 @@ spec:
     - name: mysql
       characterType: mysql
       probes:
-        roleChangedProbe:
-          failureThreshold: {{ .Values.roleChangedProbe.failureThreshold }}
-          periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.roleChangedProbe.timeoutSeconds }}
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       monitor:
         builtIn: false
         exporterConfig:
@@ -73,8 +73,7 @@ spec:
             targetPort: delvedebug
       horizontalScalePolicy:
         type: Snapshot
-        backupTemplateSelector:
-          "clusterdefinition.kubeblocks.io/name": apecloud-mysql-scale
+        backupPolicyTemplateName: apecloud-mysql-backup-policy-template
       podSpec:
         containers:
           - name: mysql
@@ -588,10 +587,10 @@ spec:
                   $TOPOLOGY_FLAGS \
                   --alsologtostderr \
                   --gateway_initial_tablet_timeout 30s \
-                  --healthcheck_timeout 1s \
+                  --healthcheck_timeout 2s \
                   --srv_topo_timeout 1s \
-                  --grpc_keepalive_time 1s \
-                  --grpc_keepalive_timeout 2s \
+                  --grpc_keepalive_time 10s \
+                  --grpc_keepalive_timeout 10s \
                   --log_dir $VTDATAROOT \
                   --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
                   --port $web_port \

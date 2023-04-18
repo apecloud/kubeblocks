@@ -39,16 +39,34 @@ const (
 	BackupTypeSnapshot    BackupType = "snapshot"
 )
 
-// BackupPolicyTemplatePhase defines phases for BackupPolicyTemplate CR.
+// BaseBackupType the base backup type.
 // +enum
-// +kubebuilder:validation:Enum={New,Available,InProgress,Failed}
-type BackupPolicyTemplatePhase string
+// +kubebuilder:validation:Enum={full,snapshot}
+type BaseBackupType string
 
 const (
-	ConfigNew        BackupPolicyTemplatePhase = "New"
-	ConfigAvailable  BackupPolicyTemplatePhase = "Available"
-	ConfigInProgress BackupPolicyTemplatePhase = "InProgress"
-	ConfigFailed     BackupPolicyTemplatePhase = "Failed"
+	BaseBackupTypeFull     BaseBackupType = "full"
+	BaseBackupTypeSnapshot BaseBackupType = "snapshot"
+)
+
+// CreatePVCPolicy the policy how to create the PersistentVolumeClaim for backup.
+// +enum
+// +kubebuilder:validation:Enum={IfNotPresent,Never}
+type CreatePVCPolicy string
+
+const (
+	CreatePVCPolicyNever        CreatePVCPolicy = "Never"
+	CreatePVCPolicyIfNotPresent CreatePVCPolicy = "IfNotPresent"
+)
+
+// BackupPolicyPhase defines phases for BackupPolicy CR.
+// +enum
+// +kubebuilder:validation:Enum={Available,Failed}
+type BackupPolicyPhase string
+
+const (
+	PolicyAvailable BackupPolicyPhase = "Available"
+	PolicyFailed    BackupPolicyPhase = "Failed"
 )
 
 // RestoreJobPhase The current phase. Valid values are New, InProgressPhy, InProgressLogic, Completed, Failed.

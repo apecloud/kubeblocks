@@ -37,10 +37,15 @@ func (v *Error) Error() string {
 type ErrorType string
 
 const (
-	// ErrorTypeBackupNotCompleted is used to report backup not completed.
-	ErrorTypeBackupNotCompleted ErrorType = "BackupNotCompleted"
 	// ErrorWaitCacheRefresh waits for synchronization of the corresponding object cache in client-go from ApiServer.
 	ErrorWaitCacheRefresh = "WaitCacheRefresh"
+
+	// ErrorTypeBackupNotCompleted is used to report backup not completed.
+	ErrorTypeBackupNotCompleted ErrorType = "BackupNotCompleted"
+	// ErrorTypeBackupPolicyFailed backup policy failed.
+	ErrorTypeBackupPolicyFailed = "BackupPolicyFailed"
+	// ErrorTypeNotFound not found any resource.
+	ErrorTypeNotFound = "NotFound"
 )
 
 var ErrFailedToAddFinalizer = errors.New("failed to add finalizer")
@@ -65,4 +70,17 @@ func IsTargetError(err error, errorType ErrorType) bool {
 		return tmpErr.Type == errorType
 	}
 	return false
+}
+
+// NewNotFound returns a new Error with ErrorTypeNotFound.
+func NewNotFound(format string, a ...any) *Error {
+	return &Error{
+		Type:    ErrorTypeNotFound,
+		Message: fmt.Sprintf(format, a...),
+	}
+}
+
+// IsNotFound returns true if the specified error is the error type of ErrorTypeNotFound.
+func IsNotFound(err error) bool {
+	return IsTargetError(err, ErrorTypeNotFound)
 }

@@ -22,40 +22,65 @@ import (
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-func getUpdateParameterList(cfg *ConfigPatchInfo) ([]string, error) {
+func getUpdateParameterList(cfg *ConfigPatchInfo, trimField string) ([]string, error) {
 	params := make([]string, 0)
-	walkFn := func(parent, cur string, v reflect.Value, fn UpdateFn) error {
+	walkFn := func(parent, cur string, v reflect.Value, fn util.UpdateFn) error {
 		if cur != "" {
+			if parent != "" {
+				cur = parent + "." + cur
+			}
 			params = append(params, cur)
 		}
 		return nil
 	}
 
 	for _, diff := range cfg.UpdateConfig {
+		var err error
 		var updatedParams any
-		if err := json.Unmarshal(diff, &updatedParams); err != nil {
+		if err = json.Unmarshal(diff, &updatedParams); err != nil {
 			return nil, err
 		}
-		if err := UnstructuredObjectWalk(updatedParams, walkFn, true); err != nil {
+		if updatedParams, err = trimNestedField(updatedParams, trimField); err != nil {
+			return nil, err
+		}
+		if err := util.UnstructuredObjectWalk(updatedParams, walkFn, true); err != nil {
 			return nil, WrapError(err, "failed to walk params: [%s]", diff)
 		}
 	}
 	return params, nil
 }
 
+func trimNestedField(updatedParams any, trimField string) (any, error) {
+	if trimField == "" {
+		return updatedParams, nil
+	}
+	if m, ok := updatedParams.(map[string]interface{}); ok {
+		trimParams, found, err := unstructured.NestedFieldNoCopy(m, trimField)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			return trimParams, nil
+		}
+	}
+	return updatedParams, nil
+}
+
 // IsUpdateDynamicParameters is used to check whether the changed parameters require a restart
 func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *ConfigPatchInfo) (bool, error) {
-	// TODO(zt) how to process new or delete file
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
 		return false, nil
 	}
 
-	params, err := getUpdateParameterList(cfg)
+	params, err := getUpdateParameterList(cfg, NestedPrefixField(cc.FormatterConfig))
 	if err != nil {
 		return false, err
 	}
@@ -64,7 +89,7 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 	// if ConfigConstraint has StaticParameters, check updated parameter
 	if len(cc.StaticParameters) > 0 {
 		staticParams := set.NewLinkedHashSetString(cc.StaticParameters...)
-		union := Union(staticParams, updateParams)
+		union := util.Union(staticParams, updateParams)
 		if union.Length() > 0 {
 			return false, nil
 		}
@@ -77,7 +102,7 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 	// if ConfigConstraint has DynamicParameter, all updated param in dynamic params
 	if len(cc.DynamicParameters) > 0 {
 		dynamicParams := set.NewLinkedHashSetString(cc.DynamicParameters...)
-		union := Difference(updateParams, dynamicParams)
+		union := util.Difference(updateParams, dynamicParams)
 		return union.Length() == 0, nil
 	}
 
@@ -99,10 +124,17 @@ func IsParametersUpdateFromManager(cm *corev1.ConfigMap) bool {
 // IsNotUserReconfigureOperation is used to check whether the parameters are updated from operation
 func IsNotUserReconfigureOperation(cm *corev1.ConfigMap) bool {
 	labels := cm.GetLabels()
-	if labels == nil {
-		return true
+	annotations := cm.GetAnnotations()
+	if labels == nil || annotations == nil {
+		return false
+	}
+	if _, ok := annotations[constant.CMInsEnableRerenderTemplateKey]; !ok {
+		return false
 	}
 	lastReconfigurePhase := labels[constant.CMInsLastReconfigurePhaseKey]
+	if annotations[constant.KBParameterUpdateSourceAnnotationKey] != constant.ReconfigureManagerSource {
+		return false
+	}
 	return lastReconfigurePhase == "" || ReconfigureCreatedPhase == lastReconfigurePhase
 }
 
@@ -117,4 +149,26 @@ func SetParametersUpdateSource(cm *corev1.ConfigMap, source string) {
 	}
 	annotation[constant.KBParameterUpdateSourceAnnotationKey] = source
 	cm.SetAnnotations(annotation)
+}
+
+func IsSchedulableConfigResource(object client.Object) bool {
+	var requiredLabels = []string{
+		constant.AppNameLabelKey,
+		constant.AppInstanceLabelKey,
+		constant.KBAppComponentLabelKey,
+		constant.CMConfigurationTemplateNameLabelKey,
+		constant.CMConfigurationTypeLabelKey,
+		constant.CMConfigurationSpecProviderLabelKey,
+	}
+
+	labels := object.GetLabels()
+	if len(labels) == 0 {
+		return false
+	}
+	for _, label := range requiredLabels {
+		if _, ok := labels[label]; !ok {
+			return false
+		}
+	}
+	return true
 }

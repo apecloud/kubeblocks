@@ -24,13 +24,12 @@ import (
 )
 
 var _ = Describe("clusterdefinition", func() {
-	const namespace = "test"
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
+		tf = cmdtesting.NewTestFactory()
 	})
 
 	AfterEach(func() {

@@ -17,229 +17,70 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
+
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("sts horizontal scaling test", func() {
-	// TODO: refactor the following ut
-	//
-	//	ctx := context.Background()
-	//	newReqCtx := func() intctrlutil.RequestCtx {
-	//		reqCtx := intctrlutil.RequestCtx{
-	//			Ctx:      ctx,
-	//			Log:      logger,
-	//			Recorder: clusterRecorder,
-	//		}
-	//		return reqCtx
-	//	}
-	//
-	//	newVolumeSnapshot := func(clusterName, componentName string) *snapshotv1.VolumeSnapshot {
-	//		vsYAML := `
-	//
-	// apiVersion: snapshot.storage.k8s.io/v1
-	// kind: VolumeSnapshot
-	// metadata:
-	//
-	//	labels:
-	//	  app.kubernetes.io/name: mysql-apecloud-mysql
-	//	  backupjobs.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-qf6cr
-	//	  backuppolicies.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-hcxps
-	//	  dataprotection.kubeblocks.io/backup-type: snapshot
-	//	name: test-volume-snapshot
-	//	namespace: default
-	//
-	// spec:
-	//
-	//	source:
-	//	  persistentVolumeClaimName: data-wesql-01-replicasets-0
-	//	volumeSnapshotClassName: csi-aws-ebs-snapclass
-	//
-	// `
-	//
-	//		vs := snapshotv1.VolumeSnapshot{}
-	//		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).ShouldNot(HaveOccurred())
-	//		labels := map[string]string{
-	//			constant.KBManagedByKey:         "cluster",
-	//			constant.AppInstanceLabelKey:    clusterName,
-	//			constant.KBAppComponentLabelKey: componentName,
-	//		}
-	//		for k, v := range labels {
-	//			vs.Labels[k] = v
-	//		}
-	//		return &vs
-	//	}
-	//
-	//	Context("with HorizontalScalePolicy set to CloneFromSnapshot and VolumeSnapshot exists", func() {
-	//		It("determines return value of doBackup according to whether VolumeSnapshot is ReadyToUse", func() {
-	//			By("prepare cluster and construct component")
-	//			reqCtx := newReqCtx()
-	//			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
-	//			component := component.BuildComponent(
-	//				reqCtx,
-	//				*cluster,
-	//				*clusterDef,
-	//				clusterDef.Spec.ComponentDefs[0],
-	//				cluster.Spec.ComponentSpecs[0],
-	//				&clusterVersion.Spec.ComponentVersions[0])
-	//			Expect(component).ShouldNot(BeNil())
-	//			component.HorizontalScalePolicy = &appsv1alpha1.HorizontalScalePolicy{
-	//				Type:             appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
-	//				VolumeMountsName: "data",
-	//			}
-	//
-	//			By("prepare VolumeSnapshot and set ReadyToUse to true")
-	//			vs := newVolumeSnapshot(cluster.Name, mysqlCompName)
-	//			Expect(testCtx.CreateObj(ctx, vs)).Should(Succeed())
-	//			Expect(testapps.ChangeObjStatus(&testCtx, vs, func() {
-	//				t := true
-	//				vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &t}
-	//			})).Should(Succeed())
-	//
-	//			// prepare doBackup input parameters
-	//			snapshotKey := types.NamespacedName{
-	//				Namespace: "default",
-	//				Name:      "test-snapshot",
-	//			}
-	//			sts := newStsObj()
-	//			stsProto := *sts.DeepCopy()
-	//			r := int32(3)
-	//			stsProto.Spec.Replicas = &r
-	//
-	//			By("doBackup should return requeue=false")
-	//			shouldRequeue, err := doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
-	//			Expect(err).ShouldNot(HaveOccurred())
-	//			Expect(shouldRequeue).Should(BeFalse())
-	//
-	//			By("Set ReadyToUse to nil, doBackup should return requeue=true")
-	//			Expect(testapps.ChangeObjStatus(&testCtx, vs, func() {
-	//				vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: nil}
-	//			})).Should(Succeed())
-	//			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
-	//			Expect(err).ShouldNot(HaveOccurred())
-	//			Expect(shouldRequeue).Should(BeTrue())
-	//		})
-	//
-	//		// REIVEW: this test seems always failed
-	//		It("should do backup to create volumesnapshot when there exists a deleting volumesnapshot", func() {
-	//			By("prepare cluster and construct component")
-	//			reqCtx := newReqCtx()
-	//			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
-	//			component := component.BuildComponent(
-	//				reqCtx,
-	//				*cluster,
-	//				*clusterDef,
-	//				clusterDef.Spec.ComponentDefs[0],
-	//				cluster.Spec.ComponentSpecs[0],
-	//				&clusterVersion.Spec.ComponentVersions[0])
-	//			Expect(component).ShouldNot(BeNil())
-	//			component.HorizontalScalePolicy = &appsv1alpha1.HorizontalScalePolicy{
-	//				Type:             appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
-	//				VolumeMountsName: "data",
-	//			}
-	//
-	//			By("prepare VolumeSnapshot and set finalizer to prevent it from deletion")
-	//			vs := newVolumeSnapshot(cluster.Name, mysqlCompName)
-	//			Expect(testCtx.CreateObj(ctx, vs)).Should(Succeed())
-	//			Expect(testapps.ChangeObj(&testCtx, vs, func() {
-	//				vs.Finalizers = append(vs.Finalizers, "test-finalizer")
-	//			})).Should(Succeed())
-	//
-	//			By("deleting volume snapshot")
-	//			Expect(k8sClient.Delete(ctx, vs)).Should(Succeed())
-	//
-	//			By("checking DeletionTimestamp exists")
-	//			Eventually(func(g Gomega) {
-	//				tmpVS := snapshotv1.VolumeSnapshot{}
-	//				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: vs.Namespace, Name: vs.Name}, &tmpVS)).Should(Succeed())
-	//				g.Expect(tmpVS.DeletionTimestamp).ShouldNot(BeNil())
-	//			}).Should(Succeed())
-	//
-	//			// prepare doBackup input parameters
-	//			snapshotKey := types.NamespacedName{
-	//				Namespace: "default",
-	//				Name:      "test-snapshot",
-	//			}
-	//			sts := newStsObj()
-	//			stsProto := *sts.DeepCopy()
-	//			r := int32(3)
-	//			stsProto.Spec.Replicas = &r
-	//
-	//			By("doBackup should create volumesnapshot and return requeue=true")
-	//			shouldRequeue, err := doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
-	//			Expect(err).ShouldNot(HaveOccurred())
-	//			Expect(shouldRequeue).Should(BeTrue())
-	//
-	//			newVS := snapshotv1.VolumeSnapshot{}
-	//			By("checking volumesnapshot created by doBackup exists")
-	//			Eventually(func(g Gomega) {
-	//				g.Expect(k8sClient.Get(ctx, snapshotKey, &newVS)).Should(Succeed())
-	//			}).Should(Succeed())
-	//
-	//			By("mocking volumesnapshot status ready")
-	//			Expect(testapps.ChangeObjStatus(&testCtx, &newVS, func() {
-	//				t := true
-	//				newVS.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &t}
-	//			})).Should(Succeed())
-	//
-	//			By("do backup again, this time should create pvcs")
-	//			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
-	//
-	//			By("checking not requeue, since create pvc is the last step of doBackup")
-	//			Expect(shouldRequeue).Should(BeFalse())
-	//			Expect(err).ShouldNot(HaveOccurred())
-	//
-	//			By("checking pvcs reference right volumesnapshot")
-	//			Eventually(func(g Gomega) {
-	//				for i := *stsProto.Spec.Replicas - 1; i > *sts.Spec.Replicas; i-- {
-	//					pvc := &corev1.PersistentVolumeClaim{}
-	//					g.Expect(k8sClient.Get(ctx,
-	//						types.NamespacedName{
-	//							Namespace: cluster.Namespace,
-	//							Name:      fmt.Sprintf("%s-%s-%d", testapps.DataVolumeName, sts.Name, i)},
-	//						pvc)).Should(Succeed())
-	//					g.Expect(pvc.Spec.DataSource.Name).Should(Equal(snapshotKey.Name))
-	//				}
-	//			}).Should(Succeed())
-	//
-	//			By("remove finalizer to clean up")
-	//			Expect(testapps.ChangeObj(&testCtx, vs, func() {
-	//				vs.SetFinalizers(vs.Finalizers[:len(vs.Finalizers)-1])
-	//			})).Should(Succeed())
-	//		})
-	//	})
-	//
-	//	Context("backup test", func() {
-	//		It("should not delete backups not created by lifecycle", func() {
-	//			backupPolicyName := "test-backup-policy"
-	//			backupName := "test-backup-job"
-	//
-	//			By("creating a backup as user do")
-	//			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-	//				SetTTL("7d").
-	//				SetBackupPolicyName(backupPolicyName).
-	//				SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
-	//				AddAppInstanceLabel(clusterName).
-	//				AddAppComponentLabel(mysqlCompName).
-	//				AddAppManangedByLabel().
-	//				Create(&testCtx).GetObject()
-	//			backupKey := client.ObjectKeyFromObject(backup)
-	//
-	//			By("checking backup exists")
-	//			Eventually(func(g Gomega) {
-	//				tmpBackup := dataprotectionv1alpha1.Backup{}
-	//				g.Expect(k8sClient.Get(ctx, backupKey, &tmpBackup)).Should(Succeed())
-	//				g.Expect(tmpBackup.Labels[constant.AppInstanceLabelKey]).NotTo(Equal(""))
-	//				g.Expect(tmpBackup.Labels[constant.KBAppComponentLabelKey]).NotTo(Equal(""))
-	//			}).Should(Succeed())
-	//
-	//			By("call deleteBackup in lifecycle which should only delete backups created by itself")
-	//			Expect(deleteBackup(ctx, k8sClient, clusterName, mysqlCompName))
-	//
-	//			By("checking backup does not be deleted")
-	//			Consistently(func(g Gomega) {
-	//				tmpBackup := dataprotectionv1alpha1.Backup{}
-	//				Expect(k8sClient.Get(ctx, backupKey, &tmpBackup)).Should(Succeed())
-	//			}).Should(Succeed())
-	//		})
-	//	})
+	When("pvc deletion", func() {
+		Context("h-scale with cluster reconcile", func() {
+			It("should not delete pvcs generated by h-scale transformer", func() {
+				cd := apps.NewClusterDefFactory("sts-h-scale-cluster-def").
+					AddComponentDef(apps.ConsensusMySQLComponent, "foo").
+					GetObject()
+				cv := apps.NewClusterVersionFactory("sts-h-scale-cluster-ver", cd.Name).
+					AddComponent("foo").
+					GetObject()
+				cluster := apps.NewClusterFactory("default", "sts-h-scale-cluster", cd.Name, cv.Name).
+					AddComponent("foo", "foo").
+					SetReplicas(3).
+					AddVolumeClaimTemplate("data", apps.NewPVCSpec("1G")).
+					GetObject()
+				sts := apps.NewStatefulSetFactory("default", "sts-h-scale-sts", cluster.Name, "foo").
+					SetReplicas(3).
+					GetObject()
+				origSts := sts.DeepCopy()
+				pvc1 := apps.NewPersistentVolumeClaimFactory("default", "data-sts-h-scale-sts-1", cluster.Name, "foo", "data").GetObject()
+				pvc2 := pvc1.DeepCopy()
+				pvc2.Name = "data-sts-h-scale-sts-2"
+				cr := clusterRefResources{cd: *cd, cv: *cv}
+				reqCtx := intctrlutil.RequestCtx{
+					Ctx: context.Background(),
+				}
+				ctrl, k8sMock := testutil.SetupK8sMock()
+				defer ctrl.Finish()
+
+				transformer := &stsHorizontalScalingTransformer{ctx: reqCtx, cli: k8sMock, cr: cr}
+				dag := graph.NewDAG()
+				rootVertex := &lifecycleVertex{obj: cluster, oriObj: cluster.DeepCopy(), action: actionPtr(STATUS)}
+				dag.AddVertex(rootVertex)
+				stsVertex := &lifecycleVertex{obj: sts, oriObj: origSts, action: actionPtr(UPDATE)}
+				dag.AddVertex(stsVertex)
+				dag.Connect(rootVertex, stsVertex)
+
+				k8sMock.EXPECT().
+					Get(gomock.Any(), gomock.Any(), &corev1.PersistentVolumeClaimList{}, gomock.Any()).DoAndReturn(func() {
+
+				})
+					Return(&corev1.PersistentVolumeClaimList{
+						Items: []corev1.PersistentVolumeClaim{
+							*pvc1,
+							*pvc2,
+						},
+					}).
+					AnyTimes()
+				Expect(transformer.Transform(dag)).Should(Succeed())
+				Expect(len(findAll[*corev1.PersistentVolumeClaim](dag))).Should(Equal(0))
+			})
+		})
+	})
 })

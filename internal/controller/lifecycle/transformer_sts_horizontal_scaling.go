@@ -271,7 +271,7 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 		return orphanPVCs
 	}
 
-	// find all pvcs that should be deleted as parent sts is deleting:
+	// find all pvcs that should be deleted when parent sts is deleting:
 	// 1. cluster is deleting
 	// 2. component is deleting by a cluster Update
 	//

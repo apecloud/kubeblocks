@@ -267,7 +267,6 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 			return nil
 		}
 	}
-	fmt.Println("111111111")
 	isChange := !reflect.DeepEqual(previewObj, unstructuredObj)
 	printer, err := o.ToPrinter(o.OutputOperation(isChange))
 	if err != nil {

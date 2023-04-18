@@ -17,9 +17,11 @@ spec:
         cronExpression: "0 18 * * 0"
     snapshot:
       target:
-        role: leader
+        role: primary
         connectionCredentialKey:
           passwordKey: password
           usernameKey: username
     full:
-      backupToolName: xtrabackup-apecloud-mysql
+      backupToolName: mongodb-physical-backup-tool
+      target:
+        role: primary

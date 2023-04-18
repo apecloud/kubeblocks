@@ -51,6 +51,7 @@ var _ = Describe("Create", func() {
 	})
 
 	Context("Create Objects", func() {
+
 		It("test Create run", func() {
 			clusterOptions := map[string]interface{}{
 				"name":              "test",
@@ -75,15 +76,68 @@ var _ = Describe("Create", func() {
 				},
 				BuildFlags: func(cmd *cobra.Command) {
 					cmd.Flags().StringVar(&baseOptions.Namespace, "clusterDefRef", "", "cluster definition")
+					cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 				},
 			}
 			cmd := BuildCommand(inputs)
+
 			Expect(cmd).ShouldNot(BeNil())
 			Expect(cmd.Flags().Lookup("clusterDefRef")).ShouldNot(BeNil())
+			Expect(cmd.Flags().Lookup("dry-run")).ShouldNot(BeNil())
 
 			Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
 			Expect(baseOptions.Validate(inputs)).Should(Succeed())
 			Expect(baseOptions.Run(inputs)).Should(Succeed())
+		})
+
+		It("test do not use dry-run strategy", func() {
+			cmd := &cobra.Command{}
+			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+
+			dryRun, _ := GetDryRunStrategy(cmd)
+			Expect(dryRun == DryRunNone).Should(BeTrue())
+		})
+
+		It("test no parameters strategy", func() {
+			cmd := &cobra.Command{}
+			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+
+			Expect(cmd.Flags().Set("dry-run", "unchanged")).Should(Succeed())
+			dryRun, _ := GetDryRunStrategy(cmd)
+			Expect(dryRun == DryRunClient).Should(BeTrue())
+		})
+
+		It("test client strategy", func() {
+			cmd := &cobra.Command{}
+			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+
+			Expect(cmd.Flags().Set("dry-run", "client")).Should(Succeed())
+			dryRun, _ := GetDryRunStrategy(cmd)
+
+			Expect(dryRun == DryRunClient).Should(BeTrue())
+		})
+
+		It("test server strategy", func() {
+			cmd := &cobra.Command{}
+			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+
+			Expect(cmd.Flags().Set("dry-run", "server")).Should(Succeed())
+			dryRun, _ := GetDryRunStrategy(cmd)
+			Expect(dryRun == DryRunServer).Should(BeTrue())
+		})
+
+		It("test error parameter", func() {
+			cmd := &cobra.Command{}
+			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+
+			Expect(cmd.Flags().Set("dry-run", "ape")).Should(Succeed())
+			dryRun, _ := GetDryRunStrategy(cmd)
+			Expect(dryRun == DryRunServer).Should(BeFalse())
 		})
 
 		It("test Create runAsApply", func() {

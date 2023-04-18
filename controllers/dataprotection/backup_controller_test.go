@@ -17,6 +17,7 @@ limitations under the License.
 package dataprotection
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -68,7 +69,6 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS)
-		//
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 	}
@@ -346,6 +346,7 @@ var _ = Describe("Backup Controller test", func() {
 			}
 
 			BeforeEach(func() {
+				viper.SetDefault(constant.CfgKeyBackupPVCStorageClass, "")
 				By("By creating a backupTool")
 				backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 					&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName(),
@@ -398,7 +399,7 @@ var _ = Describe("Backup Controller test", func() {
 				createBackup(backupName)
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
-					g.Expect(fetched.Status.FailureReason).To(ContainSubstring("not found"))
+					g.Expect(fetched.Status.FailureReason).To(ContainSubstring(fmt.Sprintf(`ConfigMap "%s" not found`, configMapName)))
 				})).Should(Succeed())
 				configMap := &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{

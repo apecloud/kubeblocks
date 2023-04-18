@@ -179,7 +179,7 @@ func (o *UninstallOptions) Uninstall() error {
 		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
 	}
-	printSpinner(newSpinner("Uninstall helm release "+types.KubeBlocksChartName+" "+v[util.KubeBlocksApp]),
+	printSpinner(newSpinner("Uninstall helm release "+types.KubeBlocksReleaseName+" "+v.KubeBlocks),
 		chart.Uninstall(o.HelmCfg))
 
 	// remove repo

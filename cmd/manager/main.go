@@ -26,6 +26,7 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	"github.com/fsnotify/fsnotify"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -181,6 +182,10 @@ func main() {
 		setupLog.Info("unable read in config, errors ignored")
 	}
 	setupLog.Info(fmt.Sprintf("config file: %s", viper.GetViper().ConfigFileUsed()))
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		setupLog.Info(fmt.Sprintf("config file changed: %s", e.Name))
+	})
+	viper.WatchConfig()
 
 	metricsAddr = viper.GetString(metricsAddrFlagKey.viperName())
 	probeAddr = viper.GetString(probeAddrFlagKey.viperName())

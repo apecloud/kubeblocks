@@ -144,7 +144,7 @@ func (o *ListLogsOptions) printListLogs(dataObj *cluster.ClusterObjects) error {
 	logFilesData := o.gatherLogFilesData(dataObj.Cluster, dataObj.ClusterDef, dataObj.Pods)
 	if len(logFilesData) == 0 {
 		fmt.Fprintf(o.ErrOut, "No log files found. You can enable the log feature with the kbcli command below.\n"+
-			"kbcli cluster update %s --enable-all-logs=true\n", dataObj.Cluster.Name)
+			"kbcli cluster update %s --enable-all-logs=true --namespace %s\n", dataObj.Cluster.Name, dataObj.Cluster.Namespace)
 	} else {
 		tbl.SetHeader("INSTANCE", "LOG-TYPE", "FILE-PATH", "SIZE", "LAST-WRITTEN", "COMPONENT")
 		for _, f := range logFilesData {

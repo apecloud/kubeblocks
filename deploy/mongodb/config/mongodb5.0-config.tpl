@@ -21,13 +21,15 @@ storage:
   directoryPerDB: true
 
 # where to write logging data.
+{{ block "logsBlock" . }}
 systemLog:
   destination: file
   quiet: false
   logAppend: true
   logRotate: reopen
-  path: {{ $mongodb_root }}/logs/mongodb.log
+  path: /data/mongodb/logs/mongodb.log
   verbosity: 0
+{{ end }}
 
 # network interfaces
 net:

@@ -691,25 +691,6 @@ func buildLableSelectors(prefix string, key string, names []string) string {
 	}
 }
 
-// CovertLineStrVariablesToMapFormat converts string format `key1=value1\nkey2=value2...` to KeyValue format
-func CovertLineStrVariablesToMapFormat(variablesStr string) map[string]string {
-	keyValues := make(map[string]string)
-	if len(variablesStr) == 0 {
-		return keyValues
-	}
-	lines := strings.Split(variablesStr, "\n")
-	for _, line := range lines {
-		if len(line) == 0 {
-			continue
-		}
-		strList := strings.Split(line, "=")
-		if len(strList) == 2 {
-			keyValues[strList[0]] = strList[1]
-		}
-	}
-	return keyValues
-}
-
 // NewOpsRequestForReconfiguring returns a new common OpsRequest for Reconfiguring operation
 func NewOpsRequestForReconfiguring(opsName, namespace, clusterName string) *appsv1alpha1.OpsRequest {
 	return &appsv1alpha1.OpsRequest{

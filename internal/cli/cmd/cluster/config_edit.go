@@ -174,7 +174,9 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 			util.CheckErr(editOptions.Run(func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error {
 				// generate patch for config
 				formatterConfig := cc.FormatterConfig
+				//2
 				params := cfgcore.GenerateVisualizedParamsList(info, formatterConfig, nil)
+				//3
 				editOptions.KeyValues = fromKeyValuesToMap(params, editOptions.CfgFile)
 				return inputs.BaseOptionsObj.Run(inputs)
 			}))

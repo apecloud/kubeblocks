@@ -57,9 +57,11 @@ idle_in_transaction_session_timeout = '1h'
 listen_addresses = '0.0.0.0'
 log_autovacuum_min_duration = '1s'
 log_checkpoints = 'True'
+{{ block "logsBlock" . }}
 log_destination = 'csvlog'
 log_directory = 'log'
 log_filename = 'postgresql-%Y-%m-%d.log'
+{{ end }}
 log_lock_waits = 'True'
 log_min_duration_statement = '100'
 log_replication_commands = 'True'

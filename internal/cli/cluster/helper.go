@@ -428,9 +428,17 @@ func GetPodWorkloadType(pod *corev1.Pod) string {
 }
 
 func GetConfigMapByName(dynamic dynamic.Interface, namespace, name string) (*corev1.ConfigMap, error) {
-	configMapObj := &corev1.ConfigMap{}
-	if err := GetK8SClientObject(dynamic, configMapObj, types.ConfigmapGVR(), namespace, name); err != nil {
+	cmObj := &corev1.ConfigMap{}
+	if err := GetK8SClientObject(dynamic, cmObj, types.ConfigmapGVR(), namespace, name); err != nil {
 		return nil, err
 	}
-	return configMapObj, nil
+	return cmObj, nil
+}
+
+func GetConfigConstraintByName(dynamic dynamic.Interface, name string) (*appsv1alpha1.ConfigConstraint, error) {
+	ccObj := &appsv1alpha1.ConfigConstraint{}
+	if err := GetK8SClientObject(dynamic, ccObj, types.ConfigConstraintGVR(), "", name); err != nil {
+		return nil, err
+	}
+	return ccObj, nil
 }

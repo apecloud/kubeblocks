@@ -32,8 +32,8 @@ const (
 	ScriptsVolumeName   = "scripts"
 	ServiceDefaultName  = ""
 	ServiceHeadlessName = "headless"
-	ServiceVPCName      = "a-vpc-lb-service-for-app"
-	ServiceInternetName = "a-internet-lb-service-for-app"
+	ServiceVPCName      = "vpc-lb"
+	ServiceInternetName = "internet-lb"
 
 	ReplicationPodRoleVolume       = "pod-role"
 	ReplicationRoleLabelFieldPath  = "metadata.labels['kubeblocks.io/role']"

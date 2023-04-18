@@ -187,18 +187,18 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Validate()).Should(Succeed())
 		})
 
-		It("can validate whether the name is not longer than 31 characters when create a new cluster", func() {
-			Expect(len(o.Name)).Should(BeNumerically("<=", 31))
+		It("can validate whether the name is not longer than 16 characters when create a new cluster", func() {
+			Expect(len(o.Name)).Should(BeNumerically("<=", 16))
 			Expect(o.Validate()).Should(Succeed())
-			moreThan31 := 32
+			moreThan16 := 17
 			bytes := make([]byte, 0)
-			var clusterNameMoreThan31 string
-			for i := 0; i < moreThan31; i++ {
+			var clusterNameMoreThan16 string
+			for i := 0; i < moreThan16; i++ {
 				bytes = append(bytes, byte(i%26+'a'))
 			}
-			clusterNameMoreThan31 = string(bytes)
-			Expect(len(clusterNameMoreThan31)).Should(BeNumerically(">", 31))
-			o.Name = clusterNameMoreThan31
+			clusterNameMoreThan16 = string(bytes)
+			Expect(len(clusterNameMoreThan16)).Should(BeNumerically(">", 16))
+			o.Name = clusterNameMoreThan16
 			Expect(o.Validate()).Should(HaveOccurred())
 		})
 	})

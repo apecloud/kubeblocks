@@ -32,8 +32,8 @@ const (
 	ScriptsVolumeName                            = "scripts"
 	ServiceDefaultName                           = ""
 	ServiceHeadlessName                          = "headless"
-	ServiceVPCName                               = "a-vpc-lb-service-for-app"
-	ServiceInternetName                          = "a-internet-lb-service-for-app"
+	ServiceVPCName                               = "vpc-lb"
+	ServiceInternetName                          = "internet-lb"
 	DefaultGeneralResourceConstraintName         = "kb-resource-constraint-general"
 	DefaultMemoryOptimizedResourceConstraintName = "kb-resource-constraint-memory-optimized"
 

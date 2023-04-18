@@ -127,7 +127,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			g.Expect(compStatus.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // original expecting value RebootingPhase
 			g.Expect(compStatus.PodsReady).ShouldNot(BeNil())
 			g.Expect(*compStatus.PodsReady).Should(BeTrue())
-			// REVIEW/TODO: ought add extra condtion check for RebootingPhase
+			// REVIEW/TODO: ought add extra condition check for RebootingPhase
 		})).Should(Succeed())
 
 		By("add leader role label for leaderPod to mock consensus component to be Running")

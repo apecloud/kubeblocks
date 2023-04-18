@@ -46,27 +46,27 @@ func newAnalyzeResult(title string, resultType string, outcomes []*troubleshoot.
 	return newFailedResultWithMessage(title, MissingOutcomeMessage)
 }
 
-func newFailAnalyzeResult(titile string, outcome *troubleshoot.Outcome) *analyze.AnalyzeResult {
+func newFailAnalyzeResult(title string, outcome *troubleshoot.Outcome) *analyze.AnalyzeResult {
 	return &analyze.AnalyzeResult{
-		Title:   titile,
+		Title:   title,
 		IsFail:  true,
 		Message: outcome.Fail.Message,
 		URI:     outcome.Fail.URI,
 	}
 }
 
-func newWarnAnalyzeResult(titile string, outcome *troubleshoot.Outcome) *analyze.AnalyzeResult {
+func newWarnAnalyzeResult(title string, outcome *troubleshoot.Outcome) *analyze.AnalyzeResult {
 	return &analyze.AnalyzeResult{
-		Title:   titile,
+		Title:   title,
 		IsWarn:  true,
 		Message: outcome.Warn.Message,
 		URI:     outcome.Warn.URI,
 	}
 }
 
-func newPassAnalyzeResult(titile string, outcome *troubleshoot.Outcome) *analyze.AnalyzeResult {
+func newPassAnalyzeResult(title string, outcome *troubleshoot.Outcome) *analyze.AnalyzeResult {
 	return &analyze.AnalyzeResult{
-		Title:   titile,
+		Title:   title,
 		IsPass:  true,
 		Message: outcome.Pass.Message,
 		URI:     outcome.Pass.URI,

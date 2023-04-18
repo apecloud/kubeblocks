@@ -96,7 +96,7 @@ func handleClusterVolumeExpandingPhase(ctx context.Context,
 			cluster.Status.SetComponentStatus(k, v)
 		}
 	}
-	// REVIEW: a single component status affect cluser level status?
+	// REVIEW: a single component status affect cluster level status?
 	cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 	return cli.Status().Patch(ctx, cluster, patch)
 }

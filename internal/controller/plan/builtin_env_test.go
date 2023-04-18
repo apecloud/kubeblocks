@@ -192,13 +192,14 @@ bootstrap:
 				},
 			},
 		}
-		component = &ctrlcomp.SynthesizedComponent{
-			Name: "mysql",
-		}
 		cluster = &appsv1alpha1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "my",
 			},
+		}
+		component = &ctrlcomp.SynthesizedComponent{
+			Name:        "mysql",
+			ClusterName: cluster.Name,
 		}
 		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{

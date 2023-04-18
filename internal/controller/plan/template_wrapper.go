@@ -70,10 +70,12 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, task *
 	}
 
 	cmObj := &corev1.ConfigMap{}
-	localObject := task.GetLocalResourceWithObjectKey(cmKey, generics.ToGVK(cmObj))
-	if localObject != nil {
-		if cm, ok := localObject.(*corev1.ConfigMap); ok {
-			return false, cm, nil
+	if task != nil {
+		localObject := task.GetLocalResourceWithObjectKey(cmKey, generics.ToGVK(cmObj))
+		if localObject != nil {
+			if cm, ok := localObject.(*corev1.ConfigMap); ok {
+				return false, cm, nil
+			}
 		}
 	}
 
@@ -95,7 +97,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 	component *component.SynthesizedComponent, task *intctrltypes.ReconcileTask) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, configSpec := range component.ConfigTemplates {
-		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpec.VolumeName)
+		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
 		enableRerender, origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, task)
 		if err != nil {
 			return err
@@ -127,14 +129,16 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster
 	task *intctrltypes.ReconcileTask) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, templateSpec := range component.ScriptTemplates {
-		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, templateSpec.VolumeName)
-		object := task.GetLocalResourceWithObjectKey(client.ObjectKey{
-			Name:      cmName,
-			Namespace: wrapper.cluster.Namespace,
-		}, generics.ToGVK(&corev1.ConfigMap{}))
-		if object != nil {
-			wrapper.addVolumeMountMeta(templateSpec, object)
-			continue
+		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, templateSpec.Name)
+		if task != nil {
+			object := task.GetLocalResourceWithObjectKey(client.ObjectKey{
+				Name:      cmName,
+				Namespace: wrapper.cluster.Namespace,
+			}, generics.ToGVK(&corev1.ConfigMap{}))
+			if object != nil {
+				wrapper.addVolumeMountMeta(templateSpec, object)
+				continue
+			}
 		}
 
 		// Generate ConfigMap objects for config files

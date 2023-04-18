@@ -31,6 +31,7 @@ type MonitorConfig struct {
 
 type SynthesizedComponent struct {
 	ClusterDefName        string                                 `json:"clusterDefName,omitempty"`
+	ClusterName           string                                 `json:"clusterName,omitempty"`
 	Name                  string                                 `json:"name,omitempty"`
 	Type                  string                                 `json:"type,omitempty"`
 	CharacterType         string                                 `json:"characterType,omitempty"`

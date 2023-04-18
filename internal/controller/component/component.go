@@ -61,6 +61,7 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
+		ClusterName:           cluster.Name,
 		Name:                  clusterCompSpec.Name,
 		Type:                  clusterCompDefObj.Name,
 		CharacterType:         clusterCompDefObj.CharacterType,

@@ -23,9 +23,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
@@ -75,9 +75,9 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	case appsv1alpha1.Replication:
 		return replication.NewReplicationComponent(cli, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Consensus:
-		return consensus.NewConsensusComponent(cli, cluster, version, synthesizedComp, dag), nil
+		return consensus1.NewConsensusComponent(cli, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Stateful:
-		return stateful.NewStatefulComponent(cli, cluster, version, synthesizedComp, dag), nil
+		return stateful1.NewStatefulComponent(cli, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Stateless:
 		return stateless.NewStatelessComponent(cli, cluster, version, synthesizedComp, dag), nil
 	}

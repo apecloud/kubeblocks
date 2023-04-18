@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package consensus
+package consensus1
 
 import (
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -41,7 +42,7 @@ func NewConsensusComponent(cli client.Client,
 				Cluster:        cluster,
 				ClusterVersion: clusterVersion,
 				Component:      synthesizedComponent,
-				ComponentSet: &ConsensusSet{
+				ComponentSet: &consensus.ConsensusSet{
 					Stateful: stateful.Stateful{
 						ComponentSetBase: types.ComponentSetBase{
 							Cli:           cli,

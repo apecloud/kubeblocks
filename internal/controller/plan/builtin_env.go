@@ -42,17 +42,21 @@ type envWrapper struct {
 	*configTemplateBuilder
 
 	// configmap or secret not yet submitted.
-	localObjects *intctrltypes.ReconcileTask
+	localObjects  *intctrltypes.ReconcileTask
+	clusterName   string
+	componentName string
 	// cache remoted configmap and secret.
 	cache map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object
 }
 
 const maxReferenceCount = 10
 
-func wrapGetEnvByName(templateBuilder *configTemplateBuilder, localObjects *intctrltypes.ReconcileTask) envBuildInFunc {
+func wrapGetEnvByName(templateBuilder *configTemplateBuilder, component *component.SynthesizedComponent, task *intctrltypes.ReconcileTask) envBuildInFunc {
 	wrapper := &envWrapper{
 		configTemplateBuilder: templateBuilder,
-		localObjects:          localObjects,
+		localObjects:          task,
+		clusterName:           component.ClusterName,
+		componentName:         component.Name,
 		cache:                 make(map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object),
 	}
 	return func(args interface{}, envName string) (string, error) {
@@ -224,12 +228,12 @@ func (w *envWrapper) checkAndReplaceEnv(value string, container *corev1.Containe
 
 func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValue string, container *corev1.Container) (string, error) {
 	var (
-		clusterName   = w.localObjects.Cluster.Name
-		componentName = w.localObjects.Component.Name
+		clusterName   = w.clusterName
+		componentName = w.componentName
 		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, componentName)
 	)
 
-	builtInEnvMap[constant.ConnCredentialPlaceHolder] = component.GenerateConnCredential(w.localObjects.Cluster.Name)
+	builtInEnvMap[constant.ConnCredentialPlaceHolder] = component.GenerateConnCredential(clusterName)
 	kbInnerEnvReplaceFn := func(envName string, strToReplace string) string {
 		return strings.ReplaceAll(strToReplace, envName, builtInEnvMap[envName])
 	}
@@ -275,8 +279,10 @@ func (w *envWrapper) incAndCheckReferenceCount() bool {
 func getResourceObject[T generics.Object, PT generics.PObject[T]](w *envWrapper, obj PT, key coreclient.ObjectKey) (PT, error) {
 	gvk := generics.ToGVK(obj)
 	object := w.getResourceFromLocal(key, gvk)
-	if v, ok := object.(PT); ok {
-		return v, nil
+	if object != nil {
+		if v, ok := object.(PT); ok {
+			return v, nil
+		}
 	}
 	if err := w.cli.Get(w.ctx, key, obj); err != nil {
 		return nil, err

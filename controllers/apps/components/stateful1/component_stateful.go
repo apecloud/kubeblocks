@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package stateful
+package stateful1
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -40,7 +41,7 @@ func NewStatefulComponent(cli client.Client,
 				Cluster:        cluster,
 				ClusterVersion: clusterVersion,
 				Component:      synthesizedComponent,
-				ComponentSet: &Stateful{
+				ComponentSet: &stateful.Stateful{
 					ComponentSetBase: types.ComponentSetBase{
 						Cli:           cli,
 						Cluster:       cluster,

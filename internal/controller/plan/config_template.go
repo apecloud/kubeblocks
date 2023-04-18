@@ -177,7 +177,7 @@ func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.Synt
 		builtInMysqlCalBufferFunctionName:            calDBPoolSize,
 		builtInGetVolumeFunctionName:                 getVolumeMountPathByName,
 		builtInGetPvcFunctionName:                    getPVCByName,
-		builtInGetEnvFunctionName:                    wrapGetEnvByName(c, task),
+		builtInGetEnvFunctionName:                    wrapGetEnvByName(c, component, task),
 		builtInGetPortFunctionName:                   getPortByName,
 		builtInGetArgFunctionName:                    getArgByName,
 		builtInGetContainerFunctionName:              getPodContainerByName,

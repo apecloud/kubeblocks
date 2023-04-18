@@ -63,8 +63,11 @@ func (r *backupPolicyTPLTransformer) Transform(dag *graph.DAG) error {
 				return intctrlutil.NewNotFound("componentDef %s not found in ClusterDefinition: %s ", v.ComponentDefRef, clusterDefName)
 			}
 			// build the backup policy from the template.
-			backupPolicy := r.transformBackupPolicy(v, origCluster, compDef.WorkloadType, tpl.Name)
-			vertex := &ictrltypes.LifecycleVertex{Obj: backupPolicy}
+			backupPolicy, action := r.transformBackupPolicy(v, origCluster, compDef.WorkloadType, tpl.Name)
+			if backupPolicy == nil {
+				continue
+			}
+			vertex := &ictrltypes.LifecycleVertex{Obj: backupPolicy, Action: action}
 			dag.AddVertex(vertex)
 			dag.Connect(rootVertex, vertex)
 		}
@@ -76,19 +79,19 @@ func (r *backupPolicyTPLTransformer) Transform(dag *graph.DAG) error {
 func (r *backupPolicyTPLTransformer) transformBackupPolicy(policyTPL appsv1alpha1.BackupPolicy,
 	cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
-	tplName string) *dataprotectionv1alpha1.BackupPolicy {
+	tplName string) (*dataprotectionv1alpha1.BackupPolicy, *ictrltypes.LifecycleAction) {
 	backupPolicyName := DeriveBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef)
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
 	if err := r.cli.Get(r.ctx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: backupPolicyName}, backupPolicy); err != nil && !apierrors.IsNotFound(err) {
-		return nil
+		return nil, nil
 	}
 	if len(backupPolicy.Name) == 0 {
 		// build a new backup policy from the backup policy template.
-		return r.buildBackupPolicy(policyTPL, cluster, workloadType, tplName)
+		return r.buildBackupPolicy(policyTPL, cluster, workloadType, tplName), ictrltypes.ActionCreatePtr()
 	}
 	// sync the existing backup policy with the cluster changes
 	r.syncBackupPolicy(backupPolicy, cluster, policyTPL, workloadType, tplName)
-	return backupPolicy
+	return backupPolicy, ictrltypes.ActionUpdatePtr()
 }
 
 // syncBackupPolicy syncs labels and annotations of the backup policy with the cluster changes.

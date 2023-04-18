@@ -17,7 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 
@@ -48,7 +47,6 @@ func ownKinds() []client.ObjectList {
 		&corev1.ServiceList{},
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
-		&corev1.PersistentVolumeClaimList{},
 		&policyv1.PodDisruptionBudgetList{},
 		&dataprotectionv1alpha1.BackupPolicyList{},
 	}
@@ -93,7 +91,7 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 
 	// get the old objects snapshot
-	oldSnapshot, err := c.readCacheSnapshot(*origCluster)
+	oldSnapshot, err := readCacheSnapshot(c.ctx.Ctx, c.cli, *origCluster, ownKinds()...)
 	if err != nil {
 		return err
 	}
@@ -134,40 +132,9 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 			v.action = actionPtr(UPDATE)
 		}
 	}
-	filterHScalePVCs := func(originSet sets.Set[gvkName]) sets.Set[gvkName] {
-		stsToBeDeleted := make([]*appsv1.StatefulSet, 0)
-		// list sts to be deleted
-		for name := range originSet {
-			obj := oldSnapshot[name]
-			if sts, ok := obj.(*appsv1.StatefulSet); ok {
-				stsToBeDeleted = append(stsToBeDeleted, sts)
-			}
-		}
-		// compose all pvc names that owned by sts to be deleted
-		pvcNameSet := sets.New[string]()
-		for _, sts := range stsToBeDeleted {
-			for _, template := range sts.Spec.VolumeClaimTemplates {
-				for i := 0; i < int(*sts.Spec.Replicas); i++ {
-					name := fmt.Sprintf("%s-%s-%d", template.Name, sts.Name, i)
-					pvcNameSet.Insert(name)
-				}
-			}
-		}
-		// pvcs that not owned by any deleting sts should be filtered
-		orphanSet := originSet.Clone()
-		for name := range orphanSet {
-			obj := oldSnapshot[name]
-			if pvc, ok := obj.(*corev1.PersistentVolumeClaim); ok {
-				if !pvcNameSet.Has(pvc.Name) {
-					orphanSet.Delete(name)
-				}
-			}
-		}
-		return orphanSet
-	}
+
 	deleteOrphanVertices := func() {
-		orphanSet := filterHScalePVCs(deleteSet)
-		for name := range orphanSet {
+		for name := range deleteSet {
 			v := &lifecycleVertex{
 				obj:      oldSnapshot[name],
 				oriObj:   oldSnapshot[name],

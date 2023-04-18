@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -55,10 +56,6 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 	}
 	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-
-	if isClusterDeleting(*origCluster) {
-		return nil
-	}
 
 	handleHorizontalScaling := func(vertex *lifecycleVertex) error {
 		stsObj, _ := vertex.oriObj.(*appsv1.StatefulSet)
@@ -243,6 +240,55 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 
 		return nil
 	}
+	findPVCsToBeDeleted := func(pvcSnapshot clusterSnapshot) []*corev1.PersistentVolumeClaim {
+		stsToBeDeleted := make([]*appsv1.StatefulSet, 0)
+		// list sts to be deleted
+		for _, vertex := range dag.Vertices() {
+			v, _ := vertex.(*lifecycleVertex)
+			// find sts to be deleted
+			if sts, ok := v.obj.(*appsv1.StatefulSet); ok && (v.action != nil && *v.action == DELETE) {
+				stsToBeDeleted = append(stsToBeDeleted, sts)
+			}
+		}
+		// compose all pvc names that owned by sts to be deleted
+		pvcNameSet := sets.New[string]()
+		for _, sts := range stsToBeDeleted {
+			for _, template := range sts.Spec.VolumeClaimTemplates {
+				for i := 0; i < int(*sts.Spec.Replicas); i++ {
+					name := fmt.Sprintf("%s-%s-%d", template.Name, sts.Name, i)
+					pvcNameSet.Insert(name)
+				}
+			}
+		}
+		// pvcs that not owned by any deleting sts should be filtered
+		orphanPVCs := make([]*corev1.PersistentVolumeClaim, 0)
+		for _, obj := range pvcSnapshot {
+			pvc, _ := obj.(*corev1.PersistentVolumeClaim)
+			if pvcNameSet.Has(pvc.Name) {
+				orphanPVCs = append(orphanPVCs, pvc)
+			}
+		}
+		return orphanPVCs
+	}
+
+	// find all pvcs that should be deleted as parent sts is deleting:
+	// 1. cluster is deleting
+	// 2. component is deleting by a cluster Update
+	oldSnapshot, err := readCacheSnapshot(s.ctx.Ctx, s.cli, *cluster, &corev1.PersistentVolumeClaimList{})
+	if err != nil {
+		return err
+	}
+	pvcs := findPVCsToBeDeleted(oldSnapshot)
+	for _, pvc := range pvcs {
+		vertex := &lifecycleVertex{obj: pvc, action: actionPtr(DELETE)}
+		dag.AddVertex(vertex)
+		dag.Connect(rootVertex, vertex)
+	}
+
+	// if cluster is deleting, no need h-scale
+	if isClusterDeleting(*origCluster) {
+		return nil
+	}
 
 	vertices := findAll[*appsv1.StatefulSet](dag)
 	for _, vertex := range vertices {
@@ -254,6 +300,7 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 			return err
 		}
 	}
+
 	return nil
 }
 

@@ -68,7 +68,7 @@ var _ = Describe("sts horizontal scaling test", func() {
 				GetObject()
 			Expect(intctrlutil.SetOwnership(cluster, pvc1, scheme, dbClusterFinalizerName)).Should(Succeed())
 			pvc2 := pvc1.DeepCopy()
-			pvc2.Name = pvcNameBase+"2"
+			pvc2.Name = pvcNameBase + "2"
 			Expect(intctrlutil.SetOwnership(cluster, pvc2, scheme, dbClusterFinalizerName)).Should(Succeed())
 
 			By("prepare params for transformer")

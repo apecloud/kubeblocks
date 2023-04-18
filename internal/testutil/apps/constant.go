@@ -25,15 +25,17 @@ import (
 )
 
 const (
-	KubeBlocks          = "kubeblocks"
-	LogVolumeName       = "log"
-	ConfVolumeName      = "conf"
-	DataVolumeName      = "data"
-	ScriptsVolumeName   = "scripts"
-	ServiceDefaultName  = ""
-	ServiceHeadlessName = "headless"
-	ServiceVPCName      = "a-vpc-lb-service-for-app"
-	ServiceInternetName = "a-internet-lb-service-for-app"
+	KubeBlocks                                   = "kubeblocks"
+	LogVolumeName                                = "log"
+	ConfVolumeName                               = "conf"
+	DataVolumeName                               = "data"
+	ScriptsVolumeName                            = "scripts"
+	ServiceDefaultName                           = ""
+	ServiceHeadlessName                          = "headless"
+	ServiceVPCName                               = "a-vpc-lb-service-for-app"
+	ServiceInternetName                          = "a-internet-lb-service-for-app"
+	DefaultGeneralResourceConstraintName         = "kb-resource-constraint-general"
+	DefaultMemoryOptimizedResourceConstraintName = "kb-resource-constraint-memory-optimized"
 
 	ReplicationPodRoleVolume       = "pod-role"
 	ReplicationRoleLabelFieldPath  = "metadata.labels['kubeblocks.io/role']"
@@ -284,6 +286,24 @@ var (
 			},
 			InitContainers: []corev1.Container{defaultRedisInitContainer},
 			Containers:     []corev1.Container{defaultRedisContainer},
+		},
+	}
+
+	classGroupTemplate = appsv1alpha1.ComponentClassGroup{
+		Template: `
+cpu: "{{ or .cpu 1 }}"
+memory: "{{ or .memory 4 }}Gi"
+volumes:
+- name: data
+  size: "{{ or .dataStorageSize 10 }}Gi"
+- name: log
+  size: "{{ or .logStorageSize 1 }}Gi"
+`,
+		Vars: []string{"cpu", "memory", "dataStorageSize", "logStorageSize"},
+		Series: []appsv1alpha1.ComponentClassSeries{
+			{
+				NamingTemplate: "custom-{{ .cpu }}c{{ .memory }}g",
+			},
 		},
 	}
 )

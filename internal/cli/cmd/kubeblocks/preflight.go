@@ -76,6 +76,8 @@ var (
 const (
 	EKSHostPreflight = "data/eks_hostpreflight.yaml"
 	EKSPreflight     = "data/eks_preflight.yaml"
+	GKEHostPreflight = "data/gke_hostpreflight.yaml"
+	GKEPreflight     = "data/gke_preflight.yaml"
 )
 
 // PreflightOptions declares the arguments accepted by the preflight command
@@ -129,6 +131,13 @@ func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 			yamlDataList = append(yamlDataList, data)
 		}
 		if data, err := defaultVendorYamlData.ReadFile(EKSPreflight); err == nil {
+			yamlDataList = append(yamlDataList, data)
+		}
+	case util.GKEProvider:
+		if data, err := defaultVendorYamlData.ReadFile(GKEHostPreflight); err == nil {
+			yamlDataList = append(yamlDataList, data)
+		}
+		if data, err := defaultVendorYamlData.ReadFile(GKEPreflight); err == nil {
 			yamlDataList = append(yamlDataList, data)
 		}
 	case util.UnknownProvider:

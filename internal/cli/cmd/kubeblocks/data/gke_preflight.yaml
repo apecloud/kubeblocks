@@ -7,7 +7,7 @@ spec:
     - clusterInfo: {}
   analyzers:
     - clusterVersion:
-        checkName: EKS-Version
+        checkName: GKE-Version
         outcomes:
           - fail:
               when: "< 1.22.0"
@@ -25,22 +25,6 @@ spec:
               message: This application requires at least 3 nodes
           - pass:
               message: This cluster has enough nodes.
-    - deploymentStatus:
-        checkName: AWS-Load-Balancer-Check
-        name: aws-load-balancer-controller
-        namespace: kube-system
-        outcomes:
-          - warn:
-              when: "absent" # note that the "absent" failure state must be listed first if used.
-              message: The aws-load-balancer-controller deployment is not present.
-          - warn:
-              when: "< 1"
-              message: The aws-load-balancer-controller deployment does not have any ready replicas.
-          - warn:
-              when: "= 1"
-              message: The aws-load-balancer-controller deployment has only a single ready replica.
-          - pass:
-              message: There are multiple replicas of the aws-load-balancer-controller deployment ready.
   extendAnalyzers:
     - clusterAccess:
         checkName: Check-K8S-Access
@@ -50,11 +34,11 @@ spec:
           - pass:
               message: k8s cluster access ok
     - storageClass:
-        checkName: Required-GP3-SC
-        storageClassType: "gp3"
-        provisioner: "ebs.csi.aws.com"
+        checkName: Required-PREMIUM-SC
+        storageClassType: "pd-ssd"
+        provisioner: "pd.csi.storage.gke.io"
         outcomes:
           - fail:
-              message: The gp3 storage class was not found
+              message: The premium storage class was not found
           - pass:
-              message: gp3 is the presence, and all good on storage classes
+              message: premium is the presence, and all good on storage classes

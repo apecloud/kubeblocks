@@ -212,11 +212,10 @@ func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.
 			return "", err
 		}
 	}
-	pgOps.OriRole = PRIMARY
 	if isRecovery {
-		pgOps.OriRole = SECONDARY
+		return SECONDARY, nil
 	}
-	return pgOps.OriRole, nil
+	return PRIMARY, nil
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

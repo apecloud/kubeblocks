@@ -24,7 +24,7 @@ function verifySupported {
         Write-Output "AMD64 is supported..."
         return
     }
-    Write-Output "No support for x86 systems"
+    Write-Output "No support to your pc $arch ARCH"
     exit 1
 }
 

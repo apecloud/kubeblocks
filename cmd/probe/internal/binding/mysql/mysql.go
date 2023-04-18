@@ -97,7 +97,7 @@ const (
 var (
 	defaultDBPort = 3306
 	dbUser        = "root"
-	dbPasswd      = "9qgdsqmk"
+	dbPasswd      = ""
 )
 
 // NewMysql returns a new MySQL output binding.

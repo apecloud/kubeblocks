@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
-	cmd2 "k8s.io/kubectl/pkg/cmd"
+	kccmd "k8s.io/kubectl/pkg/cmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -55,7 +55,7 @@ const (
 func NewDefaultCliCmd() *cobra.Command {
 	cmd := NewCliCmd()
 
-	pluginHandler := cmd2.NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes)
+	pluginHandler := kccmd.NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes)
 
 	if len(os.Args) > 1 {
 		cmdPathPieces := os.Args[1:]
@@ -75,7 +75,7 @@ func NewDefaultCliCmd() *cobra.Command {
 			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
 				// Don't search for a plugin
 			default:
-				if err := cmd2.HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
+				if err := kccmd.HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
 					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 					os.Exit(1)
 				}

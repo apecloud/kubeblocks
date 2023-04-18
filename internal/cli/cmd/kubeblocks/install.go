@@ -341,7 +341,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	return nil
 }
 
-func (o *InstallOptions) preCheck(versionInfo util.VersionInfo) error {
+func (o *InstallOptions) preCheck(v util.Version) error {
 	if !o.Check {
 		return nil
 	}
@@ -355,7 +355,7 @@ func (o *InstallOptions) preCheck(versionInfo util.VersionInfo) error {
 	}
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")
-	k8sVersionStr := versionInfo.Kubernetes
+	k8sVersionStr := v.Kubernetes
 	if k8sVersionStr == "" {
 		return versionErr
 	}
@@ -378,7 +378,7 @@ func (o *InstallOptions) preCheck(versionInfo util.VersionInfo) error {
 	}
 
 	// check kbcli version, now do nothing
-	fmt.Fprintf(o.Out, "kbcli version %s\n", versionInfo.Cli)
+	fmt.Fprintf(o.Out, "kbcli version %s\n", v.Cli)
 
 	return nil
 }

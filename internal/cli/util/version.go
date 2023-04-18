@@ -30,16 +30,16 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
-type VersionInfo struct {
+type Version struct {
 	KubeBlocks string
 	Kubernetes string
 	Cli        string
 }
 
 // GetVersionInfo get application version include KubeBlocks, CLI and kubernetes
-func GetVersionInfo(client kubernetes.Interface) (VersionInfo, error) {
+func GetVersionInfo(client kubernetes.Interface) (Version, error) {
 	var err error
-	version := VersionInfo{
+	version := Version{
 		Cli: version.GetVersion(),
 	}
 

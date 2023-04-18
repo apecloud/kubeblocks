@@ -1,13 +1,24 @@
 ---
-title: kbcli kubeblocks
+title: kbcli kubeblocks describe-config
 ---
 
-KubeBlocks operation commands.
+describe KubeBlocks config.
+
+```
+kbcli kubeblocks describe-config [flags]
+```
+
+### Examples
+
+```
+  # Describe the KubeBlocks config.
+  kbcli kubeblocks describe-config
+```
 
 ### Options
 
 ```
-  -h, --help   help for kubeblocks
+  -h, --help   help for describe-config
 ```
 
 ### Options inherited from parent commands
@@ -36,15 +47,7 @@ KubeBlocks operation commands.
 
 ### SEE ALSO
 
-
-* [kbcli kubeblocks config](kbcli_kubeblocks_config.md)	 - KubeBlocks config.
-* [kbcli kubeblocks describe-config](kbcli_kubeblocks_describe-config.md)	 - describe KubeBlocks config.
-* [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks.
-* [kbcli kubeblocks list-versions](kbcli_kubeblocks_list-versions.md)	 - List KubeBlocks versions.
-* [kbcli kubeblocks preflight](kbcli_kubeblocks_preflight.md)	 - Run and retrieve preflight checks for KubeBlocks.
-* [kbcli kubeblocks status](kbcli_kubeblocks_status.md)	 - Show list of resource KubeBlocks uses or owns.
-* [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks.
-* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks.
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

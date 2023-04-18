@@ -248,11 +248,15 @@ dataProtection:
   ## @param dataProtection.backupPVCInitCapacity - set the default pvc initCapacity if the pvc need to be created by backup controller
   ## @param dataProtection.backupPVCStorageClassName - set the default pvc storageClassName if the pvc need to be created by backup controller
   ## @param dataProtection.backupPVCCreatePolicy - set the default create policy of the pvc, optional values: IfNotPresent, Never
+  ## @param dataProtection.backupPVConfigMapName - set the default configmap name which contains key "persistentVolume" and value of the persistentVolume struct.
+  ## @param dataProtection.backupPVConfigMapNamespace - set the default configmap namespace of pv template.
   enableVolumeSnapshot: false
   backupPVCName: ""
   backupPVCInitCapacity: ""
   backupPVCStorageClassName: ""
   backupPVCCreatePolicy: ""
+  backupPVConfigMapName: ""
+  backupPVConfigMapNamespace: ""
 
 ## Addon controller settings, this will require cluster-admin clusterrole.
 addonController:

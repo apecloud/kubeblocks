@@ -18,8 +18,16 @@ data:
      # will replace the storageClassName when it is nil in the backup policy.
      BACKUP_PVC_STORAGE_CLASS: "{{ .Values.dataProtection.backupPVCStorageClassName }}"
 
-      # the pvc create policy.
-      # if the storageClass supports dynamic provisioning, recommend "IfNotPresent" policy.
-      # otherwise, using "Never" policy.
-      # only affect the backupPolicy automatically created by Kubeblocks.
-      BACKUP_PVC_CREATE_POLICY: "{{ .Values.dataProtection.backupPVCCreatePolicy }}"
+     # the pvc create policy.
+     # if the storageClass supports dynamic provisioning, recommend "IfNotPresent" policy.
+     # otherwise, using "Never" policy.
+     # only affect the backupPolicy automatically created by KubeBs-locks.
+     BACKUP_PVC_CREATE_POLICY: "{{ .Values.dataProtection.backupPVCCreatePolicy }}"
+
+     # the configmap name of the pv template. if the csi-driver not support dynamic provisioning,
+     # you can provide a configmap which contains key "persistentVolume" and value of the persistentVolume struct.
+     # only effective when storageClass is empty.
+     BACKUP_PV_CONFIGMAP_NAME: "{{ .Values.dataProtection.backupPVConfigMapName }}"
+
+     # the configmap namespace of the pv template.
+     BACKUP_PV_CONFIGMAP_NAMESPACE: "{{ .Values.dataProtection.backupPVConfigMapNamespace }}"

@@ -1220,7 +1220,7 @@ var _ = Describe("Cluster Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, replicationCompDefName).
+				AddComponentDef(testapps.ReplicationRedisComponent, replicationCompDefName).
 				Create(&testCtx).GetObject()
 		})
 
@@ -1243,7 +1243,7 @@ var _ = Describe("Cluster Controller", func() {
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, replicationCompDefName).
+				AddComponentDef(testapps.ReplicationRedisComponent, replicationCompDefName).
 				AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
 				Create(&testCtx).GetObject()
 
@@ -1278,12 +1278,12 @@ var _ = Describe("Cluster Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, replicationCompDefName).
+				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(replicationCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 
 			By("Creating a BackupPolicyTemplate")
@@ -1343,12 +1343,12 @@ var _ = Describe("Cluster Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDef obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ConsensusMySQLComponent, replicationCompDefName).
+				AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(replicationCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(consensusCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 
 			By("Creating a BackupPolicyTemplate")

@@ -75,7 +75,8 @@ func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[
 			err     error
 			classes = make(map[string]*v1alpha1.ComponentClassInstance)
 		)
-		if classDefinition.Status.ObservedGeneration == classDefinition.GetGeneration() {
+		if classDefinition.GetGeneration() != 0 &&
+			classDefinition.Status.ObservedGeneration == classDefinition.GetGeneration() {
 			for idx := range classDefinition.Status.Classes {
 				cls := classDefinition.Status.Classes[idx]
 				classes[cls.Name] = &cls

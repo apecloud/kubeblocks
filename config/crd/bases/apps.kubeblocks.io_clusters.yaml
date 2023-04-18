@@ -310,6 +310,7 @@ spec:
                             type: object
                           name:
                             description: Service name
+                            maxLength: 15
                             type: string
                           serviceType:
                             default: ClusterIP

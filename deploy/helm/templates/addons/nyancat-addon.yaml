@@ -11,7 +11,7 @@ metadata:
   {{- end }}
 spec:
   description: 'Deploys a nyancat application in a cluster.
-  Nyancat is a demo application for showing database cluster availibility.'
+  Nyancat is a demo application for showing database cluster availability.'
   type: Helm
 
   helm:

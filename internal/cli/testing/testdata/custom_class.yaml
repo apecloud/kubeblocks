@@ -12,9 +12,9 @@
     - namingTemplate: "custom-{{ .cpu }}c{{ .memory }}g"
       classes:
       - args: ["1", "1", "100", "10"]
-      - name: custom-200c400g
-        cpu: 200
-        memory: 400Gi
+      - name: custom-4c16g
+        cpu: 4
+        memory: 16Gi
 
   - resourceConstraintRef: kb-resource-constraint-memory-optimized
     template: |
@@ -29,5 +29,5 @@
     series:
     - namingTemplate: "custom-{{ .cpu }}c{{ .memory }}g"
       classes:
-      - args: ["1", "32", "100", "10"]
-      - args: ["2", "64", "100", "10"]
+      - args: ["2", "16", "100", "10"]
+      - args: ["4", "64", "100", "10"]

@@ -858,7 +858,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	testClusterAffinity := func() {
 		const topologyKey = "testTopologyKey"
-		const lableKey = "testNodeLabelKey"
+		const labelKey = "testNodeLabelKey"
 		const labelValue = "testLabelValue"
 
 		By("Creating a cluster with Affinity")
@@ -866,7 +866,7 @@ var _ = Describe("Cluster Controller", func() {
 			PodAntiAffinity: appsv1alpha1.Required,
 			TopologyKeys:    []string{topologyKey},
 			NodeLabels: map[string]string{
-				lableKey: labelValue,
+				labelKey: labelValue,
 			},
 			Tenancy: appsv1alpha1.SharedNode,
 		}
@@ -885,7 +885,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(func(g Gomega) {
 			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 			podSpec := stsList.Items[0].Spec.Template.Spec
-			g.Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(lableKey))
+			g.Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(labelKey))
 			g.Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
 			g.Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
 			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))

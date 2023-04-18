@@ -1,7 +1,7 @@
 apiVersion: v2
 name: apecloud-mysql-scale
 description: ApeCloud MySQL-Scale is ApeCloud MySQL proxy. ApeCloud MySQL-Scale can support 
-  apecloud mysql failover automatically and read write seperation.
+  apecloud mysql failover automatically and read write separation.
 
 type: application
 

@@ -62,7 +62,7 @@ func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
 
 // getKubeBlocksVersion get KubeBlocks version
 func getKubeBlocksVersion(client kubernetes.Interface) (string, error) {
-	deploy, err := getKubeBlocksDeploy(client)
+	deploy, err := GetKubeBlocksDeploy(client)
 	if err != nil || deploy == nil {
 		return "", err
 	}
@@ -96,9 +96,9 @@ func GetK8sVersion(discoveryClient discovery.DiscoveryInterface) (string, error)
 	return "", nil
 }
 
-// getKubeBlocksDeploy get KubeBlocks deployments, now one kubernetes cluster
+// GetKubeBlocksDeploy gets KubeBlocks deployments, now one kubernetes cluster
 // only support one KubeBlocks
-func getKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error) {
+func GetKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error) {
 	deploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName,
 	})

@@ -137,14 +137,14 @@ func (r *AddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// TODO: replace with controller-idioms's adopt lib
 		// Watches(&source.Kind{Type: &batchv1.Job{}},
 		// 	&handler.EnqueueRequestForObject{},
-		// 	builder.WithPredicates(&jobCompletitionPredicate{reconciler: r, Log: log.FromContext(context.TODO())})).
+		// 	builder.WithPredicates(&jobCompletionPredicate{reconciler: r, Log: log.FromContext(context.TODO())})).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurrentReconcilesKey),
 		}).
 		Complete(r)
 }
 
-// type jobCompletitionPredicate struct {
+// type jobCompletionPredicate struct {
 // 	predicate.Funcs
 // 	reconciler *AddonReconciler
 // 	Log        logr.Logger

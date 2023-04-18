@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+	"fmt"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -28,6 +29,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -54,6 +56,22 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	ml := []client.ListOption{
+		client.HasLabels{types.ResourceConstraintProviderLabelKey},
+	}
+	constraintsList := &appsv1alpha1.ComponentResourceConstraintList{}
+	if err := r.Client.List(reqCtx.Ctx, constraintsList, ml...); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	constraintsMap := make(map[string]appsv1alpha1.ComponentResourceConstraint)
+	for idx := range constraintsList.Items {
+		cf := constraintsList.Items[idx]
+		if _, ok := cf.GetLabels()[types.ResourceConstraintProviderLabelKey]; !ok {
+			continue
+		}
+		constraintsMap[cf.GetName()] = cf
+	}
+
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, classDefinition, dbClusterFinalizerName, func() (*ctrl.Result, error) {
 		// TODO validate if existing cluster reference classes being deleted
 		return nil, nil
@@ -74,6 +92,13 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 	patch := client.MergeFrom(classDefinition.DeepCopy())
 	var classList []appsv1alpha1.ComponentClassInstance
 	for _, v := range classInstances {
+		constraint, ok := constraintsMap[v.ResourceConstraintRef]
+		if !ok {
+			return intctrlutil.CheckedRequeueWithError(nil, reqCtx.Log, fmt.Sprintf("resource constraint %s not found", v.ResourceConstraintRef))
+		}
+		if !constraint.MatchClass(v) {
+			return intctrlutil.CheckedRequeueWithError(nil, reqCtx.Log, fmt.Sprintf("class %s does not conform to constraint %s", v.Name, v.ResourceConstraintRef))
+		}
 		classList = append(classList, *v)
 	}
 	classDefinition.Status.Classes = classList

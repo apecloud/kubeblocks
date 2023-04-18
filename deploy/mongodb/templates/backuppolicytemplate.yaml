@@ -23,5 +23,6 @@ spec:
           usernameKey: username
     full:
       backupToolName: mongodb-physical-backup-tool
+      backupsHistoryLimit: 7
       target:
         role: primary

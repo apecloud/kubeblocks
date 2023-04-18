@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 )
 
 type configOpsOptions struct {
@@ -127,6 +128,10 @@ func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.C
 			r[key] = ""
 		}
 		return r
+	}
+
+	if !cfgcm.IsSupportReload(cc.ReloadOptions) {
+		return o.confirmReconfigureWithRestart()
 	}
 
 	configPatch, _, err := cfgcore.CreateConfigPatch(mockEmptyData(data), data, cc.FormatterConfig.Format, tpl.Keys, false)

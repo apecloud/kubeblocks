@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	klog "k8s.io/klog/v2"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	clusterutil "github.com/apecloud/kubeblocks/internal/cli/cluster"
@@ -222,14 +222,14 @@ func (o *AccountBaseOptions) printUserInfo(response sqlchannel.SQLChannelRespons
 		o.printGeneralInfo(response)
 		return nil
 	}
-	// decode user info from metatdata
+	// decode user info from metadata
 	users := []sqlchannel.UserInfo{}
 	err := json.Unmarshal([]byte(response.Message), &users)
 	if err != nil {
 		return err
 	}
 
-	// render user info with username and pasword expired boolean
+	// render user info with username and password expired boolean
 	tblPrinter := o.newTblPrinterWithStyle("USER INFO", []interface{}{"USERNAME", "EXPIRED"})
 	for _, user := range users {
 		tblPrinter.AddRow(user.UserName, user.Expired)
@@ -245,7 +245,7 @@ func (o *AccountBaseOptions) printRoleInfo(response sqlchannel.SQLChannelRespons
 		return nil
 	}
 
-	// decode role info from metatdata
+	// decode role info from metadata
 	users := []sqlchannel.UserInfo{}
 	err := json.Unmarshal([]byte(response.Message), &users)
 	if err != nil {

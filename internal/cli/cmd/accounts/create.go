@@ -63,7 +63,7 @@ func (o *CreateUserOptions) Complete(f cmdutil.Factory) error {
 	if len(o.info.Password) == 0 {
 		o.info.Password, _ = password.Generate(10, 2, 0, false, false)
 	}
-	// encode user info to metatdata
+	// encode user info to metadata
 	o.RequestMeta, err = struct2Map(o.info)
 	return err
 }

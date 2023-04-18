@@ -144,7 +144,7 @@ log_bin_index=mysql-bin.index
 max_binlog_size=134217728
 log_replica_updates=1
 # binlog_rows_query_log_events=ON #AWS not set
-# binlog_transaction_dependency_tracking=WRITESET    #Defautl Commit Order, Aws not set
+# binlog_transaction_dependency_tracking=WRITESET    #Default Commit Order, Aws not set
 
 # replay log
 # relay_log_info_repository=TABLE

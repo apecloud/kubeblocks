@@ -155,13 +155,13 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 func (o *InstallOptions) Install() error {
 	// check if KubeBlocks has been installed
-	versionInfo, err := util.GetVersionInfo(o.Client)
+	v, err := util.GetVersionInfo(o.Client)
 	if err != nil {
 		return err
 	}
 
-	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
-		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v)
+	if v.KubeBlocks != "" {
+		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v.KubeBlocks)
 		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
 		return nil
 	}
@@ -177,7 +177,7 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
-	if err = o.preCheck(versionInfo); err != nil {
+	if err = o.preCheck(v); err != nil {
 		return err
 	}
 
@@ -341,7 +341,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	return nil
 }
 
-func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
+func (o *InstallOptions) preCheck(v util.Version) error {
 	if !o.Check {
 		return nil
 	}
@@ -355,8 +355,8 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	}
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")
-	k8sVersionStr, ok := versionInfo[util.KubernetesApp]
-	if !ok {
+	k8sVersionStr := v.Kubernetes
+	if k8sVersionStr == "" {
 		return versionErr
 	}
 
@@ -378,7 +378,7 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	}
 
 	// check kbcli version, now do nothing
-	fmt.Fprintf(o.Out, "kbcli version %s\n", versionInfo[util.KBCLIApp])
+	fmt.Fprintf(o.Out, "kbcli version %s\n", v.Cli)
 
 	return nil
 }

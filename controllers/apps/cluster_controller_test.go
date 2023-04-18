@@ -504,7 +504,7 @@ var _ = Describe("Cluster Controller", func() {
 		return pods
 	}
 
-	horizontalScaleComp := func(updatedReplicas int, comp *appsv1alpha1.ClusterComponentSpec) {
+	horizontalScaleComp := func(updatedReplicas int, comp *appsv1alpha1.ClusterComponentSpec, policy *appsv1alpha1.HorizontalScalePolicy) {
 		By("Mocking components' PVCs to bound")
 		for i := 0; i < int(comp.Replicas); i++ {
 			pvcKey := types.NamespacedName{
@@ -536,6 +536,19 @@ var _ = Describe("Cluster Controller", func() {
 
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
 		changeCompReplicas(clusterKey, int32(updatedReplicas), comp)
+
+		checkUpdatedStsReplicas := func() {
+			By("Checking updated sts replicas")
+			Eventually(func() int32 {
+				stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
+				return *stsList.Items[0].Spec.Replicas
+			}).Should(BeEquivalentTo(updatedReplicas))
+		}
+
+		if policy == nil {
+			checkUpdatedStsReplicas()
+			return
+		}
 
 		By("Checking Backup created")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
@@ -592,11 +605,7 @@ var _ = Describe("Cluster Controller", func() {
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
-		By("Checking updated sts replicas")
-		Eventually(func() int32 {
-			stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
-			return *stsList.Items[0].Spec.Replicas
-		}).Should(BeEquivalentTo(updatedReplicas))
+		checkUpdatedStsReplicas()
 	}
 
 	// @argument componentDefsWithHScalePolicy assign ClusterDefinition.spec.componentDefs[].horizontalScalePolicy for
@@ -685,8 +694,17 @@ var _ = Describe("Cluster Controller", func() {
 				})).Should(Succeed())
 			}
 		}
-		for i := range clusterObj.Spec.ComponentSpecs {
-			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i])
+
+		By("Get the latest cluster def")
+		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
+		for i, comp := range clusterObj.Spec.ComponentSpecs {
+			var policy *appsv1alpha1.HorizontalScalePolicy
+			for _, componentDef := range clusterDefObj.Spec.ComponentDefs {
+				if componentDef.Name == comp.ComponentDefRef {
+					policy = componentDef.HorizontalScalePolicy
+				}
+			}
+			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i], policy)
 		}
 
 		By("Checking cluster status and the number of replicas changed")
@@ -747,10 +765,11 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, statefulCompName, consensusCompName, replicationCompName)
 
+		// statefulCompDefName not in componentDefsWithHScalePolicy, for nil backup policy test
 		// REVIEW: (chantu)
 		//  1. this test flow, wait for running phase?
 		//  2. following horizontalScale only work with statefulCompDefName?
-		horizontalScale(int(updatedReplicas), statefulCompDefName, consensusCompDefName, replicationCompDefName)
+		horizontalScale(int(updatedReplicas), consensusCompDefName, replicationCompDefName)
 	}
 
 	testVerticalScale := func() {
@@ -839,7 +858,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	testClusterAffinity := func() {
 		const topologyKey = "testTopologyKey"
-		const lableKey = "testNodeLabelKey"
+		const labelKey = "testNodeLabelKey"
 		const labelValue = "testLabelValue"
 
 		By("Creating a cluster with Affinity")
@@ -847,7 +866,7 @@ var _ = Describe("Cluster Controller", func() {
 			PodAntiAffinity: appsv1alpha1.Required,
 			TopologyKeys:    []string{topologyKey},
 			NodeLabels: map[string]string{
-				lableKey: labelValue,
+				labelKey: labelValue,
 			},
 			Tenancy: appsv1alpha1.SharedNode,
 		}
@@ -866,7 +885,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(func(g Gomega) {
 			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 			podSpec := stsList.Items[0].Spec.Template.Spec
-			g.Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(lableKey))
+			g.Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(labelKey))
 			g.Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
 			g.Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
 			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))

@@ -318,11 +318,22 @@ func (r *backupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.Common
 	if len(globalInitCapacity) != 0 {
 		defaultInitCapacity = globalInitCapacity
 	}
+	// set the persistent volume configmap infos if these variables exist.
+	globalPVConfigMapName := viper.GetString(constant.CfgKeyBackupPVConfigmapName)
+	globalPVConfigMapNamespace := viper.GetString(constant.CfgKeyBackupPVConfigmapNamespace)
+	var persistentVolumeConfigMap *dataprotectionv1alpha1.PersistentVolumeConfigMap
+	if globalPVConfigMapName != "" && globalPVConfigMapNamespace != "" {
+		persistentVolumeConfigMap = &dataprotectionv1alpha1.PersistentVolumeConfigMap{
+			Name:      globalPVConfigMapName,
+			Namespace: globalPVConfigMapNamespace,
+		}
+	}
 	return &dataprotectionv1alpha1.CommonBackupPolicy{
 		BackupToolName: bp.BackupToolName,
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
-			InitCapacity: resource.MustParse(defaultInitCapacity),
-			CreatePolicy: defaultCreatePolicy,
+			InitCapacity:              resource.MustParse(defaultInitCapacity),
+			CreatePolicy:              defaultCreatePolicy,
+			PersistentVolumeConfigMap: persistentVolumeConfigMap,
 		},
 		BasePolicy: r.convertBasePolicy(bp.BasePolicy, clusterName, component, workloadType),
 	}

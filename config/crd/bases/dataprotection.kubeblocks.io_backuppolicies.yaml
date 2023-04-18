@@ -105,7 +105,7 @@ spec:
                         default: IfNotPresent
                         description: 'createPolicy defines the policy for creating
                           the PersistentVolumeClaim, enum values: - Never: do nothing
-                          if the PersistentVolumeClaim not exist. - IfNotPresent:
+                          if the PersistentVolumeClaim not exists. - IfNotPresent:
                           create the PersistentVolumeClaim if not present and the
                           accessModes only contains ''ReadWriteMany''.'
                         enum:
@@ -124,6 +124,26 @@ spec:
                       name:
                         description: the name of the PersistentVolumeClaim.
                         type: string
+                      persistentVolumeConfigMap:
+                        description: 'persistentVolumeConfigMap references the configmap
+                          which contains a persistentVolume template. key must be
+                          "persistentVolume" and value is the "PersistentVolume" struct.
+                          support the following built-in Objects: - $(GENERATE_NAME):
+                          generate a specific format "pvcName-pvcNamespace". if the
+                          PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent",
+                          the controller will create it by this template. this is
+                          a mutually exclusive setting with "storageClassName".'
+                        properties:
+                          name:
+                            description: the name of the persistentVolume ConfigMap.
+                            type: string
+                          namespace:
+                            description: the namespace of the persistentVolume ConfigMap.
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
                       storageClassName:
                         description: storageClassName is the name of the StorageClass
                           required by the claim.
@@ -267,7 +287,7 @@ spec:
                         default: IfNotPresent
                         description: 'createPolicy defines the policy for creating
                           the PersistentVolumeClaim, enum values: - Never: do nothing
-                          if the PersistentVolumeClaim not exist. - IfNotPresent:
+                          if the PersistentVolumeClaim not exists. - IfNotPresent:
                           create the PersistentVolumeClaim if not present and the
                           accessModes only contains ''ReadWriteMany''.'
                         enum:
@@ -286,6 +306,26 @@ spec:
                       name:
                         description: the name of the PersistentVolumeClaim.
                         type: string
+                      persistentVolumeConfigMap:
+                        description: 'persistentVolumeConfigMap references the configmap
+                          which contains a persistentVolume template. key must be
+                          "persistentVolume" and value is the "PersistentVolume" struct.
+                          support the following built-in Objects: - $(GENERATE_NAME):
+                          generate a specific format "pvcName-pvcNamespace". if the
+                          PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent",
+                          the controller will create it by this template. this is
+                          a mutually exclusive setting with "storageClassName".'
+                        properties:
+                          name:
+                            description: the name of the persistentVolume ConfigMap.
+                            type: string
+                          namespace:
+                            description: the namespace of the persistentVolume ConfigMap.
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
                       storageClassName:
                         description: storageClassName is the name of the StorageClass
                           required by the claim.

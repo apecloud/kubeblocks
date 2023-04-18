@@ -38,6 +38,7 @@ KubeBlocks operation commands.
 
 
 * [kbcli kubeblocks config](kbcli_kubeblocks_config.md)	 - KubeBlocks config.
+* [kbcli kubeblocks describe-config](kbcli_kubeblocks_describe-config.md)	 - describe KubeBlocks config.
 * [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks.
 * [kbcli kubeblocks list-versions](kbcli_kubeblocks_list-versions.md)	 - List KubeBlocks versions.
 * [kbcli kubeblocks preflight](kbcli_kubeblocks_preflight.md)	 - Run and retrieve preflight checks for KubeBlocks.

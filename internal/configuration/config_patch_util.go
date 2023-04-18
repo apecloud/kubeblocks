@@ -99,8 +99,11 @@ func TransformConfigFileToKeyValueMap(fileName, sectionName string, format appsv
 		return nil, err
 	}
 	formatConfig := &appsv1alpha1.FormatterConfig{
-		Format:           format,
-		FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{SectionName: sectionName}},
+		Format: format,
+		FormatterOptions: appsv1alpha1.FormatterOptions{
+			IniConfig: &appsv1alpha1.IniConfig{
+				SectionName: sectionName,
+			}},
 	}
 	params := GenerateVisualizedParamsList(patchInfo, formatConfig, nil)
 	result := make(map[string]string)

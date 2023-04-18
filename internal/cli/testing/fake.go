@@ -476,6 +476,10 @@ func FakeAddon(name string) *extensionsv1alpha1.Addon {
 
 func FakeConfigMap(cmName string) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: Namespace,
@@ -483,6 +487,16 @@ func FakeConfigMap(cmName string) *corev1.ConfigMap {
 		Data: map[string]string{
 			"fake": "fake",
 		},
+	}
+	return cm
+}
+
+func FakeConfigConstraint(ccName string) *appsv1alpha1.ConfigConstraint {
+	cm := &appsv1alpha1.ConfigConstraint{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ccName,
+		},
+		Spec: appsv1alpha1.ConfigConstraintSpec{},
 	}
 	return cm
 }

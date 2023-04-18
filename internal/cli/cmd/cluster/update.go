@@ -394,7 +394,7 @@ func buildLogsTPLValues(compSpec *appsv1alpha1.ClusterComponentSpec) (*gotemplat
 }
 
 func buildLogsReconfiguringOps(clusterName, namespace, compName, configName, keyName string, variables map[string]string) *appsv1alpha1.OpsRequest {
-	opsRequest := util.NewOpsRequestForReconfiguring("ops-reconfigure-logs", namespace, clusterName)
+	opsRequest := util.NewOpsRequestForReconfiguring("logs-reconfigure", namespace, clusterName)
 	parameterPairs := make([]appsv1alpha1.ParameterPair, 0, len(variables))
 	for key, value := range variables {
 		v := value

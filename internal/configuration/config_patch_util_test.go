@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -343,6 +344,58 @@ func TestLoadRawConfigObject(t *testing.T) {
 			_, err := LoadRawConfigObject(tt.args.data, tt.args.formatConfig, tt.args.keys)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LoadRawConfigObject() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+		})
+	}
+}
+
+func TestTransformConfigFileToKeyValueMap(t *testing.T) {
+	mysqlConfig := `
+[mysqld]
+key_buffer_size=16777216
+log_error=/data/mysql/logs/mysql.log
+`
+	mongodbConfig := `
+systemLog:
+  logRotate: reopen
+  path: /data/mongodb/logs/mongodb.log
+  verbosity: 0
+`
+	tests := []struct {
+		name        string
+		fileName    string
+		sectionName string
+		format      v1alpha1.CfgFileFormat
+		configData  []byte
+		expected    map[string]string
+	}{{
+		name:        "mysql-test",
+		fileName:    "my.cnf",
+		sectionName: "mysqld",
+		format:      v1alpha1.Ini,
+		configData:  []byte(mysqlConfig),
+		expected: map[string]string{
+			"key_buffer_size": "16777216",
+			"log_error":       "/data/mysql/logs/mysql.log",
+		},
+	}, {
+		name:        "mongodb-test",
+		fileName:    "mongodb.conf",
+		sectionName: "default",
+		format:      v1alpha1.YAML,
+		configData:  []byte(mongodbConfig),
+		expected: map[string]string{
+			"systemLog.logRotate": "reopen",
+			"systemLog.path":      "/data/mongodb/logs/mongodb.log",
+			"systemLog.verbosity": "0",
+		},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, _ := TransformConfigFileToKeyValueMap(tt.fileName, tt.sectionName, tt.format, tt.configData)
+			if !reflect.DeepEqual(res, tt.expected) {
+				t.Errorf("TransformConfigFileToKeyValueMap() res = %v, res %v", res, tt.expected)
 				return
 			}
 		})

@@ -1664,6 +1664,23 @@ csi-s3:
     singleBucket: ""
     mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region cn-northwest-1"
 
+csi-oss:
+  enabled: false
+  ## @param csi-oss.secret.akId -- oss Access Key.
+  ## @param csi-oss.secret.akSecret -- oss Secret Key.
+  secret:
+    akId: ""
+    akSecret: ""
+  ## @param csi-oss.storageConfig.bucket -- oss bucket name.
+  ## @param csi-oss.storageConfig.endpoint -- endpoint of the oss service, e.g. oss-cn-hangzhou.aliyuncs.com.
+  ## @param csi-oss.storageConfig.path -- mount path of the oss bucket.
+  ## @param csi-oss.storageConfig.otherOpts -- mount options.
+  storageConfig:
+    bucket: ""
+    endpoint: "oss-cn-hangzhou.aliyuncs.com"
+    path: "/"
+    otherOpts: "-o max_stat_cache_size=0 -o allow_other"
+
 alertmanager-webhook-adaptor:
   ## Linkage with prometheus.enabled
   ##

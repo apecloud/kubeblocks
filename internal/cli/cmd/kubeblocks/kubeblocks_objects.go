@@ -38,7 +38,6 @@ import (
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -105,7 +104,7 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 		}
 		result := &unstructured.UnstructuredList{}
 		for _, obj := range objs.Items {
-			if !strings.Contains(obj.GetName(), strings.ToLower(string(util.KubeBlocksApp))) {
+			if !strings.Contains(obj.GetName(), strings.ToLower(types.KubeBlocksName)) {
 				continue
 			}
 			result.Items = append(result.Items, obj)

@@ -148,6 +148,9 @@ const (
 )
 
 var (
+	// KubeBlocksName is the name of KubeBlocks project
+	KubeBlocksName = "kubeblocks"
+
 	// KubeBlocksRepoName helm repo name for kubeblocks
 	KubeBlocksRepoName = "kubeblocks"
 

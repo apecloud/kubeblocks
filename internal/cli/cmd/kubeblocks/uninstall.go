@@ -186,7 +186,7 @@ func (o *UninstallOptions) Uninstall() error {
 		// and that webhook may fail, so we need to disable hooks.
 		DisableHooks: true,
 	}
-	printSpinner(newSpinner("Uninstall helm release "+types.KubeBlocksChartName+" "+v[util.KubeBlocksApp]),
+	printSpinner(newSpinner("Uninstall helm release "+types.KubeBlocksReleaseName+" "+v.KubeBlocks),
 		chart.Uninstall(o.HelmCfg))
 
 	// remove repo

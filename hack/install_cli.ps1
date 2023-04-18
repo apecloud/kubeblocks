@@ -13,8 +13,6 @@ $GITLAB_REPO = "85948"
 $GITLAB = "https://jihulab.com/api/v4/projects"
 $COUNTRY_CODE = ""
 
-Import-Module Microsoft.PowerShell.Utility
-
 function getCountryCode() {
     return (Invoke-WebRequest -Uri "https://ifconfig.io/country_code" -UseBasicParsing | Select-Object -ExpandProperty Content).Trim()
 }
@@ -110,10 +108,10 @@ function downloadFile {
     $timer.Interval = 500
     
     Register-ObjectEvent -InputObject $timer -EventName Elapsed -SourceIdentifier "TimerElapsed" -Action {
-        $precent = $Global:Data.SourceArgs.ProgressPercentage
+        $percent = $Global:Data.SourceArgs.ProgressPercentage
         $totalBytes = $Global:Data.SourceArgs.TotalBytesToReceive
         $receivedBytes = $Global:Data.SourceArgs.BytesReceived
-        if ($precent -ne $null) {
+        if ($percent -ne $null) {
             $downloadProgress = [Math]::Round(($receivedBytes / $totalBytes) * 100, 2)
             $status = "Downloaded {0} of {1} bytes" -f $receivedBytes, $totalBytes
             Write-Progress -Activity "Downloading kbcli..." -Status $status -PercentComplete $downloadProgress
@@ -189,8 +187,6 @@ function installCompleted {
 # main
 # ---------------------------------------
 
-
-
 verifySupported
 checkExistingCLI
 $COUNTRY_CODE = getCountryCode
@@ -219,5 +215,3 @@ try {
 
 cleanup 
 installCompleted
-
-

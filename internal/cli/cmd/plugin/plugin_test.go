@@ -109,6 +109,7 @@ func TestPluginPathsAreValid(t *testing.T) {
 				return os.CreateTemp(tempDir, "notkbcli-")
 			},
 			expectErr: "error: unable to find any kbcli or kubectl plugins in your PATH\n",
+			expectOut: "NAME",
 		},
 		{
 			name:        "ensure de-duplicated plugin-paths slice",
@@ -117,7 +118,7 @@ func TestPluginPathsAreValid(t *testing.T) {
 			pluginFile: func() (*os.File, error) {
 				return os.CreateTemp(tempDir, "kbcli-")
 			},
-			expectOut: "The following compatible plugins are available:",
+			expectOut: "NAME",
 		},
 		{
 			name:        "ensure no errors when empty string or blank path are specified",
@@ -126,7 +127,7 @@ func TestPluginPathsAreValid(t *testing.T) {
 			pluginFile: func() (*os.File, error) {
 				return os.CreateTemp(tempDir, "kbcli-")
 			},
-			expectOut: "The following compatible plugins are available:",
+			expectOut: "NAME",
 		},
 	}
 
@@ -171,9 +172,7 @@ func TestPluginPathsAreValid(t *testing.T) {
 				t.Fatalf("unexpected error output: expected to contain %v, but got %v", test.expectErrOut, errOut.String())
 			}
 
-			if len(test.expectOut) == 0 && out.Len() > 0 {
-				t.Fatalf("unexpected output: expected nothing, but got %v", out.String())
-			} else if len(test.expectOut) > 0 && !strings.Contains(out.String(), test.expectOut) {
+			if len(test.expectOut) > 0 && !strings.Contains(out.String(), test.expectOut) {
 				t.Fatalf("unexpected output: expected to contain %v, but got %v", test.expectOut, out.String())
 			}
 		})

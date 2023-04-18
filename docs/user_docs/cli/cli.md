@@ -158,6 +158,8 @@ Bootstrap a playground KubeBlocks in local host or cloud.
 
 Provides utilities for interacting with plugins.
 
+ Plugins provide extended functionality that is not part of the major command-line distribution.
+
 * [kbcli plugin list](kbcli_plugin_list.md)	 - List all visible plugin executables on a user's PATH
 
 

@@ -18,8 +18,7 @@ kbcli plugin list
 ### Options
 
 ```
-  -h, --help        help for list
-      --name-only   If true, display only the binary name of each plugin, rather than its full path.
+  -h, --help   help for list
 ```
 
 ### Options inherited from parent commands

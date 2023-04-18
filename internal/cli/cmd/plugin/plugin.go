@@ -19,6 +19,7 @@ package plugin
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,11 +27,20 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 )
 
 var (
+	pluginLong = templates.LongDesc(`
+	Provides utilities for interacting with plugins.
+		
+	Plugins provide extended functionality that is not part of the major command-line distribution.
+	`)
+
 	pluginListExample = templates.Examples(`
 	# List all available plugins file on a user's PATH.
 	kbcli plugin list
@@ -43,7 +53,7 @@ func NewPluginCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plugin",
 		Short: "Provides utilities for interacting with plugins.",
-		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
+		Long:  pluginLong,
 	}
 
 	cmd.AddCommand(NewPluginListCmd(streams))
@@ -52,7 +62,6 @@ func NewPluginCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 type PluginListOptions struct {
 	Verifier PathVerifier
-	NameOnly bool
 
 	PluginPaths []string
 
@@ -73,7 +82,6 @@ func NewPluginListCmd(streams genericclioptions.IOStreams) *cobra.Command {
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmd.Flags().BoolVar(&o.NameOnly, "name-only", o.NameOnly, "If true, display only the binary name of each plugin, rather than its full path.")
 	return cmd
 }
 
@@ -90,26 +98,26 @@ func (o *PluginListOptions) Complete(cmd *cobra.Command) error {
 func (o *PluginListOptions) Run() error {
 	plugins, pluginErrors := o.ListPlugins()
 
-	if len(plugins) > 0 {
-		fmt.Fprintf(o.Out, "The following compatible plugins are available:\n\n")
-	} else {
+	if len(plugins) == 0 {
 		pluginErrors = append(pluginErrors, fmt.Errorf("error: unable to find any kbcli or kubectl plugins in your PATH"))
 	}
 
 	pluginWarnings := 0
+	p := NewPluginPrinter(o.IOStreams.Out)
+	errMsg := ""
 	for _, pluginPath := range plugins {
-		if o.NameOnly {
-			fmt.Fprintf(o.Out, "%s\n", filepath.Base(pluginPath))
-		} else {
-			fmt.Fprintf(o.Out, "%s\n", pluginPath)
-		}
+		name := filepath.Base(pluginPath)
+		path := filepath.Dir(pluginPath)
 		if errs := o.Verifier.Verify(pluginPath); len(errs) != 0 {
 			for _, err := range errs {
-				fmt.Fprintf(o.ErrOut, " - %s\n", err)
+				errMsg += fmt.Sprintf("%s\n", err)
 				pluginWarnings++
 			}
 		}
+		addRow(name, path, p)
 	}
+	p.Print()
+	klog.V(1).Info(errMsg)
 
 	if pluginWarnings > 0 {
 		if pluginWarnings == 1 {
@@ -141,7 +149,7 @@ func (o *PluginListOptions) ListPlugins() ([]string, []error) {
 		files, err := os.ReadDir(dir)
 		if err != nil {
 			if _, ok := err.(*os.PathError); ok {
-				fmt.Fprintf(o.ErrOut, "Unable read directory %q from your PATH: %v. Skipping...\n", dir, err)
+				klog.V(1).Info("Unable read directory %q from your PATH: %v. Skipping...\n", dir, err)
 				continue
 			}
 
@@ -254,4 +262,14 @@ func hasValidPrefix(filepath string, validPrefixes []string) bool {
 		}
 	}
 	return false
+}
+
+func NewPluginPrinter(out io.Writer) *printer.TablePrinter {
+	t := printer.NewTablePrinter(out)
+	t.SetHeader("NAME", "PATH")
+	return t
+}
+
+func addRow(name, path string, p *printer.TablePrinter) {
+	p.AddRow(name, path)
 }

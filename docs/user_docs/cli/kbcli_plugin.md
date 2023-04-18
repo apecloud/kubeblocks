@@ -4,9 +4,11 @@ title: kbcli plugin
 
 Provides utilities for interacting with plugins.
 
-```
-kbcli plugin [flags]
-```
+### Synopsis
+
+Provides utilities for interacting with plugins.
+
+ Plugins provide extended functionality that is not part of the major command-line distribution.
 
 ### Options
 

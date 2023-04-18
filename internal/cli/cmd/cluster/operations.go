@@ -425,12 +425,12 @@ var (
 	`)
 )
 
-// NewExposeCmd creates a Expose command
+// NewExposeCmd creates an expose command
 func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(streams, appsv1alpha1.ExposeType, true)
 	inputs := buildOperationsInputs(f, o)
-	inputs.Use = "expose"
-	inputs.Short = "Expose a cluster with a new endpoint and the new endpoint can be found by executing the command 'kbcli cluster describe <cluster-name>'."
+	inputs.Use = "expose NAME --enable=[true|false] --type=[vpc|internet]"
+	inputs.Short = "Expose a cluster with a new endpoint, the new endpoint can be found by executing 'kbcli cluster describe NAME'."
 	inputs.Example = exposeExamples
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)

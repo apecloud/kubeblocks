@@ -25,8 +25,8 @@
 	// [0|1|2] default: 2
 	innodb_autoinc_lock_mode?: int & 0 | 1 | 2 | *2
 
-	// other parmeters
-	// reference mysql parmeters
+	// other parameters
+	// reference mysql parameters
 	...
 }
 

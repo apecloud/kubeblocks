@@ -56,7 +56,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		* 2. create two clusters, one cluster for each component, and verify
 	  * a) the number of secrets, jobs, and cached secrets are as expected
 		* b) secret will be created, once corresponding job succeeds.
-		* c) secrets, deleted accidentially, will be re-created during next cluster reconciliation round.
+		* c) secrets, deleted accidentally, will be re-created during next cluster reconciliation round.
 		*
 		* Each test case, used in following IT(integration test), consists of two parts:
 		* a) how to build the test cluster, and
@@ -186,7 +186,7 @@ var _ = Describe("SystemAccount Controller", func() {
 	}
 
 	initSysAccountTestsAndCluster := func(testCases map[string]*sysAcctTestCase) (clustersMap map[string]types.NamespacedName) {
-		// create clusterdef and cluster verions, but not clusters
+		// create clusterdef and cluster versions, but not clusters
 		By("Create a clusterDefinition obj")
 		systemAccount := mockSystemAccountsSpec()
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -346,7 +346,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					return len(systemAccountReconciler.SecretMapStore.ListKeys())
 				}).Should(BeEquivalentTo(cachedSecretNum))
 
-				By("Verify all jobs created have their lables set correctly")
+				By("Verify all jobs created have their labels set correctly")
 				// get all jobs
 				Eventually(func(g Gomega) {
 					// all jobs matching filter `ml` should be a job for sys account.
@@ -450,8 +450,8 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(len(secrets.Items)).To(BeEquivalentTo(secretsNum + cachedSecretNum))
 				}).Should(Succeed())
 
-				By("Verify all secrets created have their finalizer and lables set correctly")
-				// get all secrets, and check their lables and finalizer
+				By("Verify all secrets created have their finalizer and labels set correctly")
+				// get all secrets, and check their labels and finalizer
 				Eventually(func(g Gomega) {
 					// get secrets matching filter
 					secretsForAcct := &corev1.SecretList{}

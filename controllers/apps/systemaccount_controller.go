@@ -49,8 +49,8 @@ type SystemAccountReconciler struct {
 	SecretMapStore *secretMapStore
 }
 
-// jobCompleditionPredicate implements a default delete predicate function on job deletion.
-type jobCompletitionPredicate struct {
+// jobCompletionPredicate implements a default delete predicate function on job deletion.
+type jobCompletionPredicate struct {
 	predicate.Funcs
 	reconciler *SystemAccountReconciler
 	Log        logr.Logger
@@ -90,7 +90,7 @@ const (
 )
 
 // compile-time assert that the local data object satisfies the phases data interface.
-var _ predicate.Predicate = &jobCompletitionPredicate{}
+var _ predicate.Predicate = &jobCompletionPredicate{}
 
 // compile-time assert that the local data object satisfies the phases data interface.
 var _ predicate.Predicate = &clusterDeletionPredicate{}
@@ -255,7 +255,7 @@ func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		Watches(&source.Kind{Type: &batchv1.Job{}},
 			&handler.EnqueueRequestForObject{},
-			builder.WithPredicates(&jobCompletitionPredicate{reconciler: r, Log: log.FromContext(context.TODO())})).
+			builder.WithPredicates(&jobCompletionPredicate{reconciler: r, Log: log.FromContext(context.TODO())})).
 		Complete(r)
 }
 
@@ -371,7 +371,7 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 
 // Delete implements default DeleteEvent filter on job deletion.
 // If the job for creating account completes successfully, corresponding secret will be created.
-func (r *jobCompletitionPredicate) Delete(e event.DeleteEvent) bool {
+func (r *jobCompletionPredicate) Delete(e event.DeleteEvent) bool {
 	if e.Object == nil {
 		return false
 	}

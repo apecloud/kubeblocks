@@ -128,7 +128,7 @@ func TestDockerContainerKill(t *testing.T) {
 
 	// mock ContainerKill failed
 	cli.EXPECT().ContainerKill(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(cfgcore.MakeError("faield to kill docker container!"))
+		Return(cfgcore.MakeError("failed to kill docker container!"))
 	// mock ContainerKill success
 	cli.EXPECT().ContainerKill(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil).AnyTimes()
@@ -140,7 +140,7 @@ func TestDockerContainerKill(t *testing.T) {
 	require.Nil(t, docker.Kill(context.Background(), []string{"76f9c2ae8cf47bfa43b97626e3c95045cb3b82c50019ab759801ab52e3acff55"}, "", nil))
 	require.ErrorContains(t,
 		docker.Kill(context.Background(), []string{"76f9c2ae8cf47bfa43b97626e3c95045cb3b82c50019ab759801ab52e3acff55"}, "", nil),
-		"faield to kill docker container")
+		"failed to kill docker container")
 	require.Nil(t, docker.Kill(context.Background(), []string{"76f9c2ae8cf47bfa43b97626e3c95045cb3b82c50019ab759801ab52e3acff55"}, "", nil))
 }
 

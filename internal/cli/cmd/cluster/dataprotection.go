@@ -717,7 +717,7 @@ func printBackupPolicyList(o list.ListOptions) error {
 	return nil
 }
 
-func NewLEditBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewEditBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := edit.NewEditOptions(f, streams, types.BackupPolicyGVR())
 	cmd := &cobra.Command{
 		Use:                   "edit-backup-policy",

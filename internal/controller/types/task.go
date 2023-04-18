@@ -17,13 +17,11 @@ limitations under the License.
 package types
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 type ReconcileTask struct {
@@ -60,18 +58,4 @@ func (r *ReconcileTask) AppendResource(objs ...client.Object) {
 		return
 	}
 	*r.Resources = append(*r.Resources, objs...)
-}
-
-func (r *ReconcileTask) GetLocalResourceWithObjectKey(objKey client.ObjectKey, gvk schema.GroupVersionKind) client.Object {
-	if r.Resources == nil {
-		return nil
-	}
-	for _, obj := range *r.Resources {
-		if obj.GetName() == objKey.Name && obj.GetNamespace() == objKey.Namespace {
-			if generics.ToGVK(obj) == gvk {
-				return obj
-			}
-		}
-	}
-	return nil
 }

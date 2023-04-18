@@ -34,7 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -43,6 +42,7 @@ func BuildCfgLow(clusterVersion *appsv1alpha1.ClusterVersion,
 	component *component.SynthesizedComponent,
 	obj client.Object,
 	podSpec *corev1.PodSpec,
+	localObjs []client.Object,
 	ctx context.Context,
 	cli client.Client) ([]client.Object, error) {
 	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
@@ -55,17 +55,15 @@ func BuildCfgLow(clusterVersion *appsv1alpha1.ClusterVersion,
 	namespaceName := cluster.Namespace
 	templateBuilder := newTemplateBuilder(clusterName, namespaceName, cluster, clusterVersion, ctx, cli)
 	// Prepare built-in objects and built-in functions
-	// TODO(refactor): refine task
-	var task *intctrltypes.ReconcileTask = nil
-	if err := templateBuilder.injectBuiltInObjectsAndFunctions(podSpec, component.ConfigTemplates, component, task); err != nil {
+	if err := templateBuilder.injectBuiltInObjectsAndFunctions(podSpec, component.ConfigTemplates, component, localObjs); err != nil {
 		return nil, err
 	}
 
 	renderWrapper := newTemplateRenderWrapper(templateBuilder, cluster, ctx, cli)
-	if err := renderWrapper.renderConfigTemplate(cluster, component, task); err != nil {
+	if err := renderWrapper.renderConfigTemplate(cluster, component, localObjs); err != nil {
 		return nil, err
 	}
-	if err := renderWrapper.renderScriptTemplate(cluster, component, task); err != nil {
+	if err := renderWrapper.renderScriptTemplate(cluster, component, localObjs); err != nil {
 		return nil, err
 	}
 

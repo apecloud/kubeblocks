@@ -22,11 +22,11 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/client"
+	ictrlclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
@@ -93,7 +93,7 @@ type configTemplateBuilder struct {
 	podSpec        *corev1.PodSpec
 
 	ctx context.Context
-	cli client.ReadonlyClient
+	cli ictrlclient.ReadonlyClient
 }
 
 func newTemplateBuilder(
@@ -101,7 +101,7 @@ func newTemplateBuilder(
 	cluster *appsv1alpha1.Cluster,
 	version *appsv1alpha1.ClusterVersion,
 	ctx context.Context,
-	cli client.ReadonlyClient) *configTemplateBuilder {
+	cli ictrlclient.ReadonlyClient) *configTemplateBuilder {
 	return &configTemplateBuilder{
 		namespace:      namespace,
 		clusterName:    clusterName,
@@ -161,23 +161,23 @@ func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	podSpec *corev1.PodSpec,
 	configs []appsv1alpha1.ComponentConfigSpec,
 	component *component.SynthesizedComponent,
-	task *intctrltypes.ReconcileTask) error {
+	localObjs []client.Object) error {
 	if err := c.injectBuiltInObjects(podSpec, component, configs); err != nil {
 		return err
 	}
-	if err := c.injectBuiltInFunctions(component, task); err != nil {
+	if err := c.injectBuiltInFunctions(component, localObjs); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.SynthesizedComponent, task *intctrltypes.ReconcileTask) error {
+func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.SynthesizedComponent, localObjs []client.Object) error {
 	// TODO add built-in function
 	c.builtInFunctions = &gotemplate.BuiltInObjectsFunc{
 		builtInMysqlCalBufferFunctionName:            calDBPoolSize,
 		builtInGetVolumeFunctionName:                 getVolumeMountPathByName,
 		builtInGetPvcFunctionName:                    getPVCByName,
-		builtInGetEnvFunctionName:                    wrapGetEnvByName(c, component, task),
+		builtInGetEnvFunctionName:                    wrapGetEnvByName(c, component, localObjs),
 		builtInGetPortFunctionName:                   getPortByName,
 		builtInGetArgFunctionName:                    getArgByName,
 		builtInGetContainerFunctionName:              getPodContainerByName,

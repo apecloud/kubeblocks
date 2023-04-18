@@ -29,7 +29,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	ctrlcomp "github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -230,16 +229,17 @@ bootstrap:
 				nil, ctx, mockClient.Client(),
 			)
 
-			task := intctrltypes.InitReconcileTask(nil, nil, cluster, component)
-			task.AppendResource(&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "patroni-template-config",
-					Namespace: "default",
-				},
-				Data: map[string]string{
-					"postgresql.yaml": patroniTemplate,
-				}})
-			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, task)).Should(BeNil())
+			localObjs := []coreclient.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "patroni-template-config",
+						Namespace: "default",
+					},
+					Data: map[string]string{
+						"postgresql.yaml": patroniTemplate,
+					}},
+			}
+			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, localObjs)).Should(BeNil())
 
 			rendered, err := cfgBuilder.render(map[string]string{
 				// KB_CLUSTER_NAME, KB_COMP_NAME from env

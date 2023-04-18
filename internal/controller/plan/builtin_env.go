@@ -30,7 +30,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
@@ -42,7 +41,7 @@ type envWrapper struct {
 	*configTemplateBuilder
 
 	// configmap or secret not yet submitted.
-	localObjects  *intctrltypes.ReconcileTask
+	localObjects  []coreclient.Object
 	clusterName   string
 	componentName string
 	// cache remoted configmap and secret.
@@ -51,12 +50,12 @@ type envWrapper struct {
 
 const maxReferenceCount = 10
 
-func wrapGetEnvByName(templateBuilder *configTemplateBuilder, component *component.SynthesizedComponent, task *intctrltypes.ReconcileTask) envBuildInFunc {
+func wrapGetEnvByName(templateBuilder *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []coreclient.Object) envBuildInFunc {
 	wrapper := &envWrapper{
 		configTemplateBuilder: templateBuilder,
-		localObjects:          task,
 		clusterName:           component.ClusterName,
 		componentName:         component.Name,
+		localObjects:          localObjs,
 		cache:                 make(map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object),
 	}
 	return func(args interface{}, envName string) (string, error) {
@@ -190,10 +189,7 @@ func (w *envWrapper) getResourceFromLocal(key coreclient.ObjectKey, gvk schema.G
 	if v, ok := w.cache[gvk][key]; ok {
 		return v
 	}
-	if w.localObjects == nil {
-		return nil
-	}
-	return w.localObjects.GetLocalResourceWithObjectKey(key, gvk)
+	return findMatchedLocalObject(w.localObjects, key, gvk)
 }
 
 var envPlaceHolderRegexp = regexp.MustCompile(`\$\(\w+\)`)

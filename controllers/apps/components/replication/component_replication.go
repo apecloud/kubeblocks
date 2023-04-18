@@ -88,6 +88,10 @@ func (c *replicationComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 	return appsv1alpha1.Replication
 }
 
+func (c *replicationComponent) GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error) {
+	return c.StatefulComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+}
+
 func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	return c.StatefulComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }

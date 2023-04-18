@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -33,7 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
@@ -63,19 +63,17 @@ func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *a
 	}
 }
 
-func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, task *intctrltypes.ReconcileTask) (bool, *corev1.ConfigMap, error) {
+func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localObjs []client.Object) (bool, *corev1.ConfigMap, error) {
 	cmKey := client.ObjectKey{
 		Name:      cfgCMName,
 		Namespace: wrapper.cluster.Namespace,
 	}
 
 	cmObj := &corev1.ConfigMap{}
-	if task != nil {
-		localObject := task.GetLocalResourceWithObjectKey(cmKey, generics.ToGVK(cmObj))
-		if localObject != nil {
-			if cm, ok := localObject.(*corev1.ConfigMap); ok {
-				return false, cm, nil
-			}
+	localObject := findMatchedLocalObject(localObjs, cmKey, generics.ToGVK(cmObj))
+	if localObject != nil {
+		if cm, ok := localObject.(*corev1.ConfigMap); ok {
+			return false, cm, nil
 		}
 	}
 
@@ -94,16 +92,16 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, task *
 }
 
 func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent, task *intctrltypes.ReconcileTask) error {
+	component *component.SynthesizedComponent, localObjs []client.Object) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, configSpec := range component.ConfigTemplates {
 		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
-		enableRerender, origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, task)
+		enableRerender, origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, localObjs)
 		if err != nil {
 			return err
 		}
 		if !enableRerender {
-			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj)
+			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj, false)
 			continue
 		}
 		// Generate ConfigMap objects for config files
@@ -126,19 +124,16 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 }
 
 func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
-	task *intctrltypes.ReconcileTask) error {
+	localObjs []client.Object) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, templateSpec := range component.ScriptTemplates {
 		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, templateSpec.Name)
-		if task != nil {
-			object := task.GetLocalResourceWithObjectKey(client.ObjectKey{
-				Name:      cmName,
-				Namespace: wrapper.cluster.Namespace,
-			}, generics.ToGVK(&corev1.ConfigMap{}))
-			if object != nil {
-				wrapper.addVolumeMountMeta(templateSpec, object)
-				continue
-			}
+		object := findMatchedLocalObject(localObjs, client.ObjectKey{
+			Name:      cmName,
+			Namespace: wrapper.cluster.Namespace}, generics.ToGVK(&corev1.ConfigMap{}))
+		if object != nil {
+			wrapper.addVolumeMountMeta(templateSpec, object, false)
+			continue
 		}
 
 		// Generate ConfigMap objects for config files
@@ -161,13 +156,15 @@ func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.Compon
 	}
 
 	cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
-	wrapper.addVolumeMountMeta(templateSpec, cm)
+	wrapper.addVolumeMountMeta(templateSpec, cm, true)
 	return nil
 }
 
-func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.ComponentTemplateSpec, object client.Object) {
+func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.ComponentTemplateSpec, object client.Object, rendered bool) {
 	wrapper.volumes[object.GetName()] = templateSpec
-	wrapper.renderedObjs = append(wrapper.renderedObjs, object)
+	if rendered {
+		wrapper.renderedObjs = append(wrapper.renderedObjs, object)
+	}
 	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = object.GetName()
 }
 
@@ -192,6 +189,17 @@ func (wrapper *renderWrapper) checkAndPatchConfigResource(origCMObj *corev1.Conf
 
 	origCMObj.Annotations[corev1.LastAppliedConfigAnnotation] = string(rawData)
 	return wrapper.cli.Patch(wrapper.ctx, origCMObj, patch)
+}
+
+func findMatchedLocalObject(localObjs []client.Object, objKey client.ObjectKey, gvk schema.GroupVersionKind) client.Object {
+	for _, obj := range localObjs {
+		if obj.GetName() == objKey.Name && obj.GetNamespace() == objKey.Namespace {
+			if generics.ToGVK(obj) == gvk {
+				return obj
+			}
+		}
+	}
+	return nil
 }
 
 func updateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {

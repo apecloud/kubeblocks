@@ -57,12 +57,14 @@ type ComponentWorkloadBuilderBase struct {
 	Error           error
 	EnvConfig       *corev1.ConfigMap
 	Workload        client.Object
+	LocalObjs       []client.Object // cache the objects needed for configuration, should remove this after refactoring the configuration
 }
 
 func (b *ComponentWorkloadBuilderBase) BuildEnv() ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		envCfg, err := builder.BuildEnvConfigLow(b.ReqCtx, b.Client, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		b.EnvConfig = envCfg
+		b.LocalObjs = append(b.LocalObjs, envCfg)
 		return []client.Object{envCfg}, err
 	}
 	return b.BuildWrapper(buildfn)
@@ -75,8 +77,17 @@ func (b *ComponentWorkloadBuilderBase) BuildConfig() ComponentWorkloadBuilder {
 				b.Comp.GetClusterName(), b.Comp.GetName())
 		}
 
-		return plan.BuildCfgLow(b.Comp.GetClusterVersion(), b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.Workload,
-			b.getRuntime(), b.ReqCtx.Ctx, b.Client)
+		objs, err := plan.BuildCfgLow(b.Comp.GetClusterVersion(), b.Comp.GetCluster(),
+			b.Comp.GetSynthesizedComponent(), b.Workload, b.getRuntime(), b.LocalObjs, b.ReqCtx.Ctx, b.Client)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range objs {
+			if cm, ok := obj.(*corev1.ConfigMap); ok {
+				b.LocalObjs = append(b.LocalObjs, cm)
+			}
+		}
+		return objs, nil
 	}
 	return b.BuildWrapper(buildfn)
 }
@@ -158,6 +169,7 @@ func (b *ComponentWorkloadBuilderBase) BuildTLSCert() ComponentWorkloadBuilder {
 				return nil, err
 			}
 			objs = append(objs, secret)
+			b.LocalObjs = append(b.LocalObjs, secret)
 		}
 		return objs, nil
 	}

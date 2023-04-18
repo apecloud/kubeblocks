@@ -139,6 +139,26 @@ func (c *statelessComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 	return appsv1alpha1.Stateless
 }
 
+func (c *statelessComponent) GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error) {
+	dag := c.Dag
+	defer func() {
+		c.Dag = dag
+	}()
+
+	c.Dag = graph.NewDAG()
+	if err := c.init(intctrlutil.RequestCtx{}, nil, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()), false); err != nil {
+		return nil, err
+	}
+
+	objs := make([]client.Object, 0)
+	for _, v := range c.Dag.Vertices() {
+		if vv, ok := v.(*ictrltypes.LifecycleVertex); ok {
+			objs = append(objs, vv.Obj)
+		}
+	}
+	return objs, nil
+}
+
 func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	if err := c.init(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()), false); err != nil {
 		return err

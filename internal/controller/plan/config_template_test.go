@@ -179,8 +179,7 @@ single_thread_memory = 294912
 				},
 				nil, nil, nil)
 
-			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(
-				podSpec, cfgTemplate, component, nil)).Should(BeNil())
+			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil)).Should(BeNil())
 
 			cfgBuilder.componentValues.Resource = &ResourceDefinition{
 				MemorySize: 8 * 1024 * 1024 * 1024,

@@ -17,8 +17,9 @@ limitations under the License.
 package consensus1
 
 import (
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
@@ -87,6 +88,10 @@ func (c *consensusComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli clien
 
 func (c *consensusComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 	return appsv1alpha1.Consensus
+}
+
+func (c *consensusComponent) GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error) {
+	return c.StatefulComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *consensusComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {

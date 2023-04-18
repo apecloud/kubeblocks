@@ -17,8 +17,9 @@ limitations under the License.
 package lifecycle
 
 import (
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"

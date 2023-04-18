@@ -31,6 +31,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -87,6 +88,26 @@ func (c *StatefulComponentBase) loadRunningWorkload(reqCtx intctrlutil.RequestCt
 	}
 
 	return sts, nil
+}
+
+func (c *StatefulComponentBase) GetBuiltObjects(builder ComponentWorkloadBuilder) ([]client.Object, error) {
+	dag := c.Dag
+	defer func() {
+		c.Dag = dag
+	}()
+
+	c.Dag = graph.NewDAG()
+	if err := c.init(intctrlutil.RequestCtx{}, nil, builder, false); err != nil {
+		return nil, err
+	}
+
+	objs := make([]client.Object, 0)
+	for _, v := range c.Dag.Vertices() {
+		if vv, ok := v.(*ictrltypes.LifecycleVertex); ok {
+			objs = append(objs, vv.Obj)
+		}
+	}
+	return objs, nil
 }
 
 func (c *StatefulComponentBase) Create(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {

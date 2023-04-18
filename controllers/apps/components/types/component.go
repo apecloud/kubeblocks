@@ -65,6 +65,9 @@ type Component interface {
 	GetPhase() appsv1alpha1.ClusterComponentPhase
 	// GetStatus() appsv1alpha1.ClusterComponentStatus
 
+	// GetBuiltObjects returns all objects that will be created by this component
+	GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error)
+
 	Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 	Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 	Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error

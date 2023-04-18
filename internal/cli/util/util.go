@@ -709,7 +709,7 @@ func NewOpsRequestForReconfiguring(opsName, namespace, clusterName string) *apps
 			Kind:       types.KindOps,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      opsName,
+			Name:      fmt.Sprintf("%s-%s-%s", opsName, namespace, clusterName),
 			Namespace: namespace,
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{

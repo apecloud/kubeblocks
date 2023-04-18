@@ -286,6 +286,13 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
+              type:
+                default: file
+                description: the type of backup tool, file or pitr
+                enum:
+                - file
+                - pitr
+                type: string
             required:
             - backupCommands
             - image

@@ -110,7 +110,7 @@ var (
 		kbcli cluster explain-config mycluster --component=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
 
 		# describe a specified parameters, e.g. cluster name is mycluster
-		kbcli cluster explain-config mycluster --component=mysql --config-specs=mysql-3node-tpl --param=sql_mode`)
+		kbcli cluster explain-config mycluster --param=sql_mode`)
 	diffConfigureExample = templates.Examples(`
 		# compare config files
 		kbcli cluster diff-config opsrequest1 opsrequest2`)

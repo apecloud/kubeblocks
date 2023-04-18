@@ -81,7 +81,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.20
+          go-version: "1.20"
 
       - name: Check cli doc
         id: check-cli-doc
@@ -109,24 +109,6 @@ jobs:
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
     steps:
       - uses: apecloud/checkout@main
-      - name: Download ${{ env.GO_CACHE }}
-        if: ${{ github.ref_name != 'main' }}
-        run: |
-          bash .github/utils/release_gitlab.sh \
-            --type 6 \
-            --project-id ${{ env.GITLAB_GO_CACHE_PROJECT_ID }} \
-            --tag-name ${{ env.GO_CACHE }} \
-            --asset-name ${{ env.GO_CACHE }}.tar.gz \
-            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
-
-      - name: Extract ${{ env.GO_CACHE }}
-        if: ${{ github.ref_name != 'main' }}
-        uses: a7ul/tar-action@v1.1.3
-        with:
-          command: x
-          cwd: ${{ env.GO_CACHE_DIR }}
-          files: ${{ env.GO_CACHE }}.tar.gz
-
       - name: make manifests check
         run: |
           mkdir -p ./bin
@@ -158,26 +140,6 @@ jobs:
           name: codecov-report
           verbose: true
 
-      - name: Compress ${{ env.GO_CACHE }}
-        if: ${{ github.ref_name == 'main' }}
-        uses: a7ul/tar-action@v1.1.3
-        with:
-          command: c
-          cwd: ${{ env.GO_CACHE_DIR }}
-          files: |
-            ./
-          outPath: ${{ env.GO_CACHE }}.tar.gz
-
-      - name: Upload ${{ env.GO_CACHE }} to gitlab
-        if: ${{ github.ref_name == 'main' }}
-        run: |
-          bash .github/utils/release_gitlab.sh \
-            --type 5 \
-            --project-id ${{ env.GITLAB_GO_CACHE_PROJECT_ID }} \
-            --tag-name ${{ env.GO_CACHE }} \
-            --asset-path ${{ env.GO_CACHE }}.tar.gz \
-            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
-
   check-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
@@ -187,7 +149,7 @@ jobs:
       MAKE_OPS: "build-manager-image"
       IMG: "apecloud/kubeblocks"
       VERSION: "check"
-      GO_VERSION: 1.20
+      GO_VERSION: "1.20"
     secrets: inherit
 
   check-tools-image:
@@ -200,7 +162,7 @@ jobs:
       MAKE_OPS: "build-tools-image"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "check"
-      GO_VERSION: 1.20
+      GO_VERSION: "1.20"
     secrets: inherit
 
   check-helm:
@@ -224,3 +186,35 @@ jobs:
       BRANCH_NAME: "master"
       WORKFLOW_ID: "deploy.yml"
     secrets: inherit
+
+  build-kbcli:
+    needs: trigger-mode
+    runs-on: ubuntu-latest
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') && github.ref_name != 'main' }}
+    strategy:
+      matrix:
+        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
+    steps:
+      - uses: actions/checkout@v3
+      - name: install lib
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.20"
+
+      - name: make generate
+        run: make generate
+
+      - name: build cli
+        run: |
+          CLI_OS_ARCH=`bash .github/utils/utils.sh \
+            --tag-name ${{ matrix.os }} \
+            --type 2`
+
+          make bin/kbcli.$CLI_OS_ARCH

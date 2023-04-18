@@ -40,7 +40,6 @@ var _ = Describe("MySQL data protection function", func() {
 	const mysqlCompName = "mysql"
 	const backupPolicyTemplateName = "test-backup-policy-template"
 	const backupPolicyName = "test-backup-policy"
-	const backupRemoteVolumeName = "backup-remote-volume"
 	const backupRemotePVCName = "backup-remote-pvc"
 	const backupName = "test-backup-job"
 
@@ -129,7 +128,7 @@ var _ = Describe("MySQL data protection function", func() {
 			SetBackupToolName(backupTool.Name).
 			AddMatchLabels(constant.AppInstanceLabelKey, clusterKey.Name).
 			SetTargetSecretName(component.GenerateConnCredential(clusterKey.Name)).
-			SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+			SetPVC(backupRemotePVCName).
 			Create(&testCtx).GetObject()
 		backupPolicyKey := client.ObjectKeyFromObject(backupPolicyObj)
 

@@ -587,10 +587,10 @@ spec:
                   $TOPOLOGY_FLAGS \
                   --alsologtostderr \
                   --gateway_initial_tablet_timeout 30s \
-                  --healthcheck_timeout 1s \
+                  --healthcheck_timeout 2s \
                   --srv_topo_timeout 1s \
-                  --grpc_keepalive_time 1s \
-                  --grpc_keepalive_timeout 2s \
+                  --grpc_keepalive_time 10s \
+                  --grpc_keepalive_timeout 10s \
                   --log_dir $VTDATAROOT \
                   --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
                   --port $web_port \

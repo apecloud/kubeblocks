@@ -42,8 +42,6 @@ var _ = Describe("Backup Policy Controller", func() {
 	const containerName = "mysql"
 	const defaultPVCSize = "1Gi"
 	const backupPolicyName = "test-backup-policy"
-	// const backupPolicyTplName = "test-backup-policy-template"
-	const backupRemoteVolumeName = "backup-remote-volume"
 	const backupRemotePVCName = "backup-remote-pvc"
 	const defaultSchedule = "0 3 * * *"
 	const defaultTTL = "7d"
@@ -141,7 +139,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+					SetPVC(backupRemotePVCName).
 					Create(&testCtx).GetObject()
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
@@ -245,7 +243,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+					SetPVC(backupRemotePVCName).
 					Create(&testCtx).GetObject()
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
@@ -269,7 +267,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+					SetPVC(backupRemotePVCName).
 					Create(&testCtx).GetObject()
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
@@ -291,11 +289,38 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetTargetSecretName(randomSecretName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).Create(&testCtx).GetObject()
+					SetPVC(backupRemotePVCName).
+					Create(&testCtx).GetObject()
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 					g.Expect(fetched.Spec.Full.Target.Secret.Name).To(Equal(randomSecretName))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("creating a backupPolicy with global backup config", func() {
+			It("ccreating a backupPolicy with global backup config", func() {
+				By("By creating a backupPolicy with empty secret")
+				pvcName := "backup-data"
+				pvcInitCapacity := "10Gi"
+				pvcStorageClass := "standard"
+				viper.SetDefault(constant.CfgKeyBackupPVCName, pvcName)
+				viper.SetDefault(constant.CfgKeyBackupPVCInitCapacity, pvcInitCapacity)
+				viper.SetDefault(constant.CfgKeyBackupPVCStorageClass, pvcStorageClass)
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddFullPolicy().
+					SetBackupToolName(backupToolName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					AddHookPreCommand("touch /data/mysql/.restore;sync").
+					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+					Create(&testCtx).GetObject()
+				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+					g.Expect(fetched.Spec.Full.PersistentVolumeClaim.Name).To(Equal(pvcName))
+					g.Expect(*fetched.Spec.Full.PersistentVolumeClaim.StorageClassName).To(Equal(pvcStorageClass))
+					g.Expect(fetched.Spec.Full.PersistentVolumeClaim.InitCapacity.String()).To(Equal(pvcInitCapacity))
 				})).Should(Succeed())
 			})
 		})

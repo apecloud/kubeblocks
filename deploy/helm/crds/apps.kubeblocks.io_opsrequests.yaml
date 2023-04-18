@@ -223,6 +223,46 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+              restoreFrom:
+                description: cluster RestoreFrom backup or point in time
+                properties:
+                  backup:
+                    description: use the backup name and component name for restore,
+                      support for multiple components' recovery.
+                    items:
+                      properties:
+                        ref:
+                          description: specify a reference backup to restore
+                          properties:
+                            name:
+                              description: specified the name
+                              type: string
+                            namespace:
+                              description: specified the namespace
+                              type: string
+                          type: object
+                      type: object
+                    type: array
+                  pointInTime:
+                    description: specified the point in time to recovery
+                    properties:
+                      ref:
+                        description: specify a reference source cluster to restore
+                        properties:
+                          name:
+                            description: specified the name
+                            type: string
+                          namespace:
+                            description: specified the namespace
+                            type: string
+                        type: object
+                      time:
+                        description: specify the time point to restore, with UTC as
+                          the time zone.
+                        format: date-time
+                        type: string
+                    type: object
+                type: object
               ttlSecondsAfterSucceed:
                 description: ttlSecondsAfterSucceed OpsRequest will be deleted after
                   TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.

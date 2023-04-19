@@ -25,8 +25,8 @@ kbcli cluster create-account [flags]
       --component string   Specify the name of component to be connected. If not specified, the first component will be used.
   -h, --help               help for create-account
   -i, --instance string    Specify the name of instance to be connected.
+      --name string        Required. Specify the name of user, which must be unique.
   -p, --password string    Optional. Specify the password of user. The default value is empty, which means a random password will be generated.
-  -u, --username string    Required. Specify the name of user, which must be unique.
 ```
 
 ### Options inherited from parent commands

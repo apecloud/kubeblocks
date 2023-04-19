@@ -37,7 +37,7 @@ func NewDescribeUserOptions(f cmdutil.Factory, streams genericclioptions.IOStrea
 
 func (o *DescribeUserOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVarP(&o.info.UserName, "username", "u", "", "Required. Specify the name of user")
+	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required. Specify the name of user")
 }
 
 func (o DescribeUserOptions) Validate(args []string) error {

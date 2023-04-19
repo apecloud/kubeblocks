@@ -24,7 +24,6 @@ import (
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -35,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
@@ -221,7 +219,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		origCluster := node.oriObj.(*appsv1alpha1.Cluster)
 		switch *node.action {
 		// cluster.meta and cluster.spec might change
-		case CREATE, UPDATE, STATUS:
+		case STATUS:
 			if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
 				!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
 				// TODO: we should Update instead of Patch cluster object,
@@ -241,13 +239,8 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 					return err
 				}
 			}
-		case DELETE:
-			if err := c.handleClusterDeletion(cluster); err != nil {
-				return err
-			}
-			if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {
-				return nil
-			}
+		case CREATE, UPDATE:
+			return fmt.Errorf("cluster can't be created or updated: %s", cluster.Name)
 		}
 	}
 	switch *node.action {
@@ -279,9 +272,12 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 				return err
 			}
 		}
-		err := c.cli.Delete(c.transCtx.Context, node.obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
+		// delete secondary objects
+		if _, ok := node.obj.(*appsv1alpha1.Cluster); !ok {
+			err := c.cli.Delete(c.transCtx.Context, node.obj)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
 		}
 	case STATUS:
 		patch := client.MergeFrom(node.oriObj)
@@ -359,119 +355,6 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 	}
 
 	return node.obj, nil
-}
-
-func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster) error {
-	switch cluster.Spec.TerminationPolicy {
-	case appsv1alpha1.DoNotTerminate:
-		c.transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate", "spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
-		return nil
-	case appsv1alpha1.Delete, appsv1alpha1.WipeOut:
-		if err := c.deletePVCs(cluster); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		if err := c.deleteConfigMaps(cluster); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		// The backup policy must be cleaned up when the cluster is deleted.
-		// Automatic backup scheduling needs to be stopped at this point.
-		if err := c.deleteBackupPolicies(cluster); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		if cluster.Spec.TerminationPolicy == appsv1alpha1.WipeOut {
-			// TODO check whether delete backups together with cluster is allowed
-			// wipe out all backups
-			if err := c.deleteBackups(cluster); err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-		}
-		if err := c.deleteJobs(cluster); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *clusterPlanBuilder) deletePVCs(cluster *appsv1alpha1.Cluster) error {
-	// it's possible at time of external resource deletion, cluster definition has already been deleted.
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey: cluster.GetName(),
-	}
-	inNS := client.InNamespace(cluster.Namespace)
-
-	pvcList := &corev1.PersistentVolumeClaimList{}
-	if err := c.cli.List(c.transCtx.Context, pvcList, inNS, ml); err != nil {
-		return err
-	}
-	for _, pvc := range pvcList.Items {
-		if err := c.cli.Delete(c.transCtx.Context, &pvc); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *clusterPlanBuilder) deleteConfigMaps(cluster *appsv1alpha1.Cluster) error {
-	return DeleteConfigMaps(c.transCtx.Context, c.cli, cluster)
-}
-
-func (c *clusterPlanBuilder) deleteBackupPolicies(cluster *appsv1alpha1.Cluster) error {
-	inNS := client.InNamespace(cluster.Namespace)
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey: cluster.GetName(),
-	}
-	// clean backupPolicies
-	return c.cli.DeleteAllOf(c.transCtx.Context, &dataprotectionv1alpha1.BackupPolicy{}, inNS, ml)
-}
-
-func (c *clusterPlanBuilder) deleteBackups(cluster *appsv1alpha1.Cluster) error {
-	inNS := client.InNamespace(cluster.Namespace)
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey: cluster.GetName(),
-	}
-	// clean backups
-	backups := &dataprotectionv1alpha1.BackupList{}
-	if err := c.cli.List(c.transCtx.Context, backups, inNS, ml); err != nil {
-		return err
-	}
-	for _, backup := range backups.Items {
-		// check backup delete protection label
-		deleteProtection, exists := backup.GetLabels()[constant.BackupProtectionLabelKey]
-		// not found backup-protection or value is Delete, delete it.
-		if !exists || deleteProtection == constant.BackupDelete {
-			if err := c.cli.Delete(c.transCtx.Context, &backup); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (c *clusterPlanBuilder) deleteJobs(cluster *appsv1alpha1.Cluster) error {
-	inNS := client.InNamespace(cluster.Namespace)
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey: cluster.GetName(),
-	}
-	// clean jobs
-	jobList := batchv1.JobList{}
-	if err := c.cli.List(c.transCtx.Context, &jobList, inNS, ml); err != nil {
-		return err
-	}
-	for _, job := range jobList.Items {
-		if err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, &job); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func DeleteConfigMaps(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
-	inNS := client.InNamespace(cluster.Namespace)
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey:  cluster.GetName(),
-		constant.AppManagedByLabelKey: constant.AppName,
-	}
-	return cli.DeleteAllOf(ctx, &corev1.ConfigMap{}, inNS, ml)
 }
 
 func (c *clusterPlanBuilder) emitConditionUpdatingEvent(oldConditions, newConditions []metav1.Condition) {

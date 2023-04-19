@@ -215,7 +215,9 @@ func readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.C
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
 			// put to snapshot if owned by our cluster
-			if isOwnerOf(&cluster, object, scheme) {
+			// pvcs created by sts don't have cluster in ownerReferences
+			_, isPVC := object.(*corev1.PersistentVolumeClaim)
+			if isPVC || isOwnerOf(&cluster, object, scheme) {
 				name, err := getGVKName(object, scheme)
 				if err != nil {
 					return nil, err

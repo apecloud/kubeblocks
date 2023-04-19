@@ -75,11 +75,11 @@ var _ = Describe("sts horizontal scaling test", func() {
 			ctrl, k8sMock := testutil.SetupK8sMock()
 			defer ctrl.Finish()
 			transCtx := &ClusterTransformContext{
-				Context: context.Background(),
-				Client: k8sMock,
-				ClusterDef: cd,
-				ClusterVer: cv,
-				Cluster: cluster,
+				Context:     context.Background(),
+				Client:      k8sMock,
+				ClusterDef:  cd,
+				ClusterVer:  cv,
+				Cluster:     cluster,
 				OrigCluster: cluster.DeepCopy(),
 			}
 			By("prepare initial DAG with sts.action=UPDATE")

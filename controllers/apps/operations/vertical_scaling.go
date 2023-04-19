@@ -62,6 +62,8 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 		if verticalScaling.Class != "" {
 			component.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: verticalScaling.Class}
 		} else {
+			// clear old class ref
+			component.ClassDefRef = &appsv1alpha1.ClassDefRef{}
 			component.Resources = verticalScaling.ResourceRequirements
 		}
 		opsRes.Cluster.Spec.ComponentSpecs[index] = component

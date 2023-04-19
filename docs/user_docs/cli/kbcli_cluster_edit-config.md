@@ -5,15 +5,12 @@ title: kbcli cluster edit-config
 Edit the config file of the component.
 
 ```
-kbcli cluster edit-config [flags]
+kbcli cluster edit-config NAME [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file] [flags]
 ```
 
 ### Examples
 
 ```
-  # edit config for component
-  kbcli cluster edit-config <cluster-name> [--component=<component-name>] [--config-spec=<config-spec-name>] [--config-file=<config-file>]
-  
   # update mysql max_connections, cluster name is mycluster
   kbcli cluster edit-config mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf
 ```

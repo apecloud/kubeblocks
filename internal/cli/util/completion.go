@@ -24,5 +24,19 @@ import (
 )
 
 func ResourceNameCompletionFunc(f cmdutil.Factory, gvr schema.GroupVersionResource) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return utilcomp.ResourceNameCompletionFunc(f, GVRToString(gvr))
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		comps := utilcomp.CompGetResource(f, cmd, GVRToString(gvr), toComplete)
+		seen := make(map[string]bool)
+
+		var availableComps []string
+		for _, arg := range args {
+			seen[arg] = true
+		}
+		for _, comp := range comps {
+			if !seen[comp] {
+				availableComps = append(availableComps, comp)
+			}
+		}
+		return availableComps, cobra.ShellCompDirectiveNoFileComp
+	}
 }

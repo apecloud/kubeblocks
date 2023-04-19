@@ -184,8 +184,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.ConfigTransformer{},
 			// read old snapshot from cache, and generate diff plan
 			&lifecycle.ObjectActionTransformer{},
-			// handle TerminationPolicyType=DoNotTerminate
-			&lifecycle.DoNotTerminateTransformer{},
 			// horizontal scaling
 			&lifecycle.StsHorizontalScalingTransformer{},
 			// stateful set pvc Update

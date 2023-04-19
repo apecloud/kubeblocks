@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -88,9 +88,9 @@ type SnapshotPolicy struct {
 type CommonBackupPolicy struct {
 	BasePolicy `json:",inline"`
 
-	// array of remote volumes from CSI driver definition.
+	// refer to PersistentVolumeClaim and the backup data will be stored in the corresponding persistent volume.
 	// +kubebuilder:validation:Required
-	RemoteVolume corev1.Volume `json:"remoteVolume"`
+	PersistentVolumeClaim PersistentVolumeClaim `json:"persistentVolumeClaim"`
 
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Required
@@ -98,6 +98,45 @@ type CommonBackupPolicy struct {
 	BackupToolName string `json:"backupToolName,omitempty"`
 }
 
+type PersistentVolumeClaim struct {
+	// the name of the PersistentVolumeClaim.
+	Name string `json:"name"`
+
+	// storageClassName is the name of the StorageClass required by the claim.
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty"`
+
+	// initCapacity represents the init storage size of the PersistentVolumeClaim which should be created if not exist.
+	// and the default value is 100Gi if it is empty.
+	// +optional
+	InitCapacity resource.Quantity `json:"initCapacity,omitempty"`
+
+	// createPolicy defines the policy for creating the PersistentVolumeClaim, enum values:
+	// - Never: do nothing if the PersistentVolumeClaim not exists.
+	// - IfNotPresent: create the PersistentVolumeClaim if not present and the accessModes only contains 'ReadWriteMany'.
+	// +kubebuilder:default=IfNotPresent
+	// +optional
+	CreatePolicy CreatePVCPolicy `json:"createPolicy"`
+
+	// persistentVolumeConfigMap references the configmap which contains a persistentVolume template.
+	// key must be "persistentVolume" and value is the "PersistentVolume" struct.
+	// support the following built-in Objects:
+	// - $(GENERATE_NAME): generate a specific format "pvcName-pvcNamespace".
+	// if the PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent", the controller
+	// will create it by this template. this is a mutually exclusive setting with "storageClassName".
+	// +optional
+	PersistentVolumeConfigMap *PersistentVolumeConfigMap `json:"persistentVolumeConfigMap,omitempty"`
+}
+
+type PersistentVolumeConfigMap struct {
+	// the name of the persistentVolume ConfigMap.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// the namespace of the persistentVolume ConfigMap.
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
+}
 type BasePolicy struct {
 	// target database cluster for backup.
 	// +kubebuilder:validation:Required

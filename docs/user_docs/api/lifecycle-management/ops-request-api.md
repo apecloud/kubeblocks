@@ -256,7 +256,7 @@ It corresponds to `metadata.generation`.
 | HorizontalScalingStarted           | HorizontalScaling started.                      |
 | VolumeExpandingStarted             | VolumeExpanding started.                        |
 | UpgradingStarted                   | Upgrade started.                                |
-| ClusterPhaseMisMatch               | The cluster status mismatches.                  |
+| ClusterPhaseMismatch               | The cluster status mismatches.                  |
 | OpsTypeNotSupported                | The cluster does not support this operation.    |
 | ClusterExistOtherOperation         | Another mutually exclusive operation is running.|
 | ClusterNotFound                    | The specified cluster is not found.             |

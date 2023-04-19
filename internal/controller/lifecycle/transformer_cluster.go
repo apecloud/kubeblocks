@@ -94,6 +94,10 @@ func (c *ClusterTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 				return err
 			}
 		}
+		if err = plan.DoPITRPrepare(transCtx.Context, c.Client, cluster, synthesizedComp); err != nil {
+			return err
+		}
+
 		return plan.PrepareComponentResources(reqCtx, c.Client, &iParams)
 	}
 

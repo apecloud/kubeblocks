@@ -176,10 +176,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.StsHorizontalScalingTransformer{},
 			// stateful set pvc Update
 			&lifecycle.StsPVCTransformer{},
-			// replication set horizontal scaling
-			&lifecycle.RplSetHorizontalScalingTransformer{Client: r.Client},
 			// update cluster status
 			&lifecycle.ClusterStatusTransformer{},
+			// handle PITR
+			&lifecycle.PITRTransformer{Client: r.Client},
 		).
 		Build()
 

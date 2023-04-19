@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -381,6 +382,9 @@ func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster
 				return err
 			}
 		}
+		if err := c.deleteJobs(cluster); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
 	}
 	return nil
 }
@@ -405,12 +409,7 @@ func (c *clusterPlanBuilder) deletePVCs(cluster *appsv1alpha1.Cluster) error {
 }
 
 func (c *clusterPlanBuilder) deleteConfigMaps(cluster *appsv1alpha1.Cluster) error {
-	inNS := client.InNamespace(cluster.Namespace)
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey:  cluster.GetName(),
-		constant.AppManagedByLabelKey: constant.AppName,
-	}
-	return c.cli.DeleteAllOf(c.transCtx.Context, &corev1.ConfigMap{}, inNS, ml)
+	return DeleteConfigMaps(c.transCtx.Context, c.cli, cluster)
 }
 
 func (c *clusterPlanBuilder) deleteBackupPolicies(cluster *appsv1alpha1.Cluster) error {
@@ -443,6 +442,33 @@ func (c *clusterPlanBuilder) deleteBackups(cluster *appsv1alpha1.Cluster) error 
 		}
 	}
 	return nil
+}
+
+func (c *clusterPlanBuilder) deleteJobs(cluster *appsv1alpha1.Cluster) error {
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.GetName(),
+	}
+	// clean jobs
+	jobList := batchv1.JobList{}
+	if err := c.cli.List(c.transCtx.Context, &jobList, inNS, ml); err != nil {
+		return err
+	}
+	for _, job := range jobList.Items {
+		if err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, &job); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func DeleteConfigMaps(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:  cluster.GetName(),
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+	return cli.DeleteAllOf(ctx, &corev1.ConfigMap{}, inNS, ml)
 }
 
 func (c *clusterPlanBuilder) emitConditionUpdatingEvent(oldConditions, newConditions []metav1.Condition) {

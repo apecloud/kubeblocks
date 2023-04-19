@@ -23,16 +23,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-const classTemplate = `
-cpu: "{{ or .cpu 1 }}"
-memory: "{{ or .memory 4 }}Gi"
-volumes:
-- name: data
-  size: "{{ or .dataStorageSize 10 }}Gi"
-- name: log
-  size: "{{ or .logStorageSize 1 }}Gi"
-`
-
 type MockComponentClassDefinitionFactory struct {
 	BaseFactory[appsv1alpha1.ComponentClassDefinition, *appsv1alpha1.ComponentClassDefinition, MockComponentClassDefinitionFactory]
 }
@@ -48,27 +38,24 @@ func NewComponentClassDefinitionFactory(name, clusterDefinitionRef, componentTyp
 				constant.KBAppComponentDefRefLabelKey: componentType,
 			},
 		},
-		Spec: appsv1alpha1.ComponentClassDefinitionSpec{
-			Groups: []appsv1alpha1.ComponentClassGroup{
-				{
-					ResourceConstraintRef: "kube-resource-constraint-general",
-					Template:              classTemplate,
-					Vars:                  []string{"cpu", "memory", "dataStorageSize", "logStorageSize"},
-					Series: []appsv1alpha1.ComponentClassSeries{
-						{
-							NamingTemplate: "general-{{ .cpu }}c{{ .memory }}g",
-						},
-					},
-				},
-			},
-		},
 	}, f)
 	return f
 }
 
-func (factory *MockComponentClassDefinitionFactory) AddClass(cls appsv1alpha1.ComponentClass) *MockComponentClassDefinitionFactory {
-	classes := factory.get().Spec.Groups[0].Series[0].Classes
-	classes = append(classes, cls)
-	factory.get().Spec.Groups[0].Series[0].Classes = classes
+func (factory *MockComponentClassDefinitionFactory) AddClassGroup(constraintRef string) *MockComponentClassDefinitionFactory {
+	groups := factory.get().Spec.Groups
+	group := classGroupTemplate
+	group.ResourceConstraintRef = constraintRef
+	groups = append(groups, group)
+	factory.get().Spec.Groups = groups
+	return factory
+}
+
+func (factory *MockComponentClassDefinitionFactory) AddClasses(classes []appsv1alpha1.ComponentClass) *MockComponentClassDefinitionFactory {
+	groups := factory.get().Spec.Groups
+	if len(groups) > 0 {
+		groups[len(groups)-1].Series[0].Classes = classes
+	}
+	factory.get().Spec.Groups = groups
 	return factory
 }

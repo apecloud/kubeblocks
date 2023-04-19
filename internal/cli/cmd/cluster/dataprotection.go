@@ -55,7 +55,7 @@ var (
 		kbcli cluster list-backup-policy 
         
 		# using short cmd to list backup policy of specified cluster 
-        kbcli cluster list-bp <cluster-name>
+        kbcli cluster list-bp mycluster
 	`)
 	editExample = templates.Examples(`
 		# edit backup policy
@@ -70,7 +70,7 @@ var (
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backup
-		kbcli cluster list-backup
+		kbcli cluster list-backups
 	`)
 	deleteBackupExample = templates.Examples(`
 		# delete a backup named backup-name
@@ -87,6 +87,9 @@ var (
 	createRestoreExample = templates.Examples(`
 		# restore a new cluster from a backup
 		kbcli cluster restore new-cluster-name --backup backup-name
+
+		# restore a new cluster from point in time
+		kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --source-cluster mycluster
 	`)
 )
 
@@ -239,7 +242,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	customOutPut := func(opt *create.BaseOptions) {
 		output := fmt.Sprintf("Backup %s created successfully, you can view the progress:", opt.Name)
 		printer.PrintLine(output)
-		nextLine := fmt.Sprintf("\tkbcli cluster list-backup --name=%s -n %s", opt.Name, opt.Namespace)
+		nextLine := fmt.Sprintf("\tkbcli cluster list-backups --name=%s -n %s", opt.Name, opt.Namespace)
 		printer.PrintLine(nextLine)
 	}
 	inputs := create.Inputs{
@@ -336,7 +339,7 @@ func printBackupList(o ListBackupOptions) error {
 func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &ListBackupOptions{ListOptions: list.NewListOptions(f, streams, types.OpsGVR())}
 	cmd := &cobra.Command{
-		Use:               "list-backup",
+		Use:               "list-backups",
 		Short:             "List backups.",
 		Aliases:           []string{"ls-backup"},
 		Example:           listBackupExample,
@@ -394,6 +397,12 @@ func completeForDeleteBackup(o *delete.DeleteOptions, args []string) error {
 type CreateRestoreOptions struct {
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
+
+	// point in time recovery args
+	RestoreTime    *time.Time `json:"restoreTime,omitempty"`
+	RestoreTimeStr string     `json:"restoreTimeStr,omitempty"`
+	SourceCluster  string     `json:"sourceCluster,omitempty"`
+
 	create.BaseOptions
 }
 
@@ -415,7 +424,16 @@ func (o *CreateRestoreOptions) getClusterObject(backup *dataprotectionv1alpha1.B
 }
 
 func (o *CreateRestoreOptions) Run() error {
-	// get backup job
+	if o.Backup != "" {
+		return o.runRestoreFromBackup()
+	} else if o.RestoreTime != nil {
+		return o.runPITR()
+	}
+	return nil
+}
+
+func (o *CreateRestoreOptions) runRestoreFromBackup() error {
+	// get backup
 	backup := &dataprotectionv1alpha1.Backup{}
 	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
 		return err
@@ -427,21 +445,25 @@ func (o *CreateRestoreOptions) Run() error {
 		return errors.Errorf(`missing source cluster in backup "%s", "app.kubernetes.io/instance" is empty in labels.`, o.Backup)
 	}
 	// get the cluster object and set the annotation for restore
-	cluster, err := o.getClusterObject(backup)
+	clusterObj, err := o.getClusterObject(backup)
 	if err != nil {
 		return err
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, len(cluster.Spec.ComponentSpecs), cluster.Spec.ComponentSpecs[0].Name)
+	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name)
 	if err != nil {
 		return err
 	}
-	cluster.Status = appsv1alpha1.ClusterStatus{}
-	cluster.ObjectMeta = metav1.ObjectMeta{
-		Namespace:   cluster.Namespace,
+	clusterObj.ObjectMeta = metav1.ObjectMeta{
+		Namespace:   clusterObj.Namespace,
 		Name:        o.Name,
 		Annotations: map[string]string{constant.RestoreFromBackUpAnnotationKey: restoreAnnotation},
 	}
+	return o.createCluster(clusterObj)
+}
+
+func (o *CreateRestoreOptions) createCluster(cluster *appsv1alpha1.Cluster) error {
 	clusterGVR := types.ClusterGVR()
+	cluster.Status = appsv1alpha1.ClusterStatus{}
 	cluster.TypeMeta = metav1.TypeMeta{
 		Kind:       types.KindCluster,
 		APIVersion: clusterGVR.Group + "/" + clusterGVR.Version,
@@ -461,7 +483,93 @@ func (o *CreateRestoreOptions) Run() error {
 	return nil
 }
 
+func (o *CreateRestoreOptions) runPITR() error {
+	objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
+		List(context.TODO(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s",
+				constant.AppInstanceLabelKey, o.SourceCluster),
+		})
+	if err != nil {
+		return err
+	}
+	backup := &dataprotectionv1alpha1.Backup{}
+
+	// no need check items len because it is validated by o.validateRestoreTime().
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(objs.Items[0].Object, backup); err != nil {
+		return err
+	}
+	// TODO: use opsRequest to create cluster.
+	// get the cluster object and set the annotation for restore
+	clusterObj, err := o.getClusterObject(backup)
+	if err != nil {
+		return err
+	}
+	clusterObj.ObjectMeta = metav1.ObjectMeta{
+		Namespace: clusterObj.Namespace,
+		Name:      o.Name,
+		Annotations: map[string]string{
+			// TODO: use constant annotation key
+			"kubeblocks.io/restore-from-time":           o.RestoreTime.Format(time.RFC3339),
+			"kubeblocks.io/restore-from-source-cluster": o.SourceCluster,
+		},
+	}
+	return o.createCluster(clusterObj)
+}
+
+func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
+	return !t.Before(start) && !t.After(end)
+}
+
+func (o *CreateRestoreOptions) validateRestoreTime() error {
+	if o.RestoreTimeStr == "" && o.SourceCluster == "" {
+		return nil
+	}
+	if o.RestoreTimeStr == "" && o.SourceCluster == "" {
+		return fmt.Errorf("--source-cluster must be specified if specified --restore-to-time")
+	}
+	restoreTime, err := util.TimeParse(o.RestoreTimeStr, time.Second)
+	if err != nil {
+		return err
+	}
+	o.RestoreTime = &restoreTime
+	objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
+		List(context.TODO(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s",
+				constant.AppInstanceLabelKey, o.SourceCluster),
+		})
+	if err != nil {
+		return err
+	}
+	backups := make([]dataprotectionv1alpha1.Backup, 0)
+	for _, i := range objs.Items {
+		obj := dataprotectionv1alpha1.Backup{}
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &obj); err != nil {
+			return err
+		}
+		if obj.Status.Phase != dataprotectionv1alpha1.BackupCompleted ||
+			obj.Status.Manifests == nil || obj.Status.Manifests.BackupLog == nil {
+			continue
+		}
+		backups = append(backups, obj)
+	}
+	recoverableTime := dataprotectionv1alpha1.GetRecoverableTimeRange(backups)
+	for _, i := range recoverableTime {
+		if isTimeInRange(restoreTime, i.StartTime.Time, i.StopTime.Time) {
+			return nil
+		}
+	}
+	return fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
+		"\tkbcli cluster describe %s -n %s", o.SourceCluster, o.Namespace)
+}
+
 func (o *CreateRestoreOptions) Validate() error {
+	if o.Backup == "" && o.RestoreTimeStr == "" {
+		return fmt.Errorf("must be specified one of the --backup or --restore-to-time")
+	}
+	if err := o.validateRestoreTime(); err != nil {
+		return err
+	}
+
 	if o.Name == "" {
 		name, err := generateClusterName(o.Dynamic, o.Namespace)
 		if err != nil {
@@ -471,9 +579,6 @@ func (o *CreateRestoreOptions) Validate() error {
 			return fmt.Errorf("failed to generate a random cluster name")
 		}
 		o.Name = name
-	}
-	if o.Backup == "" {
-		return fmt.Errorf("backup name should be specified by --backup")
 	}
 	return nil
 }
@@ -498,6 +603,8 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		},
 	}
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
+	cmd.Flags().StringVar(&o.RestoreTimeStr, "restore-to-time", "", "point in time recovery(PITR)")
+	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "source cluster name")
 	return cmd
 }
 
@@ -610,7 +717,7 @@ func printBackupPolicyList(o list.ListOptions) error {
 	return nil
 }
 
-func NewLEditBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewEditBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := edit.NewEditOptions(f, streams, types.BackupPolicyGVR())
 	cmd := &cobra.Command{
 		Use:                   "edit-backup-policy",

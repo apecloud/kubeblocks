@@ -35,23 +35,6 @@ jobs:
     runs-on: [ self-hosted, eks-fargate-runner ]
     steps:
       - uses: apecloud/checkout@main
-
-      - name: Download ${{ env.GO_CACHE }}
-        run: |
-          bash .github/utils/release_gitlab.sh \
-            --type 6 \
-            --project-id ${{ env.GITLAB_GO_CACHE_PROJECT_ID }} \
-            --tag-name ${{ env.GO_CACHE }} \
-            --asset-name ${{ env.GO_CACHE }}.tar.gz \
-            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
-
-      - name: Extract ${{ env.GO_CACHE }}
-        uses: a7ul/tar-action@v1.1.3
-        with:
-          command: x
-          cwd: ${{ env.GO_CACHE_DIR }}
-          files: ${{ env.GO_CACHE }}.tar.gz
-
       - name: make mod-vendor and lint
         run: |
           mkdir -p ./bin
@@ -73,7 +56,7 @@ jobs:
       MAKE_OPS: "build-manager-image"
       IMG: "apecloud/kubeblocks"
       VERSION: "check"
-      GO_VERSION: 1.19
+      GO_VERSION: "1.20"
     secrets: inherit
 
   check-tools-image:
@@ -86,7 +69,7 @@ jobs:
       MAKE_OPS: "build-tools-image"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "check"
-      GO_VERSION: 1.19
+      GO_VERSION: "1.20"
     secrets: inherit
 
   check-helm:

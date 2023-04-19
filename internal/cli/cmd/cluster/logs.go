@@ -49,7 +49,7 @@ var (
 		# Display only the most recent 20 lines from cluster mycluster with default primary instance (stdout)
 		kbcli cluster logs mycluster --tail=20
 
-		# Display stdout info of specific instance my-instance-0 (cluster name comes from annotation app.kubernetes.io/instance) 
+		# Display stdout info of specific instance my-instance-0 (cluster name comes from annotation app.kubernetes.io/instance)
 		kbcli cluster logs --instance my-instance-0
 
 		# Return snapshot logs from cluster mycluster with specific instance my-instance-0 (stdout)

@@ -404,6 +404,7 @@ type TLSSecretRef struct {
 type ClusterComponentService struct {
 	// Service name
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=15
 	Name string `json:"name"`
 
 	// serviceType determines how the Service is exposed. Valid

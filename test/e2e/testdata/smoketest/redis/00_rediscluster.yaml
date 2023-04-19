@@ -5,10 +5,10 @@ kind: ConfigMap
 metadata:
   name: redis7-config-template
   labels:
-    helm.sh/chart: redis-0.5.0-alpha.3
+    helm.sh/chart: redis-0.5.0-alpha.8
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "7.0.5"
+    app.kubernetes.io/version: "7.0.6"
     app.kubernetes.io/managed-by: Helm
 data:
   redis.conf: |-
@@ -82,6 +82,14 @@ data:
     aof-rewrite-incremental-fsync yes
     rdb-save-incremental-fsync yes
     jemalloc-bg-thread yes
+    enable-debug-command yes
+    protected-mode no
+    
+    # maxmemory <bytes>
+    {{- $request_memory := getContainerRequestMemory ( index $.podSpec.containers 0 ) }}
+    {{- if gt $request_memory 0 }}
+    maxmemory {{ $request_memory }}
+    {{- end -}}
 ---
 # Source: redis/templates/scripts.yaml
 apiVersion: v1
@@ -100,23 +108,121 @@ data:
       until redis-cli -h $KB_PRIMARY_POD_NAME -p 6379 ping; do sleep 1; done
       redis-cli -h 127.0.0.1 -p 6379 replicaof $KB_PRIMARY_POD_NAME 6379 || exit 1
     fi
+  redis-start.sh: |
+    #!/bin/sh
+    set -ex
+    echo "include /etc/conf/redis.conf" >> /etc/redis/redis.conf
+    echo "replica-announce-ip $KB_POD_FQDN" >> /etc/redis/redis.conf
+    exec redis-server /etc/redis/redis.conf \
+    --loadmodule /opt/redis-stack/lib/redisearch.so ${REDISEARCH_ARGS} \
+    --loadmodule /opt/redis-stack/lib/redisgraph.so ${REDISGRAPH_ARGS} \
+    --loadmodule /opt/redis-stack/lib/redistimeseries.so ${REDISTIMESERIES_ARGS} \
+    --loadmodule /opt/redis-stack/lib/rejson.so ${REDISJSON_ARGS} \
+    --loadmodule /opt/redis-stack/lib/redisbloom.so ${REDISBLOOM_ARGS}
+  redis-sentinel-setup.sh: |-
+    #!/bin/sh
+    set -ex
+    {{- $clusterName := $.cluster.metadata.name }}
+    {{- $namespace := $.cluster.metadata.namespace }}
+    {{- /* find redis-sentinel component */}}
+    {{- $sentinel_component := fromJson "{}" }}
+    {{- $redis_component := fromJson "{}" }}
+    {{- $primary_index := 0 }}
+    {{- $primary_pod := "" }}
+    {{- range $i, $e := $.cluster.spec.componentSpecs }}
+      {{- if eq $e.componentDefRef "redis-sentinel" }}
+        {{- $sentinel_component = $e }}
+      {{- else if eq $e.componentDefRef "redis" }}
+        {{- $redis_component = $e }}
+        {{- if index $e "primaryIndex" }}
+            {{- if ne ($e.primaryIndex | int) 0 }}
+              {{- $primary_index = ($e.primaryIndex | int) }}
+            {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- /* build primary pod message, because currently does not support cross-component acquisition of environment variables, the service of the redis master node is assembled here through specific rules  */}}
+    {{- $primary_pod = printf "%s-%s-0.%s-%s-headless.%s.svc" $clusterName $redis_component.name $clusterName $redis_component.name $namespace }}
+    {{- if ne $primary_index 0 }}
+      {{- $primary_pod = printf "%s-%s-%d-0.%s-%s-headless.%s.svc" $clusterName $redis_component.name $primary_index $clusterName $redis_component.name $namespace }}
+    {{- end }}
+    {{- $sentinel_monitor := printf "%s-%s %s" $clusterName $sentinel_component.name $primary_pod }}
+    cat>/etc/sentinel/redis-sentinel.conf<<EOF
+    port 26379
+    sentinel resolve-hostnames yes
+    sentinel announce-hostnames yes
+    sentinel monitor {{ $sentinel_monitor }} 6379 2
+    sentinel down-after-milliseconds {{ $clusterName }}-{{ $sentinel_component.name }} 5000
+    sentinel failover-timeout {{ $clusterName }}-{{ $sentinel_component.name }} 60000
+    sentinel parallel-syncs {{ $clusterName }}-{{ $sentinel_component.name }} 1
+    {{- /* $primary_svc := printf "%s-%s.%s.svc" $clusterName $redis_component.name $namespace */}}
+    EOF
+  redis-sentinel-start.sh: |-
+    #!/bin/sh
+    set -ex
+    {{- $clusterName := $.cluster.metadata.name }}
+    {{- $namespace := $.cluster.metadata.namespace }}
+    {{- /* find redis component */}}
+    {{- $redis_component := fromJson "{}" }}
+    {{- range $i, $e := $.cluster.spec.componentSpecs }}
+      {{- if eq $e.componentDefRef "redis" }}
+      {{- $redis_component = $e }}
+      {{- end }}
+    {{- end }}
+    {{- /* build redis engine service */}}
+    {{- $primary_svc := printf "%s-%s.%s.svc" $clusterName $redis_component.name $namespace }}
+    echo "Waiting for redis service {{ $primary_svc }} to be ready..."
+    until redis-cli -h {{ $primary_svc }} -p 6379 ping; do sleep 1; done
+    echo "redis service ready, Starting sentinel..."
+    echo "sentinel announce-ip $KB_POD_FQDN" >> /etc/sentinel/redis-sentinel.conf
+    exec redis-server /etc/sentinel/redis-sentinel.conf --sentinel
+    echo "Start sentinel succeeded!"
+  redis-sentinel-ping.sh: |-
+    #!/bin/sh
+    set -ex
+    response=$(
+          timeout -s 3 $1 \
+          redis-cli \
+            -h localhost \
+            -p 26379 \
+            ping
+        )
+    if [ "$?" -eq "124" ]; then
+      echo "Timed out"
+      exit 1
+    fi
+    if [ "$response" != "PONG" ]; then
+      echo "$response"
+      exit 1
+    fi
 ---
 # Source: redis/templates/backuppolicytemplate.yaml
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: backup-policy-template-redis
+  name: redis-backup-policy-template
   labels:
     clusterdefinition.kubeblocks.io/name: redis
-    helm.sh/chart: redis-0.5.0-alpha.3
+    helm.sh/chart: redis-0.5.0-alpha.8
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "7.0.5"
+    app.kubernetes.io/version: "7.0.6"
     app.kubernetes.io/managed-by: Helm
 spec:
-  # which backup tool to perform database backup, only support one tool.
-  backupToolName: volumesnapshot
-  ttl: 168h0m0s
+  clusterDefinitionRef: redis
+  backupPolicies:
+  - componentDefRef: redis
+    ttl: 7d
+    schedule:
+      baseBackup:
+        type: snapshot
+        enable: false
+        cronExpression: "0 18 * * 0"
+    snapshot:
+      target:
+        connectionCredentialKey:
+          passwordKey: password
+          usernameKey: username
 ---
 # Source: redis/templates/clusterdefinition.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -124,12 +230,13 @@ kind: ClusterDefinition
 metadata:
   name: redis
   labels:
-    helm.sh/chart: redis-0.5.0-alpha.3
+    helm.sh/chart: redis-0.5.0-alpha.8
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "7.0.5"
+    app.kubernetes.io/version: "7.0.6"
     app.kubernetes.io/managed-by: Helm
 spec:
+  type: redis
   connectionCredential:
     username: ""
     password: ""
@@ -140,6 +247,11 @@ spec:
     - name: redis
       workloadType: Replication
       characterType: redis
+      probes:
+        roleProbe:
+          failureThreshold: 2
+          periodSeconds: 2
+          timeoutSeconds: 1
       replicationSpec:
         switchPolicies:
           - type: MaximumAvailability
@@ -181,8 +293,12 @@ spec:
               - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_DEMOTE_STATEMENT)
       service:
         ports:
-          - protocol: TCP
+          - name: redis
             port: 6379
+            targetPort: redis
+          - name: metrics
+            port: 9121
+            targetPort: metrics
       configSpecs:
         - name: redis-replication-config
           templateRef: redis7-config-template
@@ -209,7 +325,6 @@ spec:
       podSpec:
         containers:
           - name: redis
-            image: redis:7.0.5
             ports:
               - name: redis
                 containerPort: 6379
@@ -220,7 +335,9 @@ spec:
                 mountPath: /etc/conf
               - name: scripts
                 mountPath: /scripts
-            args: [ "/etc/conf/redis.conf" ]
+              - name: redis-conf
+                mountPath: /etc/redis
+            command: ["/scripts/redis-start.sh"]
             lifecycle:
               postStart:
                 exec:
@@ -235,15 +352,14 @@ spec:
             ports:
               - name: metrics
                 containerPort: 9121
-                protocol: TCP
             livenessProbe:
               httpGet:
                 path: /
-                port: 9121
+                port: metrics
             readinessProbe:
               httpGet:
                 path: /
-                port: 9121
+                port: metrics
       systemAccounts:
 # Seems redis-cli has its own mechanism to parse input tokens and there is no elegent way
 # to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.
@@ -264,44 +380,125 @@ spec:
           - name: kbadmin
             provisionPolicy:
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allcommands allkeys
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
           - name: kbdataprotection
             provisionPolicy:
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allcommands allkeys
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
           - name: kbprobe
             provisionPolicy:
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) +psync +replconf +ping
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) +psync +replconf +ping
+    - name: redis-sentinel
+      workloadType: Stateful
+      characterType: redis
+      service:
+        ports:
+          - name: redis-sentinel
+            targetPort: redis-sentinel
+            port: 26379
+      configSpecs:
+        - name: redis-replication-config
+          templateRef: redis7-config-template
+          constraintRef: redis7-config-constraints
+          namespace: default
+          volumeName: redis-config
+      scriptSpecs:
+        - name: redis-scripts
+          templateRef: redis-scripts
+          namespace: default
+          volumeName: scripts
+          defaultMode: 493
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        initContainers:
+        - name: init-redis-sentinel
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: redis-config
+              mountPath: /etc/conf
+            - name: sentinel-conf
+              mountPath: /etc/sentinel
+            - name: scripts
+              mountPath: /scripts
+          command: [ "/scripts/redis-sentinel-setup.sh" ]
+        containers:
+        - name: redis-sentinel
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 26379
+              name: redis-sentinel
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: redis-config
+              mountPath: /etc/conf
+            - name: sentinel-conf
+              mountPath: /etc/sentinel
+            - name: scripts
+              mountPath: /scripts
+          command:
+            - /bin/bash
+          args:
+            - -c
+            - |
+              set -ex
+              /scripts/redis-sentinel-start.sh
+          livenessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /scripts/redis-sentinel-ping.sh 5
+          readinessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /scripts/redis-sentinel-ping.sh 1
 ---
 # Source: redis/templates/clusterversion.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: redis-7.0.5
+  name: redis-7.0.6
   labels:
-    helm.sh/chart: redis-0.5.0-alpha.3
+    helm.sh/chart: redis-0.5.0-alpha.8
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "7.0.5"
+    app.kubernetes.io/version: "7.0.6"
     app.kubernetes.io/managed-by: Helm
 spec:
   clusterDefinitionRef: redis
@@ -310,8 +507,18 @@ spec:
     versionsContext:
       containers:
       - name: redis
-        image: redis:7.0.5
+        image: redis/redis-stack-server:7.0.6-RC8
         imagePullPolicy: IfNotPresent
+  - componentDefRef: redis-sentinel
+    versionsContext:
+      initContainers:
+        - name: init-redis-sentinel
+          image: redis/redis-stack-server:7.0.6-RC8
+          imagePullPolicy: IfNotPresent
+      containers:
+        - name: redis-sentinel
+          image: redis/redis-stack-server:7.0.6-RC8
+          imagePullPolicy: IfNotPresent
 ---
 # Source: redis/templates/configconstraint.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -319,10 +526,10 @@ kind: ConfigConstraint
 metadata:
   name: redis7-config-constraints
   labels:
-    helm.sh/chart: redis-0.5.0-alpha.3
+    helm.sh/chart: redis-0.5.0-alpha.8
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "7.0.5"
+    app.kubernetes.io/version: "7.0.6"
     app.kubernetes.io/managed-by: Helm
 spec:
 
@@ -475,6 +682,10 @@ spec:
       
       	"zset-max-listpack-value": int | *64
       
+      	"protected-mode"?: string & "yes" | "no"
+      
+      	"enable-debug-command"?: string & "yes" | "no" | "local"
+      
       	...
       }
       
@@ -500,27 +711,52 @@ kind: Cluster
 metadata:
   name: mycluster
   labels: 
-    helm.sh/chart: redis-cluster-0.5.0-alpha.3
+    helm.sh/chart: redis-cluster-0.5.0-alpha.8
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "7.0.5"
+    app.kubernetes.io/version: "7.0.6"
     app.kubernetes.io/managed-by: Helm
 spec:
   clusterDefinitionRef: redis  # ref clusterDefinition.name
-  clusterVersionRef: redis-7.0.5 # ref clusterVersion.name
+  clusterVersionRef: redis-7.0.6 # ref clusterVersion.name
   terminationPolicy: Delete
   affinity:
     topologyKeys: 
       - kubernetes.io/hostname
   componentSpecs:
-    - name: redis-repl # user-defined
+    - name: redis # user-defined
       componentDefRef: redis # ref clusterDefinition componentDefs.name
       monitor: false
       enabledLogs:     ["running"]
       replicas: 2
       primaryIndex: 0
       switchPolicy:
-        type: MaximumAvailability
+        type: Noop
+      resources:
+        limits:
+          cpu: "500m"
+          memory: "3Gi"
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+    - name: redis-sentinel # user-defined
+      componentDefRef: redis-sentinel # ref clusterDefinition componentDefs.name
+      replicas: 3
+      resources:
+        limits:
+          cpu: "500m"
+          memory: "3Gi"
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:

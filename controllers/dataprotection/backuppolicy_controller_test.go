@@ -42,8 +42,6 @@ var _ = Describe("Backup Policy Controller", func() {
 	const containerName = "mysql"
 	const defaultPVCSize = "1Gi"
 	const backupPolicyName = "test-backup-policy"
-	// const backupPolicyTplName = "test-backup-policy-template"
-	const backupRemoteVolumeName = "backup-remote-volume"
 	const backupRemotePVCName = "backup-remote-pvc"
 	const defaultSchedule = "0 3 * * *"
 	const defaultTTL = "7d"
@@ -70,7 +68,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS)
 		// mgr namespaced
 		inMgrNS := client.InNamespace(mgrNamespace)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inMgrNS, ml)
@@ -141,7 +139,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+					SetPVC(backupRemotePVCName).
 					Create(&testCtx).GetObject()
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
@@ -187,38 +185,37 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetBackupType(dpv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
 
-				By("mock jobs completed")
+				By("waiting expired backup completed")
 				backupExpiredKey := client.ObjectKeyFromObject(backupExpired)
 				patchK8sJobStatus(backupExpiredKey, batchv1.JobComplete)
-				backupOutLimit1Key := client.ObjectKeyFromObject(backupOutLimit1)
-				patchK8sJobStatus(backupOutLimit1Key, batchv1.JobComplete)
-				backupOutLimit2Key := client.ObjectKeyFromObject(backupOutLimit2)
-				patchK8sJobStatus(backupOutLimit2Key, batchv1.JobComplete)
-
-				By("waiting expired backup completed")
 				Eventually(testapps.CheckObj(&testCtx, backupExpiredKey,
 					func(g Gomega, fetched *dpv1alpha1.Backup) {
 						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
 					})).Should(Succeed())
-				By("waiting 1st limit backup completed")
-				Eventually(testapps.CheckObj(&testCtx, backupOutLimit1Key,
-					func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
-					})).Should(Succeed())
-				By("waiting 2nd limit backup completed")
-				Eventually(testapps.CheckObj(&testCtx, backupOutLimit2Key,
-					func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
-					})).Should(Succeed())
-
 				By("mock update expired backup status to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(-time.Hour * 24)}
 				backupStatus.StartTimestamp = backupStatus.Expiration
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupExpired))
+
+				By("waiting 1st limit backup completed")
+				backupOutLimit1Key := client.ObjectKeyFromObject(backupOutLimit1)
+				patchK8sJobStatus(backupOutLimit1Key, batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, backupOutLimit1Key,
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					})).Should(Succeed())
 				By("mock update 1st limit backup NOT to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
 				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour)}
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit1))
+
+				By("waiting 2nd limit backup completed")
+				backupOutLimit2Key := client.ObjectKeyFromObject(backupOutLimit2)
+				patchK8sJobStatus(backupOutLimit2Key, batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, backupOutLimit2Key,
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					})).Should(Succeed())
 				By("mock update 2nd limit backup NOT to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
 				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour * 2)}
@@ -245,7 +242,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+					SetPVC(backupRemotePVCName).
 					Create(&testCtx).GetObject()
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
@@ -269,7 +266,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+					SetPVC(backupRemotePVCName).
 					Create(&testCtx).GetObject()
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
@@ -291,11 +288,38 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetTargetSecretName(randomSecretName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).Create(&testCtx).GetObject()
+					SetPVC(backupRemotePVCName).
+					Create(&testCtx).GetObject()
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 					g.Expect(fetched.Spec.Full.Target.Secret.Name).To(Equal(randomSecretName))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("creating a backupPolicy with global backup config", func() {
+			It("ccreating a backupPolicy with global backup config", func() {
+				By("By creating a backupPolicy with empty secret")
+				pvcName := "backup-data"
+				pvcInitCapacity := "10Gi"
+				pvcStorageClass := "standard"
+				viper.SetDefault(constant.CfgKeyBackupPVCName, pvcName)
+				viper.SetDefault(constant.CfgKeyBackupPVCInitCapacity, pvcInitCapacity)
+				viper.SetDefault(constant.CfgKeyBackupPVCStorageClass, pvcStorageClass)
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddFullPolicy().
+					SetBackupToolName(backupToolName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					AddHookPreCommand("touch /data/mysql/.restore;sync").
+					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+					Create(&testCtx).GetObject()
+				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+					g.Expect(fetched.Spec.Full.PersistentVolumeClaim.Name).To(Equal(pvcName))
+					g.Expect(*fetched.Spec.Full.PersistentVolumeClaim.StorageClassName).To(Equal(pvcStorageClass))
+					g.Expect(fetched.Spec.Full.PersistentVolumeClaim.InitCapacity.String()).To(Equal(pvcInitCapacity))
 				})).Should(Succeed())
 			})
 		})

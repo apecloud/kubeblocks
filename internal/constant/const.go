@@ -23,7 +23,13 @@ const (
 	CfgKeyCtrlrMgrAffinity              = "CM_AFFINITY"
 	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
 	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
-	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS" // accept time
+	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"    // accept time
+	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"               // the global pvc name which persistent volume claim to store the backup data
+	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"      // the init capacity of pvc for creating the pvc, e.g. 10Gi.
+	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"      // the pvc storage class name.
+	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"      // the pvc create policy. support "IfNotPresent" or "Never"
+	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"      // the configmap name which contains a persistentVolume template.
+	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE" // the configmap namespace which contains a persistentVolume template.
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
@@ -73,17 +79,20 @@ const (
 	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
 	KBManagedByKey                  = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
 	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
+	BackupToolTypeLabelKey          = "kubeblocks.io/backup-tool-type"
 
 	// kubeblocks.io annotations
-	OpsRequestAnnotationKey           = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	ReconcileAnnotationKey            = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
-	RestartAnnotationKey              = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	SnapShotForStartAnnotationKey     = "kubeblocks.io/snapshot-for-start"
-	RestoreFromBackUpAnnotationKey    = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
-	ClusterSnapshotAnnotationKey      = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
-	LeaderAnnotationKey               = "cs.apps.kubeblocks.io/leader"
-	DefaultBackupPolicyAnnotationKey  = "dataprotection.kubeblocks.io/is-default-policy"
-	BackupPolicyTemplateAnnotationKey = "apps.kubeblocks.io/backup-policy-template"
+	OpsRequestAnnotationKey            = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey             = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey               = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	SnapShotForStartAnnotationKey      = "kubeblocks.io/snapshot-for-start"
+	RestoreFromBackUpAnnotationKey     = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
+	ClusterSnapshotAnnotationKey       = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	LeaderAnnotationKey                = "cs.apps.kubeblocks.io/leader"
+	DefaultBackupPolicyAnnotationKey   = "dataprotection.kubeblocks.io/is-default-policy"
+	BackupPolicyTemplateAnnotationKey  = "apps.kubeblocks.io/backup-policy-template"
+	RestoreFromTimeAnnotationKey       = "kubeblocks.io/restore-from-time"           // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
+	RestoreFromSrcClusterAnnotationKey = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
@@ -113,6 +122,9 @@ const (
 
 	// CMInsLastReconfigurePhaseKey defines the current phase
 	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
+
+	// CMInsEnableRerenderTemplateKey is used to enable rerender template
+	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
@@ -208,3 +220,5 @@ const (
 	AccountNameForSecret   = "username"
 	AccountPasswdForSecret = "password"
 )
+
+const DefaultBackupPvcInitCapacity = "100Gi"

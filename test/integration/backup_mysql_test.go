@@ -36,13 +36,10 @@ var _ = Describe("MySQL data protection function", func() {
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 	const scriptConfigName = "test-cluster-mysql-scripts"
-
-	const mysqlCompType = "replicasets"
+	const mysqlCompDefName = "replicasets"
 	const mysqlCompName = "mysql"
-
 	const backupPolicyTemplateName = "test-backup-policy-template"
 	const backupPolicyName = "test-backup-policy"
-	const backupRemoteVolumeName = "backup-remote-volume"
 	const backupRemotePVCName = "backup-remote-pvc"
 	const backupName = "test-backup-job"
 
@@ -92,13 +89,13 @@ var _ = Describe("MySQL data protection function", func() {
 		By("Create a clusterDef obj")
 		mode := int32(0755)
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
+			AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
 			AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
 		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(mysqlCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			AddComponent(mysqlCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 			Create(&testCtx).GetObject()
 
 		By("Create a cluster obj")
@@ -106,7 +103,7 @@ var _ = Describe("MySQL data protection function", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(mysqlCompName, mysqlCompType).
+			AddComponent(mysqlCompName, mysqlCompDefName).
 			SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
@@ -131,7 +128,7 @@ var _ = Describe("MySQL data protection function", func() {
 			SetBackupToolName(backupTool.Name).
 			AddMatchLabels(constant.AppInstanceLabelKey, clusterKey.Name).
 			SetTargetSecretName(component.GenerateConnCredential(clusterKey.Name)).
-			SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+			SetPVC(backupRemotePVCName).
 			Create(&testCtx).GetObject()
 		backupPolicyKey := client.ObjectKeyFromObject(backupPolicyObj)
 

@@ -263,16 +263,16 @@ type MockGetReturned struct {
 func WithConstructSequenceResult(mockObjs map[client.ObjectKey][]MockGetReturned) HandleGetReturnedObject {
 	sequenceAccessCounter := make(map[client.ObjectKey]int, len(mockObjs))
 	return func(key client.ObjectKey, obj client.Object) error {
-		accessableSequence, ok := mockObjs[key]
+		accessibleSequence, ok := mockObjs[key]
 		if !ok {
 			return fmt.Errorf("not exist: %v", key)
 		}
 		index := sequenceAccessCounter[key]
-		mockReturned := accessableSequence[index]
+		mockReturned := accessibleSequence[index]
 		if mockReturned.Err == nil {
 			SetGetReturnedObject(obj, mockReturned.Object)
 		}
-		if index < len(accessableSequence)-1 {
+		if index < len(accessibleSequence)-1 {
 			sequenceAccessCounter[key]++
 		}
 		return mockReturned.Err

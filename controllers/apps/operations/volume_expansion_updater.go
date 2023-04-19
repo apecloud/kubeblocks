@@ -96,7 +96,7 @@ func handleClusterVolumeExpandingPhase(ctx context.Context,
 			cluster.Status.SetComponentStatus(k, v)
 		}
 	}
-	// REVIEW: a single component status affect cluser level status?
+	// REVIEW: a single component status affect cluster level status?
 	cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 	return cli.Status().Patch(ctx, cluster, patch)
 }
@@ -181,7 +181,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 		}
 		// save the failed message to the progressDetail.
 		objectKey := getPVCProgressObjectKey(pvc.Name)
-		progressDetail := FindStatusProgressDetail(component.ProgressDetails, objectKey)
+		progressDetail := findStatusProgressDetail(component.ProgressDetails, objectKey)
 		if progressDetail == nil || progressDetail.Message != event.Message {
 			isChanged = true
 		}
@@ -192,7 +192,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 			Message:   event.Message,
 		}
 
-		SetComponentStatusProgressDetail(recorder, opsRequest, &component.ProgressDetails, *progressDetail)
+		setComponentStatusProgressDetail(recorder, opsRequest, &component.ProgressDetails, *progressDetail)
 		compsStatus[cName] = component
 		break
 	}

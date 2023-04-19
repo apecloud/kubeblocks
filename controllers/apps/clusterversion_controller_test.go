@@ -34,7 +34,7 @@ var _ = Describe("test clusterVersion controller", func() {
 		clusterDefName     = "mysql-definition-" + randomStr
 	)
 
-	const statefulCompType = "stateful"
+	const statefulCompDefName = "stateful"
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -54,7 +54,7 @@ var _ = Describe("test clusterVersion controller", func() {
 		It("test clusterVersion controller", func() {
 			By("create a clusterVersion obj")
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(statefulCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 
 			By("wait for clusterVersion phase is unavailable when clusterDef is not found")
@@ -65,7 +65,7 @@ var _ = Describe("test clusterVersion controller", func() {
 
 			By("create a clusterDefinition obj")
 			testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				Create(&testCtx).GetObject()
 
 			By("wait for clusterVersion phase is available")

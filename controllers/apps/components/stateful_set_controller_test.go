@@ -101,16 +101,16 @@ var _ = Describe("StatefulSet Controller", func() {
 
 		By("Mock a pod without role label and it will wait for HandleProbeTimeoutWhenPodsReady")
 		leaderPod := pods[0]
-		Expect(testapps.ChangeObj(&testCtx, leaderPod, func() {
-			delete(leaderPod.Labels, constant.RoleLabelKey)
+		Expect(testapps.ChangeObj(&testCtx, leaderPod, func(lpod *corev1.Pod) {
+			delete(lpod.Labels, constant.RoleLabelKey)
 		})).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(leaderPod), func(g Gomega, pod *corev1.Pod) {
 			g.Expect(pod.Labels[constant.RoleLabelKey] == "").Should(BeTrue())
 		})).Should(Succeed())
 
 		By("mock restart component to trigger reconcile of StatefulSet controller")
-		Expect(testapps.ChangeObj(&testCtx, sts, func() {
-			sts.Spec.Template.Annotations = map[string]string{
+		Expect(testapps.ChangeObj(&testCtx, sts, func(lsts *appsv1.StatefulSet) {
+			lsts.Spec.Template.Annotations = map[string]string{
 				constant.RestartAnnotationKey: time.Now().Format(time.RFC3339),
 			}
 		})).Should(Succeed())
@@ -127,12 +127,12 @@ var _ = Describe("StatefulSet Controller", func() {
 			g.Expect(compStatus.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // original expecting value RebootingPhase
 			g.Expect(compStatus.PodsReady).ShouldNot(BeNil())
 			g.Expect(*compStatus.PodsReady).Should(BeTrue())
-			// REVIEW/TODO: ought add extra condtion check for RebootingPhase
+			// REVIEW/TODO: ought add extra condition check for RebootingPhase
 		})).Should(Succeed())
 
 		By("add leader role label for leaderPod to mock consensus component to be Running")
-		Expect(testapps.ChangeObj(&testCtx, leaderPod, func() {
-			leaderPod.Labels[constant.RoleLabelKey] = "leader"
+		Expect(testapps.ChangeObj(&testCtx, leaderPod, func(lpod *corev1.Pod) {
+			lpod.Labels[constant.RoleLabelKey] = "leader"
 		})).Should(Succeed())
 		return pods
 	}
@@ -155,8 +155,8 @@ var _ = Describe("StatefulSet Controller", func() {
 				}
 			})).Should(Succeed())
 			_ = testapps.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{consensusCompName})
-			Expect(testapps.ChangeObj(&testCtx, cluster, func() {
-				cluster.Annotations = map[string]string{
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
+				lcluster.Annotations = map[string]string{
 					constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"}]`, opsRequestName),
 				}
 			})).Should(Succeed())
@@ -180,12 +180,12 @@ var _ = Describe("StatefulSet Controller", func() {
 			})()).Should(Succeed())
 
 			By("mock stop operation and processed successfully")
-			Expect(testapps.ChangeObj(&testCtx, cluster, func() {
-				cluster.Spec.ComponentSpecs[0].Replicas = 0
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
+				lcluster.Spec.ComponentSpecs[0].Replicas = 0
 			})).Should(Succeed())
-			Expect(testapps.ChangeObj(&testCtx, sts, func() {
+			Expect(testapps.ChangeObj(&testCtx, sts, func(lsts *appsv1.StatefulSet) {
 				replicas := int32(0)
-				sts.Spec.Replicas = &replicas
+				lsts.Spec.Replicas = &replicas
 			})).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				testk8s.MockStatefulSetReady(sts)

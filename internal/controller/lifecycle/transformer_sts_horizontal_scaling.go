@@ -166,6 +166,10 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 				return err
 			}
 			if !allPVCsExist {
+				if comp.HorizontalScalePolicy == nil {
+					vertex.immutable = false
+					return nil
+				}
 				// do backup according to component's horizontal scale policy
 				if err := doBackup(reqCtx, tranxCtx.Client, comp, snapshotKey, dag, rootVertex, vertex); err != nil {
 					return err

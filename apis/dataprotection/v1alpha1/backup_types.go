@@ -18,8 +18,8 @@ package v1alpha1
 
 import (
 	"fmt"
+	"sort"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -77,7 +77,7 @@ type BackupStatus struct {
 
 	// remoteVolume saves the backup data.
 	// +optional
-	RemoteVolume *corev1.Volume `json:"remoteVolume,omitempty"`
+	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"`
 
 	// backupToolName referenced backup tool name.
 	// +optional
@@ -206,4 +206,46 @@ func (r *BackupSpec) Validate(backupPolicy *BackupPolicy) error {
 		}
 	}
 	return nil
+}
+
+// GetRecoverableTimeRange return the recoverable time range array
+func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
+	// filter backups with backupLog
+	backupsWithLog := make([]Backup, 0)
+	for _, b := range backups {
+		if b.Status.Phase == BackupCompleted &&
+			b.Status.Manifests != nil && b.Status.Manifests.BackupLog != nil {
+			backupsWithLog = append(backupsWithLog, b)
+		}
+	}
+	if len(backupsWithLog) == 0 {
+		return nil
+	}
+	sort.Slice(backups, func(i, j int) bool {
+		if backups[i].Status.StartTimestamp == nil && backups[j].Status.StartTimestamp != nil {
+			return false
+		}
+		if backups[i].Status.StartTimestamp != nil && backups[j].Status.StartTimestamp == nil {
+			return true
+		}
+		if backups[i].Status.StartTimestamp.Equal(backups[j].Status.StartTimestamp) {
+			return backups[i].Name < backups[j].Name
+		}
+		return backups[i].Status.StartTimestamp.Before(backups[j].Status.StartTimestamp)
+	})
+	result := make([]BackupLogStatus, 0)
+	start, end := backupsWithLog[0].Status.Manifests.BackupLog.StopTime, backupsWithLog[0].Status.Manifests.BackupLog.StopTime
+
+	for i := 1; i < len(backupsWithLog); i++ {
+		b := backupsWithLog[i].Status.Manifests.BackupLog
+		if b.StartTime.Before(end) || b.StartTime.Equal(end) {
+			if b.StopTime.After(end.Time) {
+				end = b.StopTime
+			}
+		} else {
+			result = append(result, BackupLogStatus{StartTime: start, StopTime: end})
+			start, end = b.StopTime, b.StopTime
+		}
+	}
+	return append(result, BackupLogStatus{StartTime: start, StopTime: end})
 }

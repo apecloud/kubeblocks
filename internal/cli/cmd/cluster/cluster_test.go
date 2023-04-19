@@ -132,6 +132,77 @@ var _ = Describe("Cluster", func() {
 		})
 	})
 
+	Context("create validate", func() {
+		var o *CreateOptions
+		BeforeEach(func() {
+			o = &CreateOptions{
+				ClusterDefRef:     testing.ClusterDefName,
+				ClusterVersionRef: testing.ClusterVersionName,
+				SetFile:           testComponentPath,
+				UpdatableFlags: UpdatableFlags{
+					TerminationPolicy: "Delete",
+				},
+				BaseOptions: create.BaseOptions{
+					Namespace: "default",
+					Name:      "mycluster",
+					Dynamic:   tf.FakeDynamicClient,
+					IOStreams: streams,
+				},
+			}
+		})
+
+		It("can validate whether the ClusterDefRef is null when create a new cluster ", func() {
+			Expect(o.ClusterDefRef).ShouldNot(BeEmpty())
+			Expect(o.Validate()).Should(Succeed())
+			o.ClusterDefRef = ""
+			Expect(o.Validate()).Should(HaveOccurred())
+		})
+
+		It("can validate whether the TerminationPolicy is null when create a new cluster ", func() {
+			Expect(o.TerminationPolicy).ShouldNot(BeEmpty())
+			Expect(o.Validate()).Should(Succeed())
+			o.TerminationPolicy = ""
+			Expect(o.Validate()).Should(HaveOccurred())
+		})
+
+		It("can validate whether the ClusterVersionRef is null and can't get latest version from client when create a new cluster ", func() {
+			Expect(o.ClusterVersionRef).ShouldNot(BeEmpty())
+			Expect(o.Validate()).Should(Succeed())
+			o.ClusterVersionRef = ""
+			Expect(o.Validate()).Should(Succeed())
+		})
+
+		It("can validate whether --set and --set-file both are specified when create a new cluster ", func() {
+			Expect(o.SetFile).ShouldNot(BeEmpty())
+			Expect(o.Values).Should(BeNil())
+			Expect(o.Validate()).Should(Succeed())
+			o.Values = []string{"notEmpty"}
+			Expect(o.Validate()).Should(HaveOccurred())
+		})
+
+		It("can validate whether the name is not specified and fail to generate a random cluster name when create a new cluster ", func() {
+			Expect(o.Name).ShouldNot(BeEmpty())
+			Expect(o.Validate()).Should(Succeed())
+			o.Name = ""
+			Expect(o.Validate()).Should(Succeed())
+		})
+
+		It("can validate whether the name is not longer than 16 characters when create a new cluster", func() {
+			Expect(len(o.Name)).Should(BeNumerically("<=", 16))
+			Expect(o.Validate()).Should(Succeed())
+			moreThan16 := 17
+			bytes := make([]byte, 0)
+			var clusterNameMoreThan16 string
+			for i := 0; i < moreThan16; i++ {
+				bytes = append(bytes, byte(i%26+'a'))
+			}
+			clusterNameMoreThan16 = string(bytes)
+			Expect(len(clusterNameMoreThan16)).Should(BeNumerically(">", 16))
+			o.Name = clusterNameMoreThan16
+			Expect(o.Validate()).Should(HaveOccurred())
+		})
+	})
+
 	It("delete", func() {
 		cmd := NewDeleteCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())

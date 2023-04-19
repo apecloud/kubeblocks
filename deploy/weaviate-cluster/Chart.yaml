@@ -4,6 +4,6 @@ description: A weaviate cluster Helm chart for KubeBlocks.
 
 type: application
 
-version: 0.1.0
+version: 0.5.0-alpha.8
 
 appVersion: "1.18.0"

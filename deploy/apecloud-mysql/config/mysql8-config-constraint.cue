@@ -83,7 +83,7 @@
 	// If this variable is enabled (the default), transactions are committed in the same order they are written to the binary log. If disabled, transactions may be committed in parallel.
 	binlog_order_commits?: string & "0" | "1" | "OFF" | "ON"
 
-	// Whether the server logs full or minmal rows with row-based replication.
+	// Whether the server logs full or minimal rows with row-based replication.
 	binlog_row_image?: string & "FULL" | "MINIMAL" | "NOBLOB"
 
 	// Controls whether metadata is logged using FULL or MINIMAL format. FULL causes all metadata to be logged; MINIMAL means that only metadata actually required by slave is logged. Default: MINIMAL.
@@ -165,6 +165,9 @@
 	// Write a core file if mysqld dies.
 	"core-file"?: string & "0" | "1" | "OFF" | "ON"
 
+	// xengine enable
+	"xengine"?: string & "0" | "1" | "OFF" | "ON"
+
 	// Abort a recursive common table expression if it does more than this number of iterations.
 	cte_max_recursion_depth: int & >=0 & <=4294967295 | *1000
 
@@ -181,7 +184,7 @@
 	default_password_lifetime: int & >=0 & <=65535 | *0
 
 	// The default storage engine (table type).
-	default_storage_engine?: string & "InnoDB" | "MRG_MYISAM" | "BLACKHOLE" | "CSV" | "MEMORY" | "FEDERATED" | "ARCHIVE" | "MyISAM"
+	default_storage_engine?: string & "InnoDB" | "MRG_MYISAM" | "BLACKHOLE" | "CSV" | "MEMORY" | "FEDERATED" | "ARCHIVE" | "MyISAM" | "xengine"
 
 	// Server current time zone
 	default_time_zone?: string
@@ -1526,8 +1529,8 @@
 	// For SQL window functions, determines whether to enable inversion optimization for moving window frames also for floating values.
 	windowing_use_high_precision: string & "0" | "1" | "OFF" | "ON" | *"1"
 
-	// other parmeters
-	// reference mysql parmeters
+	// other parameters
+	// reference mysql parameters
 	...
 }
 

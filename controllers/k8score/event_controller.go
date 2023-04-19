@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensusset"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -182,9 +182,9 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
-		return role, consensusset.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, pod, role)
+		return role, consensus.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, pod, role)
 	case appsv1alpha1.Replication:
-		return role, replicationset.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, pod, role)
+		return role, replication.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, pod, role)
 	}
 	return role, nil
 }

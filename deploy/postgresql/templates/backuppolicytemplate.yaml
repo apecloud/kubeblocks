@@ -20,5 +20,14 @@ spec:
         connectionCredentialKey:
           passwordKey: password
           usernameKey: username
+      hooks:
+        containerName: postgresql
+        preCommands:
+          - psql -c "SELECT txid_current();CHECKPOINT;"
+      backupStatusUpdates:
+        - path: manifests.backupLog
+          containerName: postgresql
+          script: /kb-scripts/backup-log-collector.sh
+          updateStage: pre
     full:
       backupToolName: postgres-basebackup

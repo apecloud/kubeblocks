@@ -88,7 +88,7 @@ var _ = Describe("List Account Options", func() {
 			o := NewListUserOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			args := []string{}
-			Expect(o.Validate(args)).Should(MatchError(errClusterNameNum))
+			Expect(o.Validate(args)).Should(MatchError(errClusterNameorInstName))
 
 			// add two elements
 			By("add two args")
@@ -102,7 +102,7 @@ var _ = Describe("List Account Options", func() {
 
 			// set pod name
 			o.PodName = "pod1"
-			Expect(o.Validate(args)).Should(Succeed())
+			Expect(o.Validate(args)).Should(MatchError(errClusterNameorInstName))
 			// set component name
 			o.ComponentName = "foo-component"
 			Expect(o.Validate(args)).Should(MatchError(errCompNameOrInstName))

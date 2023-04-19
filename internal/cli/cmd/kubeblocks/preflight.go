@@ -76,6 +76,8 @@ var (
 const (
 	EKSHostPreflight = "data/eks_hostpreflight.yaml"
 	EKSPreflight     = "data/eks_preflight.yaml"
+	GKEHostPreflight = "data/gke_hostpreflight.yaml"
+	GKEPreflight     = "data/gke_preflight.yaml"
 )
 
 // PreflightOptions declares the arguments accepted by the preflight command
@@ -131,6 +133,13 @@ func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 		if data, err := defaultVendorYamlData.ReadFile(EKSPreflight); err == nil {
 			yamlDataList = append(yamlDataList, data)
 		}
+	case util.GKEProvider:
+		if data, err := defaultVendorYamlData.ReadFile(GKEHostPreflight); err == nil {
+			yamlDataList = append(yamlDataList, data)
+		}
+		if data, err := defaultVendorYamlData.ReadFile(GKEPreflight); err == nil {
+			yamlDataList = append(yamlDataList, data)
+		}
 	case util.UnknownProvider:
 		fallthrough
 	default:
@@ -151,7 +160,7 @@ func (p *PreflightOptions) complete(factory cmdutil.Factory, args []string) erro
 		if err != nil {
 			return errors.New("get k8s version of server failed, and please check your k8s accessibility")
 		}
-		vendorName, err := util.GetK8sProvider(versionInfo[util.KubernetesApp], clientSet)
+		vendorName, err := util.GetK8sProvider(versionInfo.Kubernetes, clientSet)
 		if err != nil {
 			return errors.New("get k8s cloud provider failed, and please check your k8s accessibility")
 		}

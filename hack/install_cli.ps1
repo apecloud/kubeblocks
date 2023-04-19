@@ -107,10 +107,10 @@ function downloadFile {
     $timer.Interval = 500
     
     Register-ObjectEvent -InputObject $timer -EventName Elapsed -SourceIdentifier "TimerElapsed" -Action {
-        $precent = $Global:Data.SourceArgs.ProgressPercentage
+        $percent = $Global:Data.SourceArgs.ProgressPercentage
         $totalBytes = $Global:Data.SourceArgs.TotalBytesToReceive
         $receivedBytes = $Global:Data.SourceArgs.BytesReceived
-        if ($precent -ne $null) {
+        if ($percent -ne $null) {
             $downloadProgress = [Math]::Round(($receivedBytes / $totalBytes) * 100, 2)
             $status = "Downloaded {0} of {1} bytes" -f $receivedBytes, $totalBytes
             Write-Progress -Activity "Downloading kbcli..." -Status $status -PercentComplete $downloadProgress

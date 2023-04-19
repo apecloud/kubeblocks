@@ -212,11 +212,10 @@ func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.
 			return "", err
 		}
 	}
-	pgOps.OriRole = PRIMARY
 	if isRecovery {
-		pgOps.OriRole = SECONDARY
+		return SECONDARY, nil
 	}
-	return pgOps.OriRole, nil
+	return PRIMARY, nil
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
@@ -428,7 +427,7 @@ func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *bind
 		object = UserInfo{}
 
 		sqlTplRend = func(user UserInfo) string {
-			if SuperUserRole.EqualTo(user.UserName) {
+			if SuperUserRole.EqualTo(user.RoleName) {
 				if op == GrantUserRoleOp {
 					return "ALTER USER " + user.UserName + " WITH SUPERUSER;"
 				} else {

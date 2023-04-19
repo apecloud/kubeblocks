@@ -41,7 +41,7 @@
 	// mysql config validator
 	mysqlld: #SectionParameter
 
-	// ingore client parameter validate
+	// ignore client parameter validate
 	// mysql client: a set of name/value pairs.
 	client?: {
 		[string]: string

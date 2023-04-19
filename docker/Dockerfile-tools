@@ -1,8 +1,8 @@
 # Build the kubeblocks tools binaries
 # includes kbcli, kubectl, and manager tools.
-FROM --platform=${BUILDPLATFORM} golang:1.19 as builder
+FROM --platform=${BUILDPLATFORM} golang:1.20 as builder
 
-## docker buildx buid injected build-args:
+## docker buildx build injected build-args:
 #BUILDPLATFORM — matches the current machine. (e.g. linux/amd64)
 #BUILDOS — os component of BUILDPLATFORM, e.g. linux
 #BUILDARCH — e.g. amd64, arm64, riscv64

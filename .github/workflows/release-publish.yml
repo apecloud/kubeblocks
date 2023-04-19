@@ -8,7 +8,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   TAG_NAME: ${{ github.ref_name }}
-  GO_VERSION: '1.19'
+  GO_VERSION: "1.20"
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'
   GITLAB_KBCLI_PROJECT_ID: 85948

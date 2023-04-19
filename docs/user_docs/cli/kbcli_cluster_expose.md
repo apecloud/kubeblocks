@@ -2,10 +2,10 @@
 title: kbcli cluster expose
 ---
 
-Expose a cluster with a new endpoint and the new endpoint can be found by executing the command 'kbcli cluster describe <cluster-name>'.
+Expose a cluster with a new endpoint, the new endpoint can be found by executing 'kbcli cluster describe NAME'.
 
 ```
-kbcli cluster expose [flags]
+kbcli cluster expose NAME --enable=[true|false] --type=[vpc|internet] [flags]
 ```
 
 ### Examples

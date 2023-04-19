@@ -51,7 +51,7 @@ type configOpsOptions struct {
 var (
 	createReconfigureExample = templates.Examples(`
 		# update component params 
-		kbcli cluster configure <cluster-name> --component=<component-name> --config-spec=<config-spec-name> --config-file=<config-file> --set max_connections=1000,general_log=OFF
+		kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
 
 		# if only one component, and one config spec, and one config file, simplify the use of configure. e.g:
 		# update mysql max_connections, cluster name is mycluster
@@ -206,7 +206,7 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		OperationsOptions: newBaseOperationsOptions(streams, appsv1alpha1.ReconfiguringType, false),
 	}
 	inputs := buildOperationsInputs(f, o.OperationsOptions)
-	inputs.Use = "configure"
+	inputs.Use = "configure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file]"
 	inputs.Short = "Reconfigure parameters with the specified components in the cluster."
 	inputs.Example = createReconfigureExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {

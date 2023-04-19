@@ -358,7 +358,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	}
 
 	inputs := create.Inputs{
-		Use:             "create [CLUSTER_NAME]",
+		Use:             "create [NAME]",
 		Short:           "Create a cluster.",
 		Example:         clusterCreateExample,
 		CueTemplateName: CueTemplateName,

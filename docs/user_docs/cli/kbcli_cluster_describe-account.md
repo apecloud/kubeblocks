@@ -21,7 +21,7 @@ kbcli cluster describe-account [flags]
       --component string   Specify the name of component to be connected. If not specified, the first component will be used.
   -h, --help               help for describe-account
   -i, --instance string    Specify the name of instance to be connected.
-  -u, --username string    Required. Specify the name of user
+      --name string        Required. Specify the name of user
 ```
 
 ### Options inherited from parent commands

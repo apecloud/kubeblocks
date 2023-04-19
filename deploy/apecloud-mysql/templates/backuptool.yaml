@@ -1,7 +1,7 @@
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
-  name: xtrabackup-apecloud-mysql
+  name: xtrabackup-for-apecloud-mysql
   labels:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
     {{- include "apecloud-mysql.labels" . | nindent 4 }}

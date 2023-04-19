@@ -72,15 +72,16 @@ var _ = Describe("sts horizontal scaling test", func() {
 			Expect(intctrlutil.SetOwnership(cluster, pvc2, scheme, dbClusterFinalizerName)).Should(Succeed())
 
 			By("prepare params for transformer")
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: context.Background(),
-			}
 			ctrl, k8sMock := testutil.SetupK8sMock()
 			defer ctrl.Finish()
-			cr := clusterRefResources{cd: *cd, cv: *cv}
-
-			transformer := &stsHorizontalScalingTransformer{ctx: reqCtx, cli: k8sMock, cr: cr}
-
+			transCtx := &ClusterTransformContext{
+				Context: context.Background(),
+				Client: k8sMock,
+				ClusterDef: cd,
+				ClusterVer: cv,
+				Cluster: cluster,
+				OrigCluster: cluster.DeepCopy(),
+			}
 			By("prepare initial DAG with sts.action=UPDATE")
 			dag := graph.NewDAG()
 			rootVertex := &lifecycleVertex{obj: cluster, oriObj: cluster.DeepCopy(), action: actionPtr(STATUS)}
@@ -100,15 +101,17 @@ var _ = Describe("sts horizontal scaling test", func() {
 						return nil
 					}).AnyTimes()
 
+			transformer := &StsHorizontalScalingTransformer{}
+
 			By("do transform")
-			Expect(transformer.Transform(dag)).Should(Succeed())
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			Expect(len(findAll[*corev1.PersistentVolumeClaim](dag))).Should(Equal(0))
 
 			By("prepare initial DAG with sts.action=DELETE")
 			stsVertex.action = actionPtr(DELETE)
 
 			By("do transform")
-			Expect(transformer.Transform(dag)).Should(Succeed())
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			Expect(len(findAll[*corev1.PersistentVolumeClaim](dag))).Should(Equal(2))
 		})
 	})

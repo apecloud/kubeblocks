@@ -27,8 +27,8 @@ import (
 )
 
 func CustomizedObjFromYaml[T generics.Object, PT generics.PObject[T],
-	L generics.ObjList[T]](filePath string, signature func(T, L)) (PT, error) {
-	objList, err := CustomizedObjectListFromYaml[T, PT, L](filePath, signature)
+	L generics.ObjList[T], PL generics.PObjList[T, L]](filePath string, signature func(T, L)) (PT, error) {
+	objList, err := CustomizedObjectListFromYaml[T, PT, L, PL](filePath, signature)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func CustomizedObjFromYaml[T generics.Object, PT generics.PObject[T],
 }
 
 func CustomizedObjectListFromYaml[T generics.Object, PT generics.PObject[T],
-	L generics.ObjList[T]](yamlfile string, signature func(T, L)) ([]PT, error) {
+	L generics.ObjList[T], PL generics.PObjList[T, L]](yamlfile string, signature func(T, L)) ([]PT, error) {
 	objBytes, err := os.ReadFile(yamlfile)
 	if err != nil {
 		return nil, err
@@ -49,13 +49,13 @@ func CustomizedObjectListFromYaml[T generics.Object, PT generics.PObject[T],
 		if len(bytes.TrimSpace(doc)) == 0 {
 			continue
 		}
-		objList = append(objList, CreateTypedObjectFromYamlByte[T, PT, L](doc, signature))
+		objList = append(objList, CreateTypedObjectFromYamlByte[T, PT, L, PL](doc, signature))
 	}
 	return objList, nil
 }
 
 func CreateTypedObjectFromYamlByte[T generics.Object, PT generics.PObject[T],
-	L generics.ObjList[T]](yamlBytes []byte, _ func(T, L)) PT {
+	L generics.ObjList[T], PL generics.PObjList[T, L]](yamlBytes []byte, _ func(T, L)) PT {
 	var obj PT
 	if err := yaml.Unmarshal(yamlBytes, &obj); err != nil {
 		return nil
@@ -63,8 +63,8 @@ func CreateTypedObjectFromYamlByte[T generics.Object, PT generics.PObject[T],
 	return obj
 }
 
-func GetTypedResourceObjectBySignature[T generics.Object, PT generics.PObject[T],
-	L generics.ObjList[T]](objects []client.Object, _ func(T, L)) PT {
+func GetResourceObjectWithType[T generics.Object, PT generics.PObject[T],
+	L generics.ObjList[T], PL generics.PObjList[T, L]](objects []client.Object, _ func(T, L)) PT {
 	for _, object := range objects {
 		if cd, ok := object.(PT); ok {
 			return cd

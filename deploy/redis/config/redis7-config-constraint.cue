@@ -148,6 +148,3 @@
 
 	...
 }
-
-configuration: #RedisParameter & {
-}

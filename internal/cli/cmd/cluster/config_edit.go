@@ -44,13 +44,14 @@ type editConfigOptions struct {
 	replaceFile bool
 }
 
-var editConfigExample = templates.Examples(`
-		# edit config for component 
-		kbcli cluster edit-config <cluster-name> [--component=<component-name>] [--config-spec=<config-spec-name>] [--config-file=<config-file>] 
+var (
+	editConfigUse = "edit-config NAME [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file]"
 
+	editConfigExample = templates.Examples(`
 		# update mysql max_connections, cluster name is mycluster
 		kbcli cluster edit-config mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf 
 	`)
+)
 
 func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error) error {
 	wrapper := o.wrapper
@@ -163,7 +164,7 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 			OperationsOptions: newBaseOperationsOptions(streams, appsv1alpha1.ReconfiguringType, false),
 		}}
 	inputs := buildOperationsInputs(f, editOptions.OperationsOptions)
-	inputs.Use = "edit-config"
+	inputs.Use = editConfigUse
 	inputs.Short = "Edit the config file of the component."
 	inputs.Example = editConfigExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {

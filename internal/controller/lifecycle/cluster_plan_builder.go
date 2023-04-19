@@ -146,6 +146,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	// new a DAG and apply chain on it, after that we should get the final Plan
 	dag := graph.NewDAG()
 	err = c.transformers.ApplyTo(c.transCtx, dag)
+	// log for debug
 	c.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
 
 	// we got the execution plan
@@ -234,6 +235,8 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 				// }
 				patch := client.MergeFrom(origCluster.DeepCopy())
 				if err := c.cli.Patch(c.transCtx.Context, cluster, patch); err != nil {
+					// log for debug
+					// TODO:(free6om) make error message smaller when refactor done.
 					c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
 					return err
 				}
@@ -263,7 +266,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		}
 		err = c.cli.Update(c.transCtx.Context, o)
 		if err != nil && !apierrors.IsNotFound(err) {
-			c.transCtx.Logger.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", o, node.oriObj, o))
+			c.transCtx.Logger.Error(err, fmt.Sprintf("update %T error: %s", o, node.oriObj.GetName()))
 			return err
 		}
 		// TODO: find a better comparison way that knows whether fields are updated before calling the Update func
@@ -272,7 +275,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
 			err := c.cli.Update(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
-				c.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error, orig: %v, curr: %v", node.obj, node.oriObj, node.obj))
+				c.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", node.obj, node.oriObj.GetName()))
 				return err
 			}
 		}

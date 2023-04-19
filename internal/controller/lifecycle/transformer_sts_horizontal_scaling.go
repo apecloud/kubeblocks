@@ -18,12 +18,12 @@ package lifecycle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -328,7 +328,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				"HorizontalScaleFailed",
 				"volume snapshot not support")
 			// TODO: add ut
-			return errors.Errorf("volume snapshot not support")
+			return fmt.Errorf("volume snapshot not support")
 		}
 		vcts := component.VolumeClaimTemplates
 		if len(vcts) == 0 {
@@ -662,7 +662,7 @@ func checkedCreatePVCFromSnapshot(cli roclient.ReadonlyClient,
 			return err
 		}
 		if len(vsList.Items) == 0 {
-			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, component.Name)
+			return fmt.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, component.Name)
 		}
 		// exclude volumes that are deleting
 		vsName := ""
@@ -709,7 +709,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 			if backupList.Items[0].Status.Phase == dataprotectionv1alpha1.BackupFailed {
 				reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning,
 					"HorizontalScaleFailed", "backup %s status failed", backupKey.Name)
-				return errors.Errorf("cluster %s h-scale failed, backup error: %s",
+				return fmt.Errorf("cluster %s h-scale failed, backup error: %s",
 					cluster.Name, backupList.Items[0].Status.FailureReason)
 			}
 			return nil

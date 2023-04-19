@@ -59,9 +59,8 @@ var _ = Describe("", func() {
 			}
 		)
 
-		constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultGeneralResourceConstraintName).
-			AddConstraints(testapps.ResourceConstraintNormal).
-			AddConstraints(testapps.ResourceConstraintSpecial).
+		constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+			AddConstraints(testapps.GeneralResourceConstraint).
 			Create(&testCtx).GetObject()
 
 		componentClassDefinition = testapps.NewComponentClassDefinitionFactory("custom", "apecloud-mysql", "mysql").

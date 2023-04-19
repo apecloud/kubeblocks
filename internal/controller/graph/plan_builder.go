@@ -18,13 +18,23 @@ package graph
 
 // PlanBuilder builds a Plan by applying a group of Transformer to an empty DAG.
 type PlanBuilder interface {
+	// Init loads the primary object to be reconciled, and does meta initialization
 	Init() error
+
+	// AddTransformer adds transformers to the builder in sequence order.
+	// And the transformers will be executed in the add order.
 	AddTransformer(transformer ...Transformer) PlanBuilder
+
+	// AddParallelTransformer adds transformers to the builder.
+	// And the transformers will be executed in parallel.
 	AddParallelTransformer(transformer ...Transformer) PlanBuilder
+
+	// Build runs all the transformers added by AddTransformer and/or AddParallelTransformer.
 	Build() (Plan, error)
 }
 
 // Plan defines the final actions should be executed.
 type Plan interface {
+	// Execute the plan
 	Execute() error
 }

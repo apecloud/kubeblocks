@@ -26,6 +26,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/client"
 )
 
+// TransformContext is used by Transformer.Transform
 type TransformContext interface {
 	GetContext() context.Context
 	GetClient() client.ReadonlyClient
@@ -38,10 +39,14 @@ type Transformer interface {
 	Transform(ctx TransformContext, dag *DAG) error
 }
 
+// TransformerChain chains a group Transformer together
 type TransformerChain []Transformer
 
+// ErrFastReturn is used to stop the Transformer chain for some purpose.
+// Use it in Transformer.Transform when all jobs have done and no need to run following transformers
 var ErrFastReturn = errors.New("fast return")
 
+// ApplyTo applies TransformerChain t to dag
 func (t *TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
 	if t == nil {
 		return nil

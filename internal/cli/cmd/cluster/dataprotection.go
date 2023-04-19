@@ -70,7 +70,7 @@ var (
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backup
-		kbcli cluster list-backup
+		kbcli cluster list-backups
 	`)
 	deleteBackupExample = templates.Examples(`
 		# delete a backup named backup-name
@@ -242,7 +242,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	customOutPut := func(opt *create.BaseOptions) {
 		output := fmt.Sprintf("Backup %s created successfully, you can view the progress:", opt.Name)
 		printer.PrintLine(output)
-		nextLine := fmt.Sprintf("\tkbcli cluster list-backup --name=%s -n %s", opt.Name, opt.Namespace)
+		nextLine := fmt.Sprintf("\tkbcli cluster list-backups --name=%s -n %s", opt.Name, opt.Namespace)
 		printer.PrintLine(nextLine)
 	}
 	inputs := create.Inputs{
@@ -339,7 +339,7 @@ func printBackupList(o ListBackupOptions) error {
 func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &ListBackupOptions{ListOptions: list.NewListOptions(f, streams, types.OpsGVR())}
 	cmd := &cobra.Command{
-		Use:               "list-backup",
+		Use:               "list-backups",
 		Short:             "List backups.",
 		Aliases:           []string{"ls-backup"},
 		Example:           listBackupExample,

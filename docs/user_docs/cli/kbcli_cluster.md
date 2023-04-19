@@ -61,8 +61,8 @@ Cluster command.
 * [kbcli cluster label](kbcli_cluster_label.md)	 - Update the labels on cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters.
 * [kbcli cluster list-accounts](kbcli_cluster_list-accounts.md)	 - List accounts for a cluster
-* [kbcli cluster list-backup](kbcli_cluster_list-backup.md)	 - List backups.
 * [kbcli cluster list-backup-policy](kbcli_cluster_list-backup-policy.md)	 - List backups policies.
+* [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backups.
 * [kbcli cluster list-components](kbcli_cluster_list-components.md)	 - List cluster components.
 * [kbcli cluster list-events](kbcli_cluster_list-events.md)	 - List cluster events.
 * [kbcli cluster list-instances](kbcli_cluster_list-instances.md)	 - List cluster instances.

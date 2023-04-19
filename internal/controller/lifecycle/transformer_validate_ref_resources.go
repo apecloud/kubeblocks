@@ -72,7 +72,6 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 			message = fmt.Sprintf("%s, cv: %s", message, cv.Name)
 		}
 		err = errors.New(message)
-		transCtx.Logger.Info(fmt.Sprintf("validation error: %v", err))
 		return newRequeueError(requeueDuration, message)
 	}
 

@@ -162,12 +162,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// fix meta
 			// fix finalizer and cd&cv labels
 			&lifecycle.FixMetaTransformer{},
+			// validate
 			// validate cd & cv's existence and availability
 			&lifecycle.ValidateAndLoadRefResourcesTransformer{},
 			// validate config
 			&lifecycle.ValidateEnableLogsTransformer{},
+			// fix spec
 			// fill class related info
 			&lifecycle.FillClassTransformer{},
+			// generate objects
 			// cluster to K8s objects and put them into dag
 			&lifecycle.ClusterTransformer{Client: r.Client},
 			// tls certs secret
@@ -184,6 +187,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.ConfigTransformer{},
 			// read old snapshot from cache, and generate diff plan
 			&lifecycle.ObjectActionTransformer{},
+			// day-2 ops
 			// horizontal scaling
 			&lifecycle.StsHorizontalScalingTransformer{},
 			// stateful set pvc Update
@@ -192,6 +196,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.ClusterStatusTransformer{},
 			// handle PITR
 			&lifecycle.PITRTransformer{Client: r.Client},
+			// always safe to put your transformer below
 		).
 		Build()
 

@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	klog "k8s.io/klog/v2"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/sqlchannel"
@@ -46,11 +46,11 @@ func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op 
 
 func (o *GrantOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVarP(&o.info.UserName, "username", "u", "", "Required. Specify the name of user.")
+	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required. Specify the name of user.")
 	cmd.Flags().StringVarP(&o.info.RoleName, "role", "r", "", "Role name should be one of {SUPERUSER, READWRITE, READONLY}")
 }
 
-func (o GrantOptions) Validate(args []string) error {
+func (o *GrantOptions) Validate(args []string) error {
 	if err := o.AccountBaseOptions.Validate(args); err != nil {
 		return err
 	}
@@ -67,8 +67,8 @@ func (o GrantOptions) Validate(args []string) error {
 }
 
 func (o *GrantOptions) validRoleName() error {
-	candiates := []string{sqlchannel.SuperUserRole, sqlchannel.ReadWriteRole, sqlchannel.ReadOnlyRole}
-	if slices.Contains(candiates, strings.ToLower(o.info.RoleName)) {
+	candidates := []string{sqlchannel.SuperUserRole, sqlchannel.ReadWriteRole, sqlchannel.ReadOnlyRole}
+	if slices.Contains(candidates, strings.ToLower(o.info.RoleName)) {
 		return nil
 	}
 	return errInvalidRoleName

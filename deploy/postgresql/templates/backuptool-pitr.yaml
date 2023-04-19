@@ -40,20 +40,21 @@ spec:
       - |
         set -e;
         mkdir -p ${PITR_DIR};
-        cp -R $LOG_DIR/* ${PITR_DIR}/;
         cd ${PITR_DIR}
-        for i in $(find . -name "*.gz"); do
-          gzip -df ${i};
+        for i in $(find $LOG_DIR -name "*.gz"); do
+          cp ${i} $(basename $i)
+          gzip -df $(basename $i);
         done
         chmod 777 -R ${PITR_DIR};
         touch ${DATA_DIR}/recovery.signal;
         mkdir -p ${CONF_DIR};
         chmod 777 -R ${CONF_DIR};
         mkdir -p ${RESTORE_DATA_DIR};
-        echo "if [ -d '${DATA_DIR}.old' ]; then mv -f ${DATA_DIR}.old ${DATA_DIR}; fi;" > ${RESTORE_DATA_DIR}/kb_restore.sh;
-        echo "if [ -d '${DATA_DIR}.failed' ]; then mv -f ${DATA_DIR}.failed/data.old ${DATA_DIR}; fi;" >> ${RESTORE_DATA_DIR}/kb_restore.sh;
+        echo "#!/bin/bash" > ${RESTORE_DATA_DIR}/kb_restore.sh;
+        echo "[[ -d '${DATA_DIR}.old' ]] && mv -f ${DATA_DIR}.old ${DATA_DIR};" >> ${RESTORE_DATA_DIR}/kb_restore.sh;
+        echo "[[ -d '${DATA_DIR}.failed/data.old' ]] && mv -f ${DATA_DIR}.failed/data.old ${DATA_DIR};" >> ${RESTORE_DATA_DIR}/kb_restore.sh;
         chmod +x ${RESTORE_DATA_DIR}/kb_restore.sh;
-        echo -e "restore_command='mv ${PITR_DIR}/%f %p'\nrecovery_target_time='${RECOVERY_TIME}'\nrecovery_target_action='promote'" > ${CONF_DIR}/recovery.conf;
+        echo "restore_command='mv ${PITR_DIR}/%f %p'\nrecovery_target_time='${RECOVERY_TIME}'\nrecovery_target_action='promote'" > ${CONF_DIR}/recovery.conf;
         mv ${DATA_DIR} ${DATA_DIR}.old;
         sync;
   backupCommands:

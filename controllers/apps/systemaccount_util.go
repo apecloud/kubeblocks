@@ -306,7 +306,7 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 	accountConfig appsv1alpha1.SystemAccountConfig) ([]string, *corev1.Secret) {
 	// generated password with mixedcases = true
 	passwd, _ := password.Generate((int)(passConfig.Length), (int)(passConfig.NumDigits), (int)(passConfig.NumSymbols), false, false)
-	// refine pasword to upper or lower cases w.r.t configuration
+	// refine password to upper or lower cases w.r.t configuration
 	switch passConfig.LetterCase {
 	case appsv1alpha1.UpperCases:
 		passwd = strings.ToUpper(passwd)

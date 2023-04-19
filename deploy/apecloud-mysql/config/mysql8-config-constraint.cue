@@ -83,7 +83,7 @@
 	// If this variable is enabled (the default), transactions are committed in the same order they are written to the binary log. If disabled, transactions may be committed in parallel.
 	binlog_order_commits?: string & "0" | "1" | "OFF" | "ON"
 
-	// Whether the server logs full or minmal rows with row-based replication.
+	// Whether the server logs full or minimal rows with row-based replication.
 	binlog_row_image?: string & "FULL" | "MINIMAL" | "NOBLOB"
 
 	// Controls whether metadata is logged using FULL or MINIMAL format. FULL causes all metadata to be logged; MINIMAL means that only metadata actually required by slave is logged. Default: MINIMAL.
@@ -1529,8 +1529,8 @@
 	// For SQL window functions, determines whether to enable inversion optimization for moving window frames also for floating values.
 	windowing_use_high_precision: string & "0" | "1" | "OFF" | "ON" | *"1"
 
-	// other parmeters
-	// reference mysql parmeters
+	// other parameters
+	// reference mysql parameters
 	...
 }
 

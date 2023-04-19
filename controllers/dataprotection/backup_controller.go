@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -222,8 +223,11 @@ func (r *BackupReconciler) doNewPhaseAction(
 func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.RequestCtx,
 	backupPolicyName string,
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) error {
-	pvc := &corev1.PersistentVolumeClaim{}
 	pvcConfig := commonPolicy.PersistentVolumeClaim
+	if len(pvcConfig.Name) == 0 {
+		return fmt.Errorf("the persistentVolumeClaim name of this policy is empty")
+	}
+	pvc := &corev1.PersistentVolumeClaim{}
 	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace,
 		Name: pvcConfig.Name}, pvc); err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -234,14 +238,26 @@ func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.Reques
 	if pvcConfig.CreatePolicy == dataprotectionv1alpha1.CreatePVCPolicyNever {
 		return intctrlutil.NewNotFound(`persistent volume claim "%s" not found`, pvcConfig.Name)
 	}
-	pvc = &corev1.PersistentVolumeClaim{
+	if pvcConfig.PersistentVolumeConfigMap != nil &&
+		(pvcConfig.StorageClassName == nil || *pvcConfig.StorageClassName == "") {
+		// if the storageClassName is empty and the PersistentVolumeConfigMap is not empty,
+		// will create the persistentVolume with the template
+		if err := r.createPersistentVolumeWithTemplate(reqCtx, backupPolicyName, &pvcConfig); err != nil {
+			return err
+		}
+	}
+	return r.createPVCWithStorageClassName(reqCtx, backupPolicyName, pvcConfig)
+}
+
+// createPVCWithStorageClassName creates the persistent volume claim with the storageClassName.
+func (r *BackupReconciler) createPVCWithStorageClassName(reqCtx intctrlutil.RequestCtx,
+	backupPolicyName string,
+	pvcConfig dataprotectionv1alpha1.PersistentVolumeClaim) error {
+	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      pvcConfig.Name,
-			Namespace: reqCtx.Req.Namespace,
-			Annotations: map[string]string{
-				dataProtectionAnnotationCreateByPolicyKey: "true",
-				dataProtectionLabelBackupPolicyKey:        backupPolicyName,
-			},
+			Name:        pvcConfig.Name,
+			Namespace:   reqCtx.Req.Namespace,
+			Annotations: r.buildAutoCreationAnnotations(backupPolicyName),
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			StorageClassName: pvcConfig.StorageClassName,
@@ -259,6 +275,54 @@ func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.Reques
 	controllerutil.AddFinalizer(pvc, dataProtectionFinalizerName)
 	err := r.Client.Create(reqCtx.Ctx, pvc)
 	return client.IgnoreAlreadyExists(err)
+}
+
+// createPersistentVolumeWithTemplate creates the persistent volume with the template.
+func (r *BackupReconciler) createPersistentVolumeWithTemplate(reqCtx intctrlutil.RequestCtx,
+	backupPolicyName string,
+	pvcConfig *dataprotectionv1alpha1.PersistentVolumeClaim) error {
+	pvConfig := pvcConfig.PersistentVolumeConfigMap
+	configMap := &corev1.ConfigMap{}
+	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: pvConfig.Namespace,
+		Name: pvConfig.Name}, configMap); err != nil {
+		return err
+	}
+	pvTemplate := configMap.Data[persistentVolumeTemplateKey]
+	if pvTemplate == "" {
+		return intctrlutil.NewNotFound("the persistentVolume template is empty in the configMap %s/%s", pvConfig.Namespace, pvConfig.Name)
+	}
+	pvName := fmt.Sprintf("%s-%s", pvcConfig.Name, reqCtx.Req.Namespace)
+	pvTemplate = strings.ReplaceAll(pvTemplate, "$(GENERATE_NAME)", pvName)
+	pv := &corev1.PersistentVolume{}
+	if err := yaml.Unmarshal([]byte(pvTemplate), pv); err != nil {
+		return err
+	}
+	pv.Name = pvName
+	pv.Spec.ClaimRef = &corev1.ObjectReference{
+		Namespace: reqCtx.Req.Namespace,
+		Name:      pvcConfig.Name,
+	}
+	pv.Annotations = r.buildAutoCreationAnnotations(backupPolicyName)
+	// set the storageClassName to empty for the persistentVolumeClaim to avoid the dynamic provisioning
+	emptyStorageClassName := ""
+	pvcConfig.StorageClassName = &emptyStorageClassName
+	controllerutil.AddFinalizer(pv, dataProtectionFinalizerName)
+	return r.Client.Create(reqCtx.Ctx, pv)
+}
+
+func (r *BackupReconciler) buildAutoCreationAnnotations(backupPolicyName string) map[string]string {
+	return map[string]string{
+		dataProtectionAnnotationCreateByPolicyKey: "true",
+		dataProtectionLabelBackupPolicyKey:        backupPolicyName,
+	}
+}
+
+// getBackupPathPrefix gets the backup path prefix.
+func (r *BackupReconciler) getBackupPathPrefix(backupNamespace, pathPrefix string) string {
+	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
+		return fmt.Sprintf("/%s%s", backupNamespace, pathPrefix)
+	}
+	return fmt.Sprintf("/%s/%s", backupNamespace, pathPrefix)
 }
 
 func (r *BackupReconciler) doInProgressPhaseAction(
@@ -329,7 +393,8 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		if err = r.createUpdatesJobs(reqCtx, backup, &commonPolicy.BasePolicy, dataprotectionv1alpha1.PRE); err != nil {
 			r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPreUpdatesJob", err.Error())
 		}
-		err = r.createBackupToolJob(reqCtx, backup, commonPolicy)
+		pathPrefix := r.getBackupPathPrefix(backup.Namespace, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
+		err = r.createBackupToolJob(reqCtx, backup, commonPolicy, pathPrefix)
 		if err != nil {
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
@@ -353,6 +418,11 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			// update Phase to in Completed
 			backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 			backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+			backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{
+				BackupTool: &dataprotectionv1alpha1.BackupToolManifestsStatus{
+					FilePath: pathPrefix,
+				},
+			}
 		} else if jobStatusConditions[0].Type == batchv1.JobFailed {
 			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
 			backup.Status.FailureReason = job.Status.Conditions[0].Reason
@@ -643,7 +713,8 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 func (r *BackupReconciler) createBackupToolJob(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
-	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) error {
+	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
+	pathPrefix string) error {
 
 	key := types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}
 	job := batchv1.Job{}
@@ -656,7 +727,7 @@ func (r *BackupReconciler) createBackupToolJob(
 		return nil
 	}
 
-	toolPodSpec, err := r.buildBackupToolPodSpec(reqCtx, backup, commonPolicy)
+	toolPodSpec, err := r.buildBackupToolPodSpec(reqCtx, backup, commonPolicy, pathPrefix)
 	if err != nil {
 		return err
 	}
@@ -899,7 +970,8 @@ func (r *BackupReconciler) getTargetPVCs(reqCtx intctrlutil.RequestCtx,
 
 func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
-	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) (corev1.PodSpec, error) {
+	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
+	pathPrefix string) (corev1.PodSpec, error) {
 	podSpec := corev1.PodSpec{}
 	// get backup tool
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
@@ -969,21 +1041,12 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		Value: backup.Name,
 	}
 
-	envBackupDirPrefix := corev1.EnvVar{
-		Name: "BACKUP_DIR_PREFIX",
-		ValueFrom: &corev1.EnvVarSource{
-			FieldRef: &corev1.ObjectFieldSelector{
-				FieldPath: "metadata.namespace",
-			},
-		},
-	}
-
 	envBackupDir := corev1.EnvVar{
 		Name:  "BACKUP_DIR",
-		Value: remoteBackupPath + "/$(BACKUP_DIR_PREFIX)",
+		Value: remoteBackupPath + pathPrefix,
 	}
 
-	container.Env = []corev1.EnvVar{envDBHost, envBackupName, envBackupDirPrefix, envBackupDir}
+	container.Env = []corev1.EnvVar{envDBHost, envBackupName, envBackupDir}
 	if commonPolicy.Target.Secret != nil {
 		envDBUser := corev1.EnvVar{
 			Name: "DB_USER",

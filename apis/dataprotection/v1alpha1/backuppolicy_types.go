@@ -112,13 +112,31 @@ type PersistentVolumeClaim struct {
 	InitCapacity resource.Quantity `json:"initCapacity,omitempty"`
 
 	// createPolicy defines the policy for creating the PersistentVolumeClaim, enum values:
-	// - Never: do nothing if the PersistentVolumeClaim not exist.
+	// - Never: do nothing if the PersistentVolumeClaim not exists.
 	// - IfNotPresent: create the PersistentVolumeClaim if not present and the accessModes only contains 'ReadWriteMany'.
 	// +kubebuilder:default=IfNotPresent
 	// +optional
 	CreatePolicy CreatePVCPolicy `json:"createPolicy"`
+
+	// persistentVolumeConfigMap references the configmap which contains a persistentVolume template.
+	// key must be "persistentVolume" and value is the "PersistentVolume" struct.
+	// support the following built-in Objects:
+	// - $(GENERATE_NAME): generate a specific format "pvcName-pvcNamespace".
+	// if the PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent", the controller
+	// will create it by this template. this is a mutually exclusive setting with "storageClassName".
+	// +optional
+	PersistentVolumeConfigMap *PersistentVolumeConfigMap `json:"persistentVolumeConfigMap,omitempty"`
 }
 
+type PersistentVolumeConfigMap struct {
+	// the name of the persistentVolume ConfigMap.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// the namespace of the persistentVolume ConfigMap.
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
+}
 type BasePolicy struct {
 	// target database cluster for backup.
 	// +kubebuilder:validation:Required

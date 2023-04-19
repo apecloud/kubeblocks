@@ -85,7 +85,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			Message: "Backup/Restore Commands:",
 			Commands: []*cobra.Command{
 				NewListBackupPolicyCmd(f, streams),
-				NewLEditBackupPolicyCmd(f, streams),
+				NewEditBackupPolicyCmd(f, streams),
 				NewCreateBackupCmd(f, streams),
 				NewListBackupCmd(f, streams),
 				NewDeleteBackupCmd(f, streams),

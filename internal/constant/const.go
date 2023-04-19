@@ -23,11 +23,13 @@ const (
 	CfgKeyCtrlrMgrAffinity              = "CM_AFFINITY"
 	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
 	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
-	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS" // accept time
-	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"            // the global pvc name which persistent volume claim to store the backup data
-	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"   // the init capacity of pvc for creating the pvc, e.g. 10Gi.
-	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"   // the pvc storage class name.
-	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"   // the pvc create policy. support "IfNotPresent" or "Never"
+	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"    // accept time
+	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"               // the global pvc name which persistent volume claim to store the backup data
+	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"      // the init capacity of pvc for creating the pvc, e.g. 10Gi.
+	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"      // the pvc storage class name.
+	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"      // the pvc create policy. support "IfNotPresent" or "Never"
+	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"      // the configmap name which contains a persistentVolume template.
+	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE" // the configmap namespace which contains a persistentVolume template.
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
@@ -88,7 +90,8 @@ const (
 	RestoreFromBackUpAnnotationKey     = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
 	ClusterSnapshotAnnotationKey       = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	LeaderAnnotationKey                = "cs.apps.kubeblocks.io/leader"
-	DefaultBackupPolicyAnnotationKey   = "dataprotection.kubeblocks.io/is-default-policy"
+	DefaultBackupPolicyAnnotationKey   = "dataprotection.kubeblocks.io/is-default-policy" // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
+	BackupDataPathPrefixAnnotationKey  = "dataprotection.kubeblocks.io/path-prefix"       // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
 	BackupPolicyTemplateAnnotationKey  = "apps.kubeblocks.io/backup-policy-template"
 	RestoreFromTimeAnnotationKey       = "kubeblocks.io/restore-from-time"           // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
 	RestoreFromSrcClusterAnnotationKey = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.

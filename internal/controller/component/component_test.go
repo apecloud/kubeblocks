@@ -88,7 +88,7 @@ var _ = Describe("component module", func() {
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(component).ShouldNot(BeNil())
 
-			By("leave clusterVersion.versionCtx empty initContains and conainers")
+			By("leave clusterVersion.versionCtx empty initContains and containers")
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.Containers = nil
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.InitContainers = nil
 			component = BuildComponent(

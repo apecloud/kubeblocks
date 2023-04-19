@@ -9,7 +9,7 @@
       ],
       "properties": {
         "client": {
-          "description": "ingore client parameter validate\nmysql client: a set of name/value pairs.",
+          "description": "ignore client parameter validate\nmysql client: a set of name/value pairs.",
           "type": "object",
           "additionalProperties": {
             "type": "string"

@@ -19,21 +19,27 @@ kbcli kubeblocks config [flags]
   dataProtection.enableVolumeSnapshot=true
   
   # the global pvc name which persistent volume claim to store the backup data.
-  # will replace the pvc name when it is empty in the backup policy.
+  # replace the pvc name when it is empty in the backup policy.
   dataProtection.backupPVCName=backup-data
   
   # the init capacity of pvc for creating the pvc, e.g. 10Gi.
-  # will replace the init capacity when it is empty in the backup policy.
+  # replace the init capacity when it is empty in the backup policy.
   dataProtection.backupPVCInitCapacity=100Gi
   
-  # the pvc storage class name.
-  # will replace the storageClassName when it is nil in the backup policy.
+  # the pvc storage class name. replace the storageClassName when it is nil in the backup policy.
   dataProtection.backupPVCStorageClassName=csi-s3
   
   # the pvc create policy.
   # if the storageClass supports dynamic provisioning, recommend "IfNotPresent" policy.
-  # otherwise, using "Never" policy. only affect the backupPolicy automatically created by Kubeblocks.
+  # otherwise, using "Never" policy. only affect the backupPolicy automatically created by KubeBlocks.
   dataProtection.backupPVCCreatePolicy=Never
+  
+  # the configmap name of the pv template. if the csi-driver not support dynamic provisioning,
+  # you can provide a configmap which contains key "persistentVolume" and value of the persistentVolume struct.
+  dataProtection.backupPVConfigMapName=pv-template
+  
+  # the configmap namespace of the pv template.
+  dataProtection.backupPVConfigMapNamespace=default
 ```
 
 ### Options

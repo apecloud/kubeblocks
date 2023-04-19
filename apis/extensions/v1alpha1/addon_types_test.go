@@ -266,7 +266,7 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 		},
 	}
 
-	bulidInstallSpecItem := func() AddonInstallSpecItem {
+	buildInstallSpecItem := func() AddonInstallSpecItem {
 		toleration := []map[string]string{
 			{
 				"key":      "taint-key",
@@ -296,11 +296,11 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 	}
 
 	installSpec := AddonInstallSpec{
-		AddonInstallSpecItem: bulidInstallSpecItem(),
+		AddonInstallSpecItem: buildInstallSpecItem(),
 		ExtraItems: []AddonInstallExtraItem{
 			{
 				Name:                 "extra",
-				AddonInstallSpecItem: bulidInstallSpecItem(),
+				AddonInstallSpecItem: buildInstallSpecItem(),
 			},
 		},
 	}

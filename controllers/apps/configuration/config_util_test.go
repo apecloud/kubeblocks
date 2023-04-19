@@ -115,7 +115,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 	Context("clusterdefinition CR test", func() {
 		It("Should success without error", func() {
 			availableTPL := configConstraintObj.DeepCopy()
-			availableTPL.Status.Phase = appsv1alpha1.AvailablePhase
+			availableTPL.Status.Phase = appsv1alpha1.CCAvailablePhase
 
 			k8sMockClient.MockPatchMethod(testutil.WithSucceed())
 			k8sMockClient.MockListMethod(testutil.WithSucceed())
@@ -187,7 +187,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			Expect(err).Should(Succeed())
 
 			availableTPL := configConstraintObj.DeepCopy()
-			availableTPL.Status.Phase = appsv1alpha1.AvailablePhase
+			availableTPL.Status.Phase = appsv1alpha1.CCAvailablePhase
 
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSequenceResult(
 				map[client.ObjectKey][]testutil.MockGetReturned{
@@ -230,7 +230,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 		It("Should success without error", func() {
 			updateAVTemplates()
 			availableTPL := configConstraintObj.DeepCopy()
-			availableTPL.Status.Phase = appsv1alpha1.AvailablePhase
+			availableTPL.Status.Phase = appsv1alpha1.CCAvailablePhase
 
 			k8sMockClient.MockPatchMethod(testutil.WithSucceed())
 			k8sMockClient.MockListMethod(testutil.WithSucceed())

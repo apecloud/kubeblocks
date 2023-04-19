@@ -30,39 +30,37 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
-type AppName string
+type Version struct {
+	KubeBlocks string
+	Kubernetes string
+	Cli        string
+}
 
-const (
-	KubernetesApp AppName = "Kubernetes"
-	KubeBlocksApp AppName = "KubeBlocks"
-	KBCLIApp      AppName = "kbcli"
-)
-
-// GetVersionInfo get application version include KubeBlocks, CLI and kubernetes
-func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
+// GetVersionInfo get version include KubeBlocks, CLI and kubernetes
+func GetVersionInfo(client kubernetes.Interface) (Version, error) {
 	var err error
-	versionInfo := map[AppName]string{
-		KBCLIApp: version.GetVersion(),
+	version := Version{
+		Cli: version.GetVersion(),
 	}
 
 	if client == nil || reflect.ValueOf(client).IsNil() {
-		return versionInfo, nil
+		return version, nil
 	}
 
-	if versionInfo[KubernetesApp], err = GetK8sVersion(client.Discovery()); err != nil {
-		return versionInfo, err
+	if version.Kubernetes, err = GetK8sVersion(client.Discovery()); err != nil {
+		return version, err
 	}
 
-	if versionInfo[KubeBlocksApp], err = getKubeBlocksVersion(client); err != nil {
-		return versionInfo, err
+	if version.KubeBlocks, err = getKubeBlocksVersion(client); err != nil {
+		return version, err
 	}
 
-	return versionInfo, nil
+	return version, nil
 }
 
 // getKubeBlocksVersion get KubeBlocks version
 func getKubeBlocksVersion(client kubernetes.Interface) (string, error) {
-	deploy, err := getKubeBlocksDeploy(client)
+	deploy, err := GetKubeBlocksDeploy(client)
 	if err != nil || deploy == nil {
 		return "", err
 	}
@@ -96,9 +94,9 @@ func GetK8sVersion(discoveryClient discovery.DiscoveryInterface) (string, error)
 	return "", nil
 }
 
-// getKubeBlocksDeploy get KubeBlocks deployments, now one kubernetes cluster
+// GetKubeBlocksDeploy gets KubeBlocks deployments, now one kubernetes cluster
 // only support one KubeBlocks
-func getKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error) {
+func GetKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error) {
 	deploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName,
 	})

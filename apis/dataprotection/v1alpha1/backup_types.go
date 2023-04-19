@@ -134,10 +134,6 @@ type BackupSnapshotStatus struct {
 }
 
 type BackupToolManifestsStatus struct {
-	// backupToolName referenced backup tool name.
-	// +optional
-	BackupToolName string `json:"backupToolName,omitempty"`
-
 	// filePath records the file path of backup.
 	// +optional
 	FilePath string `json:"filePath,omitempty"`

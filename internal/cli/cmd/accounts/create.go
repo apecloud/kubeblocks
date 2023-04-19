@@ -38,7 +38,7 @@ func NewCreateUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams
 
 func (o *CreateUserOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVarP(&o.info.UserName, "username", "u", "", "Required. Specify the name of user, which must be unique.")
+	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required. Specify the name of user, which must be unique.")
 	cmd.Flags().StringVarP(&o.info.Password, "password", "p", "", "Optional. Specify the password of user. The default value is empty, which means a random password will be generated.")
 	// TODO:@shanshan add expire flag if needed
 	// cmd.Flags().DurationVar(&o.info.ExpireAt, "expire", 0, "Optional. Specify the expire time of password. The default value is 0, which means the user will never expire.")
@@ -63,7 +63,7 @@ func (o *CreateUserOptions) Complete(f cmdutil.Factory) error {
 	if len(o.info.Password) == 0 {
 		o.info.Password, _ = password.Generate(10, 2, 0, false, false)
 	}
-	// encode user info to metatdata
+	// encode user info to metadata
 	o.RequestMeta, err = struct2Map(o.info)
 	return err
 }

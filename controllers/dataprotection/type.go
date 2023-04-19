@@ -42,6 +42,9 @@ const (
 	dataProtectionAnnotationCreateByPolicyKey = "dataprotection.kubeblocks.io/created-by-policy"
 	// error status
 	errorJobFailed = "JobFailed"
+
+	// the key of persistentVolumeTemplate in the configmap.
+	persistentVolumeTemplateKey = "persistentVolume"
 )
 
 var reconcileInterval = time.Second

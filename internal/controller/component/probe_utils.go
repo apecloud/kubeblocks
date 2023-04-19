@@ -122,7 +122,6 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	container.Command = []string{"probe", "--app-id", "batch-sdk",
 		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
 		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
-		"--app-protocol", "http",
 		"--log-level", logLevel,
 		"--config", "/config/probe/config.yaml",
 		"--components-path", "/config/probe/components"}

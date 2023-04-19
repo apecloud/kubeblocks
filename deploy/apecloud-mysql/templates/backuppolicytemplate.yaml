@@ -25,4 +25,4 @@ spec:
       target:
         role: leader
     full:
-      backupToolName: xtrabackup-apecloud-mysql
+      backupToolName: xtrabackup-for-apecloud-mysql

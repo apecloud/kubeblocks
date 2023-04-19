@@ -17,15 +17,25 @@ limitations under the License.
 package lifecycle
 
 import (
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// FixClusterLabelsTransformer patches the label first to prevent the label from being modified by the user.
-type FixClusterLabelsTransformer struct{}
+type FixMetaTransformer struct {}
 
-func (f *FixClusterLabelsTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
+
+	// The object is not being deleted, so if it does not have our finalizer,
+	// then lets add the finalizer and update the object. This is equivalent
+	// registering our finalizer.
+	if !controllerutil.ContainsFinalizer(cluster, dbClusterFinalizerName) {
+		controllerutil.AddFinalizer(cluster, dbClusterFinalizerName)
+	}
+
+	// patch the label to prevent the label from being modified by the user.
 	labels := cluster.Labels
 	if labels == nil {
 		labels = map[string]string{}
@@ -39,7 +49,8 @@ func (f *FixClusterLabelsTransformer) Transform(ctx graph.TransformContext, dag 
 	labels[clusterDefLabelKey] = cdName
 	labels[clusterVersionLabelKey] = cvName
 	cluster.Labels = labels
+
 	return nil
 }
 
-var _ graph.Transformer = &FixClusterLabelsTransformer{}
+var _ graph.Transformer = &FixMetaTransformer{}

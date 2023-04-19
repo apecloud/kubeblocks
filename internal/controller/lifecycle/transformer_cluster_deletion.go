@@ -17,8 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
@@ -30,10 +28,6 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	cluster := transCtx.OrigCluster
 	if !isClusterDeleting(*cluster) {
 		return nil
-	}
-
-	if !controllerutil.ContainsFinalizer(cluster, dbClusterFinalizerName) {
-		return graph.ErrFastReturn
 	}
 
 	// list all objects owned by this cluster in cache, and delete them all

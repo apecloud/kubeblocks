@@ -89,7 +89,7 @@ pg_stat_statements.track_utility = 'False'
 random_page_cost = '1.1'
 #auto generated
 shared_buffers = '{{ printf "%d%s" $shared_buffers $buffer_unit }}'
-shared_preload_libraries = 'pg_stat_statements, auto_explain'
+# shared_preload_libraries = 'pg_stat_statements,auto_explain,bg_mon,pgextwlist,pg_auth_mon,set_user,pg_cron,pg_stat_kcache'
 superuser_reserved_connections = '10'
 temp_file_limit = '100GB'
 #timescaledb.max_background_workers = '6'

@@ -27,10 +27,10 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// ValidateRefResourcesTransformer handles referenced resources'(cd & cv) validation
-type ValidateRefResourcesTransformer struct{}
+// ValidateAndLoadRefResourcesTransformer handles referenced resources'(cd & cv) validation and load them into context
+type ValidateAndLoadRefResourcesTransformer struct{}
 
-func (t *ValidateRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
 	if isClusterDeleting(*cluster) {
@@ -76,7 +76,11 @@ func (t *ValidateRefResourcesTransformer) Transform(ctx graph.TransformContext, 
 		return newRequeueError(requeueDuration, message)
 	}
 
+	// inject cd & cv into the shared ctx
+	transCtx.ClusterDef = cd
+	transCtx.ClusterVer = cv
+
 	return nil
 }
 
-var _ graph.Transformer = &ValidateRefResourcesTransformer{}
+var _ graph.Transformer = &ValidateAndLoadRefResourcesTransformer{}

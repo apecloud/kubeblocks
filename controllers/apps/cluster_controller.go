@@ -163,9 +163,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// fix finalizer and cd&cv labels
 			&lifecycle.FixMetaTransformer{},
 			// validate cd & cv's existence and availability
-			&lifecycle.ValidateRefResourcesTransformer{},
-			// inject cd & cv into the TransformContext, a little bit hacky
-			&lifecycle.LoadRefResourcesTransformer{},
+			&lifecycle.ValidateAndLoadRefResourcesTransformer{},
 			// validate config
 			&lifecycle.ValidateEnableLogsTransformer{},
 			// fill class related info

@@ -137,18 +137,18 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
 	// Init stage
 	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req)
-
 	if err := planBuilder.Init(); err != nil {
-		return requeueError(err)
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// Build stage
-	// what you should do in most case is writing your transformer.
+	// what you should do in most cases is writing your transformer.
 	//
 	// here are the how-to tips:
 	// 1. one transformer for one scenario
 	// 2. try not to modify the current transformers, make a new one
 	// 3. transformers are independent with each-other, with some exceptions.
+	//    Which means transformers' order is not important in most cases.
 	//    If you don't know where to put your transformer, append it to the end and that would be ok.
 	// 4. don't use client.Client for object write, use client.ReadonlyClient for object read.
 	//    If you do need to create/update/delete object, make your intent operation a lifecycleVertex and put it into the DAG.

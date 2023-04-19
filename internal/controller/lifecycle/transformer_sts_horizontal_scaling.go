@@ -271,6 +271,20 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 		return orphanPVCs
 	}
 
+	// if cluster is deleting, no need h-scale
+	if !isClusterDeleting(*origCluster) {
+		vertices := findAll[*appsv1.StatefulSet](dag)
+		for _, vertex := range vertices {
+			v, _ := vertex.(*lifecycleVertex)
+			if v.obj == nil || v.oriObj == nil {
+				continue
+			}
+			if err := handleHorizontalScaling(v); err != nil {
+				return err
+			}
+		}
+	}
+
 	// find all pvcs that should be deleted when parent sts is deleting:
 	// 1. cluster is deleting
 	// 2. component is deleting by a cluster Update
@@ -289,22 +303,6 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 		vertex := &lifecycleVertex{obj: pvc, action: actionPtr(DELETE)}
 		dag.AddVertex(vertex)
 		dag.Connect(rootVertex, vertex)
-	}
-
-	// if cluster is deleting, no need h-scale
-	if isClusterDeleting(*origCluster) {
-		return nil
-	}
-
-	vertices := findAll[*appsv1.StatefulSet](dag)
-	for _, vertex := range vertices {
-		v, _ := vertex.(*lifecycleVertex)
-		if v.obj == nil || v.oriObj == nil {
-			continue
-		}
-		if err := handleHorizontalScaling(v); err != nil {
-			return err
-		}
 	}
 
 	return nil

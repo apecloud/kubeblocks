@@ -46,12 +46,6 @@ type OperationResult struct {
 	respTime time.Time
 }
 
-type Order struct {
-	OrderID  int     `json:"orderid"`
-	Customer string  `json:"customer"`
-	Price    float64 `json:"price"`
-}
-
 func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, error) {
 	if characterType == "" {
 		return nil, fmt.Errorf("pod %v chacterType must be set", pod.Name)
@@ -61,6 +55,7 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 	if ip == "" {
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
+
 	port, err := intctrlutil.GetProbeGRPCPort(pod)
 	if err != nil {
 		return nil, err
@@ -93,6 +88,7 @@ func (cli *OperationClient) GetRole() (string, error) {
 		Data:      []byte(""),
 		Metadata:  map[string]string{},
 	}
+
 	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
 	if err != nil {
 		return "", err
@@ -104,6 +100,37 @@ func (cli *OperationClient) GetRole() (string, error) {
 	}
 
 	return result["role"], nil
+}
+
+// GetSystemAccounts list all system accounts created
+func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
+	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
+	defer cancel()
+
+	// Request sql channel via Dapr SDK
+	req := &dapr.InvokeBindingRequest{
+		Name:      cli.CharacterType,
+		Operation: string(ListSystemAccountsOp),
+	}
+
+	if resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req); err != nil {
+		return nil, err
+	} else {
+		sqlResponse := SQLChannelResponse{}
+		if err = json.Unmarshal(resp.Data, &sqlResponse); err != nil {
+			return nil, err
+		}
+		if sqlResponse.Event == RespEveFail {
+			return nil, fmt.Errorf("get system accounts error: %s", sqlResponse.Message)
+		} else {
+			result := []string{}
+			if err = json.Unmarshal(([]byte)(sqlResponse.Message), &result); err != nil {
+				return nil, err
+			} else {
+				return result, err
+			}
+		}
+	}
 }
 
 func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {

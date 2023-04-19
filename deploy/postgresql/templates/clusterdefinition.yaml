@@ -276,32 +276,32 @@ spec:
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbdataprotection
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbprobe
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
-                deletion: DROP USER IF EXISTS $(USERNAME);                     
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';

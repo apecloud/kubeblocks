@@ -19,10 +19,11 @@ package lifecycle
 import (
 	"strings"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
 // ObjectActionTransformer reads all Vertex.Obj in cache and compute the diff DAG.
@@ -33,7 +34,7 @@ func (t *ObjectActionTransformer) Transform(ctx graph.TransformContext, dag *gra
 	origCluster := transCtx.OrigCluster
 
 	// get the old objects snapshot
-	oldSnapshot, err := readCacheSnapshot(transCtx, *origCluster)
+	oldSnapshot, err := readCacheSnapshot(transCtx, *origCluster, ownKinds()...)
 	if err != nil {
 		return err
 	}
@@ -42,6 +43,7 @@ func (t *ObjectActionTransformer) Transform(ctx graph.TransformContext, dag *gra
 	if err != nil {
 		return err
 	}
+
 	// we have the target objects snapshot in dag
 	newNameVertices := make(map[gvkName]graph.Vertex)
 	for _, vertex := range dag.Vertices() {
@@ -78,6 +80,7 @@ func (t *ObjectActionTransformer) Transform(ctx graph.TransformContext, dag *gra
 			v.action = actionPtr(UPDATE)
 		}
 	}
+
 	deleteOrphanVertices := func() {
 		for name := range deleteSet {
 			v := &lifecycleVertex{

@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ClusterDeletionTransformer handles cluster deletion
@@ -34,7 +35,9 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	// there is chance that objects leak occurs because of cache stale
 	// ignore the problem currently
 	// TODO: GC the leaked objects
-	snapshot, err := readCacheSnapshot(transCtx, *cluster)
+	kinds := ownKinds()
+	kinds = append(kinds, &corev1.PersistentVolumeClaimList{})
+	snapshot, err := readCacheSnapshot(transCtx, *cluster, kinds...)
 	if err != nil {
 		return err
 	}

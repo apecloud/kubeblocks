@@ -193,16 +193,14 @@ func ownKinds() []client.ObjectList {
 		&corev1.ServiceList{},
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
-		&corev1.PersistentVolumeClaimList{},
 		&policyv1.PodDisruptionBudgetList{},
 		&dataprotectionv1alpha1.BackupPolicyList{},
 	}
 }
 
 // read all objects owned by our cluster
-func readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster) (clusterSnapshot, error) {
+func readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster, kinds ...client.ObjectList) (clusterSnapshot, error) {
 	// list what kinds of object cluster owns
-	kinds := ownKinds()
 	snapshot := make(clusterSnapshot)
 	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
 	inNS := client.InNamespace(cluster.Namespace)

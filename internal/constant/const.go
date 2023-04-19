@@ -78,6 +78,7 @@ const (
 	KBManagedByKey                  = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
 	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
 	BackupToolTypeLabelKey          = "kubeblocks.io/backup-tool-type"
+	BackupTypeLabelKeyKey           = "dataprotection.kubeblocks.io/backup-type"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey            = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -91,6 +92,7 @@ const (
 	BackupPolicyTemplateAnnotationKey  = "apps.kubeblocks.io/backup-policy-template"
 	RestoreFromTimeAnnotationKey       = "kubeblocks.io/restore-from-time"           // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
 	RestoreFromSrcClusterAnnotationKey = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
+	BackupIncrementalPathAnnotationKey = "kubeblocks.io/backup-incremental-path"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"

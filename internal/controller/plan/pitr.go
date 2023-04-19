@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -231,7 +232,7 @@ func (p *PointInTimeRecoveryManager) getSortedBackups(reverse bool) ([]dpv1alpha
 
 // getLatestBaseBackup gets the latest baseBackup
 func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, error) {
-	// 1. sort backups by completed timestamp
+	// 1. sort reverse backups
 	backups, err := p.getSortedBackups(true)
 	if err != nil {
 		return nil, err
@@ -254,7 +255,7 @@ func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, 
 }
 
 func (p *PointInTimeRecoveryManager) getNextBackup() (*dpv1alpha1.Backup, error) {
-	// 1. sort backups by reverse completed timestamp
+	// 1. sort backups
 	backups, err := p.getSortedBackups(false)
 	if err != nil {
 		return nil, err
@@ -326,7 +327,7 @@ func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) (string, string) {
 	return dataVolumeMount, logVolumeMount
 }
 
-func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupToolSpec, error) {
+func (p *PointInTimeRecoveryManager) getRecoveryInfo(componentName string) (*dpv1alpha1.BackupToolSpec, error) {
 	// get scripts from backup template
 	toolList := dpv1alpha1.BackupToolList{}
 	// TODO: The reference PITR backup tool needs a stronger reference relationship, for now use label references
@@ -341,6 +342,10 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupToolSp
 	if len(toolList.Items) == 0 {
 		return nil, errors.New("not support recovery because of non-existed pitr backupTool")
 	}
+	incrementalBackup, err := p.getIncrementalBackup(componentName)
+	if err != nil {
+		return nil, err
+	}
 	spec := &toolList.Items[0].Spec
 	timeFormat := time.RFC3339
 	envTimeEnvIdx := -1
@@ -349,6 +354,8 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupToolSp
 			envTimeEnvIdx = i
 		} else if env.Name == "TIME_FORMAT" {
 			timeFormat = env.Value
+		} else if strings.Contains(env.Value, "$KB_INCREMENTAL_PATH") {
+			spec.Env[i].Value = strings.ReplaceAll(env.Value, "$KB_INCREMENTAL_PATH", incrementalBackup.Name)
 		}
 	}
 	if envTimeEnvIdx != -1 {
@@ -358,12 +365,42 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupToolSp
 	return spec, nil
 }
 
+func (p *PointInTimeRecoveryManager) getIncrementalBackup(componentName string) (*dpv1alpha1.Backup, error) {
+	incrementalBackupList := dpv1alpha1.BackupList{}
+	if err := p.Client.List(p.Ctx, &incrementalBackupList,
+		client.MatchingLabels{
+			constant.AppInstanceLabelKey:    p.sourceCluster,
+			constant.KBAppComponentLabelKey: componentName,
+			constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeIncremental),
+		}); err != nil {
+
+		return nil, err
+	}
+	if len(incrementalBackupList.Items) == 0 {
+		return nil, errors.New("not found incremental backups")
+	}
+	return &incrementalBackupList.Items[0], nil
+}
+
+func (p *PointInTimeRecoveryManager) getIncrementalPVC(componentName string) (*corev1.PersistentVolumeClaim, error) {
+	incrementalBackup, err := p.getIncrementalBackup(componentName)
+	if err != nil {
+		return nil, err
+	}
+	pvcKey := types.NamespacedName{
+		Name:      incrementalBackup.Status.PersistentVolumeClaimName,
+		Namespace: incrementalBackup.Namespace,
+	}
+	pvc := corev1.PersistentVolumeClaim{}
+	if err := p.Client.Get(p.Ctx, pvcKey, &pvc); err != nil {
+		return nil, err
+	}
+	return &pvc, nil
+}
+
 func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, err error) {
 	objs = make([]client.Object, 0)
-	recoveryInfo, err := p.getRecoveryInfo()
-	if err != nil {
-		return objs, err
-	}
+
 	for _, componentSpec := range p.Cluster.Spec.ComponentSpecs {
 		if len(componentSpec.VolumeClaimTemplates) == 0 {
 			continue
@@ -374,8 +411,6 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 			constant.AppInstanceLabelKey:    p.Cluster.Name,
 			constant.KBAppComponentLabelKey: componentSpec.Name,
 		}
-		sts := &appsv1.StatefulSet{}
-		sts.SetLabels(commonLabels)
 		vct := corev1.PersistentVolumeClaimTemplate{}
 		vct.Name = componentSpec.VolumeClaimTemplates[0].Name
 		vct.Spec = componentSpec.VolumeClaimTemplates[0].Spec.ToV1PersistentVolumeClaimSpec()
@@ -395,31 +430,25 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 		if len(dataPVCList.Items) == 0 {
 			return objs, errors.New("not found data pvc")
 		}
+		recoveryInfo, err := p.getRecoveryInfo(componentSpec.Name)
+		if err != nil {
+			return objs, err
+		}
+		incrementalPVC, err := p.getIncrementalPVC(componentSpec.Name)
+		if err != nil {
+			return objs, err
+		}
+		dataVolumeMount, logVolumeMount := getVolumeMount(recoveryInfo)
 		for i, dataPVC := range dataPVCList.Items {
 			if dataPVC.Status.Phase != corev1.ClaimBound {
 				return objs, errors.New("waiting PVC Bound")
-			}
-
-			nextBackup, err := p.getNextBackup()
-			if err != nil {
-				return objs, err
-			}
-			pitrPVCName := fmt.Sprintf("pitr-%s-%s-%d", p.Cluster.Name, componentSpec.Name, i)
-			pitrPVCKey := types.NamespacedName{
-				Namespace: p.namespace,
-				Name:      pitrPVCName,
-			}
-			pitrPVC, err := builder.BuildPVCFromSnapshot(sts, vct, pitrPVCKey, nextBackup.Name, nil)
-			if err != nil {
-				return objs, err
 			}
 			volumes := []corev1.Volume{
 				{Name: "data", VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.Name}}},
 				{Name: "log", VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pitrPVCName}}},
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: incrementalPVC.Name}}},
 			}
-			dataVolumeMount, logVolumeMount := getVolumeMount(recoveryInfo)
 			volumeMounts := []corev1.VolumeMount{
 				{Name: "data", MountPath: dataVolumeMount},
 				{Name: "log", MountPath: logVolumeMount},
@@ -449,7 +478,6 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 				objs = append(objs, logicJob)
 			}
 			// collect pvcs and jobs for later deletion
-			objs = append(objs, pitrPVC)
 			objs = append(objs, job)
 		}
 	}

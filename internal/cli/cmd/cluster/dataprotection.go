@@ -546,10 +546,6 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &obj); err != nil {
 			return err
 		}
-		if obj.Status.Phase != dataprotectionv1alpha1.BackupCompleted ||
-			obj.Status.Manifests == nil || obj.Status.Manifests.BackupLog == nil {
-			continue
-		}
 		backups = append(backups, obj)
 	}
 	recoverableTime := dataprotectionv1alpha1.GetRecoverableTimeRange(backups)

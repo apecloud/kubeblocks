@@ -7,7 +7,6 @@ metadata:
     {{- include "postgresql.labels" . | nindent 4 }}
   name: postgres-pitr
 spec:
-  backupCommands: []
   deployKind: job
   env:
     - name: VOLUME_DATA_DIR
@@ -23,32 +22,52 @@ spec:
     - name: CONF_DIR
       value: "$(VOLUME_DATA_DIR)/conf"
     - name: LOG_DIR
-      value: "$(VOLUME_LOG_DIR)/pgroot/data/pg_wal"
+      value: "$(VOLUME_LOG_DIR)/$KB_INCREMENTAL_PATH"
     - name: RECOVERY_TIME
       value: $KB_RECOVERY_TIME
     - name: TIME_FORMAT
-      value: 2006-01-02 15:04:05 MST
-  image: alpine:3.17
+      value: 2006-01-02 15:04:05` MST
+    - name: INCREMENTAL_PATH
+      value: /backupdata/$KB_INCREMENTAL_PATH
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   logical:
     restoreCommands:
       - |
         set -e;
         rm -f ${CONF_DIR}/recovery.conf;
-        rm -rf ${DATA_DIR}.old;
-        rm -rf ${DATA_DIR}.failed;
   physical:
     restoreCommands:
       - |
         set -e;
         mkdir -p ${PITR_DIR};
-        cp -R $LOG_DIR ${PITR_DIR}/;
+        cp -R $LOG_DIR/* ${PITR_DIR}/;
+        cd ${PITR_DIR}
+        for i in $(find . -name "*.gz"); do
+          gzip -df ${i};
+        done
         chmod 777 -R ${PITR_DIR};
         touch ${DATA_DIR}/recovery.signal;
         mkdir -p ${CONF_DIR};
         chmod 777 -R ${CONF_DIR};
         mkdir -p ${RESTORE_DATA_DIR};
-        echo "cp -R ${DATA_DIR}.old ${DATA_DIR}" > ${RESTORE_DATA_DIR}/kb_restore.sh;
-        echo -e "restore_command=mv ${PITR_DIR}/pg_wal/%f %p\nrecovery_target_time=${RECOVERY_TIME}\nrecovery_target_action=promote" > ${CONF_DIR}/recovery.conf;
+        echo "if [ -d '${DATA_DIR}.old' ]; then mv -f ${DATA_DIR}.old ${DATA_DIR}; fi;" > ${RESTORE_DATA_DIR}/kb_restore.sh;
+        echo "if [ -d '${DATA_DIR}.failed' ]; then mv -f ${DATA_DIR}.failed/data.old ${DATA_DIR}; fi;" >> ${RESTORE_DATA_DIR}/kb_restore.sh;
+        chmod +x ${RESTORE_DATA_DIR}/kb_restore.sh;
+        echo -e "restore_command='mv ${PITR_DIR}/%f %p'\nrecovery_target_time='${RECOVERY_TIME}'\nrecovery_target_action='promote'" > ${CONF_DIR}/recovery.conf;
         mv ${DATA_DIR} ${DATA_DIR}.old;
         sync;
+  backupCommands:
+    - |
+      set -e;
+      EXPIRED_INCR_PATH=${INCREMENTAL_PATH}/$(date -d"7 day ago" +%Y%m%d);
+      [[ -d ${EXPIRED_INCR_PATH} ]] && rm -rf ${EXPIRED_INCR_PATH};
+      TODAY_INCR_PATH=${INCREMENTAL_PATH}/$(date +%Y%m%d);
+      mkdir -p ${TODAY_INCR_PATH};
+      for i in $(find ${VOLUME_DATA_DIR}/pgroot/arcwal -name "*.gz"); do
+        mv -f ${i} ${TODAY_INCR_PATH}/;
+      done
+      cd ${DATA_DIR}/pg_wal;
+      LATEST_LOG=$(ls -t . | grep '[[:digit:]]$\|.partial$'|head -n 1);
+      gzip -kqc ${LATEST_LOG} > ${TODAY_INCR_PATH}/${LATEST_LOG}.gz;
+
   type: pitr

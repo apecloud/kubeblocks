@@ -139,15 +139,15 @@ func (r *backupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 		}
 		return target
 	}
-	if backupPolicy.Spec.Snapshot != nil {
+	if backupPolicy.Spec.Snapshot != nil && policyTPL.Snapshot != nil {
 		backupPolicy.Spec.Snapshot.Target = syncTheRoleLabel(backupPolicy.Spec.Snapshot.Target,
 			policyTPL.Snapshot.BasePolicy)
 	}
-	if backupPolicy.Spec.Full != nil {
+	if backupPolicy.Spec.Full != nil && policyTPL.Full != nil {
 		backupPolicy.Spec.Full.Target = syncTheRoleLabel(backupPolicy.Spec.Full.Target,
 			policyTPL.Full.BasePolicy)
 	}
-	if backupPolicy.Spec.Incremental != nil {
+	if backupPolicy.Spec.Incremental != nil && policyTPL.Incremental != nil {
 		backupPolicy.Spec.Incremental.Target = syncTheRoleLabel(backupPolicy.Spec.Incremental.Target,
 			policyTPL.Incremental.BasePolicy)
 	}

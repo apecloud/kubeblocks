@@ -26,6 +26,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -311,7 +312,8 @@ func (o *updateOptions) reconfigureLogVariables(c *appsv1alpha1.Cluster, cd *app
 		if err = logTPL.Execute(&buf, logValue); err != nil {
 			return err
 		}
-		if logVariables, err = cfgcore.TransformConfigFileToKeyValueMap(keyName, defaultSectionName, formatter.Format, buf.Bytes()); err != nil {
+		formatter.FormatterOptions.IniConfig.SectionName = defaultSectionName
+		if logVariables, err = cfgcore.TransformConfigFileToKeyValueMap(keyName, formatter, buf.Bytes()); err != nil {
 			return err
 		}
 		// build OpsRequest and apply this OpsRequest
@@ -397,7 +399,8 @@ func buildLogsTPLValues(compSpec *appsv1alpha1.ClusterComponentSpec) (*gotemplat
 }
 
 func buildLogsReconfiguringOps(clusterName, namespace, compName, configName, keyName string, variables map[string]string) *appsv1alpha1.OpsRequest {
-	opsRequest := util.NewOpsRequestForReconfiguring("logs-reconfigure", namespace, clusterName)
+	opsName := fmt.Sprintf("%s-%s", "logs-reconfigure", uuid.NewString())
+	opsRequest := util.NewOpsRequestForReconfiguring(opsName, namespace, clusterName)
 	parameterPairs := make([]appsv1alpha1.ParameterPair, 0, len(variables))
 	for key, value := range variables {
 		v := value

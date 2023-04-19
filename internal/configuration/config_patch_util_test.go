@@ -363,28 +363,39 @@ systemLog:
   verbosity: 0
 `
 	tests := []struct {
-		name        string
-		fileName    string
-		sectionName string
-		format      v1alpha1.CfgFileFormat
-		configData  []byte
-		expected    map[string]string
+		name         string
+		fileName     string
+		formatConfig *v1alpha1.FormatterConfig
+		configData   []byte
+		expected     map[string]string
 	}{{
-		name:        "mysql-test",
-		fileName:    "my.cnf",
-		sectionName: "mysqld",
-		format:      v1alpha1.Ini,
-		configData:  []byte(mysqlConfig),
+		name:     "mysql-test",
+		fileName: "my.cnf",
+		formatConfig: &v1alpha1.FormatterConfig{
+			Format: v1alpha1.Ini,
+			FormatterOptions: v1alpha1.FormatterOptions{
+				IniConfig: &v1alpha1.IniConfig{
+					SectionName: "mysqld",
+				},
+			},
+		},
+		configData: []byte(mysqlConfig),
 		expected: map[string]string{
 			"key_buffer_size": "16777216",
 			"log_error":       "/data/mysql/logs/mysql.log",
 		},
 	}, {
-		name:        "mongodb-test",
-		fileName:    "mongodb.conf",
-		sectionName: "default",
-		format:      v1alpha1.YAML,
-		configData:  []byte(mongodbConfig),
+		name:     "mongodb-test",
+		fileName: "mongodb.conf",
+		formatConfig: &v1alpha1.FormatterConfig{
+			Format: v1alpha1.YAML,
+			FormatterOptions: v1alpha1.FormatterOptions{
+				IniConfig: &v1alpha1.IniConfig{
+					SectionName: "default",
+				},
+			},
+		},
+		configData: []byte(mongodbConfig),
 		expected: map[string]string{
 			"systemLog.logRotate": "reopen",
 			"systemLog.path":      "/data/mongodb/logs/mongodb.log",
@@ -393,7 +404,7 @@ systemLog:
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res, _ := TransformConfigFileToKeyValueMap(tt.fileName, tt.sectionName, tt.format, tt.configData)
+			res, _ := TransformConfigFileToKeyValueMap(tt.fileName, tt.formatConfig, tt.configData)
 			if !reflect.DeepEqual(res, tt.expected) {
 				t.Errorf("TransformConfigFileToKeyValueMap() res = %v, res %v", res, tt.expected)
 				return

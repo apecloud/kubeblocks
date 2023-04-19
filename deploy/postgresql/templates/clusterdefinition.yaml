@@ -131,6 +131,8 @@ spec:
                 value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)","app.kubernetes.io/managed-by":"kubeblocks"}'
               - name: RESTORE_DATA_DIR
                 value: /home/postgres/pgdata/kb_restore
+              - name: KB_PG_CONFIG_PATH
+                value: /home/postgres/conf/postgresql.conf
               - name: SPILO_CONFIGURATION
                 value: | ## https://github.com/zalando/patroni#yaml-configuration
                   bootstrap:

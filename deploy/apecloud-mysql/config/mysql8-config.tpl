@@ -206,12 +206,12 @@ loose_xengine_compression_per_level=kZSTD:kZSTD:kZSTD
 
 {{- if gt $phy_memory 0 }}
 {{- $phy_memory := div $phy_memory ( mul 1024 1024 ) }}
-#loose_xengine_write_buffer_size={{ min ( max 32 ( mulf $phy_memory 0.01 ) ) 256 | int | mul 1024 1024 }}
-#loose_xengine_db_write_buffer_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
-#loose_xengine_db_total_write_buffer_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
-#loose_xengine_block_cache_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
-#loose_xengine_row_cache_size={{ mulf $phy_memory 0.1 | int | mul 1024 1024 }}
-#loose_xengine_max_total_wal_size={{ min ( mulf $phy_memory 0.3 ) ( mul 12 1024 ) | int | mul 1024 1024 }}
+loose_xengine_write_buffer_size={{ min ( max 32 ( mulf $phy_memory 0.01 ) ) 256 | int | mul 1024 1024 }}
+loose_xengine_db_write_buffer_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
+loose_xengine_db_total_write_buffer_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
+loose_xengine_block_cache_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
+loose_xengine_row_cache_size={{ mulf $phy_memory 0.1 | int | mul 1024 1024 }}
+loose_xengine_max_total_wal_size={{ min ( mulf $phy_memory 0.3 ) ( mul 12 1024 ) | int | mul 1024 1024 }}
 {{- end }}
 
 {{- if gt $phy_cpu 0 }}

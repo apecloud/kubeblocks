@@ -152,7 +152,7 @@ func (w *templateRenderWorkflow) createClusterObject() (*appsv1alpha1.Cluster, e
 		return CustomizedObjFromYaml(w.clusterYaml, generics.ClusterSignature)
 	}
 
-	clusterVersionObj := GetResourceObjectWithType(w.localObjects, generics.ClusterVersionSignature)
+	clusterVersionObj := GetTypedResourceObjectBySignature(w.localObjects, generics.ClusterVersionSignature)
 	return mockClusterObject(w.clusterDefObj, w.renderedOpts, clusterVersionObj), nil
 }
 
@@ -166,7 +166,7 @@ func NewWorkflowTemplateRender(helmTemplateDir string, opts RenderedOptions) (*t
 		return nil, err
 	}
 
-	clusterDefObj := GetResourceObjectWithType(allObjects, generics.ClusterDefinitionSignature)
+	clusterDefObj := GetTypedResourceObjectBySignature(allObjects, generics.ClusterDefinitionSignature)
 	if clusterDefObj == nil {
 		return nil, cfgcore.MakeError("cluster definition object is not found in helm template directory[%s]", helmTemplateDir)
 	}
@@ -235,7 +235,7 @@ func createComponentParams(w *templateRenderWorkflow, ctx intctrlutil.RequestCtx
 	if err != nil {
 		return nil, err
 	}
-	clusterVersionObj := GetResourceObjectWithType(w.localObjects, generics.ClusterVersionSignature)
+	clusterVersionObj := GetTypedResourceObjectBySignature(w.localObjects, generics.ClusterVersionSignature)
 	task := intctrltypes.InitReconcileTask(w.clusterDefObj, clusterVersionObj, cluster, component)
 	secret, err := builder.BuildConnCredential(task.GetBuilderParams())
 	if err != nil {

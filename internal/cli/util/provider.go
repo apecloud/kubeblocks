@@ -81,17 +81,18 @@ var (
 
 // GetK8sProvider returns the k8s provider
 func GetK8sProvider(version string, client kubernetes.Interface) (K8sProvider, error) {
-	nodes, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		return UnknownProvider, err
-	}
-
-	provider := GetK8sProviderFromNodes(nodes)
+	// get provider from version first
+	provider := GetK8sProviderFromVersion(version)
 	if provider != UnknownProvider {
 		return provider, nil
 	}
 
-	return GetK8sProviderFromVersion(version), nil
+	// if provider is unknown, get provider from node
+	nodes, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return UnknownProvider, err
+	}
+	return GetK8sProviderFromNodes(nodes), nil
 }
 
 // GetK8sProviderFromNodes get k8s provider from node.spec.providerID

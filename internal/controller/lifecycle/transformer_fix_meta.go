@@ -22,7 +22,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-type FixMetaTransformer struct {}
+type FixMetaTransformer struct{}
 
 func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)

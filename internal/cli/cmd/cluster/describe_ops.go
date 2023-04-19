@@ -268,12 +268,10 @@ func (o *describeOpsOptions) getVerticalScalingCommand(spec appsv1alpha1.OpsRequ
 	commands := make([]string, len(componentNameSlice))
 	for i := range componentNameSlice {
 		resource := resourceSlice[i].(corev1.ResourceRequirements)
-		commands[i] = fmt.Sprintf("kbcli cluster vertical-scale %s --components=%s",
+		commands[i] = fmt.Sprintf("kbcli cluster vscale %s --components=%s",
 			spec.ClusterRef, strings.Join(componentNameSlice[i], ","))
-		commands[i] += o.addResourceFlag("requests.cpu", resource.Requests.Cpu())
-		commands[i] += o.addResourceFlag("requests.memory", resource.Requests.Memory())
-		commands[i] += o.addResourceFlag("limits.cpu", resource.Limits.Cpu())
-		commands[i] += o.addResourceFlag("limits.memory", resource.Limits.Memory())
+		commands[i] += o.addResourceFlag("cpu", resource.Limits.Cpu())
+		commands[i] += o.addResourceFlag("memory", resource.Limits.Memory())
 	}
 	return commands
 }
@@ -293,7 +291,7 @@ func (o *describeOpsOptions) getHorizontalScalingCommand(spec appsv1alpha1.OpsRe
 		spec.HorizontalScalingList, convertObject, getCompName)
 	commands := make([]string, len(componentNameSlice))
 	for i := range componentNameSlice {
-		commands[i] = fmt.Sprintf("kbcli cluster horizontal-scale %s --components=%s --replicas=%d",
+		commands[i] = fmt.Sprintf("kbcli cluster hscale %s --components=%s --replicas=%d",
 			spec.ClusterRef, strings.Join(componentNameSlice[i], ","), replicasSlice[i].(int32))
 	}
 	return commands

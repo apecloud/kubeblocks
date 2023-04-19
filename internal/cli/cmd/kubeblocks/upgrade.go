@@ -87,23 +87,23 @@ func (o *InstallOptions) Upgrade() error {
 	}
 
 	// check if KubeBlocks has been installed
-	versionInfo, err := util.GetVersionInfo(o.Client)
+	v, err := util.GetVersionInfo(o.Client)
 	if err != nil {
 		return err
 	}
 
-	v := versionInfo[util.KubeBlocksApp]
-	if len(v) == 0 {
+	kbVersion := v.KubeBlocks
+	if kbVersion == "" {
 		return errors.New("KubeBlocks does not exist, try to run \"kbcli kubeblocks install\" to install")
 	}
 
-	if v == o.Version && helm.ValueOptsIsEmpty(&o.ValueOpts) {
+	if kbVersion == o.Version && helm.ValueOptsIsEmpty(&o.ValueOpts) {
 		fmt.Fprintf(o.Out, "Current version %s is the same as the upgraded version, no need to upgrade.\n", o.Version)
 		return nil
 	}
 	fmt.Fprintf(o.Out, "Current KubeBlocks version %s.\n", v)
 
-	if err = o.preCheck(versionInfo); err != nil {
+	if err = o.preCheck(v); err != nil {
 		return err
 	}
 

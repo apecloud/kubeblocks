@@ -54,8 +54,8 @@ func NewStatelessComponent(cli client.Client,
 					Component:     nil,
 				},
 			},
-			Dag:             dag,
-			WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
+			Dag:            dag,
+			WorkloadVertex: nil,
 		},
 	}
 	comp.ComponentSet.SetComponent(comp)
@@ -198,7 +198,7 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 }
 
 func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli, nil, true); err != nil {
+	if err := c.init(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()), true); err != nil {
 		return err
 	}
 	return c.ComponentBase.BuildLatestStatus(reqCtx, cli, c.runningWorkload)
@@ -254,21 +254,21 @@ func (c *statelessComponent) updateUnderlyingResources(reqCtx intctrlutil.Reques
 }
 
 func (c *statelessComponent) createWorkload() {
-	deployProto := c.WorkloadVertexs[0].Obj.(*appsv1.Deployment)
-	c.WorkloadVertexs[0].Obj = deployProto
-	c.WorkloadVertexs[0].Action = ictrltypes.ActionCreatePtr()
+	deployProto := c.WorkloadVertex.Obj.(*appsv1.Deployment)
+	c.WorkloadVertex.Obj = deployProto
+	c.WorkloadVertex.Action = ictrltypes.ActionCreatePtr()
 	c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload created")
 }
 
 func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	deployObjCopy := deployObj.DeepCopy()
-	deployProto := c.WorkloadVertexs[0].Obj.(*appsv1.Deployment)
+	deployProto := c.WorkloadVertex.Obj.(*appsv1.Deployment)
 
 	util.MergeAnnotations(deployObj.Spec.Template.Annotations, &deployProto.Spec.Template.Annotations)
 	deployObjCopy.Spec = deployProto.Spec
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
-		c.WorkloadVertexs[0].Obj = deployObjCopy
-		c.WorkloadVertexs[0].Action = ictrltypes.ActionUpdatePtr()
+		c.WorkloadVertex.Obj = deployObjCopy
+		c.WorkloadVertex.Action = ictrltypes.ActionUpdatePtr()
 		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload updated")
 	}
 }

@@ -96,8 +96,7 @@ func RestartPod(podTemplate *corev1.PodTemplateSpec) error {
 		podTemplate.Annotations = map[string]string{}
 	}
 
-	// startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
-	startTimestamp := time.Now() // TODO(refactor): impl
+	startTimestamp := time.Now() // TODO(impl): opsRes.OpsRequest.Status.StartTimestamp
 	restartTimestamp := podTemplate.Annotations[constant.RestartAnnotationKey]
 	// if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.After(res) {
 	if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.Before(res) {

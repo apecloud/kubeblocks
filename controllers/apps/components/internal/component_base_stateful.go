@@ -151,8 +151,8 @@ func (c *StatefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client
 	return c.ResolveObjectsAction(reqCtx, cli)
 }
 
-func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if err := c.init(reqCtx, cli, nil, true); err != nil {
+func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
+	if err := c.init(reqCtx, cli, builder, true); err != nil {
 		return err
 	}
 
@@ -191,6 +191,8 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 	return c.handleGarbageOfRestoreBeforeRunning()
+
+	//TODO: c.updateWorkload(c.runningWorkload)
 }
 
 func (c *StatefulComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -235,7 +237,7 @@ func (c *StatefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli 
 				return err
 			}
 			pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Resources.Requests[corev1.ResourceStorage]
-			c.UpdateResource(pvc, c.WorkloadVertexs[0])
+			c.UpdateResource(pvc, c.WorkloadVertex)
 		}
 	}
 	return nil
@@ -322,7 +324,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 				if err := cli.Get(reqCtx.Ctx, cronJobKey, cronJob); err != nil {
 					return client.IgnoreNotFound(err)
 				}
-				c.DeleteResource(cronJob, c.WorkloadVertexs[0])
+				c.DeleteResource(cronJob, c.WorkloadVertex)
 			}
 		}
 		return nil
@@ -384,7 +386,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	}
 	if !allPVCsExist {
 		// do backup according to component's horizontal scale policy
-		stsProto := c.WorkloadVertexs[0].Obj.(*appsv1.StatefulSet)
+		stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
 		objs, err := doBackup(reqCtx, cli, c.Cluster, c.Component, snapshotKey, stsProto, stsObj)
 		if err != nil {
 			return err
@@ -393,7 +395,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 			for _, obj := range objs {
 				c.CreateResource(obj, nil)
 			}
-			c.WorkloadVertexs[0].Immutable = true
+			c.WorkloadVertex.Immutable = true
 		}
 		return nil
 	}
@@ -404,7 +406,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		return err
 	}
 	if !allPVCBounded {
-		c.WorkloadVertexs[0].Immutable = true
+		c.WorkloadVertex.Immutable = true
 		return nil
 	}
 	// clean backup resources.
@@ -414,7 +416,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	}
 
 	// pvcs are ready, stateful_set.replicas should be updated
-	c.WorkloadVertexs[0].Immutable = false
+	c.WorkloadVertex.Immutable = false
 
 	return nil
 }
@@ -439,15 +441,15 @@ func (c *StatefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.Req
 }
 
 func (c *StatefulComponentBase) createWorkload() {
-	stsProto := c.WorkloadVertexs[0].Obj.(*appsv1.StatefulSet)
-	c.WorkloadVertexs[0].Obj = stsProto
-	c.WorkloadVertexs[0].Action = ictrltypes.ActionCreatePtr()
+	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
+	c.WorkloadVertex.Obj = stsProto
+	c.WorkloadVertex.Action = ictrltypes.ActionCreatePtr()
 	c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload created")
 }
 
 func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) {
 	stsObjCopy := stsObj.DeepCopy()
-	stsProto := c.WorkloadVertexs[0].Obj.(*appsv1.StatefulSet)
+	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
 
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the statefulSet will be updated.
@@ -456,8 +458,8 @@ func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) {
 	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
 	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
-		c.WorkloadVertexs[0].Obj = stsObjCopy
-		c.WorkloadVertexs[0].Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
+		c.WorkloadVertex.Obj = stsObjCopy
+		c.WorkloadVertex.Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
 		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload updated")
 	}
 }
@@ -487,7 +489,7 @@ func (c *StatefulComponentBase) updatePVC(reqCtx intctrlutil.RequestCtx, cli cli
 				}
 				return err
 			}
-			c.NoopResource(pvc, c.WorkloadVertexs[0])
+			c.NoopResource(pvc, c.WorkloadVertex)
 		}
 	}
 	return nil
@@ -553,28 +555,22 @@ func (c *StatefulComponentBase) getClusterBackupSourceMap(cluster *appsv1alpha1.
 
 // removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
 func (c *StatefulComponentBase) removeStsInitContainerForRestore(backupName string) error {
-	doRemoveInitContainers := false
-	for _, vertex := range c.WorkloadVertexs {
-		sts := vertex.Obj.(*appsv1.StatefulSet)
-		initContainers := sts.Spec.Template.Spec.InitContainers
-		restoreInitContainerName := component.GetRestoredInitContainerName(backupName)
-		restoreInitContainerIndex, _ := intctrlutil.GetContainerByName(initContainers, restoreInitContainerName)
-		if restoreInitContainerIndex == -1 {
-			continue
-		}
-		doRemoveInitContainers = true
-		initContainers = append(initContainers[:restoreInitContainerIndex], initContainers[restoreInitContainerIndex+1:]...)
-		sts.Spec.Template.Spec.InitContainers = initContainers
+	sts := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
+	initContainers := sts.Spec.Template.Spec.InitContainers
+	restoreInitContainerName := component.GetRestoredInitContainerName(backupName)
+	restoreInitContainerIndex, _ := intctrlutil.GetContainerByName(initContainers, restoreInitContainerName)
+	if restoreInitContainerIndex == -1 {
+		return nil
+	}
 
-		if *vertex.Action != ictrltypes.UPDATE {
-			if *vertex.Action != ictrltypes.CREATE && *vertex.Action != ictrltypes.DELETE {
-				vertex.Action = ictrltypes.ActionUpdatePtr()
-			}
+	initContainers = append(initContainers[:restoreInitContainerIndex], initContainers[restoreInitContainerIndex+1:]...)
+	sts.Spec.Template.Spec.InitContainers = initContainers
+	if *c.WorkloadVertex.Action != ictrltypes.UPDATE {
+		if *c.WorkloadVertex.Action != ictrltypes.CREATE && *c.WorkloadVertex.Action != ictrltypes.DELETE {
+			c.WorkloadVertex.Action = ictrltypes.ActionUpdatePtr()
 		}
 	}
-	if doRemoveInitContainers {
-		// if need to remove init container, reset component to Creating.
-		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Remove init container for restore")
-	}
+	// if need to remove init container, reset component to Creating.
+	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Remove init container for restore")
 	return nil
 }

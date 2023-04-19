@@ -196,7 +196,7 @@ func (b *ComponentWorkloadBuilderBase) Complete() error {
 		return fmt.Errorf("fail to create compoennt workloads, cluster: %s, component: %s",
 			b.Comp.GetClusterName(), b.Comp.GetName())
 	}
-	b.Comp.AddWorkload(b.Workload, b.DefaultAction, nil)
+	b.Comp.SetWorkload(b.Workload, b.DefaultAction, nil)
 	return nil
 }
 

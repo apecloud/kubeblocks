@@ -46,14 +46,14 @@ import (
 )
 
 type ComponentBase struct {
-	Client          client.Client
-	Recorder        record.EventRecorder
-	Cluster         *appsv1alpha1.Cluster
-	ClusterVersion  *appsv1alpha1.ClusterVersion    // building config needs the cluster version
-	Component       *component.SynthesizedComponent // built synthesized component, replace it with component workload proto
-	ComponentSet    types.ComponentSet
-	Dag             *graph.DAG
-	WorkloadVertexs []*ictrltypes.LifecycleVertex // DAG vertexes of main workload object(s)
+	Client         client.Client
+	Recorder       record.EventRecorder
+	Cluster        *appsv1alpha1.Cluster
+	ClusterVersion *appsv1alpha1.ClusterVersion    // building config needs the cluster version
+	Component      *component.SynthesizedComponent // built synthesized component, replace it with component workload proto
+	ComponentSet   types.ComponentSet
+	Dag            *graph.DAG
+	WorkloadVertex *ictrltypes.LifecycleVertex // DAG vertex of main workload object
 }
 
 func (c *ComponentBase) GetName() string {
@@ -110,6 +110,10 @@ func (c *ComponentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {
 	return c.Cluster.Status.Components[c.GetName()].Phase
 }
 
+func (c *ComponentBase) SetWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex) {
+	c.WorkloadVertex = c.AddResource(obj, action, parent)
+}
+
 func (c *ComponentBase) AddResource(obj client.Object, action *ictrltypes.LifecycleAction,
 	parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
 	if obj == nil {
@@ -125,10 +129,6 @@ func (c *ComponentBase) AddResource(obj client.Object, action *ictrltypes.Lifecy
 		c.Dag.Connect(parent, vertex)
 	}
 	return vertex
-}
-
-func (c *ComponentBase) AddWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex) {
-	c.WorkloadVertexs = append(c.WorkloadVertexs, c.AddResource(obj, action, parent))
 }
 
 func (c *ComponentBase) CreateResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {

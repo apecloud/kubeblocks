@@ -76,8 +76,8 @@ type Component interface {
 	HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 
 	// TODO(impl): impl-related, replace them with component workload
+	SetWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex)
 	AddResource(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex
-	AddWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex)
 }
 
 // TODO(impl): replace it with ComponentWorkload and <*>Set implementation.

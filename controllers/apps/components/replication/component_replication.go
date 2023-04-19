@@ -52,8 +52,8 @@ func NewReplicationComponent(cli client.Client,
 						},
 					},
 				},
-				Dag:             dag,
-				WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
+				Dag:            dag,
+				WorkloadVertex: nil,
 			},
 		},
 	}
@@ -98,4 +98,8 @@ func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.
 
 func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	return c.StatefulComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
+}
+
+func (c *replicationComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return c.StatefulComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
 }

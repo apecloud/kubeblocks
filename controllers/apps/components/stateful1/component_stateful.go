@@ -50,8 +50,8 @@ func NewStatefulComponent(cli client.Client,
 						Component:     nil,
 					},
 				},
-				Dag:             dag,
-				WorkloadVertexs: make([]*ictrltypes.LifecycleVertex, 0),
+				Dag:            dag,
+				WorkloadVertex: nil,
 			},
 		},
 	}
@@ -96,4 +96,8 @@ func (c *statefulComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cli
 
 func (c *statefulComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	return c.StatefulComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
+}
+
+func (c *statefulComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return c.StatefulComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
 }

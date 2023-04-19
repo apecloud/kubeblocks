@@ -417,6 +417,10 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			"snapshot-controller.enabled=true",
 			"csi-hostpath-driver.enabled=true",
 
+			// enable aws loadbalancer controller addon automatically on playground
+			"aws-loadbalancer-controller.enabled=true",
+			fmt.Sprintf("aws-loadbalancer-controller.clusterName=%s", k8sClusterName),
+
 			// disable the persistent volume of prometheus, if not, the prometheus
 			// will dependent the hostpath csi driver ready to create persistent
 			// volume, but the order of addon installation is not guaranteed that

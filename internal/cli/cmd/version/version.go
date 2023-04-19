@@ -52,14 +52,14 @@ func (o *versionOptions) Run(f cmdutil.Factory) {
 		klog.V(1).Infof("failed to get clientset: %v", err)
 	}
 
-	v, _ := util.GetVersionInfo(client)
-	if v.Kubernetes != "" {
-		fmt.Printf("Kubernetes: %s\n", v.Kubernetes)
+	versionInfo, _ := util.GetVersionInfo(client)
+	if v := versionInfo[util.KubernetesApp]; len(v) > 0 {
+		fmt.Printf("Kubernetes: %s\n", v)
 	}
-	if v.KubeBlocks != "" {
-		fmt.Printf("KubeBlocks: %s\n", v.KubeBlocks)
+	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
+		fmt.Printf("KubeBlocks: %s\n", v)
 	}
-	fmt.Printf("kbcli: %s\n", v.Cli)
+	fmt.Printf("kbcli: %s\n", versionInfo[util.KBCLIApp])
 	if o.verbose {
 		fmt.Printf("  BuildDate: %s\n", version.BuildDate)
 		fmt.Printf("  GitCommit: %s\n", version.GitCommit)

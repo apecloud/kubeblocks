@@ -30,32 +30,34 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
-type Version struct {
-	KubeBlocks string
-	Kubernetes string
-	Cli        string
-}
+type AppName string
 
-// GetVersionInfo get version include KubeBlocks, CLI and kubernetes
-func GetVersionInfo(client kubernetes.Interface) (Version, error) {
+const (
+	KubernetesApp AppName = "Kubernetes"
+	KubeBlocksApp AppName = "KubeBlocks"
+	KBCLIApp      AppName = "kbcli"
+)
+
+// GetVersionInfo get application version include KubeBlocks, CLI and kubernetes
+func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
 	var err error
-	version := Version{
-		Cli: version.GetVersion(),
+	versionInfo := map[AppName]string{
+		KBCLIApp: version.GetVersion(),
 	}
 
 	if client == nil || reflect.ValueOf(client).IsNil() {
-		return version, nil
+		return versionInfo, nil
 	}
 
-	if version.Kubernetes, err = GetK8sVersion(client.Discovery()); err != nil {
-		return version, err
+	if versionInfo[KubernetesApp], err = GetK8sVersion(client.Discovery()); err != nil {
+		return versionInfo, err
 	}
 
-	if version.KubeBlocks, err = getKubeBlocksVersion(client); err != nil {
-		return version, err
+	if versionInfo[KubeBlocksApp], err = getKubeBlocksVersion(client); err != nil {
+		return versionInfo, err
 	}
 
-	return version, nil
+	return versionInfo, nil
 }
 
 // getKubeBlocksVersion get KubeBlocks version

@@ -42,10 +42,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
-const (
-	ComponentStatusDefaultPodName = "Unknown"
-)
-
 var (
 	ErrReqCtrlClient              = errors.New("required arg client.Client is nil")
 	ErrReqClusterObj              = errors.New("required arg *appsv1alpha1.Cluster is nil")
@@ -277,7 +273,7 @@ func InitClusterComponentStatusIfNeed(
 		}
 		componentStatus.ConsensusSetStatus = &appsv1alpha1.ConsensusSetStatus{
 			Leader: appsv1alpha1.ConsensusMemberStatus{
-				Pod:        ComponentStatusDefaultPodName,
+				Pod:        constant.ComponentStatusDefaultPodName,
 				AccessMode: appsv1alpha1.None,
 				Name:       "",
 			},
@@ -288,7 +284,7 @@ func InitClusterComponentStatusIfNeed(
 		}
 		componentStatus.ReplicationSetStatus = &appsv1alpha1.ReplicationSetStatus{
 			Primary: appsv1alpha1.ReplicationMemberStatus{
-				Pod: ComponentStatusDefaultPodName,
+				Pod: constant.ComponentStatusDefaultPodName,
 			},
 		}
 	}

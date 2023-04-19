@@ -177,14 +177,14 @@ var _ = Describe("Consensus Component", func() {
 			err := InitClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus).ShouldNot(BeNil())
-			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(ComponentStatusDefaultPodName))
+			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
 
 			By("test ReplicationSet InitClusterComponentStatusIfNeed function")
 			componentDef.WorkloadType = appsv1alpha1.Replication
 			err = InitClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus).ShouldNot(BeNil())
-			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(ComponentStatusDefaultPodName))
+			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
 
 			By("test GetObjectListByComponentName function")
 			stsList := &appsv1.StatefulSetList{}

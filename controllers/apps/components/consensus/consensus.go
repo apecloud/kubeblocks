@@ -243,7 +243,7 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 	newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
 		Leader: appsv1alpha1.ConsensusMemberStatus{
 			Name:       "",
-			Pod:        util.ComponentStatusDefaultPodName,
+			Pod:        constant.ComponentStatusDefaultPodName,
 			AccessMode: appsv1alpha1.None,
 		},
 	}

@@ -126,6 +126,7 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		}
 		c.cleanupAnnotationsAfterRunning(cluster)
 
+		// TODO(refactor): PITR will update cluster annotations and sts spec, create and delete pvc & job resources, resolve them later.
 		if shouldRequeue, err := plan.DoPITRIfNeed(c.ctx.Ctx, c.cli, cluster); err != nil {
 			return err
 		} else if shouldRequeue {

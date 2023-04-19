@@ -89,7 +89,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if componentStatus.ConsensusSetStatus == nil {
 		return intctrlutil.Reconciled()
 	}
-	if componentStatus.ConsensusSetStatus.Leader.Pod == util.ComponentStatusDefaultPodName {
+	if componentStatus.ConsensusSetStatus.Leader.Pod == constant.ComponentStatusDefaultPodName {
 		return intctrlutil.Reconciled()
 	}
 

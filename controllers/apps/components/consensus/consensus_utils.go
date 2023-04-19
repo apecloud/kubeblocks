@@ -380,7 +380,7 @@ func setConsensusSetStatusLearner(consensusSetStatus *appsv1alpha1.ConsensusSetS
 func resetConsensusSetStatusRole(consensusSetStatus *appsv1alpha1.ConsensusSetStatus, podName string) {
 	// reset leader
 	if consensusSetStatus.Leader.Pod == podName {
-		consensusSetStatus.Leader.Pod = util.ComponentStatusDefaultPodName
+		consensusSetStatus.Leader.Pod = constant.ComponentStatusDefaultPodName
 		consensusSetStatus.Leader.AccessMode = appsv1alpha1.None
 		consensusSetStatus.Leader.Name = ""
 	}

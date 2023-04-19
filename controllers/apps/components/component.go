@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -93,6 +94,9 @@ func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	compVer *appsv1alpha1.ClusterComponentVersion) (*component.SynthesizedComponent, error) {
 	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, *cluster, *clusterDef, *compDef, *compSpec, compVer)
 	if err != nil {
+		return nil, err
+	}
+	if err := plan.DoPITRPrepare(reqCtx.Ctx, cli, cluster, synthesizedComp); err != nil {
 		return nil, err
 	}
 	return synthesizedComp, nil

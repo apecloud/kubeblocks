@@ -110,7 +110,7 @@ func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSet
 			return fmt.Errorf("primary pod cannot be removed")
 		}
 		replicationStatus.Primary = appsv1alpha1.ReplicationMemberStatus{
-			Pod: util.ComponentStatusDefaultPodName,
+			Pod: constant.ComponentStatusDefaultPodName,
 		}
 	}
 	newSecondaries := make([]appsv1alpha1.ReplicationMemberStatus, 0)

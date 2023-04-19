@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	computil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -297,7 +296,7 @@ func (o *ConnectOptions) getTargetPod() error {
 
 	// get instantces for given cluster name and component name
 	infos := cluster.GetSimpleInstanceInfosForComponent(o.Dynamic, o.clusterName, o.componentName, o.Namespace)
-	if len(infos) == 0 || infos[0].Name == computil.ComponentStatusDefaultPodName {
+	if len(infos) == 0 || infos[0].Name == constant.ComponentStatusDefaultPodName {
 		return fmt.Errorf("failed to find the instance to connect, please check cluster status")
 	}
 

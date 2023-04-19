@@ -21,9 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
 	"sort"
 	"time"
 
@@ -197,11 +194,8 @@ func GetMapKeyFromRequest(req *dapr.InvokeBindingRequest) string {
 // OperationHTTPClient is a mock client for operation, mainly used to hide curl command details.
 type OperationHTTPClient struct {
 	httpRequestPrefix string
-	httpPostPrefix    string
 	RequestTimeout    time.Duration
 	containerName     string
-	ip                string
-	port              int32
 }
 
 // NewHTTPClientWithChannelPod create a new OperationHTTPClient with sqlchannel container
@@ -229,11 +223,8 @@ func NewHTTPClientWithChannelPod(pod *corev1.Pod, characterType string) (*Operat
 
 	client := &OperationHTTPClient{
 		httpRequestPrefix: fmt.Sprintf(HTTPRequestPrefx, port, characterType),
-		httpPostPrefix:    fmt.Sprintf(HTTPPostRequest, ip, port, characterType),
 		RequestTimeout:    10 * time.Second,
 		containerName:     container,
-		ip:                ip,
-		port:              port,
 	}
 	return client, nil
 }
@@ -263,64 +254,4 @@ func (cli *OperationHTTPClient) SendRequest(exec *exec.ExecOptions, request SQLC
 		return response, err
 	}
 	return response, nil
-}
-
-func (cli *OperationHTTPClient) SendHTTPRequest(request SQLChannelRequest) (SQLChannelResponse, error) {
-	response := SQLChannelResponse{}
-	client := newHTTPClient()
-	if result, err := httpCall(client, "POST", cli.httpPostPrefix, request); err != nil {
-		return response, err
-	} else {
-		if err = json.Unmarshal(result, &response); err != nil {
-			return response, nil
-		}
-	}
-	return response, nil
-}
-
-// NewHTTPClient returns a HTTP client configured
-func newHTTPClient() *http.Client {
-	dialer := &net.Dialer{ //nolint:exhaustivestruct
-		Timeout: 5 * time.Second,
-	}
-	netTransport := &http.Transport{ //nolint:exhaustivestruct
-		DialContext:         dialer.DialContext,
-		TLSHandshakeTimeout: 5 * time.Second,
-	}
-
-	return &http.Client{ //nolint:exhaustivestruct
-		Timeout:   30 * time.Second,
-		Transport: netTransport,
-	}
-}
-
-func httpCall(httpClient *http.Client, method string, url string, requestBody interface{}) ([]byte, error) {
-	var body []byte
-	var err error
-
-	if requestBody != nil {
-		body, err = json.Marshal(requestBody)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	req, err := http.NewRequest(method, url, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer res.Body.Close()
-
-	resBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return resBody, nil
 }

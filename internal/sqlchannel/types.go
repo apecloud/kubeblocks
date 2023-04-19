@@ -44,7 +44,6 @@ const (
 	ListSystemAccountsOp bindings.OperationKind = "listSystemAccounts"
 
 	HTTPRequestPrefx string = "curl -X POST -H 'Content-Type: application/json' http://localhost:%d/v1.0/bindings/%s"
-	HTTPPostRequest  string = "http://%s:%d/v1.0/bindings/%s"
 )
 
 // UserInfo is the user information for account management

@@ -362,10 +362,12 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		if err != nil {
 			return err
 		}
-		for _, obj := range objs {
-			c.CreateResource(obj, nil)
+		if objs != nil {
+			for _, obj := range objs {
+				c.CreateResource(obj, nil)
+			}
+			c.WorkloadVertexs[0].Immutable = true
 		}
-		c.WorkloadVertexs[0].Immutable = true
 		return nil
 	}
 

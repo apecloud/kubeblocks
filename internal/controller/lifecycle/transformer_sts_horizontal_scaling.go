@@ -46,11 +46,11 @@ import (
 type StsHorizontalScalingTransformer struct{}
 
 func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	tranxCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*ClusterTransformContext)
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx:      tranxCtx.Context,
-		Log:      tranxCtx.Logger,
-		Recorder: tranxCtx.EventRecorder,
+		Ctx:      transCtx.Context,
+		Log:      transCtx.Logger,
+		Recorder: transCtx.EventRecorder,
 	}
 	rootVertex, err := findRootVertex(dag)
 	if err != nil {
@@ -78,12 +78,12 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
 		components := mergeComponentsList(reqCtx,
 			*cluster,
-			*tranxCtx.ClusterDef,
-			tranxCtx.ClusterDef.Spec.ComponentDefs,
+			*transCtx.ClusterDef,
+			transCtx.ClusterDef.Spec.ComponentDefs,
 			cluster.Spec.ComponentSpecs)
 		comp := getComponent(components, componentName)
 		if comp == nil {
-			tranxCtx.EventRecorder.Eventf(cluster,
+			transCtx.EventRecorder.Eventf(cluster,
 				corev1.EventTypeWarning,
 				"HorizontalScaleFailed",
 				"component %s not found",
@@ -101,7 +101,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 					cronJobKey := pvcKey
 					cronJobKey.Name = "delete-pvc-" + pvcKey.Name
 					cronJob := &batchv1.CronJob{}
-					if err := tranxCtx.Client.Get(tranxCtx.Context, cronJobKey, cronJob); err != nil {
+					if err := transCtx.Client.Get(transCtx.Context, cronJobKey, cronJob); err != nil {
 						return client.IgnoreNotFound(err)
 					}
 					v := &lifecycleVertex{
@@ -123,7 +123,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 					}
 					// check pvc existence
-					pvcExists, err := isPVCExists(tranxCtx.Client, tranxCtx.Context, pvcKey)
+					pvcExists, err := isPVCExists(transCtx.Client, transCtx.Context, pvcKey)
 					if err != nil {
 						return true, err
 					}
@@ -138,20 +138,20 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 		checkAllPVCBoundIfNeeded := func() (bool, error) {
 			if comp.HorizontalScalePolicy == nil ||
 				comp.HorizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				!isSnapshotAvailable(tranxCtx.Client, tranxCtx.Context) {
+				!isSnapshotAvailable(transCtx.Client, transCtx.Context) {
 				return true, nil
 			}
-			return isAllPVCBound(tranxCtx.Client, tranxCtx.Context, stsObj)
+			return isAllPVCBound(transCtx.Client, transCtx.Context, stsObj)
 		}
 
 		cleanBackupResourcesIfNeeded := func() error {
 			if comp.HorizontalScalePolicy == nil ||
 				comp.HorizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				!isSnapshotAvailable(tranxCtx.Client, tranxCtx.Context) {
+				!isSnapshotAvailable(transCtx.Client, transCtx.Context) {
 				return nil
 			}
 			// if all pvc bounded, clean backup resources
-			return deleteSnapshot(tranxCtx.Client, reqCtx, snapshotKey, cluster, comp, dag, rootVertex)
+			return deleteSnapshot(transCtx.Client, reqCtx, snapshotKey, cluster, comp, dag, rootVertex)
 		}
 
 		scaleOut := func() error {
@@ -168,7 +168,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 					return nil
 				}
 				// do backup according to component's horizontal scale policy
-				if err := doBackup(reqCtx, tranxCtx.Client, comp, snapshotKey, dag, rootVertex, vertex); err != nil {
+				if err := doBackup(reqCtx, transCtx.Client, comp, snapshotKey, dag, rootVertex, vertex); err != nil {
 					return err
 				}
 				vertex.immutable = true
@@ -208,7 +208,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 					}
 					// create cronjob to delete pvc after 30 minutes
-					if err := checkedCreateDeletePVCCronJob(tranxCtx.Client, reqCtx, pvcKey, stsObj, cluster, dag, rootVertex); err != nil {
+					if err := checkedCreateDeletePVCCronJob(transCtx.Client, reqCtx, pvcKey, stsObj, cluster, dag, rootVertex); err != nil {
 						return err
 					}
 				}
@@ -231,7 +231,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 		}
 
 		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-			tranxCtx.EventRecorder.Eventf(cluster,
+			transCtx.EventRecorder.Eventf(cluster,
 				corev1.EventTypeNormal,
 				"HorizontalScale",
 				"Start horizontal scale component %s from %d to %d",
@@ -296,7 +296,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 	// by sts: we only handle the pvc deletion which occurs in cluster deletion.
 	// by h-scale transformer: we handle the pvc creation and deletion, the creation is handled in h-scale funcs.
 	// so all in all, here we should only handle the pvc deletion of both types.
-	oldSnapshot, err := readCacheSnapshot(tranxCtx, *cluster, &corev1.PersistentVolumeClaimList{})
+	oldSnapshot, err := readCacheSnapshot(transCtx, *cluster, &corev1.PersistentVolumeClaimList{})
 	if err != nil {
 		return err
 	}

@@ -145,15 +145,15 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			return err
 		}
 	case appsv1alpha1.Replication:
-		// get the number of existing statefulsets under the current component
-		var existStsList = &appsv1.StatefulSetList{}
-		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, *task.Cluster, existStsList, task.Component.Name); err != nil {
+		// get the number of existing pods under the current component
+		var existPodList = &corev1.PodList{}
+		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, *task.Cluster, existPodList, task.Component.Name); err != nil {
 			return err
 		}
 
-		// If the statefulSets already exists, check whether there is an HA switching and the HA process is prioritized to handle.
+		// If the Pods already exists, check whether there is an HA switching and the HA process is prioritized to handle.
 		// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
-		if len(existStsList.Items) > 0 {
+		if len(existPodList.Items) > 0 {
 			primaryIndexChanged, _, err := replication.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster,
 				task.Component.Name, task.Component.GetPrimaryIndex())
 			if err != nil {

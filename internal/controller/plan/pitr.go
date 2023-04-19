@@ -373,7 +373,6 @@ func (p *PointInTimeRecoveryManager) getIncrementalBackup(componentName string) 
 			constant.KBAppComponentLabelKey: componentName,
 			constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeIncremental),
 		}); err != nil {
-
 		return nil, err
 	}
 	if len(incrementalBackupList.Items) == 0 {
@@ -411,10 +410,6 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 			constant.AppInstanceLabelKey:    p.Cluster.Name,
 			constant.KBAppComponentLabelKey: componentSpec.Name,
 		}
-		vct := corev1.PersistentVolumeClaimTemplate{}
-		vct.Name = componentSpec.VolumeClaimTemplates[0].Name
-		vct.Spec = componentSpec.VolumeClaimTemplates[0].Spec.ToV1PersistentVolumeClaimSpec()
-
 		// get data dir pvc name
 		dataPVCList := corev1.PersistentVolumeClaimList{}
 		dataPVCLabels := map[string]string{

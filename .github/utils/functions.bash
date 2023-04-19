@@ -21,16 +21,7 @@ gh_get_issues () {
         -f labels=${labels} \
         -f state=${state}"
     echo $cmd
-    last_issue_list=`gh api \
-        --header 'Accept: application/vnd.github+json' \
-        --header 'X-GitHub-Api-Version: 2022-11-28' \
-        --method GET \
-        /repos/${OWNER}/${REPO}/issues \
-        -F per_page=100 \
-        -F page=${page} \
-        -f milestone=${milestone} \
-        -f labels=${labels} \
-        -f state=${state}`
+    last_issue_list=`eval ${cmd}`
 }
 
 

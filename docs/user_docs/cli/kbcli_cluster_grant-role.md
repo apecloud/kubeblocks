@@ -21,8 +21,8 @@ kbcli cluster grant-role [flags]
       --component string   Specify the name of component to be connected. If not specified, the first component will be used.
   -h, --help               help for grant-role
   -i, --instance string    Specify the name of instance to be connected.
+      --name string        Required. Specify the name of user.
   -r, --role string        Role name should be one of {SUPERUSER, READWRITE, READONLY}
-  -u, --username string    Required. Specify the name of user.
 ```
 
 ### Options inherited from parent commands

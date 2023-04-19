@@ -4,44 +4,26 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-REMOTE_URL=$(git config --get remote.origin.url)
-OWNER=$(dirname ${REMOTE_URL} | awk -F ":" '{print $2}')
-REPO=$(basename -s .git ${REMOTE_URL})
-MILESTONE_ID=${MILESTONE_ID:-5}
+# requires `git`, `gh`, and `jq` commands, ref. https://cli.github.com/manual/installation for installation guides.
 
-# GH list issues API ref: https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28#list-repository-issues
-ISSUE_LIST=$(gh api \
-    --header 'Accept: application/vnd.github+json' \
-    --method GET \
-    /repos/${OWNER}/${REPO}/issues \
-    -F per_page=100 \
-    -f milestone=${MILESTONE_ID} \
-    -f labels=kind/feature \
-    -f state=all)
+. ./gh_env
+. ./functions.bash
 
-ROWS=$(echo ${ISSUE_LIST}| jq -r '. | sort_by(.state,.number)| .[].number')
+gh_get_issues ${MILESTONE_ID} "kind/feature" "all"
 
+rows=$(echo ${last_issue_list}| jq -r '. | sort_by(.state,.number)| .[].number')
+
+echo $rows
 
 printf "%s | %s | %s | %s | %s | %s\n" "Feature Title" "Assignees" "Issue State" "Code PR Merge Status" "Feature Doc. Status" "Extra Notes"
 echo "---|---|---|---|---|---"
-for ROW in $ROWS
+for row in $rows
 do 
-    ISSUE_ID=$(echo $ROW | awk -F "," '{print $1}')
-    # GH get issue API ref: https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28#get-an-issue
-    ISSUE_BODY=$(gh api \
-        --header 'Accept: application/vnd.github+json' \
-        --method GET \
-        /repos/${OWNER}/${REPO}/issues/${ISSUE_ID})
-    URL=$(echo $ISSUE_BODY| jq -r '.url')
-    TITLE=$(echo $ISSUE_BODY| jq -r '.title')
-    ASSIGNEES=$(echo $ISSUE_BODY| jq -r '.assignees[]?.login')
-    ASSIGNEES_PRINTABLE=
-    for ASSIGNEE in $ASSIGNEES
-    do 
-        ASSIGNEES_PRINTABLE="${ASSIGNEES_PRINTABLE},${ASSIGNEE}"
-    done
-    ASSIGNEES_PRINTABLE=${ASSIGNEES_PRINTABLE#,}
-    STATE=$(echo $ISSUE_BODY| jq -r '.state')
-    PR=$(echo $ISSUE_BODY| jq -r '.pull_request?.url')
-    printf "[%s](%s) #%s | %s | %s | | | \n" "$TITLE" $URL $ISSUE_ID "$ASSIGNEES_PRINTABLE" "$STATE"
+    issue_id=$(echo $row | awk -F "," '{print $1}')
+    gh_get_issue_body ${issue_id}
+    pr_url=$(echo $last_issue_body| jq -r '.pull_request?.url')
+    if [ "$pr_url" == "null" ]; then
+        pr_url="N/A"
+    fi
+    printf "[%s](%s) #%s | %s | %s | %s| | \n" "${last_issue_title}" "${last_issue_url}" "${issue_id}" "${last_issue_assignees_printable}" "${last_issue_state}"  "${pr_url}"
 done

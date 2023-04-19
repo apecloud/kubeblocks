@@ -9,18 +9,28 @@ set -o pipefail
 . ./gh_env
 . ./functions.bash
 
-gh_get_issues "none" "kind/bug"
+process_issue_rows() {
+    for ((i = 0; i < ${item_count}; i++))
+    do 
+        local issue_body=$(echo ${last_issue_list} | jq -r ".[${i}]")
+        local issue_id=$(echo ${issue_body} | jq -r ".number")
+        local url=$(echo ${issue_body} | jq -r '.url')
+        local title=$(echo ${issue_body} | jq -r '.title')
+        local assignees=$(echo ${issue_body} | jq -r '.assignees[]?.login')
+        local state=$(echo ${issue_body}| jq -r '.state')
+        printf "[%s](%s) #%s | %s | %s | %s \n" "${title}" "${url}" "${issue_id}" "$(join_by , ${assignees})" "${state}"
+        gh_update_issue_milestone ${issue_id}
+    done
+}
 
-rows=$(echo ${last_issue_list}| jq -r '. | sort_by(.state,.number)| .[].number')
-
-
+item_count=100
+page=1
 printf "%s | %s | %s \n" "Issue Title" "Assignees" "Issue State"
 echo "---|---|---"
-for row in $rows
-do 
-    issue_id=$(echo $row | awk -F "," '{print $1}')
-    gh_get_issue_body ${issue_id}
-    printf "[%s](%s) #%s | %s | %s\n" "${last_issue_title}" "${last_issue_url}" "${issue_id}" "${last_issue_assignees_printable}" "${last_issue_state}"
-
-    gh_update_issue_milestone ${issue_id}
+while [ "${item_count}" == "100" ]
+do
+    gh_get_issues "none" "kind/bug" "open" ${page}
+    item_count=$(echo ${last_issue_list} | jq -r '. | length')
+    process_issue_rows 
+    page=$((page+1))
 done

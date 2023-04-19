@@ -9,7 +9,6 @@ import os
 import sys
 from typing import TypeAlias
 
-OptStr : TypeAlias = str | None
 
 def main(argv: list[str]) -> None:
     git_ref = os.getenv("GITHUB_REF")

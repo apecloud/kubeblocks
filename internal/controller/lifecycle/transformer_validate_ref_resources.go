@@ -79,6 +79,9 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 	// inject cd & cv into the shared ctx
 	transCtx.ClusterDef = cd
 	transCtx.ClusterVer = cv
+	if cv == nil {
+		transCtx.ClusterVer = &appsv1alpha1.ClusterVersion{}
+	}
 
 	return nil
 }

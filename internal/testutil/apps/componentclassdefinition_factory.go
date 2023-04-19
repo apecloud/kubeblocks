@@ -42,20 +42,27 @@ func NewComponentClassDefinitionFactory(name, clusterDefinitionRef, componentTyp
 	return f
 }
 
-func (factory *MockComponentClassDefinitionFactory) AddClassGroup(constraintRef string) *MockComponentClassDefinitionFactory {
+func (factory *MockComponentClassDefinitionFactory) AddClasses(constraintRef string, classes []appsv1alpha1.ComponentClass) *MockComponentClassDefinitionFactory {
 	groups := factory.get().Spec.Groups
-	group := classGroupTemplate
-	group.ResourceConstraintRef = constraintRef
-	groups = append(groups, group)
-	factory.get().Spec.Groups = groups
-	return factory
-}
-
-func (factory *MockComponentClassDefinitionFactory) AddClasses(classes []appsv1alpha1.ComponentClass) *MockComponentClassDefinitionFactory {
-	groups := factory.get().Spec.Groups
-	if len(groups) > 0 {
-		groups[len(groups)-1].Series[0].Classes = classes
-	}
+	groups = append(groups, appsv1alpha1.ComponentClassGroup{
+		ResourceConstraintRef: constraintRef,
+		Template: `
+cpu: "{{ .cpu }}"
+memory: "{{ .memory }}Gi"
+volumes:
+- name: data
+  size: "{{ or .dataStorageSize 10 }}Gi"
+- name: log
+  size: "{{ or .logStorageSize 1 }}Gi"
+`,
+		Vars: []string{"cpu", "memory", "dataStorageSize", "logStorageSize"},
+		Series: []appsv1alpha1.ComponentClassSeries{
+			{
+				NamingTemplate: "class-{{ .cpu }}c{{ .memory}}g",
+				Classes:        classes,
+			},
+		},
+	})
 	factory.get().Spec.Groups = groups
 	return factory
 }

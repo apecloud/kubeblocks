@@ -18,6 +18,7 @@ package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -25,17 +26,15 @@ import (
 )
 
 const (
-	KubeBlocks                                   = "kubeblocks"
-	LogVolumeName                                = "log"
-	ConfVolumeName                               = "conf"
-	DataVolumeName                               = "data"
-	ScriptsVolumeName                            = "scripts"
-	ServiceDefaultName                           = ""
-	ServiceHeadlessName                          = "headless"
-	ServiceVPCName                               = "vpc-lb"
-	ServiceInternetName                          = "internet-lb"
-	DefaultGeneralResourceConstraintName         = "kb-resource-constraint-general"
-	DefaultMemoryOptimizedResourceConstraintName = "kb-resource-constraint-memory-optimized"
+	KubeBlocks          = "kubeblocks"
+	LogVolumeName       = "log"
+	ConfVolumeName      = "conf"
+	DataVolumeName      = "data"
+	ScriptsVolumeName   = "scripts"
+	ServiceDefaultName  = ""
+	ServiceHeadlessName = "headless"
+	ServiceVPCName      = "vpc-lb"
+	ServiceInternetName = "internet-lb"
 
 	ReplicationPodRoleVolume       = "pod-role"
 	ReplicationRoleLabelFieldPath  = "metadata.labels['kubeblocks.io/role']"
@@ -55,6 +54,10 @@ const (
 	DefaultRedisImageName         = "redis:7.0.5"
 	DefaultRedisContainerName     = "redis"
 	DefaultRedisInitContainerName = "redis-init-container"
+
+	Class1c1gName                 = "general-1c1g"
+	Class2c4gName                 = "general-2c4g"
+	DefaultResourceConstraintName = "kb-resource-constraint"
 )
 
 var (
@@ -289,7 +292,8 @@ var (
 		},
 	}
 
-	classGroupTemplate = appsv1alpha1.ComponentClassGroup{
+	generalClassGroup = appsv1alpha1.ComponentClassGroup{
+		ResourceConstraintRef: DefaultResourceConstraintName,
 		Template: `
 cpu: "{{ or .cpu 1 }}"
 memory: "{{ or .memory 4 }}Gi"
@@ -302,7 +306,28 @@ volumes:
 		Vars: []string{"cpu", "memory", "dataStorageSize", "logStorageSize"},
 		Series: []appsv1alpha1.ComponentClassSeries{
 			{
-				NamingTemplate: "custom-{{ .cpu }}c{{ .memory }}g",
+				NamingTemplate: "class-{{ .cpu }}c{{ .memory}}g",
+				Classes: []appsv1alpha1.ComponentClass{
+					{
+						Name: Class1c1gName,
+						Args: []string{"1", "1", "10Gi", "1Gi"},
+					},
+					{
+						Name:   Class2c4gName,
+						CPU:    resource.MustParse("2"),
+						Memory: resource.MustParse("4Gi"),
+						Volumes: []appsv1alpha1.Volume{
+							{
+								Name: "data",
+								Size: resource.MustParse("20Gi"),
+							},
+							{
+								Name: "log",
+								Size: resource.MustParse("10Gi"),
+							},
+						},
+					},
+				},
 			},
 		},
 	}

@@ -21,14 +21,14 @@ set -ex
 {{- end }}
 {{- /* build primary pod message, because currently does not support cross-component acquisition of environment variables, the service of the redis master node is assembled here through specific rules  */}}
 {{- $primary_pod = printf "%s-%s-%d.%s-%s-headless.%s.svc" $clusterName $redis_component.name $primary_index $clusterName $redis_component.name $namespace }}
-{{- $sentinel_monitor := printf "%s-%s %s" $clusterName $sentinel_component.name $primary_pod }}
+{{- $sentinel_monitor := printf "%s-%s %s" $clusterName $redis_component.name $primary_pod }}
 cat>/etc/sentinel/redis-sentinel.conf<<EOF
 port 26379
 sentinel resolve-hostnames yes
 sentinel announce-hostnames yes
 sentinel monitor {{ $sentinel_monitor }} 6379 2
-sentinel down-after-milliseconds {{ $clusterName }}-{{ $sentinel_component.name }} 5000
-sentinel failover-timeout {{ $clusterName }}-{{ $sentinel_component.name }} 60000
-sentinel parallel-syncs {{ $clusterName }}-{{ $sentinel_component.name }} 1
+sentinel down-after-milliseconds {{ $clusterName }}-{{ $redis_component.name }} 5000
+sentinel failover-timeout {{ $clusterName }}-{{ $redis_component.name }} 60000
+sentinel parallel-syncs {{ $clusterName }}-{{ $redis_component.name }} 1
 {{- /* $primary_svc := printf "%s-%s.%s.svc" $clusterName $redis_component.name $namespace */}}
 EOF

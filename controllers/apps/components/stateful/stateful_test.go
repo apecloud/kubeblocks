@@ -88,7 +88,7 @@ var _ = Describe("Stateful Component", func() {
 			clusterComponent := cluster.Spec.GetComponentByName(statefulCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			stateful := newStateful(k8sClient, cluster, clusterComponent, *componentDef)
-			phase, _ := stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
+			phase, _, _ := stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
 			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("test pods are not ready")
@@ -116,7 +116,7 @@ var _ = Describe("Stateful Component", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
 				g.Expect(tmpSts.Status.AvailableReplicas == *sts.Spec.Replicas-1).Should(BeTrue())
 			})).Should(Succeed())
-			phase, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
+			phase, _, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
 			Expect(phase == appsv1alpha1.AbnormalClusterCompPhase).Should(BeTrue())
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
@@ -124,7 +124,7 @@ var _ = Describe("Stateful Component", func() {
 			Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
 				lpod.Labels[appsv1.ControllerRevisionHashLabelKey] = fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "5wdsd8d9fs")
 			})).Should(Succeed())
-			phase, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
+			phase, _, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
 			Expect(len(phase) == 0).Should(BeTrue())
 			// reset updateRevision
 			Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {

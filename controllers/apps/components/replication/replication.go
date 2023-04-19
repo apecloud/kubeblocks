@@ -114,30 +114,29 @@ func (r *ReplicationSet) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.Cl
 // when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
 // if return an empty phase, means the pods of component are ready and skips it.
 func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
+	componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
 		componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
-		return "", err
+		return "", nil, err
 	}
 	stsObj := stsList.Items[0]
 	podCount := len(podList.Items)
 	componentReplicas := r.getReplicas()
 	if podCount == 0 || stsObj.Status.AvailableReplicas == 0 {
-		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
+		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil, nil
 	}
 	// get the statefulSet of component
 	var (
 		existLatestRevisionFailedPod bool
 		primaryIsReady               bool
-		needPatch                    bool
-		compStatus                   = r.Cluster.Status.Components[componentName]
+		statusMessages               appsv1alpha1.ComponentMessageMap
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
 		if v.DeletionTimestamp != nil {
-			return "", nil
+			return "", nil, nil
 		}
 		labelValue := v.Labels[constant.RoleLabelKey]
 		if labelValue == string(Primary) && intctrlutil.PodIsReady(&v) {
@@ -147,18 +146,17 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 		if labelValue == "" {
 			// REVIEW: this isn't a get function, where r.Cluster.Status.Components is being updated.
 			// patch abnormal reason to cluster.status.ComponentDefs.
-			needPatch = true
-			compStatus.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
+			if statusMessages == nil {
+				statusMessages = appsv1alpha1.ComponentMessageMap{}
+			}
+			statusMessages.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
 		}
 		if !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
 			existLatestRevisionFailedPod = true
 		}
 	}
-	if needPatch {
-		r.Cluster.Status.SetComponentStatus(componentName, compStatus)
-	}
 	return util.GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryIsReady,
-		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), nil
+		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), statusMessages, nil
 }
 
 func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
@@ -216,7 +214,7 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 		podsToSyncStatus = append(podsToSyncStatus, pod)
 	}
 	// sync cluster.spec.componentSpecs.[x].primaryIndex when failover occurs and switchPolicy is Noop.
-	// TODO(refactor): syncPrimaryIndex will update cluster spec...
+	// TODO(refactor): syncPrimaryIndex will update cluster spec, resolve it.
 	if err := syncPrimaryIndex(ctx, r.Cli, r.Cluster, r.getName()); err != nil {
 		return nil, err
 	}

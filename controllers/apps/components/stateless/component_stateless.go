@@ -180,10 +180,6 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
-	if err := c.Reconfigure(reqCtx, cli); err != nil {
-		return err
-	}
-
 	// cluster.spec.componentSpecs[*].volumeClaimTemplates[*].spec.resources.requests[corev1.ResourceStorage]
 	if err := c.ExpandVolume(reqCtx, cli); err != nil {
 		return err
@@ -205,7 +201,7 @@ func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if err := c.init(reqCtx, cli, nil, true); err != nil {
 		return err
 	}
-	return c.ComponentBase.Status(reqCtx, cli, c.runningWorkload)
+	return c.ComponentBase.BuildLatestStatus(reqCtx, cli, c.runningWorkload)
 }
 
 func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {

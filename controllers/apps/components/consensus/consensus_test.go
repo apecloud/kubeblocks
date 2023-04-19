@@ -141,7 +141,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(isRunning == false).Should(BeTrue())
 
 			By("expect component phase is Failed when pod of component is failed")
-			phase, _ := consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
+			phase, _, _ := consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
 			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
@@ -149,7 +149,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				sts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, "6fdd48d9cd1")
 			})).Should(Succeed())
-			phase, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
+			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
 			Expect(len(phase) == 0).Should(BeTrue())
 		})
 	})

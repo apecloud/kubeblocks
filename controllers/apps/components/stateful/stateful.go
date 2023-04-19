@@ -83,11 +83,11 @@ func (r *Stateful) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterC
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
+func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
-		return "", err
+		return "", nil, err
 	}
 	// if the failed pod is not controlled by the latest revision
 	checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
@@ -96,7 +96,7 @@ func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName s
 	}
 	stsObj := stsList.Items[0]
 	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, r.getReplicas(),
-		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil
+		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil, nil
 }
 
 func (r *Stateful) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {

@@ -80,7 +80,7 @@ var _ = Describe("Stateful Component", func() {
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			statelessComponent := newStateless(k8sClient, cluster, clusterComponent, *componentDef)
 			By("test pods number of deploy is 0 ")
-			phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
+			phase, _, _ := statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
 			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("test pod is ready")
@@ -115,7 +115,7 @@ var _ = Describe("Stateful Component", func() {
 			})).Should(Succeed())
 			podsReady, _ := statelessComponent.PodsReady(ctx, deploy)
 			Expect(podsReady == false).Should(BeTrue())
-			phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
+			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
 			Expect(phase == appsv1alpha1.AbnormalClusterCompPhase).Should(BeTrue())
 
 			By("test pods of deployment are ready")
@@ -152,7 +152,7 @@ var _ = Describe("Stateful Component", func() {
 					},
 				}
 			})).Should(Succeed())
-			phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
+			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
 			Expect(len(phase) == 0).Should(BeTrue())
 		})
 	})

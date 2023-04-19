@@ -17,6 +17,7 @@ limitations under the License.
 package internal
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -30,12 +31,14 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// StatefulComponentBase as a base class for single stateful-set based component (stateful & consensus)
+// StatefulComponentBase as a base class for single stateful-set based component (stateful & replication & consensus).
 type StatefulComponentBase struct {
 	ComponentBase
 	// runningWorkload can be nil, and the replicas of workload can be nil (zero)
@@ -131,10 +134,6 @@ func (c *StatefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
-	if err := c.Reconfigure(reqCtx, cli); err != nil {
-		return err
-	}
-
 	// cluster.spec.componentSpecs[*].volumeClaimTemplates[*].spec.resources.requests[corev1.ResourceStorage]
 	if err := c.ExpandVolume(reqCtx, cli); err != nil {
 		return err
@@ -156,10 +155,49 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 	if err := c.init(reqCtx, cli, nil, true); err != nil {
 		return err
 	}
-	if err := c.ComponentBase.Status(reqCtx, cli, c.runningWorkload); err != nil {
+
+	// TODO(impl): check the operation result of @Restart, @ExpandVolume, @HorizontalScale, and update component status if needed.
+	//   @Restart - whether pods are available, covered by @BuildLatestStatus
+	//   @ExpandVolume - whether PVCs have been expand finished
+	//   @HorizontalScale - whether replicas to added or deleted have been done, and the cron job to delete PVCs have finished
+	//  With these changes, we can remove the manipulation to cluster and component status phase in ops controller.
+
+	if err := c.statusHorizontalScale(reqCtx, cli); err != nil {
 		return err
 	}
-	return c.HandleGarbageOfRestoreBeforeRunning()
+
+	if c.runningWorkload == nil {
+		return nil
+	}
+
+	// TODO(impl): restart pod if needed, move it to @Update and restart pod directly.
+	if vertexes, err := c.ComponentSet.HandleRestart(reqCtx.Ctx, c.runningWorkload); err != nil {
+		return err
+	} else {
+		for v := range vertexes {
+			c.Dag.AddVertex(v)
+		}
+	}
+
+	if vertexes, err := c.ComponentSet.HandleRoleChange(reqCtx.Ctx, c.runningWorkload); err != nil {
+		return err
+	} else {
+		for v := range vertexes {
+			c.Dag.AddVertex(v)
+		}
+	}
+
+	if err := c.BuildLatestStatus(reqCtx, cli, c.runningWorkload); err != nil {
+		return err
+	}
+	return c.handleGarbageOfRestoreBeforeRunning()
+}
+
+func (c *StatefulComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	if c.runningWorkload == nil {
+		return nil
+	}
+	return util.RestartPod(&c.runningWorkload.Spec.Template)
 }
 
 func (c *StatefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -228,17 +266,6 @@ func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, c
 		c.GetName(), c.GetClusterName(), int(c.Component.Replicas)-ret, c.Component.Replicas)
 
 	return nil
-}
-
-func (c *StatefulComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if c.runningWorkload == nil {
-		return nil
-	}
-	return util.RestartPod(&c.runningWorkload.Spec.Template)
-}
-
-func (c *StatefulComponentBase) Reconfigure(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return nil // TODO(impl)
 }
 
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
@@ -462,6 +489,92 @@ func (c *StatefulComponentBase) updatePVC(reqCtx intctrlutil.RequestCtx, cli cli
 			}
 			c.NoopResource(pvc, c.WorkloadVertexs[0])
 		}
+	}
+	return nil
+}
+
+func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	///// ClusterStatusHandler.handleDeletePVCCronJobEvent
+	job := &batchv1.Job{}
+	checkPVCDeletionJobFail := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, string, error) {
+		// TODO(refactor): get the job.
+		for _, cond := range job.Status.Conditions {
+			if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+				return true, fmt.Sprintf("%s-%s", cond.Reason, cond.Message), nil
+			}
+		}
+		return false, "", nil
+	}
+	if failed, msg, err := checkPVCDeletionJobFail(reqCtx, cli); err != nil {
+		return err
+	} else if failed {
+		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
+		c.setStatusPhaseWithMsg(appsv1alpha1.AbnormalClusterCompPhase, msgKey, msg, "PVC deletion job failed")
+	}
+	return nil
+}
+
+// handleGarbageOfRestoreBeforeRunning handles the garbage for restore before cluster phase changes to Running.
+// @return ErrNoOps if no operation
+// REVIEW: this handling is rather hackish, call for refactor.
+// Deprecated: to be removed by PITR feature.
+func (c *StatefulComponentBase) handleGarbageOfRestoreBeforeRunning() error {
+	clusterBackupResourceMap, err := c.getClusterBackupSourceMap(c.GetCluster())
+	if err != nil {
+		return err
+	}
+	if clusterBackupResourceMap == nil {
+		return nil
+	}
+	if c.GetPhase() != appsv1alpha1.RunningClusterCompPhase {
+		return nil
+	}
+
+	// remove the garbage for restore if the component restores from backup.
+	for _, v := range clusterBackupResourceMap {
+		// remove the init container for restore
+		if err = c.removeStsInitContainerForRestore(v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// getClusterBackupSourceMap gets the backup source map from cluster.annotations
+func (c *StatefulComponentBase) getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string, error) {
+	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	if len(compBackupMapString) == 0 {
+		return nil, nil
+	}
+	compBackupMap := map[string]string{}
+	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
+	return compBackupMap, err
+}
+
+// removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
+func (c *StatefulComponentBase) removeStsInitContainerForRestore(backupName string) error {
+	doRemoveInitContainers := false
+	for _, vertex := range c.WorkloadVertexs {
+		sts := vertex.Obj.(*appsv1.StatefulSet)
+		initContainers := sts.Spec.Template.Spec.InitContainers
+		restoreInitContainerName := component.GetRestoredInitContainerName(backupName)
+		restoreInitContainerIndex, _ := intctrlutil.GetContainerByName(initContainers, restoreInitContainerName)
+		if restoreInitContainerIndex == -1 {
+			continue
+		}
+		doRemoveInitContainers = true
+		initContainers = append(initContainers[:restoreInitContainerIndex], initContainers[restoreInitContainerIndex+1:]...)
+		sts.Spec.Template.Spec.InitContainers = initContainers
+
+		if *vertex.Action != ictrltypes.UPDATE {
+			if *vertex.Action != ictrltypes.CREATE && *vertex.Action != ictrltypes.DELETE {
+				vertex.Action = ictrltypes.ActionUpdatePtr()
+			}
+		}
+	}
+	if doRemoveInitContainers {
+		// if need to remove init container, reset component to Creating.
+		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Remove init container for restore")
 	}
 	return nil
 }

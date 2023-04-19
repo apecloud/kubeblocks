@@ -17,6 +17,8 @@ limitations under the License.
 package replication
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -170,24 +172,21 @@ var _ = Describe("Replication Component", func() {
 			testk8s.UpdatePodStatusNotReady(ctx, testCtx, podList[1].Name)
 			status.AvailableReplicas -= 1
 			testk8s.PatchStatefulSetStatus(&testCtx, replicationSetSts.Name, status)
-			phase, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
+			phase, _, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			// mock primary pod is not ready
 			testk8s.UpdatePodStatusNotReady(ctx, testCtx, primaryPod.Name)
-			phase, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
+			phase, _, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
 			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			// mock pod label is empty
 			Expect(testapps.ChangeObj(&testCtx, primaryPod, func(lpod *corev1.Pod) {
 				lpod.Labels[constant.RoleLabelKey] = ""
 			})).Should(Succeed())
-			Eventually(func(g Gomega) {
-				_, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
-				compStatus := replicationComponent.Cluster.Status.Components[testapps.DefaultRedisCompName]
-				Expect(compStatus.GetObjectMessage(primaryPod.Kind, primaryPod.Name)).
-					Should(ContainSubstring("empty label for pod, please check"))
-			}).Should(Succeed())
+			_, statusMessages, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
+			Expect(statusMessages[fmt.Sprintf("%s/%s", primaryPod.Kind, primaryPod.Name)]).
+				Should(ContainSubstring("empty label for pod, please check"))
 
 			By("Checking if the pod is not updated when statefulset is not updated")
 			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())

@@ -107,12 +107,6 @@ func (r *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bo
 }
 
 func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
-	// if status.PodsReadyTime == nil {
-	//	return true, nil
-	// }
-	// if !util.IsProbeTimeout(r.ComponentDef, status.PodsReadyTime) {
-	//	return true, nil
-	// }
 	var (
 		isAbnormal bool
 		isFailed   = true
@@ -136,18 +130,18 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.Clus
 }
 
 func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
+	componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
 		componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
-		return "", err
+		return "", nil, err
 	}
 	stsObj := stsList.Items[0]
 	podCount := len(podList.Items)
 	componentReplicas := r.getReplicas()
 	if podCount == 0 || stsObj.Status.AvailableReplicas == 0 {
-		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
+		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil, nil
 	}
 	// get the statefulSet of component
 	var (
@@ -158,7 +152,7 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
 		if v.DeletionTimestamp != nil {
-			return "", nil
+			return "", nil, nil
 		}
 		labelValue := v.Labels[constant.RoleLabelKey]
 		if consensusSpec != nil && labelValue == consensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
@@ -170,7 +164,7 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 		}
 	}
 	return util.GetCompPhaseByConditions(existLatestRevisionFailedPod, leaderIsReady,
-		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), nil
+		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), nil, nil
 }
 
 func (r *ConsensusSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {

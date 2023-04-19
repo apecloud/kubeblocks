@@ -246,6 +246,25 @@ func (o *CreateOptions) Validate() error {
 	if len(o.Name) > 16 {
 		return fmt.Errorf("cluster name should be less than 16 characters")
 	}
+
+	//validate defualt storageClassName
+	// Get existedStorageClasses and find out is there a defaultStorageClasses
+	existedStorageClasses, defaultStorageClasses, err := cluster.GetStorageClasses(o.Dynamic)
+	if err != nil {
+		return err
+	}
+	//get speicfy StorageClassName or try default StorageClass if we have
+	speicfyStorageClass, err := getStorageClassName(o.ComponentSpecs, defaultStorageClasses)
+	if err != nil {
+		return err
+	}
+	// try speicfy StorageClassName
+	for requestName := range speicfyStorageClass {
+		if _, ok := existedStorageClasses[requestName]; !ok {
+			return fmt.Errorf("--set StorageClass do not exist")
+		}
+	}
+
 	return nil
 }
 
@@ -656,4 +675,39 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 				"DedicatedNode\teach pod of the cluster will run on their own dedicated node",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}))
+}
+
+// getStorageClassName return the requested StorageClassName,
+// including the strorageClassName that user specify strorageClass
+// or the defualt strorageClass "standard" if user do not specify
+func getStorageClassName(Component []map[string]interface{}, defaultStorageClasses bool) (map[string]struct{}, error) {
+	requestStorageClass := make(map[string]struct{}, 0)
+	for _, comp := range Component {
+		vcts, ok := comp["volumeClaimTemplates"]
+		if !ok { //lack of VolumeClaimTemplates field
+			return requestStorageClass, fmt.Errorf("inputs error")
+		}
+		vctsList, ok := vcts.([]interface{})
+		if !ok { //assert failed
+			return requestStorageClass, fmt.Errorf("inputs error")
+		}
+		for _, v := range vctsList {
+			vct, ok := v.(map[string]interface{})
+			if !ok { //assert failed
+				return requestStorageClass, fmt.Errorf("inputs error")
+			}
+			spec, ok := vct["spec"].(map[string]interface{})
+			if !ok { //assert failed
+				return requestStorageClass, fmt.Errorf("inputs error")
+			}
+			strorageClass, ok := spec["storageClassName"]
+			if !ok && !defaultStorageClasses {
+				return nil, fmt.Errorf("no default StorageClass found")
+			}
+			if ok { //specify the StorageClass
+				requestStorageClass[strorageClass.(string)] = struct{}{}
+			}
+		}
+	}
+	return requestStorageClass, nil
 }

@@ -63,6 +63,11 @@ const (
 	ResourceMutatingWebhookConfigurations   = "mutatingwebhookconfigurations"
 )
 
+// StorageAPIGroup K8s storage API group
+const (
+	StorageAPIGroup = "storage.k8s.io"
+)
+
 // Apps API group
 const (
 	AppsAPIGroup                        = "apps.kubeblocks.io"

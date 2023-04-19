@@ -426,3 +426,29 @@ func GetPodWorkloadType(pod *corev1.Pod) string {
 	}
 	return pod.Labels[constant.WorkloadTypeLabelKey]
 }
+
+// GetStorageClasses return all StorageClasses and whether the cluster have a defalut StorageClasses
+func GetStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, error) {
+	gvr := schema.GroupVersionResource{
+		Group:    types.StorageAPIGroup,
+		Version:  types.K8sCoreAPIVersion,
+		Resource: "storageclasses",
+	}
+	allStorageClasses := make(map[string]struct{})
+	defaultStorageClasses := false
+
+	list, err := dynamic.Resource(gvr).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, false, fmt.Errorf("failed get existed StorageClasses, " + err.Error())
+	}
+
+	for _, item := range list.Items {
+		allStorageClasses[item.GetName()] = struct {
+		}{}
+		annotations := item.GetAnnotations()
+		if defaultStorageClasses || annotations != nil && annotations["storageclass.kubernetes.io/is-default-class"] == "true" {
+			defaultStorageClasses = true
+		}
+	}
+	return allStorageClasses, defaultStorageClasses, nil
+}

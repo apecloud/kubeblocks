@@ -390,7 +390,10 @@ func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
 	if cmd == nil {
 		return DryRunNone, nil
 	}
-	dryRunFlag, _ := cmd.Flags().GetString("dry-run")
+	dryRunFlag, err := cmd.Flags().GetString("dry-run")
+	if err != nil {
+		return DryRunNone, nil
+	}
 	switch dryRunFlag {
 	case cmd.Flag("dry-run").NoOptDefVal:
 		return DryRunClient, nil

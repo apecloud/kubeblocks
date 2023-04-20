@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -105,7 +106,34 @@ func (o *ListOptions) printClass(constraintName string, compName string, classes
 		for _, volume := range cls.Volumes {
 			volumes = append(volumes, fmt.Sprintf("%s=%s", volume.Name, volume.Size.String()))
 		}
-		tbl.AddRow(compName, cls.Name, cls.CPU.String(), cls.Memory.String(), strings.Join(volumes, ","))
+		tbl.AddRow(compName, cls.Name, cls.CPU.String(), normalizeMemory(cls.Memory), strings.Join(volumes, ","))
 	}
 	tbl.Print()
+}
+
+func normalizeMemory(mem resource.Quantity) string {
+	if !strings.HasSuffix(mem.String(), "m") {
+		return mem.String()
+	}
+
+	var (
+		value  float64
+		suffix string
+		bytes  = float64(mem.MilliValue()) / 1000
+	)
+	switch {
+	case bytes < 1024:
+		value = bytes / 1024
+		suffix = "Ki"
+	case bytes < 1024*1024:
+		value = bytes / 1024 / 1024
+		suffix = "Mi"
+	case bytes < 1024*1024*1024:
+		value = bytes / 1024 / 1024 / 1024
+		suffix = "Gi"
+	default:
+		value = bytes / 1024 / 1024 / 1024 / 1024
+		suffix = "Ti"
+	}
+	return strings.TrimRight(fmt.Sprintf("%.3f", value), "0") + suffix
 }

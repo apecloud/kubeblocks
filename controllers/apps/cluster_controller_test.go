@@ -1270,7 +1270,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	When("when creating cluster with workloadType=stateful component", func() {
+	When("creating cluster with workloadType=stateful component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -1335,7 +1335,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	When("when creating cluster with workloadType=consensus component", func() {
+	When("creating cluster with workloadType=consensus component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDef obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -1455,7 +1455,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	When("when creating cluster with workloadType=replication component", func() {
+	When("creating cluster with workloadType=replication component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj with replication componentDefRef.")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).

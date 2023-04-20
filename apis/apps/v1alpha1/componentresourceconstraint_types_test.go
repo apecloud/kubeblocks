@@ -64,15 +64,59 @@ func init() {
 
 func TestResourceConstraints(t *testing.T) {
 	cases := []struct {
+		desc   string
 		cpu    string
 		memory string
 		expect bool
 	}{
-		{cpu: "0.5", memory: "2Gi", expect: true},
-		{cpu: "0.2", memory: "40Mi", expect: true},
-		{cpu: "1", memory: "6Gi", expect: true},
-		{cpu: "2", memory: "20Gi", expect: false},
-		{cpu: "2", memory: "6Gi", expect: false},
+		{
+			desc:   "test memory constraint with sizePerCPU",
+			cpu:    "0.5",
+			memory: "2Gi",
+			expect: true,
+		},
+		{
+			desc:   "test memory constraint with unit Mi",
+			cpu:    "0.2",
+			memory: "40Mi",
+			expect: true,
+		},
+		{
+			desc:   "test memory constraint with minPerCPU and maxPerCPU",
+			cpu:    "1",
+			memory: "6Gi",
+			expect: true,
+		},
+		{
+			desc:   "test cpu with decimal",
+			cpu:    "0.3",
+			memory: "1.2Gi",
+			expect: true,
+		},
+		{
+			desc:   "test CPU with invalid step",
+			cpu:    "100.6",
+			memory: "402.4Gi",
+			expect: false,
+		},
+		{
+			desc:   "test CPU with invalid step",
+			cpu:    "1.05",
+			memory: "4.2Gi",
+			expect: false,
+		},
+		{
+			desc:   "test invalid memory",
+			cpu:    "2",
+			memory: "20Gi",
+			expect: false,
+		},
+		{
+			desc:   "test invalid memory",
+			cpu:    "2",
+			memory: "6Gi",
+			expect: false,
+		},
 	}
 
 	for _, item := range cases {

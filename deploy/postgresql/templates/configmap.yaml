@@ -20,7 +20,7 @@ data:
   kb_restore.conf: |
     method: kb_restore_from_backup
     kb_restore_from_backup:
-      command: sh /home/postgres/pgdata/kb_restore/kb_restore.sh
+      command: bash /home/postgres/pgdata/kb_restore/kb_restore.sh
       keep_existing_recovery_conf: false
       recovery_conf:
         restore_command: cp /home/postgres/pgdata/pgroot/arch/%f %p
@@ -28,6 +28,6 @@ data:
   kb_pitr.conf: |
     method: kb_restore_from_time
     kb_restore_from_time:
-      command: sh /home/postgres/pgdata/kb_restore/kb_restore.sh
+      command: bash /home/postgres/pgdata/kb_restore/kb_restore.sh
       keep_existing_recovery_conf: false
       recovery_conf: {}

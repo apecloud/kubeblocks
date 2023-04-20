@@ -354,7 +354,7 @@ var verticalScalingExample = templates.Examples(`
 		kbcli cluster vscale <my-cluster> --components=<component-name> --cpu=500m --memory=500Mi 
 
 		# scale the computing resources of specified components by class, available classes can be get by executing the command "kbcli class list --cluster-definition <cluster-definition-name>"
-		kbcli cluster vscale <my-cluster> --components=<component-name> --set class=general-1c4g
+		kbcli cluster vscale <my-cluster> --components=<component-name> --class=<class-name>
 `)
 
 // NewVerticalScalingCmd creates a vertical scaling command

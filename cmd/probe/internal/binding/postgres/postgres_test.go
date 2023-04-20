@@ -264,6 +264,14 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 
+		// list system users
+		req = &bindings.InvokeRequest{
+			Operation: ListSystemAccountsOp,
+			Metadata:  map[string]string{},
+		}
+		res, err = b.Invoke(ctx, req)
+		assertResponse(t, res, err, RespEveSucc)
+
 		// grant role
 		req = &bindings.InvokeRequest{
 			Operation: GrantUserRoleOp,

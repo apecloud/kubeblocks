@@ -152,52 +152,67 @@ var _ = Describe("PITR Functions", func() {
 				VolumeClaimTemplates:  cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
 			}
 
-			By("By creating earlier backup: ")
+			By("By creating base backup: ")
 			now := metav1.Now()
 			backupLabels := map[string]string{
-				constant.AppInstanceLabelKey: sourceCluster,
+				constant.AppInstanceLabelKey:    sourceCluster,
+				constant.KBAppComponentLabelKey: mysqlCompName,
+				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeSnapshot),
 			}
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(backupLabels).
 				SetBackupPolicyName("test-fake").
-				SetBackupType(dpv1alpha1.BackupTypeFull).
+				SetBackupType(dpv1alpha1.BackupTypeSnapshot).
 				Create(&testCtx).GetObject()
-			earlierStartTime := &metav1.Time{Time: now.Add(-time.Hour * 3)}
-			earlierStopTime := &metav1.Time{Time: now.Add(-time.Hour * 2)}
+			baseStartTime := &metav1.Time{Time: now.Add(-time.Hour * 3)}
+			baseStopTime := &metav1.Time{Time: now.Add(-time.Hour * 2)}
 			backupStatus := dpv1alpha1.BackupStatus{
 				Phase:               dpv1alpha1.BackupCompleted,
-				StartTimestamp:      earlierStartTime,
-				CompletionTimestamp: earlierStopTime,
+				StartTimestamp:      baseStartTime,
+				CompletionTimestamp: baseStopTime,
 				Manifests: &dpv1alpha1.ManifestsStatus{
 					BackupLog: &dpv1alpha1.BackupLogStatus{
-						StartTime: earlierStartTime,
-						StopTime:  earlierStopTime,
+						StartTime: baseStartTime,
+						StopTime:  baseStopTime,
 					},
 				},
 			}
 			backupStatus.CompletionTimestamp = &metav1.Time{Time: now.Add(-time.Hour * 2)}
 			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backup))
 
-			By("By creating latest backup: ")
-			latestStartTime := &metav1.Time{Time: now.Add(-time.Hour * 3)}
-			latestStopTime := &metav1.Time{Time: now.Add(time.Hour * 2)}
-			backupNext := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-				WithRandomName().SetLabels(backupLabels).
+			By("By creating remote pvc: ")
+			remotePVC := testapps.NewPersistentVolumeClaimFactory(
+				testCtx.DefaultNamespace, "remote-pvc", clusterName, mysqlCompName, "log").
+				SetStorage("1Gi").
+				Create(&testCtx).GetObject()
+
+			By("By creating incremental backup: ")
+			incrBackupLabels := map[string]string{
+				constant.AppInstanceLabelKey:    sourceCluster,
+				constant.KBAppComponentLabelKey: mysqlCompName,
+				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeIncremental),
+			}
+			incrStartTime := &metav1.Time{Time: now.Add(-time.Hour * 3)}
+			incrStopTime := &metav1.Time{Time: now.Add(time.Hour * 2)}
+			backupIncr := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				WithRandomName().SetLabels(incrBackupLabels).
 				SetBackupPolicyName("test-fake").
-				SetBackupType(dpv1alpha1.BackupTypeFull).
+				SetBackupType(dpv1alpha1.BackupTypeIncremental).
 				Create(&testCtx).GetObject()
 			backupStatus = dpv1alpha1.BackupStatus{
-				Phase:               dpv1alpha1.BackupCompleted,
-				StartTimestamp:      latestStartTime,
-				CompletionTimestamp: latestStopTime,
+				Phase:                     dpv1alpha1.BackupCompleted,
+				StartTimestamp:            incrStartTime,
+				CompletionTimestamp:       incrStopTime,
+				PersistentVolumeClaimName: remotePVC.Name,
 				Manifests: &dpv1alpha1.ManifestsStatus{
 					BackupLog: &dpv1alpha1.BackupLogStatus{
-						StartTime: latestStartTime,
-						StopTime:  latestStopTime,
+						StartTime: incrStartTime,
+						StopTime:  incrStopTime,
 					},
 				},
 			}
-			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupNext))
+			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupIncr))
+
 		})
 
 		It("Test PITR prepare", func() {

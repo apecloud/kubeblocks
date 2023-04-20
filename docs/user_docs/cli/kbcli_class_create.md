@@ -11,8 +11,8 @@ kbcli class create [NAME] [flags]
 ### Examples
 
 ```
-  # Create a class following constraint kb-resource-constraint-general for component mysql in cluster definition apecloud-mysql, which have 1 cpu core, 2Gi memory and storage is 10Gi
-  kbcli class create custom-1c2g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 2Gi --storage name=data,size=10Gi
+  # Create a class following constraint kb-resource-constraint-general for component mysql in cluster definition apecloud-mysql, which have 1 cpu core, 1Gi memory and storage is 10Gi
+  kbcli class create custom-1c1g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 1Gi --storage name=data,size=10Gi
   
   # Create classes for component mysql in cluster definition apecloud-mysql, where classes is defined in file
   kbcli class create --cluster-definition apecloud-mysql --type mysql --file ./classes.yaml

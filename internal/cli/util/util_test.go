@@ -252,4 +252,17 @@ var _ = Describe("util", func() {
 	It("get helm chart repo url", func() {
 		Expect(GetHelmChartRepoURL()).ShouldNot(BeEmpty())
 	})
+
+	It("new OpsRequest for Reconfiguring ", func() {
+		Expect(NewOpsRequestForReconfiguring("logs", "test", "cluster")).ShouldNot(BeNil())
+	})
+
+	It("convert obj to unstructured ", func() {
+		unstructuredObj, err := ConvertObjToUnstructured(testing.FakeConfigMap("cm-test"))
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(unstructuredObj.Object).Should(HaveLen(4))
+
+		_, err = ConvertObjToUnstructured(struct{ name string }{name: "test"})
+		Expect(err).Should(HaveOccurred())
+	})
 })

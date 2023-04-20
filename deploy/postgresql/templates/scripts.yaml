@@ -43,7 +43,7 @@ data:
             if '=' not in line:
                 continue
             key, value = line.split('=', 1)
-            result[key.strip()] = value.strip()
+            result[key.strip()] = value.strip().strip("'")
         return result
     def main(filename):
         restore_dir = os.environ.get('RESTORE_DATA_DIR', '')
@@ -55,6 +55,11 @@ data:
         postgresql['config_dir'] = '/home/postgres/pgdata/conf'
         postgresql['custom_conf'] = '/home/postgres/conf/postgresql.conf'
         # TODO add local postgresql.parameters
+        if not 'parameters' in postgresql:
+            postgresql['parameters'] = {}
+        parameters = postgresql_conf_to_dict("/home/postgres/conf/postgresql.conf")
+        if 'archive_command' in parameters:
+            postgresql['parameters']['archive_command'] = parameters['archive_command']
         # add pg_hba.conf
         with open('/home/postgres/conf/pg_hba.conf', 'r') as f:
             lines = read_file_lines(f)
@@ -95,8 +100,9 @@ data:
     #!/bin/bash
     set -o errexit
     set -o nounset
-    LOG_START_TIME=$(pg_waldump $(ls -tr $PGDATA/pg_wal/ | grep '[[:digit:]]$'|head -n 1) --rmgr=Transaction 2>/dev/null |head -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
-    LOG_STOP_TIME=$(pg_waldump $(ls -t $PGDATA/pg_wal/ | grep '[[:digit:]]$'|head -n 1) --rmgr=Transaction 2>/dev/null |tail -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
+    SHOW_START_TIME=$1
+    LOG_START_TIME=$(pg_waldump $(ls -tr $PGDATA/pg_wal/ | grep '[[:digit:]]$\|.partial$'|head -n 1) --rmgr=Transaction 2>/dev/null |head -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
+    LOG_STOP_TIME=$(pg_waldump $(ls -t $PGDATA/pg_wal/ | grep '[[:digit:]]$\|.partial$'|head -n 1) --rmgr=Transaction 2>/dev/null |tail -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
     LOG_START_TIME=$(date -d "$LOG_START_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
     LOG_STOP_TIME=$(date -d "$LOG_STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
-    printf "{\"startTime\": \"$LOG_START_TIME\" ,\"stopTime\": \"$LOG_STOP_TIME\"}"
+    [[ $SHOW_START_TIME == "false" ]] && printf "{\"stopTime\": \"$LOG_STOP_TIME\"}" || printf "{\"startTime\": \"$LOG_START_TIME\" ,\"stopTime\": \"$LOG_STOP_TIME\"}"

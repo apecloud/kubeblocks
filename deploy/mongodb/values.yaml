@@ -30,7 +30,7 @@ auth:
   database: "admin"
 
 logConfigs:
-  running: /data/mongodb/log/mongodb.log*
+  running: /data/mongodb/logs/mongodb.log*
 
 metrics:
   image:

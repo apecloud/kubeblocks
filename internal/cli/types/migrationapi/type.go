@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"strings"
 
+	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -182,8 +183,9 @@ type MigrationObjects struct {
 	Task     *MigrationTask
 	Template *MigrationTemplate
 
-	Jobs *batchv1.JobList
-	Pods *v1.PodList
+	Jobs         *batchv1.JobList
+	Pods         *v1.PodList
+	StatefulSets *appv1.StatefulSetList
 }
 
 // +k8s:deepcopy-gen=false

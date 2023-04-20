@@ -21,7 +21,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
@@ -30,6 +29,7 @@ import (
 	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,7 +39,9 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scheme"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -116,11 +118,9 @@ type BaseOptions struct {
 
 	Client kubernetes.Interface `json:"-"`
 
-	PrintFlags *genericclioptions.PrintFlags `json:"-"`
+	ToPrinter func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error) `json:"-"`
 
-	ToPrinter func(string) (printers.ResourcePrinter, error) `json:"-"`
-
-	OutputOperation OutputOperation `json:"-"`
+	Format printer.Format `json:"-"`
 
 	// Quiet minimize unnecessary output
 	Quiet bool
@@ -172,9 +172,22 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 		return err
 	}
 
-	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
-		o.PrintFlags.NamePrintFlags.Operation = operation
-		return o.PrintFlags.ToPrinter()
+	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
+		var p printers.ResourcePrinter
+		switch o.Format {
+		case printer.JSON:
+			p = &printers.JSONPrinter{}
+		case printer.YAML:
+			p = &printers.YAMLPrinter{}
+		default:
+			return nil, genericclioptions.NoCompatiblePrinterError{AllowedFormats: []string{"JOSN", "YAML"}}
+		}
+
+		p, err = printers.NewTypeSetter(scheme.Scheme).WrapToPrinter(p, nil)
+		if err != nil {
+			return nil, err
+		}
+		return p.PrintObj, nil
 	}
 
 	// do custom options complete
@@ -267,8 +280,7 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 			return nil
 		}
 	}
-	isChange := !reflect.DeepEqual(previewObj, unstructuredObj)
-	printer, err := o.ToPrinter(o.OutputOperation(isChange))
+	printer, err := o.ToPrinter(nil, false)
 	if err != nil {
 		return err
 	}

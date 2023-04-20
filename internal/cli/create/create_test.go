@@ -21,12 +21,14 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -37,22 +39,14 @@ var _ = Describe("Create", func() {
 		streams     genericclioptions.IOStreams
 		baseOptions BaseOptions
 	)
-	const unchangedConstStr = "unchanged"
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 		tf.Client = &clientfake.RESTClient{}
 		baseOptions = BaseOptions{
-			Name:       "test",
-			IOStreams:  streams,
-			PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
-		}
-		baseOptions.OutputOperation = func(didPatch bool) string {
-			if didPatch {
-				return "created"
-			}
-			return "created (no change)"
+			Name:      "test",
+			IOStreams: streams,
 		}
 	})
 
@@ -61,7 +55,6 @@ var _ = Describe("Create", func() {
 	})
 
 	Context("Create Objects", func() {
-
 		It("test Create run", func() {
 			clusterOptions := map[string]interface{}{
 				"name":              "test",
@@ -89,7 +82,6 @@ var _ = Describe("Create", func() {
 				},
 			}
 			cmd := BuildCommand(inputs)
-
 			Expect(cmd).ShouldNot(BeNil())
 			Expect(cmd.Flags().Lookup("clusterDefRef")).ShouldNot(BeNil())
 
@@ -98,7 +90,7 @@ var _ = Describe("Create", func() {
 			Expect(baseOptions.Run(inputs)).Should(Succeed())
 		})
 
-		It("test Create run using dry-run=client", func() {
+		It("test create dry-run", func() {
 			clusterOptions := map[string]interface{}{
 				"name":              "test",
 				"namespace":         testing.Namespace,
@@ -118,78 +110,101 @@ var _ = Describe("Create", func() {
 					return nil
 				},
 				Complete: func() error {
-					baseOptions.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
-						baseOptions.PrintFlags.NamePrintFlags.Operation = operation
-						return baseOptions.PrintFlags.ToPrinter()
+					baseOptions.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
+						var p printers.ResourcePrinter
+						var err error
+						switch baseOptions.Format {
+						case printer.JSON:
+							p = &printers.JSONPrinter{}
+						case printer.YAML:
+							p = &printers.YAMLPrinter{}
+						default:
+							return nil, genericclioptions.NoCompatiblePrinterError{AllowedFormats: []string{"JOSN", "YAML"}}
+						}
+
+						p, err = printers.NewTypeSetter(scheme.Scheme).WrapToPrinter(p, nil)
+						if err != nil {
+							return nil, err
+						}
+						return p.PrintObj, nil
 					}
 					return nil
 				},
 				BuildFlags: func(cmd *cobra.Command) {
 					cmd.Flags().StringVar(&baseOptions.Namespace, "clusterDefRef", "", "cluster definition")
 					cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+					cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+					printer.AddOutputFlagForCreate(cmd, &baseOptions.Format)
 				},
 			}
 			cmd := BuildCommand(inputs)
 			inputs.Cmd = cmd
 
-			Expect(cmd).ShouldNot(BeNil())
-			Expect(cmd.Flags().Lookup("clusterDefRef")).ShouldNot(BeNil())
-			Expect(cmd.Flags().Lookup("dry-run")).ShouldNot(BeNil())
-			Expect(cmd.Flags().Set("dry-run", "client")).Should(Succeed())
+			testCases := []struct {
+				clusterName   string
+				isUseDryRun   bool
+				mode          string
+				dryRunStrateg DryRunStrategy
+				success       bool
+			}{
+				{ // test do not use dry-run strategy
+					"test1",
+					false,
+					"",
+					DryRunNone,
+					true,
+				},
+				{ // test no parameter strategy
+					"test2",
+					true,
+					"unchanged",
+					DryRunClient,
+					true,
+				},
+				{ // test client strategy
+					"test3",
+					true,
+					"client",
+					DryRunClient,
+					true,
+				},
+				{ // test server strategy
+					"test4",
+					true,
+					"server",
+					DryRunServer,
+					true,
+				},
+				{ // test error parameter
+					"test5",
+					true,
+					"ape",
+					DryRunServer,
+					false,
+				},
+			}
 
-			Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
-			Expect(baseOptions.Validate(inputs)).Should(Succeed())
-			Expect(baseOptions.Run(inputs)).Should(Succeed())
-		})
+			for _, t := range testCases {
+				clusterOptions["name"] = t.clusterName
+				Expect(cmd).ShouldNot(BeNil())
+				Expect(cmd.Flags().Lookup("clusterDefRef")).ShouldNot(BeNil())
+				Expect(cmd.Flags().Lookup("dry-run")).ShouldNot(BeNil())
+				Expect(cmd.Flags().Lookup("output")).ShouldNot(BeNil())
+				if t.isUseDryRun {
+					Expect(cmd.Flags().Set("dry-run", t.mode)).Should(Succeed())
+				}
 
-		It("test do not use dry-run strategy", func() {
-			cmd := &cobra.Command{}
-			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-			cmd.Flags().Lookup("dry-run").NoOptDefVal = unchangedConstStr
+				Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
+				Expect(baseOptions.Validate(inputs)).Should(Succeed())
 
-			dryRun, _ := GetDryRunStrategy(cmd)
-			Expect(dryRun == DryRunNone).Should(BeTrue())
-		})
-
-		It("test no parameters strategy", func() {
-			cmd := &cobra.Command{}
-			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-			cmd.Flags().Lookup("dry-run").NoOptDefVal = unchangedConstStr
-
-			Expect(cmd.Flags().Set("dry-run", "unchanged")).Should(Succeed())
-			dryRun, _ := GetDryRunStrategy(cmd)
-			Expect(dryRun == DryRunClient).Should(BeTrue())
-		})
-
-		It("test client strategy", func() {
-			cmd := &cobra.Command{}
-			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-			cmd.Flags().Lookup("dry-run").NoOptDefVal = unchangedConstStr
-
-			Expect(cmd.Flags().Set("dry-run", "client")).Should(Succeed())
-			dryRun, _ := GetDryRunStrategy(cmd)
-
-			Expect(dryRun == DryRunClient).Should(BeTrue())
-		})
-
-		It("test server strategy", func() {
-			cmd := &cobra.Command{}
-			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-			cmd.Flags().Lookup("dry-run").NoOptDefVal = unchangedConstStr
-
-			Expect(cmd.Flags().Set("dry-run", "server")).Should(Succeed())
-			dryRun, _ := GetDryRunStrategy(cmd)
-			Expect(dryRun == DryRunServer).Should(BeTrue())
-		})
-
-		It("test error parameter", func() {
-			cmd := &cobra.Command{}
-			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-			cmd.Flags().Lookup("dry-run").NoOptDefVal = unchangedConstStr
-
-			Expect(cmd.Flags().Set("dry-run", "ape")).Should(Succeed())
-			dryRun, _ := GetDryRunStrategy(cmd)
-			Expect(dryRun == DryRunServer).Should(BeFalse())
+				dryRunStrateg, _ := GetDryRunStrategy(cmd)
+				if t.success {
+					Expect(dryRunStrateg == t.dryRunStrateg).Should(BeTrue())
+					Expect(baseOptions.Run(inputs)).Should(Succeed())
+				} else {
+					Expect(dryRunStrateg == t.dryRunStrateg).Should(BeFalse())
+				}
+			}
 		})
 
 		It("test Create runAsApply", func() {

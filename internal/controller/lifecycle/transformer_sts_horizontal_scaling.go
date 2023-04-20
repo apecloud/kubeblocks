@@ -139,7 +139,7 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 				!isSnapshotAvailable(s.cli, s.ctx.Ctx) {
 				return true, nil
 			}
-			return isAllPVCBound(s.cli, s.ctx.Ctx, stsObj)
+			return isAllPVCBound(s.cli, s.ctx.Ctx, stsProto)
 		}
 
 		cleanBackupResourcesIfNeeded := func() error {

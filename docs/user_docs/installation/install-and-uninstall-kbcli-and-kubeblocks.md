@@ -1,6 +1,7 @@
 ---
 title: Install and uninstall kbcli and KubeBlocks
 description: Install KubeBlocks and kbcli developed by ApeCloud
+keywords: [kbcli, kubeblocks, install, uninstall, windows, macOS]
 sidebar_position: 1
 sidebar_label: kbcli and KubeBlocks
 ---
@@ -19,7 +20,13 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 
 ## Install kbcli
 
+`kbcli` can be installed on macOS and Windows.
+
 <Tabs>
+<TabItem value="macOS" label="macOS" default>
+
+For macOS, cURL and Homebrew options are supported.
+
 <TabItem value="cURL" label="cURL" default>
 
 1. Run the command below to install `kbcli`.
@@ -140,7 +147,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 
    </details>
 
-If you have installed `kbcli` and want to upgrade it, run
+If you have installed `kbcli` before and want to upgrade it, run
 
 ```bash
 brew upgrade kbcli
@@ -160,6 +167,50 @@ If you want to install a specified version,
    brew install kbcli@0.4.0
    ```
 
+</TabItem>
+</TabItem>
+
+<TabItem value="Windows" label="Windows">
+
+The script option installs `kbcli` under the `C:\Program Files\kbcli-windows-amd64` path by default and this path cannot be changed.
+
+If you want to customize the installation path, use the Zip file option.
+
+<TabItem value="Script" label="Script">
+
+1. Run PowerShell as admin and run `Set-ExecutionPolicy Unrestricted` to grant the script execution permission to PowerShell. Enter Y to confirm the execution policy.
+
+2. Install `kbcli` and the script adds an environment variable in your host automatically.
+
+   ```bash
+   powershell -Command " & ([scriptblock]::Create((iwr https://www.kubeblocks.io/installer/install_cli.ps1)))"
+   ```
+
+   :::note
+
+   Specify a version by adding the `-v` option. If you do not specify a version, the above command installs the latest release version on your host.
+
+   ```bash
+   powershell -Command " & ([scriptblock]::Create((iwr https://www.kubeblocks.io/installer/install_cli.ps1))) -v 0.5.0-beta.1"
+   ```
+
+</TabItem>
+
+<TabItem value="Zip" label="Zip">
+
+1. Download a Zip file of `kbcli` that suits your host from [the GitHub repository](https://github.com/apecloud/kubeblocks/releases).
+2. Decompress the package under your prefferred path.
+3. Add this path to the system environment variable.
+
+   1. Click the Windows icon and click **System**.
+   2. Go to **Settings** -> **Related Settings** -> **Advanced system settings**.
+   3. On the **Advanced** tab, click **Environment Variables**.
+   4. Click **New** to add the path under which you decompress the `kbcli` package in **User variables** or **System variables**.
+   5. Click **Apply** and then **OK** to apply the change.
+</TabItem>
+
+</TabItem>
+
 ## Install KubeBlocks
 
 :::note
@@ -170,7 +221,9 @@ For the local environment, it is recommended to run `kbcli playground init` to i
 
 ***Steps:***
 
-1. Run the command below to install KubeBlocks.
+1. Run the command below to install KubeBlocks. Both `kbcli` and Helm installation options are supported.
+
+    <TabItem value="kbcli" label="kbcli" default>
 
     ```bash
     kbcli kubeblocks install
@@ -180,7 +233,7 @@ For the local environment, it is recommended to run `kbcli playground init` to i
 
     * KubeBlocks is installed with built-in toleration which tolerates the node with the `kb-controller=true:NoSchedule` taint.
     * KubeBlocks is installed with built-in node affinity which first deploys the node with the `kb-controller:true` label.
-    * This command installs the latest version in your Kubernetes environment under the default namespace `kb-system` since your `kubectl` can connect to your Kubernetes clusters. If you want to install KubeBlocks in a specified namespace, run the command below.
+    * This command installs the latest release version in your Kubernetes environment under the default namespace `kb-system` since your `kubectl` can connect to your Kubernetes clusters. If you want to install KubeBlocks in a specified namespace, run the command below.
 
        ```bash
        kbcli kubeblocks install -n <name> --create-namespace=true
@@ -201,6 +254,18 @@ For the local environment, it is recommended to run `kbcli playground init` to i
    * `-namespace` and its abbreviated version `-n` is used to name a namespace. `--create-namespace` is used to specify whether to create a namespace if it does not exist. `-n` is a global command line option. For global command line options, run `kbcli options` to list all options (applies to all commands).
    * Use `monitor` to specify whether to install the add-ons relevant to database monitoring and visualization.
    * Use `version` to specify the version you want to install. Find the supported version in [KubeBlocks Helm Charts](https://github.com/apecloud/helm-charts).
+
+   </TabItem>
+
+   <TabItem value="Helm" label="Helm">
+
+   ```bash
+   helm repo add kubeblocks  https://apecloud.github.io/helm-charts
+
+   helm install kubeblocks kubeblocks/kubeblocks -n kb-system --create-namespace
+   ```
+
+   </TabItem>
 
 2. Run the command below to verify whether KubeBlocks is installed successfully.
 
@@ -229,7 +294,7 @@ For the local environment, it is recommended to run `kbcli playground init` to i
 
 ### Handle an exception
 
-If installing KubeBlocks fails, run preflight checks to find whether your environment meets the requirements of running KubeBlocks and clusters.
+If installing KubeBlocks by `kbcli` fails, run preflight checks to find whether your environment meets the requirements of running KubeBlocks and clusters.
 
 ```bash
 kbcli kubeblocks preflight
@@ -259,7 +324,7 @@ To list supported add-ons, run `kbcli addon list` command.
 
 **Example**
 
-```
+```bash
 kbcli addon list
 ```
 
@@ -277,7 +342,7 @@ You can perform the following steps to check and enable the add-on.
   
     **Example**
 
-    ```
+    ```bash
     kbcli addon describe snapshot-controller
     ```
 
@@ -285,7 +350,7 @@ You can perform the following steps to check and enable the add-on.
 
     In this case, you can check the version of the Kubernetes cluster, and run the following command.
 
-    ```
+    ```bash
     kubectl version -ojson | jq '.serverVersion.gitVersion'
     >
     "v1.24.4+eks"
@@ -298,13 +363,13 @@ You can perform the following steps to check and enable the add-on.
 
     **Example**
 
-    ```
+    ```bash
     kbcli addon enable snapshot-controller
     ```
 
 3. List the add-ons again to check whether it is enabled.
 
-    ```
+    ```bash
     kbcli addon list
     ```
 
@@ -347,13 +412,31 @@ Uninstall KubeBlocks first.
 
 :::
 
+### Uninstall KubeBlocks
+
 Uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
+
+<TabItem value="kbcli" label="kbcli" default>
 
 ```bash
 kbcli kubeblocks uninstall
 ```
 
-Uninstall `kbcli`.
+</TabItem>
+
+<TabItem value="helm" label="helm" default>
+
+```bash
+helm uninstall kubeblocks -n kb-system
+```
+
+</TabItem>
+
+### Uninstall kbcli
+
+Uninstall `kbcli` if you want to delete KubeBlocks after your trial.
+
+<TabItem value="macOS" label="macOS" default>
 
 <TabItem value="cURL" label="cURL" default>
 
@@ -370,3 +453,25 @@ brew uninstall kbcli
 ```
 
 </TabItem>
+
+</TabItem>
+
+<TabItem value="Windows" label="Windows">
+
+1. Go to the `kbcli` installation path and delete the installation folder.
+   * If you install `kbcli` by script, go to `C:\Program Files` and delete the `kbcli-windows-amd64` folder.
+   * If you customize the installation path, go to your path and delete the installation folder.
+
+2. Delete the environment variable.
+
+   1. Click the Windows icon and click **System**.
+   2. Go to **Settings** -> **Related Settings** -> **Advanced system settings**.
+   3. On the **Advanced** tab, click **Environment Variables**.
+   4. Double-click **Path** in **User variables** or **System variables** list.
+      * If you install `kbcli` by script, double-click **Path** in **User variables**.
+      * If you customize the installation path, double-click **Path** based on where you created the variable before.
+   5. Select `C:\Program Files\kbcli-windows-amd64` or your customized path and delete it. This operation requires double confirmation.
+
+</TabItem>
+
+</Tabs>

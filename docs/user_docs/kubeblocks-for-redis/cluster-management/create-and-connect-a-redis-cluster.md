@@ -8,65 +8,103 @@ sidebar_label: Create and connect
 
 # Create and Connect to a Redis cluster
 
-KuebBlocks for Redis supports standalone clusters and primary-secondary clusters.
+KuebBlocks for Redis supports Standalone clusters and PrimarySecondary clusters.
+But for your better high-availability experience, KubeBlocks creates a PrimarySecondary cluster and a Redis Sentinel with three replicas by default.
 
 ## Create a Redis Cluster
 
 ### Before you start
 
-* `kbcli`: Install `kbcli` on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
-* KubeBlocks: Install KubeBlocks on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
-* Run the command below to view all the database types available for creating a cluster. 
+* [Install `kbcli`](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kbcli).
+* [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kubeblocks).
+* View all the database types available for creating a cluster.
+
   ```bash
   kbcli clusterdefinition list
   ```
 
 ### Steps
 
-Run the command below to create a Redis cluster.
-   ```bash
-   kbcli cluster create redis-cluster --cluster-definition='redis'
-   ```
-   ***Result***
+Create a Redis cluster.
 
-   * A cluster then is created in the default namespace. You can specify a namespace for your cluster by using `--namespace` or the abbreviated `-n` option. For example,
+```bash
+kbcli cluster create redis-cluster --cluster-definition='redis' 
+```
 
-     ```bash
-     kubectl create namespace demo
+***Result***
 
-     kbcli cluster create -n demo --cluster-definition='redis'
-     ```
-   * A cluster is created with built-in toleration which tolerates the node with the `kb-data=true:NoSchedule` taint.
-   * A cluster is created with built-in node affinity which first deploys the node with the `kb-data:true` label.
-   * For configuring pod affinity for a cluster, refer to [Configure pod affinity for database cluster](../../resource-scheduling/resource-scheduling.md).
-  
-   To create a cluster with specified parameters, follow the steps below, and you have three options.
+* A Redis PrimarySecondary and a Redis Sentinel with three replicas are created in the default namespace. You can specify a namespace for your cluster by using `--namespace` or the abbreviated `-n` option. For example,
 
-   **Option 1.** (**Recommended**) Use --set option
-   
-    Add the `--set` option when creating a cluster. For example,
-    ```bash
-    kbcli cluster create redis-cluster --cluster-definition redis --set cpu=1,memory=1Gi,storage=10Gi,replicas=3
-    ```
+  ```bash
+  kubectl create namespace demo
 
-   **Option 2.** Change YAML file configurations
+  kbcli cluster create redis-cluster -n demo --cluster-definition='redis'
+  ```
 
-   Change the corresponding parameters in the YAML file.
-   ```bash
-   kbcli cluster create redis-cluster --cluster-definition="redis" --set -<<EOF
-   - name: redis
-     replicas: 3
-     type: redis
-     volumeClaimTemplates:
-     - name: data
-       spec:
-         accessModes:
-         - ReadWriteOnce
-         resources:
-           requests:
-             storage: 20Gi
-   EOF
-   ```
+* This cluster is created with built-in toleration which tolerates the node with the `kb-data=true:NoSchedule` taint.
+* This cluster is created with built-in node affinity which first deploys the node with the `kb-data:true` label.
+* For configuring pod affinity for a cluster, refer to [Configure pod affinity for database cluster](../../resource-scheduling/resource-scheduling.md).
+
+:::note
+
+If you want to create a Redis Standalone, run the command below:
+
+```bash
+kbcli cluster create redis-cluster --cluster-definition='redis' --set replicas=1
+```
+
+:::
+
+To create a cluster with specified parameters, follow the steps below, and you have two options.
+
+**Option 1.** (**Recommended**) Use --set option
+
+Add the `--set` option when creating a cluster. Both Redis and Redis-Sentinel components can be set.
+
+```bash
+kbcli cluster create redis-cluster --cluster-definition='redis' --set cpu=200m,memory=500Mi,storage=30Gi,type=redis --set replicas=3,cpu=200m,memory=500Mi,memory=30Gi,type=redis-sentinel
+```
+
+:::note
+
+Make sure there are enough CPU and memory resources. 
+
+:::
+
+**Option 2.** Change YAML file configurations
+
+Change the corresponding parameters in the YAML file.
+
+```bash
+kbcli cluster create redis-cluster --cluster-definition="redis" --set-file -<<EOF
+- name: redis
+  replicas: 2
+  componentDefRef: redis
+  volumeClaimTemplates:
+  - name: data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          cpu: 200m
+          memory: 500Mi
+          storage: 30Gi
+- name: redis-sentinel
+  replicas: 3
+  componentDefRef: redis-sentinel
+  volumeClaimTemplates:
+  - name: data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          cpu: 100m
+          memory: 500Mi
+          storage: 30Gi
+EOF
+```
 
 ### kbcli cluster create options description
 
@@ -78,12 +116,13 @@ Run the command below to create a Redis cluster.
 | `--help` | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
 | `--monitor` | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
 | `--node-labels` | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />```kbcli cluster create --cluster-definition='redis' --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'``` |
-| `--set` | It sets the cluster resource including CPU, memory, replicas, and storage, each set corresponds to a component. For example, `--set cpu=1,memory=1Gi,replicas=3,storage=10Gi`. |
+| `--set` | It sets the cluster resource including CPU, memory, replicas, and storage, each set corresponds to a component. For example, `--set cpu=1,memory=1Gi,replicas=1,storage=10Gi`. |
 | `--termination-policy` | It specifies the termination policy of the cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
 
 ## Connect to a Redis Cluster
 
 Run the command below to connect to a cluster. For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
+
 ```bash
 kbcli cluster connect redis-cluster
 ```

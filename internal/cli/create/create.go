@@ -104,8 +104,6 @@ type Inputs struct {
 	ResourceNameGVRForCompletion schema.GroupVersionResource
 }
 
-type OutputOperation func(bool) string
-
 // BaseOptions the options of creation command should inherit baseOptions
 type BaseOptions struct {
 	// Namespace k8s namespace
@@ -180,7 +178,7 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 		case printer.YAML:
 			p = &printers.YAMLPrinter{}
 		default:
-			return nil, genericclioptions.NoCompatiblePrinterError{AllowedFormats: []string{"JOSN", "YAML"}}
+			return nil, genericclioptions.NoCompatiblePrinterError{AllowedFormats: []string{"JSON", "YAML"}}
 		}
 
 		p, err = printers.NewTypeSetter(scheme.Scheme).WrapToPrinter(p, nil)

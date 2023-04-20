@@ -58,7 +58,7 @@ var clusterCreateExample = templates.Examples(`
 	# --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql
 
-	# OOutput resource information in YAML format, but do not create resources.
+	# Output resource information in YAML format, but do not create resources.
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=client -o yaml
 
 	# Output resource information in YAML format, the information will be sent to the server, but the resource will not be actually created.
@@ -349,10 +349,7 @@ func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 }
 
 func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &CreateOptions{
-		BaseOptions: create.BaseOptions{
-			IOStreams: streams,
-		}}
+	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 
 	inputs := create.Inputs{
 		Use:             "create [NAME]",

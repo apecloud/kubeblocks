@@ -110,14 +110,14 @@ var _ = Describe("utils", func() {
 		It("should succeed", func() {
 			var (
 				err             error
-				specClassName   = "general-1c1g"
+				specClassName   = testapps.Class1c1gName
 				statusClassName = "general-100c100g"
 				compClasses     map[string]map[string]*v1alpha1.ComponentClassInstance
 				compType        = "mysql"
 			)
 
 			classDef := testapps.NewComponentClassDefinitionFactory("custom", "apecloud-mysql", compType).
-				AddClasses(testapps.DefaultResourceConstraintName).
+				AddClasses(testapps.DefaultResourceConstraintName, []string{specClassName}).
 				GetObject()
 
 			By("class definition status is out of date")

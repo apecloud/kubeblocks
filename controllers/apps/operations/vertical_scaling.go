@@ -106,7 +106,7 @@ func (vs verticalScalingHandler) GetRealAffectedComponentMap(opsRequest *appsv1a
 		if !ok {
 			continue
 		}
-		if !reflect.DeepEqual(currVs.ResourceRequirements, v.ResourceRequirements) {
+		if !reflect.DeepEqual(currVs.ResourceRequirements, v.ResourceRequirements) || currVs.Class != v.Class {
 			realChangedMap[k] = struct{}{}
 		}
 	}

@@ -19,8 +19,6 @@ package apps
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -50,28 +48,18 @@ var _ = Describe("", func() {
 	AfterEach(cleanEnv)
 
 	It("Class should exist in status", func() {
-		var (
-			clsName = "test"
-			class   = v1alpha1.ComponentClass{
-				Name:   clsName,
-				CPU:    resource.MustParse("1"),
-				Memory: resource.MustParse("1Gi"),
-			}
-		)
-
 		constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 			AddConstraints(testapps.GeneralResourceConstraint).
 			Create(&testCtx).GetObject()
 
 		componentClassDefinition = testapps.NewComponentClassDefinitionFactory("custom", "apecloud-mysql", "mysql").
-			AddClassGroup(constraint.Name).
-			AddClasses([]v1alpha1.ComponentClass{class}).
+			AddClasses(constraint.Name, []string{testapps.Class1c1gName}).
 			Create(&testCtx).GetObject()
 
 		key := client.ObjectKeyFromObject(componentClassDefinition)
 		Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *v1alpha1.ComponentClassDefinition) {
 			g.Expect(pobj.Status.Classes).ShouldNot(BeEmpty())
-			g.Expect(pobj.Status.Classes[0].Name).Should(Equal(clsName))
+			g.Expect(pobj.Status.Classes[0].Name).Should(Equal(testapps.Class1c1gName))
 		})).Should(Succeed())
 	})
 })

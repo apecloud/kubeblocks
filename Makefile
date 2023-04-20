@@ -207,6 +207,10 @@ test-fast: envtest
 .PHONY: test
 test: manifests generate test-go-generate fmt vet add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 
+.PHONY: race
+race:
+	$(GO) test -race ./...
+
 .PHONY: test-integration
 test-integration: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./test/integration

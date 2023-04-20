@@ -1,0 +1,25 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: mongodb
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'MongoDB is a document database designed for ease of application development and scaling.'
+
+  type: Helm
+
+  helm:
+    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/mongodb-{{ default .Chart.Version .Values.versionOverride }}/mongodb-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/mongodb-{{ default .Chart.Version .Values.versionOverride }}.tgz
+
+  installable:
+    autoInstall: true
+
+  defaultInstallValues:
+    - enabled: true

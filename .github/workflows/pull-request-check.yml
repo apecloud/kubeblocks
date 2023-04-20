@@ -15,8 +15,8 @@ jobs:
       - name: check branch name
         uses: apecloud/check-branch-name@v0.1.0
         with:
-          branch_pattern: 'feature/|bugfix/|release/|releasing/|hotfix/|support/|dependabot/'
-          comment_for_invalid_branch_name: 'This branch name is not following the standards: feature/|bugfix/|release/|releasing/|hotfix/|support/|dependabot/'
+          branch_pattern: 'feature/|bugfix/|release/|hotfix/|support/|release/|release-|releasing/|releasing-|dependabot/'
+          comment_for_invalid_branch_name: 'This branch name is not following the standards: feature/|bugfix/|hotfix/|support/|release/|release-|releasing/|releasing-|dependabot/'
           fail_if_invalid_branch_name: 'true'
           ignore_branch_pattern: 'main|master'
 

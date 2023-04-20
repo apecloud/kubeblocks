@@ -81,7 +81,7 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
 	}
 
-	if err := updateConfigManagerWithComponent(podSpec, component.ConfigTemplates, ctx, cli, cluster, component); err != nil {
+	if err := buildConfigManagerWithComponent(podSpec, component.ConfigTemplates, ctx, cli, cluster, component); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
 
@@ -113,9 +113,9 @@ func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotat
 	obj.SetAnnotations(annotations)
 }
 
-// updateConfigManagerWithComponent build the configmgr sidecar container and update it
+// buildConfigManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec,
+func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec,
 	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
 	var (
 		err error
@@ -124,7 +124,7 @@ func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []ap
 		buildParams *cfgcm.CfgManagerBuildParams
 	)
 
-	if volumeDirs = getUsingVolumesByCfgTemplates(podSpec, cfgTemplates); len(volumeDirs) == 0 {
+	if volumeDirs = getUsingVolumesByConfigSpecs(podSpec, cfgTemplates); len(volumeDirs) == 0 {
 		return nil
 	}
 	if buildParams, err = buildConfigManagerParams(cli, ctx, cluster, component, cfgTemplates, volumeDirs); err != nil {
@@ -162,7 +162,7 @@ func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.CfgMana
 	podSpec.Volumes = podVolumes
 }
 
-func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec) []corev1.VolumeMount {
+func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec) []corev1.VolumeMount {
 	var usingContainers []*corev1.Container
 
 	// Ignore useless configTemplate

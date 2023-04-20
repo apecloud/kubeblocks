@@ -61,9 +61,10 @@ var _ = Describe("Backup Policy Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearBackupResources(&testCtx, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
@@ -164,14 +165,6 @@ var _ = Describe("Backup Policy Controller", func() {
 					dataProtectionLabelBackupPolicyKey: backupPolicyName,
 					dataProtectionLabelBackupTypeKey:   string(dpv1alpha1.BaseBackupTypeFull),
 				}
-
-				By("removing deleteBackupFileCommands field of BackupTool to skip delete backup files step when deleting Backup objects")
-				Eventually(testapps.GetAndChangeObj(&testCtx, types.NamespacedName{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      backupToolName,
-				}, func(backupTool *dpv1alpha1.BackupTool) {
-					backupTool.Spec.DeleteBackupFileCommands = []string{}
-				})).Should(Succeed())
 
 				By("create a expired backup")
 				backupExpired := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).

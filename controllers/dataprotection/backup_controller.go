@@ -53,10 +53,8 @@ import (
 )
 
 var (
-	errBackupToolNotFound            = errors.New("backup tool not found")
-	errEmptyDeleteBackupFileCommands = errors.New("empty DeleteBackupFileCommands")
-	errJobFailed                     = errors.New("job failed")
-	errDeletingBackupFiles           = errors.New("deleting backup files")
+	errJobFailed           = errors.New("job failed")
+	errDeletingBackupFiles = errors.New("deleting backup files")
 )
 
 const (
@@ -946,16 +944,21 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 			return nil
 		}
 
-		pathPrefix := r.getBackupPathPrefix(backup.Namespace, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
-		toolPodSpec, err := r.buildDeleteBackupFilePodSpec(reqCtx, backup, commonPolicy, pathPrefix)
+		backupFilePath := ""
+		if backup.Status.Manifests != nil && backup.Status.Manifests.BackupTool != nil {
+			backupFilePath = backup.Status.Manifests.BackupTool.FilePath
+		}
+		if backupFilePath == "" || !strings.Contains(backupFilePath, backup.Name) {
+			// For compatibility: the FilePath field was changed from time to time,
+			// and it may not contain the backup name as a path component if the Backup object
+			// was created in a previous version. In this case, it's dangerous to execute
+			// the deletion command. For example, files belongs to other Backups can be deleted as well.
+			reqCtx.Log.Info("skip deleting backup files because backupFilePath is invalid",
+				"backupFilePath", backupFilePath, "backup", backup.Name)
+			return nil
+		}
+		toolPodSpec, err := r.buildDeleteBackupFilePodSpec(backup, commonPolicy, backupFilePath)
 		if err != nil {
-			if errors.Is(err, errBackupToolNotFound) ||
-				errors.Is(err, errEmptyDeleteBackupFileCommands) {
-				msg := fmt.Sprintf("%s, this may cause residual files.", err.Error())
-				r.Recorder.Event(backup, corev1.EventTypeWarning, "DeletingBackupFiles", msg)
-				reqCtx.Log.Info(msg, "backup", backup.Name)
-				return nil // skip deleting backup files
-			}
 			return fmt.Errorf("deleteBackupFiles buildDeleteBackupFilePodSpec: %w", err)
 		}
 
@@ -1069,22 +1072,6 @@ func (r *BackupReconciler) getTargetPVCs(reqCtx intctrlutil.RequestCtx,
 	return allPVCs, nil
 }
 
-func (r *BackupReconciler) buildCommonEnvs(
-	backup *dataprotectionv1alpha1.Backup,
-	pathPrefix string) []corev1.EnvVar {
-	envBackupName := corev1.EnvVar{
-		Name:  "BACKUP_NAME",
-		Value: backup.Name,
-	}
-
-	envBackupDir := corev1.EnvVar{
-		Name:  "BACKUP_DIR",
-		Value: backupPathBase + pathPrefix,
-	}
-
-	return []corev1.EnvVar{envBackupName, envBackupDir}
-}
-
 func (r *BackupReconciler) appendBackupVolumeMount(
 	pvcName string,
 	podSpec *corev1.PodSpec,
@@ -1151,6 +1138,8 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		container.Resources = *backupTool.Spec.Resources
 	}
 
+	remoteBackupPath := "/backupdata"
+
 	// mount volumes from the target pod to the pod of backup tool
 	container.VolumeMounts = clusterPod.Spec.Containers[0].VolumeMounts
 	podSpec.Volumes = clusterPod.Spec.Volumes
@@ -1165,8 +1154,17 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser}
 
-	container.Env = r.buildCommonEnvs(backup, pathPrefix)
-	container.Env = append(container.Env, envDBHost)
+	envBackupName := corev1.EnvVar{
+		Name:  "BACKUP_NAME",
+		Value: backup.Name,
+	}
+
+	envBackupDir := corev1.EnvVar{
+		Name:  "BACKUP_DIR",
+		Value: remoteBackupPath + pathPrefix,
+	}
+
+	container.Env = []corev1.EnvVar{envDBHost, envBackupName, envBackupDir}
 	if commonPolicy.Target.Secret != nil {
 		envDBUser := corev1.EnvVar{
 			Name: "DB_USER",
@@ -1251,47 +1249,24 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 }
 
 func (r *BackupReconciler) buildDeleteBackupFilePodSpec(
-	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
-	pathPrefix string) (corev1.PodSpec, error) {
+	backupFilePath string) (corev1.PodSpec, error) {
 
 	podSpec := corev1.PodSpec{}
-	// get backup tool
-	backupTool := &dataprotectionv1alpha1.BackupTool{}
-	backupToolNameSpaceName := types.NamespacedName{
-		Namespace: reqCtx.Req.Namespace,
-		Name:      commonPolicy.BackupToolName,
-	}
-	if err := r.Client.Get(reqCtx.Ctx, backupToolNameSpaceName, backupTool); err != nil {
-		if apierrors.IsNotFound(err) {
-			return podSpec, errBackupToolNotFound
-		}
-		return podSpec, err
-	}
-
-	if len(backupTool.Spec.DeleteBackupFileCommands) == 0 {
-		return podSpec, errEmptyDeleteBackupFileCommands
-	}
 
 	container := corev1.Container{}
 	container.Name = backup.Name
 	container.Command = []string{"sh", "-c"}
-	container.Args = backupTool.Spec.DeleteBackupFileCommands
-	container.Image = backupTool.Spec.Image
-	if backupTool.Spec.Resources != nil {
-		container.Resources = *backupTool.Spec.Resources
-	}
+	container.Args = []string{"rm", "-rf", backupFilePath}
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 
 	allowPrivilegeEscalation := false
 	runAsUser := int64(0)
 	container.SecurityContext = &corev1.SecurityContext{
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser}
-
-	container.Env = r.buildCommonEnvs(backup, pathPrefix)
-	// merge env from backup tool.
-	container.Env = append(container.Env, backupTool.Spec.Env...)
 
 	// mount the backup volume to the pod
 	pvcName := commonPolicy.PersistentVolumeClaim.Name

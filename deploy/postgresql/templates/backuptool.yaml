@@ -55,12 +55,3 @@ spec:
       mkdir -p ${BACKUP_DIR};
       echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -Xs -z -D ${BACKUP_DIR} -Z5 -h ${DB_HOST} -U standby -W;
   incrementalBackupCommands: []
-  deleteBackupFileCommands:
-    - |
-      set -e;
-      # it's dangerous to run "rm -rf" if some env variable is empty
-      if [ -z "${BACKUP_DIR}" -o -z "${BACKUP_NAME}" ]; then
-        echo "error: BACKUP_DIR(${BACKUP_DIR}) or BACKUP_NAME(${BACKUP_NAME}) is empty"
-        exit 1
-      fi
-      rm -rf ${BACKUP_DIR}/${BACKUP_NAME}/

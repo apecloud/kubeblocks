@@ -70,14 +70,5 @@ spec:
         LATEST_LOG=$(ls -t . | grep '[[:digit:]]$\|.partial$'|head -n 1);
         gzip -kqc ${LATEST_LOG} > ${TODAY_INCR_LOG}/${LATEST_LOG}.gz;
       fi
-  deleteBackupFileCommands:
-    - |
-      set -e;
-      # it's dangerous to run "rm -rf" if some env variable is empty
-      if [ -z "${BACKUP_DIR}" -o -z "${BACKUP_NAME}" ]; then
-        echo "error: BACKUP_DIR(${BACKUP_DIR}) or BACKUP_NAME(${BACKUP_NAME}) is empty"
-        exit 1
-      fi
-      rm -rf ${BACKUP_DIR}/${BACKUP_NAME}/
 
   type: pitr

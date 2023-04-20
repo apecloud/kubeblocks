@@ -62,9 +62,10 @@ var _ = Describe("Backup Controller test", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearBackupResources(&testCtx, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS)
@@ -123,13 +124,10 @@ var _ = Describe("Backup Controller test", func() {
 	})
 
 	When("with default settings", func() {
-		var backupToolKey types.NamespacedName
-
 		BeforeEach(func() {
 			By("By creating a backupTool")
 			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 				&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName())
-			backupToolKey = client.ObjectKeyFromObject(backupTool)
 
 			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
 			_ = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
@@ -207,6 +205,17 @@ var _ = Describe("Backup Controller test", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {
 					g.Expect(backup.GetFinalizers()).ToNot(BeEmpty())
 				})).Should(Succeed())
+
+				By("setting backup file path")
+				Eventually(testapps.ChangeObjStatus(&testCtx, backup, func() {
+					if backup.Status.Manifests == nil {
+						backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{}
+					}
+					if backup.Status.Manifests.BackupTool == nil {
+						backup.Status.Manifests.BackupTool = &dataprotectionv1alpha1.BackupToolManifestsStatus{}
+					}
+					backup.Status.Manifests.BackupTool.FilePath = "/" + backupName
+				})).Should(Succeed())
 			})
 
 			It("should create a Job for deleting backup files when being deleted", func() {
@@ -260,40 +269,6 @@ var _ = Describe("Backup Controller test", func() {
 					obj := &dataprotectionv1alpha1.BackupPolicy{}
 					testapps.DeleteObject(&testCtx, backupPolicyKey, obj)
 					Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, obj, false)).Should(Succeed())
-				})
-
-				It("should ignore the exception and continue to delete", func() {
-					By("deleting a Backup object")
-					testapps.DeleteObject(&testCtx, backupKey, &dataprotectionv1alpha1.Backup{})
-					By("checking Backup object, it should be deleted")
-					Eventually(testapps.CheckObjExists(&testCtx, backupKey,
-						&dataprotectionv1alpha1.Backup{}, false)).Should(Succeed())
-				})
-			})
-
-			When("BackupTool is gone", func() {
-				BeforeEach(func() {
-					By("deleting BackupTool")
-					obj := &dataprotectionv1alpha1.BackupTool{}
-					testapps.DeleteObject(&testCtx, backupToolKey, obj)
-					Eventually(testapps.CheckObjExists(&testCtx, backupToolKey, obj, false)).Should(Succeed())
-				})
-
-				It("should ignore the exception and continue to delete", func() {
-					By("deleting a Backup object")
-					testapps.DeleteObject(&testCtx, backupKey, &dataprotectionv1alpha1.Backup{})
-					By("checking Backup object, it should be deleted")
-					Eventually(testapps.CheckObjExists(&testCtx, backupKey,
-						&dataprotectionv1alpha1.Backup{}, false)).Should(Succeed())
-				})
-			})
-
-			When("DeleteBackupFileCommands is empty", func() {
-				BeforeEach(func() {
-					By("setting DeleteBackupFileCommands to empty")
-					Eventually(testapps.GetAndChangeObj(&testCtx, backupToolKey, func(backupTool *dataprotectionv1alpha1.BackupTool) {
-						backupTool.Spec.DeleteBackupFileCommands = []string{}
-					})).Should(Succeed())
 				})
 
 				It("should ignore the exception and continue to delete", func() {

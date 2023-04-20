@@ -91,7 +91,6 @@ A Command Line Interface for KubeBlocks`,
 	cmd.AddCommand(
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
-		cluster.NewClusterCmd(f, ioStreams),
 		bench.NewBenchCmd(),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
@@ -106,6 +105,15 @@ A Command Line Interface for KubeBlocks`,
 
 	filters := []string{"options"}
 	templates.ActsAsRootCommand(cmd, filters, []templates.CommandGroup{}...)
+
+	helpFunc := cmd.HelpFunc()
+	usageFunc := cmd.UsageFunc()
+
+	// clusterCmd set its own usage and help function and its subcommand will inherit it,
+	// so we need to set its subcommand's usage and help function back to the root command
+	clusterCmd := cluster.NewClusterCmd(f, ioStreams)
+	registerUsageAndHelpFuncForSubCommand(clusterCmd, helpFunc, usageFunc)
+	cmd.AddCommand(clusterCmd)
 
 	utilcomp.SetFactoryForCompletion(f)
 	registerCompletionFuncForGlobalFlags(cmd, f)
@@ -158,4 +166,11 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
+}
+
+func registerUsageAndHelpFuncForSubCommand(cmd *cobra.Command, helpFunc func(*cobra.Command, []string), usageFunc func(command *cobra.Command) error) {
+	for _, subCmd := range cmd.Commands() {
+		subCmd.SetHelpFunc(helpFunc)
+		subCmd.SetUsageFunc(usageFunc)
+	}
 }

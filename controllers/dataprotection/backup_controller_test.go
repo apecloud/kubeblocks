@@ -62,10 +62,9 @@ var _ = Describe("Backup Controller test", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
+		testapps.ClearBackupResources(&testCtx, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS)
@@ -124,10 +123,13 @@ var _ = Describe("Backup Controller test", func() {
 	})
 
 	When("with default settings", func() {
+		var backupToolKey types.NamespacedName
+
 		BeforeEach(func() {
 			By("By creating a backupTool")
 			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 				&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+			backupToolKey = client.ObjectKeyFromObject(backupTool)
 
 			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
 			_ = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
@@ -177,7 +179,7 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 
 				By("Check backup job is deleted after completed")
-				Eventually(testapps.CheckObjExists(&testCtx, backupKey, &batchv1.Job{}, false))
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey, &batchv1.Job{}, false)).Should(Succeed())
 			})
 
 			It("should fail after job fails", func() {
@@ -187,6 +189,142 @@ var _ = Describe("Backup Controller test", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
 				})).Should(Succeed())
+			})
+		})
+
+		Context("deletes a full backup", func() {
+			var backupKey types.NamespacedName
+
+			BeforeEach(func() {
+				By("creating a backup from backupPolicy: " + backupPolicyName)
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+					Create(&testCtx).GetObject()
+				backupKey = client.ObjectKeyFromObject(backup)
+
+				By("waiting for finalizers to be added")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {
+					g.Expect(backup.GetFinalizers()).ToNot(BeEmpty())
+				})).Should(Succeed())
+			})
+
+			It("should create a Job for deleting backup files when being deleted", func() {
+				By("deleting a Backup object")
+				testapps.DeleteObject(&testCtx, backupKey, &dataprotectionv1alpha1.Backup{})
+
+				By("checking new created Job")
+				jobKey := types.NamespacedName{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      deleteBackupFilesJobNamePrefix + backupName,
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, jobKey,
+					&batchv1.Job{}, true)).Should(Succeed())
+				volumeName := "backup-" + backupRemotePVCName
+				Eventually(testapps.CheckObj(&testCtx, jobKey, func(g Gomega, job *batchv1.Job) {
+					Expect(job.Spec.Template.Spec.Volumes).
+						Should(ContainElement(corev1.Volume{
+							Name: volumeName,
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: backupRemotePVCName,
+								},
+							},
+						}))
+					Expect(job.Spec.Template.Spec.Containers[0].VolumeMounts).
+						Should(ContainElement(corev1.VolumeMount{
+							Name:      volumeName,
+							MountPath: backupPathBase,
+						}))
+				})).Should(Succeed())
+
+				By("checking Backup object, it should be retained until the job is done")
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey,
+					&dataprotectionv1alpha1.Backup{}, true)).Should(Succeed())
+
+				By("completing the job")
+				patchK8sJobStatus(jobKey, batchv1.JobComplete)
+
+				By("checking Backup object, it should be deleted")
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey,
+					&dataprotectionv1alpha1.Backup{}, false)).Should(Succeed())
+			})
+
+			When("BackupPolicy is gone", func() {
+				BeforeEach(func() {
+					By("deleting BackupPolicy")
+					backupPolicyKey := types.NamespacedName{
+						Namespace: testCtx.DefaultNamespace,
+						Name:      backupPolicyName,
+					}
+					obj := &dataprotectionv1alpha1.BackupPolicy{}
+					testapps.DeleteObject(&testCtx, backupPolicyKey, obj)
+					Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, obj, false)).Should(Succeed())
+				})
+
+				It("should ignore the exception and continue to delete", func() {
+					By("deleting a Backup object")
+					testapps.DeleteObject(&testCtx, backupKey, &dataprotectionv1alpha1.Backup{})
+					By("checking Backup object, it should be deleted")
+					Eventually(testapps.CheckObjExists(&testCtx, backupKey,
+						&dataprotectionv1alpha1.Backup{}, false)).Should(Succeed())
+				})
+			})
+
+			When("BackupTool is gone", func() {
+				BeforeEach(func() {
+					By("deleting BackupTool")
+					obj := &dataprotectionv1alpha1.BackupTool{}
+					testapps.DeleteObject(&testCtx, backupToolKey, obj)
+					Eventually(testapps.CheckObjExists(&testCtx, backupToolKey, obj, false)).Should(Succeed())
+				})
+
+				It("should ignore the exception and continue to delete", func() {
+					By("deleting a Backup object")
+					testapps.DeleteObject(&testCtx, backupKey, &dataprotectionv1alpha1.Backup{})
+					By("checking Backup object, it should be deleted")
+					Eventually(testapps.CheckObjExists(&testCtx, backupKey,
+						&dataprotectionv1alpha1.Backup{}, false)).Should(Succeed())
+				})
+			})
+
+			When("DeleteBackupFileCommands is empty", func() {
+				BeforeEach(func() {
+					By("setting DeleteBackupFileCommands to empty")
+					Eventually(testapps.GetAndChangeObj(&testCtx, backupToolKey, func(backupTool *dataprotectionv1alpha1.BackupTool) {
+						backupTool.Spec.DeleteBackupFileCommands = []string{}
+					})).Should(Succeed())
+				})
+
+				It("should ignore the exception and continue to delete", func() {
+					By("deleting a Backup object")
+					testapps.DeleteObject(&testCtx, backupKey, &dataprotectionv1alpha1.Backup{})
+					By("checking Backup object, it should be deleted")
+					Eventually(testapps.CheckObjExists(&testCtx, backupKey,
+						&dataprotectionv1alpha1.Backup{}, false)).Should(Succeed())
+				})
+			})
+
+			When("DeleteBackupFiles job is failed", func() {
+				It("should ignore the exception and continue to delete", func() {
+					By("deleting a Backup object")
+					testapps.DeleteObject(&testCtx, backupKey, &dataprotectionv1alpha1.Backup{})
+
+					By("checking new created Job")
+					jobKey := types.NamespacedName{
+						Namespace: testCtx.DefaultNamespace,
+						Name:      deleteBackupFilesJobNamePrefix + backupName,
+					}
+					Eventually(testapps.CheckObjExists(&testCtx, jobKey,
+						&batchv1.Job{}, true)).Should(Succeed())
+
+					By("setting the job to Failed")
+					patchK8sJobStatus(jobKey, batchv1.JobFailed)
+
+					By("checking Backup object, it should be deleted")
+					Eventually(testapps.CheckObjExists(&testCtx, backupKey,
+						&dataprotectionv1alpha1.Backup{}, false)).Should(Succeed())
+				})
 			})
 		})
 

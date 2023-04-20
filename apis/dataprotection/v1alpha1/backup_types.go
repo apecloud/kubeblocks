@@ -44,6 +44,10 @@ type BackupStatus struct {
 	// +optional
 	Phase BackupPhase `json:"phase,omitempty"`
 
+	// Indicates whether the backup file has been deleted.
+	// +optional
+	BackupFileDeleted bool `json:"backupFileDeleted,omitempty"`
+
 	// record parentBackupName if backupType is incremental.
 	// +optional
 	ParentBackupName string `json:"parentBackupName,omitempty"`

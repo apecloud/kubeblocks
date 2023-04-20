@@ -69,6 +69,11 @@ type BackupToolSpec struct {
 	// +optional
 	IncrementalBackupCommands []string `json:"incrementalBackupCommands,omitempty"`
 
+	// An array of commands that is used to delete files generated in this backup
+	// when the backup object is being deleted.
+	// +optional
+	DeleteBackupFileCommands []string `json:"deleteBackupFileCommands,omitempty"`
+
 	// backup tool can support physical restore, in this case, restore must be RESTART database.
 	// +kubebuilder:validation:Required
 	Physical BackupToolRestoreCommand `json:"physical"`

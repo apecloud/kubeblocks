@@ -58,3 +58,5 @@ spec:
      tar -czvf ${BACKUP_NAME}.tar.gz ./${BACKUP_NAME}
      rm -rf ${BACKUP_DIR}/${BACKUP_NAME}
   incrementalBackupCommands: []
+  deleteBackupFileCommands:
+    - rm ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz

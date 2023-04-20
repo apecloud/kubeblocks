@@ -44,6 +44,12 @@ spec:
                 items:
                   type: string
                 type: array
+              deleteBackupFileCommands:
+                description: An array of commands that is used to delete files generated
+                  in this backup when the backup object is being deleted.
+                items:
+                  type: string
+                type: array
               deployKind:
                 default: job
                 description: which kind for run a backup tool.

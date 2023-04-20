@@ -154,6 +154,16 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			return deleteSnapshot(transCtx.Client, reqCtx, snapshotKey, cluster, comp, dag, rootVertex)
 		}
 
+		emitHorizontalScalingEvent := func() {
+			transCtx.EventRecorder.Eventf(cluster,
+				corev1.EventTypeNormal,
+				"HorizontalScale",
+				"Start horizontal scale component %s from %d to %d",
+				comp.Name,
+				*stsObj.Spec.Replicas,
+				*stsProto.Spec.Replicas)
+		}
+
 		scaleOut := func() error {
 			if err := cleanCronJobs(); err != nil {
 				return err
@@ -201,6 +211,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			if *stsProto.Spec.Replicas == 0 || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
 				return nil
 			}
+
 			for i := *stsProto.Spec.Replicas; i < *stsObj.Spec.Replicas; i++ {
 				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 					pvcKey := types.NamespacedName{
@@ -216,8 +227,24 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			return nil
 		}
 
+		updateComponentStatus := func() {
+			if cluster.Status.Components == nil {
+				return
+			}
+			if componentStatus, ok := cluster.Status.Components[componentName]; ok {
+				if componentStatus.Phase != appsv1alpha1.SpecReconcilingClusterCompPhase {
+					emitHorizontalScalingEvent()
+				}
+				podsReady := false
+				componentStatus.PodsReady = &podsReady
+				componentStatus.Phase = appsv1alpha1.SpecReconcilingClusterCompPhase
+				cluster.Status.Components[componentName] = componentStatus
+			}
+		}
+
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
+		updateComponentStatus()
 		var err error
 		switch {
 		// scale out
@@ -228,16 +255,6 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 		}
 		if err != nil {
 			return err
-		}
-
-		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-			transCtx.EventRecorder.Eventf(cluster,
-				corev1.EventTypeNormal,
-				"HorizontalScale",
-				"Start horizontal scale component %s from %d to %d",
-				comp.Name,
-				*stsObj.Spec.Replicas,
-				*stsProto.Spec.Replicas)
 		}
 
 		return nil

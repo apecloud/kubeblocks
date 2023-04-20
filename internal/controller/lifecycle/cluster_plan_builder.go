@@ -360,6 +360,10 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 func (c *clusterPlanBuilder) emitConditionUpdatingEvent(oldConditions, newConditions []metav1.Condition) {
 	for _, newCondition := range newConditions {
 		oldCondition := meta.FindStatusCondition(oldConditions, newCondition.Type)
+		// filtered in cluster creation
+		if oldCondition == nil && newCondition.Status == metav1.ConditionFalse {
+			return
+		}
 		if !reflect.DeepEqual(oldCondition, &newCondition) {
 			eType := corev1.EventTypeNormal
 			if newCondition.Status == metav1.ConditionFalse {

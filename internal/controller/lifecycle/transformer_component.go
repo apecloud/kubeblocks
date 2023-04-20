@@ -49,35 +49,34 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 		return nil
 	}
 
-	dag4Component := graph.NewDAG()
-
-	// create new components or update existed components
-	err = c.transform4SpecUpdate(cluster, dag4Component)
+	dags4Component := make([]*graph.DAG, 0)
+	if cluster.IsStatusUpdating() {
+		// status existed components
+		err = c.transform4StatusUpdate(cluster, &dags4Component)
+	} else {
+		// create new components or update existed components
+		err = c.transform4SpecUpdate(cluster, &dags4Component)
+	}
 	if err != nil {
 		return err
 	}
 
-	// status existed components
-	err = c.transform4StatusUpdate(cluster, dag4Component)
-	if err != nil {
-		return err
-	}
-
-	for _, v := range dag4Component.Vertices() {
-		node, ok := v.(*ictrltypes.LifecycleVertex)
-		if !ok {
-			panic("runtime error, unexpected lifecycle vertex type")
+	for _, subDag := range dags4Component {
+		for _, v := range subDag.Vertices() {
+			node, ok := v.(*ictrltypes.LifecycleVertex)
+			if !ok {
+				panic("runtime error, unexpected lifecycle vertex type")
+			}
+			if node.Obj == nil {
+				panic("runtime error, nil vertex object")
+			}
 		}
-		if node.Obj == nil {
-			panic("runtime error, nil vertex object")
-		}
+		dag.Merge(subDag)
 	}
-	dag.Merge(dag4Component)
-
 	return nil
 }
 
-func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
+func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
 	compSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
 	for _, spec := range cluster.Spec.ComponentSpecs {
 		compSpecMap[spec.Name] = &spec
@@ -91,6 +90,7 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 	deleteSet := compStatus.Difference(compProto)
 
 	for compName := range createSet {
+		dag := graph.NewDAG()
 		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			return err
@@ -98,9 +98,11 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 		if err := comp.Create(c.ctx, c.cli); err != nil {
 			return err
 		}
+		*dags = append(*dags, dag)
 	}
 
 	for compName := range deleteSet {
+		dag := graph.NewDAG()
 		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			return err
@@ -110,24 +112,27 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 				return err
 			}
 		}
+		*dags = append(*dags, dag)
 	}
 
 	for compName := range updateSet {
+		dag := graph.NewDAG()
 		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
-		// TODO(refactor): will replace Update with specified operations(restart, reconfigure, h/v-scaling...) after ops-request forwards to cluster controller
 		if err := comp.Update(c.ctx, c.cli); err != nil {
 			return err
 		}
+		*dags = append(*dags, dag)
 	}
 
 	return nil
 }
 
-func (c *componentTransformer) transform4StatusUpdate(cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
+func (c *componentTransformer) transform4StatusUpdate(cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		dag := graph.NewDAG()
 		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compSpec.Name, dag)
 		if err != nil {
 			return err
@@ -135,6 +140,7 @@ func (c *componentTransformer) transform4StatusUpdate(cluster *appsv1alpha1.Clus
 		if err := comp.Status(c.ctx, c.cli); err != nil {
 			return err
 		}
+		*dags = append(*dags, dag)
 	}
 	return nil
 }

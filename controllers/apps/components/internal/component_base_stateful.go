@@ -155,6 +155,9 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 	if err := c.init(reqCtx, cli, builder, true); err != nil {
 		return err
 	}
+	if c.runningWorkload == nil {
+		return nil
+	}
 
 	// TODO(impl): check the operation result of @Restart, @ExpandVolume, @HorizontalScale, and update component status if needed.
 	//   @Restart - whether pods are available, covered by @BuildLatestStatus
@@ -164,10 +167,6 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 
 	if err := c.statusHorizontalScale(reqCtx, cli); err != nil {
 		return err
-	}
-
-	if c.runningWorkload == nil {
-		return nil
 	}
 
 	// TODO(impl): restart pod if needed, move it to @Update and restart pod directly.
@@ -190,9 +189,12 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 	if err := c.BuildLatestStatus(reqCtx, cli, c.runningWorkload); err != nil {
 		return err
 	}
-	return c.handleGarbageOfRestoreBeforeRunning()
 
-	//TODO: c.updateWorkload(c.runningWorkload)
+	if err := c.handleGarbageOfRestoreBeforeRunning(); err != nil {
+		return err
+	}
+	c.updateWorkload(c.runningWorkload)
+	return nil
 }
 
 func (c *StatefulComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -424,19 +426,19 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 func (c *StatefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	if stsObj == nil {
 		c.createWorkload()
+		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload created")
 	} else {
-		c.updateWorkload(stsObj)
-
+		if c.updateWorkload(stsObj) {
+			c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload updated")
+		}
 		// to work around that the scaled PVC will be deleted at object action.
 		if err := c.updatePVC(reqCtx, cli, stsObj); err != nil {
 			return err
 		}
 	}
-
 	if err := c.UpdateService(reqCtx, cli); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -444,10 +446,9 @@ func (c *StatefulComponentBase) createWorkload() {
 	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
 	c.WorkloadVertex.Obj = stsProto
 	c.WorkloadVertex.Action = ictrltypes.ActionCreatePtr()
-	c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload created")
 }
 
-func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) {
+func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) bool {
 	stsObjCopy := stsObj.DeepCopy()
 	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
 
@@ -460,8 +461,9 @@ func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) {
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
 		c.WorkloadVertex.Obj = stsObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload updated")
+		return true
 	}
+	return false
 }
 
 func (c *StatefulComponentBase) updatePVC(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
@@ -496,6 +498,20 @@ func (c *StatefulComponentBase) updatePVC(reqCtx intctrlutil.RequestCtx, cli cli
 }
 
 func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	ret := c.horizontalScaling(c.runningWorkload)
+	if ret == 0 {
+		return c.statusPVCDeletionJob(reqCtx, cli)
+	}
+	if ret > 0 {
+		// forward the h-scaling progress
+		if err := c.scaleOut(reqCtx, cli, c.runningWorkload); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *StatefulComponentBase) statusPVCDeletionJob(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	///// ClusterStatusHandler.handleDeletePVCCronJobEvent
 	job := &batchv1.Job{}
 	checkPVCDeletionJobFail := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, string, error) {
@@ -570,7 +586,8 @@ func (c *StatefulComponentBase) removeStsInitContainerForRestore(backupName stri
 			c.WorkloadVertex.Action = ictrltypes.ActionUpdatePtr()
 		}
 	}
-	// if need to remove init container, reset component to Creating.
-	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Remove init container for restore")
+	// TODO: it seems not reasonable to reset component phase back to Creating.
+	//// if need to remove init container, reset component to Creating.
+	// c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Remove init container for restore")
 	return nil
 }

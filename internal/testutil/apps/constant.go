@@ -292,42 +292,34 @@ var (
 		},
 	}
 
-	generalClassGroup = appsv1alpha1.ComponentClassGroup{
-		ResourceConstraintRef: DefaultResourceConstraintName,
-		Template: `
-cpu: "{{ or .cpu 1 }}"
-memory: "{{ or .memory 4 }}Gi"
-volumes:
-- name: data
-  size: "{{ or .dataStorageSize 10 }}Gi"
-- name: log
-  size: "{{ or .logStorageSize 1 }}Gi"
-`,
-		Vars: []string{"cpu", "memory", "dataStorageSize", "logStorageSize"},
-		Series: []appsv1alpha1.ComponentClassSeries{
+	class1c1g = appsv1alpha1.ComponentClass{
+		Name:   Class1c1gName,
+		CPU:    resource.MustParse("1"),
+		Memory: resource.MustParse("1Gi"),
+		Volumes: []appsv1alpha1.Volume{
 			{
-				NamingTemplate: "class-{{ .cpu }}c{{ .memory}}g",
-				Classes: []appsv1alpha1.ComponentClass{
-					{
-						Name: Class1c1gName,
-						Args: []string{"1", "1", "10Gi", "1Gi"},
-					},
-					{
-						Name:   Class2c4gName,
-						CPU:    resource.MustParse("2"),
-						Memory: resource.MustParse("4Gi"),
-						Volumes: []appsv1alpha1.Volume{
-							{
-								Name: "data",
-								Size: resource.MustParse("20Gi"),
-							},
-							{
-								Name: "log",
-								Size: resource.MustParse("10Gi"),
-							},
-						},
-					},
-				},
+				Name: "data",
+				Size: resource.MustParse("20Gi"),
+			},
+			{
+				Name: "log",
+				Size: resource.MustParse("10Gi"),
+			},
+		},
+	}
+
+	class2c4g = appsv1alpha1.ComponentClass{
+		Name:   Class2c4gName,
+		CPU:    resource.MustParse("2"),
+		Memory: resource.MustParse("4Gi"),
+		Volumes: []appsv1alpha1.Volume{
+			{
+				Name: "data",
+				Size: resource.MustParse("20Gi"),
+			},
+			{
+				Name: "log",
+				Size: resource.MustParse("10Gi"),
 			},
 		},
 	}

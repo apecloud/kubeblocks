@@ -117,11 +117,7 @@ var _ = Describe("utils", func() {
 			)
 
 			classDef := testapps.NewComponentClassDefinitionFactory("custom", "apecloud-mysql", compType).
-				AddClasses(testapps.DefaultResourceConstraintName, []v1alpha1.ComponentClass{{
-					Name:   specClassName,
-					CPU:    resource.MustParse("1"),
-					Memory: resource.MustParse("1Gi"),
-				}}).
+				AddClasses(testapps.DefaultResourceConstraintName).
 				GetObject()
 
 			By("class definition status is out of date")

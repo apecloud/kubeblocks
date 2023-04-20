@@ -188,6 +188,9 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 	if err != nil {
 		return nil, err
 	}
+	if len(podList) == 0 {
+		return nil, nil
+	}
 
 	vertexes := make([]graph.Vertex, 0)
 	podsToSyncStatus := make([]*corev1.Pod, 0)

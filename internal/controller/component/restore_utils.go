@@ -165,6 +165,11 @@ func buildInitContainerWithFullBackup(
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser}
 
+	backupDataPath := fmt.Sprintf("/%s/%s", backup.Name, backup.Namespace)
+	manifests := backup.Status.Manifests
+	if manifests != nil && manifests.BackupTool != nil {
+		backupDataPath = fmt.Sprintf("/%s%s", backup.Name, manifests.BackupTool.FilePath)
+	}
 	// build env for restore
 	container.Env = []corev1.EnvVar{
 		{
@@ -172,7 +177,7 @@ func buildInitContainerWithFullBackup(
 			Value: backup.Name,
 		}, {
 			Name:  "BACKUP_DIR",
-			Value: fmt.Sprintf("/%s/%s", backup.Name, backup.Namespace),
+			Value: backupDataPath,
 		}}
 	// merge env from backup tool.
 	container.Env = append(container.Env, backupTool.Spec.Env...)

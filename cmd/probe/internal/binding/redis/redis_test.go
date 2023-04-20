@@ -527,6 +527,31 @@ func TestRedisAccounts(t *testing.T) {
 			assert.Equal(t, test.redisPrivs, cmd)
 		}
 	})
+	// list accounts
+	t.Run("List System Accounts", func(t *testing.T) {
+		mock.ExpectDo("ACL", "USERS").SetVal([]string{"ape", "default", "kbadmin"})
+
+		response, err := r.Invoke(ctx, &bindings.InvokeRequest{
+			Operation: ListSystemAccountsOp,
+		})
+
+		assert.Nil(t, err)
+		assert.NotNil(t, response)
+		assert.NotNil(t, response.Data)
+		// parse result
+		opsResult := OpsResult{}
+		_ = json.Unmarshal(response.Data, &opsResult)
+		assert.Equal(t, RespEveSucc, opsResult[RespTypEve], opsResult[RespTypMsg])
+
+		users := []string{}
+		err = json.Unmarshal([]byte(opsResult[RespTypMsg].(string)), &users)
+		assert.Nil(t, err)
+		assert.NotEmpty(t, users)
+		assert.Len(t, users, 2)
+		assert.Contains(t, users, "kbadmin")
+		assert.Contains(t, users, "default")
+		mock.ClearExpect()
+	})
 }
 
 func mockRedisOps(t *testing.T) (*Redis, redismock.ClientMock) {

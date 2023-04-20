@@ -387,6 +387,10 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		return err
 	}
 	if !allPVCsExist {
+		if horizontalScalePolicy == nil {
+			c.WorkloadVertex.Immutable = false
+			return nil
+		}
 		// do backup according to component's horizontal scale policy
 		stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
 		objs, err := doBackup(reqCtx, cli, c.Cluster, c.Component, snapshotKey, stsProto, stsObj)

@@ -31,9 +31,8 @@ import (
 	"text/template/parse"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcontainer "github.com/apecloud/kubeblocks/internal/configuration/container"
-	"github.com/apecloud/kubeblocks/internal/configuration/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
@@ -92,7 +91,7 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 	return &gotemplate.BuiltInObjectsFunc{
 		builtInExecFunctionName: func(command string, args ...string) (string, error) {
 			execCommand := exec.CommandContext(ctx, command, args...)
-			stdout, err := cfgcontainer.ExecShellCommand(execCommand)
+			stdout, err := cfgutil.ExecShellCommand(execCommand)
 			logger.V(1).Info(fmt.Sprintf("command: [%s], output: %s, err: %v", execCommand.String(), stdout, err))
 			return stdout, err
 		},
@@ -113,7 +112,7 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 			if err != nil {
 				return err
 			}
-			newConfig, err := cfgutil.ApplyConfigPatch(b, updatedParams, formatConfig)
+			newConfig, err := cfgcore.ApplyConfigPatch(b, updatedParams, formatConfig)
 			if err != nil {
 				return err
 			}
@@ -123,30 +122,30 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 }
 
 func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCfg *appsv1alpha1.FormatterConfig) (map[string]string, error) {
-	patchOption := cfgutil.CfgOption{
-		Type:    cfgutil.CfgTplType,
+	patchOption := cfgcore.CfgOption{
+		Type:    cfgcore.CfgTplType,
 		CfgType: formatCfg.Format,
 		Log:     logger,
 	}
 
 	logger.V(1).Info(fmt.Sprintf("new version files: %v, old version files: %v", newVersion, oldVersion))
-	oldData, err := util.FromConfigFiles(oldVersion)
+	oldData, err := cfgutil.FromConfigFiles(oldVersion)
 	if err != nil {
 		return nil, err
 	}
-	newData, err := util.FromConfigFiles(newVersion)
+	newData, err := cfgutil.FromConfigFiles(newVersion)
 	if err != nil {
 		return nil, err
 	}
-	patch, err := cfgutil.CreateMergePatch(&cfgutil.ConfigResource{ConfigData: oldData}, &cfgutil.ConfigResource{ConfigData: newData}, patchOption)
+	patch, err := cfgcore.CreateMergePatch(&cfgcore.ConfigResource{ConfigData: oldData}, &cfgcore.ConfigResource{ConfigData: newData}, patchOption)
 	if err != nil {
 		return nil, err
 	}
 
-	params := cfgutil.GenerateVisualizedParamsList(patch, formatCfg, nil)
+	params := cfgcore.GenerateVisualizedParamsList(patch, formatCfg, nil)
 	r := make(map[string]string)
 	for _, key := range params {
-		if key.UpdateType != cfgutil.DeletedType {
+		if key.UpdateType != cfgcore.DeletedType {
 			for _, p := range key.Parameters {
 				if p.Value != "" {
 					r[p.Key] = p.Value
@@ -207,7 +206,7 @@ func createFileRegex(fileRegex string) (regexFilter, error) {
 
 	regxPattern, err := regexp.Compile(fileRegex)
 	if err != nil {
-		return nil, cfgutil.WrapError(err, "failed to create regexp [%s]", fileRegex)
+		return nil, cfgcore.WrapError(err, "failed to create regexp [%s]", fileRegex)
 	}
 	return func(s string) bool {
 		return regxPattern.MatchString(s)

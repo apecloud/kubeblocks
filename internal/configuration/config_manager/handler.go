@@ -34,8 +34,8 @@ import (
 	"go.uber.org/zap"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcontainer "github.com/apecloud/kubeblocks/internal/configuration/container"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 var (
@@ -68,7 +68,7 @@ func findPidFromProcessName(processName string) (PID, error) {
 		}
 		ppid, err := proc.Ppid()
 		if err != nil {
-			return InvalidPID, cfgutil.WrapError(err, "failed to get parent pid from pid[%d]", proc.Pid)
+			return InvalidPID, cfgcore.WrapError(err, "failed to get parent pid from pid[%d]", proc.Pid)
 		}
 		psGraph[PID(proc.Pid)] = ppid
 	}
@@ -79,13 +79,13 @@ func findPidFromProcessName(processName string) (PID, error) {
 		}
 	}
 
-	return InvalidPID, cfgutil.MakeError("cannot find pid of process name: [%s]", processName)
+	return InvalidPID, cfgcore.MakeError("cannot find pid of process name: [%s]", processName)
 }
 
 func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string) (WatchEventHandler, error) {
 	signal, ok := allUnixSignals[sig]
 	if !ok {
-		err := cfgutil.MakeError("not supported unix signal: %s", sig)
+		err := cfgcore.MakeError("not supported unix signal: %s", sig)
 		logger.Error(err, "failed to create signal handler")
 		return nil, err
 	}
@@ -102,11 +102,11 @@ func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string) (Watch
 func CreateExecHandler(command string) (WatchEventHandler, error) {
 	args := strings.Fields(command)
 	if len(args) == 0 {
-		return nil, cfgutil.MakeError("invalid command: %s", command)
+		return nil, cfgcore.MakeError("invalid command: %s", command)
 	}
 	cmd := exec.Command(args[0], args[1:]...)
 	return func(_ context.Context, _ fsnotify.Event) error {
-		stdout, err := cfgcontainer.ExecShellCommand(cmd)
+		stdout, err := cfgutil.ExecShellCommand(cmd)
 		if err == nil {
 			logger.V(1).Info(fmt.Sprintf("exec: [%s], result: [%s]", command, stdout))
 		}

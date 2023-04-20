@@ -589,6 +589,32 @@ func TestMySQLAccounts(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
 	})
+	t.Run("List System Accounts", func(t *testing.T) {
+		var err error
+		var result OpsResult
+
+		req := &bindings.InvokeRequest{}
+		req.Operation = CreateUserOp
+		req.Metadata = map[string]string{}
+
+		col1 := sqlmock.NewColumn("userName").OfType("STRING", "turning")
+
+		rows := sqlmock.NewRowsWithColumnDefinition(col1).
+			AddRow("kbadmin")
+
+		stmt := "SELECT user AS userName FROM mysql.user WHERE host = '%' and user like 'kb%';"
+		mock.ExpectQuery(regexp.QuoteMeta(stmt)).WillReturnRows(rows)
+
+		result, err = mysqlOps.listSystemAccountsOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+		data := result[RespTypMsg].(string)
+		users := []string{}
+		err = json.Unmarshal([]byte(data), &users)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(users))
+		assert.Equal(t, "kbadmin", users[0])
+	})
 }
 func mockDatabase(t *testing.T) (*MysqlOperations, sqlmock.Sqlmock, error) {
 	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")

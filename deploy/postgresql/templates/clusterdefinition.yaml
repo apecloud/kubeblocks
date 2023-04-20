@@ -66,9 +66,6 @@ spec:
           - name: tcp-postgresql
             port: 5432
             targetPort: tcp-postgresql
-          - name: http-metrics-postgresql
-            port: 9187
-            targetPort: http-metrics
       volumeTypes:
         - name: data
           type: data
@@ -131,6 +128,8 @@ spec:
                 value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)","app.kubernetes.io/managed-by":"kubeblocks"}'
               - name: RESTORE_DATA_DIR
                 value: /home/postgres/pgdata/kb_restore
+              - name: KB_PG_CONFIG_PATH
+                value: /home/postgres/conf/postgresql.conf
               - name: SPILO_CONFIGURATION
                 value: | ## https://github.com/zalando/patroni#yaml-configuration
                   bootstrap:
@@ -274,32 +273,32 @@ spec:
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbdataprotection
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbprobe
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
-                deletion: DROP USER IF EXISTS $(USERNAME);                     
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';

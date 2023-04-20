@@ -46,7 +46,7 @@ func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op 
 
 func (o *GrantOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVarP(&o.info.UserName, "username", "u", "", "Required. Specify the name of user.")
+	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required. Specify the name of user.")
 	cmd.Flags().StringVarP(&o.info.RoleName, "role", "r", "", "Role name should be one of {SUPERUSER, READWRITE, READONLY}")
 }
 

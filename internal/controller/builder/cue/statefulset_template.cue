@@ -52,8 +52,8 @@ statefulset: {
 				"app.kubernetes.io/managed-by":      "kubeblocks"
 				"apps.kubeblocks.io/component-name": "\(component.name)"
 			}
-		serviceName: "\(cluster.metadata.name)-\(component.name)-headless"
-		replicas: component.replicas
+		serviceName:         "\(cluster.metadata.name)-\(component.name)-headless"
+		replicas:            component.replicas
 		minReadySeconds:     10
 		podManagementPolicy: "Parallel"
 		template: {

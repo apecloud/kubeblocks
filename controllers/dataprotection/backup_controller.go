@@ -317,6 +317,14 @@ func (r *BackupReconciler) buildAutoCreationAnnotations(backupPolicyName string)
 	}
 }
 
+// getBackupPathPrefix gets the backup path prefix.
+func (r *BackupReconciler) getBackupPathPrefix(backupNamespace, pathPrefix string) string {
+	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
+		return fmt.Sprintf("/%s%s", backupNamespace, pathPrefix)
+	}
+	return fmt.Sprintf("/%s/%s", backupNamespace, pathPrefix)
+}
+
 func (r *BackupReconciler) doInProgressPhaseAction(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup) (ctrl.Result, error) {
@@ -382,7 +390,8 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			// TODO: add error type
 			return r.updateStatusIfFailed(reqCtx, backup, fmt.Errorf("not found the %s policy", backup.Spec.BackupType))
 		}
-		err = r.createBackupToolJob(reqCtx, backup, commonPolicy)
+		pathPrefix := r.getBackupPathPrefix(backup.Namespace, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
+		err = r.createBackupToolJob(reqCtx, backup, commonPolicy, pathPrefix)
 		if err != nil {
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
@@ -403,6 +412,11 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			// update Phase to in Completed
 			backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 			backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+			backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{
+				BackupTool: &dataprotectionv1alpha1.BackupToolManifestsStatus{
+					FilePath: pathPrefix,
+				},
+			}
 		} else if jobStatusConditions[0].Type == batchv1.JobFailed {
 			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
 			backup.Status.FailureReason = job.Status.Conditions[0].Reason
@@ -682,7 +696,8 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 func (r *BackupReconciler) createBackupToolJob(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
-	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) error {
+	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
+	pathPrefix string) error {
 
 	key := types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}
 	job := batchv1.Job{}
@@ -695,7 +710,7 @@ func (r *BackupReconciler) createBackupToolJob(
 		return nil
 	}
 
-	toolPodSpec, err := r.buildBackupToolPodSpec(reqCtx, backup, commonPolicy)
+	toolPodSpec, err := r.buildBackupToolPodSpec(reqCtx, backup, commonPolicy, pathPrefix)
 	if err != nil {
 		return err
 	}
@@ -938,7 +953,8 @@ func (r *BackupReconciler) getTargetPVCs(reqCtx intctrlutil.RequestCtx,
 
 func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
-	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) (corev1.PodSpec, error) {
+	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
+	pathPrefix string) (corev1.PodSpec, error) {
 	podSpec := corev1.PodSpec{}
 	// get backup tool
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
@@ -1008,21 +1024,12 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		Value: backup.Name,
 	}
 
-	envBackupDirPrefix := corev1.EnvVar{
-		Name: "BACKUP_DIR_PREFIX",
-		ValueFrom: &corev1.EnvVarSource{
-			FieldRef: &corev1.ObjectFieldSelector{
-				FieldPath: "metadata.namespace",
-			},
-		},
-	}
-
 	envBackupDir := corev1.EnvVar{
 		Name:  "BACKUP_DIR",
-		Value: remoteBackupPath + "/$(BACKUP_DIR_PREFIX)",
+		Value: remoteBackupPath + pathPrefix,
 	}
 
-	container.Env = []corev1.EnvVar{envDBHost, envBackupName, envBackupDirPrefix, envBackupDir}
+	container.Env = []corev1.EnvVar{envDBHost, envBackupName, envBackupDir}
 	if commonPolicy.Target.Secret != nil {
 		envDBUser := corev1.EnvVar{
 			Name: "DB_USER",

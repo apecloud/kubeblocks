@@ -264,7 +264,7 @@ func (r *OpsRequest) validateVerticalScaling(ctx context.Context, k8sClient clie
 				}
 			}
 			if err = validateMatchingClass(classes, v.ResourceRequirements); err != nil {
-				return fmt.Errorf("can not find matching class for component %s", v.ComponentName)
+				return errors.Wrapf(err, "can not find matching class for component %s", v.ComponentName)
 			}
 		}
 	}

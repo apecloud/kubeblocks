@@ -17,7 +17,9 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -186,4 +188,34 @@ func getBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	return nil, nil
+}
+
+// read all objects owned by our cluster
+func readCacheSnapshot(ctx context.Context, cli types2.ReadonlyClient, cluster appsv1alpha1.Cluster, kinds ...client.ObjectList) (clusterSnapshot, error) {
+	// list what kinds of object cluster owns
+	snapshot := make(clusterSnapshot)
+	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
+	inNS := client.InNamespace(cluster.Namespace)
+	for _, list := range kinds {
+		if err := cli.List(ctx, list, inNS, ml); err != nil {
+			return nil, err
+		}
+		// reflect get list.Items
+		items := reflect.ValueOf(list).Elem().FieldByName("Items")
+		l := items.Len()
+		for i := 0; i < l; i++ {
+			// get the underlying object
+			object := items.Index(i).Addr().Interface().(client.Object)
+			// put to snapshot if owned by our cluster
+			if isOwnerOf(&cluster, object, scheme) {
+				name, err := getGVKName(object, scheme)
+				if err != nil {
+					return nil, err
+				}
+				snapshot[*name] = object
+			}
+		}
+	}
+
+	return snapshot, nil
 }

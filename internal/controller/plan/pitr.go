@@ -253,28 +253,6 @@ func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, 
 	return latestBackup, nil
 }
 
-func (p *PointInTimeRecoveryManager) getNextBackup() (*dpv1alpha1.Backup, error) {
-	// 1. sort backups
-	backups, err := p.getSortedBackups(false)
-	if err != nil {
-		return nil, err
-	}
-
-	// 2. get the next earliest backup object
-	var nextBackup *dpv1alpha1.Backup
-	for _, item := range backups {
-		if p.restoreTime.Before(item.Status.Manifests.BackupLog.StopTime) {
-			nextBackup = &item
-			break
-		}
-	}
-	if nextBackup == nil {
-		return nil, errors.New("can not found next earliest base backup")
-	}
-
-	return nextBackup, nil
-}
-
 // checkAndInit checks if cluster need to be restored, return value: true: need, false: no need
 func (p *PointInTimeRecoveryManager) checkAndInit() (need bool, err error) {
 	// check args if pitr supported

@@ -122,9 +122,6 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 
 func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 	var yamlDataList [][]byte
-	if !vendorName.IsCloud() {
-		return yamlDataList, errors.New("unknown provider")
-	}
 	if data, err := defaultVendorYamlData.ReadFile(newPreflightPath(vendorName)); err == nil {
 		yamlDataList = append(yamlDataList, data)
 	}

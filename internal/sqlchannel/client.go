@@ -169,6 +169,7 @@ type OperationHTTPClient struct {
 	httpRequestPrefix string
 	RequestTimeout    time.Duration
 	containerName     string
+	characterType     string
 }
 
 // NewHTTPClientWithChannelPod create a new OperationHTTPClient with sqlchannel container
@@ -198,6 +199,7 @@ func NewHTTPClientWithChannelPod(pod *corev1.Pod, characterType string) (*Operat
 		httpRequestPrefix: fmt.Sprintf(HTTPRequestPrefx, port, characterType),
 		RequestTimeout:    10 * time.Second,
 		containerName:     container,
+		characterType:     characterType,
 	}
 	return client, nil
 }
@@ -205,10 +207,10 @@ func NewHTTPClientWithChannelPod(pod *corev1.Pod, characterType string) (*Operat
 // SendRequest exec sql operation, this is a blocking operation and it will use pod EXEC subresource to send an http request to the probe pod
 func (cli *OperationHTTPClient) SendRequest(exec *exec.ExecOptions, request SQLChannelRequest) (SQLChannelResponse, error) {
 	var (
-		response  = SQLChannelResponse{}
 		strBuffer bytes.Buffer
 		errBuffer bytes.Buffer
 		err       error
+		response  = SQLChannelResponse{}
 	)
 
 	if jsonData, err := json.Marshal(request); err != nil {
@@ -222,9 +224,35 @@ func (cli *OperationHTTPClient) SendRequest(exec *exec.ExecOptions, request SQLC
 	if err = exec.RunWithRedirect(&strBuffer, &errBuffer); err != nil {
 		return response, err
 	}
+	return parseResponse(strBuffer.Bytes(), request.Operation, cli.characterType)
+}
 
-	if err = json.Unmarshal(strBuffer.Bytes(), &response); err != nil {
+type errorResponse struct {
+	ErrorCode string `json:"errorCode"`
+	Message   string `json:"message"`
+}
+
+func parseResponse(data []byte, operation string, charType string) (SQLChannelResponse, error) {
+	// conver to errorResponse first, and check error code
+	// if error code is not empty, it means the request failed
+	errorResponse := errorResponse{}
+	response := SQLChannelResponse{}
+	if err := json.Unmarshal(data, &errorResponse); err != nil {
 		return response, err
+	} else if len(errorResponse.ErrorCode) > 0 {
+		return SQLChannelResponse{
+			Event:   RespEveFail,
+			Message: fmt.Sprintf("Operation `%s` on component of type `%s` is not supported yet.", operation, charType),
+			Metadata: SQLChannelMeta{
+				Operation: operation,
+				StartTime: time.Now(),
+				EndTime:   time.Now(),
+				Extra:     errorResponse.Message,
+			},
+		}, nil
 	}
-	return response, nil
+
+	// conver it to SQLChannelResponse
+	err := json.Unmarshal(data, &response)
+	return response, err
 }

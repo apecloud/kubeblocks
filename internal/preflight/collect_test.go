@@ -126,7 +126,7 @@ var _ = Describe("collect_test", func() {
 					g.Expect(<-progressCh).NotTo(BeNil())
 				}
 			}()
-			collectResult, err := CollectRemoteData(context.TODO(), &preflightv1beta2.HostPreflight{}, progressCh)
+			collectResult, err := CollectRemoteData(context.TODO(), &preflightv1beta2.HostPreflight{}, tf, progressCh)
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(collectResult).NotTo(BeNil())
 		}).WithTimeout(timeOut).Should(Succeed())

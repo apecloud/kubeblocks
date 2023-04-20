@@ -268,7 +268,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
 			err := c.cli.Update(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
-				c.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", node.obj, node.oriObj.GetName()))
+				c.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", node.obj, node.obj.GetName()))
 				return err
 			}
 		}

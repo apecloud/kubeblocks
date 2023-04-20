@@ -14,7 +14,7 @@ process_issue_rows() {
     do 
         local issue_body=$(echo ${last_issue_list} | jq -r ".[${i}]")
         local issue_id=$(echo ${issue_body} | jq -r ".number")
-        local url=$(echo ${issue_body} | jq -r '.url')
+        local url=$(echo ${issue_body} | jq -r '.html_url')
         local title=$(echo ${issue_body} | jq -r '.title')
         local assignees=$(echo ${issue_body} | jq -r '.assignees[]?.login')
         local state=$(echo ${issue_body}| jq -r '.state')

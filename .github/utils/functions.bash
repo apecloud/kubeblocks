@@ -48,7 +48,7 @@ _gh_get_issues () {
         ${label_filter} \
         -f state=${state}"
     if [ -n "$DEBUG" ]; then echo $cmd; fi
-    last_issue_list=`eval ${cmd}`
+    last_issue_list=`eval ${cmd} 2> /dev/null`
 }
 
 
@@ -88,10 +88,10 @@ gh_update_issue_milestone() {
     fi
 
     local req_data="{\"milestone\":$milestone_id}"
-    echo "req_data=$req_data"
     
-    local gh_token=$(gh auth token)
+    if [ -n "$DEBUG" ]; then echo "req_data=$req_data"; fi
 
+    local gh_token=$(gh auth token)
     local resp=$(curl \
         --location \
         --request PATCH \

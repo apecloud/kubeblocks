@@ -178,6 +178,10 @@ func (o *UninstallOptions) Uninstall() error {
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
+
+		// KubeBlocks chart has a hook to delete addons, but we have already deleted addons,
+		// and that webhook may fail, so we need to disable hooks.
+		DisableHooks: true,
 	}
 	printSpinner(newSpinner("Uninstall helm release "+types.KubeBlocksChartName+" "+v[util.KubeBlocksApp]),
 		chart.Uninstall(o.HelmCfg))

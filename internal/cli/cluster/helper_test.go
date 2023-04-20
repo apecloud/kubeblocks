@@ -102,4 +102,24 @@ var _ = Describe("helper", func() {
 		Expect(latestVer).ShouldNot(BeNil())
 		Expect(latestVer.Name).Should(Equal("now-version"))
 	})
+
+	It("get configmap by name", func() {
+		cmName := "test-cm"
+		dynamic := testing.FakeDynamicClient(testing.FakeConfigMap(cmName))
+		cm, err := GetConfigMapByName(dynamic, testing.Namespace, cmName)
+		Expect(err).Should(Succeed())
+		Expect(cm).ShouldNot(BeNil())
+
+		cm, err = GetConfigMapByName(dynamic, testing.Namespace, cmName+"error")
+		Expect(err).Should(HaveOccurred())
+		Expect(cm).Should(BeNil())
+	})
+
+	It("get config constraint by name", func() {
+		ccName := "test-cc"
+		dynamic := testing.FakeDynamicClient(testing.FakeConfigConstraint(ccName))
+		cm, err := GetConfigConstraintByName(dynamic, ccName)
+		Expect(err).Should(Succeed())
+		Expect(cm).ShouldNot(BeNil())
+	})
 })

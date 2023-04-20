@@ -5,8 +5,10 @@ timeout 0
 tcp-keepalive 300
 daemonize no
 pidfile /var/run/redis_6379.pid
+{{ block "logsBlock" . }}
 loglevel notice
 logfile "/data/running.log"
+{{ end }}
 databases 16
 always-show-logo no
 set-proc-title yes

@@ -138,7 +138,7 @@ The example below reconfigures `max_connections`.
    Mar 17,2023 19:25 UTC+0800   Succeed              OpsRequestProcessedSuccessfully   True     Successfully processed the OpsRequest: pg-cluster-reconfiguring-fq6q7 in Cluster: pg-cluster
    ```
 
-   </deatils>
+   </details>
 
 4. Connect to the database to verify whether the parameters are modified.
 

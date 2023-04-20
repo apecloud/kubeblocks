@@ -1,12 +1,12 @@
 ---
-title: Scale for Redis
+title: Scale for a Redis cluster
 description: How to scale a Redis cluster, horizontal scaling, vertical scaling
 keywords: [redis, horizontal scaling, vertical scaling, scale]
 sidebar_position: 2
 sidebar_label: Scale
 ---
 
-# Scale for Redis
+# Scale for a Redis cluster
 
 You can scale Redis DB instances in two ways, horizontal scaling and vertical scaling. 
 

@@ -1,12 +1,12 @@
 ---
-title: Restart Redis cluster
+title: Restart a Redis cluster
 description: How to restart a Redis cluster
 keywords: [redis, restart]
 sidebar_position: 4
 sidebar_label: Restart
 ---
 
-# Restart Redis cluster
+# Restart a Redis cluster
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
 
 :::note

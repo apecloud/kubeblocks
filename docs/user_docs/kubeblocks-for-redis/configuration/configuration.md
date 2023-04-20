@@ -133,7 +133,7 @@ The example below reconfigures `acllog-max-len`.
    Apr 17,2023 17:22 UTC+0800   ReconfigureRunning   ReconfigureRunning             True     Reconfiguring in Cluster: redis-cluster, Component: redis, ConfigSpec: redis-replication-config
    ```
 
-   </deatils>
+   </details>
 
 4. Connect to the database to verify whether the parameters are modified.
 

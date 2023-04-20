@@ -16,13 +16,33 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 ## Before you start
 
 1. A Kubernetes environment is required.
+
 2. `kubectl` is required and can connect to your Kubernetes clusters. Refer to [Install and Set Up kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) for installation details.
 
+3. For macOS:
+
+   Install Homebrew.
+
+   ```bash
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   ```
+
+4. For Windows:
+   * System requirement: a 64-bit host.
+   * Install [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.3) and PowerShell should be v5.0 or above.
+
 ## Install kbcli
+
+:::note
+
+Install `kbcli` first.
+
+:::
 
 `kbcli` can be installed on macOS and Windows.
 
 <Tabs>
+
 <TabItem value="macOS" label="macOS" default>
 
 For macOS, cURL and Homebrew options are supported.
@@ -180,7 +200,7 @@ If you want to customize the installation path, use the Zip file option.
 
 1. Run PowerShell as admin and run `Set-ExecutionPolicy Unrestricted` to grant the script execution permission to PowerShell. Enter Y to confirm the execution policy.
 
-2. Install `kbcli` and the script adds an environment variable in your host automatically.
+2. Install `kbcli` and the script adds an environment variable in your host under the `C:\Program Files\kbcli-windows-amd64` path automatically.
 
    ```bash
    powershell -Command " & ([scriptblock]::Create((iwr https://www.kubeblocks.io/installer/install_cli.ps1)))"

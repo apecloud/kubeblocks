@@ -1,7 +1,7 @@
 ---
 title: Create and connect to a Redis Cluster
 description: How to create and connect to a Redis cluster
-keywords: [redis, create, connect, cluster]
+keywords: [redis, create, connect, cluster, redis sentinel]
 sidebar_position: 1
 sidebar_label: Create and connect
 ---
@@ -9,7 +9,8 @@ sidebar_label: Create and connect
 # Create and Connect to a Redis cluster
 
 KuebBlocks for Redis supports Standalone clusters and PrimarySecondary clusters.
-But for your better high-availability experience, KubeBlocks creates a PrimarySecondary cluster and a Redis Sentinel with three replicas by default.
+
+But for your better high-availability experience, KubeBlocks creates a Redis PrimarySecondary by default.
 
 ## Create a Redis Cluster
 
@@ -33,7 +34,7 @@ kbcli cluster create redis-cluster --cluster-definition='redis'
 
 ***Result***
 
-* A Redis PrimarySecondary and a Redis Sentinel with three replicas are created in the default namespace. You can specify a namespace for your cluster by using `--namespace` or the abbreviated `-n` option. For example,
+* A Redis PrimarySecondary is created in the default namespace. You can specify a namespace for your cluster by using `--namespace` or the abbreviated `-n` option. For example,
 
   ```bash
   kubectl create namespace demo

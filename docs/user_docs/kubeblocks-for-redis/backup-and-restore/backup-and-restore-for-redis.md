@@ -1,12 +1,12 @@
 ---
-title: Backup and restore for Redis Standalone
+title: Backup and restore for a Redis cluster
 description: Guide for backup and restore for a Redis cluster
 keywords: [redis, backup, restore]
 sidebar_position: 2
 sidebar_label: Redis
 ---
 
-# Backup and restore for Redis cluster
+# Backup and restore for a Redis cluster
 
 This section shows how to use `kbcli` to back up and restore a Redis cluster.
 

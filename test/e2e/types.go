@@ -28,3 +28,7 @@ var Ctx context.Context
 var Cancel context.CancelFunc
 var Logger logr.Logger
 var Version string
+var Provider string
+var Region string
+var SecretID string
+var SecretKey string

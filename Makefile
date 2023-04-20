@@ -33,6 +33,7 @@ SKIP_GO_GEN ?= true
 CHART_PATH = deploy/helm
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
+
 # Go setup
 export GO111MODULE = auto
 # export GOPROXY = https://proxy.golang.org
@@ -755,7 +756,7 @@ render-smoke-testdata-manifests: ## Update E2E test dataset
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) -C test/e2e run
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

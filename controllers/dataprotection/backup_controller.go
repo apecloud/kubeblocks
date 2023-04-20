@@ -1138,8 +1138,6 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		container.Resources = *backupTool.Spec.Resources
 	}
 
-	remoteBackupPath := "/backupdata"
-
 	// mount volumes from the target pod to the pod of backup tool
 	container.VolumeMounts = clusterPod.Spec.Containers[0].VolumeMounts
 	podSpec.Volumes = clusterPod.Spec.Volumes
@@ -1161,7 +1159,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 
 	envBackupDir := corev1.EnvVar{
 		Name:  "BACKUP_DIR",
-		Value: remoteBackupPath + pathPrefix,
+		Value: backupPathBase + pathPrefix,
 	}
 
 	container.Env = []corev1.EnvVar{envDBHost, envBackupName, envBackupDir}

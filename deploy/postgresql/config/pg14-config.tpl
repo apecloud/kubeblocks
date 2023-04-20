@@ -26,8 +26,8 @@
 
 listen_addresses = '*'
 port = '5432'
-#archive_command = 'wal_dir=/pg/arcwal; [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); /bin/mkdir -p ${wal_dir}/$(date +%Y%m%d) && /usr/bin/lz4 -q -z %p > ${wal_dir}/$(date +%Y%m%d)/%f.lz4'
-#archive_mode = 'True'
+archive_command = 'wal_dir=/home/postgres/pgdata/pgroot/arcwal; wal_dir_today=${wal_dir}/$(date +%Y%m%d); [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); mkdir -p ${wal_dir_today} && gzip -kqc %p > ${wal_dir_today}/%f.gz'
+archive_mode = 'on'
 auto_explain.log_analyze = 'True'
 auto_explain.log_min_duration = '1s'
 auto_explain.log_nested_statements = 'True'

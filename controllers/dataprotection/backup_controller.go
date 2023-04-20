@@ -211,6 +211,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 			Time: backup.Status.StartTimestamp.Add(dataprotectionv1alpha1.ToDuration(backupPolicy.Spec.TTL)),
 		}
 	}
+
 	if err = r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -418,11 +419,13 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			// update Phase to in Completed
 			backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 			backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-			backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{
-				BackupTool: &dataprotectionv1alpha1.BackupToolManifestsStatus{
-					FilePath: pathPrefix,
-				},
+			if backup.Status.Manifests == nil {
+				backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{}
 			}
+			if backup.Status.Manifests.BackupTool == nil {
+				backup.Status.Manifests.BackupTool = &dataprotectionv1alpha1.BackupToolManifestsStatus{}
+			}
+			backup.Status.Manifests.BackupTool.FilePath = pathPrefix
 		} else if jobStatusConditions[0].Type == batchv1.JobFailed {
 			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
 			backup.Status.FailureReason = job.Status.Conditions[0].Reason
@@ -1076,11 +1079,6 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 
 	// merge env from backup tool.
 	container.Env = append(container.Env, backupTool.Spec.Env...)
-	for i, env := range container.Env {
-		if strings.Contains(env.Value, "$KB_INCREMENTAL_PATH") {
-			container.Env[i].Value = strings.ReplaceAll(env.Value, "$KB_INCREMENTAL_PATH", backup.Name)
-		}
-	}
 
 	podSpec.Containers = []corev1.Container{container}
 

@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -309,14 +308,14 @@ func (p *PointInTimeRecoveryManager) checkAndInit() (need bool, err error) {
 
 func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) (string, string) {
 	dataVolumeMount := "/data"
-	logVolumeMount := "/log"
+	logVolumeMount := "/backupdata"
 	tag := 0
 	// TODO: hack it because the mount path is not explicitly specified in cluster definition
 	for _, env := range spec.Env {
 		if env.Name == "VOLUME_DATA_DIR" {
 			dataVolumeMount = env.Value
 			tag++
-		} else if env.Name == "VOLUME_LOG_DIR" {
+		} else if env.Name == "VOLUME_BACKUP_DIR" {
 			logVolumeMount = env.Value
 			tag++
 		}
@@ -354,14 +353,19 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo(componentName string) (*dpv
 			envTimeEnvIdx = i
 		} else if env.Name == "TIME_FORMAT" {
 			timeFormat = env.Value
-		} else if strings.Contains(env.Value, "$KB_INCREMENTAL_PATH") {
-			spec.Env[i].Value = strings.ReplaceAll(env.Value, "$KB_INCREMENTAL_PATH", incrementalBackup.Name)
 		}
 	}
 	if envTimeEnvIdx != -1 {
 		spec.Env[envTimeEnvIdx].Value = p.restoreTime.Time.UTC().Format(timeFormat)
 	}
-
+	backupDIR := incrementalBackup.Name
+	if incrementalBackup.Status.Manifests != nil && incrementalBackup.Status.Manifests.BackupTool != nil {
+		backupDIR = incrementalBackup.Status.Manifests.BackupTool.FilePath
+	}
+	headEnv := []corev1.EnvVar{
+		{Name: "BACKUP_DIR", Value: backupDIR},
+		{Name: "BACKUP_NAME", Value: incrementalBackup.Name}}
+	spec.Env = append(headEnv, spec.Env...)
 	return spec, nil
 }
 

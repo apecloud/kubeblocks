@@ -210,13 +210,15 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 	backupsWithLog := make([]Backup, 0)
 	var incrementalBackup *Backup
 	for _, b := range backups {
-		if b.Spec.BackupType == BackupTypeIncremental &&
-			b.Status.Manifests != nil && b.Status.Manifests.BackupLog != nil {
+		if b.Status.Manifests == nil || b.Status.Manifests.BackupLog == nil ||
+			b.Status.Manifests.BackupLog.StopTime == nil {
+			continue
+		}
+		if b.Spec.BackupType == BackupTypeIncremental {
 			incrementalBackup = &b
 		} else if b.Spec.BackupType != BackupTypeIncremental && b.Status.Phase == BackupCompleted {
 			backupsWithLog = append(backupsWithLog, b)
 		}
-
 	}
 	if len(backupsWithLog) == 0 {
 		return nil

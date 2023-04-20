@@ -391,6 +391,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			// TODO: add error type
 			return r.updateStatusIfFailed(reqCtx, backup, fmt.Errorf("not found the %s policy", backup.Spec.BackupType))
 		}
+		// createUpdatesJobs should not affect the backup status, just need to record events when the run fails
 		if err = r.createUpdatesJobs(reqCtx, backup, &commonPolicy.BasePolicy, dataprotectionv1alpha1.PRE); err != nil {
 			r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPreUpdatesJob", err.Error())
 		}
@@ -411,6 +412,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		if err != nil {
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
+		// createUpdatesJobs should not affect the backup status, just need to record events when the run fails
 		if err = r.createUpdatesJobs(reqCtx, backup, &commonPolicy.BasePolicy, dataprotectionv1alpha1.POST); err != nil {
 			r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPostUpdatesJob", err.Error())
 		}

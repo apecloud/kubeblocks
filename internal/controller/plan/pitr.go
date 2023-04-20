@@ -62,6 +62,7 @@ type PointInTimeRecoveryManager struct {
 
 const (
 	initContainerName = "pitr-for-pause"
+	backupVolumePATH  = "/backupdata"
 )
 
 // DoPITRPrepare prepares init container and pvc before point in time recovery
@@ -290,24 +291,16 @@ func (p *PointInTimeRecoveryManager) checkAndInit() (need bool, err error) {
 	return true, nil
 }
 
-func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) (string, string) {
+func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) string {
 	dataVolumeMount := "/data"
-	logVolumeMount := "/backupdata"
-	tag := 0
 	// TODO: hack it because the mount path is not explicitly specified in cluster definition
 	for _, env := range spec.Env {
 		if env.Name == "VOLUME_DATA_DIR" {
 			dataVolumeMount = env.Value
-			tag++
-		} else if env.Name == "VOLUME_BACKUP_DIR" {
-			logVolumeMount = env.Value
-			tag++
-		}
-		if tag >= 2 {
 			break
 		}
 	}
-	return dataVolumeMount, logVolumeMount
+	return dataVolumeMount
 }
 
 func (p *PointInTimeRecoveryManager) getRecoveryInfo(componentName string) (*dpv1alpha1.BackupToolSpec, error) {
@@ -347,7 +340,7 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo(componentName string) (*dpv
 		backupDIR = incrementalBackup.Status.Manifests.BackupTool.FilePath
 	}
 	headEnv := []corev1.EnvVar{
-		{Name: "BACKUP_DIR", Value: backupDIR},
+		{Name: "BACKUP_DIR", Value: backupVolumePATH + "/" + backupDIR},
 		{Name: "BACKUP_NAME", Value: incrementalBackup.Name}}
 	spec.Env = append(headEnv, spec.Env...)
 	return spec, nil
@@ -421,7 +414,7 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 		if err != nil {
 			return objs, err
 		}
-		dataVolumeMount, logVolumeMount := getVolumeMount(recoveryInfo)
+		dataVolumeMount := getVolumeMount(recoveryInfo)
 		for i, dataPVC := range dataPVCList.Items {
 			if dataPVC.Status.Phase != corev1.ClaimBound {
 				return objs, errors.New("waiting PVC Bound")
@@ -434,7 +427,7 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 			}
 			volumeMounts := []corev1.VolumeMount{
 				{Name: "data", MountPath: dataVolumeMount},
-				{Name: "log", MountPath: logVolumeMount},
+				{Name: "log", MountPath: backupVolumePATH},
 			}
 
 			// render the job cue template

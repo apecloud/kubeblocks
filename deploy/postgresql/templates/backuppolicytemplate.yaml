@@ -31,7 +31,7 @@ spec:
         - path: manifests.backupLog
           containerName: postgresql
           script: /kb-scripts/backup-log-collector.sh true
-          updateStage: pre
+          updateStage: post
     full:
       backupToolName: postgres-basebackup
     incremental:

@@ -11,8 +11,6 @@ spec:
   env:
     - name: VOLUME_DATA_DIR
       value: /home/postgres/pgdata
-    - name: VOLUME_BACKUP_DIR
-      value: /backupdata
     - name: RESTORE_SCRIPT_DIR
       value: "$(VOLUME_DATA_DIR)/kb_restore"
     - name: PITR_DIR
@@ -24,13 +22,13 @@ spec:
     - name: RECOVERY_TIME
       value: $KB_RECOVERY_TIME
     - name: TIME_FORMAT
-      value: 2006-01-02 15:04:05` MST
+      value: 2006-01-02 15:04:05 MST
     - name: ARCHIVE_LOG_DIR
       value: $(VOLUME_DATA_DIR)/pgroot/arcwal
     - name: LOG_DIR
       value: $(VOLUME_DATA_DIR)/pgroot/data/pg_wal
     - name: REMOTE_LOG_DIR
-      value: $(VOLUME_BACKUP_DIR)/$(BACKUP_DIR)/$(BACKUP_NAME)
+      value: $(BACKUP_DIR)/$(BACKUP_NAME)
   image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   logical:
     restoreCommands:

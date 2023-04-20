@@ -36,7 +36,7 @@ spec:
         echo "mkdir -p ${DATA_DIR}/../arch" >> kb_restore.sh
         echo "mv -f ${TMP_DATA_DIR}/* ${DATA_DIR}/" >> kb_restore.sh
         echo "mv -f ${TMP_ARCH_DATA_DIR}/* ${DATA_DIR}/../arch" >> kb_restore.sh
-        echo "rm -rf ${RESTORE_DATA_DIR}" >> kb_restore.sh
+        echo "rm -rf ${RESTORE_DATA_DIR}/*" >> kb_restore.sh
 
         # extract the data file to the temporary data directory
         mkdir -p ${TMP_DATA_DIR} && mkdir -p ${TMP_ARCH_DATA_DIR}

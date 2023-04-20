@@ -92,6 +92,9 @@ data:
             sleep 5
         done
     fi
+    if [ -f ${RESTORE_DATA_DIR}/kb_restore.signal ]; then
+        chown -R postgres ${RESTORE_DATA_DIR}
+    fi
     python3 /kb-scripts/generate_patroni_yaml.py tmp_patroni.yaml
     export SPILO_CONFIGURATION=$(cat tmp_patroni.yaml)
     # export SCOPE="$KB_CLUSTER_NAME-$KB_CLUSTER_NAME"

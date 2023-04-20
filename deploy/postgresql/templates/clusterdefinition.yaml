@@ -66,9 +66,6 @@ spec:
           - name: tcp-postgresql
             port: 5432
             targetPort: tcp-postgresql
-          - name: http-metrics-postgresql
-            port: 9187
-            targetPort: http-metrics
       volumeTypes:
         - name: data
           type: data

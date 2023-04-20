@@ -207,7 +207,7 @@ func (r *BackupSpec) Validate(backupPolicy *BackupPolicy) error {
 // GetRecoverableTimeRange return the recoverable time range array
 func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 	// filter backups with backupLog
-	backupsWithLog := make([]Backup, 0)
+	baseBackups := make([]Backup, 0)
 	var incrementalBackup *Backup
 	for _, b := range backups {
 		if b.Status.Manifests == nil || b.Status.Manifests.BackupLog == nil ||
@@ -217,10 +217,10 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 		if b.Spec.BackupType == BackupTypeIncremental {
 			incrementalBackup = &b
 		} else if b.Spec.BackupType != BackupTypeIncremental && b.Status.Phase == BackupCompleted {
-			backupsWithLog = append(backupsWithLog, b)
+			baseBackups = append(baseBackups, b)
 		}
 	}
-	if len(backupsWithLog) == 0 {
+	if len(baseBackups) == 0 {
 		return nil
 	}
 	sort.Slice(backups, func(i, j int) bool {
@@ -236,7 +236,7 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 		return backups[i].Status.StartTimestamp.Before(backups[j].Status.StartTimestamp)
 	})
 	result := make([]BackupLogStatus, 0)
-	start, end := backupsWithLog[0].Status.Manifests.BackupLog.StopTime, backupsWithLog[0].Status.Manifests.BackupLog.StopTime
+	start, end := baseBackups[0].Status.Manifests.BackupLog.StopTime, baseBackups[0].Status.Manifests.BackupLog.StopTime
 	if incrementalBackup != nil && start.Before(incrementalBackup.Status.Manifests.BackupLog.StopTime) {
 		end = incrementalBackup.Status.Manifests.BackupLog.StopTime
 	}

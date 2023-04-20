@@ -173,13 +173,19 @@ func (p *PointInTimeRecoveryManager) doPrepare(component *component.SynthesizedC
 	if err != nil {
 		return err
 	}
+	if latestBackup.Spec.BackupType == dpv1alpha1.BackupTypeSnapshot {
+		return p.doPrepareSnapshotBackup(component, latestBackup)
+	}
+	return nil
+}
 
+func (p *PointInTimeRecoveryManager) doPrepareSnapshotBackup(component *component.SynthesizedComponent, backup *dpv1alpha1.Backup) error {
 	vct := component.VolumeClaimTemplates[0]
 	snapshotAPIGroup := snapshotv1.GroupName
 	vct.Spec.DataSource = &corev1.TypedLocalObjectReference{
 		APIGroup: &snapshotAPIGroup,
 		Kind:     constant.VolumeSnapshotKind,
-		Name:     latestBackup.Name,
+		Name:     backup.Name,
 	}
 	component.VolumeClaimTemplates[0] = vct
 	return nil

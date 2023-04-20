@@ -6,7 +6,7 @@ metadata:
     clusterdefinition.kubeblocks.io/name: postgresql
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  image: registry.cn-hangzhou.aliyuncs.com/apecloud/postgresql:14.7.0
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   deployKind: job
   resources:
     limits:

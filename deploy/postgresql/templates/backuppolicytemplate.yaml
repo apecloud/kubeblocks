@@ -14,7 +14,10 @@ spec:
       baseBackup:
         type: snapshot
         enable: false
-        cronExpression: "0 18 * * 0"
+        cronExpression: "0 18 * * *"
+      incremental:
+        enable: false
+        cronExpression: "*/5 * * * *"
     snapshot:
       target:
         connectionCredentialKey:
@@ -27,7 +30,14 @@ spec:
       backupStatusUpdates:
         - path: manifests.backupLog
           containerName: postgresql
-          script: /kb-scripts/backup-log-collector.sh
-          updateStage: pre
+          script: /kb-scripts/backup-log-collector.sh true
+          updateStage: post
     full:
       backupToolName: postgres-basebackup
+    incremental:
+      backupToolName: postgres-pitr
+      backupStatusUpdates:
+        - path: manifests.backupLog
+          containerName: postgresql
+          script: /kb-scripts/backup-log-collector.sh false
+          updateStage: pre

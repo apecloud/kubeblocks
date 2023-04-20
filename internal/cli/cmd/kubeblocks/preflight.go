@@ -108,7 +108,7 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(p.complete(f, args))
 			util.CheckErr(p.validate())
-			util.CheckErr(p.run())
+			util.CheckErr(p.run(f))
 		},
 	}
 	// add flags
@@ -167,10 +167,10 @@ func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 	return yamlDataList, nil
 }
 
-func (p *PreflightOptions) complete(factory cmdutil.Factory, args []string) error {
+func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) error {
 	// default no args, and run default validating vendor
 	if len(args) == 0 {
-		clientSet, err := factory.KubernetesClientSet()
+		clientSet, err := f.KubernetesClientSet()
 		if err != nil {
 			return errors.New("init k8s client failed, and please check kubeconfig")
 		}
@@ -209,7 +209,7 @@ func (p *PreflightOptions) validate() error {
 	return nil
 }
 
-func (p *PreflightOptions) run() error {
+func (p *PreflightOptions) run(f cmdutil.Factory) error {
 	var (
 		kbPreflight     *preflightv1beta2.Preflight
 		kbHostPreflight *preflightv1beta2.HostPreflight
@@ -235,7 +235,7 @@ func (p *PreflightOptions) run() error {
 		return err
 	}
 	// 2. collect data
-	collectResults, err = kbpreflight.CollectPreflight(ctx, kbPreflight, kbHostPreflight, progressCh)
+	collectResults, err = kbpreflight.CollectPreflight(f, ctx, kbPreflight, kbHostPreflight, progressCh)
 	if err != nil {
 		return err
 	}

@@ -345,7 +345,7 @@ func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
-		Use:             "create [CLUSTER_NAME]",
+		Use:             "create [NAME]",
 		Short:           "Create a cluster.",
 		Example:         clusterCreateExample,
 		CueTemplateName: CueTemplateName,

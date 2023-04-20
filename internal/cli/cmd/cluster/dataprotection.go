@@ -55,7 +55,7 @@ var (
 		kbcli cluster list-backup-policy 
         
 		# using short cmd to list backup policy of specified cluster 
-        kbcli cluster list-bp <cluster-name>
+        kbcli cluster list-bp mycluster
 	`)
 	editExample = templates.Examples(`
 		# edit backup policy

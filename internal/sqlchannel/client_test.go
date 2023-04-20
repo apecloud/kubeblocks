@@ -28,6 +28,7 @@ import (
 
 	dapr "github.com/dapr/go-sdk/client"
 	pb "github.com/dapr/go-sdk/dapr/proto/runtime/v1"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	corev1 "k8s.io/api/core/v1"
 
@@ -223,6 +224,46 @@ func TestSystemAccounts(t *testing.T) {
 		if len(cli.cache) != 0 {
 			t.Errorf("cache should be cleared: %v", cli.cache)
 		}
+	})
+}
+
+func TestParseSqlChannelResult(t *testing.T) {
+	t.Run("Binding Not Supported", func(t *testing.T) {
+		result := `
+	{"errorCode":"ERR_INVOKE_OUTPUT_BINDING","message":"error when invoke output binding mongodb: binding mongodb does not support operation listUsers. supported operations:checkRunning checkRole getRole"}
+	`
+		sqlResposne, err := parseResponse(([]byte)(result), "listUsers", "mongodb")
+		assert.Nil(t, err)
+		assert.Equal(t, sqlResposne.Event, RespEveFail)
+		assert.Contains(t, sqlResposne.Message, "not supported")
+	})
+
+	t.Run("Binding Exec Failed", func(t *testing.T) {
+		result := `
+	{"event":"Failed","message":"db not ready"}
+	`
+		sqlResposne, err := parseResponse(([]byte)(result), "listUsers", "mongodb")
+		assert.Nil(t, err)
+		assert.Equal(t, sqlResposne.Event, RespEveFail)
+		assert.Contains(t, sqlResposne.Message, "db not ready")
+	})
+
+	t.Run("Binding Exec Success", func(t *testing.T) {
+		result := `
+	{"event":"Success","message":"[]"}
+	`
+		sqlResposne, err := parseResponse(([]byte)(result), "listUsers", "mongodb")
+		assert.Nil(t, err)
+		assert.Equal(t, sqlResposne.Event, RespEveSucc)
+	})
+
+	t.Run("Invalid Resonse Format", func(t *testing.T) {
+		// msg cannot be parsed to json
+		result := `
+	{"event":"Success","message":"[]
+	`
+		_, err := parseResponse(([]byte)(result), "listUsers", "mongodb")
+		assert.NotNil(t, err)
 	})
 }
 

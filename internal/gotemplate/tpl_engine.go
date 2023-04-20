@@ -70,6 +70,10 @@ type TplEngine struct {
 	ctx context.Context
 }
 
+func (t *TplEngine) GetTplEngine() *template.Template {
+	return t.tpl
+}
+
 func (t *TplEngine) Render(context string) (string, error) {
 	var buf strings.Builder
 	tpl, err := t.tpl.Parse(context)

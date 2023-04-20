@@ -125,7 +125,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 					// check pvc existence
 					pvcExists, err := isPVCExists(transCtx.Client, transCtx.Context, pvcKey)
 					if err != nil {
-						return true, err
+						return false, err
 					}
 					if !pvcExists {
 						return false, nil
@@ -141,7 +141,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 				!isSnapshotAvailable(transCtx.Client, transCtx.Context) {
 				return true, nil
 			}
-			return isAllPVCBound(transCtx.Client, transCtx.Context, stsObj)
+			return isAllPVCBound(transCtx.Client, transCtx.Context, stsProto)
 		}
 
 		cleanBackupResourcesIfNeeded := func() error {
@@ -557,40 +557,17 @@ func deleteSnapshot(cli roclient.ReadonlyClient,
 
 // deleteBackup will delete all backup related resources created during horizontal scaling,
 func deleteBackup(ctx context.Context, cli roclient.ReadonlyClient, clusterName string, componentName string, dag *graph.DAG, root graph.Vertex) error {
-
 	ml := getBackupMatchingLabels(clusterName, componentName)
-
-	deleteBackupPolicy := func() error {
-		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
-		if err := cli.List(ctx, &backupPolicyList, ml); err != nil {
-			return err
-		}
-		for _, backupPolicy := range backupPolicyList.Items {
-			vertex := &lifecycleVertex{obj: &backupPolicy, oriObj: &backupPolicy, action: actionPtr(DELETE)}
-			dag.AddVertex(vertex)
-			dag.Connect(root, vertex)
-		}
-		return nil
-	}
-
-	deleteRelatedBackups := func() error {
-		backupList := dataprotectionv1alpha1.BackupList{}
-		if err := cli.List(ctx, &backupList, ml); err != nil {
-			return err
-		}
-		for _, backup := range backupList.Items {
-			vertex := &lifecycleVertex{obj: &backup, oriObj: &backup, action: actionPtr(DELETE)}
-			dag.AddVertex(vertex)
-			dag.Connect(root, vertex)
-		}
-		return nil
-	}
-
-	if err := deleteBackupPolicy(); err != nil {
+	backupList := dataprotectionv1alpha1.BackupList{}
+	if err := cli.List(ctx, &backupList, ml); err != nil {
 		return err
 	}
-
-	return deleteRelatedBackups()
+	for _, backup := range backupList.Items {
+		vertex := &lifecycleVertex{obj: &backup, oriObj: &backup, action: actionPtr(DELETE)}
+		dag.AddVertex(vertex)
+		dag.Connect(root, vertex)
+	}
+	return nil
 }
 
 func getBackupMatchingLabels(clusterName string, componentName string) client.MatchingLabels {

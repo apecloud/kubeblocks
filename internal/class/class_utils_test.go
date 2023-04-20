@@ -65,8 +65,8 @@ var _ = Describe("utils", func() {
 		// Add any teardown steps that needs to be executed after each test
 	})
 
-	buildFilters := func(cpu string, memory string) map[corev1.ResourceName]resource.Quantity {
-		result := make(map[corev1.ResourceName]resource.Quantity)
+	buildResourceList := func(cpu string, memory string) corev1.ResourceList {
+		result := make(corev1.ResourceList)
 		if cpu != "" {
 			result[corev1.ResourceCPU] = resource.MustParse(cpu)
 		}
@@ -77,31 +77,41 @@ var _ = Describe("utils", func() {
 	}
 
 	Context("sort component classes", func() {
+		It("should match minial class if cpu and memory are empty", func() {
+			class := ChooseComponentClasses(classes, buildResourceList("", ""))
+			Expect(class).ShouldNot(BeNil())
+			Expect(class.CPU.String()).Should(Equal("1"))
+			Expect(class.Memory.String()).Should(Equal("4Gi"))
+		})
+
 		It("should match one class by cpu and memory", func() {
-			class := ChooseComponentClasses(classes, buildFilters("1", "4Gi"))
+			class := ChooseComponentClasses(classes, buildResourceList("1", "4Gi"))
+			Expect(class).ShouldNot(BeNil())
 			Expect(class.CPU.String()).Should(Equal("1"))
 			Expect(class.Memory.String()).Should(Equal("4Gi"))
 		})
 
 		It("match multiple classes by cpu", func() {
-			class := ChooseComponentClasses(classes, buildFilters("1", ""))
+			class := ChooseComponentClasses(classes, buildResourceList("1", ""))
+			Expect(class).ShouldNot(BeNil())
 			Expect(class.CPU.String()).Should(Equal("1"))
 			Expect(class.Memory.String()).Should(Equal("4Gi"))
 		})
 
 		It("match multiple classes by memory", func() {
-			class := ChooseComponentClasses(classes, buildFilters("", "16Gi"))
+			class := ChooseComponentClasses(classes, buildResourceList("", "16Gi"))
+			Expect(class).ShouldNot(BeNil())
 			Expect(class.CPU.String()).Should(Equal("1"))
 			Expect(class.Memory.String()).Should(Equal("16Gi"))
 		})
 
 		It("not match any classes by cpu", func() {
-			class := ChooseComponentClasses(classes, buildFilters(fmt.Sprintf("%d", cpuMax+1), ""))
+			class := ChooseComponentClasses(classes, buildResourceList(fmt.Sprintf("%d", cpuMax+1), ""))
 			Expect(class).Should(BeNil())
 		})
 
 		It("not match any classes by memory", func() {
-			class := ChooseComponentClasses(classes, buildFilters("", "1Pi"))
+			class := ChooseComponentClasses(classes, buildResourceList("", "1Pi"))
 			Expect(class).Should(BeNil())
 		})
 	})

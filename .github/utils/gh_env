@@ -1,3 +1,5 @@
+DEBUG=${DEBUG:-}
+
 export REMOTE_URL=$(git config --get remote.origin.url)
 export OWNER=$(dirname ${REMOTE_URL} | awk -F ":" '{print $2}')
 prefix='^//'
@@ -7,6 +9,8 @@ fi
 export REPO=$(basename -s .git ${REMOTE_URL})
 export MILESTONE_ID=${MILESTONE_ID:-5}
 
+if [ -n "$DEBUG" ]; then 
 echo "OWNER=${OWNER}"
 echo "REPO=${REPO}"
 echo "MILESTONE_ID=${MILESTONE_ID}"
+fi

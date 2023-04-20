@@ -695,16 +695,33 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 
+		hscalePolicy := func(comp appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.HorizontalScalePolicy {
+			for _, componentDef := range clusterDefObj.Spec.ComponentDefs {
+				if componentDef.Name == comp.ComponentDefRef {
+					return componentDef.HorizontalScalePolicy
+				}
+			}
+			return nil
+		}
+
 		By("Get the latest cluster def")
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
 		for i, comp := range clusterObj.Spec.ComponentSpecs {
-			var policy *appsv1alpha1.HorizontalScalePolicy
-			for _, componentDef := range clusterDefObj.Spec.ComponentDefs {
-				if componentDef.Name == comp.ComponentDefRef {
-					policy = componentDef.HorizontalScalePolicy
-				}
+			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i], hscalePolicy(comp))
+		}
+
+		By("Checking updated sts replicas' PVC")
+		for _, comp := range clusterObj.Spec.ComponentSpecs {
+			if hscalePolicy(comp) == nil {
+				continue
 			}
-			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i], policy)
+			for i := 0; i < updatedReplicas; i++ {
+				pvcKey := types.NamespacedName{
+					Namespace: clusterKey.Namespace,
+					Name:      getPVCName(comp.Name, i),
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+			}
 		}
 
 		By("Checking cluster status and the number of replicas changed")

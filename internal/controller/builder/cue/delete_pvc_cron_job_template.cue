@@ -35,6 +35,9 @@ cronjob: {
 	spec: {
 		schedule: string
 		jobTemplate: {
+			metadata: {
+				labels: sts.metadata.labels
+			}
 			spec: {
 				template: {
 					spec: {

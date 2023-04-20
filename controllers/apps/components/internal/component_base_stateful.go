@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -36,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 // StatefulComponentBase as a base class for single stateful-set based component (stateful & replication & consensus).
@@ -504,10 +506,10 @@ func (c *StatefulComponentBase) updatePVC(reqCtx intctrlutil.RequestCtx, cli cli
 func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	ret := c.horizontalScaling(c.runningWorkload)
 	if ret == 0 {
-		return c.statusPVCDeletionJob(reqCtx, cli)
+		return c.statusPVCDeletionJobFailed(reqCtx, cli)
 	}
 	if ret > 0 {
-		// forward the h-scaling progress
+		// forward the h-scaling progress.
 		if err := c.scaleOut(reqCtx, cli, c.runningWorkload); err != nil {
 			return err
 		}
@@ -515,21 +517,27 @@ func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.Request
 	return nil
 }
 
-func (c *StatefulComponentBase) statusPVCDeletionJob(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	///// ClusterStatusHandler.handleDeletePVCCronJobEvent
-	job := &batchv1.Job{}
-	checkPVCDeletionJobFail := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, string, error) {
-		// TODO(refactor): get the job.
-		for _, cond := range job.Status.Conditions {
-			if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
-				return true, fmt.Sprintf("%s-%s", cond.Reason, cond.Message), nil
+func (c *StatefulComponentBase) statusPVCDeletionJobFailed(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	hasJobFailed := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (*batchv1.Job, string, error) {
+		jobs, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.JobSignature, c.GetNamespace(), c.GetMatchingLabels())
+		if err != nil {
+			return nil, "", err
+		}
+		for _, job := range jobs {
+			if !strings.HasPrefix(job.Name, "delete-pvc-") {
+				continue
+			}
+			for _, cond := range job.Status.Conditions {
+				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+					return job, fmt.Sprintf("%s-%s", cond.Reason, cond.Message), nil
+				}
 			}
 		}
-		return false, "", nil
+		return nil, "", nil
 	}
-	if failed, msg, err := checkPVCDeletionJobFail(reqCtx, cli); err != nil {
+	if job, msg, err := hasJobFailed(reqCtx, cli); err != nil {
 		return err
-	} else if failed {
+	} else if job != nil {
 		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
 		c.setStatusPhaseWithMsg(appsv1alpha1.AbnormalClusterCompPhase, msgKey, msg, "PVC deletion job failed")
 	}

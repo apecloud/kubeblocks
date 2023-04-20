@@ -32,7 +32,7 @@ kbcli cluster update NAME [flags]
 ```
       --allow-missing-template-keys    If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
       --dry-run string[="unchanged"]   Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
-      --enable-all-logs                Enable advanced application all log extraction, and true will ignore enabledLogs of component level (default true)
+      --enable-all-logs                Enable advanced application all log extraction, and true will ignore enabledLogs of component level, default is false
   -h, --help                           help for update
       --monitor                        Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString     Node label selector (default [])

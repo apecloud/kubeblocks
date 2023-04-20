@@ -431,13 +431,37 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 }
 
 func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]*appsv1alpha1.ClusterComponentSpec, error) {
-	getVal := func(key setKey, sets map[setKey]string) string {
+	// get value from set values and environment variables, the second return value is
+	// true if the value is from environment variables
+	getVal := func(c *appsv1alpha1.ClusterComponentDefinition, key setKey, sets map[setKey]string) string {
 		// get value from set values
 		if sets != nil {
 			if v := sets[key]; len(v) > 0 {
 				return v
 			}
 		}
+
+		// HACK: if user does not set by command flag, for replicationSet workload,
+		// set replicas to 2, for redis sentinel, set replicas to 3, cpu and memory
+		// to 200M and 200Mi
+		// TODO: use more graceful way to set default value
+		if c.WorkloadType == appsv1alpha1.Replication {
+			if key == keyReplicas {
+				return "2"
+			}
+		}
+
+		if c.CharacterType == "redis" && c.Name == "redis-sentinel" {
+			switch key {
+			case keyReplicas:
+				return "3"
+			case keyCPU:
+				return "200m"
+			case keyMemory:
+				return "200Mi"
+			}
+		}
+
 		// get value from environment variables
 		env := setKeyEnvMap[key]
 		val := viper.GetString(env.name)
@@ -452,7 +476,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 			return nil
 		}
 		var switchPolicyType appsv1alpha1.SwitchPolicyType
-		switch getVal(keySwitchPolicy, sets) {
+		switch getVal(c, keySwitchPolicy, sets) {
 		case "Noop", "":
 			switchPolicyType = appsv1alpha1.Noop
 		case "MaximumAvailability":
@@ -476,7 +500,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 
 		// get replicas
-		setReplicas, err := strconv.Atoi(getVal(keyReplicas, sets))
+		setReplicas, err := strconv.Atoi(getVal(&c, keyReplicas, sets))
 		if err != nil {
 			return nil, fmt.Errorf("repicas is illegal " + err.Error())
 		}
@@ -489,13 +513,13 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 
 		// class has higher priority than other resource related parameters
-		className := getVal(keyClass, sets)
+		className := getVal(&c, keyClass, sets)
 		if className != "" {
 			compObj.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: className}
 		} else {
 			resourceList := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
-				corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
+				corev1.ResourceCPU:    resource.MustParse(getVal(&c, keyCPU, sets)),
+				corev1.ResourceMemory: resource.MustParse(getVal(&c, keyMemory, sets)),
 			}
 			compObj.Resources = corev1.ResourceRequirements{
 				Requests: resourceList,
@@ -509,13 +533,13 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 					},
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse(getVal(keyStorage, sets)),
+							corev1.ResourceStorage: resource.MustParse(getVal(&c, keyStorage, sets)),
 						},
 					},
 				},
 			}}
 		}
-		if err := buildSwitchPolicy(&c, compObj, sets); err != nil {
+		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err
 		}
 		comps = append(comps, compObj)
@@ -575,6 +599,18 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 				return nil, err
 			}
 			compDefName = name
+		} else {
+			// check the type is a valid component definition name
+			valid := false
+			for _, c := range cd.Spec.ComponentDefs {
+				if c.Name == compDefName {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				return nil, fmt.Errorf("the type \"%s\" is not a valid component definition name", compDefName)
+			}
 		}
 
 		// if already set by other value, later values override earlier values

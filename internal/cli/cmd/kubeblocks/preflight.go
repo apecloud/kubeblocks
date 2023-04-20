@@ -108,7 +108,7 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(p.complete(f, args))
 			util.CheckErr(p.validate())
-			util.CheckErr(p.run(f))
+			util.CheckErr(p.run())
 		},
 	}
 	// add flags
@@ -209,7 +209,7 @@ func (p *PreflightOptions) validate() error {
 	return nil
 }
 
-func (p *PreflightOptions) run(f cmdutil.Factory) error {
+func (p *PreflightOptions) run() error {
 	var (
 		kbPreflight     *preflightv1beta2.Preflight
 		kbHostPreflight *preflightv1beta2.HostPreflight
@@ -235,7 +235,7 @@ func (p *PreflightOptions) run(f cmdutil.Factory) error {
 		return err
 	}
 	// 2. collect data
-	collectResults, err = kbpreflight.CollectPreflight(f, ctx, kbPreflight, kbHostPreflight, progressCh)
+	collectResults, err = kbpreflight.CollectPreflight(p.factory, ctx, kbPreflight, kbHostPreflight, progressCh)
 	if err != nil {
 		return err
 	}

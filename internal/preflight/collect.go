@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	pkgcollector "github.com/replicatedhq/troubleshoot/pkg/collect"
-	"github.com/replicatedhq/troubleshoot/pkg/k8sutil"
 	"github.com/replicatedhq/troubleshoot/pkg/logger"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/viper"
@@ -68,7 +67,7 @@ func CollectPreflight(f cmdutil.Factory, ctx context.Context, kbPreflight *prefl
 			collectResults = append(collectResults, *res)
 		}
 		if len(kbHostPreflight.Spec.RemoteCollectors) > 0 {
-			res, err := CollectRemoteData(ctx, kbHostPreflight, progressCh)
+			res, err := CollectRemoteData(ctx, kbHostPreflight, f, progressCh)
 			if err != nil {
 				return collectResults, errors.Wrap(err, "failed to collect data remotely")
 			}
@@ -137,19 +136,18 @@ func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Prefl
 	var err error
 	v := viper.GetViper()
 
-	collectOpts := CollectOptions{
-		CollectOpts: preflight.CollectOpts{
-			Namespace:              v.GetString("namespace"),
-			IgnorePermissionErrors: v.GetBool("collect-without-permissions"),
-			ProgressChan:           progressCh,
-		},
+	collectOpts := preflight.CollectOpts{
+		Namespace:              v.GetString("namespace"),
+		IgnorePermissionErrors: v.GetBool("collect-without-permissions"),
+		ProgressChan:           progressCh,
 	}
 
 	if collectOpts.KubernetesRestConfig, err = f.ToRESTConfig(); err != nil {
 		return nil, errors.Wrap(err, "failed to instantiate Kubernetes restconfig")
 	}
 
-	if collectOpts.Client, err = f.KubernetesClientSet(); err != nil {
+	k8sClient, err := f.KubernetesClientSet()
+	if err != nil {
 		return nil, errors.Wrap(err, "failed to instantiate Kubernetes client")
 	}
 
@@ -174,7 +172,7 @@ func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Prefl
 	var collectors []pkgcollector.Collector
 	allCollectorsMap := make(map[reflect.Type][]pkgcollector.Collector)
 	for _, collectSpec := range collectSpecs {
-		if collectorInterface, ok := pkgcollector.GetCollector(collectSpec, "", collectOpts.Namespace, collectOpts.KubernetesRestConfig, collectOpts.Client, nil); ok {
+		if collectorInterface, ok := pkgcollector.GetCollector(collectSpec, "", collectOpts.Namespace, collectOpts.KubernetesRestConfig, k8sClient, nil); ok {
 			if collector, ok := collectorInterface.(pkgcollector.Collector); ok {
 				err := collector.CheckRBAC(ctx, collector, collectSpec, collectOpts.KubernetesRestConfig, collectOpts.Namespace)
 				if err != nil {
@@ -194,7 +192,7 @@ func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Prefl
 }
 
 // CollectCluster collects ciuster data against by Collector，and returns the collected data which is encapsulated in CollectResult struct
-func CollectCluster(ctx context.Context, opts CollectOptions, allCollectors []pkgcollector.Collector, allCollectorsMap map[reflect.Type][]pkgcollector.Collector, kbPreflight *preflightv1beta2.Preflight) (preflight.CollectResult, error) {
+func CollectCluster(ctx context.Context, opts preflight.CollectOpts, allCollectors []pkgcollector.Collector, allCollectorsMap map[reflect.Type][]pkgcollector.Collector, kbPreflight *preflightv1beta2.Preflight) (preflight.CollectResult, error) {
 	var foundForbidden bool
 	allCollectedData := make(map[string][]byte)
 	collectorList := map[string]preflight.CollectorStatus{}
@@ -303,14 +301,13 @@ func CollectCluster(ctx context.Context, opts CollectOptions, allCollectors []pk
 	}
 
 	collectResult.AllCollectedData = allCollectedData
-
 	return collectResult, nil
 }
 
-func CollectRemoteData(ctx context.Context, preflightSpec *preflightv1beta2.HostPreflight, progressCh chan interface{}) (*preflight.CollectResult, error) {
+func CollectRemoteData(ctx context.Context, preflightSpec *preflightv1beta2.HostPreflight, f cmdutil.Factory, progressCh chan interface{}) (*preflight.CollectResult, error) {
 	v := viper.GetViper()
 
-	restConfig, err := k8sutil.GetRESTConfig()
+	restConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to convert kube flags to rest config")
 	}

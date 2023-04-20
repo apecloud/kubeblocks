@@ -30,19 +30,11 @@ import (
 	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	kbcollector "github.com/apecloud/kubeblocks/internal/preflight/collector"
 )
-
-type CollectOptions struct {
-	preflight.CollectOpts
-	Client  kubernetes.Interface
-	Dynamic dynamic.Interface
-}
 
 func CollectPreflight(f cmdutil.Factory, ctx context.Context, kbPreflight *preflightv1beta2.Preflight, kbHostPreflight *preflightv1beta2.HostPreflight, progressCh chan interface{}) ([]preflight.CollectResult, error) {
 	var (

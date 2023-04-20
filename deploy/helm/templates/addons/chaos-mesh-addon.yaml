@@ -1,31 +1,38 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  annotations:
-    meta.helm.sh/release-name: kubeblocks
-    meta.helm.sh/release-namespace: default
-  labels:
-    app.kubernetes.io/instance: kubeblocks
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: kubeblocks
-    app.kubernetes.io/version: 0.5.0-beta.0
-    helm.sh/chart: kubeblocks-0.5.0-beta.0
-    kubeblocks.io/provider: community
   name: chaos-mesh
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
-  defaultInstallValues:
-  - enabled: true
-    resources: {}
-  description: Chaos Mesh is an open-source chaos engineering tool that facilitates testing the resiliency and reliability of distributed systems by introducing various failure scenarios in a controlled manner.
+  description: 'Chaos Mesh is an open-source chaos engineering tool that facilitates testing the resiliency and reliability of distributed systems by introducing various failure scenarios in a controlled manner.'
+
+  type: Helm
+
   helm:
     chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/chaos-mesh-0.1.0-beta.0.tgz
-    installValues: {}
     valuesMapping:
-      jsonMap: {}
-      valueMap: {}
-  install:
-    enabled: true
-    resources: {}
+      valueMap:
+        replicaCount: replicaCount
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
   installable:
     autoInstall: true
-  type: Helm
+
+  defaultInstallValues:
+    - enabled: true

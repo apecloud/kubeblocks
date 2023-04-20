@@ -7,6 +7,10 @@ on:
         description: 'The tag name of release'
         required: true
         default: ''
+      release_type:
+        description: 'The type of release (1: release 2: package)'
+        required: true
+        default: '1'
 
 run-name: ref_name:${{ github.ref_name }} release_version:${{ inputs.release_version }}
 
@@ -15,7 +19,21 @@ env:
 
 
 jobs:
+  release-test:
+    runs-on: [ self-hosted, eks-fargate-runner ]
+    steps:
+      - if: ${{ inputs.release_type == '1' }}
+        uses: apecloud/checkout@main
+      - if: ${{ inputs.release_type == '1' }}
+        name: vendor lint test
+        run: |
+          mkdir -p ./bin
+          cp -r /go/bin/controller-gen ./bin/controller-gen
+          cp -r /go/bin/setup-envtest ./bin/setup-envtest
+          make mod-vendor lint test
+
   release-version:
+    needs: release-test
     runs-on: ubuntu-latest
     steps:
       - name: checkout branch ${{ github.ref_name }}

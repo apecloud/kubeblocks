@@ -375,7 +375,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
-					g.Expect(fetched.Status.Manifests.BackupTool.FilePath).To(Equal(fmt.Sprintf("/%s%s", backupKey.Namespace, pathPrefix)))
+					g.Expect(fetched.Status.Manifests.BackupTool.FilePath).To(Equal(fmt.Sprintf("/%s%s/%s", backupKey.Namespace, pathPrefix, backupKey.Name)))
 				})).Should(Succeed())
 			})
 

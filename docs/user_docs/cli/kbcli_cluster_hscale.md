@@ -18,11 +18,13 @@ kbcli cluster hscale [flags]
 ### Options
 
 ```
-      --components strings            Component names to this operations
-  -h, --help                         help for hscale
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --replicas int                 Replicas with the specified components
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+      --components strings              Component names to this operations
+      --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+  -h, --help                           help for hscale
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --replicas int                   Replicas with the specified components
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands

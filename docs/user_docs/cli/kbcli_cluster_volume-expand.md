@@ -20,8 +20,10 @@ kbcli cluster volume-expand [flags]
 
 ```
       --components strings                Component names to this operations
+      --dry-run string[="unchanged"]     Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
   -h, --help                             help for volume-expand
       --name string                      OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                    prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --storage string                   Volume storage size (required)
       --ttlSecondsAfterSucceed int       Time to live after the OpsRequest succeed
   -t, --volume-claim-templates strings   VolumeClaimTemplate names in components (required)

@@ -24,12 +24,14 @@ kbcli cluster expose NAME --enable=[true|false] --type=[vpc|internet] [flags]
 ### Options
 
 ```
-      --components strings            Component names to this operations
-      --enable string                Enable or disable the expose, values can be true or false
-  -h, --help                         help for expose
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
-      --type string                  Expose type, currently supported types are 'vpc', 'internet'
+      --components strings              Component names to this operations
+      --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --enable string                  Enable or disable the expose, values can be true or false
+  -h, --help                           help for expose
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
+      --type string                    Expose type, currently supported types are 'vpc', 'internet'
 ```
 
 ### Options inherited from parent commands

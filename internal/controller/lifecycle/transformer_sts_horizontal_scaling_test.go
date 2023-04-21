@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -72,8 +73,10 @@ var _ = Describe("sts horizontal scaling test", func() {
 			Expect(intctrlutil.SetOwnership(cluster, pvc2, scheme, dbClusterFinalizerName)).Should(Succeed())
 
 			By("prepare params for transformer")
+			ctx := context.Background()
 			reqCtx := intctrlutil.RequestCtx{
-				Ctx: context.Background(),
+				Ctx: ctx,
+				Log: log.FromContext(ctx).WithValues("transformer", "h-scale"),
 			}
 			ctrl, k8sMock := testutil.SetupK8sMock()
 			defer ctrl.Finish()

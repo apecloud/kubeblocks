@@ -26,10 +26,10 @@ import (
 type ResourceConstraintTplType string
 
 const (
-	ResourceConstraintSpecial ResourceConstraintTplType = "special"
-	ResourceConstraintNormal  ResourceConstraintTplType = "normal"
+	GeneralResourceConstraint         ResourceConstraintTplType = "general"
+	MemoryOptimizedResourceConstraint ResourceConstraintTplType = "memory-optimized"
 
-	specialConstraintTemplate = `
+	generalResourceConstraintTemplate = `
 - cpu:
     min: 0.5
     max: 2
@@ -41,12 +41,23 @@ const (
     max: 2
   memory:
     sizePerCPU: 2Gi
-`
-	normalConstraintTemplate = `
 - cpu:
     slots: [2, 4, 8, 16, 24, 32, 48, 64, 96, 128]
   memory:
     sizePerCPU: 4Gi
+`
+
+	memoryResourceConstraintTemplate = `
+- cpu:
+    slots: [2, 4, 8, 12, 24, 48]
+  memory:
+    sizePerCPU: 8Gi
+- cpu:
+    min: 2
+    max: 128
+    step: 2
+  memory:
+    sizePerCPU: 16Gi
 `
 )
 
@@ -74,10 +85,10 @@ func (factory *MockComponentResourceConstraintFactory) AddConstraints(constraint
 		constraints    = factory.get().Spec.Constraints
 	)
 	switch constraintTplType {
-	case ResourceConstraintSpecial:
-		tpl = specialConstraintTemplate
-	case ResourceConstraintNormal:
-		tpl = normalConstraintTemplate
+	case GeneralResourceConstraint:
+		tpl = generalResourceConstraintTemplate
+	case MemoryOptimizedResourceConstraint:
+		tpl = memoryResourceConstraintTemplate
 	}
 	if err := yaml.Unmarshal([]byte(tpl), &newConstraints); err != nil {
 		panic(err)

@@ -60,8 +60,8 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 	AfterEach(cleanEnv)
 
 	Context("Test OpsRequest", func() {
-		It("Test verticalScaling OpsRequest", func() {
 
+		testVerticalScaling := func(verticalScaling []appsv1alpha1.VerticalScaling) {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
@@ -69,21 +69,8 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("create VerticalScaling ops")
 			ops := testapps.NewOpsRequestObj("verticalscaling-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.VerticalScalingType)
-			ops.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
-				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-					ResourceRequirements: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("400m"),
-							corev1.ResourceMemory: resource.MustParse("300Mi"),
-						},
-						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("400m"),
-							corev1.ResourceMemory: resource.MustParse("300Mi"),
-						},
-					},
-				},
-			}
+
+			ops.Spec.VerticalScalingList = verticalScaling
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 			By("test save last configuration and OpsRequest phase is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -98,6 +85,35 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 			By("test GetRealAffectedComponentMap function")
 			Expect(len(vsHandler.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(1))
+		}
+
+		It("vertical scaling by resource", func() {
+			verticalScaling := []appsv1alpha1.VerticalScaling{
+				{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					ResourceRequirements: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("400m"),
+							corev1.ResourceMemory: resource.MustParse("300Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("400m"),
+							corev1.ResourceMemory: resource.MustParse("300Mi"),
+						},
+					},
+				},
+			}
+			testVerticalScaling(verticalScaling)
+		})
+
+		It("vertical scaling by class", func() {
+			verticalScaling := []appsv1alpha1.VerticalScaling{
+				{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					Class:        testapps.Class1c1gName,
+				},
+			}
+			testVerticalScaling(verticalScaling)
 		})
 	})
 })

@@ -6,14 +6,14 @@ metadata:
     clusterdefinition.kubeblocks.io/name: postgresql
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  image: registry.cn-hangzhou.aliyuncs.com/apecloud/postgresql:14.7.0
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   deployKind: job
   resources:
     limits:
       cpu: "1"
       memory: 2Gi
     requests:
-      cpu: "1"
+      cpu: "500m"
       memory: 128Mi
   env:
     - name: RESTORE_DATA_DIR
@@ -36,12 +36,12 @@ spec:
         echo "mkdir -p ${DATA_DIR}/../arch" >> kb_restore.sh
         echo "mv -f ${TMP_DATA_DIR}/* ${DATA_DIR}/" >> kb_restore.sh
         echo "mv -f ${TMP_ARCH_DATA_DIR}/* ${DATA_DIR}/../arch" >> kb_restore.sh
-        echo "rm -rf ${RESTORE_DATA_DIR}" >> kb_restore.sh
+        echo "rm -rf ${RESTORE_DATA_DIR}/*" >> kb_restore.sh
 
         # extract the data file to the temporary data directory
         mkdir -p ${TMP_DATA_DIR} && mkdir -p ${TMP_ARCH_DATA_DIR}
         rm -rf ${TMP_ARCH_DATA_DIR}/* && rm -rf ${TMP_DATA_DIR}/*
-        cd ${BACKUP_DIR}/${BACKUP_NAME}
+        cd ${BACKUP_DIR}
         tar -xvf base.tar.gz -C ${TMP_DATA_DIR}/
         tar -xvf pg_wal.tar.gz -C ${TMP_ARCH_DATA_DIR}/
         echo "done!"
@@ -52,6 +52,6 @@ spec:
   backupCommands:
     - >
       set -e;
-      mkdir -p ${BACKUP_DIR}/${BACKUP_NAME}/;
-      echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -Xs -z -D ${BACKUP_DIR}/${BACKUP_NAME} -Z5 -h ${DB_HOST} -U standby -W;
+      mkdir -p ${BACKUP_DIR};
+      echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -Xs -z -D ${BACKUP_DIR} -Z5 -h ${DB_HOST} -U standby -W;
   incrementalBackupCommands: []

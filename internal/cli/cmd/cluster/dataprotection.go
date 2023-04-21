@@ -55,7 +55,7 @@ var (
 		kbcli cluster list-backup-policy 
         
 		# using short cmd to list backup policy of specified cluster 
-        kbcli cluster list-bp <cluster-name>
+        kbcli cluster list-bp mycluster
 	`)
 	editExample = templates.Examples(`
 		# edit backup policy
@@ -545,10 +545,6 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 		obj := dataprotectionv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &obj); err != nil {
 			return err
-		}
-		if obj.Status.Phase != dataprotectionv1alpha1.BackupCompleted ||
-			obj.Status.Manifests == nil || obj.Status.Manifests.BackupLog == nil {
-			continue
 		}
 		backups = append(backups, obj)
 	}

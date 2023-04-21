@@ -104,6 +104,15 @@ func (factory *MockClusterFactory) SetEnabledLogs(logName ...string) *MockCluste
 	return factory
 }
 
+func (factory *MockClusterFactory) SetClassDefRef(classDefRef *appsv1alpha1.ClassDefRef) *MockClusterFactory {
+	comps := factory.get().Spec.ComponentSpecs
+	if len(comps) > 0 {
+		comps[len(comps)-1].ClassDefRef = classDefRef
+	}
+	factory.get().Spec.ComponentSpecs = comps
+	return factory
+}
+
 func (factory *MockClusterFactory) AddComponentToleration(toleration corev1.Toleration) *MockClusterFactory {
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {

@@ -8455,7 +8455,16 @@ spec:
                                         type: string
                                       deletion:
                                         description: deletion specifies statement
-                                          how to delete this account.
+                                          how to delete this account. Used in combination
+                                          with `CreateionStatement` to delete the
+                                          account before create it. For instance,
+                                          one usually uses `drop user if exists` statement
+                                          followed by `create user` statement to create
+                                          an account.
+                                        type: string
+                                      update:
+                                        description: update specifies statement how
+                                          to update account's password.
                                         type: string
                                     required:
                                     - creation

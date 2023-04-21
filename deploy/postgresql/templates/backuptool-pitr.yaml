@@ -7,14 +7,11 @@ metadata:
     {{- include "postgresql.labels" . | nindent 4 }}
   name: postgres-pitr
 spec:
-  backupCommands: []
   deployKind: job
   env:
     - name: VOLUME_DATA_DIR
       value: /home/postgres/pgdata
-    - name: VOLUME_LOG_DIR
-      value: /home/postgres/pgwal
-    - name: RESTORE_DATA_DIR
+    - name: RESTORE_SCRIPT_DIR
       value: "$(VOLUME_DATA_DIR)/kb_restore"
     - name: PITR_DIR
       value: "$(VOLUME_DATA_DIR)/pitr"
@@ -22,33 +19,58 @@ spec:
       value: "$(VOLUME_DATA_DIR)/pgroot/data"
     - name: CONF_DIR
       value: "$(VOLUME_DATA_DIR)/conf"
-    - name: LOG_DIR
-      value: "$(VOLUME_LOG_DIR)/pgroot/data/pg_wal"
     - name: RECOVERY_TIME
       value: $KB_RECOVERY_TIME
     - name: TIME_FORMAT
       value: 2006-01-02 15:04:05 MST
-  image: alpine:3.17
+    - name: ARCHIVE_LOG_DIR
+      value: $(VOLUME_DATA_DIR)/pgroot/arcwal
+    - name: LOG_DIR
+      value: $(VOLUME_DATA_DIR)/pgroot/data/pg_wal
+    - name: REMOTE_LOG_DIR
+      value: $(BACKUP_DIR)/$(BACKUP_NAME)
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   logical:
     restoreCommands:
       - |
         set -e;
         rm -f ${CONF_DIR}/recovery.conf;
-        rm -rf ${DATA_DIR}.old;
-        rm -rf ${DATA_DIR}.failed;
   physical:
     restoreCommands:
       - |
         set -e;
         mkdir -p ${PITR_DIR};
-        cp -R $LOG_DIR ${PITR_DIR}/;
+        cd ${PITR_DIR}
+        for i in $(find ${REMOTE_LOG_DIR} -name "*.gz"); do
+          cp ${i} $(basename $i)
+          gzip -df $(basename $i);
+        done
         chmod 777 -R ${PITR_DIR};
         touch ${DATA_DIR}/recovery.signal;
         mkdir -p ${CONF_DIR};
         chmod 777 -R ${CONF_DIR};
-        mkdir -p ${RESTORE_DATA_DIR};
-        echo "cp -R ${DATA_DIR}.old ${DATA_DIR}" > ${RESTORE_DATA_DIR}/kb_restore.sh;
-        echo -e "restore_command=mv ${PITR_DIR}/pg_wal/%f %p\nrecovery_target_time=${RECOVERY_TIME}\nrecovery_target_action=promote" > ${CONF_DIR}/recovery.conf;
+        mkdir -p ${RESTORE_SCRIPT_DIR};
+        echo "#!/bin/bash" > ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
+        echo "[[ -d '${DATA_DIR}.old' ]] && mv -f ${DATA_DIR}.old ${DATA_DIR};" >> ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
+        echo "[[ -d '${DATA_DIR}.failed/data.old' ]] && mv -f ${DATA_DIR}.failed/data.old ${DATA_DIR};" >> ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
+        chmod +x ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
+        echo "restore_command='mv ${PITR_DIR}/%f %p'\nrecovery_target_time='${RECOVERY_TIME}'\nrecovery_target_action='promote'" > ${CONF_DIR}/recovery.conf;
         mv ${DATA_DIR} ${DATA_DIR}.old;
         sync;
+  backupCommands:
+    - |
+      set -e;
+      EXPIRED_INCR_LOG=${REMOTE_LOG_DIR}/$(date -d"7 day ago" +%Y%m%d);
+      if [ -d ${EXPIRED_INCR_LOG} ]; then rm -rf ${EXPIRED_INCR_LOG}; fi
+      TODAY_INCR_LOG=${REMOTE_LOG_DIR}/$(date +%Y%m%d);
+      mkdir -p ${TODAY_INCR_LOG};
+      for i in $(find ${ARCHIVE_LOG_DIR} -name "*.gz"); do
+        mv -f ${i} ${TODAY_INCR_LOG}/;
+      done
+      if [ -d ${LOG_DIR} ]; then
+        cd ${LOG_DIR};
+        LATEST_LOG=$(ls -t . | grep '[[:digit:]]$\|.partial$'|head -n 1);
+        gzip -kqc ${LATEST_LOG} > ${TODAY_INCR_LOG}/${LATEST_LOG}.gz;
+      fi
+
   type: pitr

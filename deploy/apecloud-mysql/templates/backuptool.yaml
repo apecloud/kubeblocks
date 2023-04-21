@@ -29,7 +29,7 @@ spec:
           exit 1
         fi
         mkdir -p /tmp/data/ && cd /tmp/data
-        xbstream -x < /${BACKUP_DIR}/${BACKUP_NAME}.xbstream
+        xbstream -x < ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
         xtrabackup --decompress  --target-dir=/tmp/data/
         xtrabackup --prepare --target-dir=/tmp/data/
         find . -name "*.qp"|xargs rm -f

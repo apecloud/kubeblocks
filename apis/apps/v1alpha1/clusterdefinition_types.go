@@ -152,7 +152,12 @@ type ProvisionStatements struct {
 	// creation specifies statement how to create this account with required privileges.
 	// +kubebuilder:validation:Required
 	CreationStatement string `json:"creation"`
+	// update specifies statement how to update account's password.
+	// +kubebuilder:validation:Required
+	UpdateStatement string `json:"update,omitempty"`
 	// deletion specifies statement how to delete this account.
+	// Used in combination with `CreateionStatement` to delete the account before create it.
+	// For instance, one usually uses `drop user if exists` statement followed by `create user` statement to create an account.
 	// +optional
 	DeletionStatement string `json:"deletion,omitempty"`
 }

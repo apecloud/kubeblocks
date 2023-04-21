@@ -90,28 +90,25 @@ mysqlx=0
 
 datadir={{ $data_root }}/data
 
+{{ block "logsBlock" . }}
 log_statements_unsafe_for_binlog=OFF
 log_error_verbosity=2
 log_output=FILE
 {{- if hasKey $.component "enabledLogs" }}
 {{- if mustHas "error" $.component.enabledLogs }}
-# Mysql error log
-log_error={{ $data_root }}/log/mysqld-error.log
+log_error=/data/mysql/log/mysqld-error.log
 {{- end }}
-
 {{- if mustHas "slow" $.component.enabledLogs }}
-# MySQL Slow log
 slow_query_log=ON
 long_query_time=5
-slow_query_log_file={{ $data_root }}/log/mysqld-slowquery.log
+slow_query_log_file=/data/mysql/log/mysqld-slowquery.log
 {{- end }}
-
 {{- if mustHas "general" $.component.enabledLogs }}
-# SQL access log, default off
 general_log=ON
-general_log_file={{ $data_root }}/log/mysqld.log
+general_log_file=/data/mysql/log/mysqld.log
 {{- end }}
 {{- end }}
+{{ end }}
 
 #innodb
 innodb_doublewrite_batch_size=16

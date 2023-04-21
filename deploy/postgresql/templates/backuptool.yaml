@@ -6,7 +6,7 @@ metadata:
     clusterdefinition.kubeblocks.io/name: postgresql
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  image: registry.cn-hangzhou.aliyuncs.com/apecloud/postgresql:14.7.0
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   deployKind: job
   resources:
     limits:
@@ -36,7 +36,7 @@ spec:
         echo "mkdir -p ${DATA_DIR}/../arch" >> kb_restore.sh
         echo "mv -f ${TMP_DATA_DIR}/* ${DATA_DIR}/" >> kb_restore.sh
         echo "mv -f ${TMP_ARCH_DATA_DIR}/* ${DATA_DIR}/../arch" >> kb_restore.sh
-        echo "rm -rf ${RESTORE_DATA_DIR}" >> kb_restore.sh
+        echo "rm -rf ${RESTORE_DATA_DIR}/*" >> kb_restore.sh
 
         # extract the data file to the temporary data directory
         mkdir -p ${TMP_DATA_DIR} && mkdir -p ${TMP_ARCH_DATA_DIR}

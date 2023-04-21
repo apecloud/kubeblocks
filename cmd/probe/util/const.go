@@ -29,12 +29,13 @@ const (
 	CloseOperation        bindings.OperationKind = "close"
 
 	// actions for cluster accounts management
-	ListUsersOp      bindings.OperationKind = "listUsers"
-	CreateUserOp     bindings.OperationKind = "createUser"
-	DeleteUserOp     bindings.OperationKind = "deleteUser"
-	DescribeUserOp   bindings.OperationKind = "describeUser"
-	GrantUserRoleOp  bindings.OperationKind = "grantUserRole"
-	RevokeUserRoleOp bindings.OperationKind = "revokeUserRole"
+	ListUsersOp          bindings.OperationKind = "listUsers"
+	CreateUserOp         bindings.OperationKind = "createUser"
+	DeleteUserOp         bindings.OperationKind = "deleteUser"
+	DescribeUserOp       bindings.OperationKind = "describeUser"
+	GrantUserRoleOp      bindings.OperationKind = "grantUserRole"
+	RevokeUserRoleOp     bindings.OperationKind = "revokeUserRole"
+	ListSystemAccountsOp bindings.OperationKind = "listSystemAccounts"
 	// actions for cluster roles management
 
 	OperationNotImplemented = "NotImplemented"

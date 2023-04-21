@@ -69,10 +69,11 @@ const (
 	FROM pg_user
 	WHERE usename = '%s';
 	`
-	createUserTpl = "CREATE USER %s WITH PASSWORD '%s';"
-	dropUserTpl   = "DROP USER IF EXISTS %s;"
-	grantTpl      = "GRANT %s TO %s;"
-	revokeTpl     = "REVOKE %s FROM %s;"
+	createUserTpl         = "CREATE USER %s WITH PASSWORD '%s';"
+	dropUserTpl           = "DROP USER IF EXISTS %s;"
+	grantTpl              = "GRANT %s TO %s;"
+	revokeTpl             = "REVOKE %s FROM %s;"
+	listSystemAccountsTpl = "SELECT rolname FROM pg_catalog.pg_roles WHERE pg_roles.rolname LIKE 'kb%'"
 )
 
 var (
@@ -124,6 +125,7 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.RegisterOperation(DescribeUserOp, pgOps.describeUserOps)
 	pgOps.RegisterOperation(GrantUserRoleOp, pgOps.grantUserRoleOps)
 	pgOps.RegisterOperation(RevokeUserRoleOp, pgOps.revokeUserRoleOps)
+	pgOps.RegisterOperation(ListSystemAccountsOp, pgOps.listSystemAccountsOps)
 	return nil
 }
 
@@ -460,8 +462,37 @@ func (pgOps *PostgresOperations) listUsersOps(ctx context.Context, req *bindings
 			return listUserTpl
 		}
 	)
-
 	return QueryObject(ctx, pgOps, req, opsKind, sqlTplRend, pgUserRolesProcessor, UserInfo{})
+}
+
+func (pgOps *PostgresOperations) listSystemAccountsOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	var (
+		opsKind    = ListUsersOp
+		sqlTplRend = func(user UserInfo) string {
+			return listSystemAccountsTpl
+		}
+	)
+	dataProcessor := func(data interface{}) (interface{}, error) {
+		type roleInfo struct {
+			Rolname string `json:"rolname"`
+		}
+		var roles []roleInfo
+		if err := json.Unmarshal(data.([]byte), &roles); err != nil {
+			return nil, err
+		}
+
+		roleNames := make([]string, 0)
+		for _, role := range roles {
+			roleNames = append(roleNames, role.Rolname)
+		}
+		if jsonData, err := json.Marshal(roleNames); err != nil {
+			return nil, err
+		} else {
+			return string(jsonData), nil
+		}
+	}
+
+	return QueryObject(ctx, pgOps, req, opsKind, sqlTplRend, dataProcessor, UserInfo{})
 }
 
 func (pgOps *PostgresOperations) describeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

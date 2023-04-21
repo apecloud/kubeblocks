@@ -33,6 +33,7 @@ SKIP_GO_GEN ?= true
 CHART_PATH = deploy/helm
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
+
 # Go setup
 export GO111MODULE = auto
 # export GOPROXY = https://proxy.golang.org
@@ -206,6 +207,10 @@ test-fast: envtest
 
 .PHONY: test
 test: manifests generate test-go-generate fmt vet add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+
+.PHONY: race
+race:
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -race $(TEST_PACKAGES)
 
 .PHONY: test-integration
 test-integration: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
@@ -755,7 +760,7 @@ render-smoke-testdata-manifests: ## Update E2E test dataset
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) -C test/e2e run
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

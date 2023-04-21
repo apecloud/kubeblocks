@@ -82,3 +82,31 @@ func LoadRawConfigObject(data map[string]string, formatConfig *appsv1alpha1.Form
 	}
 	return r, nil
 }
+
+// TransformConfigFileToKeyValueMap transforms a config file which formed by appsv1alpha1.CfgFileFormat format to a map in which the key is config name and the value is config value。
+// sectionName means the desired section of config file, such as [mysqld] section.
+// If config file has no section structure, sectionName should be default to get all values in this config file.
+func TransformConfigFileToKeyValueMap(fileName string, formatterConfig *appsv1alpha1.FormatterConfig, configData []byte) (map[string]string, error) {
+	oldData := map[string]string{
+		fileName: "",
+	}
+	newData := map[string]string{
+		fileName: string(configData),
+	}
+	keys := []string{fileName}
+	patchInfo, _, err := CreateConfigPatch(oldData, newData, formatterConfig.Format, keys, false)
+	if err != nil {
+		return nil, err
+	}
+	params := GenerateVisualizedParamsList(patchInfo, formatterConfig, nil)
+	result := make(map[string]string)
+	for _, param := range params {
+		if param.Key != fileName {
+			continue
+		}
+		for _, kv := range param.Parameters {
+			result[kv.Key] = kv.Value
+		}
+	}
+	return result, nil
+}

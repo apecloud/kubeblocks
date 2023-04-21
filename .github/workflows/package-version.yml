@@ -1,0 +1,33 @@
+name: PACKAGE-VERSION
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'The tag name of release'
+        required: true
+        default: ''
+
+run-name: ref_name:${{ github.ref_name }} release_version:${{ inputs.release_version }}
+
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+
+jobs:
+  package-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout branch ${{ github.ref_name }}
+        uses: actions/checkout@v3
+
+      - name: package check
+        run: |
+          bash .github/utils/utils.sh --type 7 --tag-name "${{ inputs.release_version }}"
+
+      - name: push tag
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          custom_tag: ${{ inputs.release_version }}
+          github_token: ${{ env.GITHUB_TOKEN }}
+          tag_prefix: ""

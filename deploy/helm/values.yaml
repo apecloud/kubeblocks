@@ -1662,7 +1662,7 @@ csi-s3:
   storageClass:
     create: true
     singleBucket: ""
-    mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region cn-northwest-1"
+    mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666"
 
 csi-oss:
   enabled: false

@@ -1,0 +1,44 @@
+apiVersion: troubleshoot.sh/v1beta2
+kind: Preflight
+metadata:
+  name: kubeblocks_preflight
+spec:
+  collectors:
+    - clusterInfo: {}
+  analyzers:
+    - clusterVersion:
+        checkName: GKE-Version
+        outcomes:
+          - fail:
+              when: "< 1.22.0"
+              message: This application requires at least Kubernetes 1.20.0 or later, and recommends 1.22.0.
+              uri: https://www.kubernetes.io
+          - pass:
+              when: ">= 1.22.0"
+              message: Your cluster meets the recommended and required versions（>= 1.22.0） of Kubernetes.
+              uri: https://www.kubernetes.io
+    - nodeResources:
+        checkName: At-Least-3-Nodes
+        outcomes:
+          - warn:
+              when: "count() < 3"
+              message: This application requires at least 3 nodes
+          - pass:
+              message: This cluster has enough nodes.
+  extendAnalyzers:
+    - clusterAccess:
+        checkName: Check-K8S-Access
+        outcomes:
+          - fail:
+              message: k8s cluster access fail
+          - pass:
+              message: k8s cluster access ok
+    - storageClass:
+        checkName: Required-CBS-SC
+        storageClassType: "cbs"
+        provisioner: "com.tencent.cloud.csi.cbs"
+        outcomes:
+          - fail:
+              message: The cbs storage class was not found
+          - pass:
+              message: cbs is the presence, and all good on storage classes

@@ -203,33 +203,33 @@ spec:
               type: CreateByStmt
               scope: AnyPods
               statements:
-                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
           - name: kbdataprotection
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
-                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)';GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO $(USERNAME); GRANT LOCK TABLES,RELOAD,PROCESS,REPLICATION CLIENT, SUPER,SELECT,EVENT,TRIGGER,SHOW VIEW ON *.* TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO $(USERNAME); GRANT LOCK TABLES,RELOAD,PROCESS,REPLICATION CLIENT, SUPER,SELECT,EVENT,TRIGGER,SHOW VIEW ON *.* TO $(USERNAME);
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
           - name: kbprobe
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
-                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);              
+              statements:
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
+                update: ALTER USER (USERNAME) IDENTIFIED BY '$(PASSWD)';
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
-                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);            
+              statements:
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
-                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
-                deletion: DROP USER IF EXISTS $(USERNAME);            
+              statements:
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';

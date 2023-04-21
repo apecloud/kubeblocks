@@ -89,6 +89,7 @@ func (r *Redis) Init(meta bindings.Metadata) (err error) {
 	r.RegisterOperation(DescribeUserOp, r.describeUserOps)
 	r.RegisterOperation(GrantUserRoleOp, r.grantUserRoleOps)
 	r.RegisterOperation(RevokeUserRoleOp, r.revokeUserRoleOps)
+	r.RegisterOperation(ListSystemAccountsOp, r.listSystemAccountsOps)
 
 	return nil
 }
@@ -267,6 +268,33 @@ func (r *Redis) listUsersOps(ctx context.Context, req *bindings.InvokeRequest, r
 		}
 	}
 
+	cmdRender := func(user UserInfo) string {
+		return "ACL USERS"
+	}
+
+	return QueryObject(ctx, r, req, ListUsersOp, cmdRender, dataProcessor, UserInfo{})
+}
+
+func (r *Redis) listSystemAccountsOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	dataProcessor := func(data interface{}) (interface{}, error) {
+		// data is an array of interface{} of string
+		results := make([]string, 0)
+		err := json.Unmarshal(data.([]byte), &results)
+		if err != nil {
+			return nil, err
+		}
+		sysetmUsers := make([]string, 0)
+		for _, user := range results {
+			if slices.Contains(redisPreDefinedUsers, user) {
+				sysetmUsers = append(sysetmUsers, user)
+			}
+		}
+		if jsonData, err := json.Marshal(sysetmUsers); err != nil {
+			return nil, err
+		} else {
+			return string(jsonData), nil
+		}
+	}
 	cmdRender := func(user UserInfo) string {
 		return "ACL USERS"
 	}

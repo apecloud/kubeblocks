@@ -1,5 +1,3 @@
-//go:build !linux && !darwin
-
 /*
 Copyright ApeCloud, Inc.
 
@@ -16,15 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configmanager
+package class
 
 import (
-	"os"
-	"runtime"
+	"testing"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func sendSignal(pid PID, sig os.Signal) error {
-	return cfgcore.MakeError("not support os: ", runtime.GOOS)
+func TestClass(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	RunSpecs(t, "Class Test Suite")
 }

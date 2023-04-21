@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	. "github.com/apecloud/kubeblocks/test/e2e"
 	e2eutil "github.com/apecloud/kubeblocks/test/e2e/util"
 )
 
@@ -45,10 +46,37 @@ func PlaygroundInit() {
 			}
 		})
 		It("kbcli playground init", func() {
-			cmd := "kbcli playground init"
-			log.Println(cmd)
-			init := e2eutil.ExecuteCommand(cmd)
-			log.Println(init)
+			var cmd string
+			if len(Provider) > 0 && len(Region) > 0 && len(SecretID) > 0 && len(SecretKey) > 0 {
+				var id, key string
+				if Provider == "aws" {
+					id = "export AWS_ACCESS_KEY_ID=" + SecretID
+					key = "export AWS_SECRET_ACCESS_KEY=" + SecretKey
+				} else if Provider == "tencentcloud" {
+					id = "export TENCENTCLOUD_SECRET_ID=" + SecretID
+					key = "export TENCENTCLOUD_SECRET_KEY" + SecretKey
+				} else if Provider == "alicloud" {
+					id = "export ALICLOUD_ACCESS_KEY=" + SecretID
+					key = "export ALICLOUD_SECRET_KEY=" + SecretKey
+				} else {
+					log.Println("not support " + Provider + " cloud-provider")
+				}
+				idCmd := e2eutil.ExecuteCommand(id)
+				log.Println(idCmd)
+				keyCmd := e2eutil.ExecuteCommand(key)
+				log.Println(keyCmd)
+				cmd = "kbcli playground init --cloud-provider " + Provider + " --region " + Region
+				output, err := e2eutil.Check(cmd, "yes\n")
+				if err != nil {
+					log.Fatalf("Command execution failure: %v\n", err)
+				}
+				log.Println("Command execution result：", output)
+			} else {
+				cmd = "kbcli playground init"
+				log.Println(cmd)
+				init := e2eutil.ExecuteCommand(cmd)
+				log.Println(init)
+			}
 		})
 		It("check kbcli playground cluster and pod status", func() {
 			checkPlaygroundCluster()
@@ -64,15 +92,15 @@ func UninstallKubeblocks() {
 	})
 	Context("KubeBlocks uninstall", func() {
 		It("delete mycluster", func() {
-			command := "kbcli cluster delete mycluster --auto-approve"
-			log.Println(command)
-			result := e2eutil.ExecuteCommand(command)
+			commond := "kbcli cluster delete mycluster --auto-approve"
+			log.Println(commond)
+			result := e2eutil.ExecuteCommand(commond)
 			Expect(result).Should(BeTrue())
 		})
 		It("check mycluster and pod", func() {
-			command := "kbcli cluster list -A"
+			commond := "kbcli cluster list -A"
 			Eventually(func(g Gomega) {
-				cluster := e2eutil.ExecCommand(command)
+				cluster := e2eutil.ExecCommand(commond)
 				g.Expect(e2eutil.StringStrip(cluster)).Should(Equal("Noclusterfound"))
 			}, time.Second*10, time.Second*1).Should(Succeed())
 			cmd := "kbcli cluster list-instances"
@@ -107,19 +135,19 @@ func PlaygroundDestroy() {
 }
 
 func checkPlaygroundCluster() {
-	command := "kubectl get pod -n default -l 'app.kubernetes.io/instance in (mycluster)'| grep mycluster |" +
+	commond := "kubectl get pod -n default -l 'app.kubernetes.io/instance in (mycluster)'| grep mycluster |" +
 		" awk '{print $3}'"
-	log.Println(command)
+	log.Println(commond)
 	Eventually(func(g Gomega) {
-		podStatus := e2eutil.ExecCommand(command)
-		log.Println(e2eutil.StringStrip(podStatus))
+		podStatus := e2eutil.ExecCommand(commond)
+		log.Println("podStatus is " + e2eutil.StringStrip(podStatus))
 		g.Expect(e2eutil.StringStrip(podStatus)).Should(Equal("Running"))
 	}, time.Second*180, time.Second*1).Should(Succeed())
 	cmd := "kbcli cluster list | grep mycluster | awk '{print $6}'"
 	log.Println(cmd)
 	Eventually(func(g Gomega) {
 		clusterStatus := e2eutil.ExecCommand(cmd)
-		log.Println(e2eutil.StringStrip(clusterStatus))
+		log.Println("clusterStatus is " + e2eutil.StringStrip(clusterStatus))
 		g.Expect(e2eutil.StringStrip(clusterStatus)).Should(Equal("Running"))
 	}, time.Second*360, time.Second*1).Should(Succeed())
 }

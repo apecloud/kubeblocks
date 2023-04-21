@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("utils", func() {
@@ -102,6 +103,51 @@ var _ = Describe("utils", func() {
 		It("not match any classes by memory", func() {
 			class := ChooseComponentClasses(classes, buildFilters("", "1Pi"))
 			Expect(class).Should(BeNil())
+		})
+	})
+
+	Context("get classes", func() {
+		It("should succeed", func() {
+			var (
+				err             error
+				specClassName   = testapps.Class1c1gName
+				statusClassName = "general-100c100g"
+				compClasses     map[string]map[string]*v1alpha1.ComponentClassInstance
+				compType        = "mysql"
+			)
+
+			classDef := testapps.NewComponentClassDefinitionFactory("custom", "apecloud-mysql", compType).
+				AddClasses(testapps.DefaultResourceConstraintName, []string{specClassName}).
+				GetObject()
+
+			By("class definition status is out of date")
+			classDef.SetGeneration(1)
+			classDef.Status.ObservedGeneration = 0
+			classDef.Status.Classes = []v1alpha1.ComponentClassInstance{
+				{
+					ComponentClass: v1alpha1.ComponentClass{
+						Name:   statusClassName,
+						CPU:    resource.MustParse("100"),
+						Memory: resource.MustParse("100Gi"),
+					},
+					ResourceConstraintRef: "",
+				},
+			}
+			compClasses, err = GetClasses(v1alpha1.ComponentClassDefinitionList{
+				Items: []v1alpha1.ComponentClassDefinition{*classDef},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(compClasses[compType][specClassName]).ShouldNot(BeNil())
+			Expect(compClasses[compType][statusClassName]).Should(BeNil())
+
+			By("class definition status is in sync with the class definition spec")
+			classDef.Status.ObservedGeneration = 1
+			compClasses, err = GetClasses(v1alpha1.ComponentClassDefinitionList{
+				Items: []v1alpha1.ComponentClassDefinition{*classDef},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(compClasses[compType][specClassName]).Should(BeNil())
+			Expect(compClasses[compType][statusClassName]).ShouldNot(BeNil())
 		})
 	})
 })

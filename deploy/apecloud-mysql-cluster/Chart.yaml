@@ -4,6 +4,6 @@ description: An ApeCloud MySQL Cluster Helm chart for KubeBlocks.
 
 type: application
 
-version: 0.5.0-alpha.8
+version: 0.5.0-beta.2
 
 appVersion: "8.0.30"

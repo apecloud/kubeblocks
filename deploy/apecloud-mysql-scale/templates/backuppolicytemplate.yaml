@@ -19,10 +19,10 @@ spec:
       hooks:
         containerName: mysql
         preCommands:
-        - "touch /data/mysql/data/.restore_new_cluster; sync"
+          - "touch /data/mysql/data/.restore_new_cluster; sync"
         postCommands:
-        - "rm -f /data/mysql/data/.restore_new_cluster; sync"
+          - "rm -f /data/mysql/data/.restore_new_cluster; sync"
       target:
         role: leader
     full:
-      backupToolName: xtrabackup-apecloud-mysql-scale
+      backupToolName: xtrabackup-for-apecloud-mysql-scale

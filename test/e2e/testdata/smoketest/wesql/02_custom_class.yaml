@@ -8,13 +8,12 @@ metadata:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
 spec:
   groups:
-    - resourceConstraintRef: kb-resource-constraint-general
+    - resourceConstraintRef: kb-resource-constraint-custom
       template: |
         cpu: "{{ or .cpu 1 }}" 
         memory: "{{ or .memory 4 }}Gi"
-      vars: [ cpu, memory]
+      vars: [ cpu, memory ]
       series:
-      - namingTemplate: "general-{{ .cpu }}c{{ .memory }}g"
-        classes:
-        - args: [ "1", "4" ]
-        - args: [ "1", "16"]
+        - namingTemplate: "general-{{ .cpu }}c{{ .memory }}g"
+          classes:
+            - args: [ "0.2", "0.6" ]

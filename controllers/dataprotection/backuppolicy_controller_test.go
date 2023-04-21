@@ -68,7 +68,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS)
 		// mgr namespaced
 		inMgrNS := client.InNamespace(mgrNamespace)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inMgrNS, ml)
@@ -185,38 +185,37 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetBackupType(dpv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
 
-				By("mock jobs completed")
+				By("waiting expired backup completed")
 				backupExpiredKey := client.ObjectKeyFromObject(backupExpired)
 				patchK8sJobStatus(backupExpiredKey, batchv1.JobComplete)
-				backupOutLimit1Key := client.ObjectKeyFromObject(backupOutLimit1)
-				patchK8sJobStatus(backupOutLimit1Key, batchv1.JobComplete)
-				backupOutLimit2Key := client.ObjectKeyFromObject(backupOutLimit2)
-				patchK8sJobStatus(backupOutLimit2Key, batchv1.JobComplete)
-
-				By("waiting expired backup completed")
 				Eventually(testapps.CheckObj(&testCtx, backupExpiredKey,
 					func(g Gomega, fetched *dpv1alpha1.Backup) {
 						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
 					})).Should(Succeed())
-				By("waiting 1st limit backup completed")
-				Eventually(testapps.CheckObj(&testCtx, backupOutLimit1Key,
-					func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
-					})).Should(Succeed())
-				By("waiting 2nd limit backup completed")
-				Eventually(testapps.CheckObj(&testCtx, backupOutLimit2Key,
-					func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
-					})).Should(Succeed())
-
 				By("mock update expired backup status to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(-time.Hour * 24)}
 				backupStatus.StartTimestamp = backupStatus.Expiration
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupExpired))
+
+				By("waiting 1st limit backup completed")
+				backupOutLimit1Key := client.ObjectKeyFromObject(backupOutLimit1)
+				patchK8sJobStatus(backupOutLimit1Key, batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, backupOutLimit1Key,
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					})).Should(Succeed())
 				By("mock update 1st limit backup NOT to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
 				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour)}
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit1))
+
+				By("waiting 2nd limit backup completed")
+				backupOutLimit2Key := client.ObjectKeyFromObject(backupOutLimit2)
+				patchK8sJobStatus(backupOutLimit2Key, batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, backupOutLimit2Key,
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					})).Should(Succeed())
 				By("mock update 2nd limit backup NOT to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
 				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour * 2)}

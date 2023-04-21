@@ -145,6 +145,9 @@ func (r *ReplicationComponent) HandleUpdate(ctx context.Context, obj client.Obje
 	if err != nil {
 		return err
 	}
+	if len(podList) == 0 {
+		return nil
+	}
 	for _, pod := range podList {
 		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
 		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {

@@ -1,5 +1,3 @@
-//go:build linux || darwin
-
 /*
 Copyright ApeCloud, Inc.
 

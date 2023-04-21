@@ -63,17 +63,29 @@ func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance,
 
 func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string]map[string]*v1alpha1.ComponentClassInstance, error) {
 	var (
+		compTypeLabel    = "apps.kubeblocks.io/component-def-ref"
 		componentClasses = make(map[string]map[string]*v1alpha1.ComponentClassInstance)
 	)
 	for _, classDefinition := range classDefinitionList.Items {
-		componentType := classDefinition.GetLabels()["apps.kubeblocks.io/component-def-ref"]
+		componentType := classDefinition.GetLabels()[compTypeLabel]
 		if componentType == "" {
-			return nil, fmt.Errorf("failed to find component type")
+			return nil, fmt.Errorf("can not find component type label %s", compTypeLabel)
 		}
-		classes := make(map[string]*v1alpha1.ComponentClassInstance)
-		for idx := range classDefinition.Status.Classes {
-			cls := classDefinition.Status.Classes[idx]
-			classes[cls.Name] = &cls
+		var (
+			err     error
+			classes = make(map[string]*v1alpha1.ComponentClassInstance)
+		)
+		if classDefinition.GetGeneration() != 0 &&
+			classDefinition.Status.ObservedGeneration == classDefinition.GetGeneration() {
+			for idx := range classDefinition.Status.Classes {
+				cls := classDefinition.Status.Classes[idx]
+				classes[cls.Name] = &cls
+			}
+		} else {
+			classes, err = ParseComponentClasses(classDefinition)
+			if err != nil {
+				return nil, err
+			}
 		}
 		if _, ok := componentClasses[componentType]; !ok {
 			componentClasses[componentType] = classes

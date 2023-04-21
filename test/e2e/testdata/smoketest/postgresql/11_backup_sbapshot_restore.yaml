@@ -3,10 +3,10 @@ kind: Cluster
 metadata:
   name: mycluster-sbapshot
   annotations:
-    kubeblocks.io/restore-from-backup: "{\"mysql\":\"backup-sbapshot-mycluster\"}"
+    kubeblocks.io/restore-from-backup: "{\"postgresql\":\"backup-sbapshot-mycluster\"}"
 spec:
   clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-15.2.0
+  clusterVersionRef: postgresql-14.7.0
   terminationPolicy: WipeOut
   componentSpecs:
     - name: wesql

@@ -248,10 +248,32 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 				PasswordConfig: appsv1alpha1.PasswordConfig{},
 				Accounts:       []appsv1alpha1.SystemAccountConfig{},
 			},
+			ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
+				{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:        "mysql-consensusset-config",
+						TemplateRef: "mysql8.0-config-template",
+						Namespace:   Namespace,
+						VolumeName:  "mysql-config",
+					},
+					ConfigConstraintRef: "mysql8.0-config-constraints",
+				},
+			},
 		},
 		{
 			Name:          fmt.Sprintf("%s-%d", ComponentDefName, 1),
 			CharacterType: "mysql",
+			ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
+				{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:        "mysql-consensusset-config",
+						TemplateRef: "mysql8.0-config-template",
+						Namespace:   Namespace,
+						VolumeName:  "mysql-config",
+					},
+					ConfigConstraintRef: "mysql8.0-config-constraints",
+				},
+			},
 		},
 	}
 	return clusterDef
@@ -477,6 +499,35 @@ func FakeAddon(name string) *extensionsv1alpha1.Addon {
 	}
 	addon.SetCreationTimestamp(metav1.Now())
 	return addon
+}
+
+func FakeConfigMap(cmName string) *corev1.ConfigMap {
+	cm := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: Namespace,
+		},
+		Data: map[string]string{
+			"fake": "fake",
+		},
+	}
+	return cm
+}
+
+func FakeConfigConstraint(ccName string) *appsv1alpha1.ConfigConstraint {
+	cm := &appsv1alpha1.ConfigConstraint{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ccName,
+		},
+		Spec: appsv1alpha1.ConfigConstraintSpec{
+			FormatterConfig: &appsv1alpha1.FormatterConfig{},
+		},
+	}
+	return cm
 }
 
 func FakeStorageClass(name string, isDefault bool) *storagev1.StorageClass {

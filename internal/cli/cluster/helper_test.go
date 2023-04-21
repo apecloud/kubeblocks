@@ -103,6 +103,26 @@ var _ = Describe("helper", func() {
 		Expect(latestVer.Name).Should(Equal("now-version"))
 	})
 
+	It("get configmap by name", func() {
+		cmName := "test-cm"
+		dynamic := testing.FakeDynamicClient(testing.FakeConfigMap(cmName))
+		cm, err := GetConfigMapByName(dynamic, testing.Namespace, cmName)
+		Expect(err).Should(Succeed())
+		Expect(cm).ShouldNot(BeNil())
+
+		cm, err = GetConfigMapByName(dynamic, testing.Namespace, cmName+"error")
+		Expect(err).Should(HaveOccurred())
+		Expect(cm).Should(BeNil())
+	})
+
+	It("get config constraint by name", func() {
+		ccName := "test-cc"
+		dynamic := testing.FakeDynamicClient(testing.FakeConfigConstraint(ccName))
+		cm, err := GetConfigConstraintByName(dynamic, ccName)
+		Expect(err).Should(Succeed())
+		Expect(cm).ShouldNot(BeNil())
+	})
+
 	It("get all storage classes and identify if there is a default storage class", func() {
 		dynamic := testing.FakeDynamicClient(testing.FakeStorageClass("test", testing.ISDefautl))
 		classes, ok, err := GetStorageClasses(dynamic)
@@ -115,5 +135,4 @@ var _ = Describe("helper", func() {
 		Expect(ok).ShouldNot(BeTrue())
 		Expect(err).Should(Succeed())
 	})
-
 })

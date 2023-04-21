@@ -5,14 +5,14 @@ title: kbcli cluster configure
 Reconfigure parameters with the specified components in the cluster.
 
 ```
-kbcli cluster configure [flags]
+kbcli cluster configure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file] [flags]
 ```
 
 ### Examples
 
 ```
   # update component params
-  kbcli cluster configure <cluster-name> --component=<component-name> --config-spec=<config-spec-name> --config-file=<config-file> --set max_connections=1000,general_log=OFF
+  kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
   
   # if only one component, and one config spec, and one config file, simplify the use of configure. e.g:
   # update mysql max_connections, cluster name is mycluster

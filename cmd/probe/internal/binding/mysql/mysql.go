@@ -84,10 +84,11 @@ const (
 	FROM mysql.user
 	WHERE host = '%%' and user <> 'root' and user not like 'kb%%' and user ='%s';"
 	`
-	createUserTpl = "CREATE USER '%s'@'%%' IDENTIFIED BY '%s';"
-	deleteUserTpl = "DROP USER IF EXISTS '%s'@'%%';"
-	grantTpl      = "GRANT %s TO '%s'@'%%';"
-	revokeTpl     = "REVOKE %s FROM '%s'@'%%';"
+	createUserTpl         = "CREATE USER '%s'@'%%' IDENTIFIED BY '%s';"
+	deleteUserTpl         = "DROP USER IF EXISTS '%s'@'%%';"
+	grantTpl              = "GRANT %s TO '%s'@'%%';"
+	revokeTpl             = "REVOKE %s FROM '%s'@'%%';"
+	listSystemAccountsTpl = "SELECT user AS userName FROM mysql.user WHERE host = '%' and user like 'kb%';"
 )
 
 var (
@@ -130,6 +131,7 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.RegisterOperation(DescribeUserOp, mysqlOps.describeUserOps)
 	mysqlOps.RegisterOperation(GrantUserRoleOp, mysqlOps.grantUserRoleOps)
 	mysqlOps.RegisterOperation(RevokeUserRoleOp, mysqlOps.revokeUserRoleOps)
+	mysqlOps.RegisterOperation(ListSystemAccountsOp, mysqlOps.listSystemAccountsOps)
 	return nil
 }
 
@@ -505,6 +507,28 @@ func (mysqlOps *MysqlOperations) listUsersOps(ctx context.Context, req *bindings
 	}
 
 	return QueryObject(ctx, mysqlOps, req, ListUsersOp, sqlTplRend, nil, UserInfo{})
+}
+
+func (mysqlOps *MysqlOperations) listSystemAccountsOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	sqlTplRend := func(user UserInfo) string {
+		return listSystemAccountsTpl
+	}
+	dataProcessor := func(data interface{}) (interface{}, error) {
+		var users []UserInfo
+		if err := json.Unmarshal(data.([]byte), &users); err != nil {
+			return nil, err
+		}
+		userNames := make([]string, 0)
+		for _, user := range users {
+			userNames = append(userNames, user.UserName)
+		}
+		if jsonData, err := json.Marshal(userNames); err != nil {
+			return nil, err
+		} else {
+			return string(jsonData), nil
+		}
+	}
+	return QueryObject(ctx, mysqlOps, req, ListSystemAccountsOp, sqlTplRend, dataProcessor, UserInfo{})
 }
 
 func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

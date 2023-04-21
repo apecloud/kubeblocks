@@ -1,0 +1,20 @@
+apiVersion: troubleshoot.sh/v1beta2
+kind: HostPreflight
+metadata:
+  name: host-utility
+spec:
+  collectors:
+  analyzers:
+  extendCollectors:
+    - hostUtility:
+        collectorName: aliyun-cli
+        utilityName: aliyun
+  extendAnalyzers:
+    - hostUtility:
+        checkName: aliyunCli-Check
+        collectorName: aliyun-cli
+        outcomes:
+          - pass:
+              message: aliyun-cli has been installed
+          - warn:
+              message: aliyun-cli isn't installed

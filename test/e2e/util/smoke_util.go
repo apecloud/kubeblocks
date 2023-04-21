@@ -18,9 +18,11 @@ package util
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"log"
 	"os"
+	executil "os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -285,4 +287,33 @@ func StringStrip(str string) string {
 func CheckKbcliExists() error {
 	_, err := exec.New().LookPath("kbcli")
 	return err
+}
+
+func Check(command string, input string) (string, error) {
+	cmd := executil.Command("bash", "-c", command)
+
+	var output bytes.Buffer
+	cmd.Stdout = &output
+
+	inPipe, err := cmd.StdinPipe()
+	if err != nil {
+		return "", err
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return "", err
+	}
+
+	_, e := io.WriteString(inPipe, input)
+	if e != nil {
+		return "", e
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		return "", err
+	}
+
+	return output.String(), nil
 }

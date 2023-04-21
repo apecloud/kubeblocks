@@ -16,6 +16,7 @@ Usage: $(basename "$0") <options>
                                 4) get latest release tag
                                 5) update release latest
                                 6) get the ci trigger mode
+                                7) check package version
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -52,6 +53,9 @@ main() {
         ;;
         6)
             get_trigger_mode
+        ;;
+        7)
+            check_package_version
         ;;
         *)
             show_help
@@ -163,6 +167,27 @@ get_trigger_mode() {
         esac
     done
     echo $TRIGGER_MODE
+}
+
+check_package_version() {
+    exit_status=0
+    beta_tag="v"*"."*"."*"-beta."*
+    rc_tag="v"*"."*"."*"-rc."*
+    release_tag="v"*"."*"."*
+    not_release_tag="v"*"."*"."*"-"*
+    if [[ "$TAG_NAME" == $release_tag && "$TAG_NAME" != $not_release_tag ]]; then
+        echo "::error title=Release Version Not Allow::$(tput -T xterm setaf 1) $TAG_NAME does not allow packaging.$(tput -T xterm sgr0)"
+        exit_status=1
+    elif [[ "$TAG_NAME" == $beta_tag ]]; then
+        echo "::error title=Beta Version Not Allow::$(tput -T xterm setaf 1) $TAG_NAME does not allow packaging.$(tput -T xterm sgr0)"
+        exit_status=1
+    elif [[ "$TAG_NAME" == $rc_tag ]]; then
+        echo "::error title=Release Candidate Version Not Allow::$(tput -T xterm setaf 1) $TAG_NAME does not allow packaging.$(tput -T xterm sgr0)"
+        exit_status=1
+    else
+        echo "$(tput -T xterm setaf 2)Version allows packaging$(tput -T xterm sgr0)"
+    fi
+    exit $exit_status
 }
 
 main "$@"

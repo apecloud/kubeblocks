@@ -80,6 +80,7 @@ const (
 	KBManagedByKey                  = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
 	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
 	BackupToolTypeLabelKey          = "kubeblocks.io/backup-tool-type"
+	BackupTypeLabelKeyKey           = "dataprotection.kubeblocks.io/backup-type"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey            = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -89,7 +90,8 @@ const (
 	RestoreFromBackUpAnnotationKey     = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
 	ClusterSnapshotAnnotationKey       = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	LeaderAnnotationKey                = "cs.apps.kubeblocks.io/leader"
-	DefaultBackupPolicyAnnotationKey   = "dataprotection.kubeblocks.io/is-default-policy"
+	DefaultBackupPolicyAnnotationKey   = "dataprotection.kubeblocks.io/is-default-policy" // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
+	BackupDataPathPrefixAnnotationKey  = "dataprotection.kubeblocks.io/path-prefix"       // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
 	BackupPolicyTemplateAnnotationKey  = "apps.kubeblocks.io/backup-policy-template"
 	RestoreFromTimeAnnotationKey       = "kubeblocks.io/restore-from-time"           // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
 	RestoreFromSrcClusterAnnotationKey = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.

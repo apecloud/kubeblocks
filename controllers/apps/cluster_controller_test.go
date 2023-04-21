@@ -504,7 +504,7 @@ var _ = Describe("Cluster Controller", func() {
 		return pods
 	}
 
-	horizontalScaleComp := func(updatedReplicas int, comp *appsv1alpha1.ClusterComponentSpec) {
+	horizontalScaleComp := func(updatedReplicas int, comp *appsv1alpha1.ClusterComponentSpec, policy *appsv1alpha1.HorizontalScalePolicy) {
 		By("Mocking components' PVCs to bound")
 		for i := 0; i < int(comp.Replicas); i++ {
 			pvcKey := types.NamespacedName{
@@ -536,6 +536,19 @@ var _ = Describe("Cluster Controller", func() {
 
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
 		changeCompReplicas(clusterKey, int32(updatedReplicas), comp)
+
+		checkUpdatedStsReplicas := func() {
+			By("Checking updated sts replicas")
+			Eventually(func() int32 {
+				stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
+				return *stsList.Items[0].Spec.Replicas
+			}).Should(BeEquivalentTo(updatedReplicas))
+		}
+
+		if policy == nil {
+			checkUpdatedStsReplicas()
+			return
+		}
 
 		By("Checking Backup created")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
@@ -592,11 +605,7 @@ var _ = Describe("Cluster Controller", func() {
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
-		By("Checking updated sts replicas")
-		Eventually(func() int32 {
-			stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
-			return *stsList.Items[0].Spec.Replicas
-		}).Should(BeEquivalentTo(updatedReplicas))
+		checkUpdatedStsReplicas()
 	}
 
 	// @argument componentDefsWithHScalePolicy assign ClusterDefinition.spec.componentDefs[].horizontalScalePolicy for
@@ -685,8 +694,17 @@ var _ = Describe("Cluster Controller", func() {
 				})).Should(Succeed())
 			}
 		}
-		for i := range clusterObj.Spec.ComponentSpecs {
-			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i])
+
+		By("Get the latest cluster def")
+		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
+		for i, comp := range clusterObj.Spec.ComponentSpecs {
+			var policy *appsv1alpha1.HorizontalScalePolicy
+			for _, componentDef := range clusterDefObj.Spec.ComponentDefs {
+				if componentDef.Name == comp.ComponentDefRef {
+					policy = componentDef.HorizontalScalePolicy
+				}
+			}
+			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i], policy)
 		}
 
 		By("Checking cluster status and the number of replicas changed")
@@ -747,10 +765,11 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, statefulCompName, consensusCompName, replicationCompName)
 
+		// statefulCompDefName not in componentDefsWithHScalePolicy, for nil backup policy test
 		// REVIEW: (chantu)
 		//  1. this test flow, wait for running phase?
 		//  2. following horizontalScale only work with statefulCompDefName?
-		horizontalScale(int(updatedReplicas), statefulCompDefName, consensusCompDefName, replicationCompDefName)
+		horizontalScale(int(updatedReplicas), consensusCompDefName, replicationCompDefName)
 	}
 
 	testVerticalScale := func() {
@@ -1251,7 +1270,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	When("when creating cluster with workloadType=stateful component", func() {
+	When("creating cluster with workloadType=stateful component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -1316,7 +1335,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	When("when creating cluster with workloadType=consensus component", func() {
+	When("creating cluster with workloadType=consensus component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDef obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -1436,7 +1455,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	When("when creating cluster with workloadType=replication component", func() {
+	When("creating cluster with workloadType=replication component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj with replication componentDefRef.")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).

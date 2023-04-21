@@ -300,8 +300,8 @@ var _ = Describe("create", func() {
 				true,
 			},
 			{
-				[]string{"type=comp1,cpu=1,memory=2Gi,class=general-2c4g", "type=comp2,storage=10Gi,cpu=2,class=mo-1c8g"},
-				[]string{"my-comp"},
+				[]string{"type=comp1,cpu=1,memory=2Gi,class=general-2c4g", "type=comp2,storage=10Gi,cpu=2,class=mo-1c8g,replicas=3"},
+				[]string{"comp1", "comp2"},
 				map[string]map[setKey]string{
 					"comp1": {
 						keyType:   "comp1",
@@ -310,10 +310,11 @@ var _ = Describe("create", func() {
 						keyClass:  "general-2c4g",
 					},
 					"comp2": {
-						keyType:    "comp2",
-						keyCPU:     "2",
-						keyStorage: "10Gi",
-						keyClass:   "mo-1c8g",
+						keyType:     "comp2",
+						keyCPU:      "2",
+						keyStorage:  "10Gi",
+						keyClass:    "mo-1c8g",
+						keyReplicas: "3",
 					},
 				},
 				true,

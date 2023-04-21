@@ -57,16 +57,22 @@ idle_in_transaction_session_timeout = '1h'
 listen_addresses = '0.0.0.0'
 log_autovacuum_min_duration = '1s'
 log_checkpoints = 'True'
-{{ block "logsBlock" . }}
+
+{{- block "logsBlock" . }}
+{{- if hasKey $.component "enabledLogs" }}
+{{- if mustHas "running" $.component.enabledLogs }}
+logging_collector = 'True'
 log_destination = 'csvlog'
 log_directory = 'log'
 log_filename = 'postgresql-%Y-%m-%d.log'
-{{ end }}
+{{ end -}}
+{{ end -}}
+{{ end -}}
+
 log_lock_waits = 'True'
 log_min_duration_statement = '100'
 log_replication_commands = 'True'
 log_statement = 'ddl'
-logging_collector = 'True'
 #maintenance_work_mem = '3952MB'
 max_connections = '{{ $max_connections }}'
 max_locks_per_transaction = '128'

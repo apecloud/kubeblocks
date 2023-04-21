@@ -148,7 +148,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
 	var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
 	for _, volume := range cls.Volumes {
-		volume := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+		volumes = append(volumes, appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 			Name: volume.Name,
 			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 				// TODO define access mode in class
@@ -159,8 +159,7 @@ func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1a
 					},
 				},
 			},
-		}
-		volumes = append(volumes, volume)
+		})
 	}
 	return volumes
 }

@@ -5,7 +5,7 @@ kind: ConfigMap
 metadata:
   name: mongodb5.0-config-template
   labels:
-    helm.sh/chart: mongodb-0.5.0-alpha.8
+    helm.sh/chart: mongodb-0.5.0-beta.2
     app.kubernetes.io/name: mongodb
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -35,13 +35,15 @@ data:
       directoryPerDB: true
     
     # where to write logging data.
+    {{ block "logsBlock" . }}
     systemLog:
       destination: file
       quiet: false
       logAppend: true
       logRotate: reopen
-      path: {{ $mongodb_root }}/logs/mongodb.log
+      path: /data/mongodb/logs/mongodb.log
       verbosity: 0
+    {{ end }}
     
     # network interfaces
     net:
@@ -85,7 +87,7 @@ kind: ConfigMap
 metadata:
   name: mongodb-metrics-config
   labels:
-    helm.sh/chart: mongodb-0.5.0-alpha.8
+    helm.sh/chart: mongodb-0.5.0-beta.2
     app.kubernetes.io/name: mongodb
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -99,7 +101,7 @@ kind: ConfigMap
 metadata:
   name: mongodb-scripts
   labels:
-    helm.sh/chart: mongodb-0.5.0-alpha.8
+    helm.sh/chart: mongodb-0.5.0-beta.2
     app.kubernetes.io/name: mongodb
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -148,7 +150,6 @@ data:
     {{- $mongodb_port = $mongodb_port_info.containerPort }}
     {{- end }}
     
-    set -e
     PORT={{ $mongodb_port }}
     MONGODB_ROOT={{ $mongodb_root }}
     INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+\$");
@@ -219,7 +220,7 @@ metadata:
   name: mongodb-backup-policy-template
   labels:
     clusterdefinition.kubeblocks.io/name: mongodb
-    helm.sh/chart: mongodb-0.5.0-alpha.8
+    helm.sh/chart: mongodb-0.5.0-beta.2
     app.kubernetes.io/name: mongodb
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -236,12 +237,15 @@ spec:
         cronExpression: "0 18 * * 0"
     snapshot:
       target:
-        role: leader
+        role: primary
         connectionCredentialKey:
           passwordKey: password
           usernameKey: username
     full:
-      backupToolName: xtrabackup-apecloud-mysql
+      backupToolName: mongodb-physical-backup-tool
+      backupsHistoryLimit: 7
+      target:
+        role: primary
 ---
 # Source: mongodb/templates/backuptool.yaml
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
@@ -269,7 +273,7 @@ spec:
         set -e
         mkdir -p ${DATA_DIR}
         res=`ls -A ${DATA_DIR}`
-        if [ ! -z ${res} ]; then
+        if [ ! -z "${res}" ]; then
           echo "${DATA_DIR} is not empty! Please make sure that the directory is empty before restoring the backup."
           exit 1
         fi
@@ -312,7 +316,7 @@ kind: ClusterDefinition
 metadata:
   name: mongodb
   labels:
-    helm.sh/chart: mongodb-0.5.0-alpha.8
+    helm.sh/chart: mongodb-0.5.0-beta.2
     app.kubernetes.io/name: mongodb
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -358,7 +362,7 @@ spec:
           scrapePort: 9216
       logConfigs:
         - name: running
-          filePathPattern: /data/mongodb/log/mongodb.log*
+          filePathPattern: /data/mongodb/logs/mongodb.log*
       workloadType: Consensus
       consensusSpec:
         leader:
@@ -446,6 +450,30 @@ spec:
             volumeMounts:
               - name: mongodb-metrics-config
                 mountPath: /opt/conf
+---
+# Source: mongodb/templates/sharding-clusterdefinition.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: mongodb-sharding
+  labels:
+    helm.sh/chart: mongodb-0.5.0-beta.2
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: "5.0.14"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: mongodb
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-monogdb)"
+    headlessEndpoint: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
+    headlessHost: "$(POD_NAME_PREFIX)-0.$(HEADLESS_SVC_FQDN)"
+    headlessPort: "$(SVC_PORT_tcp-monogdb)"
+  componentDefs:
     - name: mongos
       scriptSpecs:
         - name: mongodb-scripts
@@ -583,7 +611,7 @@ kind: ClusterVersion
 metadata:
   name: mongodb-5.0.14
   labels:
-    helm.sh/chart: mongodb-0.5.0-alpha.8
+    helm.sh/chart: mongodb-0.5.0-beta.2
     app.kubernetes.io/name: mongodb
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -597,6 +625,21 @@ spec:
           - name: mongodb
             image: mongo:5.0.14
             imagePullPolicy: IfNotPresent
+---
+# Source: mongodb/templates/sharding-clusterversion.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: mongodb-sharding-5.0.14
+  labels:
+    helm.sh/chart: mongodb-0.5.0-beta.2
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: "5.0.14"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: mongodb-sharding
+  componentVersions:
     - componentDefRef: mongos
       versionsContext:
         containers:
@@ -624,7 +667,7 @@ kind: ConfigConstraint
 metadata:
   name: mongodb-config-constraints
   labels:
-    helm.sh/chart: mongodb-0.5.0-alpha.8
+    helm.sh/chart: mongodb-0.5.0-beta.2
     app.kubernetes.io/name: mongodb
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -643,7 +686,7 @@ kind: Cluster
 metadata:
   name: mycluster
   labels:
-    helm.sh/chart: mongodb-cluster-0.5.0-alpha.8
+    helm.sh/chart: mongodb-cluster-0.5.0-beta.2
     app.kubernetes.io/name: mongodb-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -669,24 +712,3 @@ spec:
             resources:
               requests:
                 storage: 20Gi
----
-# Source: mongodb-cluster/templates/tests/test-connection.yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: "mycluster-mongodb-cluster-test-connection"
-  labels:
-    helm.sh/chart: mongodb-cluster-0.5.0-alpha.8
-    app.kubernetes.io/name: mongodb-cluster
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "5.0.14"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": test
-spec:
-  containers:
-    - name: wget
-      image: busybox
-      command: ['wget']
-      args: ['mycluster-mongodb-cluster:']
-  restartPolicy: Never

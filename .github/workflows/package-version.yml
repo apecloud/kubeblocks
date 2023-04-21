@@ -1,4 +1,4 @@
-name: RELEASE-VERSION
+name: PACKAGE-VERSION
 
 on:
   workflow_dispatch:
@@ -15,23 +15,15 @@ env:
 
 
 jobs:
-  release-test:
-    runs-on: [ self-hosted, eks-fargate-runner ]
-    steps:
-      - uses: apecloud/checkout@main
-      - name: vendor lint test
-        run: |
-          mkdir -p ./bin
-          cp -r /go/bin/controller-gen ./bin/controller-gen
-          cp -r /go/bin/setup-envtest ./bin/setup-envtest
-          make mod-vendor lint test
-
-  release-version:
-    needs: release-test
+  package-version:
     runs-on: ubuntu-latest
     steps:
       - name: checkout branch ${{ github.ref_name }}
         uses: actions/checkout@v3
+
+      - name: package check
+        run: |
+          bash .github/utils/utils.sh --type 7 --tag-name "${{ inputs.release_version }}"
 
       - name: push tag
         uses: mathieudutour/github-tag-action@v6.1

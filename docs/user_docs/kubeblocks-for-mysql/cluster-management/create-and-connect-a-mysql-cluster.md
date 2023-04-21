@@ -46,7 +46,7 @@ This document shows how to create and connect to a MySQL cluster.
 * For configuring pod affinity for a cluster, refer to [Configure pod affinity for database cluster](../../resource-scheduling/resource-scheduling.md).
 * The CPU and memory set for the cluster are 1 core and 1g.
   
-### (Recommanded) Create a cluster with specified class type
+### (Recommended) Create a cluster with specified class type
 
    A class is a set of resource configurations of CPU, memory and storage, to offer convenience and also set a constraints on the resources applied to the cluster. See [Cluster types](user_docs/kubeblocks-for-mysql/cluster-type/cluster-types.md).
   ***Steps:***

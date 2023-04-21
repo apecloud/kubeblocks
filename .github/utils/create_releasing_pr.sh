@@ -12,26 +12,10 @@ worddir=$(dirname $0)
 
 set -x
 
-# git stash
+git stash
 git switch ${BASE_BRANCH}
 git pull
 git merge origin/${HEAD_BRANCH}
 
 echo "Creating ${PR_TITLE}"
-result=$(gh api \
-    --method POST \
-    -H "Accept: application/vnd.github+json" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    /repos/${OWNER}/${REPO}/pulls \
-    -f title="${PR_TITLE}" \
-    -f head="${HEAD_BRANCH}" \
-    -f base="${BASE_BRANCH}" 1> /dev/null)
-
-if [ "$?" != "0" ]; then
-    echo "error: ${result}"
-    exit 1
-else
-    echo "PR created"
-fi
-
-
+gh pr create --head ${HEAD_BRANCH} --base ${BASE_BRANCH} --title "${PR_TITLE}" --body ""

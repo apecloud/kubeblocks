@@ -124,18 +124,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 			corev1.ResourceMemory: cls.Memory,
 		}
 		requests.DeepCopyInto(&comp.Resources.Requests)
-
-		limits := comp.Resources.Limits
-		if len(limits) == 0 {
-			limits = make(corev1.ResourceList)
-		}
-		if limits.Cpu().IsZero() || limits.Cpu().Cmp(*requests.Cpu()) < 0 {
-			limits[corev1.ResourceCPU] = *requests.Cpu()
-		}
-		if limits.Memory().IsZero() || limits.Memory().Cmp(*requests.Memory()) < 0 {
-			limits[corev1.ResourceMemory] = *requests.Memory()
-		}
-		limits.DeepCopyInto(&comp.Resources.Limits)
+		requests.DeepCopyInto(&comp.Resources.Limits)
 
 		var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
 		if len(comp.VolumeClaimTemplates) > 0 {

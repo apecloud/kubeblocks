@@ -24,6 +24,7 @@ import (
 	"time"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -155,13 +156,20 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 		}
 
 		emitHorizontalScalingEvent := func() {
-			transCtx.EventRecorder.Eventf(cluster,
-				corev1.EventTypeNormal,
-				"HorizontalScale",
-				"Start horizontal scale component %s from %d to %d",
-				comp.Name,
-				*stsObj.Spec.Replicas,
-				*stsProto.Spec.Replicas)
+			if cluster.Status.Components == nil {
+				return
+			}
+			if componentStatus, ok := cluster.Status.Components[componentName]; ok {
+				if componentStatus.Phase != appsv1alpha1.SpecReconcilingClusterCompPhase {
+					transCtx.EventRecorder.Eventf(cluster,
+						corev1.EventTypeNormal,
+						"HorizontalScale",
+						"Start horizontal scale component %s from %d to %d",
+						comp.Name,
+						*stsObj.Spec.Replicas,
+						*stsProto.Spec.Replicas)
+				}
+			}
 		}
 
 		scaleOut := func() error {
@@ -227,24 +235,9 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			return nil
 		}
 
-		updateComponentStatus := func() {
-			if cluster.Status.Components == nil {
-				return
-			}
-			if componentStatus, ok := cluster.Status.Components[componentName]; ok {
-				if componentStatus.Phase != appsv1alpha1.SpecReconcilingClusterCompPhase {
-					emitHorizontalScalingEvent()
-				}
-				podsReady := false
-				componentStatus.PodsReady = &podsReady
-				componentStatus.Phase = appsv1alpha1.SpecReconcilingClusterCompPhase
-				cluster.Status.Components[componentName] = componentStatus
-			}
-		}
-
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
-		updateComponentStatus()
+		emitHorizontalScalingEvent()
 		var err error
 		switch {
 		// scale out
@@ -521,6 +514,9 @@ func timeToSchedule(t time.Time) string {
 
 // check volume snapshot available
 func isSnapshotAvailable(cli roclient.ReadonlyClient, ctx context.Context) bool {
+	if !viper.GetBool("VOLUMESNAPSHOT") {
+		return false
+	}
 	vsList := snapshotv1.VolumeSnapshotList{}
 	getVSErr := cli.List(ctx, &vsList)
 	return getVSErr == nil
@@ -653,11 +649,6 @@ func doSnapshot(cli roclient.ReadonlyClient,
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 
-		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-		// TODO: SetOwnership
-		if err := controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
-			return err
-		}
 		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
 	}
 	return nil

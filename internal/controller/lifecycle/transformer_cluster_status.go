@@ -113,7 +113,7 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 			return err
 		}
 		// reconcile the phase and conditions of the Cluster.status
-		if err := t.reconcileClusterStatus(transCtx, cluster); err != nil {
+		if err := t.reconcileClusterStatus(transCtx, dag, cluster); err != nil {
 			return err
 		}
 		t.cleanupAnnotationsAfterRunning(cluster)
@@ -123,7 +123,7 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 }
 
 // reconcileClusterStatus reconciles phase and conditions of the Cluster.status.
-func (t *ClusterStatusTransformer) reconcileClusterStatus(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+func (t *ClusterStatusTransformer) reconcileClusterStatus(transCtx *ClusterTransformContext, dag *graph.DAG, cluster *appsv1alpha1.Cluster) error {
 	if len(cluster.Status.Components) == 0 {
 		return nil
 	}
@@ -131,7 +131,7 @@ func (t *ClusterStatusTransformer) reconcileClusterStatus(transCtx *ClusterTrans
 	t.removeInvalidCompStatus(cluster)
 
 	// do analysis of Cluster.Status.component and update the results to status synchronizer.
-	t.doAnalysisAndUpdateSynchronizer(cluster)
+	t.doAnalysisAndUpdateSynchronizer(dag, cluster)
 
 	// sync the LatestOpsRequestProcessed condition.
 	t.syncOpsRequestProcessedCondition(cluster)
@@ -170,7 +170,7 @@ func (t *ClusterStatusTransformer) removeInvalidCompStatus(cluster *appsv1alpha1
 }
 
 // doAnalysisAndUpdateSynchronizer analyses the Cluster.Status.Components and updates the results to the synchronizer.
-func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(cluster *appsv1alpha1.Cluster) {
+func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(dag *graph.DAG, cluster *appsv1alpha1.Cluster) {
 	var (
 		runningCompCount int
 		stoppedCompCount int
@@ -185,7 +185,9 @@ func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(cluster *apps
 		case appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.FailedClusterCompPhase:
 			t.existsAbnormalOrFailed, t.notReadyCompNames[k] = true, struct{}{}
 		case appsv1alpha1.RunningClusterCompPhase:
-			runningCompCount += 1
+			if !isComponentInHorizontalScaling(dag, k) {
+				runningCompCount += 1
+			}
 		case appsv1alpha1.StoppedClusterCompPhase:
 			stoppedCompCount += 1
 		}
@@ -201,6 +203,24 @@ func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(cluster *apps
 		// cluster is Stopped when cluster is not Running and all components are Stopped or Running
 		t.phaseSyncLevel = clusterIsStopped
 	}
+}
+
+func isComponentInHorizontalScaling(dag *graph.DAG, componentName string) bool {
+	stsVertices := findAll[*appsv1.StatefulSet](dag)
+	for _, v := range stsVertices {
+		vertex, _ := v.(*lifecycleVertex)
+		if vertex.action == nil || *vertex.action != UPDATE {
+			continue
+		}
+		name := vertex.obj.GetLabels()[constant.KBAppComponentLabelKey]
+		if name != componentName {
+			continue
+		}
+		oldSts, _ := vertex.oriObj.(*appsv1.StatefulSet)
+		newSts, _ := vertex.obj.(*appsv1.StatefulSet)
+		return *oldSts.Spec.Replicas != *newSts.Spec.Replicas
+	}
+	return false
 }
 
 // handleOpsRequestProcessedCondition syncs the condition that OpsRequest has been processed.

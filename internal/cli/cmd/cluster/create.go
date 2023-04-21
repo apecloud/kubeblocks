@@ -116,6 +116,7 @@ const (
 	keyMemory       setKey = "memory"
 	keyReplicas     setKey = "replicas"
 	keyStorage      setKey = "storage"
+	keyStorageClass setKey = "storageClass"
 	keySwitchPolicy setKey = "switchPolicy"
 	keyUnknown      setKey = "unknown"
 )
@@ -232,6 +233,10 @@ func (o *CreateOptions) Validate() error {
 		return fmt.Errorf("does not support --set and --set-file being specified at the same time")
 	}
 
+	//if len(o.ComponentSpecs) == 0 {
+	//	return fmt.Errorf("ComponentSpecs is nil")
+	//}  // do we need this validate?
+
 	// if name is not specified, generate a random cluster name
 	if o.Name == "" {
 		name, err := generateClusterName(o.Dynamic, o.Namespace)
@@ -248,21 +253,9 @@ func (o *CreateOptions) Validate() error {
 	}
 
 	//validate defualt storageClassName
-	// Get existedStorageClasses and find out is there a defaultStorageClasses
-	existedStorageClasses, defaultStorageClasses, err := cluster.GetStorageClasses(o.Dynamic)
+	err := validateStorageClassName(o.Dynamic, o.ComponentSpecs)
 	if err != nil {
 		return err
-	}
-	//get speicfy StorageClassName or try default StorageClass if we have
-	speicfyStorageClass, err := getStorageClassName(o.ComponentSpecs, defaultStorageClasses)
-	if err != nil {
-		return err
-	}
-	// try speicfy StorageClassName
-	for requestName := range speicfyStorageClass {
-		if _, ok := existedStorageClasses[requestName]; !ok {
-			return fmt.Errorf("--set StorageClass do not exist")
-		}
 	}
 
 	return nil
@@ -488,7 +481,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 	}
 
 	var comps []*appsv1alpha1.ClusterComponentSpec
-	for _, c := range cd.Spec.ComponentDefs {
+	for idx, c := range cd.Spec.ComponentDefs {
 		sets := map[setKey]string{}
 		if setsMap != nil {
 			sets = setsMap[c.Name]
@@ -534,6 +527,11 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				},
 			}}
 		}
+		storageClass := getVal(keyStorageClass, sets)
+		if len(storageClass) != 0 {
+			compObj.VolumeClaimTemplates[idx].Spec.StorageClassName = &storageClass
+		}
+
 		if err := buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err
 		}
@@ -546,7 +544,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 // specified in the set, use the cluster definition default component name.
 func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
-	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keySwitchPolicy)}
+	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keyStorageClass), string(keySwitchPolicy)}
 	parseKey := func(key string) setKey {
 		for _, k := range keys {
 			if strings.EqualFold(k, key) {
@@ -677,10 +675,31 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 		}))
 }
 
-// getStorageClassName return the requested StorageClassName,
-// including the strorageClassName that user specify strorageClass
-// or the defualt strorageClass "standard" if user do not specify
-func getStorageClassName(Component []map[string]interface{}, defaultStorageClasses bool) (map[string]struct{}, error) {
+// validateStorageClassName check whether the StorageClasses we need are exist in K8S or
+// //the Defualt StorageClasses are exist
+func validateStorageClassName(dynamic dynamic.Interface, Components []map[string]interface{}) error {
+	existedStorageClasses, allowDefault, err := cluster.GetStorageClasses(dynamic)
+	if err != nil {
+		return err
+	}
+	speicfyStorageClass, err := getSpecifyStorageClassName(Components)
+	if err != nil {
+		return err
+	}
+	if len(speicfyStorageClass) == 0 && !allowDefault {
+		return fmt.Errorf("lack of default StorageClass")
+	}
+	for requestName := range speicfyStorageClass {
+		if _, ok := existedStorageClasses[requestName]; !ok {
+			return fmt.Errorf("the StorageClass your specif do not exist")
+		}
+	}
+	return nil
+}
+
+// getSpecifyStorageClassName return the requested StorageClassName
+// that user specify strorageClass.
+func getSpecifyStorageClassName(Component []map[string]interface{}) (map[string]struct{}, error) {
 	requestStorageClass := make(map[string]struct{}, 0)
 	for _, comp := range Component {
 		vcts, ok := comp["volumeClaimTemplates"]
@@ -701,9 +720,6 @@ func getStorageClassName(Component []map[string]interface{}, defaultStorageClass
 				return requestStorageClass, fmt.Errorf("inputs error")
 			}
 			strorageClass, ok := spec["storageClassName"]
-			if !ok && !defaultStorageClasses {
-				return nil, fmt.Errorf("no default StorageClass found")
-			}
 			if ok { //specify the StorageClass
 				requestStorageClass[strorageClass.(string)] = struct{}{}
 			}

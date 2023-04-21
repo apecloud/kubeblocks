@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -427,16 +428,11 @@ func GetPodWorkloadType(pod *corev1.Pod) string {
 	return pod.Labels[constant.WorkloadTypeLabelKey]
 }
 
-// GetStorageClasses return all StorageClasses and whether the cluster have a defalut StorageClasses
+// GetStorageClasses return all StorageClasses in K8S and return true if the cluster have a defalut StorageClasses
 func GetStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, error) {
-	gvr := schema.GroupVersionResource{
-		Group:    types.StorageAPIGroup,
-		Version:  types.K8sCoreAPIVersion,
-		Resource: "storageclasses",
-	}
+	gvr := types.StorageClassGVR()
 	allStorageClasses := make(map[string]struct{})
-	defaultStorageClasses := false
-
+	defaultStorageClassesExist := false //
 	list, err := dynamic.Resource(gvr).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, false, fmt.Errorf("failed get existed StorageClasses, " + err.Error())
@@ -446,9 +442,9 @@ func GetStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 		allStorageClasses[item.GetName()] = struct {
 		}{}
 		annotations := item.GetAnnotations()
-		if defaultStorageClasses || annotations != nil && annotations["storageclass.kubernetes.io/is-default-class"] == "true" {
-			defaultStorageClasses = true
+		if defaultStorageClassesExist || annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == "true" || annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true") {
+			defaultStorageClassesExist = true
 		}
 	}
-	return allStorageClasses, defaultStorageClasses, nil
+	return allStorageClasses, defaultStorageClassesExist, nil
 }

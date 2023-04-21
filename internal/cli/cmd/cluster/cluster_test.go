@@ -26,6 +26,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -42,7 +43,10 @@ var _ = Describe("Cluster", func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
 		cd := testing.FakeClusterDef()
-		tf.FakeDynamicClient = testing.FakeDynamicClient(cd, testing.FakeClusterVersion())
+		fakeDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.ISDefautl)
+		fakeDynamicClientWithDefaultSC := testing.FakeDynamicClient(cd, fakeDefaultStorageClass, testing.FakeClusterVersion())
+
+		tf.FakeDynamicClient = fakeDynamicClientWithDefaultSC
 		tf.Client = &clientfake.RESTClient{}
 	})
 
@@ -82,7 +86,6 @@ var _ = Describe("Cluster", func() {
 
 		It("run", func() {
 			clusterDef := testing.FakeClusterDef()
-			tf.FakeDynamicClient = testing.FakeDynamicClient(clusterDef)
 			data, err := os.ReadFile(testClassDefsPath)
 			Expect(err).NotTo(HaveOccurred())
 			clientSet := testing.FakeClientSet(testing.FakeComponentClassDef(clusterDef, data))
@@ -148,7 +151,15 @@ var _ = Describe("Cluster", func() {
 					Dynamic:   tf.FakeDynamicClient,
 					IOStreams: streams,
 				},
+				ComponentSpecs: make([]map[string]interface{}, 1),
 			}
+			o.ComponentSpecs[0] = make(map[string]interface{})
+			o.ComponentSpecs[0]["volumeClaimTemplates"] = make([]interface{}, 1)
+			vct := o.ComponentSpecs[0]["volumeClaimTemplates"].([]interface{})
+			vct[0] = make(map[string]interface{})
+			vct[0].(map[string]interface{})["spec"] = make(map[string]interface{})
+			spec := vct[0].(map[string]interface{})["spec"]
+			spec.(map[string]interface{})["storageClassName"] = testing.StorageClassName
 		})
 
 		It("can validate whether the ClusterDefRef is null when create a new cluster ", func() {
@@ -184,7 +195,7 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Name).ShouldNot(BeEmpty())
 			Expect(o.Validate()).Should(Succeed())
 			o.Name = ""
-			Expect(o.Validate()).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed()) //Expected to generate a random name and
 		})
 
 		It("can validate whether the name is not longer than 16 characters when create a new cluster", func() {
@@ -201,6 +212,47 @@ var _ = Describe("Cluster", func() {
 			o.Name = clusterNameMoreThan16
 			Expect(o.Validate()).Should(HaveOccurred())
 		})
+
+		//todo: The order of create is buildClusterComp first then valiation, it make generating the test case mess.
+		Context("valiate storageClass", func() {
+			It("can get all StorageClasses in K8S and check out if the cluster have a defalut StorageClasses by GetStorageClasses()", func() {
+				storageClasses, allowDefault, err := cluster.GetStorageClasses(o.Dynamic)
+				Expect(err).Should(Succeed())
+				Expect(storageClasses).Should(HaveKey(testing.StorageClassName))
+				Expect(allowDefault).Should(BeTrue())
+				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsNotDefault)
+				cd := testing.FakeClusterDef()
+				tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
+				storageClasses, allowDefault, err = cluster.GetStorageClasses(tf.FakeDynamicClient)
+				Expect(err).Should(Succeed())
+				Expect(storageClasses).Should(HaveKey(testing.StorageClassName))
+				Expect(allowDefault).ShouldNot(BeTrue())
+			})
+
+			It("can get all StorageClasses we specify by getSpecifyStorageClassName()", func() {
+				storageClassName, err := getSpecifyStorageClassName(o.ComponentSpecs)
+				Expect(err).Should(Succeed())
+				Expect(storageClassName).Should(HaveKey(testing.StorageClassName))
+			})
+
+			It("can specify the StorageClass and the StorageClass must exsit", func() {
+				Expect(validateStorageClassName(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
+				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault)
+				cd := testing.FakeClusterDef()
+				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
+				Expect(validateStorageClassName(FakeDynamicClientWithNotDefaultSC, o.ComponentSpecs)).Should(HaveOccurred())
+			})
+
+			It("can get valiate the default StorageClasses", func() {
+				o.ComponentSpecs = make([]map[string]interface{}, 0)
+				Expect(validateStorageClassName(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
+				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault)
+				cd := testing.FakeClusterDef()
+				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
+				Expect(validateStorageClassName(FakeDynamicClientWithNotDefaultSC, o.ComponentSpecs)).Should(HaveOccurred())
+			})
+		})
+
 	})
 
 	It("delete", func() {

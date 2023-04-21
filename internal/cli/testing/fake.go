@@ -24,8 +24,10 @@ import (
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -51,6 +53,9 @@ const (
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupToolName      = "fake-backup-tool"
+
+	ISDefautl    = true
+	IsNotDefault = false
 )
 
 func GetRandomStr() string {
@@ -472,4 +477,21 @@ func FakeAddon(name string) *extensionsv1alpha1.Addon {
 	}
 	addon.SetCreationTimestamp(metav1.Now())
 	return addon
+}
+
+func FakeStorageClass(name string, isDefault bool) *storagev1.StorageClass {
+	storageClassObj := &storagev1.StorageClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StorageClass",
+			APIVersion: "storage.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	if isDefault {
+		storageClassObj.ObjectMeta.Annotations = make(map[string]string)
+		storageClassObj.ObjectMeta.Annotations[storage.IsDefaultStorageClassAnnotation] = "true"
+	}
+	return storageClassObj
 }

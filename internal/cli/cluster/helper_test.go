@@ -102,4 +102,18 @@ var _ = Describe("helper", func() {
 		Expect(latestVer).ShouldNot(BeNil())
 		Expect(latestVer.Name).Should(Equal("now-version"))
 	})
+
+	It("get all storage classes and identify if there is a defualt storage class", func() {
+		dynamic := testing.FakeDynamicClient(testing.FakeStorageClass("test", testing.ISDefautl))
+		classes, ok, err := GetStorageClasses(dynamic)
+		Expect(classes).To(HaveKey("test"))
+		Expect(ok).Should(BeTrue())
+		Expect(err).Should(Succeed())
+		dynamic = testing.FakeDynamicClient(testing.FakeStorageClass("test2", testing.IsNotDefault))
+		classes, ok, err = GetStorageClasses(dynamic)
+		Expect(classes).ToNot(HaveKey("test"))
+		Expect(ok).ShouldNot(BeTrue())
+		Expect(err).Should(Succeed())
+	})
+
 })

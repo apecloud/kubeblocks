@@ -118,7 +118,7 @@ spec:
   backupPolicyName: \(options.backupPolicyName)
   backupType: \(options.backupType)
 EOF
-kubectl patch backup/\(options.name) --subresource=status --type=merge --patch '{"status": {"phase": "New"}}';
+kubectl -n \(options.namespace) patch backup/\(options.name) --subresource=status --type=merge --patch '{"status": {"phase": "New"}}';
 """,
 				]
 			}]

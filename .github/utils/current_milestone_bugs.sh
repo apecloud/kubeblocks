@@ -6,9 +6,9 @@ set -o pipefail
 
 # requires `git` and `gh` commands, ref. https://cli.github.com/manual/installation for installation guides.
 
-worddir=$(dirname $0)
-. ${worddir}/gh_env
-. ${worddir}/functions.bash
+workdir=$(dirname $0)
+. ${workdir}/gh_env
+. ${workdir}/functions.bash
 
 LABELS=${LABELS:-'kind/bug,bug'} #"severity/critical,severity/major,severity/minor,severity/normal" 
 

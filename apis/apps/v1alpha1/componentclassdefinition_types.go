@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -174,4 +175,12 @@ type ComponentClassDefinitionList struct {
 
 func init() {
 	SchemeBuilder.Register(&ComponentClassDefinition{}, &ComponentClassDefinitionList{})
+}
+
+func (r *ComponentClass) ToResourceRequirements() corev1.ResourceRequirements {
+	requests := corev1.ResourceList{
+		corev1.ResourceCPU:    r.CPU,
+		corev1.ResourceMemory: r.Memory,
+	}
+	return corev1.ResourceRequirements{Requests: requests, Limits: requests}
 }

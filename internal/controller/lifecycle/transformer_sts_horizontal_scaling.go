@@ -158,16 +158,20 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			if cluster.Status.Components == nil {
 				return
 			}
+			if *stsObj.Spec.Replicas == *stsProto.Spec.Replicas {
+				return
+			}
 			if componentStatus, ok := cluster.Status.Components[componentName]; ok {
-				if componentStatus.Phase != appsv1alpha1.SpecReconcilingClusterCompPhase {
-					transCtx.EventRecorder.Eventf(cluster,
-						corev1.EventTypeNormal,
-						"HorizontalScale",
-						"Start horizontal scale component %s from %d to %d",
-						comp.Name,
-						*stsObj.Spec.Replicas,
-						*stsProto.Spec.Replicas)
+				if componentStatus.Phase == appsv1alpha1.SpecReconcilingClusterCompPhase {
+					return
 				}
+				transCtx.EventRecorder.Eventf(cluster,
+					corev1.EventTypeNormal,
+					"HorizontalScale",
+					"Start horizontal scale component %s from %d to %d",
+					comp.Name,
+					*stsObj.Spec.Replicas,
+					*stsProto.Spec.Replicas)
 			}
 		}
 
@@ -185,10 +189,10 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 					return nil
 				}
 				// do backup according to component's horizontal scale policy
+				vertex.immutable = true
 				if err := doBackup(reqCtx, transCtx.Client, comp, snapshotKey, dag, rootVertex, vertex); err != nil {
 					return err
 				}
-				vertex.immutable = true
 				return nil
 			}
 			// pvcs are ready, stateful_set.replicas should be updated
@@ -237,7 +241,6 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
-		emitHorizontalScalingEvent()
 		var err error
 		switch {
 		// scale out
@@ -249,6 +252,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 		if err != nil {
 			return err
 		}
+		emitHorizontalScalingEvent()
 
 		if err = postScaleOut(); err != nil {
 			return err

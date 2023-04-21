@@ -16,29 +16,45 @@ The KubeBlocks log enhancement function uses methods similar to kubectl exec and
 ## Steps
 
 1. Enable the log enhancement function.
-   - If you create a cluster by running the `kbcli cluster create` command, add the `--enable-all-logs=true` option to enable the log enhancement function. When this option is `true`, all the log types defined by `spec.components.logConfigs` in `ClusterDefinition` are enabled automatically.
 
-     ```bash
-     kbcli cluster create pg-cluster --cluster-definition='postgresql' --enable-all-logs=true 
-     ```
-   - If you create a cluster by applying a YAML file, add the log type you need in `spec.components.enabledLogs`. As for PostgreSQL, running log is supported.
+   * Enable this function when creating a cluster.
 
-     ```YAML
-     apiVersion: apps.kubeblocks.io/v1alpha1
-     kind: Cluster
-     metadata:
-       name: pg-cluster
-       namespace: default
-     spec:
-       clusterDefinitionRef: postgresql-cluster-definition
-       appVersionRef: appversion-postgresql-latest
-       components:
-       - name: replicasets
-         type: replicasets
-         enabledLogs:
-           - running
-     ```
-   
+     * If you create a cluster by running the `kbcli cluster create` command, add the `--enable-all-logs=true` option to enable the log enhancement function. When this option is `true`, all the log types defined by `spec.components.logConfigs` in `ClusterDefinition` are enabled automatically.
+
+       ```bash
+       kbcli cluster create pg-cluster --cluster-definition='postgresql' --enable-all-logs=true
+       ```
+
+     * If you create a cluster by applying a YAML file, add the log type you need in `spec.components.enabledLogs`. As for PostgreSQL, running log is supported.
+
+        ```YAML
+        apiVersion: apps.kubeblocks.io/v1alpha1
+        kind: Cluster
+        metadata:
+          name: pg-cluster
+          namespace: default
+        spec:
+          clusterDefinitionRef: postgresql-cluster-definition
+          appVersionRef: appversion-postgresql-latest
+          components:
+          - name: replicasets
+            type: replicasets
+            enabledLogs:
+              - running
+        ```
+
+    * Update this function if you do not enable it when creating a cluster.
+       
+       ```bash
+       kbcli cluster pg-cluster update --enable-all-logs=true -n <namespace>
+       ```
+    
+    :::note
+
+    The default namespace in which a cluster is created is `default`. If you specify a namespace when creating a cluster, fill in `<namespace>` with your customized one.
+
+    :::
+
 2. View the supported logs.
    
    Run the `kbcli cluster list-logs` command to view the enabled log types of the target cluster and the log file details. INSTANCE of each node is displayed.

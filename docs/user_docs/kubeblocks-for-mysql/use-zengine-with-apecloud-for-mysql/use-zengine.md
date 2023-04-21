@@ -38,7 +38,7 @@ c2 varchar(64)
 +-------+-------------------------------------------------------------
 ```
 
-For the tables created before enbaling SmartEngine, the storage engine will not change. To change the engine to SmartEngine, you can use the ```ALTER``` command.
+For the tables created before enabling SmartEngine, the storage engine will not change. To change the engine to SmartEngine, you can use the ```ALTER``` command.
 
 ```
 ALTER TABLE {table_name} engine=ZEngine;

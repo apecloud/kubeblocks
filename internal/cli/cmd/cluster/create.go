@@ -43,6 +43,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -276,6 +277,11 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 		err           error
 	)
 
+	componentClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return nil, err
+	}
+
 	// build components from file
 	components := o.ComponentSpecs
 	if len(o.SetFile) > 0 {
@@ -287,6 +293,15 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 		}
 		if err = json.Unmarshal(componentByte, &components); err != nil {
 			return nil, err
+		}
+		for _, item := range components {
+			var comp appsv1alpha1.ClusterComponentSpec
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item, &comp); err != nil {
+				return nil, err
+			}
+			if err = validateComponentClass(&comp, componentClasses); err != nil {
+				return nil, err
+			}
 		}
 		return components, nil
 	}
@@ -308,6 +323,9 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 			return nil, err
 		}
 		for _, compObj := range componentObjs {
+			if err = validateComponentClass(compObj, componentClasses); err != nil {
+				return nil, err
+			}
 			comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compObj)
 			if err != nil {
 				return nil, err
@@ -316,6 +334,28 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 		}
 	}
 	return components, nil
+}
+
+// TODO: optimize this function as it's duplicate with logic in the controller
+func validateComponentClass(comp *appsv1alpha1.ClusterComponentSpec, compClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance) error {
+	classes := compClasses[comp.ComponentDefRef]
+	var cls *appsv1alpha1.ComponentClassInstance
+	switch {
+	case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
+		if classes == nil {
+			return fmt.Errorf("can not find classes for component %s", comp.ComponentDefRef)
+		}
+		cls = classes[comp.ClassDefRef.Class]
+		if cls == nil {
+			return fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
+		}
+	case classes != nil:
+		cls = class.ChooseComponentClasses(classes, comp.Resources.Requests)
+		if cls == nil {
+			return fmt.Errorf("can not find matching class for component %s", comp.Name)
+		}
+	}
+	return nil
 }
 
 // MultipleSourceComponents get component data from multiple source, such as stdin, URI and local file

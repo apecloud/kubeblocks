@@ -100,6 +100,9 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		// TODO another case if len(constraintList.Items) > 0, use matchClassFamilies to find matching resource constraint:
 		switch {
 		case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
+			if classes == nil {
+				return fmt.Errorf("can not find classes for component %s", comp.ComponentDefRef)
+			}
 			cls = classes[comp.ClassDefRef.Class]
 			if cls == nil {
 				return fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
@@ -123,6 +126,9 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		requests.DeepCopyInto(&comp.Resources.Requests)
 
 		limits := comp.Resources.Limits
+		if len(limits) == 0 {
+			limits = make(corev1.ResourceList)
+		}
 		if limits.Cpu().IsZero() || limits.Cpu().Cmp(*requests.Cpu()) < 0 {
 			limits[corev1.ResourceCPU] = *requests.Cpu()
 		}

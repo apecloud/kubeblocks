@@ -17,7 +17,7 @@ limitations under the License.
 package cluster
 
 import (
-	"os"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,11 +29,17 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("Cluster", func() {
-	const testComponentPath = "../../testing/testdata/component.yaml"
-	const testClassDefsPath = "../../testing/testdata/class.yaml"
+	const (
+		testComponentPath                    = "../../testing/testdata/component.yaml"
+		testComponentWithClassPath           = "../../testing/testdata/component_with_class_1c1g.yaml"
+		testComponentWithInvalidClassPath    = "../../testing/testdata/component_with_invalid_class.yaml"
+		testComponentWithResourcePath        = "../../testing/testdata/component_with_resource_1c1g.yaml"
+		testComponentWithInvalidResourcePath = "../../testing/testdata/component_with_invalid_resource.yaml"
+	)
 
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
@@ -80,55 +86,162 @@ var _ = Describe("Cluster", func() {
 			cmd.Run(nil, []string{"test1"})
 		})
 
-		It("run", func() {
-			clusterDef := testing.FakeClusterDef()
-			tf.FakeDynamicClient = testing.FakeDynamicClient(clusterDef)
-			data, err := os.ReadFile(testClassDefsPath)
-			Expect(err).NotTo(HaveOccurred())
-			clientSet := testing.FakeClientSet(testing.FakeComponentClassDef(clusterDef, data))
-			o := &CreateOptions{
-				BaseOptions:       create.BaseOptions{IOStreams: streams, Name: "test", Dynamic: tf.FakeDynamicClient, ClientSet: clientSet},
-				SetFile:           "",
-				ClusterDefRef:     testing.ClusterDefName,
-				ClusterVersionRef: "cluster-version",
-				UpdatableFlags: UpdatableFlags{
-					PodAntiAffinity: "Preferred",
-					TopologyKeys:    []string{"kubernetes.io/hostname"},
-					NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
-					TolerationsRaw:  []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"},
-					Tenancy:         string(appsv1alpha1.SharedNode),
-				},
+		Context("run", func() {
+			var o *CreateOptions
+
+			BeforeEach(func() {
+				clusterDef := testing.FakeClusterDef()
+				tf.FakeDynamicClient = testing.FakeDynamicClient(
+					clusterDef,
+					testing.FakeComponentClassDef(fmt.Sprintf("custom-%s", testing.ComponentDefName), clusterDef.Name, testing.ComponentDefName),
+					testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
+				)
+				o = &CreateOptions{
+					BaseOptions:       create.BaseOptions{IOStreams: streams, Name: "test", Dynamic: tf.FakeDynamicClient},
+					SetFile:           "",
+					ClusterDefRef:     testing.ClusterDefName,
+					ClusterVersionRef: "cluster-version",
+					UpdatableFlags: UpdatableFlags{
+						PodAntiAffinity: "Preferred",
+						TopologyKeys:    []string{"kubernetes.io/hostname"},
+						NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
+						TolerationsRaw:  []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"},
+						Tenancy:         string(appsv1alpha1.SharedNode),
+					},
+				}
+				o.TerminationPolicy = "WipeOut"
+			})
+
+			Run := func() {
+				inputs := create.Inputs{
+					ResourceName:    types.ResourceClusters,
+					CueTemplateName: CueTemplateName,
+					Options:         o,
+					Factory:         tf,
+				}
+
+				Expect(o.BaseOptions.Complete(inputs, []string{"test"})).Should(Succeed())
+				Expect(o.Namespace).To(Equal("default"))
+				Expect(o.Name).To(Equal("test"))
+
+				Expect(o.Run(inputs)).Should(Succeed())
 			}
 
-			Expect(len(o.TolerationsRaw)).Should(Equal(1))
-			Expect(o.Complete()).Should(Succeed())
-			Expect(len(o.Tolerations)).Should(Equal(1))
-			Expect(o.Validate()).Should(HaveOccurred())
+			It("validate tolerations", func() {
+				Expect(len(o.TolerationsRaw)).Should(Equal(1))
+				Expect(o.Complete()).Should(Succeed())
+				Expect(len(o.Tolerations)).Should(Equal(1))
+			})
 
-			o.TerminationPolicy = "WipeOut"
-			o.SetFile = "test.yaml"
-			Expect(o.Complete()).ShouldNot(Succeed())
+			It("validate termination policy should be set", func() {
+				o.TerminationPolicy = ""
+				Expect(o.Validate()).Should(HaveOccurred())
+			})
 
-			o.SetFile = ""
-			Expect(o.Complete()).Should(Succeed())
-			Expect(o.Validate()).Should(Succeed())
+			It("should succeed if component with valid class", func() {
+				o.Values = []string{fmt.Sprintf("type=%s,class=%s", testing.ComponentDefName, testapps.Class1c1gName)}
+				Expect(o.Complete()).Should(Succeed())
+				Expect(o.Validate()).Should(Succeed())
+				Run()
+			})
 
-			o.SetFile = testComponentPath
-			Expect(o.Complete()).Should(Succeed())
-			Expect(o.Validate()).Should(Succeed())
+			It("should fail if component with invalid class", func() {
+				o.Values = []string{fmt.Sprintf("type=%s,class=class-not-exists", testing.ComponentDefName)}
+				Expect(o.Complete()).Should(HaveOccurred())
+			})
 
-			inputs := create.Inputs{
-				ResourceName:    types.ResourceClusters,
-				CueTemplateName: CueTemplateName,
-				Options:         o,
-				Factory:         tf,
-			}
+			It("should succeed if component with resource matching to one class", func() {
+				o.Values = []string{fmt.Sprintf("type=%s,cpu=1,memory=1Gi", testing.ComponentDefName)}
+				Expect(o.Complete()).Should(Succeed())
+				Expect(o.Validate()).Should(Succeed())
+				Run()
+			})
 
-			Expect(o.BaseOptions.Complete(inputs, []string{"test"})).Should(Succeed())
-			Expect(o.Namespace).To(Equal("default"))
-			Expect(o.Name).To(Equal("test"))
+			It("should succeed component with resource equivalent to class", func() {
+				o.Values = []string{fmt.Sprintf("type=%s,cpu=1000m,memory=1024Mi", testing.ComponentDefName)}
+				Expect(o.Complete()).Should(Succeed())
+				Expect(o.Validate()).Should(Succeed())
+				Run()
+			})
 
-			Expect(o.Run(inputs)).Should(Succeed())
+			It("should fail if component with resource not matching to any class", func() {
+				o.Values = []string{fmt.Sprintf("type=%s,cpu=1,memory=2Gi", testing.ComponentDefName)}
+				Expect(o.Complete()).Should(HaveOccurred())
+			})
+
+			It("should succeed if component with cpu matching one class", func() {
+				o.Values = []string{fmt.Sprintf("type=%s,cpu=1", testing.ComponentDefName)}
+				Expect(o.Complete()).Should(Succeed())
+				Expect(o.Validate()).Should(Succeed())
+				Run()
+			})
+
+			It("should fail if component with cpu not matching to any class", func() {
+				o.Values = []string{fmt.Sprintf("type=%s,cpu=4", testing.ComponentDefName)}
+				Expect(o.Complete()).Should(HaveOccurred())
+			})
+
+			It("should succeed if component with memory matching one class", func() {
+				o.Values = []string{fmt.Sprintf("type=%s,memory=1Gi", testing.ComponentDefName)}
+				Expect(o.Complete()).Should(Succeed())
+				Expect(o.Validate()).Should(Succeed())
+				Run()
+			})
+
+			It("should fail if component with memory not matching to any class", func() {
+				o.Values = []string{fmt.Sprintf("type=%s,memory=4Gi", testing.ComponentDefName)}
+				Expect(o.Complete()).Should(HaveOccurred())
+			})
+
+			It("should succeed if component don't have class definition", func() {
+				o.Values = []string{fmt.Sprintf("type=%s,cpu=3,memory=7Gi", testing.ExtraComponentDefName)}
+				Expect(o.Complete()).Should(Succeed())
+				Expect(o.Validate()).Should(Succeed())
+				Run()
+			})
+
+			It("should fail if create cluster by file not existing", func() {
+				o.SetFile = "test.yaml"
+				Expect(o.Complete()).Should(HaveOccurred())
+			})
+
+			It("should succeed if create cluster by empty file", func() {
+				o.SetFile = ""
+				Expect(o.Complete()).Should(Succeed())
+				Expect(o.Validate()).Should(Succeed())
+				Run()
+			})
+
+			It("should succeed if create cluster by file without class and resource", func() {
+				o.SetFile = testComponentPath
+				Expect(o.Complete()).Should(Succeed())
+				Expect(o.Validate()).Should(Succeed())
+				Run()
+			})
+
+			It("should succeed if create cluster by file with class", func() {
+				o.SetFile = testComponentWithClassPath
+				Expect(o.Complete()).Should(Succeed())
+				Expect(o.Validate()).Should(Succeed())
+				Run()
+			})
+
+			It("should succeed if create cluster by file with resource", func() {
+				o.SetFile = testComponentWithResourcePath
+				Expect(o.Complete()).Should(Succeed())
+				Expect(o.Validate()).Should(Succeed())
+				Run()
+			})
+
+			It("should fail if create cluster by file with class not exists", func() {
+				o.SetFile = testComponentWithInvalidClassPath
+				Expect(o.Complete()).Should(HaveOccurred())
+			})
+
+			It("should fail if create cluster by file with resource not matching to any class", func() {
+				o.SetFile = testComponentWithInvalidResourcePath
+				Expect(o.Complete()).Should(HaveOccurred())
+			})
 		})
 	})
 

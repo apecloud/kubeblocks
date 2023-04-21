@@ -15,6 +15,7 @@ def main(argv: list[str]) -> None:
     tag_ref_prefix = "refs/tags/v"
     github_env : str = str(os.getenv("GITHUB_ENV"))
 
+
     with open(github_env, "a") as github_env_f:
         if git_ref is None or not git_ref.startswith(tag_ref_prefix):
             print("This is not a release tag")
@@ -23,13 +24,7 @@ def main(argv: list[str]) -> None:
         release_version = git_ref[len(tag_ref_prefix) :]
         release_note_path = f"docs/release_notes/v{release_version}/v{release_version}.md"
 
-        if git_ref.find("-alpha.") > 0:
-            print(f"Alpha release build from {git_ref} ...")
-        elif git_ref.find("-beta.") > 0:
-            print(f"Beta release build from {git_ref} ...")
-        elif git_ref.find("-rc.") > 0:
-            print(f"Release Candidate build from {git_ref} ...")
-        else:
+        def set_with_rel_note_to_true() -> None
             print(f"Checking if {release_note_path} exists")
             if os.path.exists(release_note_path):
                 print(f"Found {release_note_path}")
@@ -37,6 +32,19 @@ def main(argv: list[str]) -> None:
             else:
                 print("{} is not found".format(release_note_path))
             print(f"Release build from {git_ref} ...")
+
+
+        if git_ref.find("-alpha.") > 0:
+            print(f"Alpha release build from {git_ref} ...")
+            print(f"IGNORED")
+        elif git_ref.find("-beta.") > 0:
+            print(f"Beta release build from {git_ref} ...")
+            print(f"IGNORED")
+        elif git_ref.find("-rc.") > 0:
+            print(f"Release Candidate build from {git_ref} ...")
+            set_with_rel_note_to_true()
+        else:
+            set_with_rel_note_to_true()
 
         github_env_f.write(f"REL_VERSION={release_version}\n")
 

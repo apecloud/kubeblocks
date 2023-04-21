@@ -428,7 +428,17 @@ Here we take zsh as an example.
 
 :::note
 
-Uninstall KubeBlocks first.
+Uninstallation steps:
+
+1. Delete your cluster if you have created a cluster.
+
+   ```bash
+   kbcli cluster delete <name>
+   ```
+
+2. Uninstall KubeBlocks.
+
+3. Uninstall `kbcli`.
 
 :::
 

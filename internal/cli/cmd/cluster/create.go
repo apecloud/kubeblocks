@@ -318,7 +318,7 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 			return nil, err
 		}
 
-		componentObjs, err := buildClusterComp(cd, compSets)
+		componentObjs, err := buildClusterComp(cd, compSets, componentClasses)
 		if err != nil {
 			return nil, err
 		}
@@ -470,7 +470,7 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 	}
 }
 
-func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string, componentClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	// get value from set values and environment variables, the second return value is
 	// true if the value is from environment variables
 	getVal := func(c *appsv1alpha1.ClusterComponentDefinition, key setKey, sets map[setKey]string) string {
@@ -553,32 +553,41 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 
 		// class has higher priority than other resource related parameters
-		className := getVal(&c, keyClass, sets)
-		if className != "" {
-			compObj.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: className}
+		resourceList := make(corev1.ResourceList)
+		if _, ok := componentClasses[c.Name]; ok {
+			if className := getVal(&c, keyClass, sets); className != "" {
+				compObj.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: className}
+			} else {
+				if cpu, ok := sets[keyCPU]; ok {
+					resourceList[corev1.ResourceCPU] = resource.MustParse(cpu)
+				}
+				if mem, ok := sets[keyMemory]; ok {
+					resourceList[corev1.ResourceMemory] = resource.MustParse(mem)
+				}
+			}
 		} else {
-			resourceList := corev1.ResourceList{
+			resourceList = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse(getVal(&c, keyCPU, sets)),
 				corev1.ResourceMemory: resource.MustParse(getVal(&c, keyMemory, sets)),
 			}
-			compObj.Resources = corev1.ResourceRequirements{
-				Requests: resourceList,
-				Limits:   resourceList,
-			}
-			compObj.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
-				Name: "data",
-				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
-					AccessModes: []corev1.PersistentVolumeAccessMode{
-						corev1.ReadWriteOnce,
-					},
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse(getVal(&c, keyStorage, sets)),
-						},
+		}
+		compObj.Resources = corev1.ResourceRequirements{
+			Requests: resourceList,
+			Limits:   resourceList,
+		}
+		compObj.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
+			Name: "data",
+			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{
+					corev1.ReadWriteOnce,
+				},
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse(getVal(&c, keyStorage, sets)),
 					},
 				},
-			}}
-		}
+			},
+		}}
 		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err
 		}

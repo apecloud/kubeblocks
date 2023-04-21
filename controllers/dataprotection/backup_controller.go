@@ -751,13 +751,13 @@ func (r *BackupReconciler) createDeleteBackupFileJob(
 	}
 
 	// build pod
-	podSpec := corev1.PodSpec{}
+	podSpec := corev1.PodSpec{
+		Containers:    []corev1.Container{container},
+		RestartPolicy: corev1.RestartPolicyNever,
+	}
 
 	// mount the backup volume to the pod
-	r.appendBackupVolumeMount(backupPVCName, &podSpec, &container)
-
-	podSpec.Containers = []corev1.Container{container}
-	podSpec.RestartPolicy = corev1.RestartPolicyNever
+	r.appendBackupVolumeMount(backupPVCName, &podSpec, &podSpec.Containers[0])
 
 	if err := addTolerations(&podSpec); err != nil {
 		return err
@@ -1163,14 +1163,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	if backupTool.Spec.Resources != nil {
 		container.Resources = *backupTool.Spec.Resources
 	}
-
-	// mount volumes from the target pod to the pod of backup tool
 	container.VolumeMounts = clusterPod.Spec.Containers[0].VolumeMounts
-	podSpec.Volumes = clusterPod.Spec.Volumes
-
-	// mount the backup volume to the pod of backup tool
-	pvcName := commonPolicy.PersistentVolumeClaim.Name
-	r.appendBackupVolumeMount(pvcName, &podSpec, &container)
 
 	allowPrivilegeEscalation := false
 	runAsUser := int64(0)
@@ -1220,7 +1213,12 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	container.Env = append(container.Env, backupTool.Spec.Env...)
 
 	podSpec.Containers = []corev1.Container{container}
+	podSpec.Volumes = clusterPod.Spec.Volumes
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
+
+	// mount the backup volume to the pod of backup tool
+	pvcName := commonPolicy.PersistentVolumeClaim.Name
+	r.appendBackupVolumeMount(pvcName, &podSpec, &podSpec.Containers[0])
 
 	// the pod of job needs to be scheduled on the same node as the workload pod, because it needs to share one pvc
 	// see: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename

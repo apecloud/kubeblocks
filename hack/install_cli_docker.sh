@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#Copyright (C) 2022 ApeCloud Co., Ltd
+#Copyright (C) 2022-2023 ApeCloud Co., Ltd
 #
 #This file is part of KubeBlocks project
 #

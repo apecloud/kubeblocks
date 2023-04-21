@@ -26,7 +26,7 @@ spec:
     # schema: auto generate from mmmcue scripts
     # example: ../../internal/configuration/testdata/mysql_openapi.json
     cue: |-
-      //Copyright (C) 2022 ApeCloud Co., Ltd
+      //Copyright (C) 2022-2023 ApeCloud Co., Ltd
       //
       //This file is part of KubeBlocks project
       //

@@ -129,4 +129,12 @@ var _ = Describe("Preflight API Test", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(res)).Should(Equal(2))
 	})
+	It("newPreflightPath test, and expect success", func() {
+		res := newPreflightPath("test")
+		Expect(res).Should(Equal("data/test_preflight.yaml"))
+	})
+	It("newHostPreflightPath test, and expect success", func() {
+		res := newHostPreflightPath("test")
+		Expect(res).Should(Equal("data/test_hostpreflight.yaml"))
+	})
 })

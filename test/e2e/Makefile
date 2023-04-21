@@ -30,10 +30,20 @@ ginkgo: # Make sure ginkgo is in $GOPATH/bin
 ifeq ($(origin VERSION), command line)
     VERSION ?= $(VERSION)
 endif
+ifeq ($(origin VERSION), command line)
+    PROVIDER ?= $(PROVIDER)
+else
+    PROVIDER ?= ""
+endif
+ifeq ($(origin REGION), command line)
+    REGION ?= $(REGION)
+else
+    REGION ?= ""
+endif
 .PHONY: run
 run: ginkgo ## Run end-to-end tests.
 	#ACK_GINKGO_DEPRECATIONS=$(GINKGO_VERSION) $(GINKGO) run .
-	$(GINKGO) test -process -ginkgo.v . -- --VERSION=$(VERSION) --ginkgo.json-report=report.json
+	$(GINKGO) test -process -ginkgo.v . -- -VERSION=$(VERSION) -PROVIDER=$(PROVIDER) -REGION=$(REGION) -SECRET_ID=$(SECRET_ID) -SECRET_KEY=$(SECRET_KEY) --ginkgo.json-report=report.json
 
 build: ginkgo ## Run ginkgo build e2e test suite binary.
 	$(GINKGO) build .

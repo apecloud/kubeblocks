@@ -113,6 +113,7 @@ func executeTpcc(action string) error {
 	tpccConfig.DBName = dbName
 	tpccConfig.Threads = threads
 	tpccConfig.Isolation = isolationLevel
+	tpccConfig.Driver = driver
 
 	switch tpccConfig.OutputType {
 	case "csv", "CSV":

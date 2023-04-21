@@ -1,7 +1,7 @@
 /*
 Copyright (C) 2022 ApeCloud Co., Ltd
 
-# This file is part of KubeBlocks project
+This file is part of KubeBlocks project
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
 package appstest
 
 import (

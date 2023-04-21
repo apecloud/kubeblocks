@@ -159,7 +159,7 @@ var _ = Describe("Cluster", func() {
 			Run()
 		})
 
-		It("should succeed component with resource equivalent to class", func() {
+		It("should succeed if component with resource equivalent to class", func() {
 			o.Values = []string{fmt.Sprintf("type=%s,cpu=1000m,memory=1024Mi", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())

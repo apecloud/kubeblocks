@@ -118,12 +118,12 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 			newSpec := reflect.ValueOf(v.obj).Elem().FieldByName("Spec")
 
 			// compare replicas
-			oldReplicas := oldSpec.FieldByName("Replicas").Interface()
-			newReplicas := newSpec.FieldByName("Replicas").Interface()
-			if !reflect.DeepEqual(oldReplicas, newReplicas) {
-				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
-				continue
-			}
+			// oldReplicas := oldSpec.FieldByName("Replicas").Interface()
+			// newReplicas := newSpec.FieldByName("Replicas").Interface()
+			// if !reflect.DeepEqual(oldReplicas, newReplicas) {
+			//	updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
+			//	continue
+			// }
 			// compare cpu & memory
 			oldResources := oldSpec.FieldByName("Template").
 				FieldByName("Spec").

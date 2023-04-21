@@ -238,9 +238,21 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			}
 			return nil
 		}
+		updateClusterPhase := func() {
+			if *stsObj.Spec.Replicas == *stsProto.Spec.Replicas {
+				return
+			}
+			clusterPhase := cluster.Status.Phase
+			if clusterPhase == "" {
+				cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
+			} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
+				cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
+			}
+		}
 
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
+		updateClusterPhase()
 		var err error
 		switch {
 		// scale out

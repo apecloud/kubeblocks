@@ -566,6 +566,9 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				}
 			}
 		} else {
+			if className := getVal(&c, keyClass, sets); className != "" {
+				return nil, fmt.Errorf("can not find class %s for component type %s", className, c.Name)
+			}
 			resourceList = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse(getVal(&c, keyCPU, sets)),
 				corev1.ResourceMemory: resource.MustParse(getVal(&c, keyMemory, sets)),

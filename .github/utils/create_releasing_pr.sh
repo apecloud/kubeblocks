@@ -6,11 +6,18 @@ set -o pipefail
 
 # requires `git` and `gh` commands, ref. https://cli.github.com/manual/installation for installation guides.
 
-. ./gh_env
-. ./functions.bash
+worddir=$(dirname $0)
+. ${worddir}/gh_env
+. ${worddir}/functions.bash
+
+set -x
+
+# git stash
+git switch ${BASE_BRANCH}
+git pull
+git merge origin/${HEAD_BRANCH}
 
 echo "Creating ${PR_TITLE}"
-
 result=$(gh api \
     --method POST \
     -H "Accept: application/vnd.github+json" \

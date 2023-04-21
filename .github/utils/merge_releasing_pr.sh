@@ -6,8 +6,9 @@ set -o pipefail
 
 # requires `git` and `gh` commands, ref. https://cli.github.com/manual/installation for installation guides.
 
-. ./gh_env
-. ./functions.bash
+worddir=$(dirname $0)
+. ${worddir}/gh_env
+. ${worddir}/functions.bash
 
 echo "Merging ${PR_TITLE}"
 

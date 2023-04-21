@@ -39,7 +39,7 @@ Run the command below to create a MySQL cluster.
   
    To create a cluster with specified parameters, follow the steps below, and you have three options.
 
-   **Option 1.** (**Recommended**) Use --set option
+   **Option 1.** (**Recommended**) Use --set command.
    
     Add the `--set` option when creating a cluster. For example,
     ```bash

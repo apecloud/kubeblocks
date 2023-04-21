@@ -319,11 +319,12 @@ func (r *BackupReconciler) buildAutoCreationAnnotations(backupPolicyName string)
 }
 
 // getBackupPathPrefix gets the backup path prefix.
-func (r *BackupReconciler) getBackupPathPrefix(backupNamespace, pathPrefix string) string {
+func (r *BackupReconciler) getBackupPathPrefix(req ctrl.Request, pathPrefix string) string {
+	pathPrefix = strings.TrimRight(pathPrefix, "/")
 	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
-		return fmt.Sprintf("/%s%s", backupNamespace, pathPrefix)
+		return fmt.Sprintf("/%s%s/%s", req.Namespace, pathPrefix, req.Name)
 	}
-	return fmt.Sprintf("/%s/%s", backupNamespace, pathPrefix)
+	return fmt.Sprintf("/%s/%s/%s", req.Namespace, pathPrefix, req.Name)
 }
 
 func (r *BackupReconciler) doInProgressPhaseAction(
@@ -395,7 +396,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		if err = r.createUpdatesJobs(reqCtx, backup, &commonPolicy.BasePolicy, dataprotectionv1alpha1.PRE); err != nil {
 			r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPreUpdatesJob", err.Error())
 		}
-		pathPrefix := r.getBackupPathPrefix(backup.Namespace, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
+		pathPrefix := r.getBackupPathPrefix(reqCtx.Req, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
 		err = r.createBackupToolJob(reqCtx, backup, commonPolicy, pathPrefix)
 		if err != nil {
 			return r.updateStatusIfFailed(reqCtx, backup, err)

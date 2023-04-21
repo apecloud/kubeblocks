@@ -58,9 +58,10 @@ var _ = Describe("MySQL data protection function", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearBackupResources(&testCtx, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
 

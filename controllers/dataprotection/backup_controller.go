@@ -728,6 +728,66 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))
 }
 
+func (r *BackupReconciler) createDeleteBackupFileJob(
+	reqCtx intctrlutil.RequestCtx,
+	jobKey types.NamespacedName,
+	backup *dataprotectionv1alpha1.Backup,
+	backupPVCName string,
+	backupFilePath string) error {
+
+	// build container
+	container := corev1.Container{}
+	container.Name = backup.Name
+	container.Command = []string{"sh", "-c"}
+	container.Args = []string{fmt.Sprintf("rm -rf %s%s", backupPathBase, backupFilePath)}
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
+
+	allowPrivilegeEscalation := false
+	runAsUser := int64(0)
+	container.SecurityContext = &corev1.SecurityContext{
+		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+		RunAsUser:                &runAsUser,
+	}
+
+	// build pod
+	podSpec := corev1.PodSpec{}
+
+	// mount the backup volume to the pod
+	r.appendBackupVolumeMount(backupPVCName, &podSpec, &container)
+
+	podSpec.Containers = []corev1.Container{container}
+	podSpec.RestartPolicy = corev1.RestartPolicyNever
+
+	if err := addTolerations(&podSpec); err != nil {
+		return err
+	}
+
+	// build job
+	backOffLimit := int32(3)
+	ttlSecondsAfterSuccess := int32(600)
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: jobKey.Namespace,
+			Name:      jobKey.Name,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: jobKey.Namespace,
+					Name:      jobKey.Name,
+				},
+				Spec: podSpec,
+			},
+			BackoffLimit:            &backOffLimit,
+			TTLSecondsAfterFinished: &ttlSecondsAfterSuccess,
+		},
+	}
+
+	reqCtx.Log.V(1).Info("create a job from delete backup files", "job", job)
+	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))
+}
+
 func (r *BackupReconciler) createBackupToolJob(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
@@ -921,26 +981,18 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	}
 
 	jobName := deleteBackupFilesJobNamePrefix + backup.Name
-	key := types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
+	jobKey := types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
 	job := batchv1.Job{}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, &job)
+	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, jobKey, &job)
 	if err != nil {
 		return err
 	}
 	// create job for deleting backup files
 	if !exists {
-		backupPolicy, err := r.getBackupPolicyAndValidate(reqCtx, backup)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				reqCtx.Log.Info("BackupPolicy not found", "policy", backup.Spec.BackupPolicyName)
-				return nil
-			}
-			return fmt.Errorf("deleteBackupFiles getBackupPolicyAndValidate: %w", err)
-		}
-		commonPolicy := backupPolicy.Spec.GetCommonPolicy(backup.Spec.BackupType)
-		if commonPolicy == nil {
-			reqCtx.Log.Info("no commonPolicy", "backupType", backup.Spec.BackupType)
-			// nothing to do
+		pvcName := backup.Status.PersistentVolumeClaimName
+		if pvcName == "" {
+			reqCtx.Log.Info("skip deleting backup files because PersistentVolumeClaimName empty",
+				"backup", backup.Name)
 			return nil
 		}
 
@@ -957,44 +1009,18 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 				"backupFilePath", backupFilePath, "backup", backup.Name)
 			return nil
 		}
-		toolPodSpec, err := r.buildDeleteBackupFilePodSpec(backup, commonPolicy, backupFilePath)
-		if err != nil {
-			return fmt.Errorf("deleteBackupFiles buildDeleteBackupFilePodSpec: %w", err)
+		// the job will run in the background
+		if err = r.createDeleteBackupFileJob(reqCtx, jobKey, backup, pvcName, backupFilePath); err != nil {
+			return err
 		}
-
-		if err = r.createBatchV1Job(reqCtx, key, backup, toolPodSpec); err != nil {
-			return fmt.Errorf("deleteBackupFiles createBatchV1Job: %w", err)
-		}
-		msg := fmt.Sprintf("Waiting for job %s to be completed.", key.Name)
-		r.Recorder.Event(backup, corev1.EventTypeNormal, "DeletingBackupFiles", msg)
 	}
 
-	isOK, err := r.ensureBatchV1JobCompleted(reqCtx, key)
-	if err != nil {
-		if errors.Is(err, errJobFailed) {
-			msg := "the job for deleting backup files is failed, this may cause residual files."
-			r.Recorder.Event(backup, corev1.EventTypeWarning, "DeletingBackupFiles", msg)
-			reqCtx.Log.Info(msg, "backup", backup.Name)
-			return nil // skip deleting backup files
-		}
-		return fmt.Errorf("deleteBackupFiles ensureBatchV1JobCompleted: %w", err)
-	}
-	if !isOK {
-		return fmt.Errorf("deleteBackupFiles job %s is not completed, %w", jobName, errDeletingBackupFiles)
-	}
 	return nil
 }
 
 func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) error {
-	if !backup.Status.BackupFileDeleted {
-		if err := r.deleteBackupFiles(reqCtx, backup); err != nil {
-			return err
-		}
-		patch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.BackupFileDeleted = true
-		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
-			return err
-		}
+	if err := r.deleteBackupFiles(reqCtx, backup); err != nil {
+		return err
 	}
 	if err := r.deleteReferenceBatchV1Jobs(reqCtx, backup); err != nil {
 		return err
@@ -1240,40 +1266,6 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 
 	if err = addTolerations(&podSpec); err != nil {
-		return podSpec, err
-	}
-
-	return podSpec, nil
-}
-
-func (r *BackupReconciler) buildDeleteBackupFilePodSpec(
-	backup *dataprotectionv1alpha1.Backup,
-	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
-	backupFilePath string) (corev1.PodSpec, error) {
-
-	podSpec := corev1.PodSpec{}
-
-	container := corev1.Container{}
-	container.Name = backup.Name
-	container.Command = []string{"sh", "-c"}
-	container.Args = []string{fmt.Sprintf("rm -rf %s%s", backupPathBase, backupFilePath)}
-	container.Image = viper.GetString(constant.KBToolsImage)
-	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-
-	allowPrivilegeEscalation := false
-	runAsUser := int64(0)
-	container.SecurityContext = &corev1.SecurityContext{
-		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
-		RunAsUser:                &runAsUser}
-
-	// mount the backup volume to the pod
-	pvcName := commonPolicy.PersistentVolumeClaim.Name
-	r.appendBackupVolumeMount(pvcName, &podSpec, &container)
-
-	podSpec.Containers = []corev1.Container{container}
-	podSpec.RestartPolicy = corev1.RestartPolicyNever
-
-	if err := addTolerations(&podSpec); err != nil {
 		return podSpec, err
 	}
 

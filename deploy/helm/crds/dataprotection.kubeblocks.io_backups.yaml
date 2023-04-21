@@ -79,9 +79,6 @@ spec:
           status:
             description: BackupStatus defines the observed state of Backup
             properties:
-              backupFileDeleted:
-                description: Indicates whether the backup file has been deleted.
-                type: boolean
               backupToolName:
                 description: backupToolName referenced backup tool name.
                 type: string

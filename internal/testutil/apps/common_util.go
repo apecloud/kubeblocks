@@ -1,9 +1,12 @@
 /*
 Copyright ApeCloud, Inc.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -286,34 +289,14 @@ func DeleteObject[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
 	testCtx *testutil.TestContext, funcSig func(T, L), opts ...client.DeleteAllOfOption) {
-	ClearResourcesWithCleaner[T, PT, L, PL](testCtx, funcSig, nil, opts...)
+	ClearResourcesWithRemoveFinalizerOption[T, PT, L, PL](testCtx, funcSig, false, opts...)
 }
 
 // ClearResourcesWithRemoveFinalizerOption clears all resources of the given type T with
 // removeFinalizer specifier, and satisfying the input ListOptions.
 func ClearResourcesWithRemoveFinalizerOption[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
-	testCtx *testutil.TestContext, funcSig func(T, L), removeFinalizer bool, opts ...client.DeleteAllOfOption) {
-
-	ClearResourcesWithCleaner[T, PT, L, PL](testCtx, funcSig, func(g gomega.Gomega, pobj PT) {
-		finalizers := pobj.GetFinalizers()
-		if len(finalizers) > 0 {
-			if removeFinalizer {
-				g.Expect(ChangeObj(testCtx, pobj, func(lobj PT) {
-					pobj.SetFinalizers([]string{})
-				})).To(gomega.Succeed())
-			} else {
-				g.Expect(finalizers).Should(gomega.BeEmpty())
-			}
-		}
-	}, opts...)
-}
-
-// ClearResourcesWithCleaner clears all resources of the given type T satisfying the input ListOptions.
-// The cleaner takes extra actions to help clearing the object.
-func ClearResourcesWithCleaner[T intctrlutil.Object, PT intctrlutil.PObject[T],
-	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
-	testCtx *testutil.TestContext, _ func(T, L), cleaner func(gomega.Gomega, PT), opts ...client.DeleteAllOfOption) {
+	testCtx *testutil.TestContext, _ func(T, L), removeFinalizer bool, opts ...client.DeleteAllOfOption) {
 	var (
 		obj     T
 		objList L
@@ -338,8 +321,15 @@ func ClearResourcesWithCleaner[T intctrlutil.Object, PT intctrlutil.PObject[T],
 			if pobj.GetDeletionTimestamp().IsZero() {
 				panic("expected DeletionTimestamp is not nil")
 			}
-			if cleaner != nil {
-				cleaner(g, pobj)
+			finalizers := pobj.GetFinalizers()
+			if len(finalizers) > 0 {
+				if removeFinalizer {
+					g.Expect(ChangeObj(testCtx, pobj, func(lobj PT) {
+						pobj.SetFinalizers([]string{})
+					})).To(gomega.Succeed())
+				} else {
+					g.Expect(finalizers).Should(gomega.BeEmpty())
+				}
 			}
 		}
 		g.Expect(items).Should(gomega.BeEmpty())

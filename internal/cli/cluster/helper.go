@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -441,4 +442,25 @@ func GetConfigConstraintByName(dynamic dynamic.Interface, name string) (*appsv1a
 		return nil, err
 	}
 	return ccObj, nil
+}
+
+// GetStorageClasses return all StorageClasses in K8S and return true if the cluster have a defalut StorageClasses
+func GetStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, error) {
+	gvr := types.StorageClassGVR()
+	allStorageClasses := make(map[string]struct{})
+	defaultStorageClassesExist := false //
+	list, err := dynamic.Resource(gvr).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, false, fmt.Errorf("failed get existed StorageClasses, " + err.Error())
+	}
+
+	for _, item := range list.Items {
+		allStorageClasses[item.GetName()] = struct {
+		}{}
+		annotations := item.GetAnnotations()
+		if defaultStorageClassesExist || annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == "true" || annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true") {
+			defaultStorageClassesExist = true
+		}
+	}
+	return allStorageClasses, defaultStorageClassesExist, nil
 }

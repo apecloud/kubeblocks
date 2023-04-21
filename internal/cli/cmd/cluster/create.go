@@ -116,6 +116,7 @@ const (
 	keyMemory       setKey = "memory"
 	keyReplicas     setKey = "replicas"
 	keyStorage      setKey = "storage"
+	keyStorageClass setKey = "storageClass"
 	keySwitchPolicy setKey = "switchPolicy"
 	keyUnknown      setKey = "unknown"
 )
@@ -246,6 +247,13 @@ func (o *CreateOptions) Validate() error {
 	if len(o.Name) > 16 {
 		return fmt.Errorf("cluster name should be less than 16 characters")
 	}
+
+	// validate default storageClassName
+	err := validateStorageClassName(o.Dynamic, o.ComponentSpecs)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -493,7 +501,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 	}
 
 	var comps []*appsv1alpha1.ClusterComponentSpec
-	for _, c := range cd.Spec.ComponentDefs {
+	for idx, c := range cd.Spec.ComponentDefs {
 		sets := map[setKey]string{}
 		if setsMap != nil {
 			sets = setsMap[c.Name]
@@ -539,6 +547,10 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				},
 			}}
 		}
+		storageClass := getVal(&c, keyStorageClass, sets)
+		if len(storageClass) != 0 {
+			compObj.VolumeClaimTemplates[idx].Spec.StorageClassName = &storageClass
+		}
 		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err
 		}
@@ -551,7 +563,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 // specified in the set, use the cluster definition default component name.
 func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
-	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keySwitchPolicy)}
+	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keyStorageClass), string(keySwitchPolicy)}
 	parseKey := func(key string) setKey {
 		for _, k := range keys {
 			if strings.EqualFold(k, key) {
@@ -692,4 +704,57 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 				"DedicatedNode\teach pod of the cluster will run on their own dedicated node",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}))
+}
+
+// validateStorageClassName check whether the StorageClasses we need are exist in K8S or
+// //the default StorageClasses are exist
+func validateStorageClassName(dynamic dynamic.Interface, components []map[string]interface{}) error {
+	existedStorageClasses, allowDefault, err := cluster.GetStorageClasses(dynamic)
+	if err != nil {
+		return err
+	}
+	speicfyStorageClass, err := getSpecifyStorageClassName(components)
+	if err != nil {
+		return err
+	}
+	if len(speicfyStorageClass) == 0 && !allowDefault {
+		return fmt.Errorf("lack of default StorageClass")
+	}
+	for requestName := range speicfyStorageClass {
+		if _, ok := existedStorageClasses[requestName]; !ok {
+			return fmt.Errorf("the StorageClass your specif do not exist")
+		}
+	}
+	return nil
+}
+
+// getSpecifyStorageClassName return the requested StorageClassName
+// that user specify strorageClass.
+func getSpecifyStorageClassName(component []map[string]interface{}) (map[string]struct{}, error) {
+	requestStorageClass := make(map[string]struct{}, 0)
+	for _, comp := range component {
+		vcts, ok := comp["volumeClaimTemplates"]
+		if !ok { // lack of VolumeClaimTemplates field
+			return requestStorageClass, fmt.Errorf("inputs error")
+		}
+		vctsList, ok := vcts.([]interface{})
+		if !ok { // assert failed
+			return requestStorageClass, fmt.Errorf("inputs error")
+		}
+		for _, v := range vctsList {
+			vct, ok := v.(map[string]interface{})
+			if !ok { // assert failed
+				return requestStorageClass, fmt.Errorf("inputs error")
+			}
+			spec, ok := vct["spec"].(map[string]interface{})
+			if !ok { // assert failed
+				return requestStorageClass, fmt.Errorf("inputs error")
+			}
+			strorageClass, ok := spec["storageClassName"]
+			if ok { // specify the StorageClass
+				requestStorageClass[strorageClass.(string)] = struct{}{}
+			}
+		}
+	}
+	return requestStorageClass, nil
 }

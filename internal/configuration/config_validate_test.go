@@ -108,11 +108,11 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		},
 		err: errors.New(`failed to cue template render configure: [mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction:
 mysqld.innodb_autoinc_lock_mode: conflicting values 0 and 100:
-    28:35
+    31:35
 mysqld.innodb_autoinc_lock_mode: conflicting values 1 and 100:
-    28:39
+    31:39
 mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
-    28:43
+    31:43
 ]`),
 	}, {
 		name: "configmap_key_filter",

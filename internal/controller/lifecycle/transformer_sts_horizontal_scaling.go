@@ -60,9 +60,6 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 	handleHorizontalScaling := func(vertex *lifecycleVertex) error {
 		stsObj, _ := vertex.oriObj.(*appsv1.StatefulSet)
 		stsProto, _ := vertex.obj.(*appsv1.StatefulSet)
-		if *stsObj.Spec.Replicas == *stsProto.Spec.Replicas {
-			return nil
-		}
 
 		key := client.ObjectKey{
 			Namespace: stsProto.GetNamespace(),
@@ -81,11 +78,13 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 			cluster.Spec.ComponentSpecs)
 		comp := getComponent(components, componentName)
 		if comp == nil {
-			s.ctx.Recorder.Eventf(cluster,
-				corev1.EventTypeWarning,
-				"HorizontalScaleFailed",
-				"component %s not found",
-				componentName)
+			if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
+				s.ctx.Recorder.Eventf(cluster,
+					corev1.EventTypeWarning,
+					"HorizontalScaleFailed",
+					"component %s not found",
+					componentName)
+			}
 			return nil
 		}
 		cleanCronJobs := func() error {
@@ -172,13 +171,19 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 				vertex.immutable = true
 				return nil
 			}
-			// check all pvc bound, requeue if not all ready
+			// pvcs are ready, stateful_set.replicas should be updated
+			vertex.immutable = false
+
+			return nil
+		}
+
+		postScaleOut := func() error {
+			// check all pvc bound, wait next reconciliation if not all ready
 			allPVCBounded, err := checkAllPVCBoundIfNeeded()
 			if err != nil {
 				return err
 			}
 			if !allPVCBounded {
-				vertex.immutable = true
 				return nil
 			}
 			// clean backup resources.
@@ -186,12 +191,7 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 			if err := cleanBackupResourcesIfNeeded(); err != nil {
 				return err
 			}
-
-			// pvcs are ready, stateful_set.replicas should be updated
-			vertex.immutable = false
-
 			return nil
-
 		}
 
 		scaleIn := func() error {
@@ -236,6 +236,10 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 				comp.Name,
 				*stsObj.Spec.Replicas,
 				*stsProto.Spec.Replicas)
+		}
+
+		if err = postScaleOut(); err != nil {
+			return err
 		}
 
 		return nil
@@ -521,7 +525,7 @@ func isAllPVCBound(cli types2.ReadonlyClient,
 		pvc := corev1.PersistentVolumeClaim{}
 		// check pvc existence
 		if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
-			return false, err
+			return false, client.IgnoreNotFound(err)
 		}
 		if pvc.Status.Phase != corev1.ClaimBound {
 			return false, nil

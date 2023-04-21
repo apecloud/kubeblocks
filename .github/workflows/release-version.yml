@@ -19,6 +19,13 @@ env:
 
 
 jobs:
+  merge-releasing-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Auto merge releasing PR
+        run: ./.github/utils/merge_releasing_pr.sh
+
   release-test:
     runs-on: [ self-hosted, eks-fargate-runner ]
     steps:
@@ -38,7 +45,6 @@ jobs:
     steps:
       - name: checkout branch ${{ github.ref_name }}
         uses: actions/checkout@v3
-
       - name: push tag
         uses: mathieudutour/github-tag-action@v6.1
         with:

@@ -19,8 +19,10 @@ package lifecycle
 import (
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
@@ -74,17 +76,78 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 	}
 
-	updateComponentsPhase := func() {
-		vertices := findAllNot[*appsv1alpha1.Cluster](dag)
-		for _, vertex := range vertices {
-			v, _ := vertex.(*lifecycleVertex)
-			if v.immutable || v.action == nil || *v.action != CREATE {
+	isStorageUpdated := func(oldSts, newSts *appsv1.StatefulSet) bool {
+		if oldSts == nil || newSts == nil {
+			return false
+		}
+		for _, oldVct := range oldSts.Spec.VolumeClaimTemplates {
+			var newVct *corev1.PersistentVolumeClaim
+			for _, v := range newSts.Spec.VolumeClaimTemplates {
+				if v.Name == oldVct.Name {
+					newVct = &v
+					break
+				}
+			}
+			if newVct == nil {
 				continue
 			}
-			switch v.obj.(type) {
-			case *appsv1.StatefulSet, *appsv1.Deployment:
-				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
+			if oldVct.Spec.Resources.Requests[corev1.ResourceStorage] != newVct.Spec.Resources.Requests[corev1.ResourceStorage] {
+				return true
 			}
+		}
+		return false
+	}
+
+	updateComponentsPhase := func() {
+		stsVertices := findAll[*appsv1.StatefulSet](dag)
+		deployVertices := findAll[*appsv1.Deployment](dag)
+		vertices := append(stsVertices, deployVertices...)
+		for _, vertex := range vertices {
+			v, _ := vertex.(*lifecycleVertex)
+			if v.immutable || v.action == nil {
+				continue
+			}
+			if *v.action == CREATE {
+				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
+				continue
+			}
+			if *v.action != UPDATE {
+				continue
+			}
+			oldSpec := reflect.ValueOf(v.oriObj).Elem().FieldByName("Spec")
+			newSpec := reflect.ValueOf(v.obj).Elem().FieldByName("Spec")
+
+			// compare replicas
+			oldReplicas := oldSpec.FieldByName("Replicas").Interface()
+			newReplicas := newSpec.FieldByName("Replicas").Interface()
+			if !reflect.DeepEqual(oldReplicas, newReplicas) {
+				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
+				continue
+			}
+			// compare cpu & memory
+			oldResources := oldSpec.FieldByName("Template").
+				FieldByName("Spec").
+				FieldByName("Containers").
+				Index(0).
+				FieldByName("Resources")
+			newResources := newSpec.FieldByName("Template").
+				FieldByName("Spec").
+				FieldByName("Containers").
+				Index(0).
+				FieldByName("Resources")
+			if !reflect.DeepEqual(oldResources, newResources) {
+				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
+				continue
+			}
+			// compare sts storage
+			if _, ok := v.obj.(*appsv1.StatefulSet); ok {
+				oldSts, _ := v.oriObj.(*appsv1.StatefulSet)
+				newSts, _ := v.obj.(*appsv1.StatefulSet)
+				if !isStorageUpdated(oldSts, newSts) {
+					continue
+				}
+			}
+			updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
 		}
 	}
 

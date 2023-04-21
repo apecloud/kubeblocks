@@ -15,7 +15,7 @@ set -x
 git stash
 git switch ${HEAD_BRANCH}
 git pull
-git merge origin/${BASE_BRANCH}
+git rebase origin/${BASE_BRANCH}
 git pull
 
 echo "Creating ${PR_TITLE}"

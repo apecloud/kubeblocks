@@ -129,12 +129,12 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 				FieldByName("Spec").
 				FieldByName("Containers").
 				Index(0).
-				FieldByName("Resources")
+				FieldByName("Resources").Interface()
 			newResources := newSpec.FieldByName("Template").
 				FieldByName("Spec").
 				FieldByName("Containers").
 				Index(0).
-				FieldByName("Resources")
+				FieldByName("Resources").Interface()
 			if !reflect.DeepEqual(oldResources, newResources) {
 				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
 				continue

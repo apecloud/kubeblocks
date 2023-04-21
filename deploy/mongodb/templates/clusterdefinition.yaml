@@ -94,7 +94,7 @@ spec:
                 exec:
                   command:
                     - /scripts/replicaset-post-start.sh
-                    - REPLICASET
+                    - MONGODB
             volumeMounts:
               - mountPath: /data/mongodb
                 name: data

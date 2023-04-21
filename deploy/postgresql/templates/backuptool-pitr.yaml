@@ -27,8 +27,6 @@ spec:
       value: $(VOLUME_DATA_DIR)/pgroot/arcwal
     - name: LOG_DIR
       value: $(VOLUME_DATA_DIR)/pgroot/data/pg_wal
-    - name: REMOTE_LOG_DIR
-      value: $(BACKUP_DIR)/$(BACKUP_NAME)
   image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   logical:
     restoreCommands:
@@ -41,7 +39,7 @@ spec:
         set -e;
         mkdir -p ${PITR_DIR};
         cd ${PITR_DIR}
-        for i in $(find ${REMOTE_LOG_DIR} -name "*.gz"); do
+        for i in $(find ${BACKUP_DIR} -name "*.gz"); do
           cp ${i} $(basename $i)
           gzip -df $(basename $i);
         done
@@ -60,9 +58,9 @@ spec:
   backupCommands:
     - |
       set -e;
-      EXPIRED_INCR_LOG=${REMOTE_LOG_DIR}/$(date -d"7 day ago" +%Y%m%d);
+      EXPIRED_INCR_LOG=${BACKUP_DIR}/$(date -d"7 day ago" +%Y%m%d);
       if [ -d ${EXPIRED_INCR_LOG} ]; then rm -rf ${EXPIRED_INCR_LOG}; fi
-      TODAY_INCR_LOG=${REMOTE_LOG_DIR}/$(date +%Y%m%d);
+      TODAY_INCR_LOG=${BACKUP_DIR}/$(date +%Y%m%d);
       mkdir -p ${TODAY_INCR_LOG};
       for i in $(find ${ARCHIVE_LOG_DIR} -name "*.gz"); do
         mv -f ${i} ${TODAY_INCR_LOG}/;

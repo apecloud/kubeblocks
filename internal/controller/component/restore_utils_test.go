@@ -51,8 +51,7 @@ var _ = Describe("probe_utils", func() {
 			// delete rest mocked objects
 			inNS := client.InNamespace(testCtx.DefaultNamespace)
 			ml := client.HasLabels{testCtx.TestObjLabelKey}
-			testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
-			testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
+			testapps.ClearBackupResources(&testCtx, inNS, ml)
 			// non-namespaced
 			testapps.ClearResources(&testCtx, generics.BackupToolSignature, ml)
 		}

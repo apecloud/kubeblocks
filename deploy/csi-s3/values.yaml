@@ -51,6 +51,9 @@ tolerations:
   - key: node-role.kubernetes.io/master
     operator: "Exists"
 
+daemonSetTolerations:
+  - operator: Exists
+
 affinity:
   nodeAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:

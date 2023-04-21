@@ -150,6 +150,15 @@ Bootstrap a playground KubeBlocks in local host or cloud.
 * [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a kubernetes cluster and install KubeBlocks for playground.
 
 
+## [plugin](kbcli_plugin.md)
+
+Provides utilities for interacting with plugins.
+
+ Plugins provide extended functionality that is not part of the major command-line distribution.
+
+* [kbcli plugin list](kbcli_plugin_list.md)	 - List all visible plugin executables on a user's PATH
+
+
 ## [version](kbcli_version.md)
 
 Print the version information, include kubernetes, KubeBlocks and kbcli version.

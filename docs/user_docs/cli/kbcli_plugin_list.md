@@ -1,28 +1,24 @@
 ---
-title: kbcli cluster start
+title: kbcli plugin list
 ---
 
-Start the cluster if cluster is stopped.
+List all visible plugin executables on a user's PATH
 
 ```
-kbcli cluster start [flags]
+kbcli plugin list
 ```
 
 ### Examples
 
 ```
-  # start the cluster when cluster is stopped
-  kbcli cluster start <my-cluster>
+  # List all available plugins file on a user's PATH.
+  kbcli plugin list
 ```
 
 ### Options
 
 ```
-      --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
-  -h, --help                           help for start
-      --name string                    OpsRequest name. if not specified, it will be randomly generated 
-  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
+  -h, --help   help for list
 ```
 
 ### Options inherited from parent commands
@@ -51,7 +47,7 @@ kbcli cluster start [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli plugin](kbcli_plugin.md)	 - Provides utilities for interacting with plugins.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

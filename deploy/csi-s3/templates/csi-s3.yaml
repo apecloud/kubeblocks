@@ -53,6 +53,10 @@ spec:
         app: csi-s3
     spec:
       serviceAccount: csi-s3
+      {{- with .Values.daemonSetTolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       hostNetwork: true
       containers:
         - name: driver-registrar

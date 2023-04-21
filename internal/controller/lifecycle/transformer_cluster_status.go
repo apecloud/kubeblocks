@@ -17,12 +17,13 @@ limitations under the License.
 package lifecycle
 
 import (
+	"reflect"
+
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
@@ -99,9 +100,9 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	updateComponentsPhase := func() {
-		stsVertices := findAll[*appsv1.StatefulSet](dag)
+		vertices := findAll[*appsv1.StatefulSet](dag)
 		deployVertices := findAll[*appsv1.Deployment](dag)
-		vertices := append(stsVertices, deployVertices...)
+		vertices = append(vertices, deployVertices...)
 		for _, vertex := range vertices {
 			v, _ := vertex.(*lifecycleVertex)
 			if v.immutable || v.action == nil {

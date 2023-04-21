@@ -185,8 +185,8 @@ spec:
                       type: array
                       x-kubernetes-list-type: set
                     issuer:
-                      description: issuer who provides tls certs required when TLS
-                        enabled
+                      description: issuer defines provider context for TLS certs.
+                        required when TLS enabled
                       properties:
                         name:
                           default: KubeBlocks
@@ -198,7 +198,7 @@ spec:
                           - UserProvided
                           type: string
                         secretRef:
-                          description: secretRef, Tls certs Secret reference required
+                          description: secretRef, TLS certs Secret reference required
                             when from is UserProvided
                           properties:
                             ca:
@@ -353,7 +353,7 @@ spec:
                           type: string
                       type: object
                     tls:
-                      description: tls should be enabled or not
+                      description: Enable or disable TLS certs.
                       type: boolean
                     tolerations:
                       description: Component tolerations will override ClusterSpec.Tolerations

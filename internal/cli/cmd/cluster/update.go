@@ -312,7 +312,7 @@ func (o *updateOptions) reconfigureLogVariables(c *appsv1alpha1.Cluster, cd *app
 		if err = logTPL.Execute(&buf, logValue); err != nil {
 			return err
 		}
-		formatter.FormatterOptions.IniConfig.SectionName = defaultSectionName
+		formatter.FormatterOptions = appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{SectionName: defaultSectionName}}
 		if logVariables, err = cfgcore.TransformConfigFileToKeyValueMap(keyName, formatter, buf.Bytes()); err != nil {
 			return err
 		}

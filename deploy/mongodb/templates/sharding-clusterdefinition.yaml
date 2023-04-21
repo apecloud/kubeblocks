@@ -60,8 +60,9 @@ spec:
         updateStrategy: Serial
       probes:
         roleProbe:
-          periodSeconds: 2
-          failureThreshold: 3
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       service:
         ports:
           - name: configsvr
@@ -109,8 +110,9 @@ spec:
         updateStrategy: BestEffortParallel
       probes:
         roleProbe:
-          periodSeconds: 2
-          failureThreshold: 3
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       service:
         ports:
           - name: shard

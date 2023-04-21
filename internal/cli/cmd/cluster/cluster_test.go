@@ -179,7 +179,7 @@ var _ = Describe("Cluster", func() {
 		})
 
 		It("should fail if component with cpu not matching to any class", func() {
-			o.Values = []string{fmt.Sprintf("type=%s,cpu=4", testing.ComponentDefName)}
+			o.Values = []string{fmt.Sprintf("type=%s,cpu=3", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 

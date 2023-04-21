@@ -233,10 +233,6 @@ func (o *CreateOptions) Validate() error {
 		return fmt.Errorf("does not support --set and --set-file being specified at the same time")
 	}
 
-	//if len(o.ComponentSpecs) == 0 {
-	//	return fmt.Errorf("ComponentSpecs is nil")
-	//}  // do we need this validate?
-
 	// if name is not specified, generate a random cluster name
 	if o.Name == "" {
 		name, err := generateClusterName(o.Dynamic, o.Namespace)
@@ -252,7 +248,7 @@ func (o *CreateOptions) Validate() error {
 		return fmt.Errorf("cluster name should be less than 16 characters")
 	}
 
-	//validate defualt storageClassName
+	// validate default storageClassName
 	err := validateStorageClassName(o.Dynamic, o.ComponentSpecs)
 	if err != nil {
 		return err
@@ -676,13 +672,13 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 }
 
 // validateStorageClassName check whether the StorageClasses we need are exist in K8S or
-// //the Defualt StorageClasses are exist
-func validateStorageClassName(dynamic dynamic.Interface, Components []map[string]interface{}) error {
+// //the default StorageClasses are exist
+func validateStorageClassName(dynamic dynamic.Interface, components []map[string]interface{}) error {
 	existedStorageClasses, allowDefault, err := cluster.GetStorageClasses(dynamic)
 	if err != nil {
 		return err
 	}
-	speicfyStorageClass, err := getSpecifyStorageClassName(Components)
+	speicfyStorageClass, err := getSpecifyStorageClassName(components)
 	if err != nil {
 		return err
 	}
@@ -699,28 +695,28 @@ func validateStorageClassName(dynamic dynamic.Interface, Components []map[string
 
 // getSpecifyStorageClassName return the requested StorageClassName
 // that user specify strorageClass.
-func getSpecifyStorageClassName(Component []map[string]interface{}) (map[string]struct{}, error) {
+func getSpecifyStorageClassName(component []map[string]interface{}) (map[string]struct{}, error) {
 	requestStorageClass := make(map[string]struct{}, 0)
-	for _, comp := range Component {
+	for _, comp := range component {
 		vcts, ok := comp["volumeClaimTemplates"]
-		if !ok { //lack of VolumeClaimTemplates field
+		if !ok { // lack of VolumeClaimTemplates field
 			return requestStorageClass, fmt.Errorf("inputs error")
 		}
 		vctsList, ok := vcts.([]interface{})
-		if !ok { //assert failed
+		if !ok { // assert failed
 			return requestStorageClass, fmt.Errorf("inputs error")
 		}
 		for _, v := range vctsList {
 			vct, ok := v.(map[string]interface{})
-			if !ok { //assert failed
+			if !ok { // assert failed
 				return requestStorageClass, fmt.Errorf("inputs error")
 			}
 			spec, ok := vct["spec"].(map[string]interface{})
-			if !ok { //assert failed
+			if !ok { // assert failed
 				return requestStorageClass, fmt.Errorf("inputs error")
 			}
 			strorageClass, ok := spec["storageClassName"]
-			if ok { //specify the StorageClass
+			if ok { // specify the StorageClass
 				requestStorageClass[strorageClass.(string)] = struct{}{}
 			}
 		}

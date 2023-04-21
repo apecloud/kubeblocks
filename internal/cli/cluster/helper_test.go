@@ -103,7 +103,7 @@ var _ = Describe("helper", func() {
 		Expect(latestVer.Name).Should(Equal("now-version"))
 	})
 
-	It("get all storage classes and identify if there is a defualt storage class", func() {
+	It("get all storage classes and identify if there is a default storage class", func() {
 		dynamic := testing.FakeDynamicClient(testing.FakeStorageClass("test", testing.ISDefautl))
 		classes, ok, err := GetStorageClasses(dynamic)
 		Expect(classes).To(HaveKey("test"))

@@ -186,6 +186,18 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return nil
 }
 
+// updateComponentPhaseWithOperation if workload of component changes, should update the component phase.
+func updateComponentPhaseWithOperation(cluster *appsv1alpha1.Cluster, componentName string) {
+	componentPhase := appsv1alpha1.SpecReconcilingClusterCompPhase
+	if cluster.Status.Phase == appsv1alpha1.CreatingClusterPhase {
+		componentPhase = appsv1alpha1.CreatingClusterCompPhase
+	}
+	compStatus := cluster.Status.Components[componentName]
+	// synchronous component phase is consistent with cluster phase
+	compStatus.Phase = componentPhase
+	cluster.Status.SetComponentStatus(componentName, compStatus)
+}
+
 // reconcileClusterStatus reconciles phase and conditions of the Cluster.status.
 func (t *ClusterStatusTransformer) reconcileClusterStatus(transCtx *ClusterTransformContext, dag *graph.DAG, cluster *appsv1alpha1.Cluster) error {
 	if len(cluster.Status.Components) == 0 {

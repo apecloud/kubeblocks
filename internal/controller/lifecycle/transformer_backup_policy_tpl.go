@@ -59,6 +59,9 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 			}
 			// build the backup policy from the template.
 			backupPolicy := r.transformBackupPolicy(transCtx, v, origCluster, compDef.WorkloadType, tpl.Name)
+			if backupPolicy == nil {
+				continue
+			}
 			vertex := &lifecycleVertex{obj: backupPolicy}
 			dag.AddVertex(vertex)
 			dag.Connect(rootVertex, vertex)
@@ -105,12 +108,9 @@ func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 	backupPolicy.Labels[constant.AppInstanceLabelKey] = cluster.Name
 	backupPolicy.Labels[constant.KBAppComponentDefRefLabelKey] = policyTPL.ComponentDefRef
 
-	// REVIEW/TODO: (wangyelei)
-	// 1. following is rather hack-ish, as Backup target criteria has no direct relation with workloadType,
-	// need extra attributes for the target selector.
-	// 2. need to update workloadType API attributes documentation for current design implementation.
-	//
 	// only update the role labelSelector of the backup target instance when component workload is Replication/Consensus.
+	// because the replicas of component will change, such as 2->1. then if the target role is 'follower' and replicas is 1,
+	// the target instance can not be found. so we sync the label selector automatically.
 	if !slices.Contains([]appsv1alpha1.WorkloadType{appsv1alpha1.Replication, appsv1alpha1.Consensus}, workloadType) {
 		return
 	}
@@ -136,15 +136,15 @@ func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 		}
 		return target
 	}
-	if backupPolicy.Spec.Snapshot != nil {
+	if backupPolicy.Spec.Snapshot != nil && policyTPL.Snapshot != nil {
 		backupPolicy.Spec.Snapshot.Target = syncTheRoleLabel(backupPolicy.Spec.Snapshot.Target,
 			policyTPL.Snapshot.BasePolicy)
 	}
-	if backupPolicy.Spec.Full != nil {
+	if backupPolicy.Spec.Full != nil && policyTPL.Full != nil {
 		backupPolicy.Spec.Full.Target = syncTheRoleLabel(backupPolicy.Spec.Full.Target,
 			policyTPL.Full.BasePolicy)
 	}
-	if backupPolicy.Spec.Incremental != nil {
+	if backupPolicy.Spec.Incremental != nil && policyTPL.Incremental != nil {
 		backupPolicy.Spec.Incremental.Target = syncTheRoleLabel(backupPolicy.Spec.Incremental.Target,
 			policyTPL.Incremental.BasePolicy)
 	}
@@ -155,6 +155,10 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 	cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
 	tplName string) *dataprotectionv1alpha1.BackupPolicy {
+	component := r.getFirstComponent(cluster, policyTPL.ComponentDefRef)
+	if component == nil {
+		return nil
+	}
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DeriveBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef),
@@ -166,6 +170,7 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 			Annotations: map[string]string{
 				constant.DefaultBackupPolicyAnnotationKey:  "true",
 				constant.BackupPolicyTemplateAnnotationKey: tplName,
+				constant.BackupDataPathPrefixAnnotationKey: fmt.Sprintf("/%s-%s/%s", cluster.Name, cluster.UID, component.Name),
 			},
 		},
 	}
@@ -173,12 +178,9 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 	bpSpec.TTL = policyTPL.TTL
 	bpSpec.Schedule.BaseBackup = r.convertBaseBackupSchedulePolicy(policyTPL.Schedule.BaseBackup)
 	bpSpec.Schedule.Incremental = r.convertSchedulePolicy(policyTPL.Schedule.Incremental)
-	component := r.getFirstComponent(cluster, policyTPL.ComponentDefRef)
-	if component != nil {
-		bpSpec.Full = r.convertCommonPolicy(policyTPL.Full, cluster.Name, *component, workloadType)
-		bpSpec.Incremental = r.convertCommonPolicy(policyTPL.Incremental, cluster.Name, *component, workloadType)
-		bpSpec.Snapshot = r.convertSnapshotPolicy(policyTPL.Snapshot, cluster.Name, *component, workloadType)
-	}
+	bpSpec.Full = r.convertCommonPolicy(policyTPL.Full, cluster.Name, *component, workloadType)
+	bpSpec.Incremental = r.convertCommonPolicy(policyTPL.Incremental, cluster.Name, *component, workloadType)
+	bpSpec.Snapshot = r.convertSnapshotPolicy(policyTPL.Snapshot, cluster.Name, *component, workloadType)
 	backupPolicy.Spec = bpSpec
 	return backupPolicy
 }
@@ -307,8 +309,8 @@ func (r *BackupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.Common
 	}
 	defaultCreatePolicy := dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent
 	globalCreatePolicy := viper.GetString(constant.CfgKeyBackupPVCCreatePolicy)
-	if len(globalCreatePolicy) != 0 {
-		defaultCreatePolicy = dataprotectionv1alpha1.CreatePVCPolicy(globalCreatePolicy)
+	if dataprotectionv1alpha1.CreatePVCPolicy(globalCreatePolicy) == dataprotectionv1alpha1.CreatePVCPolicyNever {
+		defaultCreatePolicy = dataprotectionv1alpha1.CreatePVCPolicyNever
 	}
 	defaultInitCapacity := constant.DefaultBackupPvcInitCapacity
 	globalInitCapacity := viper.GetString(constant.CfgKeyBackupPVCInitCapacity)

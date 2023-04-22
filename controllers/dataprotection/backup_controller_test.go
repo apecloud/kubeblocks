@@ -336,6 +336,7 @@ var _ = Describe("Backup Controller test", func() {
 		Context("creates a full backup", func() {
 			var backupKey types.NamespacedName
 			var backupPolicy *dataprotectionv1alpha1.BackupPolicy
+			var pathPrefix = "/mysql/backup"
 			createBackup := func(backupName string) {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
@@ -356,6 +357,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("By creating a backupPolicy from backupTool: " + backupTool.Name)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddAnnotations(constant.BackupDataPathPrefixAnnotationKey, pathPrefix).
 					AddFullPolicy().
 					SetBackupToolName(backupTool.Name).
 					SetSchedule(defaultSchedule, true).
@@ -373,6 +375,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
+					g.Expect(fetched.Status.Manifests.BackupTool.FilePath).To(Equal(fmt.Sprintf("/%s%s/%s", backupKey.Namespace, pathPrefix, backupKey.Name)))
 				})).Should(Succeed())
 			})
 

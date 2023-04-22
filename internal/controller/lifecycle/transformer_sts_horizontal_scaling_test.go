@@ -85,6 +85,7 @@ var _ = Describe("sts horizontal scaling test", func() {
 				Cluster:     cluster,
 				OrigCluster: cluster.DeepCopy(),
 			}
+
 			By("prepare initial DAG with sts.action=UPDATE")
 			dag := graph.NewDAG()
 			rootVertex := &lifecycleVertex{obj: cluster, oriObj: cluster.DeepCopy(), action: actionPtr(STATUS)}

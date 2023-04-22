@@ -173,21 +173,8 @@ func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 
 func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.SynthesizedComponent, task *intctrltypes.ReconcileTask) error {
 	// TODO add built-in function
-	c.builtInFunctions = &gotemplate.BuiltInObjectsFunc{
-		builtInMysqlCalBufferFunctionName:            calDBPoolSize,
-		builtInGetVolumeFunctionName:                 getVolumeMountPathByName,
-		builtInGetPvcFunctionName:                    getPVCByName,
-		builtInGetEnvFunctionName:                    wrapGetEnvByName(c, task),
-		builtInGetPortFunctionName:                   getPortByName,
-		builtInGetArgFunctionName:                    getArgByName,
-		builtInGetContainerFunctionName:              getPodContainerByName,
-		builtInGetContainerCPUFunctionName:           getContainerCPU,
-		builtInGetContainerMemoryFunctionName:        getContainerMemory,
-		builtInGetContainerRequestMemoryFunctionName: getContainerRequestMemory,
-		builtInGetCAFile:                             getCAFile,
-		builtInGetCertFile:                           getCertFile,
-		builtInGetKeyFile:                            getKeyFile,
-	}
+	c.builtInFunctions = BuiltInCustomFunctions(c, task)
+	// other logic here
 	return nil
 }
 

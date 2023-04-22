@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 
 # generate release note for milestone
@@ -15,139 +15,149 @@ from string import Template
 
 from github import Github
 
-releaseIssueRegex = "^v(.*) Release Planning$"
-majorReleaseRegex = "^([0-9]+\.[0-9]+)\.[0-9]+.*$"
-milestoneRegex = "https://github.com/apecloud/kubeblocks/milestone/([0-9]+)"
-
-githubToken = os.getenv("GITHUB_TOKEN")
-
-changeTypes = [
-    "New Features",
-    "Bug Fixes",
-    "Miscellaneous"
-]
+RELEASE_ISSUE_RANGE = "^v(.*) Release Planning$"
+MAJOR_RELEASE_REGEX = "^([0-9]+\.[0-9]+)\.[0-9]+.*$"
+MILESTONE_REGEX = "https://github.com/apecloud/kubeblocks/milestone/([0-9]+)"
+CHANGE_TYPES : list[str] = ["New Features", "Bug Fixes", "Miscellaneous"]
 
 
-def get_change_priority(name):
-    if name in changeTypes:
-        return changeTypes.index(name)
-    return len(changeTypes)
+def get_change_priority(name: str) -> int:
+    if name in CHANGE_TYPES:
+        return CHANGE_TYPES.index(name)
+    return len(CHANGE_TYPES)
 
 
-changes = []
-warnings = []
-changeLines = []
-breakingChangeLines = []
+def main(argv: list[str]) -> None:
+    changes = []
+    warnings = []
+    change_lines = []
+    breaking_change_lines = []
+    gh_env = os.getenv("GITHUB_ENV")
+    gh = Github(os.getenv("GITHUB_TOKEN"))
 
-gh = Github(githubToken)
+    # get milestone issue
+    issues = [
+        i
+        for i in gh.get_repo("apecloud/kubeblocks").get_issues(state="open")
+        if re.search(RELEASE_ISSUE_RANGE, i.title)
+    ]
+    issues = sorted(issues, key=lambda i: i.id)
 
-# get milestone issue
-issues = [i for i in gh.get_repo("apecloud/kubeblocks").get_issues(state='open') if
-          re.search(releaseIssueRegex, i.title)]
-issues = sorted(issues, key=lambda i: i.id)
+    if len(issues) == 0:
+        print("FATAL: failed to find issue for release.")
+        sys.exit(0)
 
-if len(issues) == 0:
-    print("FATAL: failed to find issue for release.")
-    sys.exit(0)
+    if len(issues) > 1:
+        print(f"WARNING: found more than one issue for release, so first issue created will be picked: {[i.title for i in issues]}")
 
-if len(issues) > 1:
-    print("WARNING: found more than one issue for release, so first issue created will be picked: {}".
-          format([i.title for i in issues]))
+    issue = issues[0]
+    print(f"Found issue: {issue.title}")
 
-issue = issues[0]
-print("Found issue: {}".format(issue.title))
+    # get release version from issue name
+    release_version = re.search(RELEASE_ISSUE_RANGE, issue.title).group(1)
+    print(f"Generating release notes for KubeBlocks {release_version}")
 
-# get release version from issue name
-releaseVersion = re.search(releaseIssueRegex, issue.title).group(1)
-print("Generating release notes for KubeBlocks {}".format(releaseVersion))
+    # Set REL_VERSION
+    if gh_env:
+        with open(gh_env, "a") as f:
+            f.write(f"REL_VERSION={release_version}\n")
+            f.write(f"REL_BRANCH=release-{re.search(MAJOR_RELEASE_REGEX, release_version).group(1)}\n")
 
-# Set REL_VERSION
-if os.getenv("GITHUB_ENV"):
-    with open(os.getenv("GITHUB_ENV"), "a") as githubEnv:
-        githubEnv.write("REL_VERSION={}\n".format(releaseVersion))
-        githubEnv.write("REL_BRANCH=release-{}\n".format(re.search(majorReleaseRegex, releaseVersion).group(1)))
+    release_note_path = f"docs/release_notes/v{release_version}.md"
 
-releaseNotePath = "docs/release_notes/v{}.md".format(releaseVersion)
+    # get milestone
+    repo_milestones = re.findall(MILESTONE_REGEX, issue.body)
+    if len(repo_milestones) == 0:
+        print("FATAL: failed to find milestone in release issue body")
+        sys.exit(0)
+    if len(repo_milestones) > 1:
+        print(f"WARNING: found more than one milestone in release issue body, first milestone will be picked: {[i for i in repo_milestones]}")
 
-# get milestone
-repoMilestones = re.findall(milestoneRegex, issue.body)
-if len(repoMilestones) == 0:
-    print("FATAL: failed to find milestone in release issue body")
-    sys.exit(0)
-if len(repoMilestones) > 1:
-    print("WARNING: found more than one milestone in release issue body, first milestone will be picked: {}".
-          format([i for i in repoMilestones]))
+    # find all issues and PRs in milestone
+    repo = gh.get_repo(f"apecloud/kubeblocks")
+    milestone = repo.get_milestone(int(repo_milestones[0]))
+    issue_or_prs = [i for i in repo.get_issues(milestone, state="closed")]
+    print(f"Detected {len(issue_or_prs)} issues or pull requests")
 
-# find all issues and PRs in milestone
-repo = gh.get_repo(f"apecloud/kubeblocks")
-milestone = repo.get_milestone(int(repoMilestones[0]))
-issueOrPRs = [i for i in repo.get_issues(milestone, state="closed")]
-print("Detected {} issues or pull requests".format(len(issueOrPRs)))
+    # find all contributors and build changes
+    allContributors = set()
+    for issue_or_pr in issue_or_prs:
+        url = issue_or_pr.html_url
+        try:
+            # only a PR can be converted to a PR object, otherwise will throw error.
+            pr = issue_or_pr.as_pull_request()
+        except:
+            continue
+        if not pr.merged:
+            continue
+        contributor = "@" + str(pr.user.login)
+        # Auto generate a release note
+        note = pr.title.strip()
+        change_type = "Miscellaneous"
+        title = note.split(":")
+        if len(title) > 1:
+            prefix = title[0].strip().lower()
+            if prefix in ("feat", "feature"):
+                change_type = "New Features"
+            elif prefix in ("fix", "bug"):
+                change_type = "Bug Fixes"
+            note = title[1].strip()
+        changes.append((change_type, pr, note, contributor, url))
+        allContributors.add(contributor)
 
-# find all contributors and build changes
-allContributors = set()
-for issueOrPR in issueOrPRs:
-    url = issueOrPR.html_url
+    last_subtitle = ""
+    # generate changes for release notes
+    for change in sorted(changes, key=lambda c: (get_change_priority(c[0]), c[1].id)):
+        subtitle = change[0]
+        if last_subtitle != subtitle:
+            last_subtitle = subtitle
+            change_lines.append("\n### " + subtitle)
+        breaking_change = "breaking-change" in [label.name for label in change[1].labels]
+        change_url = " ([#" + str(change[1].number) + "](" + change[4] + ")"
+        change_author = ", " + change[3] + ")"
+        change_lines.append("- " + change[2] + change_url + change_author)
+        if breaking_change:
+            breaking_change_lines.append("- " + change[2] + change_url + change_author)
+
+    if len(breaking_change_lines) > 0:
+        warnings.append(
+            "> **Note: This release contains a few [breaking changes](#breaking-changes).**"
+        )
+
+    # generate release note from template
+    template = ""
+    release_note_template_path = "docs/release_notes/template.md"
     try:
-        # only a PR can be converted to a PR object, otherwise will throw error.
-        pr = issueOrPR.as_pull_request()
-    except:
-        continue
-    if not pr.merged:
-        continue
-    contributor = "@" + str(pr.user.login)
-    # Auto generate a release note
-    note = pr.title.strip()
-    changeType = "Miscellaneous"
-    title = note.split(":")
-    if len(title) > 1:
-        prefix = title[0].strip().lower()
-        if prefix in ("feat", "feature"):
-            changeType = "New Features"
-        elif prefix in ("fix", "bug"):
-            changeType = "Bug Fixes"
-        note = title[1].strip()
-    changes.append((changeType, pr, note, contributor, url))
-    allContributors.add(contributor)
+        with open(release_note_template_path, "r") as file:
+            template = file.read()
+    except FileNotFoundError as e:
+        print(f"template {release_note_template_path} not found, IGNORED")
 
-lastSubtitle = ""
-# generate changes for release notes
-for change in sorted(changes, key=lambda c: (get_change_priority(c[0]), c[1].id)):
-    subtitle = change[0]
-    if lastSubtitle != subtitle:
-        lastSubtitle = subtitle
-        changeLines.append("\n### " + subtitle)
-    breakingChange = 'breaking-change' in [label.name for label in change[1].labels]
-    changeUrl = " ([#" + str(change[1].number) + "](" + change[4] + ")"
-    changeAuthor = ", " + change[3] + ")"
-    changeLines.append("- " + change[2] + changeUrl + changeAuthor)
-    if breakingChange:
-        breakingChangeLines.append("- " + change[2] + changeUrl + changeAuthor)
+    change_text = "\n".join(change_lines)
+    breaking_change_text = "None."
+    if len(breaking_change_lines) > 0:
+        breaking_change_text = "\n".join(breaking_change_lines)
+    
+    warnings_text = ""
+    if len(warnings) > 0:
+        warnings_text = "\n".join(warnings)
 
-if len(breakingChangeLines) > 0:
-    warnings.append("> **Note: This release contains a few [breaking changes](#breaking-changes).**")
+    with open(release_note_path, "w") as file:
+        file.write(
+            Template(template).safe_substitute(
+                kubeblocks_version=release_version,
+                kubeblocks_changes=change_text,
+                kubeblocks_breaking_changes=breaking_change_text,
+                warnings=warnings_text,
+                kubeblocks_contributors=", ".join(
+                    sorted(list(allContributors), key=str.casefold)
+                ),
+                today=date.today().strftime("%Y-%m-%d"),
+            )
+        )
 
-# generate release note from template
-template = ''
-releaseNoteTemplatePath = "docs/release_notes/template.md"
-with open(releaseNoteTemplatePath, "r") as file:
-    template = file.read()
+    print("Done")
 
-changeText = "\n".join(changeLines)
-breakingChangeText = "None."
-if len(breakingChangeLines) > 0:
-    breakingChangeText = '\n'.join(breakingChangeLines)
-warningsText = ''
-if len(warnings) > 0:
-    warningsText = '\n'.join(warnings)
 
-with open(releaseNotePath, 'w') as file:
-    file.write(Template(template).safe_substitute(
-        kubeblocks_version=releaseVersion,
-        kubeblocks_changes=changeText,
-        kubeblocks_breaking_changes=breakingChangeText,
-        warnings=warningsText,
-        kubeblocks_contributors=', '.join(sorted(list(allContributors), key=str.casefold)),
-        today=date.today().strftime("%Y-%m-%d")))
-
-print("Done")
+if __name__ == "__main__":
+    main(sys.argv)

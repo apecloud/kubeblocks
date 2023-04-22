@@ -94,8 +94,13 @@ func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType appsv
 
 // buildCommonFlags build common flags for operations command
 func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
+	// add print flags
+	printer.AddOutputFlagForCreate(cmd, &o.Format)
+
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
+	cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	if o.HasComponentNamesFlag {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "components", nil, " Component names to this operations")
 	}
@@ -349,7 +354,7 @@ var verticalScalingExample = templates.Examples(`
 		kbcli cluster vscale <my-cluster> --components=<component-name> --cpu=500m --memory=500Mi 
 
 		# scale the computing resources of specified components by class, available classes can be get by executing the command "kbcli class list --cluster-definition <cluster-definition-name>"
-		kbcli cluster vscale <my-cluster> --components=<component-name> --set class=general-1c4g
+		kbcli cluster vscale <my-cluster> --components=<component-name> --class=<class-name>
 `)
 
 // NewVerticalScalingCmd creates a vertical scaling command

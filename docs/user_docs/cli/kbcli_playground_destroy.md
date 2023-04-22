@@ -18,7 +18,8 @@ kbcli playground destroy [flags]
 ### Options
 
 ```
-  -h, --help   help for destroy
+  -h, --help    help for destroy
+      --purge   Purge all resources before destroy kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks. (default true)
 ```
 
 ### Options inherited from parent commands

@@ -134,10 +134,6 @@ type BackupSnapshotStatus struct {
 }
 
 type BackupToolManifestsStatus struct {
-	// backupToolName referenced backup tool name.
-	// +optional
-	BackupToolName string `json:"backupToolName,omitempty"`
-
 	// filePath records the file path of backup.
 	// +optional
 	FilePath string `json:"filePath,omitempty"`
@@ -211,14 +207,20 @@ func (r *BackupSpec) Validate(backupPolicy *BackupPolicy) error {
 // GetRecoverableTimeRange return the recoverable time range array
 func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 	// filter backups with backupLog
-	backupsWithLog := make([]Backup, 0)
+	baseBackups := make([]Backup, 0)
+	var incrementalBackup *Backup
 	for _, b := range backups {
-		if b.Status.Phase == BackupCompleted &&
-			b.Status.Manifests != nil && b.Status.Manifests.BackupLog != nil {
-			backupsWithLog = append(backupsWithLog, b)
+		if b.Status.Manifests == nil || b.Status.Manifests.BackupLog == nil ||
+			b.Status.Manifests.BackupLog.StopTime == nil {
+			continue
+		}
+		if b.Spec.BackupType == BackupTypeIncremental {
+			incrementalBackup = &b
+		} else if b.Spec.BackupType != BackupTypeIncremental && b.Status.Phase == BackupCompleted {
+			baseBackups = append(baseBackups, b)
 		}
 	}
-	if len(backupsWithLog) == 0 {
+	if len(baseBackups) == 0 {
 		return nil
 	}
 	sort.Slice(backups, func(i, j int) bool {
@@ -234,18 +236,9 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 		return backups[i].Status.StartTimestamp.Before(backups[j].Status.StartTimestamp)
 	})
 	result := make([]BackupLogStatus, 0)
-	start, end := backupsWithLog[0].Status.Manifests.BackupLog.StopTime, backupsWithLog[0].Status.Manifests.BackupLog.StopTime
-
-	for i := 1; i < len(backupsWithLog); i++ {
-		b := backupsWithLog[i].Status.Manifests.BackupLog
-		if b.StartTime.Before(end) || b.StartTime.Equal(end) {
-			if b.StopTime.After(end.Time) {
-				end = b.StopTime
-			}
-		} else {
-			result = append(result, BackupLogStatus{StartTime: start, StopTime: end})
-			start, end = b.StopTime, b.StopTime
-		}
+	start, end := baseBackups[0].Status.Manifests.BackupLog.StopTime, baseBackups[0].Status.Manifests.BackupLog.StopTime
+	if incrementalBackup != nil && start.Before(incrementalBackup.Status.Manifests.BackupLog.StopTime) {
+		end = incrementalBackup.Status.Manifests.BackupLog.StopTime
 	}
 	return append(result, BackupLogStatus{StartTime: start, StopTime: end})
 }

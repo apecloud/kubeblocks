@@ -19,11 +19,13 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
+	kccmd "k8s.io/kubectl/pkg/cmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -40,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -47,6 +50,40 @@ import (
 const (
 	cliName = "kbcli"
 )
+
+func NewDefaultCliCmd() *cobra.Command {
+	cmd := NewCliCmd()
+
+	pluginHandler := kccmd.NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes)
+
+	if len(os.Args) > 1 {
+		cmdPathPieces := os.Args[1:]
+
+		// only look for suitable extension executables if
+		// the specified command does not already exist
+		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
+			var cmdName string
+			for _, arg := range cmdPathPieces {
+				if !strings.HasPrefix(arg, "-") {
+					cmdName = arg
+					break
+				}
+			}
+
+			switch cmdName {
+			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+				// Don't search for a plugin
+			default:
+				if err := kccmd.HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					os.Exit(1)
+				}
+			}
+		}
+	}
+
+	return cmd
+}
 
 func NewCliCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -91,7 +128,6 @@ A Command Line Interface for KubeBlocks`,
 	cmd.AddCommand(
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
-		cluster.NewClusterCmd(f, ioStreams),
 		bench.NewBenchCmd(),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
@@ -102,10 +138,20 @@ A Command Line Interface for KubeBlocks`,
 		alert.NewAlertCmd(f, ioStreams),
 		addon.NewAddonCmd(f, ioStreams),
 		migration.NewMigrationCmd(f, ioStreams),
+		plugin.NewPluginCmd(ioStreams),
 	)
 
 	filters := []string{"options"}
 	templates.ActsAsRootCommand(cmd, filters, []templates.CommandGroup{}...)
+
+	helpFunc := cmd.HelpFunc()
+	usageFunc := cmd.UsageFunc()
+
+	// clusterCmd set its own usage and help function and its subcommand will inherit it,
+	// so we need to set its subcommand's usage and help function back to the root command
+	clusterCmd := cluster.NewClusterCmd(f, ioStreams)
+	registerUsageAndHelpFuncForSubCommand(clusterCmd, helpFunc, usageFunc)
+	cmd.AddCommand(clusterCmd)
 
 	utilcomp.SetFactoryForCompletion(f)
 	registerCompletionFuncForGlobalFlags(cmd, f)
@@ -158,4 +204,11 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
+}
+
+func registerUsageAndHelpFuncForSubCommand(cmd *cobra.Command, helpFunc func(*cobra.Command, []string), usageFunc func(command *cobra.Command) error) {
+	for _, subCmd := range cmd.Commands() {
+		subCmd.SetHelpFunc(helpFunc)
+		subCmd.SetUsageFunc(usageFunc)
+	}
 }

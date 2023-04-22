@@ -90,28 +90,25 @@ mysqlx=0
 
 datadir={{ $data_root }}/data
 
+{{ block "logsBlock" . }}
 log_statements_unsafe_for_binlog=OFF
 log_error_verbosity=2
 log_output=FILE
 {{- if hasKey $.component "enabledLogs" }}
 {{- if mustHas "error" $.component.enabledLogs }}
-# Mysql error log
-log_error={{ $data_root }}/log/mysqld-error.log
+log_error=/data/mysql/log/mysqld-error.log
 {{- end }}
-
 {{- if mustHas "slow" $.component.enabledLogs }}
-# MySQL Slow log
 slow_query_log=ON
 long_query_time=5
-slow_query_log_file={{ $data_root }}/log/mysqld-slowquery.log
+slow_query_log_file=/data/mysql/log/mysqld-slowquery.log
 {{- end }}
-
 {{- if mustHas "general" $.component.enabledLogs }}
-# SQL access log, default off
 general_log=ON
-general_log_file={{ $data_root }}/log/mysqld.log
+general_log_file=/data/mysql/log/mysqld.log
 {{- end }}
 {{- end }}
+{{ end }}
 
 #innodb
 innodb_doublewrite_batch_size=16
@@ -206,12 +203,12 @@ loose_xengine_compression_per_level=kZSTD:kZSTD:kZSTD
 
 {{- if gt $phy_memory 0 }}
 {{- $phy_memory := div $phy_memory ( mul 1024 1024 ) }}
-#loose_xengine_write_buffer_size={{ min ( max 32 ( mulf $phy_memory 0.01 ) ) 256 | int | mul 1024 1024 }}
-#loose_xengine_db_write_buffer_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
-#loose_xengine_db_total_write_buffer_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
-#loose_xengine_block_cache_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
-#loose_xengine_row_cache_size={{ mulf $phy_memory 0.1 | int | mul 1024 1024 }}
-#loose_xengine_max_total_wal_size={{ min ( mulf $phy_memory 0.3 ) ( mul 12 1024 ) | int | mul 1024 1024 }}
+loose_xengine_write_buffer_size={{ min ( max 32 ( mulf $phy_memory 0.01 ) ) 256 | int | mul 1024 1024 }}
+loose_xengine_db_write_buffer_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
+loose_xengine_db_total_write_buffer_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
+loose_xengine_block_cache_size={{ mulf $phy_memory 0.3 | int | mul 1024 1024 }}
+loose_xengine_row_cache_size={{ mulf $phy_memory 0.1 | int | mul 1024 1024 }}
+loose_xengine_max_total_wal_size={{ min ( mulf $phy_memory 0.3 ) ( mul 12 1024 ) | int | mul 1024 1024 }}
 {{- end }}
 
 {{- if gt $phy_cpu 0 }}

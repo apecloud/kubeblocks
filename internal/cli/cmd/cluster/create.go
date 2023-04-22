@@ -58,6 +58,12 @@ var clusterCreateExample = templates.Examples(`
 	# --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql
 
+	# Output resource information in YAML format, but do not create resources.
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=client -o yaml
+
+	# Output resource information in YAML format, the information will be sent to the server, but the resource will not be actually created.
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=server -o yaml
+	
 	# Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
 
@@ -362,9 +368,13 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
 			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
-
+			cmd.Flags().String("dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 			// add updatable flags
 			o.UpdatableFlags.addFlags(cmd)
+
+			// add print flags
+			printer.AddOutputFlagForCreate(cmd, &o.Format)
 
 			// set required flag
 			util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
@@ -387,6 +397,21 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 		"cluster-version",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+
+	var formatsWithDesc = map[string]string{
+		"JSON": "Output result in JSON format",
+		"YAML": "Output result in YAML format",
+	}
+	util.CheckErr(cmd.RegisterFlagCompletionFunc("output",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var names []string
+			for format, desc := range formatsWithDesc {
+				if strings.HasPrefix(format, toComplete) {
+					names = append(names, fmt.Sprintf("%s\t%s", format, desc))
+				}
+			}
+			return names, cobra.ShellCompDirectiveNoFileComp
 		}))
 }
 
@@ -431,13 +456,37 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 }
 
 func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]*appsv1alpha1.ClusterComponentSpec, error) {
-	getVal := func(key setKey, sets map[setKey]string) string {
+	// get value from set values and environment variables, the second return value is
+	// true if the value is from environment variables
+	getVal := func(c *appsv1alpha1.ClusterComponentDefinition, key setKey, sets map[setKey]string) string {
 		// get value from set values
 		if sets != nil {
 			if v := sets[key]; len(v) > 0 {
 				return v
 			}
 		}
+
+		// HACK: if user does not set by command flag, for replicationSet workload,
+		// set replicas to 2, for redis sentinel, set replicas to 3, cpu and memory
+		// to 200M and 200Mi
+		// TODO: use more graceful way to set default value
+		if c.WorkloadType == appsv1alpha1.Replication {
+			if key == keyReplicas {
+				return "2"
+			}
+		}
+
+		if c.CharacterType == "redis" && c.Name == "redis-sentinel" {
+			switch key {
+			case keyReplicas:
+				return "3"
+			case keyCPU:
+				return "200m"
+			case keyMemory:
+				return "200Mi"
+			}
+		}
+
 		// get value from environment variables
 		env := setKeyEnvMap[key]
 		val := viper.GetString(env.name)
@@ -452,7 +501,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 			return nil
 		}
 		var switchPolicyType appsv1alpha1.SwitchPolicyType
-		switch getVal(keySwitchPolicy, sets) {
+		switch getVal(c, keySwitchPolicy, sets) {
 		case "Noop", "":
 			switchPolicyType = appsv1alpha1.Noop
 		case "MaximumAvailability":
@@ -476,7 +525,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 
 		// get replicas
-		setReplicas, err := strconv.Atoi(getVal(keyReplicas, sets))
+		setReplicas, err := strconv.Atoi(getVal(&c, keyReplicas, sets))
 		if err != nil {
 			return nil, fmt.Errorf("repicas is illegal " + err.Error())
 		}
@@ -489,13 +538,13 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 
 		// class has higher priority than other resource related parameters
-		className := getVal(keyClass, sets)
+		className := getVal(&c, keyClass, sets)
 		if className != "" {
 			compObj.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: className}
 		} else {
 			resourceList := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
-				corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
+				corev1.ResourceCPU:    resource.MustParse(getVal(&c, keyCPU, sets)),
+				corev1.ResourceMemory: resource.MustParse(getVal(&c, keyMemory, sets)),
 			}
 			compObj.Resources = corev1.ResourceRequirements{
 				Requests: resourceList,
@@ -509,13 +558,13 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 					},
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse(getVal(keyStorage, sets)),
+							corev1.ResourceStorage: resource.MustParse(getVal(&c, keyStorage, sets)),
 						},
 					},
 				},
 			}}
 		}
-		if err := buildSwitchPolicy(&c, compObj, sets); err != nil {
+		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err
 		}
 		comps = append(comps, compObj)
@@ -575,6 +624,18 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 				return nil, err
 			}
 			compDefName = name
+		} else {
+			// check the type is a valid component definition name
+			valid := false
+			for _, c := range cd.Spec.ComponentDefs {
+				if c.Name == compDefName {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				return nil, fmt.Errorf("the type \"%s\" is not a valid component definition name", compDefName)
+			}
 		}
 
 		// if already set by other value, later values override earlier values
@@ -623,7 +684,7 @@ func generateClusterName(dynamic dynamic.Interface, namespace string) (string, e
 func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type, one of: (Preferred, Required)")
 	cmd.Flags().BoolVar(&f.Monitor, "monitor", true, "Set monitor enabled and inject metrics exporter")
-	cmd.Flags().BoolVar(&f.EnableAllLogs, "enable-all-logs", true, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
+	cmd.Flags().BoolVar(&f.EnableAllLogs, "enable-all-logs", false, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level, default is false")
 	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
 	cmd.Flags().StringArrayVar(&f.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 	cmd.Flags().StringToStringVar(&f.NodeLabels, "node-labels", nil, "Node label selector")

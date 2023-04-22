@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/ahmetalpbalkan/go-cursor"
 	"github.com/fatih/color"
@@ -54,6 +55,9 @@ const (
 	flagDebug                     = "debug"
 	flagNamespace                 = "namespace"
 	flagVerbose                   = "verbose"
+
+	PreflightPattern     = "data/%s_preflight.yaml"
+	HostPreflightPattern = "data/%s_hostpreflight.yaml"
 )
 
 var (
@@ -71,13 +75,6 @@ var (
 
 		# Run preflight checks and display AnalyzeResults with interactive mode
 		kbcli kubeblocks preflight preflight-check.yaml --interactive=true`)
-)
-
-const (
-	EKSHostPreflight = "data/eks_hostpreflight.yaml"
-	EKSPreflight     = "data/eks_preflight.yaml"
-	GKEHostPreflight = "data/gke_hostpreflight.yaml"
-	GKEPreflight     = "data/gke_preflight.yaml"
 )
 
 // PreflightOptions declares the arguments accepted by the preflight command
@@ -125,26 +122,14 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 
 func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 	var yamlDataList [][]byte
-	switch vendorName {
-	case util.EKSProvider:
-		if data, err := defaultVendorYamlData.ReadFile(EKSHostPreflight); err == nil {
-			yamlDataList = append(yamlDataList, data)
-		}
-		if data, err := defaultVendorYamlData.ReadFile(EKSPreflight); err == nil {
-			yamlDataList = append(yamlDataList, data)
-		}
-	case util.GKEProvider:
-		if data, err := defaultVendorYamlData.ReadFile(GKEHostPreflight); err == nil {
-			yamlDataList = append(yamlDataList, data)
-		}
-		if data, err := defaultVendorYamlData.ReadFile(GKEPreflight); err == nil {
-			yamlDataList = append(yamlDataList, data)
-		}
-	case util.UnknownProvider:
-		fallthrough
-	default:
-		fmt.Println("unsupported k8s provider, and the validation of provider will coming soon")
-		return yamlDataList, errors.New("no supported provider")
+	if data, err := defaultVendorYamlData.ReadFile(newPreflightPath(vendorName)); err == nil {
+		yamlDataList = append(yamlDataList, data)
+	}
+	if data, err := defaultVendorYamlData.ReadFile(newHostPreflightPath(vendorName)); err == nil {
+		yamlDataList = append(yamlDataList, data)
+	}
+	if len(yamlDataList) == 0 {
+		return yamlDataList, errors.New("unsupported k8s provider, and the validation of provider will coming soon")
 	}
 	return yamlDataList, nil
 }
@@ -260,4 +245,12 @@ func CollectProgress(ctx context.Context, progressCh <-chan interface{}, verbose
 			}
 		}
 	}
+}
+
+func newPreflightPath(vendorName util.K8sProvider) string {
+	return fmt.Sprintf(PreflightPattern, strings.ToLower(string(vendorName)))
+}
+
+func newHostPreflightPath(vendorName util.K8sProvider) string {
+	return fmt.Sprintf(HostPreflightPattern, strings.ToLower(string(vendorName)))
 }

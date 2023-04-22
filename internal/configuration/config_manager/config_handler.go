@@ -25,11 +25,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
+	"gopkg.in/yaml.v2"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/fsnotify/fsnotify"
-	"gopkg.in/yaml.v2"
 )
 
 type ConfigHandler interface {
@@ -293,7 +294,7 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		return CreateSignalHandler(signalTrigger.Signal, signalTrigger.ProcessName, mountPoint)
 	}
 	tplHandler := func(tplTrigger *appsv1alpha1.TPLScriptTrigger, configMeta ConfigSpecMeta) (ConfigHandler, error) {
-		if tplTrigger != nil {
+		if tplTrigger == nil {
 			return nil, cfgcore.MakeError("tpl trigger is nil")
 		}
 		return CreateTPLScriptHandler(

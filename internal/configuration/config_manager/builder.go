@@ -66,7 +66,7 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, c
 func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
 	args := buildConfigManagerCommonArgs(volumeDirs)
 	args = append(args, "--operator-update-enable")
-	args = append(args, "--log-level", viper.GetString(constant.ConfigManagerLogLevel))
+	// args = append(args, "--log-level", viper.GetString(constant.ConfigManagerLogLevel))
 	args = append(args, "--tcp", viper.GetString(constant.ConfigManagerGPRCPortEnv))
 	// args = append(args, "--notify-type", string(appsv1alpha1.MultiType))
 

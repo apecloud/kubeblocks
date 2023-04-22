@@ -120,7 +120,7 @@ func (c *clusterPlanBuilder) AddParallelTransformer(transformer ...graph.Transfo
 	return c
 }
 
-// Build only cluster Creation, Update and Deletion supported.
+// Build runs all transformers to generate a plan
 func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	var err error
 	defer func() {

@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
@@ -34,7 +35,6 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
@@ -70,7 +70,7 @@ func runConfigManagerCommand(ctx context.Context, opt *VolumeWatcherOpts) error 
 		return err
 	}
 
-	if opt.NotifyHandType == TPLScript && opt.BackupPath == "" {
+	if (opt.NotifyHandType == TPLScript || opt.NotifyHandType == Comb) && opt.BackupPath == "" {
 		tmpDir, err := os.MkdirTemp(os.TempDir(), "reload-backup-")
 		if err != nil {
 			return err
@@ -83,39 +83,46 @@ func runConfigManagerCommand(ctx context.Context, opt *VolumeWatcherOpts) error 
 }
 
 func run(ctx context.Context, opt *VolumeWatcherOpts) error {
-	if len(opt.VolumeDirs) > 0 {
-		volumeWatcher, err := startVolumeWatcher(ctx, opt)
-		if err != nil {
-			return err
-		}
-		defer volumeWatcher.Close()
+	var (
+		err           error
+		volumeWatcher *cfgcore.ConfigMapVolumeWatcher
+		configHandler cfgcore.ConfigHandler
+	)
+
+	if configHandler, err = createConfigHandle(opt); err != nil {
+		return err
+	}
+	if volumeWatcher, err = startVolumeWatcher(ctx, opt, configHandler); err != nil {
+		return err
 	}
 
-	serviceOpt := opt.ServiceOpt
-	if serviceOpt.ContainerRuntimeEnable || serviceOpt.RemoteOnlineUpdateEnable {
-		if err := startGRPCService(opt, ctx); err != nil {
-			logger.Error(err, "failed to start grpc service.")
-			return err
-		}
+	if err = checkAndCreateService(ctx, opt, configHandler); err != nil {
+		return err
 	}
 
 	logger.Info("config manager started.")
 	<-ctx.Done()
 	logger.Info("config manager shutdown.")
 	return nil
-
 }
 
-func startVolumeWatcher(ctx context.Context, opt *VolumeWatcherOpts) (*cfgcore.ConfigMapVolumeWatcher, error) {
-	volumeWatcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
-
-	logger.Info("config backup path: ", opt.BackupPath)
-	eventHandle, err := createHandlerWithVolumeWatch(opt)
-	if err != nil {
-		logger.Error(err, "failed to create event handle.")
-		return nil, err
+func checkAndCreateService(ctx context.Context, opt *VolumeWatcherOpts, handler cfgcore.ConfigHandler) error {
+	serviceOpt := opt.ServiceOpt
+	if !serviceOpt.ContainerRuntimeEnable && !serviceOpt.RemoteOnlineUpdateEnable {
+		return nil
 	}
-	err = volumeWatcher.AddHandler(eventHandle).Run()
+	if err := startGRPCService(opt, ctx, handler); err != nil {
+		return cfgutil.WrapError(err, "failed to start grpc service")
+	}
+	return nil
+}
+
+func startVolumeWatcher(ctx context.Context, opt *VolumeWatcherOpts, handler cfgcore.ConfigHandler) (*cfgcore.ConfigMapVolumeWatcher, error) {
+	eventHandler := func(ctx context.Context, event fsnotify.Event) error {
+		return handler.VolumeHandle(ctx, event)
+	}
+	volumeWatcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
+	err := volumeWatcher.AddHandler(eventHandler).Run()
 	if err != nil {
 		logger.Error(err, "failed to handle VolumeWatcher.")
 		return nil, err
@@ -123,13 +130,13 @@ func startVolumeWatcher(ctx context.Context, opt *VolumeWatcherOpts) (*cfgcore.C
 	return volumeWatcher, nil
 }
 
-func startGRPCService(opt *VolumeWatcherOpts, ctx context.Context) error {
+func startGRPCService(opt *VolumeWatcherOpts, ctx context.Context, handler cfgcore.ConfigHandler) error {
 	var (
 		server *grpc.Server
 		proxy  = &reconfigureProxy{opt: opt.ServiceOpt, ctx: ctx, logger: logger.Named("grpcProxy")}
 	)
 
-	if err := proxy.Init(opt); err != nil {
+	if err := proxy.Init(opt, handler); err != nil {
 		return err
 	}
 
@@ -164,6 +171,10 @@ func checkOptions(opt *VolumeWatcherOpts) error {
 		return cfgutil.MakeError("required volume directory is null.")
 	}
 
+	if opt.NotifyHandType == Comb && opt.CombConfig == "" {
+		return cfgutil.MakeError("required config is empty.")
+	}
+
 	if opt.NotifyHandType == TPLScript {
 		return checkTPLScriptOptions(opt)
 	}
@@ -176,14 +187,6 @@ func checkOptions(opt *VolumeWatcherOpts) error {
 		return cfgutil.MakeError("required process name is null.")
 	}
 	return nil
-}
-
-type TplScriptConfig struct {
-	Scripts         string                       `json:"scripts"`
-	FileRegex       string                       `json:"fileRegex"`
-	DataType        string                       `json:"dataType"`
-	DSN             string                       `json:"dsn"`
-	FormatterConfig appsv1alpha1.FormatterConfig `json:"formatterConfig"`
 }
 
 func checkTPLScriptOptions(opt *VolumeWatcherOpts) error {
@@ -199,7 +202,7 @@ func checkTPLScriptOptions(opt *VolumeWatcherOpts) error {
 	if err != nil {
 		return err
 	}
-	tplConfig := TplScriptConfig{}
+	tplConfig := cfgcore.TPLScriptConfig{}
 	if err := yaml.Unmarshal(b, &tplConfig); err != nil {
 		return err
 	}
@@ -240,15 +243,18 @@ func initLog(level string) *zap.Logger {
 	return zapLog
 }
 
-func createHandlerWithVolumeWatch(opt *VolumeWatcherOpts) (cfgcore.WatchEventHandler, error) {
+func createConfigHandle(opt *VolumeWatcherOpts) (cfgcore.ConfigHandler, error) {
+	// func createHandlerWithVolumeWatch(opt *VolumeWatcherOpts) (cfgcore.WatchEventHandler, error) {
 	logger.Infof("access info: [%d] [%s]", opt.NotifyHandType, opt.ProcessName)
 	switch opt.NotifyHandType {
 	case UnixSignal:
-		return cfgcore.CreateSignalHandler(opt.Signal, opt.ProcessName)
+		return cfgcore.CreateSignalHandler(opt.Signal, opt.ProcessName, "")
 	case ShellTool:
-		return cfgcore.CreateExecHandler(opt.Command)
+		return cfgcore.CreateExecHandler(opt.Command, "")
 	case TPLScript:
-		return cfgcore.CreateTPLScriptHandler(opt.TPLScriptPath, opt.VolumeDirs, opt.FileRegex, opt.BackupPath, opt.FormatterConfig, opt.DataType, opt.DSN)
+		return cfgcore.CreateTPLScriptHandler("", opt.TPLConfig, opt.VolumeDirs, opt.BackupPath)
+	case Comb:
+		return cfgcore.CreateCombinedHandler(opt.CombConfig, opt.BackupPath)
 	case SQL, WebHook:
 		return nil, cfgutil.MakeError("event type[%s]: not supported", opt.NotifyHandType.String())
 	default:

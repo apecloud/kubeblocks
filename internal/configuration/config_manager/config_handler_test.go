@@ -21,60 +21,32 @@ package configmanager
 
 import (
 	"context"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/shirou/gopsutil/v3/process"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func init() {
-	var zapLog, _ = zap.NewDevelopment()
-	SetLogger(zapLog)
-}
-
-func TestFindParentPidFromProcessName(t *testing.T) {
-	processName := getProcName()
-	fmt.Printf("current test program name: %s\n", processName)
-	pid, err := findPidFromProcessName(processName)
-	require.Nil(t, err)
-	require.Equal(t, PID(os.Getpid()), pid)
-}
-
-func getProcName() string {
-	pid := int32(os.Getpid())
-	procs, _ := process.Processes()
-	for _, proc := range procs {
-		if pid == proc.Pid {
-			name, _ := proc.Name()
-			return name
-		}
-	}
-	return ""
-}
-
 func TestCreateSignalHandler(t *testing.T) {
-	_, err := CreateSignalHandler(appsv1alpha1.SIGALRM, "test")
+	_, err := CreateSignalHandler(appsv1alpha1.SIGALRM, "test", "")
 	require.Nil(t, err)
-	_, err = CreateSignalHandler("NOSIGNAL", "test")
+	_, err = CreateSignalHandler("NOSIGNAL", "test", "")
 	require.ErrorContains(t, err, "not supported unix signal")
 }
 
 func TestCreateExecHandler(t *testing.T) {
-	_, err := CreateExecHandler("")
+	_, err := CreateExecHandler("", "")
 	require.ErrorContains(t, err, "invalid command")
-	_, err = CreateExecHandler(" ")
+	_, err = CreateExecHandler(" ", "")
 	require.ErrorContains(t, err, "invalid command")
-	c, err := CreateExecHandler("go 	version")
+	c, err := CreateExecHandler("go 	version", "")
 	require.Nil(t, err)
-	require.Nil(t, c(context.Background(), fsnotify.Event{}))
+	require.Nil(t, c.VolumeHandle(context.Background(), fsnotify.Event{}))
 }
 
 func TestCreateTPLScriptHandler(t *testing.T) {
@@ -86,7 +58,7 @@ func TestCreateTPLScriptHandler(t *testing.T) {
 	tplFile := filepath.Join(tmpDir, "test.tpl")
 	require.Nil(t, os.WriteFile(tplFile, []byte("xxx"), fs.ModePerm))
 
-	_, err = CreateTPLScriptHandler(tplFile, []string{filepath.Join(tmpDir, "config")}, "", filepath.Join(tmpDir, "backup"), nil, "", "")
+	_, err = CreateTPLScriptHandler("", tplFile, []string{filepath.Join(tmpDir, "config")}, "")
 	require.Nil(t, err)
 }
 

@@ -208,7 +208,7 @@ var _ = Describe("ConfigManager Test", func() {
 				if param == nil {
 					param = &CfgManagerBuildParams{}
 				}
-				err := BuildConfigManagerContainerArgs(tt.args.reloadOptions, tt.args.volumeDirs, tt.args.cli, tt.args.ctx, param, nil)
+				err := BuildConfigManagerContainerParams(tt.args.cli, tt.args.ctx, param, tt.args.volumeDirs)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 				if !tt.wantErr {
 					for _, arg := range tt.expectedArgs {
@@ -283,7 +283,7 @@ formatterConfig:
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := checkAndUpdateReloadYaml(tt.args.data, tt.args.reloadConfig, tt.args.formatterConfig)
+			got, err := checkAndUpdateReloadYaml(tt.args.data, tt.args.reloadConfig, *tt.args.formatterConfig)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("checkAndUpdateReloadYaml() error = %v, wantErr %v", err, tt.wantErr)
 				return

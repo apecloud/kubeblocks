@@ -38,6 +38,7 @@ const (
 	ShellTool                         // "exec"
 	SQL                               // "sql"
 	TPLScript                         // "tpl"
+	Comb                              // "comb"
 )
 
 const (
@@ -121,6 +122,7 @@ type VolumeWatcherOpts struct {
 
 	LogLevel       string
 	NotifyHandType NotifyEventType
+	CombConfig     string
 
 	ServiceOpt ReconfigureServiceOptions
 }
@@ -137,7 +139,7 @@ func NewVolumeWatcherOpts() *VolumeWatcherOpts {
 			RemoteOnlineUpdateEnable: false,
 		},
 		// for configmap watch
-		NotifyHandType: UnixSignal,
+		NotifyHandType: Comb,
 		Signal:         appsv1alpha1.SIGHUP,
 		LogLevel:       "info",
 	}
@@ -218,4 +220,10 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"operator-update-enable",
 		opt.ServiceOpt.ContainerRuntimeEnable,
 		"the config sets enable operator update parameter.")
+
+	// for multi handler
+	flags.StringVar(&opt.CombConfig,
+		"config",
+		"",
+		"the reload config.")
 }

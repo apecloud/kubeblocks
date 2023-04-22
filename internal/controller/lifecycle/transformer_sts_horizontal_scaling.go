@@ -250,9 +250,9 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			}
 		}
 
+		updateClusterPhase()
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
-		updateClusterPhase()
 		var err error
 		switch {
 		// scale out

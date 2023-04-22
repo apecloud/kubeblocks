@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
-	"gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"

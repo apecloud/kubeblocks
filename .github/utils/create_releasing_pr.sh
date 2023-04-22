@@ -18,4 +18,4 @@ git pull
 git merge origin/${HEAD_BRANCH}
 
 echo "Creating ${PR_TITLE}"
-gh pr create --head ${HEAD_BRANCH} --base ${BASE_BRANCH} --title "${PR_TITLE}" --body ""
+gh pr create --head ${HEAD_BRANCH} --base ${BASE_BRANCH} --title "${PR_TITLE}" --body "" --label "releasing-task"

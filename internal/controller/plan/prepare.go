@@ -148,6 +148,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	if err != nil {
 		return err
 	}
+	updateEnvPath(container, buildParams)
 	updateTPLScriptVolume(podSpec, buildParams)
 
 	// Add sidecar to podTemplate
@@ -159,6 +160,24 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	// This sidecar container will be able to view and signal processes from other containers
 	podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
 	return nil
+}
+
+func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildParams) {
+	if len(params.ScriptVolume) == 0 {
+		return
+	}
+	scriptPath := make([]string, 0, len(params.ScriptVolume))
+	for _, volume := range params.ScriptVolume {
+		if vm := cfgcm.FindVolumeMount(params.Volumes, volume.Name); vm != nil {
+			scriptPath = append(scriptPath, vm.MountPath)
+		}
+	}
+	if len(scriptPath) != 0 {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:  "PATH",
+			Value: fmt.Sprintf("$PATH:%s", strings.Join(scriptPath, ":")),
+		})
+	}
 }
 
 func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.CfgManagerBuildParams) {

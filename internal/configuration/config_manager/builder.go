@@ -50,7 +50,7 @@ const (
 func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, cmBuildParams *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
 	for i := range cmBuildParams.ConfigSpecsBuildParams {
 		buildParam := &cmBuildParams.ConfigSpecsBuildParams[i]
-		volumeMount := findVolumeMount(cmBuildParams.Volumes, buildParam.ConfigSpec.VolumeName)
+		volumeMount := FindVolumeMount(cmBuildParams.Volumes, buildParam.ConfigSpec.VolumeName)
 		if volumeMount == nil {
 			logger.Info(fmt.Sprintf("volume mount not be use : %s", buildParam.ConfigSpec.VolumeName))
 			continue
@@ -79,7 +79,7 @@ func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.V
 	return nil
 }
 
-func findVolumeMount(volumeDirs []corev1.VolumeMount, volumeName string) *corev1.VolumeMount {
+func FindVolumeMount(volumeDirs []corev1.VolumeMount, volumeName string) *corev1.VolumeMount {
 	for i := range volumeDirs {
 		if volumeDirs[i].Name == volumeName {
 			return &volumeDirs[i]

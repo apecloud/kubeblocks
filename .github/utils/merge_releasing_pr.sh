@@ -43,7 +43,7 @@ if [ "${pr_mergeable}" == "MERGEABLE" ]; then
 
     if [ "${pr_merge_status}" == "UNSTABLE" ]; then
         retry_times=100
-        while [ $retry_times -gt 0 ]
+        while [ $retry_times -gt 0 ] && [ "${pr_merge_status}" == "UNSTABLE" ]
         do
             ((retry_times--))
             sleep 5
@@ -53,7 +53,8 @@ if [ "${pr_mergeable}" == "MERGEABLE" ]; then
 
     if [ "${pr_merge_status}" == "CLEAN" ]; then 
         echo "Merging PR #${pr_number}"
-        gh pr --repo ${OWNER}/${REPO} merge ${pr_number} --merge
+        set -x
+        gh pr --repo ${OWNER}/${REPO} merge ${pr_number} --rebase
         exit 0
     fi
 fi

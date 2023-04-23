@@ -250,7 +250,7 @@ func (o *CreateOptions) Validate() error {
 	}
 
 	// validate default storageClassName
-	err := validateStorageClassName(o.Dynamic, o.ComponentSpecs)
+	err := validateStorageClass(o.Dynamic, o.ComponentSpecs)
 	if err != nil {
 		return err
 	}
@@ -502,7 +502,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 	}
 
 	var comps []*appsv1alpha1.ClusterComponentSpec
-	for idx, c := range cd.Spec.ComponentDefs {
+	for i, c := range cd.Spec.ComponentDefs {
 		sets := map[setKey]string{}
 		if setsMap != nil {
 			sets = setsMap[c.Name]
@@ -550,7 +550,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 		storageClass := getVal(&c, keyStorageClass, sets)
 		if len(storageClass) != 0 {
-			compObj.VolumeClaimTemplates[idx].Spec.StorageClassName = &storageClass
+			compObj.VolumeClaimTemplates[i].Spec.StorageClassName = &storageClass
 		}
 		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err
@@ -707,9 +707,9 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 		}))
 }
 
-// validateStorageClassName check whether the StorageClasses we need are exist in K8S or
+// validateStorageClass check whether the StorageClasses we need are exist in K8S or
 // the default StorageClasses are exist
-func validateStorageClassName(dynamic dynamic.Interface, components []map[string]interface{}) error {
+func validateStorageClass(dynamic dynamic.Interface, components []map[string]interface{}) error {
 	existedStorageClasses, defaultSCNum, err := getStorageClasses(dynamic)
 	if err != nil {
 		return err
@@ -755,8 +755,7 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, int, err
 		return nil, defaultStorageClassesCount, fmt.Errorf("failed get existed StorageClasses, " + err.Error())
 	}
 	for _, item := range list.Items {
-		allStorageClasses[item.GetName()] = struct {
-		}{}
+		allStorageClasses[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
 		if annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == "true" || annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true") {
 			defaultStorageClassesCount++

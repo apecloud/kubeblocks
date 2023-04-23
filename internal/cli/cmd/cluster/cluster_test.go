@@ -229,22 +229,22 @@ var _ = Describe("Cluster", func() {
 			})
 
 			It("can specify the StorageClass and the StorageClass must exist", func() {
-				Expect(validateStorageClassName(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
+				Expect(validateStorageClass(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
 				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault)
 				cd := testing.FakeClusterDef()
 				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
-				Expect(validateStorageClassName(FakeDynamicClientWithNotDefaultSC, o.ComponentSpecs)).Should(HaveOccurred())
+				Expect(validateStorageClass(FakeDynamicClientWithNotDefaultSC, o.ComponentSpecs)).Should(HaveOccurred())
 			})
 
 			It("can get valiate the default StorageClasses", func() {
 				vct := o.ComponentSpecs[0]["volumeClaimTemplates"].([]interface{})
 				spec := vct[0].(map[string]interface{})["spec"]
 				delete(spec.(map[string]interface{}), "storageClassName")
-				Expect(validateStorageClassName(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
+				Expect(validateStorageClass(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
 				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault)
 				cd := testing.FakeClusterDef()
 				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
-				Expect(validateStorageClassName(FakeDynamicClientWithNotDefaultSC, o.ComponentSpecs)).Should(HaveOccurred())
+				Expect(validateStorageClass(FakeDynamicClientWithNotDefaultSC, o.ComponentSpecs)).Should(HaveOccurred())
 			})
 		})
 

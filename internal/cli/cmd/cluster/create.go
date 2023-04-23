@@ -735,20 +735,20 @@ func getSpecifyStorageClassName(component []map[string]interface{}) (map[string]
 	for _, comp := range component {
 		vcts, ok := comp["volumeClaimTemplates"]
 		if !ok { // lack of VolumeClaimTemplates field
-			return requestStorageClass, fmt.Errorf("inputs error")
+			return requestStorageClass, fmt.Errorf("your inputs missing the field 'ComponentSpecs.volumeClaimTemplates'")
 		}
 		vctsList, ok := vcts.([]interface{})
 		if !ok { // assert failed
-			return requestStorageClass, fmt.Errorf("inputs error")
+			return requestStorageClass, fmt.Errorf("the field 'ComponentSpecs.volumeClaimTemplates' you input has a bad struct")
 		}
 		for _, v := range vctsList {
 			vct, ok := v.(map[string]interface{})
 			if !ok { // assert failed
-				return requestStorageClass, fmt.Errorf("inputs error")
+				return requestStorageClass, fmt.Errorf("the fieleds in your 'ComponentSpecs.volumeClaimTemplates' are not map")
 			}
 			spec, ok := vct["spec"].(map[string]interface{})
 			if !ok { // assert failed
-				return requestStorageClass, fmt.Errorf("inputs error")
+				return requestStorageClass, fmt.Errorf("the field 'ComponentSpecs.volumeClaimTemplates.spec' you input has a bad struct or lack of the spec field")
 			}
 			strorageClass, ok := spec["storageClassName"]
 			if ok { // specify the StorageClass

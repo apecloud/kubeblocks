@@ -448,7 +448,7 @@ func GetConfigConstraintByName(dynamic dynamic.Interface, name string) (*appsv1a
 func GetStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, error) {
 	gvr := types.StorageClassGVR()
 	allStorageClasses := make(map[string]struct{})
-	defaultStorageClassesExist := false //
+	defaultStorageClassesExist := false
 	list, err := dynamic.Resource(gvr).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, false, fmt.Errorf("failed get existed StorageClasses, " + err.Error())

@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -203,11 +202,6 @@ func (o *InstallOptions) Install() error {
 
 	// wait for auto-install addons to be ready
 	if err = o.waitAddonsEnabled(); err != nil {
-		return err
-	}
-
-	// create VolumeSnapshotClass
-	if err = o.createVolumeSnapshotClass(); err != nil {
 		return err
 	}
 
@@ -461,46 +455,6 @@ Note: Monitoring add-ons are not installed.
     Use 'kbcli addon enable <addon-name>' to install them later.
 `)
 	}
-}
-
-func (o *InstallOptions) createVolumeSnapshotClass() error {
-	createFunc := func() error {
-		options := cluster.CreateVolumeSnapshotClassOptions{}
-		options.BaseOptions.Dynamic = o.Dynamic
-		options.BaseOptions.IOStreams = o.IOStreams
-		options.BaseOptions.Quiet = true
-
-		spinner := printer.Spinner(o.Out, "%-50s", "Configure VolumeSnapshotClass")
-		defer spinner(false)
-
-		if err := options.Complete(); err != nil {
-			return err
-		}
-		if err := options.Create(); err != nil {
-			return err
-		}
-		spinner(true)
-		return nil
-	}
-
-	var sets []string
-	for _, set := range o.ValueOpts.Values {
-		splitSet := strings.Split(set, ",")
-		sets = append(sets, splitSet...)
-	}
-	for _, set := range sets {
-		if set != "snapshot-controller.enabled=true" {
-			continue
-		}
-
-		if err := createFunc(); err != nil {
-			return err
-		} else {
-			// only need to create once
-			return nil
-		}
-	}
-	return nil
 }
 
 func (o *InstallOptions) buildChart() *helm.InstallOpts {

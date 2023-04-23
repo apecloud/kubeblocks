@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -429,6 +430,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				cluster,
 				snapshotKey,
 				stsObj,
+				vcts,
 				component.ComponentDef,
 				component.HorizontalScalePolicy.BackupPolicyTemplateName,
 				dag,
@@ -575,6 +577,14 @@ func deleteSnapshot(cli roclient.ReadonlyClient,
 		return client.IgnoreNotFound(err)
 	}
 	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotKey.Name)
+	vs := &snapshotv1.VolumeSnapshot{}
+	if err := cli.Get(ctx, snapshotKey, vs); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	vertex := &lifecycleVertex{obj: vs, oriObj: vs, action: actionPtr(DELETE)}
+	dag.AddVertex(vertex)
+	dag.Connect(root, vertex)
+	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", snapshotKey.Name)
 	return nil
 }
 
@@ -626,6 +636,7 @@ func doSnapshot(cli roclient.ReadonlyClient,
 	cluster *appsv1alpha1.Cluster,
 	snapshotKey types.NamespacedName,
 	stsObj *appsv1.StatefulSet,
+	vcts []corev1.PersistentVolumeClaimTemplate,
 	componentDef,
 	backupPolicyTemplateName string,
 	dag *graph.DAG,
@@ -637,16 +648,29 @@ func doSnapshot(cli roclient.ReadonlyClient,
 	if err := cli.Get(ctx, client.ObjectKey{Name: backupPolicyTemplateName}, backupPolicyTemplate); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	if len(backupPolicyTemplate.Name) == 0 {
-		return intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTemplateName)
-	}
-	// if there is backuppolicytemplate created by provider
-	// create backupjob CR, will ignore error if already exists
-	err := createBackup(reqCtx, cli, stsObj, componentDef, backupPolicyTemplateName, snapshotKey, cluster, dag, root)
-	if err != nil {
-		return err
-	}
+	if len(backupPolicyTemplate.Name) > 0 {
+		// if there is backuppolicytemplate created by provider
+		// create backupjob CR, will ignore error if already exists
+		err := createBackup(reqCtx, cli, stsObj, componentDef, backupPolicyTemplateName, snapshotKey, cluster, dag, root)
+		if err != nil {
+			return err
+		}
+	} else {
+		// no backuppolicytemplate, then try native volumesnapshot
+		pvcName := strings.Join([]string{vcts[0].Name, stsObj.Name, "0"}, "-")
+		snapshot, err := builder.BuildVolumeSnapshot(snapshotKey, pvcName, stsObj)
+		if err != nil {
+			return err
+		}
+		if err := controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
+			return err
+		}
+		vertex := &lifecycleVertex{obj: snapshot, action: actionPtr(CREATE)}
+		dag.AddVertex(vertex)
+		dag.Connect(root, vertex)
 
+		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
+	}
 	return nil
 }
 

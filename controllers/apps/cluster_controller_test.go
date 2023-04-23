@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -475,15 +476,12 @@ var _ = Describe("Cluster Controller", func() {
 			compName, "data").SetStorage("1Gi").CheckedCreate(&testCtx)
 	}
 
-	mockPodsForConsensusTest := func(cluster *appsv1alpha1.Cluster, componentName string, number int) []corev1.Pod {
+	mockPodsForConsensusTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
+		componentName := cluster.Spec.ComponentSpecs[0].Name
 		clusterName := cluster.Name
 		stsName := cluster.Name + "-" + componentName
 		pods := make([]corev1.Pod, 0)
 		for i := 0; i < number; i++ {
-			role := "follower"
-			if i == 0 {
-				role = "leader"
-			}
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      stsName + "-" + strconv.Itoa(i),
@@ -491,7 +489,6 @@ var _ = Describe("Cluster Controller", func() {
 					Labels: map[string]string{
 						constant.AppInstanceLabelKey:          clusterName,
 						constant.KBAppComponentLabelKey:       componentName,
-						constant.RoleLabelKey:                 role,
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
 					},
 				},
@@ -499,14 +496,6 @@ var _ = Describe("Cluster Controller", func() {
 					Containers: []corev1.Container{{
 						Name:  "mock-container",
 						Image: "mock-container",
-					}},
-					Volumes: []corev1.Volume{{
-						Name: "data",
-						VolumeSource: corev1.VolumeSource{
-							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-								ClaimName: getPVCName(componentName, i),
-							},
-						},
 					}},
 				},
 			}
@@ -534,7 +523,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
 
 		By("Creating mock pods in StatefulSet")
-		pods := mockPodsForConsensusTest(clusterObj, comp.Name, int(comp.Replicas))
+		pods := mockPodsForConsensusTest(clusterObj, int(comp.Replicas))
 		for _, pod := range pods {
 			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			// mock the status to pass the isReady(pod) check in consensus_set
@@ -567,20 +556,34 @@ var _ = Describe("Cluster Controller", func() {
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: comp.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(1))
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.VolumeSnapshotSignature,
-			client.InNamespace(clusterKey.Namespace))).Should(Equal(1))
 
-		By("Set it as ReadyToUse")
-		snapshotList := &snapshotv1.VolumeSnapshotList{}
-		Expect(k8sClient.List(testCtx.Ctx, snapshotList)).Should(Succeed())
-		Expect(len(snapshotList.Items)).Should(Equal(1))
-		snapshot := &snapshotList.Items[0]
-		snapshotKey := client.ObjectKeyFromObject(snapshot)
-		Expect(testapps.GetAndChangeObjStatus(&testCtx, snapshotKey, func(snapshot *snapshotv1.VolumeSnapshot) {
-			readyToUse := true
-			volumeSnapshotStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
-			snapshot.Status = &volumeSnapshotStatus
-		})()).ShouldNot(HaveOccurred())
+		By("Mocking VolumeSnapshot and set it as ReadyToUse")
+		snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
+			clusterKey.Name, comp.Name),
+			Namespace: testCtx.DefaultNamespace}
+		pvcName := getPVCName(comp.Name, 0)
+		volumeSnapshot := &snapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      snapshotKey.Name,
+				Namespace: snapshotKey.Namespace,
+				Labels: map[string]string{
+					constant.KBManagedByKey:         "cluster",
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: comp.Name,
+				}},
+			Spec: snapshotv1.VolumeSnapshotSpec{
+				Source: snapshotv1.VolumeSnapshotSource{
+					PersistentVolumeClaimName: &pvcName,
+				},
+			},
+		}
+		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+		Expect(controllerruntime.SetControllerReference(clusterObj, volumeSnapshot, scheme)).Should(Succeed())
+		Expect(testCtx.CreateObj(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
+		readyToUse := true
+		volumeSnapshotStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
+		volumeSnapshot.Status = &volumeSnapshotStatus
+		Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
 
 		By("Mock PVCs status to bound")
 		for i := 0; i < updatedReplicas; i++ {
@@ -806,18 +809,13 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(replicas))
 
 		By("Mock PVCs in Bound Status")
-		vctName := "data"
 		for i := 0; i < replicas; i++ {
 			pvc := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      getPVCName(replicationCompName, i),
 					Namespace: clusterKey.Namespace,
 					Labels: map[string]string{
-						constant.AppInstanceLabelKey:             clusterKey.Name,
-						constant.KBAppComponentLabelKey:          replicationCompName,
-						constant.AppManagedByLabelKey:            constant.AppName,
-						constant.VolumeClaimTemplateNameLabelKey: vctName,
-						constant.VolumeTypeLabelKey:              vctName,
+						constant.AppInstanceLabelKey: clusterKey.Name,
 					}},
 				Spec: pvcSpec.ToV1PersistentVolumeClaimSpec(),
 			}
@@ -834,7 +832,7 @@ var _ = Describe("Cluster Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 
 		By("mock pods/sts of component are available")
-		podList := testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, replicationCompName)
+		testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, replicationCompName)
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
@@ -855,11 +853,6 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			Expect(k8sClient.Get(testCtx.Ctx, pvcKey, pvc)).Should(Succeed())
 			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newStorageValue))
-		}
-
-		By("Delete pods & pvcs")
-		for _, pod := range podList {
-			testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(pod), pod)
 		}
 	}
 
@@ -1070,7 +1063,7 @@ var _ = Describe("Cluster Controller", func() {
 		}).Should(Succeed())
 
 		By("Creating mock pods in StatefulSet")
-		pods := mockPodsForConsensusTest(clusterObj, replicationCompName, replicas)
+		pods := mockPodsForConsensusTest(clusterObj, replicas)
 		for _, pod := range pods {
 			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			// mock the status to pass the isReady(pod) check in consensus_set

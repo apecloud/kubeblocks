@@ -30,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("operations", func() {
@@ -52,8 +53,11 @@ var _ = Describe("operations", func() {
 		clusterWithOneComp.Spec.ComponentSpecs = []appsv1alpha1.ClusterComponentSpec{
 			clusterWithOneComp.Spec.ComponentSpecs[0],
 		}
+		classDef := testapps.NewComponentClassDefinitionFactory("custom", clusterWithOneComp.Spec.ClusterDefRef, testing.ComponentDefName).
+			AddClasses(testapps.DefaultResourceConstraintName, []string{testapps.Class1c1gName}).
+			GetObject()
 		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(),
-			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp)
+			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp, classDef)
 		tf.Client = &clientfake.RESTClient{}
 	})
 
@@ -103,6 +107,39 @@ var _ = Describe("operations", func() {
 		o.Storage = "2Gi"
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
+	})
+
+	It("Vscale Ops", func() {
+		o := initCommonOperationOps(appsv1alpha1.VerticalScalingType, clusterName1, true)
+		By("test CompleteComponentsFlag function")
+		o.ComponentNames = nil
+		By("expect to auto complete components when cluster has only one component")
+		Expect(o.CompleteComponentsFlag()).Should(Succeed())
+		Expect(o.ComponentNames[0]).Should(Equal(testing.ComponentName))
+
+		By("validate invalid class")
+		o.Class = "class-not-exists"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).Should(HaveOccurred())
+
+		By("expect to validate success with class")
+		o.Class = testapps.Class1c1gName
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).ShouldNot(HaveOccurred())
+
+		By("validate invalid resource")
+		o.Class = ""
+		o.CPU = "100"
+		o.Memory = "100Gi"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).Should(HaveOccurred())
+
+		By("expect to validate success with resource")
+		o.Class = ""
+		o.CPU = "1"
+		o.Memory = "1Gi"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).ShouldNot(HaveOccurred())
 	})
 
 	It("Hscale Ops", func() {

@@ -771,35 +771,24 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 // validateStorageClass check whether the StorageClasses we need are exist in K8S or
 // the default StorageClasses are exist
 func validateStorageClass(dynamic dynamic.Interface, components []map[string]interface{}) error {
-	existedStorageClasses, defaultSCNum, err := getStorageClasses(dynamic)
+	existedStorageClasses, existedDefault, err := getStorageClasses(dynamic)
 	if err != nil {
 		return err
 	}
 	for _, comp := range components {
-		vcts, ok := comp["volumeClaimTemplates"]
-		if !ok { // lack of VolumeClaimTemplates field
-			return fmt.Errorf("your inputs missing the field 'ComponentSpecs.volumeClaimTemplates'")
+		compObj := appsv1alpha1.ClusterComponentSpec{}
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(comp, &compObj)
+		if err != nil {
+			return err
 		}
-		vctsList, ok := vcts.([]interface{})
-		if !ok { // assert failed
-			return fmt.Errorf("the field 'ComponentSpecs.volumeClaimTemplates' you input has a bad struct")
-		}
-		for _, v := range vctsList {
-			vct, ok := v.(map[string]interface{})
-			if !ok { // assert failed
-				return fmt.Errorf("the fieleds in your 'ComponentSpecs.volumeClaimTemplates' are not map")
-			}
-			spec, ok := vct["spec"].(map[string]interface{})
-			if !ok { // assert failed
-				return fmt.Errorf("the field 'ComponentSpecs.volumeClaimTemplates.spec' you input has a bad struct or lack of the spec field")
-			}
-			strorageClass, ok := spec["storageClassName"]
-			if ok { // validate the specified StorageClass whether exist
-				if _, ok := existedStorageClasses[strorageClass.(string)]; !ok {
-					return fmt.Errorf("the StorageClass of 'ComponentSpecs.volumeClaimTemplates' you specified do not exist")
+		for _, vct := range compObj.VolumeClaimTemplates {
+			name := vct.Spec.StorageClassName
+			if name != nil { // 1. validate the specified StorageClass whether exist
+				if _, ok := existedStorageClasses[*name]; !ok {
+					return fmt.Errorf("failed to find the specified storageClass \"%s\"", *name)
 				}
-			} else if defaultSCNum == 0 {
-				return fmt.Errorf("lack of a default StorageClass")
+			} else if !existedDefault { //2. validate the default StorageClass
+				return fmt.Errorf("failed to find the default storageClass, use '--set storageClass=NAME' to set it")
 			}
 		}
 	}
@@ -807,20 +796,21 @@ func validateStorageClass(dynamic dynamic.Interface, components []map[string]int
 }
 
 // getStorageClasses return all StorageClasses in K8S and return true if the cluster have a defalut StorageClasses
-func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, int, error) {
+func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, error) {
 	gvr := types.StorageClassGVR()
 	allStorageClasses := make(map[string]struct{})
-	defaultStorageClassesCount := 0
+	existedDefault := false
 	list, err := dynamic.Resource(gvr).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		return nil, defaultStorageClassesCount, fmt.Errorf("failed get existed StorageClasses, " + err.Error())
+		return nil, false, err
 	}
 	for _, item := range list.Items {
 		allStorageClasses[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
 		if annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == "true" || annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true") {
-			defaultStorageClassesCount++
+			existedDefault = true
+			break
 		}
 	}
-	return allStorageClasses, defaultStorageClassesCount, nil
+	return allStorageClasses, existedDefault, nil
 }

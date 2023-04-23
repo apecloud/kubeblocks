@@ -49,7 +49,6 @@ var _ = Describe("Cluster", func() {
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
 		cd := testing.FakeClusterDef()
 		fakeDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.ISDefautl)
-
 		tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeDefaultStorageClass, testing.FakeClusterVersion())
 		tf.Client = &clientfake.RESTClient{}
 	})
@@ -97,6 +96,7 @@ var _ = Describe("Cluster", func() {
 			clusterDef := testing.FakeClusterDef()
 			tf.FakeDynamicClient = testing.FakeDynamicClient(
 				clusterDef,
+				testing.FakeStorageClass(testing.StorageClassName, testing.ISDefautl),
 				testing.FakeComponentClassDef(fmt.Sprintf("custom-%s", testing.ComponentDefName), clusterDef.Name, testing.ComponentDefName),
 				testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
 			)
@@ -326,19 +326,19 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Validate()).Should(HaveOccurred())
 		})
 
-		Context("valiate storageClass", func() {
+		Context("validate storageClass", func() {
 			It("can get all StorageClasses in K8S and check out if the cluster have a defalut StorageClasses by GetStorageClasses()", func() {
-				storageClasses, defaultNums, err := getStorageClasses(o.Dynamic)
+				storageClasses, existedDefault, err := getStorageClasses(o.Dynamic)
 				Expect(err).Should(Succeed())
 				Expect(storageClasses).Should(HaveKey(testing.StorageClassName))
-				Expect(defaultNums).Should(Equal(1))
+				Expect(existedDefault).Should(BeTrue())
 				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsNotDefault)
 				cd := testing.FakeClusterDef()
 				tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
-				storageClasses, defaultNums, err = getStorageClasses(tf.FakeDynamicClient)
+				storageClasses, existedDefault, err = getStorageClasses(tf.FakeDynamicClient)
 				Expect(err).Should(Succeed())
 				Expect(storageClasses).Should(HaveKey(testing.StorageClassName))
-				Expect(defaultNums).Should(Equal(0))
+				Expect(existedDefault).ShouldNot(BeTrue())
 			})
 
 			It("can specify the StorageClass and the StorageClass must exist", func() {

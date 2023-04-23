@@ -32,6 +32,11 @@ jobs:
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
 
+      - name: merge releasing to release
+        if: ${{ startsWith(github.ref_name, 'releasing-') }}
+        run: |
+          bash .github/utils/merge_releasing_branch.sh
+
   pre-push:
     needs: trigger-mode
     runs-on: ubuntu-latest

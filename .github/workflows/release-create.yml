@@ -5,6 +5,9 @@ on:
     tags:
       - v*
 
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
 jobs:
   publish:
     name: create a release

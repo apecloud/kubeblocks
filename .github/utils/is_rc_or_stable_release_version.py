@@ -24,7 +24,7 @@ def main(argv: list[str]) -> None:
         release_version = git_ref[len(tag_ref_prefix) :]
         release_note_path = f"docs/release_notes/v{release_version}/v{release_version}.md"
 
-        def set_with_rel_note_to_true() -> None
+        def set_with_rel_note_to_true() -> None:
             print(f"Checking if {release_note_path} exists")
             if os.path.exists(release_note_path):
                 print(f"Found {release_note_path}")

@@ -296,6 +296,10 @@ func (o *OperationsOptions) fillExpose() error {
 		return fmt.Errorf("unknown k8s provider")
 	}
 
+	if err = o.CompleteComponentsFlag(); err != nil {
+		return err
+	}
+
 	// default expose to internet
 	exposeType := util.ExposeType(o.ExposeType)
 	if exposeType == "" {

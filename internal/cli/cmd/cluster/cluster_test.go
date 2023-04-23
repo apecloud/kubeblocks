@@ -26,7 +26,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -216,26 +215,20 @@ var _ = Describe("Cluster", func() {
 		//todo: The order of create is buildClusterComp first then valiation, it make generating the test case mess.
 		Context("valiate storageClass", func() {
 			It("can get all StorageClasses in K8S and check out if the cluster have a defalut StorageClasses by GetStorageClasses()", func() {
-				storageClasses, allowDefault, err := cluster.GetStorageClasses(o.Dynamic)
+				storageClasses, defaultNums, err := getStorageClasses(o.Dynamic)
 				Expect(err).Should(Succeed())
 				Expect(storageClasses).Should(HaveKey(testing.StorageClassName))
-				Expect(allowDefault).Should(BeTrue())
+				Expect(defaultNums).Should(Equal(1))
 				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsNotDefault)
 				cd := testing.FakeClusterDef()
 				tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
-				storageClasses, allowDefault, err = cluster.GetStorageClasses(tf.FakeDynamicClient)
+				storageClasses, defaultNums, err = getStorageClasses(tf.FakeDynamicClient)
 				Expect(err).Should(Succeed())
 				Expect(storageClasses).Should(HaveKey(testing.StorageClassName))
-				Expect(allowDefault).ShouldNot(BeTrue())
+				Expect(defaultNums).Should(Equal(0))
 			})
 
-			It("can get all StorageClasses we specify by getSpecifyStorageClassName()", func() {
-				storageClassName, err := getSpecifyStorageClassName(o.ComponentSpecs)
-				Expect(err).Should(Succeed())
-				Expect(storageClassName).Should(HaveKey(testing.StorageClassName))
-			})
-
-			It("can specify the StorageClass and the StorageClass must exsit", func() {
+			It("can specify the StorageClass and the StorageClass must exist", func() {
 				Expect(validateStorageClassName(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
 				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault)
 				cd := testing.FakeClusterDef()
@@ -244,7 +237,9 @@ var _ = Describe("Cluster", func() {
 			})
 
 			It("can get valiate the default StorageClasses", func() {
-				o.ComponentSpecs = make([]map[string]interface{}, 0)
+				vct := o.ComponentSpecs[0]["volumeClaimTemplates"].([]interface{})
+				spec := vct[0].(map[string]interface{})["spec"]
+				delete(spec.(map[string]interface{}), "storageClassName")
 				Expect(validateStorageClassName(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
 				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault)
 				cd := testing.FakeClusterDef()

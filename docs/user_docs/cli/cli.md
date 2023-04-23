@@ -52,7 +52,6 @@ Cluster command.
 * [kbcli cluster delete-account](kbcli_cluster_delete-account.md)	 - Delete account for a cluster
 * [kbcli cluster delete-backup](kbcli_cluster_delete-backup.md)	 - Delete a backup.
 * [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete an OpsRequest.
-* [kbcli cluster delete-restore](kbcli_cluster_delete-restore.md)	 - Delete a restore job.
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster.
 * [kbcli cluster describe-account](kbcli_cluster_describe-account.md)	 - Describe account roles and related information
 * [kbcli cluster describe-config](kbcli_cluster_describe-config.md)	 - Show details of a specific reconfiguring.
@@ -74,7 +73,6 @@ Cluster command.
 * [kbcli cluster list-instances](kbcli_cluster_list-instances.md)	 - List cluster instances.
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster.
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests.
-* [kbcli cluster list-restores](kbcli_cluster_list-restores.md)	 - List all restore jobs.
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file.
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster.
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup.
@@ -148,6 +146,15 @@ Bootstrap a playground KubeBlocks in local host or cloud.
 * [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground kubernetes cluster.
 * [kbcli playground guide](kbcli_playground_guide.md)	 - Display playground cluster user guide.
 * [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a kubernetes cluster and install KubeBlocks for playground.
+
+
+## [plugin](kbcli_plugin.md)
+
+Provides utilities for interacting with plugins.
+
+ Plugins provide extended functionality that is not part of the major command-line distribution.
+
+* [kbcli plugin list](kbcli_plugin_list.md)	 - List all visible plugin executables on a user's PATH
 
 
 ## [version](kbcli_version.md)

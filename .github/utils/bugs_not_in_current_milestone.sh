@@ -6,8 +6,9 @@ set -o pipefail
 
 # requires `git` and `gh` commands, ref. https://cli.github.com/manual/installation for installation guides.
 
-. ./gh_env
-. ./functions.bash
+workdir=$(dirname $0)
+. ${workdir}/gh_env
+. ${workdir}/functions.bash
 
 process_issue_rows() {
     for ((i = 0; i < ${item_count}; i++))

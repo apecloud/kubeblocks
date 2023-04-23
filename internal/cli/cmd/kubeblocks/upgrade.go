@@ -130,11 +130,6 @@ func (o *InstallOptions) Upgrade() error {
 	// successfully upgraded
 	spinner(true)
 
-	// create VolumeSnapshotClass
-	if err = o.createVolumeSnapshotClass(); err != nil {
-		return err
-	}
-
 	if !o.Quiet {
 		fmt.Fprintf(o.Out, "\nKubeBlocks has been upgraded %s SUCCESSFULLY!\n", msg)
 		// set monitor to true, so that we can print notes with monitor

@@ -29,16 +29,21 @@ import (
 	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scheme"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -75,6 +80,9 @@ type Inputs struct {
 	// Group of Version, default is v1alpha1
 	Version string
 
+	// Command of input
+	Cmd *cobra.Command
+
 	// Factory
 	Factory cmdutil.Factory
 
@@ -108,10 +116,12 @@ type BaseOptions struct {
 
 	Client kubernetes.Interface `json:"-"`
 
+	ToPrinter func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error) `json:"-"`
+
+	Format printer.Format `json:"-"`
+
 	// Quiet minimize unnecessary output
 	Quiet bool
-
-	ClientSet kubernetes.Interface
 
 	genericclioptions.IOStreams
 }
@@ -129,6 +139,7 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 			util.CheckErr(inputs.BaseOptionsObj.Run(inputs))
 		},
 	}
+	inputs.Cmd = cmd
 	if inputs.BuildFlags != nil {
 		inputs.BuildFlags(cmd)
 	}
@@ -153,8 +164,22 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 		return err
 	}
 
-	if o.ClientSet, err = inputs.Factory.KubernetesClientSet(); err != nil {
-		return err
+	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
+		var p printers.ResourcePrinter
+		switch o.Format {
+		case printer.JSON:
+			p = &printers.JSONPrinter{}
+		case printer.YAML:
+			p = &printers.YAMLPrinter{}
+		default:
+			return nil, genericclioptions.NoCompatiblePrinterError{AllowedFormats: []string{"JSON", "YAML"}}
+		}
+
+		p, err = printers.NewTypeSetter(scheme.Scheme).WrapToPrinter(p, nil)
+		if err != nil {
+			return nil, err
+		}
+		return p.PrintObj, nil
 	}
 
 	// do custom options complete
@@ -215,21 +240,43 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	if len(version) == 0 {
 		version = types.AppsAPIVersion
 	}
-	// create k8s resource
-	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
-	if unstructuredObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+
+	previewObj := unstructuredObj
+	dryRunStrategy, err := GetDryRunStrategy(inputs.Cmd)
+	if err != nil {
 		return err
 	}
-	o.Name = unstructuredObj.GetName()
-	if o.Quiet {
-		return nil
+
+	if dryRunStrategy != DryRunClient {
+		gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
+		createOptions := metav1.CreateOptions{}
+
+		if dryRunStrategy == DryRunServer {
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		// create k8s resource
+		previewObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), previewObj, createOptions)
+		if err != nil {
+			return err
+		}
+		if dryRunStrategy != DryRunServer {
+			o.Name = unstructuredObj.GetName()
+			if o.Quiet {
+				return nil
+			}
+			if inputs.CustomOutPut != nil {
+				inputs.CustomOutPut(o)
+			} else {
+				fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+			}
+			return nil
+		}
 	}
-	if inputs.CustomOutPut != nil {
-		inputs.CustomOutPut(o)
-	} else {
-		fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+	printer, err := o.ToPrinter(nil, false)
+	if err != nil {
+		return err
 	}
-	return nil
+	return printer.PrintObj(previewObj, o.Out)
 }
 
 // RunAsApply execute command. the options of parameter contain the command flags and args.
@@ -332,4 +379,35 @@ func convertContentToUnstructured(cueValue cue.Value) (*unstructured.Unstructure
 		return nil, err
 	}
 	return unstructuredObj, nil
+}
+
+type DryRunStrategy int
+
+const (
+	// DryRunNone indicates the client will make all mutating calls
+	DryRunNone DryRunStrategy = iota
+	DryRunClient
+	DryRunServer
+)
+
+func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
+	if cmd == nil {
+		return DryRunNone, nil
+	}
+	dryRunFlag, err := cmd.Flags().GetString("dry-run")
+	if err != nil {
+		return DryRunNone, nil
+	}
+	switch dryRunFlag {
+	case cmd.Flag("dry-run").NoOptDefVal:
+		return DryRunClient, nil
+	case "client":
+		return DryRunClient, nil
+	case "server":
+		return DryRunServer, nil
+	case "none":
+		return DryRunNone, nil
+	default:
+		return DryRunNone, fmt.Errorf(`invalid dry-run value (%v). Must be "none", "server", or "client"`, dryRunFlag)
+	}
 }

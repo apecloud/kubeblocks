@@ -35,6 +35,7 @@ import (
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 const (
@@ -56,6 +57,10 @@ const (
 
 	ISDefautl    = true
 	IsNotDefault = false
+)
+
+var (
+	ExtraComponentDefName = fmt.Sprintf("%s-%d", ComponentDefName, 1)
 )
 
 func GetRandomStr() string {
@@ -261,7 +266,7 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 			},
 		},
 		{
-			Name:          fmt.Sprintf("%s-%d", ComponentDefName, 1),
+			Name:          ExtraComponentDefName,
 			CharacterType: "mysql",
 			ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
 				{
@@ -279,18 +284,16 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 	return clusterDef
 }
 
-func FakeComponentClassDef(clusterDef *appsv1alpha1.ClusterDefinition, def []byte) *corev1.ConfigMapList {
-	result := &corev1.ConfigMapList{}
-	cm := &corev1.ConfigMap{}
-	cm.Name = fmt.Sprintf("fake-kubeblocks-classes-%s", ComponentName)
-	cm.SetLabels(map[string]string{
-		constant.KBAppComponentDefRefLabelKey: ComponentDefName,
-		types.ClassProviderLabelKey:           "kubeblocks",
-		constant.ClusterDefLabelKey:           clusterDef.Name,
-	})
-	cm.Data = map[string]string{"families-20230223162700": string(def)}
-	result.Items = append(result.Items, *cm)
-	return result
+func FakeComponentClassDef(name string, clusterDefRef string, componentDefRef string) *appsv1alpha1.ComponentClassDefinition {
+	constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+		AddConstraints(testapps.GeneralResourceConstraint).
+		GetObject()
+
+	componentClassDefinition := testapps.NewComponentClassDefinitionFactory(name, clusterDefRef, componentDefRef).
+		AddClasses(constraint.Name, []string{testapps.Class1c1gName, testapps.Class2c4gName}).
+		GetObject()
+
+	return componentClassDefinition
 }
 
 func FakeClusterVersion() *appsv1alpha1.ClusterVersion {

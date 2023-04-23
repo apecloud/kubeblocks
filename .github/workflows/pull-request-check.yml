@@ -10,13 +10,14 @@ env:
 jobs:
   pr-check:
     name: PR Pre-Check
+    if: ${{ !(startsWith(github.head_ref, 'releasing-') && startsWith(github.base_ref, 'release-')) }}
     runs-on: ubuntu-latest
     steps:
       - name: check branch name
         uses: apecloud/check-branch-name@v0.1.0
         with:
-          branch_pattern: 'feature/|bugfix/|release/|hotfix/|support/|release/|release-|releasing/|releasing-|dependabot/'
-          comment_for_invalid_branch_name: 'This branch name is not following the standards: feature/|bugfix/|hotfix/|support/|release/|release-|releasing/|releasing-|dependabot/'
+          branch_pattern: 'feature/|bugfix/|release/|hotfix/|support/|releasing/|dependabot/'
+          comment_for_invalid_branch_name: 'This branch name is not following the standards: feature/|bugfix/|release/|hotfix/|support/|releasing/|dependabot/'
           fail_if_invalid_branch_name: 'true'
           ignore_branch_pattern: 'main|master'
 

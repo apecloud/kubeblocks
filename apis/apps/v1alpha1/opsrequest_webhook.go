@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -176,7 +175,7 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 	case UpgradeType:
 		return r.validateUpgrade(ctx, k8sClient)
 	case VerticalScalingType:
-		return r.validateVerticalScaling(ctx, k8sClient, cluster)
+		return r.validateVerticalScaling(cluster)
 	case HorizontalScalingType:
 		return r.validateHorizontalScaling(ctx, k8sClient, cluster)
 	case VolumeExpansionType:
@@ -219,24 +218,10 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 }
 
 // validateVerticalScaling validates api when spec.type is VerticalScaling
-func (r *OpsRequest) validateVerticalScaling(ctx context.Context, k8sClient client.Client, cluster *Cluster) error {
+func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 	verticalScalingList := r.Spec.VerticalScalingList
 	if len(verticalScalingList) == 0 {
 		return notEmptyError("spec.verticalScaling")
-	}
-
-	compClasses, err := getClasses(ctx, k8sClient, cluster.Spec.ClusterDefRef)
-	if err != nil {
-		return nil
-	}
-
-	getComponent := func(name string) *ClusterComponentSpec {
-		for _, comp := range cluster.Spec.ComponentSpecs {
-			if comp.Name == name {
-				return &comp
-			}
-		}
-		return nil
 	}
 
 	// validate resources is legal and get component name slice
@@ -252,20 +237,6 @@ func (r *OpsRequest) validateVerticalScaling(ctx context.Context, k8sClient clie
 		}
 		if invalidValue, err := compareRequestsAndLimits(v.ResourceRequirements); err != nil {
 			return invalidValueError(invalidValue, err.Error())
-		}
-		comp := getComponent(v.ComponentName)
-		if comp == nil {
-			continue
-		}
-		if classes, ok := compClasses[comp.ComponentDefRef]; ok {
-			if comp.ClassDefRef.Class != "" {
-				if _, ok = classes[comp.ClassDefRef.Class]; !ok {
-					return field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].classDefRef", i)), comp.ClassDefRef.Class, err.Error())
-				}
-			}
-			if err = validateMatchingClass(classes, v.ResourceRequirements); err != nil {
-				return errors.Wrapf(err, "can not find matching class for component %s", v.ComponentName)
-			}
 		}
 	}
 	return r.checkComponentExistence(cluster, componentNames)
@@ -484,51 +455,6 @@ func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.
 	}
 
 	return "", nil
-}
-
-func getClasses(ctx context.Context, k8sClient client.Client, clusterDef string) (map[string]map[string]*ComponentClassInstance, error) {
-	ml := []client.ListOption{
-		client.MatchingLabels{"clusterdefinition.kubeblocks.io/name": clusterDef},
-	}
-	var classDefinitionList ComponentClassDefinitionList
-	if err := k8sClient.List(ctx, &classDefinitionList, ml...); err != nil {
-		return nil, err
-	}
-	var (
-		componentClasses = make(map[string]map[string]*ComponentClassInstance)
-	)
-	for _, classDefinition := range classDefinitionList.Items {
-		componentType := classDefinition.GetLabels()["apps.kubeblocks.io/component-def-ref"]
-		if componentType == "" {
-			return nil, fmt.Errorf("failed to find component type")
-		}
-		classes := make(map[string]*ComponentClassInstance)
-		for idx := range classDefinition.Status.Classes {
-			cls := classDefinition.Status.Classes[idx]
-			classes[cls.Name] = &cls
-		}
-		if _, ok := componentClasses[componentType]; !ok {
-			componentClasses[componentType] = classes
-		} else {
-			for k, v := range classes {
-				if _, exists := componentClasses[componentType][k]; exists {
-					return nil, fmt.Errorf("duplicate component class %s", k)
-				}
-				componentClasses[componentType][k] = v
-			}
-		}
-	}
-	return componentClasses, nil
-}
-
-func validateMatchingClass(classes map[string]*ComponentClassInstance, resource corev1.ResourceRequirements) error {
-	if cls := chooseComponentClasses(classes, resource.Requests); cls == nil {
-		return fmt.Errorf("can not find matching class with specified requests")
-	}
-	if cls := chooseComponentClasses(classes, resource.Limits); cls == nil {
-		return fmt.Errorf("can not find matching class with specified limits")
-	}
-	return nil
 }
 
 func notEmptyError(target string) error {

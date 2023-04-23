@@ -67,6 +67,15 @@ var (
 	createBackupExample = templates.Examples(`
 		# create a backup
 		kbcli cluster backup cluster-name
+
+		# create a snapshot backup
+		kbcli cluster backup cluster-name --backup-type snapshot
+
+		# create a full backup
+		kbcli cluster backup cluster-name --backup-type full
+
+		# create a backup with specified backup policy
+		kbcli cluster backup cluster-name --backup-policy <backup-policy-name>
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backup
@@ -75,14 +84,6 @@ var (
 	deleteBackupExample = templates.Examples(`
 		# delete a backup named backup-name
 		kbcli cluster delete-backup cluster-name --name backup-name
-	`)
-	listRestoreExample = templates.Examples(`
-		# list all restore
-		kbcli cluster list-restore
-	`)
-	deleteRestoreExample = templates.Examples(`
-		# delete a restore named restore-name
-		kbcli cluster delete-restore cluster-name --name restore-name
 	`)
 	createRestoreExample = templates.Examples(`
 		# restore a new cluster from a backup
@@ -103,71 +104,9 @@ type CreateBackupOptions struct {
 	create.BaseOptions
 }
 
-type CreateVolumeSnapshotClassOptions struct {
-	Driver string `json:"driver"`
-	Name   string `json:"name"`
-	create.BaseOptions
-}
-
 type ListBackupOptions struct {
 	*list.ListOptions
 	BackupName string
-}
-
-func (o *CreateVolumeSnapshotClassOptions) Complete() error {
-	objs, err := o.Dynamic.
-		Resource(types.StorageClassGVR()).
-		List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, sc := range objs.Items {
-		annotations := sc.GetAnnotations()
-		if annotations == nil {
-			continue
-		}
-		if annotations["storageclass.kubernetes.io/is-default-class"] == annotationTrueValue {
-			o.Driver, _, _ = unstructured.NestedString(sc.Object, "provisioner")
-			o.Name = "default-vsc"
-		}
-	}
-	// warning if not found default storage class
-	if o.Driver == "" {
-		return fmt.Errorf("no default StorageClass found, snapshot-controller may not work")
-	}
-	return nil
-}
-
-func (o *CreateVolumeSnapshotClassOptions) Create() error {
-	objs, err := o.Dynamic.
-		Resource(types.VolumeSnapshotClassGVR()).
-		List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, vsc := range objs.Items {
-		annotations := vsc.GetAnnotations()
-		if annotations == nil {
-			continue
-		}
-		// skip creation if default volumesnapshotclass exists.
-		if annotations["snapshot.storage.kubernetes.io/is-default-class"] == annotationTrueValue {
-			return nil
-		}
-	}
-
-	inputs := create.Inputs{
-		CueTemplateName: "volumesnapshotclass_template.cue",
-		ResourceName:    "volumesnapshotclasses",
-		Group:           "snapshot.storage.k8s.io",
-		Version:         types.K8sCoreAPIVersion,
-		BaseOptionsObj:  &o.BaseOptions,
-		Options:         o,
-	}
-	if err := o.BaseOptions.Run(inputs); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (o *CreateBackupOptions) Complete() error {
@@ -214,7 +153,7 @@ func (o *CreateBackupOptions) getDefaultBackupPolicy() (string, error) {
 			constant.AppInstanceLabelKey, clusterObj.GetName()),
 	}
 	objs, err := o.Dynamic.
-		Resource(types.BackupPolicyGVR()).
+		Resource(types.BackupPolicyGVR()).Namespace(o.Namespace).
 		List(context.TODO(), opts)
 	if err != nil {
 		return "", err
@@ -602,63 +541,6 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	cmd.Flags().StringVar(&o.RestoreTimeStr, "restore-to-time", "", "point in time recovery(PITR)")
 	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "source cluster name")
 	return cmd
-}
-
-func NewListRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := list.NewListOptions(f, streams, types.RestoreJobGVR())
-	cmd := &cobra.Command{
-		Use:               "list-restores",
-		Short:             "List all restore jobs.",
-		Aliases:           []string{"ls-restores"},
-		Example:           listRestoreExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
-		Run: func(cmd *cobra.Command, args []string) {
-			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
-			o.Names = nil
-			_, err := o.Run()
-			util.CheckErr(err)
-		},
-	}
-	o.AddFlags(cmd)
-	return cmd
-}
-
-func NewDeleteRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := delete.NewDeleteOptions(f, streams, types.RestoreJobGVR())
-	cmd := &cobra.Command{
-		Use:               "delete-restore",
-		Short:             "Delete a restore job.",
-		Example:           deleteRestoreExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
-		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(completeForDeleteRestore(o, args))
-			util.CheckErr(o.Run())
-		},
-	}
-	cmd.Flags().StringSliceVar(&o.Names, "name", []string{}, "Restore names")
-	o.AddFlags(cmd)
-	return cmd
-}
-
-// completeForDeleteRestore complete cmd for delete restore
-func completeForDeleteRestore(o *delete.DeleteOptions, args []string) error {
-	if len(args) == 0 {
-		return errors.New("Missing cluster name")
-	}
-	if len(args) > 1 {
-		return errors.New("Only supported delete the restore of one cluster")
-	}
-	if !o.Force && len(o.Names) == 0 {
-		return errors.New("Missing --name as restore name.")
-	}
-	if o.Force && len(o.Names) == 0 {
-		// do force action, if specified --force and not specified --name, all restores with the cluster will be deleted
-		// if no specify restore name and cluster name is specified. it will delete all restores with the cluster
-		o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
-		o.ConfirmedNames = args
-	}
-	o.ConfirmedNames = o.Names
-	return nil
 }
 
 func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

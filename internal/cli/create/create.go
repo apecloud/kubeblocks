@@ -123,8 +123,6 @@ type BaseOptions struct {
 	// Quiet minimize unnecessary output
 	Quiet bool
 
-	ClientSet kubernetes.Interface
-
 	genericclioptions.IOStreams
 }
 
@@ -163,10 +161,6 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 	}
 
 	if o.Client, err = inputs.Factory.KubernetesClientSet(); err != nil {
-		return err
-	}
-
-	if o.ClientSet, err = inputs.Factory.KubernetesClientSet(); err != nil {
 		return err
 	}
 

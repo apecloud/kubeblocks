@@ -21,7 +21,6 @@ import (
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -92,38 +91,16 @@ func (r *FillClassTransformer) fillClass(transCtx *ClusterTransformContext) erro
 		return cls
 	}
 
-	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*appsv1alpha1.ComponentClassInstance) *appsv1alpha1.ComponentClassInstance {
-		filters := make(map[corev1.ResourceName]resource.Quantity)
-		if !comp.Resources.Requests.Cpu().IsZero() {
-			filters[corev1.ResourceCPU] = *comp.Resources.Requests.Cpu()
-		}
-		if !comp.Resources.Requests.Memory().IsZero() {
-			filters[corev1.ResourceMemory] = *comp.Resources.Requests.Memory()
-		}
-		return class.ChooseComponentClasses(classes, filters)
-	}
-
 	for idx, comp := range cluster.Spec.ComponentSpecs {
-		classes := compClasses[comp.ComponentDefRef]
-
-		var cls *appsv1alpha1.ComponentClassInstance
-		// TODO another case if len(constraintList.Items) > 0, use matchClassFamilies to find matching resource constraint:
-		switch {
-		case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
-			cls = classes[comp.ClassDefRef.Class]
-			if cls == nil {
-				return fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
-			}
-		case classes != nil:
-			cls = matchComponentClass(comp, classes)
-			if cls == nil {
-				return fmt.Errorf("can not find matching class for component %s", comp.Name)
-			}
+		cls, err := class.ValidateComponentClass(&comp, compClasses)
+		if err != nil {
+			return err
 		}
 		if cls == nil {
 			// TODO reconsider handling policy for this case
 			continue
 		}
+
 		comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: cls.Name}
 		requests := corev1.ResourceList{
 			corev1.ResourceCPU:    cls.CPU,
@@ -131,6 +108,7 @@ func (r *FillClassTransformer) fillClass(transCtx *ClusterTransformContext) erro
 		}
 		requests.DeepCopyInto(&comp.Resources.Requests)
 		requests.DeepCopyInto(&comp.Resources.Limits)
+
 		var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
 		if len(comp.VolumeClaimTemplates) > 0 {
 			volumes = comp.VolumeClaimTemplates

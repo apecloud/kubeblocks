@@ -53,15 +53,15 @@ func (factory *MockBackupFactory) SetLabels(labels map[string]string) *MockBacku
 }
 
 func (factory *MockBackupFactory) SetBackLog(startTime, stopTime time.Time) *MockBackupFactory {
-	manitests := factory.get().Status.Manifests
-	if manitests == nil {
-		manitests = &dataprotectionv1alpha1.ManifestsStatus{}
+	manifests := factory.get().Status.Manifests
+	if manifests == nil {
+		manifests = &dataprotectionv1alpha1.ManifestsStatus{}
 	}
-	if manitests.BackupLog == nil {
-		manitests.BackupLog = &dataprotectionv1alpha1.BackupLogStatus{}
+	if manifests.BackupLog == nil {
+		manifests.BackupLog = &dataprotectionv1alpha1.BackupLogStatus{}
 	}
-	manitests.BackupLog.StartTime = &metav1.Time{Time: startTime}
-	manitests.BackupLog.StopTime = &metav1.Time{Time: stopTime}
-	factory.get().Status.Manifests = manitests
+	manifests.BackupLog.StartTime = &metav1.Time{Time: startTime}
+	manifests.BackupLog.StopTime = &metav1.Time{Time: stopTime}
+	factory.get().Status.Manifests = manifests
 	return factory
 }

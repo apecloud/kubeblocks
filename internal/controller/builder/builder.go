@@ -718,3 +718,23 @@ func BuildRestoreJobForFullBackup(
 	}
 	return &job, nil
 }
+
+func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, params BuilderParams, toolsMetas map[string]appsv1alpha1.ToolConfig) []corev1.Container {
+	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
+	for _, toolConfig := range toolsMetas {
+		toolContainer := corev1.Container{
+			Name:            toolConfig.Name,
+			Command:         toolConfig.Command,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			VolumeMounts:    sidecarRenderedParam.Volumes,
+		}
+		if toolConfig.Image != "" {
+			toolContainer.Image = toolConfig.Image
+		}
+		toolContainers = append(toolContainers, toolContainer)
+	}
+	for i := range toolContainers {
+		injectEnvs(params, sidecarRenderedParam.EnvConfigName, &toolContainers[i])
+	}
+	return toolContainers
+}

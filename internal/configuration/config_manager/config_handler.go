@@ -42,8 +42,9 @@ type ConfigHandler interface {
 type ConfigSpecMeta struct {
 	*appsv1alpha1.ReloadOptions `json:",inline"`
 
-	ReloadType appsv1alpha1.CfgReloadType       `json:"reloadType"`
-	ConfigSpec appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
+	ReloadType  appsv1alpha1.CfgReloadType       `json:"reloadType"`
+	ConfigSpec  appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
+	ToolsConfig []appsv1alpha1.ToolConfig        `json:"toolConfig"`
 
 	// config volume mount path
 	TPLConfig  string `json:"tplConfig"`

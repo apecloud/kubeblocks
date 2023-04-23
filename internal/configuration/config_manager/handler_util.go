@@ -48,6 +48,8 @@ type CfgManagerBuildParams struct {
 	ScriptVolume           []corev1.Volume
 	Cluster                *appsv1alpha1.Cluster
 	ConfigSpecsBuildParams []ConfigSpecMeta
+	// init tools container
+	ToolsContainers []corev1.Container
 }
 
 func IsSupportReload(reload *appsv1alpha1.ReloadOptions) bool {

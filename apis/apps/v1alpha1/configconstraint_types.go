@@ -29,6 +29,10 @@ type ConfigConstraintSpec struct {
 	// +optional
 	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
 
+	// toolConfig used to config init container.
+	// +optional
+	ToolsConfig []ToolConfig `json:"toolsConfig,omitempty"`
+
 	// cfgSchemaTopLevelName is cue type name, which generates openapi schema.
 	// +optional
 	CfgSchemaTopLevelName string `json:"cfgSchemaTopLevelName,omitempty"`
@@ -124,6 +128,32 @@ type UnixSignalTrigger struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ProcessName string `json:"processName"`
+}
+
+type ToolConfig struct {
+	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
+	// The volume name must be defined in podSpec.containers[*].volumeMounts.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=32
+	VolumeName string `json:"volumeName"`
+
+	// Specify the name of initContainer.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=32
+	Name string `json:"name,omitempty"`
+
+	// tools Container image name.
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// mountPoint is the mount point of the scripts file.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	MountPoint string `json:"mountPoint"`
+
+	// exec used to execute for init containers.
+	// +kubebuilder:validation:Required
+	Command []string `json:"command"`
 }
 
 type ShellTrigger struct {

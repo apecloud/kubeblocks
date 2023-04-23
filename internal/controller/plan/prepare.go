@@ -152,6 +152,9 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 
 	// Add sidecar to podTemplate
 	podSpec.Containers = append(podSpec.Containers, *container)
+	if len(buildParams.ToolsContainers) > 0 {
+		podSpec.InitContainers = append(podSpec.InitContainers, buildParams.ToolsContainers...)
+	}
 
 	// This sidecar container will be able to view and signal processes from other containers
 	podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
@@ -224,8 +227,37 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		ConfigSpecsBuildParams: configSpecBuildParams,
 	}
 
-	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, configManagerParams, volumeDirs); err != nil {
+	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {
 		return nil, err
 	}
-	return configManagerParams, nil
+
+	// construct config manager tools volume
+	toolContainers := make(map[string]appsv1alpha1.ToolConfig)
+	for _, buildParam := range cfgManagerParams.ConfigSpecsBuildParams {
+		for _, toolConfig := range buildParam.ToolsConfig {
+			if _, ok := toolContainers[toolConfig.Name]; ok {
+				continue
+			}
+			buildToolsVolumeMount(cfgManagerParams, toolConfig)
+			toolContainers[toolConfig.Name] = toolConfig
+		}
+	}
+	if len(toolContainers) != 0 {
+		cfgManagerParams.ToolsContainers = builder.BuildCfgManagerToolsContainer(cfgManagerParams, params, toolContainers)
+	}
+	return cfgManagerParams, nil
+}
+
+func buildToolsVolumeMount(cfgManagerParams *cfgcm.CfgManagerBuildParams, toolConfig appsv1alpha1.ToolConfig) {
+	cfgManagerParams.ScriptVolume = append(cfgManagerParams.ScriptVolume, corev1.Volume{
+		Name: toolConfig.VolumeName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	})
+
+	cfgManagerParams.Volumes = append(cfgManagerParams.Volumes, corev1.VolumeMount{
+		Name:      toolConfig.VolumeName,
+		MountPath: toolConfig.MountPoint,
+	})
 }

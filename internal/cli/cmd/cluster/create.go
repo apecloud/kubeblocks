@@ -450,6 +450,12 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				return "2"
 			}
 		}
+		// the default replicas is 3 if not set by command flag, for Consensus workload
+		if c.WorkloadType == appsv1alpha1.Consensus {
+			if key == keyReplicas {
+				return "3"
+			}
+		}
 
 		if c.CharacterType == "redis" && c.Name == "redis-sentinel" {
 			switch key {

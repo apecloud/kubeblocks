@@ -787,7 +787,7 @@ func validateStorageClass(dynamic dynamic.Interface, components []map[string]int
 				if _, ok := existedStorageClasses[*name]; !ok {
 					return fmt.Errorf("failed to find the specified storageClass \"%s\"", *name)
 				}
-			} else if !existedDefault { //2. validate the default StorageClass
+			} else if !existedDefault { // 2. validate the default StorageClass
 				return fmt.Errorf("failed to find the default storageClass, use '--set storageClass=NAME' to set it")
 			}
 		}

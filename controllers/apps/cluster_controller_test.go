@@ -95,7 +95,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
@@ -1400,11 +1400,11 @@ var _ = Describe("Cluster Controller", func() {
 					g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
 				})).Should(Succeed())
 			By("mocking backup status completed, we don't need backup reconcile here")
-			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dataprotectionv1alpha1.Backup) {
 				backup.Status.BackupToolName = backupTool.Name
 				backup.Status.PersistentVolumeClaimName = "backup-pvc"
 				backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
-			})).ShouldNot(HaveOccurred())
+			})).Should(Succeed())
 			By("checking backup status completed")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
 				func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {

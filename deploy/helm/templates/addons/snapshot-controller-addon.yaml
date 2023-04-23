@@ -26,6 +26,7 @@ spec:
     valuesMapping:
       valueMap:
         replicaCount: replicaCount
+        storageClass: volumeSnapshotClasses[0].driver
 
       jsonMap:
         tolerations: tolerations
@@ -39,8 +40,36 @@ spec:
           limits: resources.limits.memory
 
   defaultInstallValues:
-    - replicas: 1
+    - enabled: {{ get ( get ( .Values | toYaml | fromYaml ) "snapshot-controller" ) "enabled" }}
+    - storageClass: ebs.csi.aws.com
+      selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - eks
+    - storageClass: diskplugin.csi.alibabacloud.com
+      selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - aliyun
+    - storageClass: pd.csi.storage.gke.io
+      selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - gke
+    - storageClass: disk.csi.azure.com
+      selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - aks
 
   installable:
     autoInstall:  {{ get ( get ( .Values | toYaml | fromYaml ) "snapshot-controller" ) "enabled" }}
-
+    selectors:
+      - key: KubeGitVersion
+        operator: DoesNotContain
+        values:
+          - tke

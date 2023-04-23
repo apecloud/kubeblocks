@@ -25,7 +25,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -35,21 +34,41 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
+// ValidateComponentClass check if component classDefRef or resource is invalid
+func ValidateComponentClass(comp *v1alpha1.ClusterComponentSpec, compClasses map[string]map[string]*v1alpha1.ComponentClassInstance) (*v1alpha1.ComponentClassInstance, error) {
+	classes := compClasses[comp.ComponentDefRef]
+	var cls *v1alpha1.ComponentClassInstance
+	switch {
+	case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
+		if classes == nil {
+			return nil, fmt.Errorf("can not find classes for component %s", comp.ComponentDefRef)
+		}
+		cls = classes[comp.ClassDefRef.Class]
+		if cls == nil {
+			return nil, fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
+		}
+	case classes != nil:
+		cls = ChooseComponentClasses(classes, comp.Resources.Requests)
+		if cls == nil {
+			return nil, fmt.Errorf("can not find matching class for component %s", comp.Name)
+		}
+	}
+	return cls, nil
+}
+
 // GetCustomClassObjectName Returns the name of the ComponentClassDefinition object containing the custom classes
 func GetCustomClassObjectName(cdName string, componentName string) string {
 	return fmt.Sprintf("kb.classes.custom.%s.%s", cdName, componentName)
 }
 
 // ChooseComponentClasses Choose the classes to be used for a given component with some constraints
-func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance, filters map[corev1.ResourceName]resource.Quantity) *v1alpha1.ComponentClassInstance {
+func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance, resources corev1.ResourceList) *v1alpha1.ComponentClassInstance {
 	var candidates []*v1alpha1.ComponentClassInstance
 	for _, cls := range classes {
-		cpu, ok := filters[corev1.ResourceCPU]
-		if ok && !cpu.Equal(cls.CPU) {
+		if !resources.Cpu().IsZero() && !resources.Cpu().Equal(cls.CPU) {
 			continue
 		}
-		memory, ok := filters[corev1.ResourceMemory]
-		if ok && !memory.Equal(cls.Memory) {
+		if !resources.Memory().IsZero() && !resources.Memory().Equal(cls.Memory) {
 			continue
 		}
 		candidates = append(candidates, cls)

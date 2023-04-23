@@ -134,15 +134,12 @@ var _ = Describe("OpsRequest Controller", func() {
 	}
 
 	type verticalScalingContext struct {
-		description string
-		source      resourceContext
-		target      resourceContext
+		source resourceContext
+		target resourceContext
 	}
 
 	testVerticalScaleCPUAndMemory := func(workloadType testapps.ComponentDefTplType, scalingCtx verticalScalingContext) {
 		const opsName = "mysql-verticalscaling"
-
-		By(scalingCtx.description)
 
 		By("Create class related objects")
 		constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).

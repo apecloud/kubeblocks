@@ -42,6 +42,7 @@ type CfgManagerBuildParams struct {
 	Volumes       []corev1.VolumeMount `json:"volumes"`
 	CharacterType string               `json:"characterType"`
 	SecreteName   string               `json:"secreteName"`
+	EnvConfigName string               `json:"envConfigName"`
 
 	// add volume to pod
 	ScriptVolume           []corev1.Volume

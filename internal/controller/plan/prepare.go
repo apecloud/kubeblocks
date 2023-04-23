@@ -144,7 +144,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 		return nil
 	}
 
-	container, err := builder.BuildCfgManagerContainer(buildParams)
+	container, err := builder.BuildCfgManagerContainer(buildParams, component)
 	if err != nil {
 		return err
 	}
@@ -217,6 +217,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		ManagerName:            constant.ConfigSidecarName,
 		CharacterType:          comp.CharacterType,
 		SecreteName:            component.GenerateConnCredential(cluster.Name),
+		EnvConfigName:          component.GenerateComponentEnvName(cluster.Name, comp.Name),
 		Image:                  viper.GetString(constant.KBToolsImage),
 		Volumes:                volumeDirs,
 		Cluster:                cluster,

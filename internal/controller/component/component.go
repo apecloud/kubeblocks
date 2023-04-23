@@ -332,3 +332,7 @@ func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,
 func GenerateConnCredential(clusterName string) string {
 	return fmt.Sprintf("%s-conn-credential", clusterName)
 }
+
+func GenerateComponentEnvName(clusterName, componentName string) string {
+	return fmt.Sprintf("%s-conn-credential", clusterName)
+}

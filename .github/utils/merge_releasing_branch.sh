@@ -13,5 +13,5 @@ workdir=$(dirname $0)
 set -x
 
 git switch ${BASE_BRANCH}
-git merge origin/${HEAD_BRANCH}
+git merge ${HEAD_BRANCH}
 git push

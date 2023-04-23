@@ -13,6 +13,15 @@ kbcli cluster backup [flags]
 ```
   # create a backup
   kbcli cluster backup cluster-name
+  
+  # create a snapshot backup
+  kbcli cluster backup cluster-name --backup-type snapshot
+  
+  # create a full backup
+  kbcli cluster backup cluster-name --backup-type full
+  
+  # create a backup with specified backup policy
+  kbcli cluster backup cluster-name --backup-policy <backup-policy-name>
 ```
 
 ### Options

@@ -215,7 +215,7 @@ func (o *CreateBackupOptions) getDefaultBackupPolicy() (string, error) {
 			constant.AppInstanceLabelKey, clusterObj.GetName()),
 	}
 	objs, err := o.Dynamic.
-		Resource(types.BackupPolicyGVR()).
+		Resource(types.BackupPolicyGVR()).Namespace(o.Namespace).
 		List(context.TODO(), opts)
 	if err != nil {
 		return "", err

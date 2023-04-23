@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -73,7 +74,7 @@ func FindRootVertex(dag *graph.DAG) (*ObjectVertex, error) {
 	return rootVertex, nil
 }
 
-func GetGVKName(object client.Object, scheme *runtime.Scheme) (*GVKName, error) {
+func GetGVKName(object client.Object) (*GVKName, error) {
 	gvk, err := apiutil.GVKForObject(object, scheme)
 	if err != nil {
 		return nil, err
@@ -85,7 +86,11 @@ func GetGVKName(object client.Object, scheme *runtime.Scheme) (*GVKName, error) 
 	}, nil
 }
 
-func IsOwnerOf(owner, obj client.Object, scheme *runtime.Scheme) bool {
+func AddScheme(addToScheme func(*runtime.Scheme) error) {
+	utilruntime.Must(addToScheme(scheme))
+}
+
+func IsOwnerOf(owner, obj client.Object) bool {
 	ro, ok := owner.(runtime.Object)
 	if !ok {
 		return false
@@ -133,11 +138,11 @@ func NewRequeueError(after time.Duration, reason string) error {
 	}
 }
 
-func isObjectDeleting(object client.Object) bool {
+func IsObjectDeleting(object client.Object) bool {
 	return !object.GetDeletionTimestamp().IsZero()
 }
 
-func isObjectUpdating(object client.Object) bool {
+func IsObjectUpdating(object client.Object) bool {
 	value := reflect.ValueOf(object)
 	if value.Kind() == reflect.Ptr {
 		value = value.Elem()
@@ -160,6 +165,6 @@ func isObjectUpdating(object client.Object) bool {
 	return observedGeneration.Interface() == generation.Interface()
 }
 
-func isObjectStatusUpdating(object client.Object) bool {
-	return !isObjectDeleting(object) && !isObjectUpdating(object)
+func IsObjectStatusUpdating(object client.Object) bool {
+	return !IsObjectDeleting(object) && !IsObjectUpdating(object)
 }

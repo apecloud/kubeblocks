@@ -61,7 +61,7 @@ func (builder *ServiceBuilder) AddSelectorsInMap(keyValues map[string]string) *S
 	return builder
 }
 
-func (builder *ServiceBuilder) AddPorts(ports ...corev1.ServicePort) *ServiceBuilder  {
+func (builder *ServiceBuilder) AddPorts(ports ...corev1.ServicePort) *ServiceBuilder {
 	portList := builder.get().Spec.Ports
 	if portList == nil {
 		portList = make([]corev1.ServicePort, 0)

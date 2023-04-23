@@ -15,3 +15,82 @@ limitations under the License.
 */
 
 package consensusset
+
+import (
+	"context"
+
+	apps "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+// statusTransformer computes the current status:
+// 1. read the underlying sts's status and copy them to consensus set's status
+// 2. read pod role label and update consensus set's status role fields
+type statusTransformer struct {
+	context.Context
+	Client roclient.ReadonlyClient
+}
+
+func (t *statusTransformer) Transform(dag *graph.DAG) error {
+	// get root vertex(i.e. consensus set)
+	root, err := model.FindRootVertex(dag)
+	if err != nil {
+		return err
+	}
+	csSet, _ := root.Obj.(*workloads.ConsensusSet)
+	oriSet, _ := root.OriObj.(*workloads.ConsensusSet)
+
+	// fast return
+	if model.IsObjectDeleting(oriSet) {
+		return nil
+	}
+
+	// read the underlying sts
+	sts := &apps.StatefulSet{}
+	if err = t.Client.Get(t.Context, client.ObjectKeyFromObject(csSet), sts); err != nil {
+		return err
+	}
+	csSet.Status.StatefulSetStatus = sts.Status
+	// use consensus set's generation instead of sts's
+	csSet.Status.ObservedGeneration = csSet.Generation
+
+	// read all pods belong to the sts, hence belong to our consensus set
+	pods, err := t.getPodsOfStatefulSet(sts)
+	if err != nil {
+		return err
+	}
+
+	// update role fields
+	setConsensusSetStatusRoles(csSet, pods)
+
+	// TODO: handle Update(i.e. pods deletion)
+
+	return nil
+}
+
+func (t *statusTransformer)getPodsOfStatefulSet(stsObj *apps.StatefulSet) ([]corev1.Pod, error) {
+	podList := &corev1.PodList{}
+	if err := t.Client.List(t.Context, podList,
+		&client.ListOptions{Namespace: stsObj.Namespace},
+		client.MatchingLabels{
+			constant.KBManagedByKey: stsObj.Labels[constant.KBManagedByKey],
+			constant.AppInstanceLabelKey:    stsObj.Labels[constant.AppInstanceLabelKey],
+		}); err != nil {
+		return nil, err
+	}
+	var pods []corev1.Pod
+	for _, pod := range podList.Items {
+		if controllerutil.IsMemberOf(stsObj, &pod) {
+			pods = append(pods, pod)
+		}
+	}
+	return pods, nil
+}

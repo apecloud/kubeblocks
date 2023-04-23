@@ -43,5 +43,3 @@ func (builder *ConsensusSetBuilder) SetReplicas(replicas int32) *ConsensusSetBui
 	builder.get().Spec.Replicas = replicas
 	return builder
 }
-
-

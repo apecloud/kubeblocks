@@ -30,17 +30,17 @@ var _ = Describe("transform utils test", func() {
 			object := &apps.StatefulSet{}
 			object.Generation = 1
 			object.Status.ObservedGeneration = 1
-			Expect(isObjectUpdating(object)).Should(BeTrue())
+			Expect(IsObjectUpdating(object)).Should(BeTrue())
 		})
 		It("should return false if generation doesn't equal", func() {
 			object := &apps.StatefulSet{}
 			object.Generation = 2
 			object.Status.ObservedGeneration = 1
-			Expect(isObjectUpdating(object)).Should(BeFalse())
+			Expect(IsObjectUpdating(object)).Should(BeFalse())
 		})
 		It("should return false if fields not exist", func() {
 			object := &corev1.Secret{}
-			Expect(isObjectUpdating(object)).Should(BeFalse())
+			Expect(IsObjectUpdating(object)).Should(BeFalse())
 		})
 	})
 })

@@ -89,3 +89,8 @@ func (builder *StatefulSetBuilder) SetVolumeClaimTemplates(templates ...corev1.P
 	builder.get().Spec.VolumeClaimTemplates = templates
 	return builder
 }
+
+func (builder *StatefulSetBuilder) SetUpdateStrategyType(strategyType apps.StatefulSetUpdateStrategyType) *StatefulSetBuilder {
+	builder.get().Spec.UpdateStrategy.Type = strategyType
+	return builder
+}

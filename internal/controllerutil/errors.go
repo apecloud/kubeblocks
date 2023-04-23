@@ -38,13 +38,16 @@ type ErrorType string
 
 const (
 	// ErrorWaitCacheRefresh waits for synchronization of the corresponding object cache in client-go from ApiServer.
-	ErrorWaitCacheRefresh = "WaitCacheRefresh"
-
-	// ErrorTypeBackupNotCompleted is used to report backup not completed.
-	ErrorTypeBackupNotCompleted ErrorType = "BackupNotCompleted"
-
+	ErrorWaitCacheRefresh ErrorType = "WaitCacheRefresh"
 	// ErrorTypeNotFound not found any resource.
-	ErrorTypeNotFound = "NotFound"
+	ErrorTypeNotFound ErrorType = "NotFound"
+
+	// ErrorType for backup
+	ErrorTypeBackupNotSupported       ErrorType = "BackupNotSupported"       // this backup type not supported
+	ErrorTypeBackupPVTemplateNotFound ErrorType = "BackupPVTemplateNotFound" // this pv template not found
+	ErrorTypeBackupNotCompleted       ErrorType = "BackupNotCompleted"       // report backup not completed.
+	ErrorTypeBackupPVCNameIsEmpty     ErrorType = "BackupPVCNameIsEmpty"     // pvc name for backup is empty
+	ErrorTypeBackupJobFailed          ErrorType = "BackupJobFailed"          // backup job failed
 )
 
 var ErrFailedToAddFinalizer = errors.New("failed to add finalizer")
@@ -71,6 +74,14 @@ func IsTargetError(err error, errorType ErrorType) bool {
 	return false
 }
 
+// ToControllerError converts the error to the Controller error.
+func ToControllerError(err error) *Error {
+	if tmpErr, ok := err.(*Error); ok || errors.As(err, &tmpErr) {
+		return tmpErr
+	}
+	return nil
+}
+
 // NewNotFound returns a new Error with ErrorTypeNotFound.
 func NewNotFound(format string, a ...any) *Error {
 	return &Error{
@@ -82,4 +93,24 @@ func NewNotFound(format string, a ...any) *Error {
 // IsNotFound returns true if the specified error is the error type of ErrorTypeNotFound.
 func IsNotFound(err error) bool {
 	return IsTargetError(err, ErrorTypeNotFound)
+}
+
+// NewBackupNotSupported returns a new Error with ErrorTypeBackupNotSupported.
+func NewBackupNotSupported(backupType, backupPolicyName string) *Error {
+	return NewErrorf(ErrorTypeBackupNotSupported, `backup type "%s" not supported by backup policy "%s"`, backupType, backupPolicyName)
+}
+
+// NewBackupPVTemplateNotFound returns a new Error with ErrorTypeBackupPVTemplateNotFound.
+func NewBackupPVTemplateNotFound(cmName, cmNamespace string) *Error {
+	return NewErrorf(ErrorTypeBackupPVTemplateNotFound, `"the persistentVolume template is empty in the configMap %s/%s", pvConfig.Namespace, pvConfig.Name`, cmNamespace, cmName)
+}
+
+// NewBackupPVCNameIsEmpty returns a new Error with ErrorTypeBackupPVCNameIsEmpty.
+func NewBackupPVCNameIsEmpty(backupPolicyName string) *Error {
+	return NewErrorf(ErrorTypeBackupPVCNameIsEmpty, `the persistentVolumeClaim name of this policy "%s" is empty`, backupPolicyName)
+}
+
+// NewBackupJobFailed returns a new Error with ErrorTypeBackupJobFailed.
+func NewBackupJobFailed(jobName string) *Error {
+	return NewErrorf(ErrorTypeBackupJobFailed, `backup job "%s" failed`, jobName)
 }

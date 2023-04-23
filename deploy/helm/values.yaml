@@ -1752,7 +1752,7 @@ csi-hostpath-driver:
     create: true
     default: true
 
-aws-loadbalancer-controller:
+aws-load-balancer-controller:
   clusterName: ""
   enabled: false
   replicaCount: 1

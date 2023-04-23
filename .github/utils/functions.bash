@@ -110,4 +110,3 @@ function join_by {
     printf %s "$f" "${@/#/$d}"
   fi
 }
-

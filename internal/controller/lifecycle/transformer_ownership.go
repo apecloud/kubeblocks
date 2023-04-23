@@ -24,12 +24,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// ownershipTransformer add finalizer to all none cluster objects
-type ownershipTransformer struct {
-	finalizer string
-}
+// OwnershipTransformer add finalizer to all none cluster objects
+type OwnershipTransformer struct{}
 
-func (f *ownershipTransformer) Transform(dag *graph.DAG) error {
+func (f *OwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	rootVertex, err := findRootVertex(dag)
 	if err != nil {
 		return err
@@ -45,3 +43,5 @@ func (f *ownershipTransformer) Transform(dag *graph.DAG) error {
 	}
 	return nil
 }
+
+var _ graph.Transformer = &OwnershipTransformer{}

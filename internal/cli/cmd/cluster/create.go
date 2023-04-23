@@ -58,6 +58,12 @@ var clusterCreateExample = templates.Examples(`
 	# --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql
 
+	# Output resource information in YAML format, but do not create resources.
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=client -o yaml
+
+	# Output resource information in YAML format, the information will be sent to the server, but the resource will not be actually created.
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=server -o yaml
+	
 	# Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
 
@@ -362,9 +368,13 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
 			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
-
+			cmd.Flags().String("dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 			// add updatable flags
 			o.UpdatableFlags.addFlags(cmd)
+
+			// add print flags
+			printer.AddOutputFlagForCreate(cmd, &o.Format)
 
 			// set required flag
 			util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
@@ -387,6 +397,21 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 		"cluster-version",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+
+	var formatsWithDesc = map[string]string{
+		"JSON": "Output result in JSON format",
+		"YAML": "Output result in YAML format",
+	}
+	util.CheckErr(cmd.RegisterFlagCompletionFunc("output",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var names []string
+			for format, desc := range formatsWithDesc {
+				if strings.HasPrefix(format, toComplete) {
+					names = append(names, fmt.Sprintf("%s\t%s", format, desc))
+				}
+			}
+			return names, cobra.ShellCompDirectiveNoFileComp
 		}))
 }
 
@@ -448,6 +473,12 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		if c.WorkloadType == appsv1alpha1.Replication {
 			if key == keyReplicas {
 				return "2"
+			}
+		}
+		// the default replicas is 3 if not set by command flag, for Consensus workload
+		if c.WorkloadType == appsv1alpha1.Consensus {
+			if key == keyReplicas {
+				return "3"
 			}
 		}
 

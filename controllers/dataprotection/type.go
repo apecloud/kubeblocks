@@ -40,8 +40,6 @@ const (
 
 	dataProtectionBackupTargetPodKey          = "dataprotection.kubeblocks.io/target-pod-name"
 	dataProtectionAnnotationCreateByPolicyKey = "dataprotection.kubeblocks.io/created-by-policy"
-	// error status
-	errorJobFailed = "JobFailed"
 
 	// the key of persistentVolumeTemplate in the configmap.
 	persistentVolumeTemplateKey = "persistentVolume"

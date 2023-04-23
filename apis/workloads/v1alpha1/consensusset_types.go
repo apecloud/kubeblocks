@@ -80,7 +80,7 @@ type ConsensusSetSpec struct {
 
 // ConsensusSetStatus defines the observed state of ConsensusSet
 type ConsensusSetStatus struct {
-	apps.StatefulSetStatus
+	apps.StatefulSetStatus `json:"apps.StatefulSetStatus"`
 
 	// leader status.
 	// +kubebuilder:validation:Required

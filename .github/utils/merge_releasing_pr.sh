@@ -25,9 +25,13 @@ echo "Merging ${PR_TITLE}"
 
 retry_times=0
 pr_info=$(gh pr list --repo ${OWNER}/${REPO} --base ${BASE_BRANCH} --json "number" )
+pr_len=$(echo ${pr_info}  | jq -r '. | length')
+if [ "${pr_len}" == "0" ]; then
+exit 0
+fi
+
 pr_number=$(echo ${pr_info} | jq -r '.[0].number') 
 get_pr_status
-
 
 if [ "${pr_mergeable}" == "MERGEABLE" ]; then
     if [ "${pr_merge_status}" == "BLOCKED" ]; then

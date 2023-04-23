@@ -58,6 +58,7 @@ const (
 
 	PreflightPattern     = "data/%s_preflight.yaml"
 	HostPreflightPattern = "data/%s_hostpreflight.yaml"
+	PreflightMessage     = "Run a preflight to check that the environment meets the requirement for KubeBlocks. It takes 10~20 seconds."
 )
 
 var (
@@ -134,6 +135,20 @@ func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 	return yamlDataList, nil
 }
 
+func (p *PreflightOptions) Preflight(f cmdutil.Factory, args []string) error {
+	var err error
+	if err = p.complete(f, args); err != nil {
+		return err
+	}
+	if err = p.validate(); err != nil {
+		return err
+	}
+	if err = p.run(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) error {
 	// default no args, and run default validating vendor
 	if len(args) == 0 {
@@ -153,11 +168,12 @@ func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) error {
 		if err != nil {
 			return err
 		}
-		color.New(color.FgCyan).Printf("current provider %s. collecting and analyzing data will take 10-20 seconds...  \n", vendorName)
+		color.New(color.FgCyan).Println(PreflightMessage)
 	} else {
 		p.checkFileList = args
-		color.New(color.FgCyan).Println("collecting and analyzing data will take 10-20 seconds...")
+		color.New(color.FgCyan).Println(PreflightMessage)
 	}
+	p.factory = f
 	// conceal warning logs
 	rest.SetDefaultWarningHandler(rest.NoWarnings{})
 	go func() {

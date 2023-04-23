@@ -1608,7 +1608,7 @@ grafana:
 snapshot-controller:
   ## @param snapshot-controller.enabled -- Enable snapshot-controller chart.
   ##
-  enabled: false
+  enabled: true
   ## @param snapshot-controller.replicaCount -- Number of replicas to deploy.
   ##
   replicaCount: 1

@@ -23,6 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
@@ -162,6 +164,42 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 	return nil
 }
 
+func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error {
+	componentClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, cluster.Spec.ClusterDefRef)
+	if err != nil {
+		return err
+	}
+
+	fillClassParams := func(comp *appsv1alpha1.ClusterComponentSpec) {
+		if o.Class != "" {
+			comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: o.Class}
+		}
+
+		requests := make(corev1.ResourceList)
+		if o.CPU != "" {
+			requests[corev1.ResourceCPU] = resource.MustParse(o.CPU)
+		}
+		if o.Memory != "" {
+			requests[corev1.ResourceMemory] = resource.MustParse(o.Memory)
+		}
+		requests.DeepCopyInto(&comp.Resources.Requests)
+		requests.DeepCopyInto(&comp.Resources.Limits)
+	}
+
+	for _, name := range o.ComponentNames {
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			if comp.Name != name {
+				continue
+			}
+			fillClassParams(&comp)
+			if _, err = class.ValidateComponentClass(&comp, componentClasses); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // Validate command flags or args is legal
 func (o *OperationsOptions) Validate() error {
 	if o.Name == "" {
@@ -169,8 +207,12 @@ func (o *OperationsOptions) Validate() error {
 	}
 
 	// check if cluster exist
-	_, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	unstructuredObj, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
+		return err
+	}
+	var cluster appsv1alpha1.Cluster
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, &cluster); err != nil {
 		return err
 	}
 
@@ -186,6 +228,10 @@ func (o *OperationsOptions) Validate() error {
 		}
 	case appsv1alpha1.UpgradeType:
 		if err := o.validateUpgrade(); err != nil {
+			return err
+		}
+	case appsv1alpha1.VerticalScalingType:
+		if err := o.validateVScale(&cluster); err != nil {
 			return err
 		}
 	}

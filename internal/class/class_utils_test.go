@@ -18,6 +18,7 @@ package class
 
 import (
 	"fmt"
+	"reflect"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -75,6 +76,100 @@ var _ = Describe("utils", func() {
 		}
 		return result
 	}
+
+	Context("validate component class", func() {
+		var (
+			specClassName = testapps.Class1c1gName
+			comp1Name     = "component-have-class-definition"
+			comp2Name     = "component-does-not-have-class-definition"
+			compClasses   map[string]map[string]*v1alpha1.ComponentClassInstance
+		)
+
+		BeforeEach(func() {
+			var err error
+			classDef := testapps.NewComponentClassDefinitionFactory("custom", "apecloud-mysql", comp1Name).
+				AddClasses(testapps.DefaultResourceConstraintName, []string{specClassName}).
+				GetObject()
+			compClasses, err = GetClasses(v1alpha1.ComponentClassDefinitionList{
+				Items: []v1alpha1.ComponentClassDefinition{
+					*classDef,
+				},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("should succeed if component have class definition and with valid classDefRef", func() {
+			comp := &v1alpha1.ClusterComponentSpec{
+				ComponentDefRef: comp1Name,
+				ClassDefRef:     &v1alpha1.ClassDefRef{Class: specClassName},
+			}
+			cls, err := ValidateComponentClass(comp, compClasses)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(reflect.DeepEqual(cls.ComponentClass, testapps.Class1c1g)).Should(BeTrue())
+		})
+
+		It("should fail if component have class definition and with invalid classDefRef", func() {
+			comp := &v1alpha1.ClusterComponentSpec{
+				ComponentDefRef: comp1Name,
+				ClassDefRef:     &v1alpha1.ClassDefRef{Class: "class-not-exists"},
+			}
+			_, err := ValidateComponentClass(comp, compClasses)
+			Expect(err).Should(HaveOccurred())
+		})
+
+		It("should succeed if component have class definition and with valid resource", func() {
+			comp := &v1alpha1.ClusterComponentSpec{
+				ComponentDefRef: comp1Name,
+				Resources: corev1.ResourceRequirements{
+					Requests: buildResourceList("1", "1Gi"),
+				},
+			}
+			cls, err := ValidateComponentClass(comp, compClasses)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(reflect.DeepEqual(cls.ComponentClass, testapps.Class1c1g)).Should(BeTrue())
+		})
+
+		It("should fail if component have class definition and with invalid resource", func() {
+			comp := &v1alpha1.ClusterComponentSpec{
+				ComponentDefRef: comp1Name,
+				Resources: corev1.ResourceRequirements{
+					Requests: buildResourceList("100", "200Gi"),
+				},
+			}
+			_, err := ValidateComponentClass(comp, compClasses)
+			Expect(err).Should(HaveOccurred())
+		})
+
+		It("should succeed if component does not have class definition and without classDefRef", func() {
+			comp := &v1alpha1.ClusterComponentSpec{
+				ComponentDefRef: comp2Name,
+			}
+			cls, err := ValidateComponentClass(comp, compClasses)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(cls).Should(BeNil())
+		})
+
+		It("should fail if component does not have class definition and with classDefRef", func() {
+			comp := &v1alpha1.ClusterComponentSpec{
+				ComponentDefRef: comp2Name,
+				ClassDefRef:     &v1alpha1.ClassDefRef{Class: specClassName},
+			}
+			_, err := ValidateComponentClass(comp, compClasses)
+			Expect(err).Should(HaveOccurred())
+		})
+
+		It("should succeed if component does not have class definition and without classDefRef", func() {
+			comp := &v1alpha1.ClusterComponentSpec{
+				ComponentDefRef: comp2Name,
+				Resources: corev1.ResourceRequirements{
+					Requests: buildResourceList("100", "200Gi"),
+				},
+			}
+			cls, err := ValidateComponentClass(comp, compClasses)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(cls).Should(BeNil())
+		})
+	})
 
 	Context("sort component classes", func() {
 		It("should match minial class if cpu and memory are empty", func() {

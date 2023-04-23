@@ -34,6 +34,28 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
+// ValidateComponentClass check if component classDefRef or resource is invalid
+func ValidateComponentClass(comp *v1alpha1.ClusterComponentSpec, compClasses map[string]map[string]*v1alpha1.ComponentClassInstance) (*v1alpha1.ComponentClassInstance, error) {
+	classes := compClasses[comp.ComponentDefRef]
+	var cls *v1alpha1.ComponentClassInstance
+	switch {
+	case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
+		if classes == nil {
+			return nil, fmt.Errorf("can not find classes for component %s", comp.ComponentDefRef)
+		}
+		cls = classes[comp.ClassDefRef.Class]
+		if cls == nil {
+			return nil, fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
+		}
+	case classes != nil:
+		cls = ChooseComponentClasses(classes, comp.Resources.Requests)
+		if cls == nil {
+			return nil, fmt.Errorf("can not find matching class for component %s", comp.Name)
+		}
+	}
+	return cls, nil
+}
+
 // GetCustomClassObjectName Returns the name of the ComponentClassDefinition object containing the custom classes
 func GetCustomClassObjectName(cdName string, componentName string) string {
 	return fmt.Sprintf("kb.classes.custom.%s.%s", cdName, componentName)

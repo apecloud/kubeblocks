@@ -94,24 +94,9 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	}
 
 	for idx, comp := range cluster.Spec.ComponentSpecs {
-		classes := compClasses[comp.ComponentDefRef]
-
-		var cls *appsv1alpha1.ComponentClassInstance
-		// TODO another case if len(constraintList.Items) > 0, use matchClassFamilies to find matching resource constraint:
-		switch {
-		case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
-			if classes == nil {
-				return fmt.Errorf("can not find classes for component %s", comp.ComponentDefRef)
-			}
-			cls = classes[comp.ClassDefRef.Class]
-			if cls == nil {
-				return fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
-			}
-		case classes != nil:
-			cls = class.ChooseComponentClasses(classes, comp.Resources.Requests)
-			if cls == nil {
-				return fmt.Errorf("can not find matching class for component %s", comp.Name)
-			}
+		cls, err := class.ValidateComponentClass(&comp, compClasses)
+		if err != nil {
+			return err
 		}
 		if cls == nil {
 			// TODO reconsider handling policy for this case

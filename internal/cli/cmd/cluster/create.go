@@ -305,7 +305,7 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item, &comp); err != nil {
 				return nil, err
 			}
-			if err = validateComponentClass(&comp, componentClasses); err != nil {
+			if _, err = class.ValidateComponentClass(&comp, componentClasses); err != nil {
 				return nil, err
 			}
 		}
@@ -329,7 +329,7 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 			return nil, err
 		}
 		for _, compObj := range componentObjs {
-			if err = validateComponentClass(compObj, componentClasses); err != nil {
+			if _, err = class.ValidateComponentClass(compObj, componentClasses); err != nil {
 				return nil, err
 			}
 			comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compObj)
@@ -340,28 +340,6 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 		}
 	}
 	return components, nil
-}
-
-// TODO: optimize this function as it's duplicate with logic in the controller
-func validateComponentClass(comp *appsv1alpha1.ClusterComponentSpec, compClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance) error {
-	classes := compClasses[comp.ComponentDefRef]
-	var cls *appsv1alpha1.ComponentClassInstance
-	switch {
-	case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
-		if classes == nil {
-			return fmt.Errorf("can not find classes for component %s", comp.ComponentDefRef)
-		}
-		cls = classes[comp.ClassDefRef.Class]
-		if cls == nil {
-			return fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
-		}
-	case classes != nil:
-		cls = class.ChooseComponentClasses(classes, comp.Resources.Requests)
-		if cls == nil {
-			return fmt.Errorf("can not find matching class for component %s", comp.Name)
-		}
-	}
-	return nil
 }
 
 // MultipleSourceComponents get component data from multiple source, such as stdin, URI and local file

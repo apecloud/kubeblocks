@@ -22,6 +22,9 @@ import (
 	"reflect"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -138,33 +141,26 @@ func isClusterUpdating(cluster appsv1alpha1.Cluster) bool {
 
 func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
 	return !isClusterDeleting(cluster) && !isClusterUpdating(cluster)
-	// return cluster.Status.ObservedGeneration == cluster.Generation &&
-	//	slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
 }
 
-func getBackupObjects(reqCtx intctrlutil.RequestCtx,
+func getBackupObjects(ctx context.Context,
 	cli types2.ReadonlyClient,
 	namespace string,
 	backupName string) (*dataprotectionv1alpha1.Backup, *dataprotectionv1alpha1.BackupTool, error) {
 	// get backup
 	backup := &dataprotectionv1alpha1.Backup{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, backup); err != nil {
+	if err := cli.Get(ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, backup); err != nil {
 		return nil, nil, err
 	}
 
 	// get backup tool
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
 	if backup.Spec.BackupType != dataprotectionv1alpha1.BackupTypeSnapshot {
-		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
+		if err := cli.Get(ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
 			return nil, nil, err
 		}
 	}
 	return backup, backupTool, nil
-}
-
-func isTypeOf[T interface{}](obj client.Object) bool {
-	_, ok := obj.(T)
-	return ok
 }
 
 // getBackupPolicyFromTemplate gets backup policy from template policy template.
@@ -190,14 +186,26 @@ func getBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
 	return nil, nil
 }
 
+func ownKinds() []client.ObjectList {
+	return []client.ObjectList{
+		&appsv1.StatefulSetList{},
+		&appsv1.DeploymentList{},
+		&corev1.ServiceList{},
+		&corev1.SecretList{},
+		&corev1.ConfigMapList{},
+		&policyv1.PodDisruptionBudgetList{},
+		&dataprotectionv1alpha1.BackupPolicyList{},
+	}
+}
+
 // read all objects owned by our cluster
-func readCacheSnapshot(ctx context.Context, cli types2.ReadonlyClient, cluster appsv1alpha1.Cluster, kinds ...client.ObjectList) (clusterSnapshot, error) {
+func readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster, kinds ...client.ObjectList) (clusterSnapshot, error) {
 	// list what kinds of object cluster owns
 	snapshot := make(clusterSnapshot)
 	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
 	inNS := client.InNamespace(cluster.Namespace)
 	for _, list := range kinds {
-		if err := cli.List(ctx, list, inNS, ml); err != nil {
+		if err := transCtx.Client.List(transCtx.Context, list, inNS, ml); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items
@@ -207,7 +215,9 @@ func readCacheSnapshot(ctx context.Context, cli types2.ReadonlyClient, cluster a
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
 			// put to snapshot if owned by our cluster
-			if isOwnerOf(&cluster, object, scheme) {
+			// pvcs created by sts don't have cluster in ownerReferences
+			_, isPVC := object.(*corev1.PersistentVolumeClaim)
+			if isPVC || isOwnerOf(&cluster, object, scheme) {
 				name, err := getGVKName(object, scheme)
 				if err != nil {
 					return nil, err

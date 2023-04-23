@@ -177,7 +177,7 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 
 				By("Check backup job is deleted after completed")
-				Eventually(testapps.CheckObjExists(&testCtx, backupKey, &batchv1.Job{}, false))
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey, &batchv1.Job{}, false)).Should(Succeed())
 			})
 
 			It("should fail after job fails", func() {
@@ -187,6 +187,69 @@ var _ = Describe("Backup Controller test", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
 				})).Should(Succeed())
+			})
+		})
+
+		Context("deletes a full backup", func() {
+			var backupKey types.NamespacedName
+
+			BeforeEach(func() {
+				By("creating a backup from backupPolicy: " + backupPolicyName)
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+					Create(&testCtx).GetObject()
+				backupKey = client.ObjectKeyFromObject(backup)
+
+				By("waiting for finalizers to be added")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {
+					g.Expect(backup.GetFinalizers()).ToNot(BeEmpty())
+				})).Should(Succeed())
+
+				By("setting backup file path")
+				Eventually(testapps.ChangeObjStatus(&testCtx, backup, func() {
+					if backup.Status.Manifests == nil {
+						backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{}
+					}
+					if backup.Status.Manifests.BackupTool == nil {
+						backup.Status.Manifests.BackupTool = &dataprotectionv1alpha1.BackupToolManifestsStatus{}
+					}
+					backup.Status.Manifests.BackupTool.FilePath = "/" + backupName
+				})).Should(Succeed())
+			})
+
+			It("should create a Job for deleting backup files", func() {
+				By("deleting a Backup object")
+				testapps.DeleteObject(&testCtx, backupKey, &dataprotectionv1alpha1.Backup{})
+
+				By("checking new created Job")
+				jobKey := types.NamespacedName{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      deleteBackupFilesJobNamePrefix + backupName,
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, jobKey,
+					&batchv1.Job{}, true)).Should(Succeed())
+				volumeName := "backup-" + backupRemotePVCName
+				Eventually(testapps.CheckObj(&testCtx, jobKey, func(g Gomega, job *batchv1.Job) {
+					Expect(job.Spec.Template.Spec.Volumes).
+						Should(ContainElement(corev1.Volume{
+							Name: volumeName,
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: backupRemotePVCName,
+								},
+							},
+						}))
+					Expect(job.Spec.Template.Spec.Containers[0].VolumeMounts).
+						Should(ContainElement(corev1.VolumeMount{
+							Name:      volumeName,
+							MountPath: backupPathBase,
+						}))
+				})).Should(Succeed())
+
+				By("checking Backup object, it should be deleted")
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey,
+					&dataprotectionv1alpha1.Backup{}, false)).Should(Succeed())
 			})
 		})
 

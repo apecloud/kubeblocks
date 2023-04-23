@@ -390,7 +390,7 @@ func getResourceInfo(reqs, limits corev1.ResourceList) (string, string) {
 		res := types.None
 		limit, req := limits[name], reqs[name]
 
-		// if request is empty, set request to limit
+		// if request is empty and limit is not, set limit to request
 		if util.ResourceIsEmpty(&req) && !util.ResourceIsEmpty(&limit) {
 			req = limit
 		}

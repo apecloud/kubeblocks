@@ -44,7 +44,10 @@ until is_inited=$(mongosh --quiet --port $PORT --eval "rs.status().ok" -u root -
 if [ $is_inited -eq 1 ]; then
   exit 0
 fi;
+sleep 10
+set -e
 mongosh --quiet --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", $CONFIGSVR members: [$MEMBERS]})";
+set +e
 
 (until mongosh --quiet --port $PORT --eval "rs.isMaster().isWritablePrimary"|grep true; do sleep 1; done;
 echo "create user";

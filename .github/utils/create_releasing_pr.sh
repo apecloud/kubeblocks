@@ -15,8 +15,9 @@ set -x
 git stash
 git switch ${HEAD_BRANCH}
 git pull
-git merge origin/${BASE_BRANCH}
+git rebase origin/${BASE_BRANCH}
 git pull
+git push
 
 echo "Creating ${PR_TITLE}"
 gh pr create --head ${HEAD_BRANCH} --base ${BASE_BRANCH} --title "${PR_TITLE}" --body "" --label "releasing-task"

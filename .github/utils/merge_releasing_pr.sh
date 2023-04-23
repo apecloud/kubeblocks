@@ -24,7 +24,7 @@ get_pr_status() {
 echo "Merging ${PR_TITLE}"
 
 retry_times=0
-pr_info=$(gh pr list --repo ${OWNER}/${REPO} --base ${BASE_BRANCH} --json "number" )
+pr_info=$(gh pr list --repo ${OWNER}/${REPO} --head ${HEAD_BRANCH} --base ${BASE_BRANCH} --json "number" )
 pr_len=$(echo ${pr_info}  | jq -r '. | length')
 if [ "${pr_len}" == "0" ]; then
 exit 0

@@ -17,7 +17,6 @@ limitations under the License.
 package consensusset
 
 import (
-	"context"
 	"reflect"
 
 	apps "k8s.io/api/apps/v1"
@@ -29,17 +28,13 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
-type objectGenerationTransformer struct {
-	ctx context.Context
-	cli roclient.ReadonlyClient
-}
+type ObjectGenerationTransformer struct {}
 
-func (t *objectGenerationTransformer) Transform(dag *graph.DAG) error {
+func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// get root vertex(i.e. consensus set)
 	root, err := model.FindRootVertex(dag)
 	if err != nil {
@@ -58,7 +53,7 @@ func (t *objectGenerationTransformer) Transform(dag *graph.DAG) error {
 		AddPorts(csSet.Spec.Service.Ports...).
 		SetType(csSet.Spec.Service.Type).
 		GetObject()
-	hdlBuilder := builder.NewHeadlessServiceBuilder(csSet.Namespace, csSet.Name + "-headless").
+	hdlBuilder := builder.NewHeadlessServiceBuilder(csSet.Namespace, csSet.Name+"-headless").
 		AddLabels(constant.AppInstanceLabelKey, csSet.Name).
 		AddLabels(constant.KBManagedByKey, ConsensusSetKind).
 		AddSelectors(constant.AppInstanceLabelKey, csSet.Name).
@@ -72,9 +67,9 @@ func (t *objectGenerationTransformer) Transform(dag *graph.DAG) error {
 	for _, container := range csSet.Spec.Template.Spec.Containers {
 		for _, port := range container.Ports {
 			servicePort := corev1.ServicePort{
-				Name: port.Name,
-				Protocol: port.Protocol,
-				Port: port.ContainerPort,
+				Name:       port.Name,
+				Protocol:   port.Protocol,
+				Port:       port.ContainerPort,
 				TargetPort: intstr.FromString(port.Name),
 			}
 			hdlBuilder.AddPorts(servicePort)
@@ -207,7 +202,7 @@ func ownKinds() []client.ObjectList {
 }
 
 // read all objects owned by our cluster
-func (t *objectGenerationTransformer) readCacheSnapshot(owner client.Object) (model.ObjectSnapshot, error) {
+func (t *ObjectGenerationTransformer) readCacheSnapshot(owner client.Object) (model.ObjectSnapshot, error) {
 	// list what kinds of object cluster owns
 	kinds := ownKinds()
 	snapshot := make(model.ObjectSnapshot)
@@ -236,3 +231,5 @@ func (t *objectGenerationTransformer) readCacheSnapshot(owner client.Object) (mo
 
 	return snapshot, nil
 }
+
+var _ graph.Transformer = &ObjectGenerationTransformer{}

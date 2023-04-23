@@ -336,8 +336,8 @@ func main() {
 	}
 
 	if err = (&workloadscontrollers.ConsensusSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("consensus-set-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ConsensusSet")

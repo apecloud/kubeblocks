@@ -26,11 +26,16 @@ type initTransformer struct {
 	*workloads.ConsensusSet
 }
 
-func (t *initTransformer) Transform(dag *graph.DAG) error {
-	vertex := &model.ObjectVertex{
-		Obj: t.ConsensusSet,
-		OriObj: t.ConsensusSet.DeepCopy(),
-	}
+func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	obj, origObj := t.ConsensusSet, t.ConsensusSet.DeepCopy()
+	// init context
+	transCtx, _ := ctx.(*CSSetTransformContext)
+	transCtx.CSSet, transCtx.OrigCSSet = obj, origObj
+
+	//init dag
+	vertex := &model.ObjectVertex{Obj: transCtx.CSSet, OriObj: transCtx.OrigCSSet}
 	dag.AddVertex(vertex)
 	return nil
 }
+
+var _ graph.Transformer = &initTransformer{}

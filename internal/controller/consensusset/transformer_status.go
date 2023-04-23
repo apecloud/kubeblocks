@@ -31,15 +31,12 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// statusTransformer computes the current status:
+// CSSetStatusTransformer computes the current status:
 // 1. read the underlying sts's status and copy them to consensus set's status
 // 2. read pod role label and update consensus set's status role fields
-type statusTransformer struct {
-	context.Context
-	Client roclient.ReadonlyClient
-}
+type CSSetStatusTransformer struct {}
 
-func (t *statusTransformer) Transform(dag *graph.DAG) error {
+func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// get root vertex(i.e. consensus set)
 	root, err := model.FindRootVertex(dag)
 	if err != nil {
@@ -76,13 +73,13 @@ func (t *statusTransformer) Transform(dag *graph.DAG) error {
 	return nil
 }
 
-func (t *statusTransformer)getPodsOfStatefulSet(stsObj *apps.StatefulSet) ([]corev1.Pod, error) {
+func (t *CSSetStatusTransformer) getPodsOfStatefulSet(stsObj *apps.StatefulSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	if err := t.Client.List(t.Context, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
 		client.MatchingLabels{
-			constant.KBManagedByKey: stsObj.Labels[constant.KBManagedByKey],
-			constant.AppInstanceLabelKey:    stsObj.Labels[constant.AppInstanceLabelKey],
+			constant.KBManagedByKey:      stsObj.Labels[constant.KBManagedByKey],
+			constant.AppInstanceLabelKey: stsObj.Labels[constant.AppInstanceLabelKey],
 		}); err != nil {
 		return nil, err
 	}
@@ -94,3 +91,5 @@ func (t *statusTransformer)getPodsOfStatefulSet(stsObj *apps.StatefulSet) ([]cor
 	}
 	return pods, nil
 }
+
+var _ graph.Transformer = &CSSetStatusTransformer{}

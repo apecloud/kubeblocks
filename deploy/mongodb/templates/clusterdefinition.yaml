@@ -16,7 +16,7 @@ spec:
     headlessHost: "$(POD_NAME_PREFIX)-0.$(HEADLESS_SVC_FQDN)"
     headlessPort: "$(SVC_PORT_tcp-monogdb)"
   componentDefs:
-    - name: replicaset
+    - name: mongodb
       characterType: mongodb
       scriptSpecs:
         - name: mongodb-scripts
@@ -59,8 +59,9 @@ spec:
         updateStrategy: Serial
       probes:
         roleProbe:
-          periodSeconds: 2
-          failureThreshold: 3
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       service:
         ports:
           - protocol: TCP
@@ -93,7 +94,7 @@ spec:
                 exec:
                   command:
                     - /scripts/replicaset-post-start.sh
-                    - REPLICASET
+                    - MONGODB
             volumeMounts:
               - mountPath: /data/mongodb
                 name: data

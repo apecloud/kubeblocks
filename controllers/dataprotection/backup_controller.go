@@ -52,11 +52,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-var (
-	errJobFailed           = errors.New("job failed")
-	errDeletingBackupFiles = errors.New("deleting backup files")
-)
-
 const (
 	backupPathBase                 = "/backupdata"
 	deleteBackupFilesJobNamePrefix = "delete-backup-files-"
@@ -101,11 +96,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// handle finalizer
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backup, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
-		err := r.deleteExternalResources(reqCtx, backup)
-		if errors.Is(err, errDeletingBackupFiles) {
-			return intctrlutil.ResultToP(intctrlutil.Requeue(reqCtx.Log, "deleting backup files"))
-		}
-		return nil, err
+		return nil, r.deleteExternalResources(reqCtx, backup)
 	})
 	if res != nil {
 		return *res, err
@@ -155,7 +146,7 @@ func (r *BackupReconciler) getBackupPolicyAndValidate(
 	}
 
 	if len(backupPolicy.Name) == 0 {
-		return nil, fmt.Errorf("backup policy %s not found", backupPolicyNameSpaceName)
+		return nil, intctrlutil.NewNotFound(`backup policy "%s" not found`, backupPolicyNameSpaceName)
 	}
 
 	// validate backup spec
@@ -193,7 +184,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 	default:
 		commonPolicy := backupPolicy.Spec.GetCommonPolicy(backup.Spec.BackupType)
 		if commonPolicy == nil {
-			return r.updateStatusIfFailed(reqCtx, backup, intctrlutil.NewNotFound(`backup type "%s" not supported in the backupPolicy "%s"`, backup.Spec.BackupType, backupPolicy.Name))
+			return r.updateStatusIfFailed(reqCtx, backup, intctrlutil.NewBackupNotSupported(string(backup.Spec.BackupType), backupPolicy.Name))
 		}
 		// save the backup message for restore
 		backup.Status.PersistentVolumeClaimName = commonPolicy.PersistentVolumeClaim.Name
@@ -238,7 +229,7 @@ func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.Reques
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) error {
 	pvcConfig := commonPolicy.PersistentVolumeClaim
 	if len(pvcConfig.Name) == 0 {
-		return fmt.Errorf("the persistentVolumeClaim name of this policy is empty")
+		return intctrlutil.NewBackupPVCNameIsEmpty(backupPolicyName)
 	}
 	pvc := &corev1.PersistentVolumeClaim{}
 	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace,
@@ -302,7 +293,7 @@ func (r *BackupReconciler) createPersistentVolumeWithTemplate(reqCtx intctrlutil
 	}
 	pvTemplate := configMap.Data[persistentVolumeTemplateKey]
 	if pvTemplate == "" {
-		return intctrlutil.NewNotFound("the persistentVolume template is empty in the configMap %s/%s", pvConfig.Namespace, pvConfig.Name)
+		return intctrlutil.NewBackupPVTemplateNotFound(pvConfig.Namespace, pvConfig.Name)
 	}
 	pvName := fmt.Sprintf("%s-%s", pvcConfig.Name, reqCtx.Req.Namespace)
 	pvTemplate = strings.ReplaceAll(pvTemplate, "$(GENERATE_NAME)", pvName)
@@ -481,8 +472,13 @@ func (r *BackupReconciler) doCompletedPhaseAction(
 func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup, err error) (ctrl.Result, error) {
 	patch := client.MergeFrom(backup.DeepCopy())
-	r.Recorder.Eventf(backup, corev1.EventTypeWarning, "FailedCreatedBackup",
-		"Failed creating backup, error: %s", err.Error())
+	controllerErr := intctrlutil.ToControllerError(err)
+	if controllerErr != nil {
+		r.Recorder.Eventf(backup, corev1.EventTypeWarning, string(controllerErr.Type), err.Error())
+	} else {
+		r.Recorder.Eventf(backup, corev1.EventTypeWarning, "FailedCreatedBackup",
+			"Failed creating backup, error: %s", err.Error())
+	}
 	backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
 	backup.Status.FailureReason = err.Error()
 	if errUpdate := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); errUpdate != nil {
@@ -575,7 +571,7 @@ func (r *BackupReconciler) ensureBatchV1JobCompleted(
 			if jobStatusConditions[0].Type == batchv1.JobComplete {
 				return true, nil
 			} else if jobStatusConditions[0].Type == batchv1.JobFailed {
-				return false, errJobFailed
+				return false, intctrlutil.NewBackupJobFailed(job.Name)
 			}
 		}
 	}

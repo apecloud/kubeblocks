@@ -390,6 +390,11 @@ func getResourceInfo(reqs, limits corev1.ResourceList) (string, string) {
 		res := types.None
 		limit, req := limits[name], reqs[name]
 
+		// if request is empty and limit is not, set limit to request
+		if util.ResourceIsEmpty(&req) && !util.ResourceIsEmpty(&limit) {
+			req = limit
+		}
+
 		// if both limit and request are empty, only output none
 		if !util.ResourceIsEmpty(&limit) || !util.ResourceIsEmpty(&req) {
 			res = fmt.Sprintf("%s / %s", req.String(), limit.String())

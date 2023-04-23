@@ -35,3 +35,11 @@ func FromConfigFiles(files []string) (map[string]string, error) {
 	}
 	return m, nil
 }
+
+func ToArgs(m map[string]string) []string {
+	args := make([]string, 0, len(m)*2)
+	for k, v := range m {
+		args = append(args, k, v)
+	}
+	return args
+}

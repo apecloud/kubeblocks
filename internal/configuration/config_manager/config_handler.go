@@ -70,6 +70,8 @@ type configVolumeHandleMeta struct {
 	mountPoint string
 	reloadType appsv1alpha1.CfgReloadType
 	configSpec appsv1alpha1.ComponentTemplateSpec
+
+	formatterConfig *appsv1alpha1.FormatterConfig
 }
 
 func (s *configVolumeHandleMeta) OnlineUpdate(_ context.Context, _ string, _ map[string]string) error {
@@ -80,6 +82,29 @@ func (s *configVolumeHandleMeta) OnlineUpdate(_ context.Context, _ string, _ map
 func (s *configVolumeHandleMeta) VolumeHandle(_ context.Context, _ fsnotify.Event) error {
 	logger.Info("not support online update")
 	return nil
+}
+
+func (s *configVolumeHandleMeta) prepare(backupPath string, filter regexFilter, event fsnotify.Event) (map[string]string, []string, error) {
+	var (
+		lastVersion = []string{backupPath}
+		currVersion = []string{filepath.Dir(event.Name)}
+	)
+
+	logger.Info(fmt.Sprintf("prepare for config update: %s %s", s.mountPoint, event.Name))
+	currFiles, err := scanConfigFiles(currVersion, filter)
+	if err != nil {
+		return nil, nil, err
+	}
+	lastFiles, err := scanConfigFiles(lastVersion, filter)
+	if err != nil {
+		return nil, nil, err
+	}
+	updatedParams, err := createUpdatedParamsPatch(currFiles, lastFiles, s.formatterConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	logger.Info(fmt.Sprintf("config update patch: %v", updatedParams))
+	return updatedParams, currFiles, nil
 }
 
 func (s *configVolumeHandleMeta) MountPoint() string {
@@ -158,6 +183,10 @@ type shellCommandHandler struct {
 	configVolumeHandleMeta
 	command string
 	arg     []string
+
+	backupPath string
+	configMeta *ConfigSpecMeta
+	filter     regexFilter
 }
 
 func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
@@ -165,47 +194,94 @@ func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.E
 	for i, v := range s.arg {
 		args[i] = strings.ReplaceAll(v, "$volume_dir", event.Name)
 	}
+
+	logger.V(1).Info(fmt.Sprintf("mountpoint change trigger: [%s], %s", s.mountPoint, event.Name))
+	updatedParams, files, err := s.checkAndPrepareUpdate(event)
+	if err != nil {
+		return err
+	}
+	if len(updatedParams) != 0 {
+		args = append(args, cfgutil.ToArgs(updatedParams)...)
+	}
+
 	command := exec.CommandContext(ctx, s.command, args...)
 	stdout, err := cfgutil.ExecShellCommand(command)
-	if err == nil {
-		logger.V(1).Info(fmt.Sprintf("exec: [%s], result: [%s]", command.String(), stdout))
+	logger.V(1).Info(fmt.Sprintf("exec: [%s], stdout: [%s], stderr:%v", command.String(), stdout, err))
+
+	if err == nil && len(files) != 0 {
+		return backupLastConfigFiles(files, s.backupPath)
 	}
 	return err
 }
 
-func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgReloadType, mountPoint string) configVolumeHandleMeta {
+func (s *shellCommandHandler) checkAndPrepareUpdate(event fsnotify.Event) (map[string]string, []string, error) {
+	if s.configMeta == nil || s.backupPath == "" {
+		return nil, nil, nil
+	}
+	updatedParams, files, err := s.prepare(s.backupPath, s.filter, event)
+	if err != nil {
+		return nil, nil, err
+	}
+	return updatedParams, files, nil
+}
+
+func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgReloadType, mountPoint string, formatterConfig *appsv1alpha1.FormatterConfig) configVolumeHandleMeta {
 	return configVolumeHandleMeta{
 		reloadType: reloadType,
 		mountPoint: mountPoint,
 		configSpec: appsv1alpha1.ComponentTemplateSpec{
 			Name: configSpecName,
 		},
+		formatterConfig: formatterConfig,
 	}
 }
 
-func CreateExecHandler(command string, mountPoint string) (ConfigHandler, error) {
+func CreateExecHandler(command string, mountPoint string, configMeta *ConfigSpecMeta, backupPath string) (ConfigHandler, error) {
 	args := strings.Fields(command)
 	if len(args) == 0 {
 		return nil, cfgcore.MakeError("invalid command: %s", command)
 	}
+	filter, err := createFileRegex(fromConfigSpecMeta(configMeta))
+	if err != nil {
+		return nil, err
+	}
 
+	var formatterConfig *appsv1alpha1.FormatterConfig
+	if backupPath != "" && configMeta != nil {
+		if err := backupConfigFiles([]string{configMeta.MountPoint}, filter, backupPath); err != nil {
+			return nil, err
+		}
+		formatterConfig = &configMeta.FormatterConfig
+	}
 	shellTrigger := &shellCommandHandler{
 		command:                args[0],
 		arg:                    args[1:],
-		configVolumeHandleMeta: createConfigVolumeMeta("", appsv1alpha1.ShellType, mountPoint),
+		backupPath:             backupPath,
+		configMeta:             configMeta,
+		filter:                 filter,
+		configVolumeHandleMeta: createConfigVolumeMeta("", appsv1alpha1.ShellType, mountPoint, formatterConfig),
 	}
 	return shellTrigger, nil
+}
+
+func fromConfigSpecMeta(meta *ConfigSpecMeta) string {
+	if meta == nil || len(meta.ConfigSpec.Keys) == 0 {
+		return ""
+	}
+	if len(meta.ConfigSpec.Keys) == 1 {
+		return meta.ConfigSpec.Keys[0]
+	}
+	return "( " + strings.Join(meta.ConfigSpec.Keys, " | ") + " )"
 }
 
 type tplScriptHandler struct {
 	configVolumeHandleMeta
 
-	tplContent      string
-	fileFilter      regexFilter
-	engineType      string
-	dsn             string
-	formatterConfig appsv1alpha1.FormatterConfig
-	backupPath      string
+	tplContent string
+	fileFilter regexFilter
+	engineType string
+	dsn        string
+	backupPath string
 }
 
 func (u *tplScriptHandler) OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error {
@@ -214,31 +290,19 @@ func (u *tplScriptHandler) OnlineUpdate(ctx context.Context, name string, update
 		u.configVolumeHandleMeta.configSpec.Name,
 		u.tplContent,
 		updatedParams,
-		&u.formatterConfig,
+		u.formatterConfig,
 		u.engineType, u.dsn)
 }
 
 func (u *tplScriptHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
-	var (
-		lastVersion = []string{u.backupPath}
-		currVersion = []string{filepath.Dir(event.Name)}
-	)
-	currFiles, err := scanConfigFiles(currVersion, u.fileFilter)
-	if err != nil {
-		return err
-	}
-	lastFiles, err := scanConfigFiles(lastVersion, u.fileFilter)
-	if err != nil {
-		return err
-	}
-	updatedParams, err := createUpdatedParamsPatch(currFiles, lastFiles, &u.formatterConfig)
+	updatedParams, files, err := u.prepare(u.backupPath, u.fileFilter, event)
 	if err != nil {
 		return err
 	}
 	if err := u.OnlineUpdate(ctx, "", updatedParams); err != nil {
 		return err
 	}
-	return backupLastConfigFiles(currFiles, u.backupPath)
+	return backupLastConfigFiles(files, u.backupPath)
 }
 
 func CreateTPLScriptHandler(name, configPath string, dirs []string, backupPath string) (ConfigHandler, error) {
@@ -270,23 +334,23 @@ func CreateTPLScriptHandler(name, configPath string, dirs []string, backupPath s
 		return nil, err
 	}
 	tplHandler := &tplScriptHandler{
-		configVolumeHandleMeta: createConfigVolumeMeta(name, appsv1alpha1.TPLScriptType, dirs[0]),
+		configVolumeHandleMeta: createConfigVolumeMeta(name, appsv1alpha1.TPLScriptType, dirs[0], &tplConfig.FormatterConfig),
 		tplContent:             string(tplContent),
 		fileFilter:             filter,
 		engineType:             tplConfig.DataType,
 		dsn:                    tplConfig.DSN,
 		backupPath:             backupPath,
-		formatterConfig:        tplConfig.FormatterConfig,
 	}
 	return tplHandler, nil
 }
 
 func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, error) {
-	shellHandler := func(shellTrigger *appsv1alpha1.ShellTrigger, mountPoint string) (ConfigHandler, error) {
-		if shellTrigger == nil {
+	shellHandler := func(configMeta ConfigSpecMeta, backupPath string) (ConfigHandler, error) {
+		if configMeta.ShellTrigger == nil {
 			return nil, cfgcore.MakeError("shell trigger is nil")
 		}
-		return CreateExecHandler(shellTrigger.Exec, mountPoint)
+		shellTrigger := configMeta.ShellTrigger
+		return CreateExecHandler(shellTrigger.Exec, configMeta.MountPoint, &configMeta, filepath.Join(backupPath, configMeta.ConfigSpec.Name))
 	}
 	signalHandler := func(signalTrigger *appsv1alpha1.UnixSignalTrigger, mountPoint string) (ConfigHandler, error) {
 		if signalTrigger == nil {
@@ -294,7 +358,7 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		}
 		return CreateSignalHandler(signalTrigger.Signal, signalTrigger.ProcessName, mountPoint)
 	}
-	tplHandler := func(tplTrigger *appsv1alpha1.TPLScriptTrigger, configMeta ConfigSpecMeta) (ConfigHandler, error) {
+	tplHandler := func(tplTrigger *appsv1alpha1.TPLScriptTrigger, configMeta ConfigSpecMeta, backupPath string) (ConfigHandler, error) {
 		if tplTrigger == nil {
 			return nil, cfgcore.MakeError("tpl trigger is nil")
 		}
@@ -302,7 +366,7 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 			configMeta.ConfigSpec.Name,
 			configMeta.TPLConfig,
 			[]string{configMeta.MountPoint},
-			filepath.Join(backupPath, configMeta.ConfigSpec.Name),
+			backupPath,
 		)
 	}
 
@@ -311,21 +375,23 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 	if err != nil {
 		return nil, err
 	}
+
+	var h ConfigHandler
 	mhandler := &multiHandler{
 		handlers: make(map[string]ConfigHandler, len(handlerMetas)),
 	}
 
-	var h ConfigHandler
 	for _, configMeta := range handlerMetas {
+		tmpPath := filepath.Join(backupPath, configMeta.ConfigSpec.Name)
 		switch configMeta.ReloadType {
 		default:
 			return nil, fmt.Errorf("not support reload type: %s", configMeta.ReloadType)
 		case appsv1alpha1.ShellType:
-			h, err = shellHandler(configMeta.ReloadOptions.ShellTrigger, configMeta.MountPoint)
+			h, err = shellHandler(configMeta, tmpPath)
 		case appsv1alpha1.UnixSignalType:
 			h, err = signalHandler(configMeta.ReloadOptions.UnixSignalTrigger, configMeta.MountPoint)
 		case appsv1alpha1.TPLScriptType:
-			h, err = tplHandler(configMeta.ReloadOptions.TPLScriptTrigger, configMeta)
+			h, err = tplHandler(configMeta.ReloadOptions.TPLScriptTrigger, configMeta, tmpPath)
 		}
 		if err != nil {
 			return nil, err

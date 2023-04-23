@@ -238,6 +238,12 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 			if _, ok := toolContainers[toolConfig.Name]; ok {
 				continue
 			}
+			if toolConfig.Image == "" {
+				usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, buildParam.ConfigSpec.VolumeName)
+				if len(usingContainers) != 0 {
+					toolConfig.Image = usingContainers[0].Image
+				}
+			}
 			buildToolsVolumeMount(cfgManagerParams, toolConfig)
 			toolContainers[toolConfig.Name] = toolConfig
 		}

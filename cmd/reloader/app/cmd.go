@@ -250,7 +250,7 @@ func createConfigHandle(opt *VolumeWatcherOpts) (cfgcore.ConfigHandler, error) {
 	case UnixSignal:
 		return cfgcore.CreateSignalHandler(opt.Signal, opt.ProcessName, "")
 	case ShellTool:
-		return cfgcore.CreateExecHandler(opt.Command, "")
+		return cfgcore.CreateExecHandler(opt.Command, "", nil, "")
 	case TPLScript:
 		return cfgcore.CreateTPLScriptHandler("", opt.TPLConfig, opt.VolumeDirs, opt.BackupPath)
 	case Comb:

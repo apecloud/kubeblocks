@@ -37,3 +37,19 @@ spec:
   # redis configuration file format
   formatterConfig:
     format: redis
+
+  ## for tools
+  reloadOptions:
+    shellTrigger:
+      exec: "redis-update.sh"
+      scriptConfigMapRef: redis-reload-script
+      namespace: {{ .Release.Namespace }}
+
+  toolsConfig:
+  - name: "init-redis-tools"
+    volumeName: "redis-tools"
+    mountPoint: "/kb/tools"
+    command:
+      - cp
+      - /usr/bin/redis-cli
+      - /kb/tools/redis-cli

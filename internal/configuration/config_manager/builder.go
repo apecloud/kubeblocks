@@ -135,6 +135,7 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 }
 
 func buildReloadScriptVolume(scriptCMName string, manager *CfgManagerBuildParams, mountPoint, volumeName string) {
+	var execMode int32 = 0755
 	manager.Volumes = append(manager.Volumes, corev1.VolumeMount{
 		Name:      volumeName,
 		MountPath: mountPoint,
@@ -144,6 +145,7 @@ func buildReloadScriptVolume(scriptCMName string, manager *CfgManagerBuildParams
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{Name: scriptCMName},
+				DefaultMode:          &execMode,
 			},
 		},
 	})

@@ -334,5 +334,5 @@ func GenerateConnCredential(clusterName string) string {
 }
 
 func GenerateComponentEnvName(clusterName, componentName string) string {
-	return fmt.Sprintf("%s-conn-credential", clusterName)
+	return fmt.Sprintf("%s-%s-env", clusterName, componentName)
 }

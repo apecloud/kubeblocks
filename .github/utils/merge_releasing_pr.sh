@@ -53,7 +53,7 @@ if [ "${pr_mergeable}" == "MERGEABLE" ]; then
 
     if [ "${pr_merge_status}" == "CLEAN" ]; then 
         echo "Merging PR #${pr_number}"
-        # gh pr --repo ${OWNER}/${REPO} merge ${pr_number} --rebase
+        gh pr --repo ${OWNER}/${REPO} merge ${pr_number} --rebase
         exit 0
     fi
 fi

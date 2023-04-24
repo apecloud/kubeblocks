@@ -37,7 +37,8 @@ func (t *ObjectActionTransformer) Transform(ctx graph.TransformContext, dag *gra
 	origCluster := transCtx.OrigCluster
 
 	// get the old objects snapshot
-	oldSnapshot, err := readCacheSnapshot(transCtx, *origCluster, ownKinds()...)
+	ml := getAppInstanceAndManagedByML(*origCluster)
+	oldSnapshot, err := readCacheSnapshot(transCtx, *origCluster, ml, ownKinds()...)
 	if err != nil {
 		return err
 	}

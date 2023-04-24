@@ -125,7 +125,7 @@ spec:
               - name: KUBERNETES_ROLE_LABEL
                 value: "apps.kubeblocks.postgres.patroni/role"
               - name: KUBERNETES_LABELS
-                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)","app.kubernetes.io/managed-by":"kubeblocks"}'
+                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
               - name: RESTORE_DATA_DIR
                 value: /home/postgres/pgdata/kb_restore
               - name: KB_PG_CONFIG_PATH

@@ -120,94 +120,32 @@ var _ = Describe("Cluster Controller", func() {
 		clusterKey        types.NamespacedName
 	)
 
-	// Test cases
+	// test function helpers
+	createAllWorkloadTypesClusterDef := func(noCreateAssociateCV ...bool) {
+		By("Create a clusterDefinition obj")
+		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
+			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
+			AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
+			AddComponentDef(testapps.ReplicationRedisComponent, replicationCompDefName).
+			AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
+			Create(&testCtx).GetObject()
+
+		if len(noCreateAssociateCV) > 0 && !noCreateAssociateCV[0] {
+			return
+		}
+		By("Create a clusterVersion obj")
+		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+			AddComponent(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+			AddComponent(consensusCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+			AddComponent(replicationCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+			AddComponent(statelessCompDefName).AddContainerShort("nginx", testapps.NginxImage).
+			Create(&testCtx).GetObject()
+	}
 
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		for _, compName := range compNames {
 			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
-		}
-	}
-
-	checkAllResourcesCreated := func() {
-		By("Creating a cluster")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(replicationCompName, replicationCompDefName).SetReplicas(3).
-			AddComponent(statelessCompName, statelessCompDefName).SetReplicas(3).
-			WithRandomName().Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
-
-		By("Check deployment workload has been created")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.DeploymentSignature,
-			client.MatchingLabels{
-				constant.AppInstanceLabelKey: clusterKey.Name,
-			}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEquivalentTo(0))
-
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-
-		By("Check statefulset pod's volumes")
-		for _, sts := range stsList.Items {
-			podSpec := sts.Spec.Template
-			volumeNames := map[string]struct{}{}
-			for _, v := range podSpec.Spec.Volumes {
-				volumeNames[v.Name] = struct{}{}
-			}
-
-			for _, cc := range [][]corev1.Container{
-				podSpec.Spec.Containers,
-				podSpec.Spec.InitContainers,
-			} {
-				for _, c := range cc {
-					for _, vm := range c.VolumeMounts {
-						_, ok := volumeNames[vm.Name]
-						Expect(ok).Should(BeTrue())
-					}
-				}
-			}
-		}
-
-		By("Check associated PDB has been created")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.PodDisruptionBudgetSignature,
-			client.MatchingLabels{
-				constant.AppInstanceLabelKey: clusterKey.Name,
-			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
-
-		podSpec := stsList.Items[0].Spec.Template.Spec
-		By("Checking created sts pods template with built-in toleration")
-		Expect(podSpec.Tolerations).Should(HaveLen(1))
-		Expect(podSpec.Tolerations[0].Key).To(Equal(constant.KubeBlocksDataNodeTolerationKey))
-
-		By("Checking created sts pods template with built-in Affinity")
-		Expect(podSpec.Affinity.PodAntiAffinity == nil && podSpec.Affinity.PodAffinity == nil).Should(BeTrue())
-		Expect(podSpec.Affinity.NodeAffinity).ShouldNot(BeNil())
-		Expect(podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).To(
-			Equal(constant.KubeBlocksDataNodeLabelKey))
-
-		By("Checking created sts pods template without TopologySpreadConstraints")
-		Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
-
-		By("Check should create env configmap")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.ConfigMapSignature,
-			client.MatchingLabels{
-				constant.AppInstanceLabelKey:   clusterKey.Name,
-				constant.AppConfigTypeLabelKey: "kubeblocks-env",
-			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
-
-		By("Make sure the cluster controller has set the cluster status to Running")
-		for i, comp := range clusterObj.Spec.ComponentSpecs {
-			if comp.ComponentDefRef != replicationCompDefName || comp.Name != replicationCompName {
-				continue
-			}
-			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
-			for _, v := range stsList.Items {
-				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
-					testk8s.MockStatefulSetReady(&v)
-				})).ShouldNot(HaveOccurred())
-			}
 		}
 	}
 
@@ -261,109 +199,6 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 		g.Expect(len(expectServices)).Should(Equal(len(svcList.Items)))
-	}
-
-	testServiceAddAndDelete := func() {
-		By("Creating a cluster with two LoadBalancer services")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(replicationCompName, replicationCompDefName).SetReplicas(1).
-			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
-			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
-			WithRandomName().Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
-
-		expectServices := map[string]ExpectService{
-			testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
-			testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
-			testapps.ServiceVPCName:      {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
-			testapps.ServiceInternetName: {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
-		}
-		Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
-
-		By("Delete a LoadBalancer service")
-		deleteService := testapps.ServiceVPCName
-		delete(expectServices, deleteService)
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			for idx, comp := range cluster.Spec.ComponentSpecs {
-				if comp.ComponentDefRef != replicationCompDefName || comp.Name != replicationCompName {
-					continue
-				}
-				var services []appsv1alpha1.ClusterComponentService
-				for _, item := range comp.Services {
-					if item.Name == deleteService {
-						continue
-					}
-					services = append(services, item)
-				}
-				cluster.Spec.ComponentSpecs[idx].Services = services
-				return
-			}
-		})()).ShouldNot(HaveOccurred())
-		Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
-
-		By("Add the deleted LoadBalancer service back")
-		expectServices[deleteService] = ExpectService{svcType: corev1.ServiceTypeLoadBalancer, headless: false}
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			for idx, comp := range cluster.Spec.ComponentSpecs {
-				if comp.ComponentDefRef != replicationCompDefName || comp.Name != replicationCompName {
-					continue
-				}
-				comp.Services = append(comp.Services, appsv1alpha1.ClusterComponentService{
-					Name:        deleteService,
-					ServiceType: corev1.ServiceTypeLoadBalancer,
-				})
-				cluster.Spec.ComponentSpecs[idx] = comp
-				return
-			}
-		})()).ShouldNot(HaveOccurred())
-		Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
-	}
-
-	checkAllServicesCreate := func() {
-		By("Creating a cluster")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(replicationCompName, replicationCompDefName).SetReplicas(1).
-			AddComponent(statelessCompName, statelessCompDefName).SetReplicas(3).
-			WithRandomName().Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, replicationCompName, statelessCompName)
-
-		By("Checking proxy services")
-		nginxExpectServices := map[string]ExpectService{
-			// TODO: fix me later, proxy should not have internal headless service
-			testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
-			testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
-		}
-		Eventually(func(g Gomega) { validateCompSvcList(g, statelessCompName, statelessCompDefName, nginxExpectServices) }).Should(Succeed())
-
-		By("Checking mysql services")
-		mysqlExpectServices := map[string]ExpectService{
-			testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
-			testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
-		}
-		Eventually(func(g Gomega) {
-			validateCompSvcList(g, replicationCompName, replicationCompDefName, mysqlExpectServices)
-		}).Should(Succeed())
-
-		By("Make sure the cluster controller has set the cluster status to Running")
-		for i, comp := range clusterObj.Spec.ComponentSpecs {
-			if comp.ComponentDefRef != replicationCompDefName || comp.Name != replicationCompName {
-				continue
-			}
-			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
-			for _, v := range stsList.Items {
-				Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
-					testk8s.MockStatefulSetReady(&v)
-				})).ShouldNot(HaveOccurred())
-			}
-		}
 	}
 
 	testWipeOut := func() {
@@ -724,7 +559,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
-	testHorizontalScale := func() {
+	testHorizontalScale := func(compName, compDefName string) {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
 
@@ -732,50 +567,20 @@ var _ = Describe("Cluster Controller", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(replicationCompName, replicationCompDefName).
+			AddComponent(compName, compDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		// REVIEW: this test flow, wait for running phase?
 		horizontalScale(int(updatedReplicas))
 	}
 
-	testMultiCompHScale := func() {
-		initialReplicas := int32(1)
-		updatedReplicas := int32(3)
-
-		By("Creating a multi components cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(statefulCompName, statefulCompDefName).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			SetReplicas(initialReplicas).
-			AddComponent(consensusCompName, consensusCompDefName).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			SetReplicas(initialReplicas).
-			AddComponent(replicationCompName, replicationCompDefName).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			SetReplicas(initialReplicas).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, statefulCompName, consensusCompName, replicationCompName)
-
-		// statefulCompDefName not in componentDefsWithHScalePolicy, for nil backup policy test
-		// REVIEW: (chantu)
-		//  1. this test flow, wait for running phase?
-		//  2. following horizontalScale only work with statefulCompDefName?
-		horizontalScale(int(updatedReplicas), consensusCompDefName, replicationCompDefName)
-	}
-
-	testVerticalScale := func() {
+	testVerticalScale := func(compName, compDefName string) {
 		const storageClassName = "sc-mock"
 		const replicas = 3
 
@@ -797,14 +602,14 @@ var _ = Describe("Cluster Controller", func() {
 		By("Create cluster and waiting for the cluster initialized")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(replicationCompName, replicationCompDefName).
+			AddComponent(compName, compDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(replicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("Checking the replicas")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -835,14 +640,14 @@ var _ = Describe("Cluster Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 
 		By("mock pods/sts of component are available")
-		testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, replicationCompName)
+		testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
 
 		By("Checking the resize operation finished")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
-		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, replicationCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking PVCs are resized")
@@ -852,14 +657,14 @@ var _ = Describe("Cluster Controller", func() {
 			pvc := &corev1.PersistentVolumeClaim{}
 			pvcKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
-				Name:      getPVCName(replicationCompName, int(i)),
+				Name:      getPVCName(compName, int(i)),
 			}
 			Expect(k8sClient.Get(testCtx.Ctx, pvcKey, pvc)).Should(Succeed())
 			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newStorageValue))
 		}
 	}
 
-	testClusterAffinity := func() {
+	testClusterAffinity := func(compName, compDefName string) {
 		const topologyKey = "testTopologyKey"
 		const labelKey = "testNodeLabelKey"
 		const labelValue = "testLabelValue"
@@ -876,13 +681,13 @@ var _ = Describe("Cluster Controller", func() {
 
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(replicationCompName, replicationCompDefName).SetReplicas(3).
+			AddComponent(compName, compDefName).SetReplicas(3).
 			WithRandomName().SetClusterAffinity(affinity).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("Checking the Affinity and TopologySpreadConstraints")
 		Eventually(func(g Gomega) {
@@ -897,7 +702,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	}
 
-	testComponentAffinity := func() {
+	testComponentAffinity := func(compName, compDefName string) {
 		const clusterTopologyKey = "testClusterTopologyKey"
 		const compTopologyKey = "testComponentTopologyKey"
 
@@ -914,12 +719,12 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().SetClusterAffinity(affinity).
-			AddComponent(replicationCompName, replicationCompDefName).SetComponentAffinity(compAffinity).
+			AddComponent(compName, compDefName).SetComponentAffinity(compAffinity).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("Checking the Affinity and the TopologySpreadConstraints")
 		Eventually(func(g Gomega) {
@@ -933,7 +738,7 @@ var _ = Describe("Cluster Controller", func() {
 		}).Should(Succeed())
 	}
 
-	testClusterToleration := func() {
+	testClusterToleration := func(compName, compDefName string) {
 		const tolerationKey = "testClusterTolerationKey"
 		const tolerationValue = "testClusterTolerationValue"
 		By("Creating a cluster with Toleration")
@@ -945,13 +750,13 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(replicationCompName, replicationCompDefName).SetReplicas(1).
+			AddComponent(compName, compDefName).SetReplicas(1).
 			AddClusterToleration(toleration).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("Checking the tolerations")
 		Eventually(func(g Gomega) {
@@ -966,7 +771,7 @@ var _ = Describe("Cluster Controller", func() {
 		}).Should(Succeed())
 	}
 
-	testComponentToleration := func() {
+	testComponentToleration := func(compName, compDefName string) {
 		clusterTolerationKey := "testClusterTolerationKey"
 		compTolerationKey := "testcompTolerationKey"
 		compTolerationValue := "testcompTolerationValue"
@@ -985,12 +790,12 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().AddClusterToleration(toleration).
-			AddComponent(replicationCompName, replicationCompDefName).AddComponentToleration(compToleration).
+			AddComponent(compName, compDefName).AddComponentToleration(compToleration).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("Checking the tolerations")
 		Eventually(func(g Gomega) {
@@ -1042,20 +847,20 @@ var _ = Describe("Cluster Controller", func() {
 		return names
 	}
 
-	testThreeReplicas := func() {
+	testThreeReplicas := func(compName, compDefName string) {
 		const replicas = 3
 
 		By("Mock a cluster obj")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(replicationCompName, replicationCompDefName).
+			AddComponent(compName, compDefName).
 			SetReplicas(replicas).AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		var stsList *appsv1.StatefulSetList
 		var sts *appsv1.StatefulSet
@@ -1132,10 +937,11 @@ var _ = Describe("Cluster Controller", func() {
 		}).Should(Succeed())
 
 		By("Waiting the component be running")
-		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, replicationCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, compName)).
+			Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 	}
 
-	testBackupError := func() {
+	testBackupError := func(compName, compDefName string) {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
 
@@ -1143,14 +949,14 @@ var _ = Describe("Cluster Controller", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(replicationCompName, replicationCompDefName).
+			AddComponent(compName, compDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		// REVIEW: this test flow, should wait/fake still Running phase?
 		By("Creating backup")
@@ -1164,12 +970,12 @@ var _ = Describe("Cluster Controller", func() {
 				Namespace: backupKey.Namespace,
 				Labels: map[string]string{
 					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: replicationCompName,
+					constant.KBAppComponentLabelKey: compName,
 					constant.KBManagedByKey:         "cluster",
 				},
 			},
 			Spec: dataprotectionv1alpha1.BackupSpec{
-				BackupPolicyName: lifecycle.DeriveBackupPolicyName(clusterKey.Name, replicationCompDefName),
+				BackupPolicyName: lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDefName),
 				BackupType:       "snapshot",
 			},
 		}
@@ -1213,14 +1019,12 @@ var _ = Describe("Cluster Controller", func() {
 		})).ShouldNot(HaveOccurred())
 	}
 
+	// Test cases
 	// Scenarios
-
 	Context("when creating cluster without clusterversion", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ReplicationRedisComponent, replicationCompDefName).
-				Create(&testCtx).GetObject()
+			createAllWorkloadTypesClusterDef(true)
 		})
 
 		It("should reconcile to create cluster with no error", func() {
@@ -1237,21 +1041,249 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	Context("when creating cluster with multiple kinds of components", func() {
+		compNameNDef := map[string]string{
+			statelessCompName: statelessCompDefName,
+			consensusCompName: consensusCompDefName,
+		}
+
+		createNWaitClusterObj := func(replicasProcessor func(compName string) int32) {
+			Expect(compNameNDef).ShouldNot(BeEmpty())
+			By("Creating a cluster")
+			clusterBuilder := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name)
+
+			compNames := make([]string, 0, len(compNameNDef))
+			for compName, compDefName := range compNameNDef {
+				replicas := replicasProcessor(compName)
+				clusterBuilder = clusterBuilder.AddComponent(compName, compDefName).SetReplicas(replicas)
+				compNames = append(compNames, compName)
+			}
+
+			clusterObj = clusterBuilder.WithRandomName().Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey, compNames...)
+		}
+
+		// @arg compNameNDef - map of key as componentName, value as componentDefName
+		checkAllResourcesCreated := func() {
+			createNWaitClusterObj(func(string) int32 { return 3 })
+
+			By("Check deployment workload has been created")
+			Eventually(testapps.GetListLen(&testCtx, intctrlutil.DeploymentSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEquivalentTo(0))
+
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+
+			By("Check statefulset pod's volumes")
+			for _, sts := range stsList.Items {
+				podSpec := sts.Spec.Template
+				volumeNames := map[string]struct{}{}
+				for _, v := range podSpec.Spec.Volumes {
+					volumeNames[v.Name] = struct{}{}
+				}
+
+				for _, cc := range [][]corev1.Container{
+					podSpec.Spec.Containers,
+					podSpec.Spec.InitContainers,
+				} {
+					for _, c := range cc {
+						for _, vm := range c.VolumeMounts {
+							_, ok := volumeNames[vm.Name]
+							Expect(ok).Should(BeTrue())
+						}
+					}
+				}
+			}
+
+			By("Check associated PDB has been created")
+			Eventually(testapps.GetListLen(&testCtx, intctrlutil.PodDisruptionBudgetSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
+
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			By("Checking created sts pods template with built-in toleration")
+			Expect(podSpec.Tolerations).Should(HaveLen(1))
+			Expect(podSpec.Tolerations[0].Key).To(Equal(constant.KubeBlocksDataNodeTolerationKey))
+
+			By("Checking created sts pods template with built-in Affinity")
+			Expect(podSpec.Affinity.PodAntiAffinity == nil && podSpec.Affinity.PodAffinity == nil).Should(BeTrue())
+			Expect(podSpec.Affinity.NodeAffinity).ShouldNot(BeNil())
+			Expect(podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).To(
+				Equal(constant.KubeBlocksDataNodeLabelKey))
+
+			By("Checking created sts pods template without TopologySpreadConstraints")
+			Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
+
+			By("Check should create env configmap")
+			Eventually(testapps.GetListLen(&testCtx, intctrlutil.ConfigMapSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey:   clusterKey.Name,
+					constant.AppConfigTypeLabelKey: "kubeblocks-env",
+				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
+
+			// REVIEW/TODO:
+			// remove hardcoded `if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {` ?
+			By("Make sure the cluster controller has set the cluster status to Running")
+			for i, comp := range clusterObj.Spec.ComponentSpecs {
+				if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {
+					continue
+				}
+				stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+				for _, v := range stsList.Items {
+					Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+						testk8s.MockStatefulSetReady(&v)
+					})).ShouldNot(HaveOccurred())
+				}
+			}
+		}
+
+		checkAllServicesCreate := func() {
+			Expect(compNameNDef).Should(HaveKey(consensusCompName))
+			Expect(compNameNDef).Should(HaveKey(statelessCompName))
+
+			By("Creating a cluster")
+			createNWaitClusterObj(func(compName string) int32 {
+				switch compName {
+				case consensusCompName:
+					return 1
+				default:
+					return 3
+				}
+			})
+
+			By("Checking stateless services")
+			nginxExpectServices := map[string]ExpectService{
+				// TODO: fix me later, proxy should not have internal headless service
+				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+				testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+			}
+			Eventually(func(g Gomega) {
+				validateCompSvcList(g, statelessCompName, statelessCompDefName, nginxExpectServices)
+			}).Should(Succeed())
+
+			By("Checking stateful types services")
+			mysqlExpectServices := map[string]ExpectService{
+				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+				testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+			}
+			Eventually(func(g Gomega) {
+				validateCompSvcList(g, consensusCompName, consensusCompDefName, mysqlExpectServices)
+			}).Should(Succeed())
+
+			// REVIEW/TODO:
+			// remove hardcoded `if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {` ?
+			By("Make sure the cluster controller has set the cluster status to Running")
+			for i, comp := range clusterObj.Spec.ComponentSpecs {
+				if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {
+					continue
+				}
+				stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx,
+					client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+				for _, v := range stsList.Items {
+					Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+						testk8s.MockStatefulSetReady(&v)
+					})).ShouldNot(HaveOccurred())
+				}
+			}
+		}
+
+		testServiceAddAndDelete := func() {
+			By("Creating a cluster with two LoadBalancer services")
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name).
+				AddComponent(consensusCompName, consensusCompDefName).SetReplicas(1).
+				AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
+				AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
+				WithRandomName().Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+
+			expectServices := map[string]ExpectService{
+				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+				testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+				testapps.ServiceVPCName:      {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
+				testapps.ServiceInternetName: {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
+			}
+			Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
+
+			By("Delete a LoadBalancer service")
+			deleteService := testapps.ServiceVPCName
+			delete(expectServices, deleteService)
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+				for idx, comp := range cluster.Spec.ComponentSpecs {
+					if comp.ComponentDefRef != replicationCompDefName || comp.Name != replicationCompName {
+						continue
+					}
+					var services []appsv1alpha1.ClusterComponentService
+					for _, item := range comp.Services {
+						if item.Name == deleteService {
+							continue
+						}
+						services = append(services, item)
+					}
+					cluster.Spec.ComponentSpecs[idx].Services = services
+					return
+				}
+			})()).ShouldNot(HaveOccurred())
+			Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
+
+			By("Add the deleted LoadBalancer service back")
+			expectServices[deleteService] = ExpectService{svcType: corev1.ServiceTypeLoadBalancer, headless: false}
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+				for idx, comp := range cluster.Spec.ComponentSpecs {
+					if comp.ComponentDefRef != replicationCompDefName || comp.Name != replicationCompName {
+						continue
+					}
+					comp.Services = append(comp.Services, appsv1alpha1.ClusterComponentService{
+						Name:        deleteService,
+						ServiceType: corev1.ServiceTypeLoadBalancer,
+					})
+					cluster.Spec.ComponentSpecs[idx] = comp
+					return
+				}
+			})()).ShouldNot(HaveOccurred())
+			Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
+		}
+
+		testMultiCompHScale := func() {
+			initialReplicas := int32(1)
+			updatedReplicas := int32(3)
+
+			By("Creating a multi components cluster with VolumeClaimTemplate")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+				AddComponent(statefulCompName, statefulCompDefName).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+				SetReplicas(initialReplicas).
+				AddComponent(consensusCompName, consensusCompDefName).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+				SetReplicas(initialReplicas).
+				AddComponent(replicationCompName, replicationCompDefName).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+				SetReplicas(initialReplicas).
+				Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey, statefulCompName, consensusCompName, replicationCompName)
+
+			// statefulCompDefName not in componentDefsWithHScalePolicy, for nil backup policy test
+			// REVIEW: (chantu)
+			//  1. this test flow, wait for running phase?
+			//  2. following horizontalScale only work with statefulCompDefName?
+			horizontalScale(int(updatedReplicas), consensusCompDefName, replicationCompDefName)
+		}
+
 		BeforeEach(func() {
-			By("Create a clusterDefinition obj")
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
-				AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
-				AddComponentDef(testapps.ReplicationRedisComponent, replicationCompDefName).
-				AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
-				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(replicationCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				AddComponent(statelessCompDefName).AddContainerShort("nginx", testapps.NginxImage).
-				Create(&testCtx).GetObject()
-
+			createAllWorkloadTypesClusterDef()
 			By("Creating a BackupPolicyTemplate")
 			createBackupPolicyTpl(clusterDefObj)
 		})
@@ -1274,16 +1306,13 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	When("creating cluster with workloadType=stateful component", func() {
+		const (
+			compName    = statefulCompName
+			compDefName = statefulCompDefName
+		)
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
-				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
+			createAllWorkloadTypesClusterDef()
 
 			By("Creating a BackupPolicyTemplate")
 			createBackupPolicyTpl(clusterDefObj)
@@ -1303,59 +1332,55 @@ var _ = Describe("Cluster Controller", func() {
 
 		Context("and with cluster affinity set", func() {
 			It("should create pod with cluster affinity", func() {
-				testClusterAffinity()
+				testClusterAffinity(compName, compDefName)
 			})
 		})
 
 		Context("and with both cluster affinity and component affinity set", func() {
 			It("Should observe the component affinity will override the cluster affinity", func() {
-				testComponentAffinity()
+				testComponentAffinity(compName, compDefName)
 			})
 		})
 
 		Context("and with cluster tolerations set", func() {
 			It("Should create pods with cluster tolerations", func() {
-				testClusterToleration()
+				testClusterToleration(compName, compDefName)
 			})
 		})
 
 		Context("and with both cluster tolerations and component tolerations set", func() {
 			It("Should observe the component tolerations will override the cluster tolerations", func() {
-				testComponentToleration()
+				testComponentToleration(compName, compDefName)
 			})
 		})
 
 		Context("with pvc", func() {
 			It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
-				testHorizontalScale()
+				testHorizontalScale(compName, compDefName)
 			})
 		})
 
 		Context("with pvc and dynamic-provisioning storage class", func() {
 			It("should update PVC request storage size accordingly when vertical scale the cluster", func() {
-				testVerticalScale()
+				testVerticalScale(compName, compDefName)
 			})
 		})
 	})
 
 	When("creating cluster with workloadType=consensus component", func() {
+		const (
+			compName    = consensusCompName
+			compDefName = consensusCompDefName
+		)
 		BeforeEach(func() {
-			By("Create a clusterDef obj")
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
-				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(consensusCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
+			createAllWorkloadTypesClusterDef()
 
 			By("Creating a BackupPolicyTemplate")
 			createBackupPolicyTpl(clusterDefObj)
 		})
 
 		It("Should success with one leader pod and two follower pods", func() {
-			testThreeReplicas()
+			testThreeReplicas(compName, compDefName)
 		})
 
 		It("should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", func() {
@@ -1364,25 +1389,25 @@ var _ = Describe("Cluster Controller", func() {
 
 		Context("with pvc", func() {
 			It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
-				testHorizontalScale()
+				testHorizontalScale(compName, compDefName)
 			})
 		})
 
 		Context("with pvc and dynamic-provisioning storage class", func() {
 			It("should update PVC request storage size accordingly when vertical scale the cluster", func() {
-				testVerticalScale()
+				testVerticalScale(compName, compDefName)
 			})
 		})
 
 		Context("with horizontalScale after verticalScale", func() {
 			It("should succeed", func() {
-				testVerticalScale()
+				testVerticalScale(compName, compDefName)
 				horizontalScale(5)
 			})
 		})
 
 		It("should report error if backup error during h-scale", func() {
-			testBackupError()
+			testBackupError(compName, compDefName)
 		})
 
 		It("test restore cluster from backup", func() {
@@ -1460,16 +1485,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	When("creating cluster with workloadType=replication component", func() {
 		BeforeEach(func() {
-			By("Create a clusterDefinition obj with replication componentDefRef.")
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompDefName).
-				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj with replication componentDefRef.")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(testapps.DefaultRedisCompDefName).
-				AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
-				Create(&testCtx).GetObject()
+			createAllWorkloadTypesClusterDef()
 		})
 
 		// REVIEW/TODO: following test always failed at cluster.phase.observerGeneration=1
@@ -1479,7 +1495,7 @@ var _ = Describe("Cluster Controller", func() {
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
+				AddComponent(replicationCompName, replicationCompDefName).
 				SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 				SetReplicas(testapps.DefaultReplicationReplicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -1487,7 +1503,7 @@ var _ = Describe("Cluster Controller", func() {
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 			By("Waiting for the cluster controller to create resources completely")
-			waitForCreatingResourceCompletely(clusterKey, testapps.DefaultRedisCompName)
+			waitForCreatingResourceCompletely(clusterKey, replicationCompDefName)
 
 			By("Checking statefulSet number")
 			stsList := testk8s.ListAndCheckStatefulSetCount(&testCtx, clusterKey, 1)
@@ -1499,7 +1515,7 @@ var _ = Describe("Cluster Controller", func() {
 			for i := int32(0); i < *sts.Spec.Replicas; i++ {
 				podName := fmt.Sprintf("%s-%d", sts.Name, i)
 				testapps.MockReplicationComponentStsPod(nil, testCtx, sts, clusterObj.Name,
-					testapps.DefaultRedisCompName, podName, replication.DefaultRole(i))
+					replicationCompDefName, podName, replication.DefaultRole(i))
 			}
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})

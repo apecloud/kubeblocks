@@ -12,7 +12,11 @@ kbcli cluster delete-account [flags]
 
 ```
   # delete account by name
-  kbcli cluster delete-account NAME --component COMPNAME --username NAME
+  kbcli cluster delete-account NAME --component COMPNAME --name USERNAME
+  # delete account with default component
+  kbcli cluster delete-account NAME --name USERNAME
+  # delete account for instance
+  kbcli cluster delete-account --instance INSTANCE --name USERNAME
 ```
 
 ### Options

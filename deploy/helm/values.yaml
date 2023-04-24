@@ -1752,7 +1752,7 @@ csi-hostpath-driver:
     create: true
     default: true
 
-aws-loadbalancer-controller:
+aws-load-balancer-controller:
   clusterName: ""
   enabled: false
   replicaCount: 1
@@ -1764,3 +1764,13 @@ aws-loadbalancer-controller:
   serviceAccount:
     create: true
     name: kubeblocks-service-account-aws-load-balancer-controller
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: kb-controller
+            operator: In
+            values:
+            - "true"

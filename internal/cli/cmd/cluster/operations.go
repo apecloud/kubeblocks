@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -234,6 +237,10 @@ func (o *OperationsOptions) Validate() error {
 		if err := o.validateVScale(&cluster); err != nil {
 			return err
 		}
+	case appsv1alpha1.ExposeType:
+		if err := o.validateExpose(); err != nil {
+			return err
+		}
 	}
 	if o.RequireConfirm {
 		return delete.Confirm([]string{o.Name}, o.In)
@@ -292,6 +299,10 @@ func (o *OperationsOptions) fillExpose() error {
 		return fmt.Errorf("unknown k8s provider")
 	}
 
+	if err = o.CompleteComponentsFlag(); err != nil {
+		return err
+	}
+
 	// default expose to internet
 	exposeType := util.ExposeType(o.ExposeType)
 	if exposeType == "" {
@@ -311,14 +322,6 @@ func (o *OperationsOptions) fillExpose() error {
 	cluster := appsv1alpha1.Cluster{}
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.UnstructuredContent(), &cluster); err != nil {
 		return err
-	}
-
-	if len(o.ComponentNames) == 0 {
-		if len(cluster.Spec.ComponentSpecs) == 1 {
-			o.ComponentNames = append(o.ComponentNames, cluster.Spec.ComponentSpecs[0].Name)
-		} else {
-			return fmt.Errorf("please specify --components")
-		}
 	}
 
 	compMap := make(map[string]appsv1alpha1.ClusterComponentSpec)
@@ -495,7 +498,6 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		}))
 		_ = cmd.MarkFlagRequired("enable")
 	}
-	inputs.Validate = o.validateExpose
 	inputs.Complete = o.fillExpose
 	return create.BuildCommand(inputs)
 }

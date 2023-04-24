@@ -41,7 +41,7 @@ func NewClusterVersionFactory(name, cdRef string) *MockClusterVersionFactory {
 	return f
 }
 
-func (factory *MockClusterVersionFactory) AddComponent(compDefName string) *MockClusterVersionFactory {
+func (factory *MockClusterVersionFactory) AddComponentVersion(compDefName string) *MockClusterVersionFactory {
 	comp := appsv1alpha1.ClusterComponentVersion{
 		ComponentDefRef: compDefName,
 	}

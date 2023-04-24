@@ -101,7 +101,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 			By("Create a clusterVersion obj")
 			testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(statefulCompDefName).AddContainerShort(mysqlContainerName, testapps.ApeCloudMySQLImage).
+				AddComponentVersion(statefulCompDefName).AddContainerShort(mysqlContainerName, testapps.ApeCloudMySQLImage).
 				CheckedCreate(&testCtx).GetObject()
 
 		})

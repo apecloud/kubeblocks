@@ -135,10 +135,10 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		By("Create a clusterVersion obj")
 		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponent(consensusCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponent(replicationCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponent(statelessCompDefName).AddContainerShort("nginx", testapps.NginxImage).
+			AddComponentVersion(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+			AddComponentVersion(consensusCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+			AddComponentVersion(replicationCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+			AddComponentVersion(statelessCompDefName).AddContainerShort("nginx", testapps.NginxImage).
 			Create(&testCtx).GetObject()
 	}
 
@@ -172,7 +172,7 @@ var _ = Describe("Cluster Controller", func() {
 		return headlessSvcPorts
 	}
 
-	validateCompSvcList := func(g Gomega, compName string, compType string, expectServices map[string]ExpectService) {
+	validateCompSvcList := func(g Gomega, compName string, compDefName string, expectServices map[string]ExpectService) {
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		svcList := &corev1.ServiceList{}
@@ -195,7 +195,7 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(svc.Spec.ClusterIP).ShouldNot(Equal(corev1.ClusterIPNone))
 			case svc.Spec.Type == corev1.ServiceTypeClusterIP && svcSpec.headless:
 				g.Expect(svc.Spec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
-				g.Expect(reflect.DeepEqual(svc.Spec.Ports, getHeadlessSvcPorts(g, compType))).Should(BeTrue())
+				g.Expect(reflect.DeepEqual(svc.Spec.Ports, getHeadlessSvcPorts(g, compDefName))).Should(BeTrue())
 			}
 		}
 		g.Expect(len(expectServices)).Should(Equal(len(svcList.Items)))
@@ -1193,18 +1193,20 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 
-		testServiceAddAndDelete := func() {
+		// REVIEW/TODO: (ziang.gza)
+		// this is not a multi-components setup
+		testServiceAddAndDelete := func(compName, compDefName string) {
 			By("Creating a cluster with two LoadBalancer services")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponent(consensusCompName, consensusCompDefName).SetReplicas(1).
+				AddComponent(compName, compDefName).SetReplicas(1).
 				AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
 				AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
 				WithRandomName().Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 			By("Waiting for the cluster controller to create resources completely")
-			waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+			waitForCreatingResourceCompletely(clusterKey, compName)
 
 			expectServices := map[string]ExpectService{
 				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
@@ -1212,14 +1214,14 @@ var _ = Describe("Cluster Controller", func() {
 				testapps.ServiceVPCName:      {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
 				testapps.ServiceInternetName: {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
 			}
-			Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
+			Eventually(func(g Gomega) { validateCompSvcList(g, compName, compDefName, expectServices) }).Should(Succeed())
 
 			By("Delete a LoadBalancer service")
 			deleteService := testapps.ServiceVPCName
 			delete(expectServices, deleteService)
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 				for idx, comp := range cluster.Spec.ComponentSpecs {
-					if comp.ComponentDefRef != replicationCompDefName || comp.Name != replicationCompName {
+					if comp.ComponentDefRef != compDefName || comp.Name != compName {
 						continue
 					}
 					var services []appsv1alpha1.ClusterComponentService
@@ -1233,13 +1235,13 @@ var _ = Describe("Cluster Controller", func() {
 					return
 				}
 			})()).ShouldNot(HaveOccurred())
-			Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
+			Eventually(func(g Gomega) { validateCompSvcList(g, compName, compDefName, expectServices) }).Should(Succeed())
 
 			By("Add the deleted LoadBalancer service back")
 			expectServices[deleteService] = ExpectService{svcType: corev1.ServiceTypeLoadBalancer, headless: false}
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 				for idx, comp := range cluster.Spec.ComponentSpecs {
-					if comp.ComponentDefRef != replicationCompDefName || comp.Name != replicationCompName {
+					if comp.ComponentDefRef != compDefName || comp.Name != compName {
 						continue
 					}
 					comp.Services = append(comp.Services, appsv1alpha1.ClusterComponentService{
@@ -1250,7 +1252,7 @@ var _ = Describe("Cluster Controller", func() {
 					return
 				}
 			})()).ShouldNot(HaveOccurred())
-			Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
+			Eventually(func(g Gomega) { validateCompSvcList(g, compName, compDefName, expectServices) }).Should(Succeed())
 		}
 
 		testMultiCompHScale := func() {
@@ -1298,7 +1300,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("should add and delete service correctly", func() {
-			testServiceAddAndDelete()
+			testServiceAddAndDelete(consensusCompName, consensusCompDefName)
 		})
 
 		It("should successfully h-scale with multiple components", func() {

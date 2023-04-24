@@ -17,13 +17,10 @@ limitations under the License.
 package consensusset
 
 import (
-	"reflect"
-
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -106,7 +103,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	dag.Connect(stsVertex, headlessSvcVertex)
 
 	// read cache snapshot
-	oldSnapshot, err := t.readCacheSnapshot(csSet)
+	oldSnapshot, err := model.ReadCacheSnapshot(ctx, csSet, ownedKinds()...)
 	if err != nil {
 		return err
 	}
@@ -192,44 +189,6 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	return nil
-}
-
-func ownKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&apps.StatefulSetList{},
-		&corev1.ServiceList{},
-	}
-}
-
-// read all objects owned by our cluster
-func (t *ObjectGenerationTransformer) readCacheSnapshot(owner client.Object) (model.ObjectSnapshot, error) {
-	// list what kinds of object cluster owns
-	kinds := ownKinds()
-	snapshot := make(model.ObjectSnapshot)
-	ml := client.MatchingLabels{constant.AppInstanceLabelKey: owner.GetName()}
-	inNS := client.InNamespace(owner.GetNamespace())
-	for _, list := range kinds {
-		if err := t.cli.List(t.ctx, list, inNS, ml); err != nil {
-			return nil, err
-		}
-		// reflect get list.Items
-		items := reflect.ValueOf(list).Elem().FieldByName("Items")
-		l := items.Len()
-		for i := 0; i < l; i++ {
-			// get the underlying object
-			object := items.Index(i).Addr().Interface().(client.Object)
-			// put to snapshot if owned by our cluster
-			if model.IsOwnerOf(owner, object) {
-				name, err := model.GetGVKName(object)
-				if err != nil {
-					return nil, err
-				}
-				snapshot[*name] = object
-			}
-		}
-	}
-
-	return snapshot, nil
 }
 
 var _ graph.Transformer = &ObjectGenerationTransformer{}

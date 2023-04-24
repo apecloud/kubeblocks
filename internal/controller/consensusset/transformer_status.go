@@ -37,36 +37,42 @@ import (
 type CSSetStatusTransformer struct {}
 
 func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	// get root vertex(i.e. consensus set)
+	transCtx, _ := ctx.(*CSSetTransformContext)
+	csSet := transCtx.CSSet
+	origCSSet := transCtx.OrigCSSet
+
 	root, err := model.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
-	csSet, _ := root.Obj.(*workloads.ConsensusSet)
-	oriSet, _ := root.OriObj.(*workloads.ConsensusSet)
 
 	// fast return
-	if model.IsObjectDeleting(oriSet) {
+	if model.IsObjectDeleting(origCSSet) {
 		return nil
 	}
 
 	// read the underlying sts
 	sts := &apps.StatefulSet{}
-	if err = t.Client.Get(t.Context, client.ObjectKeyFromObject(csSet), sts); err != nil {
+	if err = transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(csSet), sts); err != nil {
 		return err
 	}
-	csSet.Status.StatefulSetStatus = sts.Status
-	// use consensus set's generation instead of sts's
-	csSet.Status.ObservedGeneration = csSet.Generation
-
-	// read all pods belong to the sts, hence belong to our consensus set
-	pods, err := t.getPodsOfStatefulSet(sts)
-	if err != nil {
-		return err
+	switch {
+	case model.IsObjectUpdating(origCSSet):
+		// use consensus set's generation instead of sts's
+		csSet.Status.ObservedGeneration = csSet.Generation
+	case model.IsObjectStatusUpdating(origCSSet):
+		generation := csSet.Status.ObservedGeneration
+		csSet.Status.StatefulSetStatus = sts.Status
+		csSet.Status.ObservedGeneration = generation
+		// read all pods belong to the sts, hence belong to our consensus set
+		pods, err := t.getPodsOfStatefulSet(sts)
+		if err != nil {
+			return err
+		}
+		// update role fields
+		setConsensusSetStatusRoles(csSet, pods)
 	}
 
-	// update role fields
-	setConsensusSetStatusRoles(csSet, pods)
 
 	// TODO: handle Update(i.e. pods deletion)
 

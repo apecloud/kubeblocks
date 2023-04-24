@@ -46,6 +46,10 @@ const (
 	STATUS = Action("STATUS")
 )
 
+const (
+	AppInstanceLabelKey  = "app.kubernetes.io/instance"
+)
+
 // RequeueDuration default reconcile requeue after duration
 var RequeueDuration = time.Millisecond * 100
 

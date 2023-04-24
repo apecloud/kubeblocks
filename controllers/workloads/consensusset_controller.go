@@ -18,8 +18,6 @@ package workloads
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
-	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -123,6 +123,22 @@ func (r *ConsensusSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&workloads.ConsensusSet{}).
 		Owns(&appsv1.StatefulSet{}).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{OwnerType: &workloads.ConsensusSet{}, IsController: false}).
+		Watches(&source.Kind{Type: &corev1.Pod{}},
+			&handler.EnqueueRequestForOwner{
+				OwnerType:    &workloads.ConsensusSet{},
+				IsController: false,
+			}).
+		Watches(&source.Kind{Type: &corev1.Pod{}},
+			&consensusset.EnqueueRequestForAncestor{
+				Client: r.Client,
+				OwnerType: &workloads.ConsensusSet{},
+				UpToLevel: 2,
+			}).
+		Watches(&source.Kind{Type: &corev1.Event{}},
+			&consensusset.EnqueueRequestForAncestor{
+				Client:    r.Client,
+				OwnerType: &workloads.ConsensusSet{},
+				UpToLevel: 2,
+			}).
 		Complete(r)
 }

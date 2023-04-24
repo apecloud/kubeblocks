@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
@@ -63,9 +64,10 @@ const (
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
-	Scheme   *k8sruntime.Scheme
-	Recorder record.EventRecorder
-	clock    clock.RealClock
+	Scheme      *k8sruntime.Scheme
+	Recorder    record.EventRecorder
+	clock       clock.RealClock
+	snapshotCli *intctrlutil.VolumeSnapshotCompatClient
 }
 
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
@@ -89,6 +91,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Req:      req,
 		Log:      log.FromContext(ctx).WithValues("backup", req.NamespacedName),
 		Recorder: r.Recorder,
+	}
+	// initialize snapshotCompatClient
+	r.snapshotCli = &intctrlutil.VolumeSnapshotCompatClient{
+		Client: r.Client,
+		Ctx:    ctx,
 	}
 	// Get backup obj
 	backup := &dataprotectionv1alpha1.Backup{}
@@ -129,7 +136,11 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{})
 
 	if viper.GetBool("VOLUMESNAPSHOT") {
-		b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		if intctrlutil.InVolumeSnapshotV1Beta1() {
+			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		} else {
+			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		}
 	}
 
 	return b.Complete(r)
@@ -386,7 +397,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 		backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 		snap := &snapshotv1.VolumeSnapshot{}
-		exists, _ := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, snap)
+		exists, _ := r.snapshotCli.CheckResourceExists(key, snap)
 		if exists {
 			backup.Status.TotalSize = snap.Status.RestoreSize.String()
 		}
@@ -587,7 +598,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 	snapshotPolicy *dataprotectionv1alpha1.SnapshotPolicy) error {
 
 	snap := &snapshotv1.VolumeSnapshot{}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, reqCtx.Req.NamespacedName, snap)
+	exists, err := r.snapshotCli.CheckResourceExists(reqCtx.Req.NamespacedName, snap)
 	if err != nil {
 		return err
 	}
@@ -640,7 +651,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		}
 
 		reqCtx.Log.V(1).Info("create a volumeSnapshot from backup", "snapshot", snap.Name)
-		if err = r.Client.Create(reqCtx.Ctx, snap); err != nil && !apierrors.IsAlreadyExists(err) {
+		if err = r.snapshotCli.Create(snap); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
@@ -653,7 +664,8 @@ func (r *BackupReconciler) ensureVolumeSnapshotReady(reqCtx intctrlutil.RequestC
 	key types.NamespacedName) (bool, error) {
 
 	snap := &snapshotv1.VolumeSnapshot{}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, snap)
+	// not found, continue creation
+	exists, err := r.snapshotCli.CheckResourceExists(key, snap)
 	if err != nil {
 		return false, err
 	}
@@ -948,20 +960,20 @@ func (r *BackupReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.Request
 func (r *BackupReconciler) deleteReferenceVolumeSnapshot(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) error {
 	snaps := &snapshotv1.VolumeSnapshotList{}
 
-	if err := r.Client.List(reqCtx.Ctx, snaps,
+	if err := r.snapshotCli.List(snaps,
 		client.InNamespace(reqCtx.Req.Namespace),
 		client.MatchingLabels(buildBackupLabels(backup))); err != nil {
 		return err
 	}
 	for _, i := range snaps.Items {
 		if controllerutil.ContainsFinalizer(&i, dataProtectionFinalizerName) {
-			patch := client.MergeFrom(i.DeepCopy())
+			patch := i.DeepCopy()
 			controllerutil.RemoveFinalizer(&i, dataProtectionFinalizerName)
-			if err := r.Patch(reqCtx.Ctx, &i, patch); err != nil {
+			if err := r.snapshotCli.Patch(&i, patch); err != nil {
 				return err
 			}
 		}
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &i); err != nil {
+		if err := r.snapshotCli.Delete(&i); err != nil {
 			return err
 		}
 	}

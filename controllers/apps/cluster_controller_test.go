@@ -1138,7 +1138,6 @@ var _ = Describe("Cluster Controller", func() {
 			waitForCreatingResourceCompletely(clusterKey, compNames...)
 		}
 
-		// @arg compNameNDef - map of key as componentName, value as componentDefName
 		checkAllResourcesCreated := func() {
 			compNameNDef := map[string]string{
 				statelessCompName: statelessCompDefName,
@@ -1222,54 +1221,38 @@ var _ = Describe("Cluster Controller", func() {
 
 		checkAllServicesCreate := func() {
 			compNameNDef := map[string]string{
-				statelessCompName: statelessCompDefName,
-				consensusCompName: consensusCompDefName,
+				statelessCompName:   statelessCompDefName,
+				consensusCompName:   consensusCompDefName,
+				statefulCompName:    statefulCompDefName,
+				replicationCompName: replicationCompDefName,
 			}
-			Expect(compNameNDef).Should(HaveKey(consensusCompName))
-			Expect(compNameNDef).Should(HaveKey(statelessCompName))
 
 			createNWaitClusterObj(compNameNDef, func(compName string, factory *testapps.MockClusterFactory) {
-				switch compName {
-				case consensusCompName:
-					factory.SetReplicas(1)
-				default:
-					factory.SetReplicas(3)
-				}
+				factory.SetReplicas(3)
 			})
 
 			By("Checking stateless services")
-			nginxExpectServices := map[string]ExpectService{
+			statelessExpectServices := map[string]ExpectService{
 				// TODO: fix me later, proxy should not have internal headless service
 				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
 				testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
 			}
 			Eventually(func(g Gomega) {
-				validateCompSvcList(g, statelessCompName, statelessCompDefName, nginxExpectServices)
+				validateCompSvcList(g, statelessCompName, statelessCompDefName, statelessExpectServices)
 			}).Should(Succeed())
 
 			By("Checking stateful types services")
-			mysqlExpectServices := map[string]ExpectService{
-				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
-				testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
-			}
-			Eventually(func(g Gomega) {
-				validateCompSvcList(g, consensusCompName, consensusCompDefName, mysqlExpectServices)
-			}).Should(Succeed())
-
-			// REVIEW/TODO:
-			// remove hardcoded `if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {` ?
-			By("Make sure the cluster controller has set the cluster status to Running")
-			for i, comp := range clusterObj.Spec.ComponentSpecs {
-				if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {
+			for compName, compNameNDef := range compNameNDef {
+				if compName == statelessCompName {
 					continue
 				}
-				stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx,
-					client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
-				for _, v := range stsList.Items {
-					Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
-						testk8s.MockStatefulSetReady(&v)
-					})).ShouldNot(HaveOccurred())
+				consensusExpectServices := map[string]ExpectService{
+					testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+					testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
 				}
+				Eventually(func(g Gomega) {
+					validateCompSvcList(g, compName, compNameNDef, consensusExpectServices)
+				}).Should(Succeed())
 			}
 		}
 
@@ -1555,6 +1538,10 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	When("creating cluster with workloadType=consensus component", func() {
+		const (
+			compName    = consensusCompName
+			compDefName = consensusCompDefName
+		)
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj)

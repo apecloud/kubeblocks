@@ -185,7 +185,11 @@ var _ = Describe("Cluster Controller", func() {
 
 		for svcName, svcSpec := range expectServices {
 			idx := slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
-				return strings.HasSuffix(e.Name, svcName)
+				parts := []string{clusterKey.Name, compName}
+				if svcName != "" {
+					parts = append(parts, svcName)
+				}
+				return strings.Join(parts, "-") == e.Name
 			})
 			g.Expect(idx >= 0).To(BeTrue())
 			svc := svcList.Items[idx]

@@ -1109,6 +1109,247 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	Context("when creating cluster with multiple kinds of components", func() {
+		compNameNDef := map[string]string{
+			statelessCompName: statelessCompDefName,
+			consensusCompName: consensusCompDefName,
+		}
+
+		createNWaitClusterObj := func(replicasProcessor func(compName string) int32) {
+			Expect(compNameNDef).ShouldNot(BeEmpty())
+			By("Creating a cluster")
+			clusterBuilder := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name)
+
+			compNames := make([]string, 0, len(compNameNDef))
+			for compName, compDefName := range compNameNDef {
+				replicas := replicasProcessor(compName)
+				clusterBuilder = clusterBuilder.AddComponent(compName, compDefName).SetReplicas(replicas)
+				compNames = append(compNames, compName)
+			}
+
+			clusterObj = clusterBuilder.WithRandomName().Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey, compNames...)
+		}
+
+		// @arg compNameNDef - map of key as componentName, value as componentDefName
+		checkAllResourcesCreated := func() {
+			createNWaitClusterObj(func(string) int32 { return 3 })
+
+			By("Check deployment workload has been created")
+			Eventually(testapps.GetListLen(&testCtx, intctrlutil.DeploymentSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEquivalentTo(0))
+
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+
+			By("Check statefulset pod's volumes")
+			for _, sts := range stsList.Items {
+				podSpec := sts.Spec.Template
+				volumeNames := map[string]struct{}{}
+				for _, v := range podSpec.Spec.Volumes {
+					volumeNames[v.Name] = struct{}{}
+				}
+
+				for _, cc := range [][]corev1.Container{
+					podSpec.Spec.Containers,
+					podSpec.Spec.InitContainers,
+				} {
+					for _, c := range cc {
+						for _, vm := range c.VolumeMounts {
+							_, ok := volumeNames[vm.Name]
+							Expect(ok).Should(BeTrue())
+						}
+					}
+				}
+			}
+
+			By("Check associated PDB has been created")
+			Eventually(testapps.GetListLen(&testCtx, intctrlutil.PodDisruptionBudgetSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
+
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			By("Checking created sts pods template with built-in toleration")
+			Expect(podSpec.Tolerations).Should(HaveLen(1))
+			Expect(podSpec.Tolerations[0].Key).To(Equal(constant.KubeBlocksDataNodeTolerationKey))
+
+			By("Checking created sts pods template with built-in Affinity")
+			Expect(podSpec.Affinity.PodAntiAffinity == nil && podSpec.Affinity.PodAffinity == nil).Should(BeTrue())
+			Expect(podSpec.Affinity.NodeAffinity).ShouldNot(BeNil())
+			Expect(podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).To(
+				Equal(constant.KubeBlocksDataNodeLabelKey))
+
+			By("Checking created sts pods template without TopologySpreadConstraints")
+			Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
+
+			By("Check should create env configmap")
+			Eventually(testapps.GetListLen(&testCtx, intctrlutil.ConfigMapSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey:   clusterKey.Name,
+					constant.AppConfigTypeLabelKey: "kubeblocks-env",
+				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
+
+			// REVIEW/TODO:
+			// remove hardcoded `if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {` ?
+			By("Make sure the cluster controller has set the cluster status to Running")
+			for i, comp := range clusterObj.Spec.ComponentSpecs {
+				if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {
+					continue
+				}
+				stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+				for _, v := range stsList.Items {
+					Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+						testk8s.MockStatefulSetReady(&v)
+					})).ShouldNot(HaveOccurred())
+				}
+			}
+		}
+
+		checkAllServicesCreate := func() {
+			Expect(compNameNDef).Should(HaveKey(consensusCompName))
+			Expect(compNameNDef).Should(HaveKey(statelessCompName))
+
+			By("Creating a cluster")
+			createNWaitClusterObj(func(compName string) int32 {
+				switch compName {
+				case consensusCompName:
+					return 1
+				default:
+					return 3
+				}
+			})
+
+			By("Checking stateless services")
+			nginxExpectServices := map[string]ExpectService{
+				// TODO: fix me later, proxy should not have internal headless service
+				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+				testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+			}
+			Eventually(func(g Gomega) {
+				validateCompSvcList(g, statelessCompName, statelessCompDefName, nginxExpectServices)
+			}).Should(Succeed())
+
+			By("Checking stateful types services")
+			mysqlExpectServices := map[string]ExpectService{
+				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+				testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+			}
+			Eventually(func(g Gomega) {
+				validateCompSvcList(g, consensusCompName, consensusCompDefName, mysqlExpectServices)
+			}).Should(Succeed())
+
+			// REVIEW/TODO:
+			// remove hardcoded `if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {` ?
+			By("Make sure the cluster controller has set the cluster status to Running")
+			for i, comp := range clusterObj.Spec.ComponentSpecs {
+				if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {
+					continue
+				}
+				stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx,
+					client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
+				for _, v := range stsList.Items {
+					Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
+						testk8s.MockStatefulSetReady(&v)
+					})).ShouldNot(HaveOccurred())
+				}
+			}
+		}
+
+		testServiceAddAndDelete := func() {
+			By("Creating a cluster with two LoadBalancer services")
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name).
+				AddComponent(consensusCompName, consensusCompDefName).SetReplicas(1).
+				AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
+				AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
+				WithRandomName().Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+
+			expectServices := map[string]ExpectService{
+				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+				testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+				testapps.ServiceVPCName:      {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
+				testapps.ServiceInternetName: {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
+			}
+			Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
+
+			By("Delete a LoadBalancer service")
+			deleteService := testapps.ServiceVPCName
+			delete(expectServices, deleteService)
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+				for idx, comp := range cluster.Spec.ComponentSpecs {
+					if comp.ComponentDefRef != replicationCompDefName || comp.Name != replicationCompName {
+						continue
+					}
+					var services []appsv1alpha1.ClusterComponentService
+					for _, item := range comp.Services {
+						if item.Name == deleteService {
+							continue
+						}
+						services = append(services, item)
+					}
+					cluster.Spec.ComponentSpecs[idx].Services = services
+					return
+				}
+			})()).ShouldNot(HaveOccurred())
+			Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
+
+			By("Add the deleted LoadBalancer service back")
+			expectServices[deleteService] = ExpectService{svcType: corev1.ServiceTypeLoadBalancer, headless: false}
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+				for idx, comp := range cluster.Spec.ComponentSpecs {
+					if comp.ComponentDefRef != replicationCompDefName || comp.Name != replicationCompName {
+						continue
+					}
+					comp.Services = append(comp.Services, appsv1alpha1.ClusterComponentService{
+						Name:        deleteService,
+						ServiceType: corev1.ServiceTypeLoadBalancer,
+					})
+					cluster.Spec.ComponentSpecs[idx] = comp
+					return
+				}
+			})()).ShouldNot(HaveOccurred())
+			Eventually(func(g Gomega) { validateCompSvcList(g, replicationCompName, replicationCompDefName, expectServices) }).Should(Succeed())
+		}
+
+		testMultiCompHScale := func() {
+			initialReplicas := int32(1)
+			updatedReplicas := int32(3)
+
+			By("Creating a multi components cluster with VolumeClaimTemplate")
+			pvcSpec := testapps.NewPVCSpec("1Gi")
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+				AddComponent(statefulCompName, statefulCompDefName).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+				SetReplicas(initialReplicas).
+				AddComponent(consensusCompName, consensusCompDefName).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+				SetReplicas(initialReplicas).
+				AddComponent(replicationCompName, replicationCompDefName).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+				SetReplicas(initialReplicas).
+				Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey, statefulCompName, consensusCompName, replicationCompName)
+
+			// statefulCompDefName not in componentDefsWithHScalePolicy, for nil backup policy test
+			// REVIEW: (chantu)
+			//  1. this test flow, wait for running phase?
+			//  2. following horizontalScale only work with statefulCompDefName?
+			horizontalScale(int(updatedReplicas), consensusCompDefName, replicationCompDefName)
+		}
+
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj)

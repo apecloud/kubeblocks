@@ -683,7 +683,7 @@ var _ = Describe("Cluster Controller", func() {
 		for i := 0; i < replicas; i++ {
 			pvc := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      getPVCName(replicationCompName, i),
+					Name:      getPVCName(compName, i),
 					Namespace: clusterKey.Namespace,
 					Labels: map[string]string{
 						constant.AppInstanceLabelKey: clusterKey.Name,

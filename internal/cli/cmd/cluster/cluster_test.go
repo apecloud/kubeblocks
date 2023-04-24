@@ -44,12 +44,16 @@ var _ = Describe("Cluster", func() {
 		testComponentWithInvalidResourcePath = "../../testing/testdata/component_with_invalid_resource.yaml"
 	)
 
+	const (
+		clusterName = "test"
+		namespace   = "default"
+	)
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace("default")
+		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		cd := testing.FakeClusterDef()
 		tf.FakeDynamicClient = testing.FakeDynamicClient(cd, testing.FakeClusterVersion())
 		tf.Client = &clientfake.RESTClient{}
@@ -69,10 +73,11 @@ var _ = Describe("Cluster", func() {
 					TerminationPolicy: "Delete",
 				},
 				CreateOptions: create.CreateOptions{
-					Dynamic: tf.FakeDynamicClient,
+					Factory:   tf,
+					Dynamic:   tf.FakeDynamicClient,
+					IOStreams: streams,
 				},
 			}
-			o.IOStreams = streams
 			Expect(o.Validate()).To(Succeed())
 			Expect(o.Name).ShouldNot(BeEmpty())
 		})
@@ -102,7 +107,14 @@ var _ = Describe("Cluster", func() {
 				testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
 			)
 			o = &CreateOptions{
-				CreateOptions:     create.CreateOptions{IOStreams: streams, Name: "test", Dynamic: tf.FakeDynamicClient},
+				CreateOptions: create.CreateOptions{
+					IOStreams:       streams,
+					Name:            clusterName,
+					Dynamic:         tf.FakeDynamicClient,
+					CueTemplateName: CueTemplateName,
+					Factory:         tf,
+					GVR:             types.ClusterGVR(),
+				},
 				SetFile:           "",
 				ClusterDefRef:     testing.ClusterDefName,
 				ClusterVersionRef: "cluster-version",
@@ -118,18 +130,12 @@ var _ = Describe("Cluster", func() {
 		})
 
 		Run := func() {
-			inputs := create.Inputs{
-				ResourceName:    types.ResourceClusters,
-				CueTemplateName: CueTemplateName,
-				Options:         o,
-				Factory:         tf,
-			}
-
-			Expect(o.CreateOptions.Complete(inputs, []string{"test"})).Should(Succeed())
-			Expect(o.Namespace).To(Equal("default"))
-			Expect(o.Name).To(Equal("test"))
-
-			Expect(o.Run(inputs)).Should(Succeed())
+			o.CreateOptions.Options = o
+			o.Args = []string{clusterName}
+			Expect(o.CreateOptions.Complete()).Should(Succeed())
+			Expect(o.Namespace).To(Equal(namespace))
+			Expect(o.Name).To(Equal(clusterName))
+			Expect(o.Run()).Should(Succeed())
 		}
 
 		It("validate tolerations", func() {
@@ -260,6 +266,7 @@ var _ = Describe("Cluster", func() {
 					TerminationPolicy: "Delete",
 				},
 				CreateOptions: create.CreateOptions{
+					Factory:   tf,
 					Namespace: "default",
 					Name:      "mycluster",
 					Dynamic:   tf.FakeDynamicClient,

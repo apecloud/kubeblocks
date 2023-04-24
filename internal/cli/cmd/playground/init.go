@@ -441,12 +441,14 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 
 // createCluster construct a cluster create options and run
 func (o *initOptions) createCluster() error {
-	dynamicClient, err := util.NewFactory().DynamicClient()
+	f := util.NewFactory()
+	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return err
 	}
 	options := &cmdcluster.CreateOptions{
 		CreateOptions: create.CreateOptions{
+			Factory:         f,
 			IOStreams:       genericclioptions.NewTestIOStreamsDiscard(),
 			Namespace:       defaultNamespace,
 			Name:            kbClusterName,

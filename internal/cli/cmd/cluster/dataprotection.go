@@ -104,7 +104,8 @@ type BackupOptions struct {
 	BackupName   string `json:"backupName"`
 	Role         string `json:"role,omitempty"`
 	BackupPolicy string `json:"backupPolicy"`
-	create.CreateOptions
+
+	create.CreateOptions `json:"-"`
 }
 
 type ListBackupOptions struct {
@@ -191,12 +192,15 @@ func NewBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		printer.PrintLine(nextLine)
 	}
 
-	o := &BackupOptions{CreateOptions: create.CreateOptions{IOStreams: streams,
+	o := &BackupOptions{}
+	o.CreateOptions = create.CreateOptions{
+		IOStreams:       streams,
 		Factory:         f,
 		GVR:             types.BackupGVR(),
 		CueTemplateName: "backup_template.cue",
 		CustomOutPut:    customOutPut,
-	}}
+		Options:         o,
+	}
 
 	cmd := &cobra.Command{
 		Use:     "backup",
@@ -351,7 +355,7 @@ type CreateRestoreOptions struct {
 	RestoreTimeStr string     `json:"restoreTimeStr,omitempty"`
 	SourceCluster  string     `json:"sourceCluster,omitempty"`
 
-	create.CreateOptions
+	create.CreateOptions `json:"-"`
 }
 
 func (o *CreateRestoreOptions) getClusterObject(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
@@ -528,11 +532,12 @@ func (o *CreateRestoreOptions) Validate() error {
 }
 
 func NewRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &CreateRestoreOptions{
-		CreateOptions: create.CreateOptions{
-			IOStreams: streams,
-			Factory:   f,
-		}}
+	o := &CreateRestoreOptions{}
+	o.CreateOptions = create.CreateOptions{
+		IOStreams: streams,
+		Factory:   f,
+		Options:   o,
+	}
 
 	cmd := &cobra.Command{
 		Use:               "restore",

@@ -79,14 +79,13 @@ var _ = Describe("Create", func() {
 		})
 
 		It("test create with dry-run", func() {
-			var format printer.Format
 			cmd := &cobra.Command{
 				Use: "test-create",
 			}
 			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
-			printer.AddOutputFlagForCreate(cmd, &format)
 			options.Cmd = cmd
+			options.Format = printer.YAML
 
 			testCases := []struct {
 				clusterName    string
@@ -135,7 +134,7 @@ var _ = Describe("Create", func() {
 			for _, t := range testCases {
 				By(fmt.Sprintf("when isDryRun %v, dryRunStrategy %v, mode %s",
 					t.isUseDryRun, t.dryRunStrategy, t.mode))
-				options.Options.(map[string]interface{})["name"] = t.clusterName
+				options.Name = t.clusterName
 				if t.isUseDryRun {
 					Expect(cmd.Flags().Set("dry-run", t.mode)).Should(Succeed())
 				}

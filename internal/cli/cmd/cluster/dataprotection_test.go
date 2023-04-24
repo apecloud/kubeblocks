@@ -105,9 +105,9 @@ var _ = Describe("DataProtection", func() {
 				CreateOptions: create.CreateOptions{
 					Dynamic:   testing.FakeDynamicClient(),
 					IOStreams: streams,
+					Factory:   tf,
 				},
 			}
-			o.IOStreams = streams
 			Expect(o.Validate()).To(MatchError("missing cluster name"))
 
 			By("test without default backupPolicy")

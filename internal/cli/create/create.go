@@ -131,6 +131,10 @@ func (o *CreateOptions) Complete() error {
 // Run execute command. the options of parameter contain the command flags and args.
 func (o *CreateOptions) Run() error {
 	resObj, err := o.buildResourceObj()
+	if err != nil {
+		return err
+	}
+
 	if o.PreCreate != nil {
 		if err = o.PreCreate(resObj); err != nil {
 			return err

@@ -394,27 +394,26 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 			return nil
 		}
 		// do backup according to component's horizontal scale policy
+		c.WorkloadVertex.Immutable = true
 		stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
 		objs, err := doBackup(reqCtx, cli, c.Cluster, c.Component, snapshotKey, stsProto, stsObj)
 		if err != nil {
 			return err
 		}
-		if objs != nil {
-			for _, obj := range objs {
-				c.CreateResource(obj, nil)
-			}
-			c.WorkloadVertex.Immutable = true
+		for _, obj := range objs {
+			c.CreateResource(obj, nil)
 		}
 		return nil
 	}
+	// pvcs are ready, stateful_set.replicas should be updated
+	c.WorkloadVertex.Immutable = false
 
-	// check all pvc bound, requeue if not all ready
+	// check all pvc bound, wait next reconciliation if not all ready
 	allPVCBounded, err := checkAllPVCBoundIfNeeded()
 	if err != nil {
 		return err
 	}
 	if !allPVCBounded {
-		c.WorkloadVertex.Immutable = true
 		return nil
 	}
 	// clean backup resources.
@@ -422,9 +421,6 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	if err := cleanBackupResourcesIfNeeded(); err != nil {
 		return err
 	}
-
-	// pvcs are ready, stateful_set.replicas should be updated
-	c.WorkloadVertex.Immutable = false
 
 	return nil
 }

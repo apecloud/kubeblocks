@@ -1,28 +1,24 @@
 ---
-title: kbcli cluster list-restores
+title: kbcli plugin list
 ---
 
-List all restore jobs.
+List all visible plugin executables on a user's PATH
 
 ```
-kbcli cluster list-restores [flags]
+kbcli plugin list
 ```
 
 ### Examples
 
 ```
-  # list all restore
-  kbcli cluster list-restore
+  # List all available plugins file on a user's PATH.
+  kbcli plugin list
 ```
 
 ### Options
 
 ```
-  -A, --all-namespace     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
-  -h, --help              help for list-restores
-  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
-  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
-      --show-labels       When printing, show all labels as the last column (default hide labels column)
+  -h, --help   help for list
 ```
 
 ### Options inherited from parent commands
@@ -51,7 +47,7 @@ kbcli cluster list-restores [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli plugin](kbcli_plugin.md)	 - Provides utilities for interacting with plugins.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

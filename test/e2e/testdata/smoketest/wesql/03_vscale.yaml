@@ -1,0 +1,11 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-vscale
+spec:
+  clusterRef: mycluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: mysql
+      class: general-0.2c0.6g
+

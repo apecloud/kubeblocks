@@ -127,8 +127,11 @@ def main(argv: list[str]) -> None:
     # generate release note from template
     template = ""
     release_note_template_path = "docs/release_notes/template.md"
-    with open(release_note_template_path, "r") as file:
-        template = file.read()
+    try:
+        with open(release_note_template_path, "r") as file:
+            template = file.read()
+    except FileNotFoundError as e:
+        print(f"template {release_note_template_path} not found, IGNORED")
 
     change_text = "\n".join(change_lines)
     breaking_change_text = "None."

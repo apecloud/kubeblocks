@@ -173,21 +173,8 @@ func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 
 func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.SynthesizedComponent, localObjs []client.Object) error {
 	// TODO add built-in function
-	c.builtInFunctions = &gotemplate.BuiltInObjectsFunc{
-		builtInMysqlCalBufferFunctionName:            calDBPoolSize,
-		builtInGetVolumeFunctionName:                 getVolumeMountPathByName,
-		builtInGetPvcFunctionName:                    getPVCByName,
-		builtInGetEnvFunctionName:                    wrapGetEnvByName(c, component, localObjs),
-		builtInGetPortFunctionName:                   getPortByName,
-		builtInGetArgFunctionName:                    getArgByName,
-		builtInGetContainerFunctionName:              getPodContainerByName,
-		builtInGetContainerCPUFunctionName:           getContainerCPU,
-		builtInGetContainerMemoryFunctionName:        getContainerMemory,
-		builtInGetContainerRequestMemoryFunctionName: getContainerRequestMemory,
-		builtInGetCAFile:                             getCAFile,
-		builtInGetCertFile:                           getCertFile,
-		builtInGetKeyFile:                            getKeyFile,
-	}
+	c.builtInFunctions = BuiltInCustomFunctions(c, component, localObjs)
+	// other logic here
 	return nil
 }
 

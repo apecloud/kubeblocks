@@ -160,7 +160,7 @@ func (b *ComponentWorkloadBuilderBase) BuildTLSCert() ComponentWorkloadBuilder {
 		objs := make([]client.Object, 0)
 		switch component.Issuer.Name {
 		case appsv1alpha1.IssuerUserProvided:
-			if err := plan.CheckTLSSecretRef(b.ReqCtx, b.Client, cluster.Namespace, component.Issuer.SecretRef); err != nil {
+			if err := plan.CheckTLSSecretRef(b.ReqCtx.Ctx, b.Client, cluster.Namespace, component.Issuer.SecretRef); err != nil {
 				return nil, err
 			}
 		case appsv1alpha1.IssuerKubeBlocks:

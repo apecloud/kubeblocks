@@ -41,6 +41,7 @@ COPY externalapis/ externalapis/
 COPY version/ version/
 COPY cmd/cli/ cmd/cli/
 COPY apis/ apis/
+COPY test/testdata/testdata.go test/testdata/testdata.go
 
 # Download binaries
 RUN curl -fsSL https://dl.k8s.io/v1.26.3/kubernetes-client-${TARGETOS}-${TARGETARCH}.tar.gz | tar -zxv

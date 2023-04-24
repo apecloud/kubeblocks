@@ -12,11 +12,10 @@ clusterVersionOverride: ""
 nameOverride: ""
 fullnameOverride: ""
 
-replicaset:
-  roleProbe:
-    failureThreshold: 2
-    periodSeconds: 1
-    timeoutSeconds: 1
+roleProbe:
+  failureThreshold: 3
+  periodSeconds: 2
+  timeoutSeconds: 1
 
 ## Authentication parameters
 ##
@@ -30,7 +29,7 @@ auth:
   database: "admin"
 
 logConfigs:
-  running: /data/mongodb/log/mongodb.log*
+  running: /data/mongodb/logs/mongodb.log*
 
 metrics:
   image:

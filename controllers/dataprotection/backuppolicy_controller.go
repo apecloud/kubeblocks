@@ -69,8 +69,6 @@ type BackupPolicyReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.1/pkg/reconcile
 func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-
 	// NOTES:
 	// setup common request context
 	reqCtx := intctrlutil.RequestCtx{
@@ -257,7 +255,11 @@ func (r *BackupPolicyReconciler) removeOldestBackups(reqCtx intctrlutil.RequestC
 }
 
 func (r *BackupPolicyReconciler) getCronJobName(backupPolicyName, backupPolicyNamespace string, backupType dataprotectionv1alpha1.BackupType) string {
-	return fmt.Sprintf("%s-%s-%s", backupPolicyName, backupPolicyNamespace, string(backupType))
+	name := fmt.Sprintf("%s-%s", backupPolicyName, backupPolicyNamespace)
+	if len(name) > 30 {
+		name = name[:30]
+	}
+	return fmt.Sprintf("%s-%s", name, string(backupType))
 }
 
 // buildCronJob builds cronjob from backup policy.
@@ -287,6 +289,7 @@ func (r *BackupPolicyReconciler) buildCronJob(
 		BackupType:       string(backType),
 		ServiceAccount:   viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
 		MgrNamespace:     viper.GetString(constant.CfgKeyCtrlrMgrNS),
+		Image:            viper.GetString(constant.KBToolsImage),
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {
@@ -295,8 +298,11 @@ func (r *BackupPolicyReconciler) buildCronJob(
 	if err = cueValue.Fill("options", backupPolicyOptionsByte); err != nil {
 		return nil, err
 	}
-
-	cronjobByte, err := cueValue.Lookup("cronjob")
+	cuePath := "cronjob"
+	if backType == dataprotectionv1alpha1.BackupTypeIncremental {
+		cuePath = "cronjob_incremental"
+	}
+	cronjobByte, err := cueValue.Lookup(cuePath)
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +426,6 @@ func (r *BackupPolicyReconciler) handleIncrementalPolicy(
 	reqCtx intctrlutil.RequestCtx,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
 	if backupPolicy.Spec.Incremental == nil {
-		// TODO delete cronjob if exists
 		return nil
 	}
 	var cronExpression string

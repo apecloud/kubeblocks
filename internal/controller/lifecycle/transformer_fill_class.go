@@ -21,34 +21,32 @@ import (
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// fixClusterLabelsTransformer fill the class related info to cluster
-type fillClass struct {
-	cc  clusterRefResources
-	cli client.Client
-	ctx intctrlutil.RequestCtx
-}
+// FillClassTransformer fill the class related info to cluster
+type FillClassTransformer struct{}
 
-func (r *fillClass) Transform(dag *graph.DAG) error {
-	rootVertex, err := types.FindRootVertex(dag)
-	if err != nil {
-		return err
+var _ graph.Transformer = &FillClassTransformer{}
+
+func (r *FillClassTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	cluster := transCtx.Cluster
+	if cluster.IsDeleting() {
+		return nil
 	}
-	cluster, _ := rootVertex.Obj.(*appsv1alpha1.Cluster)
-	return r.fillClass(r.ctx, cluster, r.cc.cd)
+	return r.fillClass(transCtx)
 }
 
-func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, clusterDefinition appsv1alpha1.ClusterDefinition) error {
+func (r *FillClassTransformer) fillClass(transCtx *ClusterTransformContext) error {
+	cluster := transCtx.Cluster
+	clusterDefinition := transCtx.ClusterDef
+
 	var (
 		classDefinitionList appsv1alpha1.ComponentClassDefinitionList
 	)
@@ -56,7 +54,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	ml := []client.ListOption{
 		client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefinition.Name},
 	}
-	if err := r.cli.List(reqCtx.Ctx, &classDefinitionList, ml...); err != nil {
+	if err := transCtx.Client.List(transCtx.Context, &classDefinitionList, ml...); err != nil {
 		return err
 	}
 	compClasses, err := class.GetClasses(classDefinitionList)
@@ -65,7 +63,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 	}
 
 	var constraintList appsv1alpha1.ComponentResourceConstraintList
-	if err = r.cli.List(reqCtx.Ctx, &constraintList); err != nil {
+	if err = transCtx.Client.List(transCtx.Context, &constraintList); err != nil {
 		return err
 	}
 
@@ -95,38 +93,16 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		return cls
 	}
 
-	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*appsv1alpha1.ComponentClassInstance) *appsv1alpha1.ComponentClassInstance {
-		filters := make(map[corev1.ResourceName]resource.Quantity)
-		if !comp.Resources.Requests.Cpu().IsZero() {
-			filters[corev1.ResourceCPU] = *comp.Resources.Requests.Cpu()
-		}
-		if !comp.Resources.Requests.Memory().IsZero() {
-			filters[corev1.ResourceMemory] = *comp.Resources.Requests.Memory()
-		}
-		return class.ChooseComponentClasses(classes, filters)
-	}
-
 	for idx, comp := range cluster.Spec.ComponentSpecs {
-		classes := compClasses[comp.ComponentDefRef]
-
-		var cls *appsv1alpha1.ComponentClassInstance
-		// TODO another case if len(constraintList.Items) > 0, use matchClassFamilies to find matching resource constraint:
-		switch {
-		case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
-			cls = classes[comp.ClassDefRef.Class]
-			if cls == nil {
-				return fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
-			}
-		case classes != nil:
-			cls = matchComponentClass(comp, classes)
-			if cls == nil {
-				return fmt.Errorf("can not find matching class for component %s", comp.Name)
-			}
+		cls, err := class.ValidateComponentClass(&comp, compClasses)
+		if err != nil {
+			return err
 		}
 		if cls == nil {
 			// TODO reconsider handling policy for this case
 			continue
 		}
+
 		comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: cls.Name}
 		requests := corev1.ResourceList{
 			corev1.ResourceCPU:    cls.CPU,
@@ -134,6 +110,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 		}
 		requests.DeepCopyInto(&comp.Resources.Requests)
 		requests.DeepCopyInto(&comp.Resources.Limits)
+
 		var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
 		if len(comp.VolumeClaimTemplates) > 0 {
 			volumes = comp.VolumeClaimTemplates
@@ -149,7 +126,7 @@ func (r *fillClass) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alph
 func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
 	var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
 	for _, volume := range cls.Volumes {
-		volume := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+		volumes = append(volumes, appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 			Name: volume.Name,
 			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 				// TODO define access mode in class
@@ -160,8 +137,7 @@ func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1a
 					},
 				},
 			},
-		}
-		volumes = append(volumes, volume)
+		})
 	}
 	return volumes
 }

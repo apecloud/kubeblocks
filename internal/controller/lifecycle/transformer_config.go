@@ -24,10 +24,12 @@ import (
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
-// configTransformer makes all config related ConfigMaps immutable
-type configTransformer struct{}
+// ConfigTransformer makes all config related ConfigMaps immutable
+type ConfigTransformer struct{}
 
-func (c *configTransformer) Transform(dag *graph.DAG) error {
+var _ graph.Transformer = &ConfigTransformer{}
+
+func (c *ConfigTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	for _, vertex := range ictrltypes.FindAll[*corev1.ConfigMap](dag) {
 		v, _ := vertex.(*ictrltypes.LifecycleVertex)
 		cm, _ := v.Obj.(*corev1.ConfigMap)

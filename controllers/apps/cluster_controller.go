@@ -124,16 +124,72 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
-	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req, r.Recorder)
+	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
+	// Init stage
+	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	} else if err := planBuilder.Validate(); err != nil {
-		return requeueError(err)
-	} else if plan, err := planBuilder.Build(); err != nil {
-		return requeueError(err)
-	} else if err = plan.Execute(); err != nil {
-		return requeueError(err)
 	}
+
+	// Build stage
+	// what you should do in most cases is writing your transformer.
+	//
+	// here are the how-to tips:
+	// 1. one transformer for one scenario
+	// 2. try not to modify the current transformers, make a new one
+	// 3. transformers are independent with each-other, with some exceptions.
+	//    Which means transformers' order is not important in most cases.
+	//    If you don't know where to put your transformer, append it to the end and that would be ok.
+	// 4. don't use client.Client for object write, use client.ReadonlyClient for object read.
+	//    If you do need to create/update/delete object, make your intent operation a lifecycleVertex and put it into the DAG.
+	//
+	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
+	plan, errBuild := planBuilder.
+		AddTransformer(
+			// handle deletion
+			// handle cluster deletion first
+			&lifecycle.ClusterDeletionTransformer{},
+			// fix meta
+			// fix finalizer and cd&cv labels
+			&lifecycle.FixMetaTransformer{},
+			// validate
+			// validate cd & cv's existence and availability
+			&lifecycle.ValidateAndLoadRefResourcesTransformer{},
+			// validate config
+			&lifecycle.ValidateEnableLogsTransformer{},
+			// fix spec
+			// fill class related info
+			&lifecycle.FillClassTransformer{},
+			// create cluster connection credential secret object
+			&lifecycle.ClusterCredentialTransformer{},
+			// create all components objects
+			&lifecycle.ComponentTransformer{Client: r.Client},
+			// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
+			&lifecycle.BackupPolicyTPLTransformer{},
+			// add our finalizer to all objects
+			&lifecycle.OwnershipTransformer{},
+			// make all workload objects depending on credential secret
+			&lifecycle.SecretTransformer{},
+			// make config configmap immutable
+			&lifecycle.ConfigTransformer{},
+			// update cluster status
+			&lifecycle.ClusterStatusTransformer{},
+			// handle PITR
+			&lifecycle.PITRTransformer{Client: r.Client},
+			// always safe to put your transformer below
+		).
+		Build()
+
+	// Execute stage
+	// errBuild not nil means build stage partial success or validation error
+	// execute the plan first, delay error handling
+	if errExec := plan.Execute(); errExec != nil {
+		return requeueError(errExec)
+	}
+	if errBuild != nil {
+		return requeueError(errBuild)
+	}
+
 	return intctrlutil.Reconciled()
 }
 

@@ -19,16 +19,17 @@ package lifecycle
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
-// secretTransformer puts all the secrets at the beginning of the DAG
-type secretTransformer struct{}
+// SecretTransformer puts all the secrets at the beginning of the DAG
+type SecretTransformer struct{}
 
-func (c *secretTransformer) Transform(dag *graph.DAG) error {
+var _ graph.Transformer = &SecretTransformer{}
+
+func (c *SecretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	var secretVertices, noneRootVertices []graph.Vertex
 	secretVertices = ictrltypes.FindAll[*corev1.Secret](dag)
 	noneRootVertices = ictrltypes.FindAllNot[*appsv1alpha1.Cluster](dag)

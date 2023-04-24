@@ -24,6 +24,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -89,7 +90,7 @@ func isAllPVCBound(cli types2.ReadonlyClient,
 		pvc := corev1.PersistentVolumeClaim{}
 		// check pvc existence
 		if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
-			return false, err
+			return false, client.IgnoreNotFound(err)
 		}
 		if pvc.Status.Phase != corev1.ClaimBound {
 			return false, nil
@@ -100,6 +101,9 @@ func isAllPVCBound(cli types2.ReadonlyClient,
 
 // check volume snapshot available
 func isSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
+	if !viper.GetBool("VOLUMESNAPSHOT") {
+		return false
+	}
 	vsList := snapshotv1.VolumeSnapshotList{}
 	getVSErr := cli.List(ctx, &vsList)
 	return getVSErr == nil
@@ -130,38 +134,14 @@ func deleteSnapshot(cli types2.ReadonlyClient,
 
 // deleteBackup will delete all backup related resources created during horizontal scaling,
 func deleteBackup(ctx context.Context, cli types2.ReadonlyClient, clusterName string, componentName string) ([]client.Object, error) {
-
-	objs := make([]client.Object, 0)
-
 	ml := getBackupMatchingLabels(clusterName, componentName)
-
-	deleteBackupPolicy := func() error {
-		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
-		if err := cli.List(ctx, &backupPolicyList, ml); err != nil {
-			return client.IgnoreNotFound(err)
-		}
-		for _, backupPolicy := range backupPolicyList.Items {
-			objs = append(objs, &backupPolicy)
-		}
-		return nil
-	}
-
-	deleteRelatedBackups := func() error {
-		backupList := dataprotectionv1alpha1.BackupList{}
-		if err := cli.List(ctx, &backupList, ml); err != nil {
-			return client.IgnoreNotFound(err)
-		}
-		for _, backup := range backupList.Items {
-			objs = append(objs, &backup)
-		}
-		return nil
-	}
-
-	if err := deleteBackupPolicy(); err != nil {
+	backupList := dataprotectionv1alpha1.BackupList{}
+	if err := cli.List(ctx, &backupList, ml); err != nil {
 		return nil, err
 	}
-	if err := deleteRelatedBackups(); err != nil {
-		return nil, err
+	objs := make([]client.Object, 0)
+	for i := range backupList.Items {
+		objs = append(objs, &backupList.Items[i])
 	}
 	return objs, nil
 }

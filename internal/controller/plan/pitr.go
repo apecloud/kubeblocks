@@ -62,6 +62,7 @@ type PointInTimeRecoveryManager struct {
 
 const (
 	initContainerName = "pitr-for-pause"
+	backupVolumePATH  = "/backupdata"
 )
 
 // DoPITRPrepare prepares init container and pvc before point in time recovery
@@ -173,13 +174,19 @@ func (p *PointInTimeRecoveryManager) doPrepare(component *component.SynthesizedC
 	if err != nil {
 		return err
 	}
+	if latestBackup.Spec.BackupType == dpv1alpha1.BackupTypeSnapshot {
+		return p.doPrepareSnapshotBackup(component, latestBackup)
+	}
+	return nil
+}
 
+func (p *PointInTimeRecoveryManager) doPrepareSnapshotBackup(component *component.SynthesizedComponent, backup *dpv1alpha1.Backup) error {
 	vct := component.VolumeClaimTemplates[0]
 	snapshotAPIGroup := snapshotv1.GroupName
 	vct.Spec.DataSource = &corev1.TypedLocalObjectReference{
 		APIGroup: &snapshotAPIGroup,
 		Kind:     constant.VolumeSnapshotKind,
-		Name:     latestBackup.Name,
+		Name:     backup.Name,
 	}
 	component.VolumeClaimTemplates[0] = vct
 	return nil
@@ -231,7 +238,7 @@ func (p *PointInTimeRecoveryManager) getSortedBackups(reverse bool) ([]dpv1alpha
 
 // getLatestBaseBackup gets the latest baseBackup
 func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, error) {
-	// 1. sort backups by completed timestamp
+	// 1. sort reverse backups
 	backups, err := p.getSortedBackups(true)
 	if err != nil {
 		return nil, err
@@ -251,28 +258,6 @@ func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, 
 	}
 
 	return latestBackup, nil
-}
-
-func (p *PointInTimeRecoveryManager) getNextBackup() (*dpv1alpha1.Backup, error) {
-	// 1. sort backups by reverse completed timestamp
-	backups, err := p.getSortedBackups(false)
-	if err != nil {
-		return nil, err
-	}
-
-	// 2. get the next earliest backup object
-	var nextBackup *dpv1alpha1.Backup
-	for _, item := range backups {
-		if p.restoreTime.Before(item.Status.Manifests.BackupLog.StopTime) {
-			nextBackup = &item
-			break
-		}
-	}
-	if nextBackup == nil {
-		return nil, errors.New("can not found next earliest base backup")
-	}
-
-	return nextBackup, nil
 }
 
 // checkAndInit checks if cluster need to be restored, return value: true: need, false: no need
@@ -306,27 +291,19 @@ func (p *PointInTimeRecoveryManager) checkAndInit() (need bool, err error) {
 	return true, nil
 }
 
-func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) (string, string) {
+func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) string {
 	dataVolumeMount := "/data"
-	logVolumeMount := "/log"
-	tag := 0
 	// TODO: hack it because the mount path is not explicitly specified in cluster definition
 	for _, env := range spec.Env {
 		if env.Name == "VOLUME_DATA_DIR" {
 			dataVolumeMount = env.Value
-			tag++
-		} else if env.Name == "VOLUME_LOG_DIR" {
-			logVolumeMount = env.Value
-			tag++
-		}
-		if tag >= 2 {
 			break
 		}
 	}
-	return dataVolumeMount, logVolumeMount
+	return dataVolumeMount
 }
 
-func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupToolSpec, error) {
+func (p *PointInTimeRecoveryManager) getRecoveryInfo(componentName string) (*dpv1alpha1.BackupToolSpec, error) {
 	// get scripts from backup template
 	toolList := dpv1alpha1.BackupToolList{}
 	// TODO: The reference PITR backup tool needs a stronger reference relationship, for now use label references
@@ -341,6 +318,10 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupToolSp
 	if len(toolList.Items) == 0 {
 		return nil, errors.New("not support recovery because of non-existed pitr backupTool")
 	}
+	incrementalBackup, err := p.getIncrementalBackup(componentName)
+	if err != nil {
+		return nil, err
+	}
 	spec := &toolList.Items[0].Spec
 	timeFormat := time.RFC3339
 	envTimeEnvIdx := -1
@@ -354,16 +335,52 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupToolSp
 	if envTimeEnvIdx != -1 {
 		spec.Env[envTimeEnvIdx].Value = p.restoreTime.Time.UTC().Format(timeFormat)
 	}
-
+	backupDIR := incrementalBackup.Name
+	if incrementalBackup.Status.Manifests != nil && incrementalBackup.Status.Manifests.BackupTool != nil {
+		backupDIR = incrementalBackup.Status.Manifests.BackupTool.FilePath
+	}
+	headEnv := []corev1.EnvVar{
+		{Name: "BACKUP_DIR", Value: backupVolumePATH + "/" + backupDIR},
+		{Name: "BACKUP_NAME", Value: incrementalBackup.Name}}
+	spec.Env = append(headEnv, spec.Env...)
 	return spec, nil
+}
+
+func (p *PointInTimeRecoveryManager) getIncrementalBackup(componentName string) (*dpv1alpha1.Backup, error) {
+	incrementalBackupList := dpv1alpha1.BackupList{}
+	if err := p.Client.List(p.Ctx, &incrementalBackupList,
+		client.MatchingLabels{
+			constant.AppInstanceLabelKey:    p.sourceCluster,
+			constant.KBAppComponentLabelKey: componentName,
+			constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeIncremental),
+		}); err != nil {
+		return nil, err
+	}
+	if len(incrementalBackupList.Items) == 0 {
+		return nil, errors.New("not found incremental backups")
+	}
+	return &incrementalBackupList.Items[0], nil
+}
+
+func (p *PointInTimeRecoveryManager) getIncrementalPVC(componentName string) (*corev1.PersistentVolumeClaim, error) {
+	incrementalBackup, err := p.getIncrementalBackup(componentName)
+	if err != nil {
+		return nil, err
+	}
+	pvcKey := types.NamespacedName{
+		Name:      incrementalBackup.Status.PersistentVolumeClaimName,
+		Namespace: incrementalBackup.Namespace,
+	}
+	pvc := corev1.PersistentVolumeClaim{}
+	if err := p.Client.Get(p.Ctx, pvcKey, &pvc); err != nil {
+		return nil, err
+	}
+	return &pvc, nil
 }
 
 func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, err error) {
 	objs = make([]client.Object, 0)
-	recoveryInfo, err := p.getRecoveryInfo()
-	if err != nil {
-		return objs, err
-	}
+
 	for _, componentSpec := range p.Cluster.Spec.ComponentSpecs {
 		if len(componentSpec.VolumeClaimTemplates) == 0 {
 			continue
@@ -374,12 +391,6 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 			constant.AppInstanceLabelKey:    p.Cluster.Name,
 			constant.KBAppComponentLabelKey: componentSpec.Name,
 		}
-		sts := &appsv1.StatefulSet{}
-		sts.SetLabels(commonLabels)
-		vct := corev1.PersistentVolumeClaimTemplate{}
-		vct.Name = componentSpec.VolumeClaimTemplates[0].Name
-		vct.Spec = componentSpec.VolumeClaimTemplates[0].Spec.ToV1PersistentVolumeClaimSpec()
-
 		// get data dir pvc name
 		dataPVCList := corev1.PersistentVolumeClaimList{}
 		dataPVCLabels := map[string]string{
@@ -395,34 +406,28 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 		if len(dataPVCList.Items) == 0 {
 			return objs, errors.New("not found data pvc")
 		}
+		recoveryInfo, err := p.getRecoveryInfo(componentSpec.Name)
+		if err != nil {
+			return objs, err
+		}
+		incrementalPVC, err := p.getIncrementalPVC(componentSpec.Name)
+		if err != nil {
+			return objs, err
+		}
+		dataVolumeMount := getVolumeMount(recoveryInfo)
 		for i, dataPVC := range dataPVCList.Items {
 			if dataPVC.Status.Phase != corev1.ClaimBound {
 				return objs, errors.New("waiting PVC Bound")
-			}
-
-			nextBackup, err := p.getNextBackup()
-			if err != nil {
-				return objs, err
-			}
-			pitrPVCName := fmt.Sprintf("pitr-%s-%s-%d", p.Cluster.Name, componentSpec.Name, i)
-			pitrPVCKey := types.NamespacedName{
-				Namespace: p.namespace,
-				Name:      pitrPVCName,
-			}
-			pitrPVC, err := builder.BuildPVCFromSnapshot(sts, vct, pitrPVCKey, nextBackup.Name, nil)
-			if err != nil {
-				return objs, err
 			}
 			volumes := []corev1.Volume{
 				{Name: "data", VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.Name}}},
 				{Name: "log", VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pitrPVCName}}},
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: incrementalPVC.Name}}},
 			}
-			dataVolumeMount, logVolumeMount := getVolumeMount(recoveryInfo)
 			volumeMounts := []corev1.VolumeMount{
 				{Name: "data", MountPath: dataVolumeMount},
-				{Name: "log", MountPath: logVolumeMount},
+				{Name: "log", MountPath: backupVolumePATH},
 			}
 
 			// render the job cue template
@@ -449,7 +454,6 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 				objs = append(objs, logicJob)
 			}
 			// collect pvcs and jobs for later deletion
-			objs = append(objs, pitrPVC)
 			objs = append(objs, job)
 		}
 	}

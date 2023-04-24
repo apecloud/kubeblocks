@@ -26,8 +26,8 @@
 
 listen_addresses = '*'
 port = '5432'
-#archive_command = 'wal_dir=/pg/arcwal; [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); /bin/mkdir -p ${wal_dir}/$(date +%Y%m%d) && /usr/bin/lz4 -q -z %p > ${wal_dir}/$(date +%Y%m%d)/%f.lz4'
-#archive_mode = 'True'
+archive_command = 'wal_dir=/home/postgres/pgdata/pgroot/arcwal; wal_dir_today=${wal_dir}/$(date +%Y%m%d); [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); mkdir -p ${wal_dir_today} && gzip -kqc %p > ${wal_dir_today}/%f.gz'
+archive_mode = 'on'
 auto_explain.log_analyze = 'True'
 auto_explain.log_min_duration = '1s'
 auto_explain.log_nested_statements = 'True'
@@ -57,14 +57,22 @@ idle_in_transaction_session_timeout = '1h'
 listen_addresses = '0.0.0.0'
 log_autovacuum_min_duration = '1s'
 log_checkpoints = 'True'
+
+{{- block "logsBlock" . }}
+{{- if hasKey $.component "enabledLogs" }}
+{{- if mustHas "running" $.component.enabledLogs }}
+logging_collector = 'True'
 log_destination = 'csvlog'
 log_directory = 'log'
 log_filename = 'postgresql-%Y-%m-%d.log'
+{{ end -}}
+{{ end -}}
+{{ end -}}
+
 log_lock_waits = 'True'
 log_min_duration_statement = '100'
 log_replication_commands = 'True'
 log_statement = 'ddl'
-logging_collector = 'True'
 #maintenance_work_mem = '3952MB'
 max_connections = '{{ $max_connections }}'
 max_locks_per_transaction = '128'

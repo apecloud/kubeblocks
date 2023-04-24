@@ -19,19 +19,18 @@ package lifecycle
 import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// ownershipTransformer add finalizer to all none cluster objects
-type ownershipTransformer struct {
-	finalizer string
-}
+// OwnershipTransformer add finalizer to all none cluster objects
+type OwnershipTransformer struct{}
 
-func (f *ownershipTransformer) Transform(dag *graph.DAG) error {
+var _ graph.Transformer = &OwnershipTransformer{}
+
+func (f *OwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	rootVertex, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err

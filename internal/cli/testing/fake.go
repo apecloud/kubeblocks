@@ -33,6 +33,7 @@ import (
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 const (
@@ -51,6 +52,10 @@ const (
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupToolName      = "fake-backup-tool"
+)
+
+var (
+	ExtraComponentDefName = fmt.Sprintf("%s-%d", ComponentDefName, 1)
 )
 
 func GetRandomStr() string {
@@ -243,27 +248,47 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 				PasswordConfig: appsv1alpha1.PasswordConfig{},
 				Accounts:       []appsv1alpha1.SystemAccountConfig{},
 			},
+			ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
+				{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:        "mysql-consensusset-config",
+						TemplateRef: "mysql8.0-config-template",
+						Namespace:   Namespace,
+						VolumeName:  "mysql-config",
+					},
+					ConfigConstraintRef: "mysql8.0-config-constraints",
+				},
+			},
 		},
 		{
-			Name:          fmt.Sprintf("%s-%d", ComponentDefName, 1),
+			Name:          ExtraComponentDefName,
 			CharacterType: "mysql",
+			ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
+				{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:        "mysql-consensusset-config",
+						TemplateRef: "mysql8.0-config-template",
+						Namespace:   Namespace,
+						VolumeName:  "mysql-config",
+					},
+					ConfigConstraintRef: "mysql8.0-config-constraints",
+				},
+			},
 		},
 	}
 	return clusterDef
 }
 
-func FakeComponentClassDef(clusterDef *appsv1alpha1.ClusterDefinition, def []byte) *corev1.ConfigMapList {
-	result := &corev1.ConfigMapList{}
-	cm := &corev1.ConfigMap{}
-	cm.Name = fmt.Sprintf("fake-kubeblocks-classes-%s", ComponentName)
-	cm.SetLabels(map[string]string{
-		constant.KBAppComponentDefRefLabelKey: ComponentDefName,
-		types.ClassProviderLabelKey:           "kubeblocks",
-		constant.ClusterDefLabelKey:           clusterDef.Name,
-	})
-	cm.Data = map[string]string{"families-20230223162700": string(def)}
-	result.Items = append(result.Items, *cm)
-	return result
+func FakeComponentClassDef(name string, clusterDefRef string, componentDefRef string) *appsv1alpha1.ComponentClassDefinition {
+	constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+		AddConstraints(testapps.GeneralResourceConstraint).
+		GetObject()
+
+	componentClassDefinition := testapps.NewComponentClassDefinitionFactory(name, clusterDefRef, componentDefRef).
+		AddClasses(constraint.Name, []string{testapps.Class1c1gName, testapps.Class2c4gName}).
+		GetObject()
+
+	return componentClassDefinition
 }
 
 func FakeClusterVersion() *appsv1alpha1.ClusterVersion {
@@ -472,4 +497,33 @@ func FakeAddon(name string) *extensionsv1alpha1.Addon {
 	}
 	addon.SetCreationTimestamp(metav1.Now())
 	return addon
+}
+
+func FakeConfigMap(cmName string) *corev1.ConfigMap {
+	cm := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: Namespace,
+		},
+		Data: map[string]string{
+			"fake": "fake",
+		},
+	}
+	return cm
+}
+
+func FakeConfigConstraint(ccName string) *appsv1alpha1.ConfigConstraint {
+	cm := &appsv1alpha1.ConfigConstraint{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ccName,
+		},
+		Spec: appsv1alpha1.ConfigConstraintSpec{
+			FormatterConfig: &appsv1alpha1.FormatterConfig{},
+		},
+	}
+	return cm
 }

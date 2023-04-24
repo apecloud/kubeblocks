@@ -17,6 +17,10 @@ limitations under the License.
 package apps
 
 import (
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
@@ -45,5 +49,19 @@ func (factory *MockBackupFactory) SetBackupType(backupType dataprotectionv1alpha
 
 func (factory *MockBackupFactory) SetLabels(labels map[string]string) *MockBackupFactory {
 	factory.get().SetLabels(labels)
+	return factory
+}
+
+func (factory *MockBackupFactory) SetBackLog(startTime, stopTime time.Time) *MockBackupFactory {
+	manifests := factory.get().Status.Manifests
+	if manifests == nil {
+		manifests = &dataprotectionv1alpha1.ManifestsStatus{}
+	}
+	if manifests.BackupLog == nil {
+		manifests.BackupLog = &dataprotectionv1alpha1.BackupLogStatus{}
+	}
+	manifests.BackupLog.StartTime = &metav1.Time{Time: startTime}
+	manifests.BackupLog.StopTime = &metav1.Time{Time: stopTime}
+	factory.get().Status.Manifests = manifests
 	return factory
 }

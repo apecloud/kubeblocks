@@ -22,9 +22,12 @@ import (
 	"math"
 
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) (interface{}, error) {
@@ -263,4 +266,24 @@ func getCertFile() string {
 // getKeyFile for general builtIn
 func getKeyFile() string {
 	return builder.MountPath + "/" + builder.KeyName
+}
+
+// BuiltInCustomFunctions builds a map of customized functions for KubeBlocks
+func BuiltInCustomFunctions(c *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []client.Object) *gotemplate.BuiltInObjectsFunc {
+	return &gotemplate.BuiltInObjectsFunc{
+		builtInMysqlCalBufferFunctionName:            calDBPoolSize,
+		builtInGetVolumeFunctionName:                 getVolumeMountPathByName,
+		builtInGetPvcFunctionName:                    getPVCByName,
+		builtInGetEnvFunctionName:                    wrapGetEnvByName(c, component, localObjs),
+		builtInGetPortFunctionName:                   getPortByName,
+		builtInGetArgFunctionName:                    getArgByName,
+		builtInGetContainerFunctionName:              getPodContainerByName,
+		builtInGetContainerCPUFunctionName:           getContainerCPU,
+		builtInGetContainerMemoryFunctionName:        getContainerMemory,
+		builtInGetContainerRequestMemoryFunctionName: getContainerRequestMemory,
+		builtInGetCAFile:                             getCAFile,
+		builtInGetCertFile:                           getCertFile,
+		builtInGetKeyFile:                            getKeyFile,
+	}
+
 }

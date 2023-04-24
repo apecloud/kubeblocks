@@ -19,31 +19,31 @@ package lifecycle
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
-// clusterCredentialTransformer creates the connection credential secret
-type clusterCredentialTransformer struct {
-	cc clusterRefResources
-}
+// ClusterCredentialTransformer creates the connection credential secret
+type ClusterCredentialTransformer struct{}
 
-func (c *clusterCredentialTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
+var _ graph.Transformer = &ClusterCredentialTransformer{}
 
-	cluster, _ := rootVertex.Obj.(*appsv1alpha1.Cluster)
+func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	cluster := transCtx.Cluster
 	if cluster.IsDeleting() {
 		return nil
 	}
 
+	root, err := ictrltypes.FindRootVertex(dag)
+	if err != nil {
+		return err
+	}
+
 	var secret *corev1.Secret
-	for _, compDef := range c.cc.cd.Spec.ComponentDefs {
+	for _, compDef := range transCtx.ClusterDef.Spec.ComponentDefs {
 		if compDef.Service == nil {
 			continue
 		}
@@ -53,14 +53,14 @@ func (c *clusterCredentialTransformer) Transform(dag *graph.DAG) error {
 				{Spec: compDef.Service.ToSVCSpec()},
 			},
 		}
-		if secret, err = builder.BuildConnCredentialLow(&c.cc.cd, cluster, component); err != nil {
+		if secret, err = builder.BuildConnCredentialLow(transCtx.ClusterDef, cluster, component); err != nil {
 			return err
 		}
 		break
 	}
 
 	if secret != nil {
-		ictrltypes.LifecycleObjectCreate(dag, secret, rootVertex)
+		ictrltypes.LifecycleObjectCreate(dag, secret, root)
 	}
 	return nil
 }

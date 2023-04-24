@@ -27,35 +27,37 @@ import (
 	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// componentTransformer transforms all components to a K8s objects DAG
-// TODO: remove cli and ctx, we should read all objects needed, and then do pure objects computation
-// TODO: only replication set left
-type componentTransformer struct {
-	cc  clusterRefResources
-	cli client.Client
-	ctx ictrlutil.RequestCtx
+// ComponentTransformer transforms all components to a K8s objects DAG
+type ComponentTransformer struct {
+	client.Client
 }
 
-func (c *componentTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	origCluster, _ := rootVertex.ObjCopy.(*appsv1alpha1.Cluster)
-	cluster, _ := rootVertex.Obj.(*appsv1alpha1.Cluster)
+var _ graph.Transformer = &ComponentTransformer{}
 
-	// return fast when cluster is deleting
+func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	origCluster := transCtx.OrigCluster
+	cluster := transCtx.Cluster
 	if origCluster.IsDeleting() {
 		return nil
 	}
 
+	clusterDef := transCtx.ClusterDef
+	clusterVer := transCtx.ClusterVer
+	reqCtx := ictrlutil.RequestCtx{
+		Ctx:      transCtx.Context,
+		Log:      transCtx.Logger,
+		Recorder: transCtx.EventRecorder,
+	}
+
+	var err error
 	dags4Component := make([]*graph.DAG, 0)
 	if cluster.IsStatusUpdating() {
 		// status existed components
-		err = c.transform4StatusUpdate(cluster, &dags4Component)
+		err = c.transform4StatusUpdate(reqCtx, clusterDef, clusterVer, cluster, &dags4Component)
 	} else {
 		// create new components or update existed components
-		err = c.transform4SpecUpdate(cluster, &dags4Component)
+		err = c.transform4SpecUpdate(reqCtx, clusterDef, clusterVer, cluster, &dags4Component)
 	}
 	if err != nil {
 		return err
@@ -76,7 +78,8 @@ func (c *componentTransformer) Transform(dag *graph.DAG) error {
 	return nil
 }
 
-func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
+func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
 	compSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
 	for _, spec := range cluster.Spec.ComponentSpecs {
 		compSpecMap[spec.Name] = &spec
@@ -91,11 +94,11 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 
 	for compName := range createSet {
 		dag := graph.NewDAG()
-		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
+		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
-		if err := comp.Create(c.ctx, c.cli); err != nil {
+		if err := comp.Create(reqCtx, c.Client); err != nil {
 			return err
 		}
 		*dags = append(*dags, dag)
@@ -103,12 +106,12 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 
 	for compName := range deleteSet {
 		dag := graph.NewDAG()
-		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
+		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
 		if comp != nil {
-			if err := comp.Delete(c.ctx, c.cli); err != nil {
+			if err := comp.Delete(reqCtx, c.Client); err != nil {
 				return err
 			}
 		}
@@ -117,11 +120,11 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 
 	for compName := range updateSet {
 		dag := graph.NewDAG()
-		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compName, dag)
+		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
-		if err := comp.Update(c.ctx, c.cli); err != nil {
+		if err := comp.Update(reqCtx, c.Client); err != nil {
 			return err
 		}
 		*dags = append(*dags, dag)
@@ -130,14 +133,15 @@ func (c *componentTransformer) transform4SpecUpdate(cluster *appsv1alpha1.Cluste
 	return nil
 }
 
-func (c *componentTransformer) transform4StatusUpdate(cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
+func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		dag := graph.NewDAG()
-		comp, err := components.NewComponent(c.ctx, c.cli, &c.cc.cd, &c.cc.cv, cluster, compSpec.Name, dag)
+		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compSpec.Name, dag)
 		if err != nil {
 			return err
 		}
-		if err := comp.Status(c.ctx, c.cli); err != nil {
+		if err := comp.Status(reqCtx, c.Client); err != nil {
 			return err
 		}
 		*dags = append(*dags, dag)

@@ -1608,7 +1608,7 @@ grafana:
 snapshot-controller:
   ## @param snapshot-controller.enabled -- Enable snapshot-controller chart.
   ##
-  enabled: false
+  enabled: true
   ## @param snapshot-controller.replicaCount -- Number of replicas to deploy.
   ##
   replicaCount: 1
@@ -1624,6 +1624,13 @@ snapshot-controller:
       operator: Equal
       value: "true"
       effect: NoSchedule
+
+  volumeSnapshotClasses:
+    - name: default-vsc
+      annotations:
+        snapshot.storage.kubernetes.io/is-default-class: "true"
+      driver: hostpath.csi.k8s.io
+      deletionPolicy: Delete
 
   affinity:
     nodeAffinity:
@@ -1662,7 +1669,7 @@ csi-s3:
   storageClass:
     create: true
     singleBucket: ""
-    mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region cn-northwest-1"
+    mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666"
 
 csi-oss:
   enabled: false

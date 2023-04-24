@@ -45,6 +45,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("DataProtection", func() {
@@ -182,36 +183,6 @@ var _ = Describe("DataProtection", func() {
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql (deleted)"))
 	})
 
-	It("delete-restore", func() {
-		By("test delete-restore cmd")
-		cmd := NewDeleteRestoreCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-
-		args := []string{"test1"}
-		clusterLabel := util.BuildLabelSelectorByNames("", args)
-
-		By("test delete-restore with cluster")
-		o := delete.NewDeleteOptions(tf, streams, types.BackupGVR())
-		Expect(completeForDeleteRestore(o, args)).Should(HaveOccurred())
-
-		By("test delete-restore with cluster and force")
-		o.Force = true
-		Expect(completeForDeleteRestore(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
-
-		By("test delete-restore with cluster and force and labels")
-		o.Force = true
-		customLabel := "test=test"
-		o.LabelSelector = customLabel
-		Expect(completeForDeleteRestore(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == customLabel+","+clusterLabel).Should(BeTrue())
-	})
-
-	It("list-restore", func() {
-		cmd := NewListRestoreCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-	})
-
 	It("restore", func() {
 		timestamp := time.Now().Format("20060102150405")
 		backupName := "backup-test-" + timestamp
@@ -271,37 +242,30 @@ var _ = Describe("DataProtection", func() {
 		}
 		cluster.SetLabels(clusterDefLabel)
 		backupPolicy := testing.FakeBackupPolicy("backPolicy", cluster.Name)
-		backup := testing.FakeBackup("backup-base")
+		backupTypeMeta := testing.FakeBackup("backup-none").TypeMeta
+		backupLabels := map[string]string{
+			constant.AppInstanceLabelKey:    clusterName,
+			constant.KBAppComponentLabelKey: "test",
+		}
+		now := metav1.Now()
+		baseBackup := testapps.NewBackupFactory(testing.Namespace, "backup-base").
+			SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
+			SetBackLog(now.Add(-time.Minute), now.Add(-time.Second)).
+			SetLabels(backupLabels).GetObject()
+		baseBackup.TypeMeta = backupTypeMeta
+		baseBackup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+		incrBackup := testapps.NewBackupFactory(testing.Namespace, backupName).
+			SetBackupType(dataprotectionv1alpha1.BackupTypeIncremental).
+			SetBackLog(now.Add(-time.Minute), now.Add(time.Minute)).
+			SetLabels(backupLabels).GetObject()
+		incrBackup.TypeMeta = backupTypeMeta
 
 		pods := testing.FakePods(1, testing.Namespace, clusterName)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy, backup)
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy, baseBackup, incrBackup)
 		tf.Client = &clientfake.RESTClient{}
-		// create backup
-		cmd := NewCreateBackupCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-		_ = cmd.Flags().Set("backup-type", "snapshot")
-		_ = cmd.Flags().Set("backup-name", backupName)
-		cmd.Run(nil, []string{clusterName})
 
 		By("restore new cluster from source cluster which is not deleted")
-		// mock backup is ok
-		now := metav1.Now()
-		baseManifests := map[string]any{
-			"backupLog": map[string]any{
-				"startTime": now.Add(-time.Minute).Format(time.RFC3339),
-				"stopTime":  now.Add(-time.Second).Format(time.RFC3339),
-			},
-		}
-		mockBackupInfo(tf.FakeDynamicClient, backup.Name, clusterName, baseManifests)
-
-		manifests := map[string]any{
-			"backupLog": map[string]any{
-				"startTime": now.Add(-time.Minute).Format(time.RFC3339),
-				"stopTime":  now.Add(time.Minute).Format(time.RFC3339),
-			},
-		}
-		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName, manifests)
 		cmdRestore := NewCreateRestoreCmd(tf, streams)
 		Expect(cmdRestore != nil).To(BeTrue())
 		_ = cmdRestore.Flags().Set("restore-to-time", util.TimeFormatWithDuration(&now, time.Second))

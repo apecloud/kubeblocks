@@ -170,11 +170,11 @@ type ClusterComponentSpec struct {
 	// +optional
 	SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
 
-	// tls should be enabled or not
+	// Enable or disable TLS certs.
 	// +optional
 	TLS bool `json:"tls,omitempty"`
 
-	// issuer who provides tls certs
+	// issuer defines provider context for TLS certs.
 	// required when TLS enabled
 	// +optional
 	Issuer *Issuer `json:"issuer,omitempty"`
@@ -376,7 +376,7 @@ type Issuer struct {
 	// +kubebuilder:validation:Required
 	Name IssuerName `json:"name"`
 
-	// secretRef, Tls certs Secret reference
+	// secretRef, TLS certs Secret reference
 	// required when from is UserProvided
 	// +optional
 	SecretRef *TLSSecretRef `json:"secretRef,omitempty"`
@@ -484,8 +484,6 @@ func (r Cluster) IsUpdating() bool {
 
 func (r Cluster) IsStatusUpdating() bool {
 	return !r.IsDeleting() && !r.IsUpdating()
-	// return r.Status.ObservedGeneration == r.Generation &&
-	//	slices.Contains(GetClusterTerminalPhases(), r.Status.Phase)
 }
 
 // GetComponentByName gets component by name.

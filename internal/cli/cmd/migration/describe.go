@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -147,7 +148,7 @@ func (o *describeOptions) describeMigration(name string) error {
 	switch o.Task.Spec.TaskType {
 	case v1alpha1.InitializationAndCdc, v1alpha1.CDC:
 		// Cdc Detail
-		showCdc(o.Pods, o.Out)
+		showCdc(o.StatefulSets, o.Pods, o.Out)
 
 		// Cdc Metrics
 		showCdcMetrics(o.Task, o.Out)
@@ -181,6 +182,9 @@ func getMigrationObjects(o *describeOptions, taskName string) (*v1alpha1.Migrati
 		return nil, err
 	}
 	if obj.Pods, err = o.client.CoreV1().Pods(o.namespace).List(context.Background(), listOpts()); err != nil {
+		return nil, err
+	}
+	if obj.StatefulSets, err = o.client.AppsV1().StatefulSets(o.namespace).List(context.Background(), listOpts()); err != nil {
 		return nil, err
 	}
 	return obj, nil
@@ -249,8 +253,8 @@ func showInitialization(task *v1alpha1.MigrationTask, template *v1alpha1.Migrati
 	tbl.Print()
 }
 
-func showCdc(pods *v1.PodList, out io.Writer) {
-	if len(pods.Items) == 0 {
+func showCdc(statefulSets *appv1.StatefulSetList, pods *v1.PodList, out io.Writer) {
+	if len(pods.Items) == 0 || len(statefulSets.Items) == 0 {
 		return
 	}
 	tbl := newTbl(out, "\nCdc:", "NAMESPACE", "STATUS", "CREATED_TIME", "START-TIME")
@@ -258,7 +262,7 @@ func showCdc(pods *v1.PodList, out io.Writer) {
 		if pod.Annotations[MigrationTaskStepAnnotation] != v1alpha1.StepCdc.String() {
 			continue
 		}
-		tbl.AddRow(pod.Namespace, pod.Status.Phase, util.TimeFormatWithDuration(&pod.CreationTimestamp, time.Second), util.TimeFormatWithDuration(pod.Status.StartTime, time.Second))
+		tbl.AddRow(pod.Namespace, getCdcStatus(&statefulSets.Items[0], &pod), util.TimeFormatWithDuration(&pod.CreationTimestamp, time.Second), util.TimeFormatWithDuration(pod.Status.StartTime, time.Second))
 	}
 	tbl.Print()
 }
@@ -271,6 +275,7 @@ func showCdcMetrics(task *v1alpha1.MigrationTask, out io.Writer) {
 	for mKey := range task.Status.Cdc.Metrics {
 		arr = append(arr, mKey)
 	}
+	sort.Strings(arr)
 	tbl := newTbl(out, "\nCdc Metrics:")
 	for _, k := range arr {
 		tbl.AddRow(k, task.Status.Cdc.Metrics[k])
@@ -283,5 +288,18 @@ func getJobStatus(conditions []batchv1.JobCondition) string {
 		return "-"
 	} else {
 		return string(conditions[len(conditions)-1].Type)
+	}
+}
+
+func getCdcStatus(statefulSet *appv1.StatefulSet, cdcPod *v1.Pod) v1.PodPhase {
+	if cdcPod.Status.Phase == v1.PodRunning &&
+		statefulSet.Status.Replicas > statefulSet.Status.AvailableReplicas {
+		if time.Now().Unix()-statefulSet.CreationTimestamp.Time.Unix() < 10*60 {
+			return v1.PodPending
+		} else {
+			return v1.PodFailed
+		}
+	} else {
+		return cdcPod.Status.Phase
 	}
 }

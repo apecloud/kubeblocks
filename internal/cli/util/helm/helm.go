@@ -66,6 +66,7 @@ type InstallOpts struct {
 	ValueOpts       *values.Options
 	Timeout         time.Duration
 	Atomic          bool
+	DisableHooks    bool
 }
 
 type Option func(*cli.EnvSettings)
@@ -282,6 +283,7 @@ func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 	client := action.NewUninstall(cfg)
 	client.Wait = i.Wait
 	client.Timeout = defaultTimeout
+	client.DisableHooks = i.DisableHooks
 
 	// Create context and prepare the handle of SIGTERM
 	ctx := context.Background()

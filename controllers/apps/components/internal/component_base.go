@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -363,11 +364,15 @@ func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isR
 			// check if the role probe timed out when component phase is not Running but all pods of component are ready.
 			c.ComponentSet.HandleProbeTimeoutWhenPodsReady(status, pods)
 		} else {
-			//// if no operation is running in cluster or failed pod timed out,
-			//// means the component is Failed or Abnormal.
-			// if slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), c.Cluster.Status.Phase) || hasFailedPodTimedOut {
-			// TODO(refactor): should review and check this pre-condition carefully.
+			// if there is no running operation in cluster or failed pod timed-out, that means the component is Failed or Abnormal.
 			status.Message = timedOutPodStatusMessage
+			// TODO(refactor): should review and check this condition carefully.
+			//// clusterUpRunning checks if the cluster is up running, includes the partially running.
+			// clusterUpRunning := func(cluster *appsv1alpha1.Cluster) bool {
+			//	return cluster.Status.ObservedGeneration != cluster.Generation &&
+			//		slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), cluster.Status.Phase)
+			// }
+			// if clusterUpRunning(c.Cluster) || hasFailedPodTimedOut {
 			if hasFailedPodTimedOut {
 				phase, statusMessage, err := c.ComponentSet.GetPhaseWhenPodsNotReady(ctx, c.GetName())
 				if err != nil {
@@ -509,8 +514,9 @@ func ownedKinds() []client.ObjectList {
 		&corev1.ServiceList{},
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
-		&corev1.PersistentVolumeClaimList{},
+		&corev1.PersistentVolumeClaimList{}, // TODO(merge): remove it?
 		&policyv1.PodDisruptionBudgetList{},
+		&dataprotectionv1alpha1.BackupPolicyList{},
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -42,11 +43,13 @@ import (
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -696,4 +699,66 @@ func buildLabelSelectors(prefix string, key string, names []string) string {
 	} else {
 		return prefix + "," + label
 	}
+}
+
+// NewOpsRequestForReconfiguring returns a new common OpsRequest for Reconfiguring operation
+func NewOpsRequestForReconfiguring(opsName, namespace, clusterName string) *appsv1alpha1.OpsRequest {
+	return &appsv1alpha1.OpsRequest{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.AppsAPIGroup, types.AppsAPIVersion),
+			Kind:       types.KindOps,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opsName,
+			Namespace: namespace,
+		},
+		Spec: appsv1alpha1.OpsRequestSpec{
+			ClusterRef:  clusterName,
+			Type:        appsv1alpha1.ReconfiguringType,
+			Reconfigure: &appsv1alpha1.Reconfigure{},
+		},
+	}
+}
+func ConvertObjToUnstructured(obj any) (*unstructured.Unstructured, error) {
+	var (
+		contentBytes    []byte
+		err             error
+		unstructuredObj = &unstructured.Unstructured{}
+	)
+
+	if contentBytes, err = json.Marshal(obj); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(contentBytes, unstructuredObj); err != nil {
+		return nil, err
+	}
+	return unstructuredObj, nil
+}
+
+func CreateResourceIfAbsent(
+	dynamic dynamic.Interface,
+	gvr schema.GroupVersionResource,
+	namespace string,
+	unstructuredObj *unstructured.Unstructured) error {
+	objectName, isFound, err := unstructured.NestedString(unstructuredObj.Object, "metadata", "name")
+	if !isFound || err != nil {
+		return err
+	}
+	objectByte, err := json.Marshal(unstructuredObj)
+	if err != nil {
+		return err
+	}
+	if _, err = dynamic.Resource(gvr).Namespace(namespace).Patch(
+		context.TODO(), objectName, k8sapitypes.MergePatchType,
+		objectByte, metav1.PatchOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			if _, err = dynamic.Resource(gvr).Namespace(namespace).Create(
+				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
 }

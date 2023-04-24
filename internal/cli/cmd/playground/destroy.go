@@ -55,6 +55,10 @@ var (
 type destroyOptions struct {
 	genericclioptions.IOStreams
 	baseOptions
+
+	// purge resources, before destroy kubernetes cluster we should delete cluster and
+	// uninstall KubeBlocks
+	purge bool
 }
 
 func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
@@ -70,6 +74,9 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 			util.CheckErr(o.destroy())
 		},
 	}
+
+	cmd.Flags().BoolVar(&o.purge, "purge", true, "Purge all resources before destroy kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks.")
+
 	return cmd
 }
 
@@ -121,10 +128,8 @@ func (o *destroyOptions) destroyLocal() error {
 func (o *destroyOptions) destroyCloud() error {
 	var err error
 
-	// start to destroy cluster
-	printer.Warning(o.Out, `This action will uninstall KubeBlocks and delete the kubernetes cluster,
-  there may be residual resources, please confirm and manually clean up related
-  resources after this action.
+	printer.Warning(o.Out, `This action will destroy the kubernetes cluster, there may be residual resources, 
+  please confirm and manually clean up related resources after this action.
 
 `)
 
@@ -186,6 +191,11 @@ func (o *destroyOptions) destroyCloud() error {
 
 func (o *destroyOptions) deleteClustersAndUninstallKB() error {
 	var err error
+
+	if !o.purge {
+		klog.V(1).Infof("Skip to delete all clusters created by KubeBlocks and uninstall KubeBlocks")
+		return nil
+	}
 
 	if o.prevCluster.KubeConfig == "" {
 		fmt.Fprintf(o.Out, "No kubeconfig found for kubernetes cluster %s in %s \n",

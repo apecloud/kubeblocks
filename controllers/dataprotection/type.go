@@ -40,8 +40,6 @@ const (
 
 	dataProtectionBackupTargetPodKey          = "dataprotection.kubeblocks.io/target-pod-name"
 	dataProtectionAnnotationCreateByPolicyKey = "dataprotection.kubeblocks.io/created-by-policy"
-	// error status
-	errorJobFailed = "JobFailed"
 
 	// the key of persistentVolumeTemplate in the configmap.
 	persistentVolumeTemplateKey = "persistentVolume"
@@ -68,4 +66,5 @@ type backupPolicyOptions struct {
 	BackupType       string          `json:"backupType"`
 	TTL              metav1.Duration `json:"ttl,omitempty"`
 	ServiceAccount   string          `json:"serviceAccount"`
+	Image            string          `json:"image"`
 }

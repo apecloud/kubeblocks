@@ -1,0 +1,16 @@
+- name: test
+  componentDefRef: mysql
+  monitor: true
+  enabledLogs: [error, slow]
+  replicas: 1
+  classDefRef:
+    class: class-not-exists
+  volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        volumeMode: Filesystem

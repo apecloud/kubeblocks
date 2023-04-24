@@ -22,6 +22,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,10 +56,12 @@ const (
 // default reconcile requeue after duration
 var requeueDuration = time.Millisecond * 100
 
-type clusterRefResources struct {
-	cd appsv1alpha1.ClusterDefinition
-	cv appsv1alpha1.ClusterVersion
+type gvkName struct {
+	gvk      schema.GroupVersionKind
+	ns, name string
 }
+
+type clusterSnapshot map[gvkName]client.Object
 
 type RequeueError interface {
 	RequeueAfter() time.Duration

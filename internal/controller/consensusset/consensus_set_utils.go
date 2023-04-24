@@ -17,10 +17,15 @@ limitations under the License.
 package consensusset
 
 import (
+	"errors"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"sort"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/internal/controller/model"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -42,6 +47,201 @@ const (
 	roleFollower consensusRole = "Follower"
 	roleLearner  consensusRole = "Learner"
 )
+
+const (
+	leaderPriority            = 1 << 5
+	followerReadWritePriority = 1 << 4
+	followerReadonlyPriority  = 1 << 3
+	followerNonePriority      = 1 << 2
+	learnerPriority           = 1 << 1
+	emptyPriority             = 1 << 0
+	// unknownPriority           = 0
+)
+
+// SortPods sorts pods by their role priority
+func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
+	// make a Serial pod list,
+	// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
+	sort.SliceStable(pods, func(i, j int) bool {
+		roleI := pods[i].Labels[constant.RoleLabelKey]
+		roleJ := pods[j].Labels[constant.RoleLabelKey]
+
+		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
+			_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
+			_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
+			return ordinal1 < ordinal2
+		}
+
+		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
+	})
+}
+
+// generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
+func generateConsensusUpdatePlan(stsObj *appsv1.StatefulSet, pods []corev1.Pod, set workloads.ConsensusSet, dag *graph.DAG) *Plan {
+	plan := &Plan{}
+	plan.Start = &Step{}
+	plan.WalkFunc = func(obj interface{}) (bool, error) {
+		pod, ok := obj.(corev1.Pod)
+		if !ok {
+			return false, errors.New("wrong type: obj not Pod")
+		}
+
+		// if DeletionTimestamp is not nil, it is terminating.
+		if pod.DeletionTimestamp != nil {
+			return true, nil
+		}
+
+		// if pod is the latest version, we do nothing
+		if intctrlutil.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
+			// wait until ready
+			return !intctrlutil.PodIsReadyWithLabel(pod), nil
+		}
+
+		// delete the pod to trigger associate StatefulSet to re-create it
+		root, err := model.FindRootVertex(dag)
+		if err != nil {
+			return false, err
+		}
+		vertex := model.ObjectVertex{Obj: &pod, Action: model.ActionPtr(model.DELETE)}
+		dag.AddVertex(vertex)
+		dag.Connect(root, vertex)
+
+		return true, nil
+	}
+
+	rolePriorityMap := ComposeRolePriorityMap(set)
+	SortPods(pods, rolePriorityMap)
+
+	// generate plan by UpdateStrategy
+	switch set.Spec.UpdateStrategy {
+	case workloads.SerialUpdateStrategy:
+		generateConsensusSerialPlan(plan, pods)
+	case workloads.ParallelUpdateStrategy:
+		generateConsensusParallelPlan(plan, pods)
+	case workloads.BestEffortParallelUpdateStrategy:
+		generateConsensusBestEffortParallelPlan(plan, pods, rolePriorityMap)
+	}
+
+	return plan
+}
+
+// unknown & empty & learner & 1/2 followers -> 1/2 followers -> leader
+func generateConsensusBestEffortParallelPlan(plan *Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	// append unknown, empty and learner
+	index := 0
+	for _, pod := range pods {
+		role := pod.Labels[constant.RoleLabelKey]
+		if rolePriorityMap[role] <= learnerPriority {
+			nextStep := &Step{}
+			nextStep.Obj = pod
+			start.NextSteps = append(start.NextSteps, nextStep)
+			index++
+		}
+	}
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append 1/2 followers
+	podList := pods[index:]
+	followerCount := 0
+	for _, pod := range podList {
+		if rolePriorityMap[pod.Labels[constant.RoleLabelKey]] < leaderPriority {
+			followerCount++
+		}
+	}
+	end := followerCount / 2
+	for i := 0; i < end; i++ {
+		nextStep := &Step{}
+		nextStep.Obj = podList[i]
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append the other 1/2 followers
+	podList = podList[end:]
+	end = followerCount - end
+	for i := 0; i < end; i++ {
+		nextStep := &Step{}
+		nextStep.Obj = podList[i]
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append leader
+	podList = podList[end:]
+	for _, pod := range podList {
+		nextStep := &Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+}
+
+// unknown & empty & leader & followers & learner
+func generateConsensusParallelPlan(plan *Plan, pods []corev1.Pod) {
+	start := plan.Start
+	for _, pod := range pods {
+		nextStep := &Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+}
+
+// unknown -> empty -> learner -> followers(none->readonly->readwrite) -> leader
+func generateConsensusSerialPlan(plan *Plan, pods []corev1.Pod) {
+	start := plan.Start
+	for _, pod := range pods {
+		nextStep := &Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+		start = nextStep
+	}
+}
+
+// ComposeRolePriorityMap generates a priority map based on roles.
+func ComposeRolePriorityMap(set workloads.ConsensusSet) map[string]int {
+	rolePriorityMap := make(map[string]int, 0)
+	rolePriorityMap[""] = emptyPriority
+	rolePriorityMap[set.Spec.Leader.Name] = leaderPriority
+	if set.Spec.Learner != nil {
+		rolePriorityMap[set.Spec.Learner.Name] = learnerPriority
+	}
+	for _, follower := range set.Spec.Followers {
+		switch follower.AccessMode {
+		case workloads.NoneMode:
+			rolePriorityMap[follower.Name] = followerNonePriority
+		case workloads.ReadonlyMode:
+			rolePriorityMap[follower.Name] = followerReadonlyPriority
+		case workloads.ReadWriteMode:
+			rolePriorityMap[follower.Name] = followerReadWritePriority
+		}
+	}
+
+	return rolePriorityMap
+}
+
+// updateConsensusSetRoleLabel updates pod role label when internal container role changed
+func updateConsensusSetRoleLabel(cli client.Client,
+	reqCtx intctrlutil.RequestCtx,
+	set workloads.ConsensusSet,
+	pod *corev1.Pod, role string) error {
+	ctx := reqCtx.Ctx
+	roleMap := composeConsensusRoleMap(set)
+	// role not defined in CR, ignore it
+	if _, ok := roleMap[role]; !ok {
+		return nil
+	}
+
+	// update pod role label
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Labels[model.RoleLabelKey] = role
+	pod.Labels[model.ConsensusSetAccessModeLabelKey] = string(roleMap[role].accessMode)
+	return cli.Patch(ctx, pod, patch)
+}
 
 func putConsensusMemberExt(roleMap map[string]consensusMemberExt, name string, role consensusRole, accessMode workloads.AccessMode) {
 	if roleMap == nil {

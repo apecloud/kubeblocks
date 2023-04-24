@@ -101,9 +101,17 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			&consensusset.ObjectGenerationTransformer{},
 			// handle status
 			&consensusset.CSSetStatusTransformer{},
+			// handle UpdateStrategy
+			&consensusset.UpdateStrategyTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()
+
+	// TODO: define error categories in Build stage and handle them here like this:
+	// switch errBuild.(type) {
+	// case NOTFOUND:
+	// case ALREADYEXISY:
+	// }
 
 	// Execute stage
 	// errBuild not nil means build stage partial success or validation error

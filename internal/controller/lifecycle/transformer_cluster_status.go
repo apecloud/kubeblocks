@@ -24,7 +24,6 @@ import (
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -80,28 +79,6 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 	}
 
-	isStorageUpdated := func(oldSts, newSts *appsv1.StatefulSet) bool {
-		if oldSts == nil || newSts == nil {
-			return false
-		}
-		for _, oldVct := range oldSts.Spec.VolumeClaimTemplates {
-			var newVct *corev1.PersistentVolumeClaim
-			for _, v := range newSts.Spec.VolumeClaimTemplates {
-				if v.Name == oldVct.Name {
-					newVct = &v
-					break
-				}
-			}
-			if newVct == nil {
-				continue
-			}
-			if oldVct.Spec.Resources.Requests[corev1.ResourceStorage] != newVct.Spec.Resources.Requests[corev1.ResourceStorage] {
-				return true
-			}
-		}
-		return false
-	}
-
 	updateComponentsPhase := func() {
 		vertices := findAll[*appsv1.StatefulSet](dag)
 		deployVertices := findAll[*appsv1.Deployment](dag)
@@ -143,15 +120,6 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
 				continue
 			}
-			// compare sts storage
-			if _, ok := v.obj.(*appsv1.StatefulSet); ok {
-				oldSts, _ := v.oriObj.(*appsv1.StatefulSet)
-				newSts, _ := v.obj.(*appsv1.StatefulSet)
-				if !isStorageUpdated(oldSts, newSts) {
-					continue
-				}
-			}
-			updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
 		}
 	}
 

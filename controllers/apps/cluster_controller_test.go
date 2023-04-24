@@ -200,7 +200,7 @@ var _ = Describe("Cluster Controller", func() {
 			case svc.Spec.Type == corev1.ServiceTypeClusterIP && svcSpec.headless:
 				g.Expect(svc.Spec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
 				for _, port := range getHeadlessSvcPorts(g, compDefName) {
-					Expect(slices.Index(svc.Spec.Ports, port) >= 0).Should(BeTrue())
+					g.Expect(slices.Index(svc.Spec.Ports, port) >= 0).Should(BeTrue())
 				}
 			}
 		}

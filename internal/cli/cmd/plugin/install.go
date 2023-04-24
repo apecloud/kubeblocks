@@ -1,0 +1,128 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package plugin
+
+import (
+	"fmt"
+	"os"
+	"runtime"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
+)
+
+var (
+	pluginInstallExample = templates.Examples(`
+	# install a kbcli or kubectl plugin by name
+	kbcli plugin install [PLUGIN]
+
+	# install a kbcli or kubectl plugin by name and index
+	kbcli plugin install [INDEX/PLUGIN]
+	`)
+)
+
+type pluginInstallOption struct {
+	plugins []pluginEntry
+
+	genericclioptions.IOStreams
+}
+
+type pluginEntry struct {
+	index  string
+	plugin Plugin
+}
+
+func NewPluginInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
+	o := &pluginInstallOption{
+		IOStreams: streams,
+	}
+	cmd := &cobra.Command{
+		Use:     "install",
+		Short:   "Install kbcli or kubectl plugins",
+		Example: pluginInstallExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.complete(args))
+			cmdutil.CheckErr(o.install())
+		},
+	}
+	return cmd
+}
+
+func (o *pluginInstallOption) complete(names []string) error {
+	for _, name := range names {
+		indexName, pluginName := CanonicalPluginName(name)
+		plugin, err := LoadPluginByName(paths.IndexPluginsPath(indexName), pluginName)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return errors.Errorf("plugin %q does not exist in the plugin index", name)
+			}
+			return errors.Wrapf(err, "failed to load plugin %q from the index", name)
+		}
+		o.plugins = append(o.plugins, pluginEntry{
+			index:  indexName,
+			plugin: plugin,
+		})
+	}
+	return nil
+}
+
+func (o *pluginInstallOption) install() error {
+	var failed []string
+	var returnErr error
+	for _, entry := range o.plugins {
+		plugin := entry.plugin
+		fmt.Fprintf(os.Stderr, "Installing plugin: %s\n", plugin.Name)
+		err := Install(paths, plugin, entry.index, InstallOpts{})
+		if err == ErrIsAlreadyInstalled {
+			klog.Warningf("Skipping plugin %q, it is already installed", plugin.Name)
+			continue
+		}
+		if err != nil {
+			klog.Warningf("failed to install plugin %q: %v", plugin.Name, err)
+			if returnErr == nil {
+				returnErr = err
+			}
+			failed = append(failed, plugin.Name)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "Installed plugin: %s\n", plugin.Name)
+		output := fmt.Sprintf("Use this plugin:\n\tkubectl %s\n", plugin.Name)
+		if plugin.Spec.Homepage != "" {
+			output += fmt.Sprintf("Documentation:\n\t%s\n", plugin.Spec.Homepage)
+		}
+		if plugin.Spec.Caveats != "" {
+			output += fmt.Sprintf("Caveats:\n%s\n", indent(plugin.Spec.Caveats))
+		}
+		fmt.Fprintln(os.Stderr, indent(output))
+	}
+	if len(failed) > 0 {
+		return errors.Wrapf(returnErr, "failed to install some plugins: %+v", failed)
+	}
+	return nil
+}
+
+func IsWindows() bool {
+	goos := runtime.GOOS
+	return goos == "windows"
+}

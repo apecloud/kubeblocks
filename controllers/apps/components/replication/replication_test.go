@@ -17,6 +17,7 @@ limitations under the License.
 package replication
 
 import (
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -25,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -191,7 +191,7 @@ var _ = Describe("Replication Component", func() {
 			By("Checking if the pod is not updated when statefulset is not updated")
 			Expect(replicationComponent.HandleUpdate(ctx, replicationSetSts)).To(Succeed())
 			Expect(err).To(Succeed())
-			Expect(util.IsStsAndPodsRevisionConsistent(ctx, k8sClient, replicationSetSts)).Should(BeTrue())
+			Expect(controllerutil.IsStsAndPodsRevisionConsistent(ctx, k8sClient, replicationSetSts)).Should(BeTrue())
 		})
 	})
 })

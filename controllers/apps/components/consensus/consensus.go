@@ -44,12 +44,12 @@ func (r *ConsensusComponent) IsRunning(ctx context.Context, obj client.Object) (
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
+	sts := intctrlutil.ConvertToStatefulSet(obj)
+	isRevisionConsistent, err := intctrlutil.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
-	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, sts)
+	pods, err := intctrlutil.GetPodListByStatefulSet(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
@@ -59,7 +59,7 @@ func (r *ConsensusComponent) IsRunning(ctx context.Context, obj client.Object) (
 		}
 	}
 
-	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
+	return intctrlutil.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
 }
 
 func (r *ConsensusComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
@@ -177,7 +177,7 @@ func (r *ConsensusComponent) HandleUpdate(ctx context.Context, obj client.Object
 		return nil
 	}
 
-	stsObj := util.ConvertToStatefulSet(obj)
+	stsObj := intctrlutil.ConvertToStatefulSet(obj)
 	// get compDefName from stsObj.name
 	compDefName := r.Cluster.Spec.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
 
@@ -190,7 +190,7 @@ func (r *ConsensusComponent) HandleUpdate(ctx context.Context, obj client.Object
 	if component == nil || component.WorkloadType != appsv1alpha1.Consensus {
 		return nil
 	}
-	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
+	pods, err := intctrlutil.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
 	if err != nil {
 		return err
 	}

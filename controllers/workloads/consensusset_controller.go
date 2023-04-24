@@ -130,7 +130,7 @@ func (r *ConsensusSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}).
 		Watches(&source.Kind{Type: &corev1.Pod{}},
 			&consensusset.EnqueueRequestForAncestor{
-				Client: r.Client,
+				Client:    r.Client,
 				OwnerType: &workloads.ConsensusSet{},
 				UpToLevel: 2,
 			}).

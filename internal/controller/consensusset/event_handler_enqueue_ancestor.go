@@ -214,7 +214,7 @@ func (e *EnqueueRequestForAncestor) getSourceObject(object client.Object) (clien
 // if the object is the Pod, then set upToLevel to 2 if you want to find the ConsensusSet.
 // Each level of ownership should be a controller-relationship (i.e. controller=true in ownerReferences).
 // nil return if no owner find in any level.
-func (e *EnqueueRequestForAncestor) getOwnerUpTo(ctx context.Context, object client.Object, upToLevel int, scheme runtime.Scheme) (*metav1.OwnerReference, error)  {
+func (e *EnqueueRequestForAncestor) getOwnerUpTo(ctx context.Context, object client.Object, upToLevel int, scheme runtime.Scheme) (*metav1.OwnerReference, error) {
 	if upToLevel <= 0 {
 		return nil, nil
 	}
@@ -229,7 +229,7 @@ func (e *EnqueueRequestForAncestor) getOwnerUpTo(ctx context.Context, object cli
 	if err != nil {
 		return nil, err
 	}
-	return e.getOwnerUpTo(ctx, objectNew, upToLevel - 1, scheme)
+	return e.getOwnerUpTo(ctx, objectNew, upToLevel-1, scheme)
 }
 
 func (e *EnqueueRequestForAncestor) getObjectByOwnerRef(ctx context.Context, ownerRef metav1.OwnerReference, scheme runtime.Scheme) (client.Object, error) {
@@ -238,9 +238,9 @@ func (e *EnqueueRequestForAncestor) getObjectByOwnerRef(ctx context.Context, own
 		return nil, err
 	}
 	gvk := schema.GroupVersionKind{
-		Group: gv.Group,
+		Group:   gv.Group,
 		Version: gv.Version,
-		Kind: ownerRef.Kind,
+		Kind:    ownerRef.Kind,
 	}
 	objectRT, err := scheme.New(gvk)
 	if err != nil {

@@ -15,13 +15,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package controllerutil
 
 import (
 	"context"
 	"regexp"
 	"strconv"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // DescendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted from the statefulSet.
@@ -40,7 +38,7 @@ var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
 // getParentName gets the name of pod's parent StatefulSet. If pod has not parent, the empty string is returned.
 func getParentName(pod *corev1.Pod) string {
-	parent, _ := intctrlutil.GetParentNameAndOrdinal(pod)
+	parent, _ := GetParentNameAndOrdinal(pod)
 	return parent
 }
 
@@ -62,7 +60,7 @@ func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts 
 	}
 
 	for _, pod := range pods {
-		if intctrlutil.GetPodRevision(&pod) != sts.Status.UpdateRevision {
+		if GetPodRevision(&pod) != sts.Status.UpdateRevision {
 			revisionConsistent = false
 			break
 		}
@@ -86,7 +84,7 @@ func DeleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulS
 			continue
 		}
 		// do nothing if the pod has the latest version
-		if intctrlutil.GetPodRevision(&pod) == sts.Status.UpdateRevision {
+		if GetPodRevision(&pod) == sts.Status.UpdateRevision {
 			continue
 		}
 		// delete the pod to trigger associate StatefulSet to re-create it
@@ -177,14 +175,4 @@ func GetPodOwnerReferencesSts(ctx context.Context, cli client.Client, podObj *co
 		}
 	}
 	return nil, nil
-}
-
-// MarkPrimaryStsToReconcile marks the primary statefulSet annotation to be reconciled.
-func MarkPrimaryStsToReconcile(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
-	patch := client.MergeFrom(sts.DeepCopy())
-	if sts.Annotations == nil {
-		sts.Annotations = map[string]string{}
-	}
-	sts.Annotations[constant.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-	return cli.Patch(ctx, sts, patch)
 }

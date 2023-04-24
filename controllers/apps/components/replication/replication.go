@@ -44,12 +44,12 @@ var _ types.Component = &ReplicationComponent{}
 // which is used to check whether the replicationSet component is running normally.
 func (r *ReplicationComponent) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	var componentStatusIsRunning = true
-	sts := util.ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
+	sts := intctrlutil.ConvertToStatefulSet(obj)
+	isRevisionConsistent, err := intctrlutil.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
-	stsIsReady := util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, nil)
+	stsIsReady := intctrlutil.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, nil)
 	if !stsIsReady {
 		return false, nil
 	}
@@ -137,11 +137,11 @@ func (r *ReplicationComponent) GetPhaseWhenPodsNotReady(ctx context.Context,
 
 // HandleUpdate is the implementation of the type Component interface method, handles replicationSet workload Pod updates.
 func (r *ReplicationComponent) HandleUpdate(ctx context.Context, obj client.Object) error {
-	sts := util.ConvertToStatefulSet(obj)
+	sts := intctrlutil.ConvertToStatefulSet(obj)
 	if sts.Generation != sts.Status.ObservedGeneration {
 		return nil
 	}
-	podList, err := util.GetPodListByStatefulSet(ctx, r.Cli, sts)
+	podList, err := intctrlutil.GetPodListByStatefulSet(ctx, r.Cli, sts)
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func (r *ReplicationComponent) HandleUpdate(ctx context.Context, obj client.Obje
 	for _, pod := range podList {
 		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
 		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
-			_, o := util.ParseParentNameAndOrdinal(pod.Name)
+			_, o := intctrlutil.ParseParentNameAndOrdinal(pod.Name)
 			role := string(Secondary)
 			if o == r.Component.GetPrimaryIndex() {
 				role = string(Primary)
@@ -160,7 +160,7 @@ func (r *ReplicationComponent) HandleUpdate(ctx context.Context, obj client.Obje
 				return err
 			}
 		}
-		if err := util.DeleteStsPods(ctx, r.Cli, sts); err != nil {
+		if err := intctrlutil.DeleteStsPods(ctx, r.Cli, sts); err != nil {
 			return err
 		}
 	}

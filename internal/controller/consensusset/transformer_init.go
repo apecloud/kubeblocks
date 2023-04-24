@@ -32,7 +32,7 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	transCtx, _ := ctx.(*CSSetTransformContext)
 	transCtx.CSSet, transCtx.OrigCSSet = obj, origObj
 
-	//init dag
+	// init dag
 	vertex := &model.ObjectVertex{Obj: transCtx.CSSet, OriObj: transCtx.OrigCSSet}
 	dag.AddVertex(vertex)
 	return nil

@@ -23,8 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
@@ -34,17 +32,12 @@ import (
 // CSSetStatusTransformer computes the current status:
 // 1. read the underlying sts's status and copy them to consensus set's status
 // 2. read pod role label and update consensus set's status role fields
-type CSSetStatusTransformer struct {}
+type CSSetStatusTransformer struct{}
 
 func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*CSSetTransformContext)
 	csSet := transCtx.CSSet
 	origCSSet := transCtx.OrigCSSet
-
-	root, err := model.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
 
 	// fast return
 	if model.IsObjectDeleting(origCSSet) {
@@ -53,7 +46,7 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 
 	// read the underlying sts
 	sts := &apps.StatefulSet{}
-	if err = transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(csSet), sts); err != nil {
+	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(csSet), sts); err != nil {
 		return err
 	}
 	switch {
@@ -65,7 +58,7 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 		csSet.Status.StatefulSetStatus = sts.Status
 		csSet.Status.ObservedGeneration = generation
 		// read all pods belong to the sts, hence belong to our consensus set
-		pods, err := t.getPodsOfStatefulSet(sts)
+		pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
 		if err != nil {
 			return err
 		}
@@ -73,19 +66,18 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 		setConsensusSetStatusRoles(csSet, pods)
 	}
 
-
 	// TODO: handle Update(i.e. pods deletion)
 
 	return nil
 }
 
-func (t *CSSetStatusTransformer) getPodsOfStatefulSet(stsObj *apps.StatefulSet) ([]corev1.Pod, error) {
+func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsObj *apps.StatefulSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
-	if err := t.Client.List(t.Context, podList,
+	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
 		client.MatchingLabels{
-			constant.KBManagedByKey:      stsObj.Labels[constant.KBManagedByKey],
-			constant.AppInstanceLabelKey: stsObj.Labels[constant.AppInstanceLabelKey],
+			model.KBManagedByKey:      stsObj.Labels[model.KBManagedByKey],
+			model.AppInstanceLabelKey: stsObj.Labels[model.AppInstanceLabelKey],
 		}); err != nil {
 		return nil, err
 	}

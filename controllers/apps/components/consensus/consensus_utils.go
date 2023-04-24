@@ -18,7 +18,6 @@ package consensus
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
 	"sort"
 	"strings"
 
@@ -31,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 

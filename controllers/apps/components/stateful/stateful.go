@@ -41,20 +41,20 @@ func (r *StatefulComponent) IsRunning(ctx context.Context, obj client.Object) (b
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
+	sts := intctrlutil.ConvertToStatefulSet(obj)
+	isRevisionConsistent, err := intctrlutil.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
-	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
+	return intctrlutil.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
 }
 
 func (r *StatefulComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.ConvertToStatefulSet(obj)
-	return util.StatefulSetPodsAreReady(sts, r.Component.Replicas), nil
+	sts := intctrlutil.ConvertToStatefulSet(obj)
+	return intctrlutil.StatefulSetPodsAreReady(sts, r.Component.Replicas), nil
 }
 
 func (r *StatefulComponent) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {

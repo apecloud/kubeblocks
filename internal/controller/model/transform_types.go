@@ -47,7 +47,8 @@ const (
 )
 
 const (
-	AppInstanceLabelKey  = "app.kubernetes.io/instance"
+	AppInstanceLabelKey = "app.kubernetes.io/instance"
+	KBManagedByKey      = "apps.kubeblocks.io/managed-by"
 )
 
 // RequeueDuration default reconcile requeue after duration

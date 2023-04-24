@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package controllerutil
 
 import (
 	"testing"
@@ -27,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -36,13 +35,13 @@ import (
 func TestGetParentNameAndOrdinal(t *testing.T) {
 	set := testk8s.NewFakeStatefulSet("foo", 3)
 	pod := testk8s.NewFakeStatefulSetPod(set, 1)
-	if parent, ordinal := intctrlutil.GetParentNameAndOrdinal(pod); parent != set.Name {
+	if parent, ordinal := GetParentNameAndOrdinal(pod); parent != set.Name {
 		t.Errorf("Extracted the wrong parent name expected %s found %s", set.Name, parent)
 	} else if ordinal != 1 {
 		t.Errorf("Extracted the wrong ordinal expected %d found %d", 1, ordinal)
 	}
 	pod.Name = "1-bar"
-	if parent, ordinal := intctrlutil.GetParentNameAndOrdinal(pod); parent != "" {
+	if parent, ordinal := GetParentNameAndOrdinal(pod); parent != "" {
 		t.Error("Expected empty string for non-member Pod parent")
 	} else if ordinal != -1 {
 		t.Error("Expected -1 for non member Pod ordinal")

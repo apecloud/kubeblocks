@@ -29,7 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
-type ObjectGenerationTransformer struct {}
+type ObjectGenerationTransformer struct{}
 
 func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// get root vertex(i.e. consensus set)

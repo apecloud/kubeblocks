@@ -18,13 +18,13 @@ package consensusset
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
 const (

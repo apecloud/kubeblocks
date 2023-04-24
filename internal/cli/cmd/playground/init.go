@@ -427,9 +427,9 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			"prometheus.alertmanager.statefulSet.enabled=false")
 	} else if o.cloudProvider == cp.AWS {
 		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
-			// enable aws loadbalancer controller addon automatically on playground
-			"aws-loadbalancer-controller.enabled=true",
-			fmt.Sprintf("aws-loadbalancer-controller.clusterName=%s", k8sClusterName),
+			// enable aws-load-balancer-controller addon automatically on playground
+			"aws-load-balancer-controller.enabled=true",
+			fmt.Sprintf("aws-load-balancer-controller.clusterName=%s", k8sClusterName),
 		)
 	}
 

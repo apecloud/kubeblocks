@@ -11,12 +11,14 @@ kbcli cluster create-account [flags]
 ### Examples
 
 ```
-  # create account
-  kbcli cluster create-account NAME --component COMPNAME --username NAME --password PASSWD
+  # create account with password
+  kbcli cluster create-account NAME --component COMPNAME --name USERNAME --password PASSWD
   # create account without password
-  kbcli cluster create-account NAME --component COMPNAME --username NAME
-  # create account with expired interval
-  kbcli cluster create-account NAME --component COMPNAME --username NAME --password PASSWD --expiredAt 2046-01-02T15:04:05Z
+  kbcli cluster create-account NAME --component COMPNAME --name USERNAME
+  # create account with default component
+  kbcli cluster create-account NAME --name USERNAME
+  # create account for instance
+  kbcli cluster create-account --instance INSTANCE --name USERNAME
 ```
 
 ### Options

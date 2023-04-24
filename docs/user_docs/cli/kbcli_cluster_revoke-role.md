@@ -12,7 +12,11 @@ kbcli cluster revoke-role [flags]
 
 ```
   # revoke role from user
-  kbcli cluster revoke-role NAME --component COMPNAME --role ROLENAME
+  kbcli cluster revoke-role NAME --component COMPNAME --name USERNAME --role ROLENAME
+  # revoke role from user with default component
+  kbcli cluster revoke-role NAME --name USERNAME --role ROLENAME
+  # revoke role from user for instance
+  kbcli cluster revoke-role --instance INSTANCE --name USERNAME --role ROLENAME
 ```
 
 ### Options

@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ .Release.Name }}-config-storage-post-job"
+  labels: {{ include "foxlake-cluster.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "2"
+    "helm.sh/hook-delete-policy": before-hook-creation, hook-succeeded
+spec:
+  template:
+    metadata:
+      name: "{{ .Release.Name }}-config-storage"
+      labels: {{ include "foxlake-cluster.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-foxlake
+          image: "busybox:latest"
+          command:
+            - "sh"
+            - "-c"
+            - "while ! nc -z ${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_HOST} ${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_PORT}; do sleep 1; printf '-'; done; echo -e '  >> FoxLake Server has started';"
+      containers:
+        - name: config-storage
+          image: "mysql:latest"
+          command:
+            - "scripts/setup_{{- include "foxlake-cluster.deployEnv" . -}}_storage.sh"
+          env:
+            - name: MYSQL_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-conn-credential
+                  key: username
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-conn-credential
+                  key: password
+            {{- include "post-job.env" . | nindent 12}}
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: foxlake-cluster-setup-scripts 
+            defaultMode: 0777
+  backoffLimit: 4

@@ -31,6 +31,7 @@ spec:
             port: 10030
             nodePort: null
       podSpec:
+        serviceAccountName: foxlake-cluster-admin
         securityContext:
           fsGroup: 1001
           seccompProfile:
@@ -66,7 +67,47 @@ spec:
                 name: foxlake
             env:
               {{- include "foxlake.env" . | nindent 14 }}
-
+      systemAccounts:
+        cmdExecutorConfig:
+          image: {{ .Values.mysql.image.repository }}:{{ .Values.mysql.image.tag }}
+          command:
+          - mysql
+          args:
+          - -u$(MYSQL_ROOT_USER)
+          - -p$(MYSQL_ROOT_PASSWORD)
+          - -h$(KB_ACCOUNT_ENDPOINT)
+          - -P$(SVC_PORT)
+          - -e
+          - "$(KB_ACCOUNT_STATEMENT)"
+          env:
+          - name: MYSQL_ROOT_USER
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: username
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: password
+          - name: SVC_PORT
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: port
+        passwordConfig:
+          length: 10
+          numDigits: 5
+          numSymbols: 0
+          letterCase: MixedCases
+        accounts:
+          - name: kbadmin
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);
+                deletion: DROP USER IF EXISTS $(USERNAME);
     - name: foxlake-metadb
       workloadType: Stateful
       characterType: mysql

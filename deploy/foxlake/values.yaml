@@ -12,7 +12,7 @@ clusterVersionOverride: ""
 # for foxlake
 image:
   repository: apecloud/foxlake
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   tag: "main"
 
 # for foxlake-metadb

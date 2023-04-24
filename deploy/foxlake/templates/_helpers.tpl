@@ -72,6 +72,12 @@ FoxLake MetaDB Service FQDN
 FoxLake Configration Environment Variables
 */}}
 {{- define "foxlake.env" -}}
+- name: FOXLAKE_ROOT_USER
+  value: "foxlake_root"
+- name: FOXLAKE_ROOT_PASSWORD
+  value: "foxlake2023"
+- name: rootPasswd
+  value: "foxlake2023"
 - name: instanceId
   valueFrom:
     fieldRef:

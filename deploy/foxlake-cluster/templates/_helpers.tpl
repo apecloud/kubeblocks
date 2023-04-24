@@ -60,3 +60,46 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "foxlake-cluster.deployEnv" -}}
+{{- if contains "eks" .Capabilities.KubeVersion.GitVersion -}}
+cloud
+{{- else -}}
+local
+{{- end }}
+{{- end }}
+
+{{- define "post-job.env" -}}
+{{- if eq (include "foxlake-cluster.deployEnv" .) "cloud" -}}
+- name: S3_BUCKET_NAME
+  value: {{ .Values.s3BucketName }}
+- name: AWS_ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: csi-s3-secret
+      key:  accessKeyID 
+- name: AWS_SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: csi-s3-secret
+      key: secretAccessKey
+- name: AWS_DEFAULT_REGION
+  value: cn-northwest-1
+{{- else -}}
+- name: MINIO_BUCKET_NAME
+  valueFrom:
+    configMapKeyRef:
+      name: minio-chart-kubeblocks-values
+      key: bucketName
+- name: MINIO_ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: kb-addon-minio
+      key: rootUser
+- name: MINIO_SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: kb-addon-minio
+      key: rootPassword
+{{- end }}
+{{- end }}

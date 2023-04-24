@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: foxlake-cluster-setup-scripts
+  labels:
+    {{- include "foxlake-cluster.labels" . | nindent 4 }}
+data:
+  setup_local_storage.sh: |
+    #!/bin/bash
+    echo -e "create local storage for foxlake cluster"
+    mysql -u${MYSQL_ROOT_USER} -p${MYSQL_ROOT_PASSWORD} \
+      -h${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_HOST} \
+      -P${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_PORT} \
+      -e \
+      "CREATE OR REPLACE STORAGE default AT URI \
+        'minio://${KB_ADDON_MINIO_SERVICE_HOST}:${KB_ADDON_MINIO_SERVICE_PORT}/${MINIO_BUCKET_NAME}' \
+        credentials (ACCESS_KEY_ID='${MINIO_ACCESS_KEY_ID}' SECRET_ACCESS_KEY='${MINIO_SECRET_ACCESS_KEY}');"
+  setup_cloud_storage.sh: |
+    #!/bin/bash
+    echo -e "create cloud storage for foxlake cluster"
+    mysql -u${MYSQL_ROOT_USER} -p${MYSQL_ROOT_PASSWORD} \
+      -h${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_HOST} \
+      -P${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_PORT} \
+      -e \
+      "CREATE OR REPLACE STORAGE default AT URI \
+        's3://${S3_BUCKET_NAME}.s3.cn-northwest-1.amazonaws.com.cn/default' \
+        credentials (ACCESS_KEY_ID='${AWS_ACCESS_KEY_ID}' SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}');"
+
+

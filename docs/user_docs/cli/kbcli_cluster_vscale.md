@@ -5,17 +5,17 @@ title: kbcli cluster vscale
 Vertically scale the specified components in the cluster.
 
 ```
-kbcli cluster vscale [flags]
+kbcli cluster vscale NAME [flags]
 ```
 
 ### Examples
 
 ```
-  # scale the computing resources of specified components, separate with commas when <component-name> more than one
-  kbcli cluster vscale <my-cluster> --components=<component-name> --cpu=500m --memory=500Mi
+  # scale the computing resources of specified components, separate with commas when component more than one
+  kbcli cluster vscale mycluster --components=mysql --cpu=500m --memory=500Mi
   
-  # scale the computing resources of specified components by class, available classes can be get by executing the command "kbcli class list --cluster-definition <cluster-definition-name>"
-  kbcli cluster vscale <my-cluster> --components=<component-name> --class=<class-name>
+  # scale the computing resources of specified components by class, run command 'kbcli class list --cluster-definition cluster-definition-name' to get available classes
+  kbcli cluster vscale mycluster --components=mysql --class=<class-name>
 ```
 
 ### Options

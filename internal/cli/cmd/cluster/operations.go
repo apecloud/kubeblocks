@@ -234,6 +234,10 @@ func (o *OperationsOptions) Validate() error {
 		if err := o.validateVScale(&cluster); err != nil {
 			return err
 		}
+	case appsv1alpha1.ExposeType:
+		if err := o.validateExpose(); err != nil {
+			return err
+		}
 	}
 	if o.RequireConfirm {
 		return delete.Confirm([]string{o.Name}, o.In)
@@ -292,6 +296,10 @@ func (o *OperationsOptions) fillExpose() error {
 		return fmt.Errorf("unknown k8s provider")
 	}
 
+	if err = o.CompleteComponentsFlag(); err != nil {
+		return err
+	}
+
 	// default expose to internet
 	exposeType := util.ExposeType(o.ExposeType)
 	if exposeType == "" {
@@ -311,14 +319,6 @@ func (o *OperationsOptions) fillExpose() error {
 	cluster := appsv1alpha1.Cluster{}
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.UnstructuredContent(), &cluster); err != nil {
 		return err
-	}
-
-	if len(o.ComponentNames) == 0 {
-		if len(cluster.Spec.ComponentSpecs) == 1 {
-			o.ComponentNames = append(o.ComponentNames, cluster.Spec.ComponentSpecs[0].Name)
-		} else {
-			return fmt.Errorf("please specify --components")
-		}
 	}
 
 	compMap := make(map[string]appsv1alpha1.ClusterComponentSpec)
@@ -495,7 +495,6 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		}))
 		_ = cmd.MarkFlagRequired("enable")
 	}
-	inputs.Validate = o.validateExpose
 	inputs.Complete = o.fillExpose
 	return create.BuildCommand(inputs)
 }

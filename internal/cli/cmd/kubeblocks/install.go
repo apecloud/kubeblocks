@@ -116,8 +116,6 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
-	cmd.Flags().BoolVar(p.Interactive, flagInteractive, false, "interactive preflights, default value is false")
-	cmd.Flags().StringVar(p.Format, flagFormat, "yaml", "output format, one of human, json, yaml. only used when interactive is set to false, default format is yaml")
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Auto install monitoring add-ons including prometheus, grafana and alertmanager-webhook-adaptor")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")

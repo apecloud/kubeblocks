@@ -186,7 +186,7 @@ func (cs *ComponentStatusSynchronizer) updateComponentsPhase(
 	if !componentIsRunning {
 		// if no operation is running in cluster or failed pod timed out,
 		// means the component is Failed or Abnormal.
-		if slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), cs.cluster.Status.Phase) || hasFailedPodTimedOut {
+		if clusterUpRunning(cs.cluster) || hasFailedPodTimedOut {
 			if phase, err := cs.component.GetPhaseWhenPodsNotReady(ctx, componentName); err != nil {
 				return err
 			} else if phase != "" {
@@ -257,4 +257,10 @@ func isContainerFailedAndTimedOut(pod *corev1.Pod, podConditionType corev1.PodCo
 		return false
 	}
 	return time.Now().After(containerReadyCondition.LastTransitionTime.Add(types.PodContainerFailedTimeout))
+}
+
+// clusterUpRunning checks if the cluster is up running, includes the partially running.
+func clusterUpRunning(cluster *appsv1alpha1.Cluster) bool {
+	return cluster.Status.ObservedGeneration != cluster.Generation &&
+		slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), cluster.Status.Phase)
 }

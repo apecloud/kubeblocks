@@ -20,15 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -93,7 +94,7 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 			return expectProgressCount, completedCount, err
 		}
 		// TODO: delete the configmaps of the cluster should be removed from the opsRequest after refactor.
-		if err := lifecycle.DeleteConfigMaps(reqCtx.Ctx, cli, opsRes.Cluster); err != nil {
+		if err := deleteConfigMaps(reqCtx.Ctx, cli, opsRes.Cluster); err != nil {
 			return expectProgressCount, completedCount, err
 		}
 		return expectProgressCount, completedCount, nil
@@ -136,4 +137,13 @@ func getCompMapFromLastConfiguration(opsRequest *appsv1alpha1.OpsRequest) realAf
 		realChangedMap[k] = struct{}{}
 	}
 	return realChangedMap
+}
+
+func deleteConfigMaps(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:  cluster.GetName(),
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+	return cli.DeleteAllOf(ctx, &corev1.ConfigMap{}, inNS, ml)
 }

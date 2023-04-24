@@ -28,27 +28,25 @@ import (
 	"github.com/pkg/errors"
 	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	pkgcollector "github.com/replicatedhq/troubleshoot/pkg/collect"
-	"github.com/replicatedhq/troubleshoot/pkg/constants"
-	"github.com/replicatedhq/troubleshoot/pkg/k8sutil"
 	"github.com/replicatedhq/troubleshoot/pkg/logger"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/kubernetes"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	kbcollector "github.com/apecloud/kubeblocks/internal/preflight/collector"
 )
 
-func CollectPreflight(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, kbHostPreflight *preflightv1beta2.HostPreflight, progressCh chan interface{}) ([]preflight.CollectResult, error) {
+func CollectPreflight(f cmdutil.Factory, ctx context.Context, kbPreflight *preflightv1beta2.Preflight, kbHostPreflight *preflightv1beta2.HostPreflight, progressCh chan interface{}) ([]preflight.CollectResult, error) {
 	var (
 		collectResults []preflight.CollectResult
 		err            error
 	)
 	// deal with preflight
 	if kbPreflight != nil && (len(kbPreflight.Spec.ExtendCollectors) > 0 || len(kbPreflight.Spec.Collectors) > 0) {
-		res, err := CollectClusterData(ctx, kbPreflight, progressCh)
+		res, err := CollectClusterData(ctx, kbPreflight, f, progressCh)
 		if err != nil {
 			return collectResults, errors.Wrap(err, "failed to collect data in cluster")
 		}
@@ -64,7 +62,7 @@ func CollectPreflight(ctx context.Context, kbPreflight *preflightv1beta2.Preflig
 			collectResults = append(collectResults, *res)
 		}
 		if len(kbHostPreflight.Spec.RemoteCollectors) > 0 {
-			res, err := CollectRemoteData(ctx, kbHostPreflight, progressCh)
+			res, err := CollectRemoteData(ctx, kbHostPreflight, f, progressCh)
 			if err != nil {
 				return collectResults, errors.Wrap(err, "failed to collect data remotely")
 			}
@@ -129,19 +127,23 @@ func CollectHost(ctx context.Context, opts preflight.CollectOpts, collectors []p
 }
 
 // CollectClusterData transforms the specs of Preflight to Collector, and sets the collectOpts, such as restConfig, Namespace, and ProgressChan
-func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, progressCh chan interface{}) (*preflight.CollectResult, error) {
+func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, f cmdutil.Factory, progressCh chan interface{}) (*preflight.CollectResult, error) {
+	var err error
 	v := viper.GetViper()
-
-	restConfig, err := k8sutil.GetRESTConfig()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to convert kube flags to rest config")
-	}
 
 	collectOpts := preflight.CollectOpts{
 		Namespace:              v.GetString("namespace"),
 		IgnorePermissionErrors: v.GetBool("collect-without-permissions"),
 		ProgressChan:           progressCh,
-		KubernetesRestConfig:   restConfig,
+	}
+
+	if collectOpts.KubernetesRestConfig, err = f.ToRESTConfig(); err != nil {
+		return nil, errors.Wrap(err, "failed to instantiate Kubernetes restconfig")
+	}
+
+	k8sClient, err := f.KubernetesClientSet()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to instantiate Kubernetes client")
 	}
 
 	if v.GetString("since") != "" || v.GetString("since-time") != "" {
@@ -162,14 +164,6 @@ func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Prefl
 	collectSpecs = pkgcollector.DedupCollectors(collectSpecs)
 	collectSpecs = pkgcollector.EnsureClusterResourcesFirst(collectSpecs)
 
-	collectOpts.KubernetesRestConfig.QPS = constants.DEFAULT_CLIENT_QPS
-	collectOpts.KubernetesRestConfig.Burst = constants.DEFAULT_CLIENT_BURST
-	// collectOpts.KubernetesRestConfig.UserAgent = fmt.Sprintf("%s/%s", constants.DEFAULT_CLIENT_USER_AGENT, version.Version())
-
-	k8sClient, err := kubernetes.NewForConfig(collectOpts.KubernetesRestConfig)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to instantiate Kubernetes client")
-	}
 	var collectors []pkgcollector.Collector
 	allCollectorsMap := make(map[reflect.Type][]pkgcollector.Collector)
 	for _, collectSpec := range collectSpecs {
@@ -302,14 +296,13 @@ func CollectCluster(ctx context.Context, opts preflight.CollectOpts, allCollecto
 	}
 
 	collectResult.AllCollectedData = allCollectedData
-
 	return collectResult, nil
 }
 
-func CollectRemoteData(ctx context.Context, preflightSpec *preflightv1beta2.HostPreflight, progressCh chan interface{}) (*preflight.CollectResult, error) {
+func CollectRemoteData(ctx context.Context, preflightSpec *preflightv1beta2.HostPreflight, f cmdutil.Factory, progressCh chan interface{}) (*preflight.CollectResult, error) {
 	v := viper.GetViper()
 
-	restConfig, err := k8sutil.GetRESTConfig()
+	restConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to convert kube flags to rest config")
 	}

@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/cli/values"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -95,23 +94,6 @@ var _ = Describe("kubeblocks install", func() {
 		Expect(o.ValueOpts.Values[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
 		Expect(o.installChart()).Should(HaveOccurred())
 		o.printNotes()
-	})
-
-	It("create volumeSnapshotClass", func() {
-		o := &InstallOptions{
-			Options: Options{
-				IOStreams: streams,
-				HelmCfg:   helm.NewFakeConfig(namespace),
-				Namespace: "default",
-				Client:    testing.FakeClientSet(),
-				Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
-			},
-			Version:         version.DefaultKubeBlocksVersion,
-			Monitor:         true,
-			CreateNamespace: true,
-			ValueOpts:       values.Options{Values: []string{"snapshot-controller.enabled=true"}},
-		}
-		Expect(o.createVolumeSnapshotClass()).Should(HaveOccurred())
 	})
 
 	It("preCheck", func() {

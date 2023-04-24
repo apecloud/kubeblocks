@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
@@ -178,7 +177,7 @@ func (r *Cluster) validate() error {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDefinitionRef"),
 			r.Spec.ClusterDefRef, err.Error()))
 	} else {
-		r.validateComponents(&allErrs, webhookMgr.client, clusterDef)
+		r.validateComponents(&allErrs, clusterDef)
 	}
 
 	if len(allErrs) > 0 {
@@ -203,7 +202,7 @@ func (r *Cluster) validateClusterVersionRef(allErrs *field.ErrorList) {
 }
 
 // ValidateComponents validate spec.components is legal
-func (r *Cluster) validateComponents(allErrs *field.ErrorList, k8sClient client.Client, clusterDef *ClusterDefinition) {
+func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *ClusterDefinition) {
 	var (
 		// invalid component slice
 		invalidComponentDefs = make([]string, 0)
@@ -217,10 +216,6 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, k8sClient client.
 		componentMap[v.Name] = v
 	}
 
-	compClasses, err := getClasses(context.Background(), k8sClient, clusterDef.Name)
-	if err != nil {
-		return
-	}
 	for i, v := range r.Spec.ComponentSpecs {
 		if _, ok := componentDefMap[v.ComponentDefRef]; !ok {
 			invalidComponentDefs = append(invalidComponentDefs, v.ComponentDefRef)
@@ -228,19 +223,6 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, k8sClient client.
 
 		componentNameMap[v.Name] = struct{}{}
 		r.validateComponentResources(allErrs, v.Resources, i)
-
-		if classes, ok := compClasses[v.ComponentDefRef]; ok {
-			if v.ClassDefRef.Class != "" {
-				if _, ok = classes[v.ClassDefRef.Class]; !ok {
-					*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].classDefRef", i)), v.ClassDefRef.Class, "can not find the specified class"))
-					return
-				}
-			}
-			if err = validateMatchingClass(classes, v.Resources); err != nil {
-				*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].resources", i)), v.Resources.String(), err.Error()))
-				return
-			}
-		}
 	}
 
 	r.validatePrimaryIndex(allErrs)
@@ -264,7 +246,6 @@ func (r *Cluster) validateComponentResources(allErrs *field.ErrorList, resources
 	if invalidValue, err := compareRequestsAndLimits(resources); err != nil {
 		*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].resources.requests", index)), invalidValue, err.Error()))
 	}
-
 }
 
 func (r *Cluster) validateComponentTLSSettings(allErrs *field.ErrorList) {

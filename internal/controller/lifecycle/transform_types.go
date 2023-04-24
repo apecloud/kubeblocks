@@ -73,11 +73,6 @@ type gvkName struct {
 	ns, name string
 }
 
-type clusterRefResources struct {
-	cd appsv1alpha1.ClusterDefinition
-	cv appsv1alpha1.ClusterVersion
-}
-
 // lifecycleVertex describes expected object spec and how to reach it
 // obj always represents the expected part: new object in Create/Update action and old object in Delete action
 // oriObj is set in Update action
@@ -92,8 +87,6 @@ type lifecycleVertex struct {
 	immutable bool
 	isOrphan  bool
 	action    *Action
-	// postHandleAfterStatusPatch is called after the object status has changed
-	postHandleAfterStatusPatch []func() error
 }
 
 func (v lifecycleVertex) String() string {

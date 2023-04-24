@@ -46,6 +46,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -61,6 +62,12 @@ var clusterCreateExample = templates.Examples(`
 	# --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql
 
+	# Output resource information in YAML format, but do not create resources.
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=client -o yaml
+
+	# Output resource information in YAML format, the information will be sent to the server, but the resource will not be actually created.
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=server -o yaml
+	
 	# Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
 
@@ -228,7 +235,7 @@ func (o *CreateOptions) Validate() error {
 			return err
 		}
 		o.ClusterVersionRef = version
-		printer.Warning(o.Out, "cluster version is not specified, use the recently created ClusterVersion %s\n", o.ClusterVersionRef)
+		fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
 	}
 
 	if len(o.Values) > 0 && len(o.SetFile) > 0 {
@@ -279,6 +286,11 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 		err           error
 	)
 
+	componentClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return nil, err
+	}
+
 	// build components from file
 	components := o.ComponentSpecs
 	if len(o.SetFile) > 0 {
@@ -290,6 +302,15 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 		}
 		if err = json.Unmarshal(componentByte, &components); err != nil {
 			return nil, err
+		}
+		for _, item := range components {
+			var comp appsv1alpha1.ClusterComponentSpec
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item, &comp); err != nil {
+				return nil, err
+			}
+			if _, err = class.ValidateComponentClass(&comp, componentClasses); err != nil {
+				return nil, err
+			}
 		}
 		return components, nil
 	}
@@ -306,11 +327,14 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 			return nil, err
 		}
 
-		componentObjs, err := buildClusterComp(cd, compSets)
+		componentObjs, err := buildClusterComp(cd, compSets, componentClasses)
 		if err != nil {
 			return nil, err
 		}
 		for _, compObj := range componentObjs {
+			if _, err = class.ValidateComponentClass(compObj, componentClasses); err != nil {
+				return nil, err
+			}
 			comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compObj)
 			if err != nil {
 				return nil, err
@@ -365,9 +389,13 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
 			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
-
+			cmd.Flags().String("dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 			// add updatable flags
 			o.UpdatableFlags.addFlags(cmd)
+
+			// add print flags
+			printer.AddOutputFlagForCreate(cmd, &o.Format)
 
 			// set required flag
 			util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
@@ -390,6 +418,21 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 		"cluster-version",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+
+	var formatsWithDesc = map[string]string{
+		"JSON": "Output result in JSON format",
+		"YAML": "Output result in YAML format",
+	}
+	util.CheckErr(cmd.RegisterFlagCompletionFunc("output",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var names []string
+			for format, desc := range formatsWithDesc {
+				if strings.HasPrefix(format, toComplete) {
+					names = append(names, fmt.Sprintf("%s\t%s", format, desc))
+				}
+			}
+			return names, cobra.ShellCompDirectiveNoFileComp
 		}))
 }
 
@@ -433,7 +476,7 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 	}
 }
 
-func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string, componentClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	// get value from set values and environment variables, the second return value is
 	// true if the value is from environment variables
 	getVal := func(c *appsv1alpha1.ClusterComponentDefinition, key setKey, sets map[setKey]string) string {
@@ -451,6 +494,12 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		if c.WorkloadType == appsv1alpha1.Replication {
 			if key == keyReplicas {
 				return "2"
+			}
+		}
+		// the default replicas is 3 if not set by command flag, for Consensus workload
+		if c.WorkloadType == appsv1alpha1.Consensus {
+			if key == keyReplicas {
+				return "3"
 			}
 		}
 
@@ -516,32 +565,44 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 
 		// class has higher priority than other resource related parameters
-		className := getVal(&c, keyClass, sets)
-		if className != "" {
-			compObj.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: className}
+		resourceList := make(corev1.ResourceList)
+		if _, ok := componentClasses[c.Name]; ok {
+			if className := getVal(&c, keyClass, sets); className != "" {
+				compObj.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: className}
+			} else {
+				if cpu, ok := sets[keyCPU]; ok {
+					resourceList[corev1.ResourceCPU] = resource.MustParse(cpu)
+				}
+				if mem, ok := sets[keyMemory]; ok {
+					resourceList[corev1.ResourceMemory] = resource.MustParse(mem)
+				}
+			}
 		} else {
-			resourceList := corev1.ResourceList{
+			if className := getVal(&c, keyClass, sets); className != "" {
+				return nil, fmt.Errorf("can not find class %s for component type %s", className, c.Name)
+			}
+			resourceList = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse(getVal(&c, keyCPU, sets)),
 				corev1.ResourceMemory: resource.MustParse(getVal(&c, keyMemory, sets)),
 			}
-			compObj.Resources = corev1.ResourceRequirements{
-				Requests: resourceList,
-				Limits:   resourceList,
-			}
-			compObj.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
-				Name: "data",
-				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
-					AccessModes: []corev1.PersistentVolumeAccessMode{
-						corev1.ReadWriteOnce,
-					},
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse(getVal(&c, keyStorage, sets)),
-						},
+		}
+		compObj.Resources = corev1.ResourceRequirements{
+			Requests: resourceList,
+			Limits:   resourceList,
+		}
+		compObj.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
+			Name: "data",
+			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{
+					corev1.ReadWriteOnce,
+				},
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse(getVal(&c, keyStorage, sets)),
 					},
 				},
-			}}
-		}
+			},
+		}}
 		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err
 		}

@@ -23,8 +23,6 @@ import (
 	"strings"
 
 	"golang.org/x/exp/maps"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 // mergeAnnotations keeps the original annotations.
@@ -58,16 +56,4 @@ func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]s
 	}
 	maps.Copy(tmpAnnotations, targetAnnotations)
 	return tmpAnnotations
-}
-
-// updateComponentPhaseWithOperation if workload of component changes, should update the component phase.
-func updateComponentPhaseWithOperation(cluster *appsv1alpha1.Cluster, componentName string) {
-	componentPhase := appsv1alpha1.SpecReconcilingClusterCompPhase
-	if cluster.Status.Phase == appsv1alpha1.CreatingClusterPhase {
-		componentPhase = appsv1alpha1.CreatingClusterCompPhase
-	}
-	compStatus := cluster.Status.Components[componentName]
-	// synchronous component phase is consistent with cluster phase
-	compStatus.Phase = componentPhase
-	cluster.Status.SetComponentStatus(componentName, compStatus)
 }

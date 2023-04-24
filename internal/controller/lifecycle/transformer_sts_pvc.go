@@ -26,23 +26,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type stsPVCTransformer struct {
-	cli types2.ReadonlyClient
-	ctx intctrlutil.RequestCtx
-}
+type StsPVCTransformer struct{}
 
-func (s *stsPVCTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	origCluster := transCtx.OrigCluster
 
 	if isClusterDeleting(*origCluster) {
 		return nil
@@ -78,7 +69,7 @@ func (s *stsPVCTransformer) Transform(dag *graph.DAG) error {
 					Namespace: stsObj.Namespace,
 					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 				}
-				if err := s.cli.Get(s.ctx.Ctx, pvcKey, pvc); err != nil {
+				if err := transCtx.Client.Get(transCtx.Context, pvcKey, pvc); err != nil {
 					return err
 				}
 				obj := pvc.DeepCopy()
@@ -106,3 +97,5 @@ func (s *stsPVCTransformer) Transform(dag *graph.DAG) error {
 	}
 	return nil
 }
+
+var _ graph.Transformer = &StsPVCTransformer{}

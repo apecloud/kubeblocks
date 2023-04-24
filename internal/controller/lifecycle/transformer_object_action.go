@@ -22,46 +22,27 @@ package lifecycle
 import (
 	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// objectActionTransformer reads all Vertex.Obj in cache and compute the diff DAG.
-type objectActionTransformer struct {
-	cli client2.ReadonlyClient
-	ctx intctrlutil.RequestCtx
-}
+// ObjectActionTransformer reads all Vertex.Obj in cache and compute the diff DAG.
+type ObjectActionTransformer struct{}
 
-func ownKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&appsv1.StatefulSetList{},
-		&appsv1.DeploymentList{},
-		&corev1.ServiceList{},
-		&corev1.SecretList{},
-		&corev1.ConfigMapList{},
-		&policyv1.PodDisruptionBudgetList{},
-		&dataprotectionv1alpha1.BackupPolicyList{},
-	}
-}
+func (t *ObjectActionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	origCluster := transCtx.OrigCluster
 
-func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
+	// get the old objects snapshot
+	oldSnapshot, err := readCacheSnapshot(transCtx, *origCluster, ownKinds()...)
 	if err != nil {
 		return err
 	}
-	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 
-	// get the old objects snapshot
-	oldSnapshot, err := readCacheSnapshot(c.ctx.Ctx, c.cli, *origCluster, ownKinds()...)
+	rootVertex, err := findRootVertex(dag)
 	if err != nil {
 		return err
 	}
@@ -167,3 +148,5 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 
 	return nil
 }
+
+var _ graph.Transformer = &ObjectActionTransformer{}

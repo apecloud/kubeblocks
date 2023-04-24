@@ -81,7 +81,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	}
-	opsIsCompleted := opsRequestIsComponent(*opsRes)
+	opsIsCompleted := opsRequestHasProcessed(*opsRes)
 	for k, v := range opsRes.Cluster.Status.Components {
 		if _, ok = componentNameMap[k]; !ok && !checkAllClusterComponent {
 			continue
@@ -134,8 +134,8 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	return appsv1alpha1.OpsSucceedPhase, 0, nil
 }
 
-// opsRequestIsComponent checks if the opsRequest is completed.
-func opsRequestIsComponent(opsRes OpsResource) bool {
+// opsRequestHasProcessed checks if the opsRequest has processed.
+func opsRequestHasProcessed(opsRes OpsResource) bool {
 	return opsRes.ToClusterPhase != opsRes.Cluster.Status.Phase &&
 		opsRes.Cluster.Status.ObservedGeneration >= opsRes.OpsRequest.Status.ClusterGeneration
 }

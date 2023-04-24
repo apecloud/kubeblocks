@@ -24,13 +24,18 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Get trigger mode
         id: get_trigger_mode
         run: |
           TRIGGER_MODE=`bash .github/utils/utils.sh --type 6`
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
+
+      - name: merge releasing to release
+        if: ${{ startsWith(github.ref_name, 'releasing-') }}
+        run: |
+          bash .github/utils/merge_releasing_branch.sh
 
   pre-push:
     needs: trigger-mode

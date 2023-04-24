@@ -22,13 +22,8 @@ secret:
   # AccessKey Secret
   akSecret: ""
 
-tolerations:
-  - key: kb-controller
-    operator: Equal
-    value: "true"
-    effect: NoSchedule
-  - key: node-role.kubernetes.io/master
-    operator: "Exists"
+daemonSetTolerations:
+  - operator: Exists
 
 affinity:
   nodeAffinity:

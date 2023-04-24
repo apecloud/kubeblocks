@@ -26,6 +26,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -52,6 +53,14 @@ func conditionIsChanged(oldCondition *metav1.Condition, newCondition metav1.Cond
 	return !reflect.DeepEqual(oldCondition, &newCondition)
 }
 
+func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName string, clusterGeneration int64, err error) {
+	condition := newProvisioningStartedCondition(clusterName, clusterGeneration)
+	if err != nil {
+		condition = newFailedProvisioningStartedCondition(err.Error(), ReasonPreCheckFailed)
+	}
+	meta.SetStatusCondition(conditions, condition)
+}
+
 // newProvisioningStartedCondition creates the provisioning started condition in cluster conditions.
 func newProvisioningStartedCondition(clusterName string, clusterGeneration int64) metav1.Condition {
 	return metav1.Condition{
@@ -71,6 +80,14 @@ func newFailedProvisioningStartedCondition(message, reason string) metav1.Condit
 		Message: message,
 		Reason:  reason,
 	}
+}
+
+func setApplyResourceCondition(conditions *[]metav1.Condition, clusterGeneration int64, err error) {
+	condition := newApplyResourcesCondition(clusterGeneration)
+	if err != nil {
+		condition = newFailedApplyResourcesCondition(err.Error())
+	}
+	meta.SetStatusCondition(conditions, condition)
 }
 
 // newApplyResourcesCondition creates a condition when applied resources succeed.

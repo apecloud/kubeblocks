@@ -21,6 +21,7 @@ package plan
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"text/template"
 
@@ -29,63 +30,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-func CreateOrCheckTLSCerts(reqCtx controllerutil.RequestCtx,
-	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster,
-) (*v1.Secret, error) {
-	if cluster == nil {
-		return nil, componentutil.ErrReqClusterObj
-	}
-
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if !comp.TLS {
-			continue
-		}
-		// REVIEW/TODO: should do spec validation during validation stage
-		if comp.Issuer == nil {
-			return nil, errors.New("issuer shouldn't be nil when tls enabled")
-		}
-		switch comp.Issuer.Name {
-		case dbaasv1alpha1.IssuerUserProvided:
-			if err := CheckTLSSecretRef(reqCtx, cli, cluster.Namespace, comp.Issuer.SecretRef); err != nil {
-				return nil, err
-			}
-		case dbaasv1alpha1.IssuerKubeBlocks:
-			return createTLSSecret(reqCtx, cli, cluster, comp.Name)
-		}
-	}
-	return nil, nil
-}
-
-// func deleteTLSSecrets(reqCtx controllerutil.RequestCtx, cli client.Client, secretList []v1.Secret) {
-// 	for _, secret := range secretList {
-// 		err := cli.Delete(reqCtx.Ctx, &secret)
-// 		if err != nil {
-// 			reqCtx.Log.Info("delete tls secret error", "err", err)
-// 		}
-// 	}
-// }
-
-func createTLSSecret(reqCtx controllerutil.RequestCtx,
-	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster,
-	componentName string) (*v1.Secret, error) {
-	secret, err := ComposeTLSSecret(cluster.Namespace, cluster.Name, componentName)
-	if err != nil {
-		return nil, err
-	}
-	return secret, nil
-}
 
 // ComposeTLSSecret compose a TSL secret object.
 // REVIEW/TODO:
@@ -134,14 +84,14 @@ func buildFromTemplate(tpl string, vars interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func CheckTLSSecretRef(reqCtx controllerutil.RequestCtx, cli client2.ReadonlyClient, namespace string,
+func CheckTLSSecretRef(ctx context.Context, cli client2.ReadonlyClient, namespace string,
 	secretRef *dbaasv1alpha1.TLSSecretRef) error {
 	if secretRef == nil {
 		return errors.New("issuer.secretRef shouldn't be nil when issuer is UserProvided")
 	}
 
 	secret := &v1.Secret{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: namespace, Name: secretRef.Name}, secret); err != nil {
+	if err := cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: secretRef.Name}, secret); err != nil {
 		return err
 	}
 	if secret.Data == nil {

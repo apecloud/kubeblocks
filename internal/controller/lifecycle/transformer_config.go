@@ -26,10 +26,10 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// configTransformer makes all config related ConfigMaps immutable
-type configTransformer struct{}
+// ConfigTransformer makes all config related ConfigMaps immutable
+type ConfigTransformer struct{}
 
-func (c *configTransformer) Transform(dag *graph.DAG) error {
+func (c *ConfigTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	for _, vertex := range findAll[*corev1.ConfigMap](dag) {
 		v, _ := vertex.(*lifecycleVertex)
 		cm, _ := v.obj.(*corev1.ConfigMap)
@@ -41,3 +41,5 @@ func (c *configTransformer) Transform(dag *graph.DAG) error {
 	}
 	return nil
 }
+
+var _ graph.Transformer = &ConfigTransformer{}

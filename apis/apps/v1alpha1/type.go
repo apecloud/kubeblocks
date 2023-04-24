@@ -21,10 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	"sort"
-
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -528,47 +524,3 @@ func RegisterWebhookManager(mgr manager.Manager) {
 }
 
 type ComponentNameSet map[string]struct{}
-
-func chooseComponentClasses(classes map[string]*ComponentClassInstance, filters map[corev1.ResourceName]resource.Quantity) *ComponentClassInstance {
-	var candidates []*ComponentClassInstance
-	for _, cls := range classes {
-		cpu, ok := filters[corev1.ResourceCPU]
-		if ok && !cpu.Equal(cls.CPU) {
-			continue
-		}
-		memory, ok := filters[corev1.ResourceMemory]
-		if ok && !memory.Equal(cls.Memory) {
-			continue
-		}
-		candidates = append(candidates, cls)
-	}
-	if len(candidates) == 0 {
-		return nil
-	}
-	sort.Sort(byClassCPUAndMemory(candidates))
-	return candidates[0]
-}
-
-var _ sort.Interface = byClassCPUAndMemory{}
-
-type byClassCPUAndMemory []*ComponentClassInstance
-
-func (b byClassCPUAndMemory) Len() int {
-	return len(b)
-}
-
-func (b byClassCPUAndMemory) Less(i, j int) bool {
-	if out := b[i].CPU.Cmp(b[j].CPU); out != 0 {
-		return out < 0
-	}
-
-	if out := b[i].Memory.Cmp(b[j].Memory); out != 0 {
-		return out < 0
-	}
-
-	return false
-}
-
-func (b byClassCPUAndMemory) Swap(i, j int) {
-	b[i], b[j] = b[j], b[i]
-}

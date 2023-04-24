@@ -27,7 +27,7 @@ import (
 )
 
 func main() {
-	cmd := cmd.NewCliCmd()
+	cmd := cmd.NewDefaultCliCmd()
 	if err := cli.RunNoErrOutput(cmd); err != nil {
 		util.CheckErr(err)
 	}

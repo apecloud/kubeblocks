@@ -20,19 +20,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package lifecycle
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// fixClusterLabelsTransformer should patch the label first to prevent the label from being modified by the user.
-type fixClusterLabelsTransformer struct{}
+type FixMetaTransformer struct{}
 
-func (f *fixClusterLabelsTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
-	if err != nil {
-		return err
+func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	cluster := transCtx.Cluster
+
+	// The object is not being deleted, so if it does not have our finalizer,
+	// then lets add the finalizer and update the object. This is equivalent
+	// registering our finalizer.
+	if !controllerutil.ContainsFinalizer(cluster, dbClusterFinalizerName) {
+		controllerutil.AddFinalizer(cluster, dbClusterFinalizerName)
 	}
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+
+	// patch the label to prevent the label from being modified by the user.
 	labels := cluster.Labels
 	if labels == nil {
 		labels = map[string]string{}
@@ -46,5 +52,8 @@ func (f *fixClusterLabelsTransformer) Transform(dag *graph.DAG) error {
 	labels[clusterDefLabelKey] = cdName
 	labels[clusterVersionLabelKey] = cvName
 	cluster.Labels = labels
+
 	return nil
 }
+
+var _ graph.Transformer = &FixMetaTransformer{}

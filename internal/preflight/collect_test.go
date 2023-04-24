@@ -100,7 +100,7 @@ var _ = Describe("collect_test", func() {
 					g.Expect(<-progressCh).NotTo(BeNil())
 				}
 			}()
-			results, err := CollectPreflight(context.TODO(), preflight, hostPreflight, progressCh)
+			results, err := CollectPreflight(tf, context.TODO(), preflight, hostPreflight, progressCh)
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(len(results)).Should(BeNumerically(">=", 3))
 		}).WithTimeout(timeOut).Should(Succeed())
@@ -129,7 +129,7 @@ var _ = Describe("collect_test", func() {
 					g.Expect(<-progressCh).NotTo(BeNil())
 				}
 			}()
-			collectResult, err := CollectRemoteData(context.TODO(), &preflightv1beta2.HostPreflight{}, progressCh)
+			collectResult, err := CollectRemoteData(context.TODO(), &preflightv1beta2.HostPreflight{}, tf, progressCh)
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(collectResult).NotTo(BeNil())
 		}).WithTimeout(timeOut).Should(Succeed())

@@ -35,24 +35,17 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// clusterTransformer transforms a Cluster to a K8s objects DAG
+// ClusterTransformer builds a Cluster into K8s objects and put them into a DAG
 // TODO: remove cli and ctx, we should read all objects needed, and then do pure objects computation
 // TODO: only replication set left
-type clusterTransformer struct {
-	cc  clusterRefResources
-	cli client.Client
-	ctx intctrlutil.RequestCtx
+type ClusterTransformer struct {
+	client.Client
 }
 
-func (c *clusterTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-
-	// return fast when cluster is deleting
+func (c *ClusterTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	origCluster := transCtx.OrigCluster
+	cluster := transCtx.Cluster
 	if isClusterDeleting(*origCluster) {
 		return nil
 	}
@@ -62,8 +55,8 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	resourcesQueue := make([]client.Object, 0, 3)
 	task := intctrltypes.ReconcileTask{
 		Cluster:           cluster,
-		ClusterDefinition: &c.cc.cd,
-		ClusterVersion:    &c.cc.cv,
+		ClusterDefinition: transCtx.ClusterDef,
+		ClusterVersion:    transCtx.ClusterVer,
 		Resources:         &resourcesQueue,
 	}
 
@@ -73,9 +66,14 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	}
 
 	clusterCompSpecMap := cluster.Spec.GetDefNameMappingComponents()
-	clusterCompVerMap := c.cc.cv.Spec.GetDefNameMappingComponents()
+	clusterCompVerMap := transCtx.ClusterVer.Spec.GetDefNameMappingComponents()
 	process1stComp := true
 
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      transCtx.Context,
+		Log:      transCtx.Logger,
+		Recorder: transCtx.EventRecorder,
+	}
 	// TODO: should move credential secrets creation from system_account_controller & here into credential_transformer,
 	// TODO: as those secrets are owned by the cluster
 	prepareComp := func(synthesizedComp *component.SynthesizedComponent) error {
@@ -91,7 +89,7 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 		// build info that needs to be restored from backup
 		backupSourceName := clusterBackupResourceMap[synthesizedComp.Name]
 		if len(backupSourceName) > 0 {
-			backup, backupTool, err := getBackupObjects(c.ctx, c.cli, cluster.Namespace, backupSourceName)
+			backup, backupTool, err := getBackupObjects(transCtx.Context, c.Client, cluster.Namespace, backupSourceName)
 			if err != nil {
 				return err
 			}
@@ -99,19 +97,19 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 				return err
 			}
 		}
-		if err = plan.DoPITRPrepare(c.ctx.Ctx, c.cli, cluster, synthesizedComp); err != nil {
+		if err = plan.DoPITRPrepare(transCtx.Context, c.Client, cluster, synthesizedComp); err != nil {
 			return err
 		}
 
-		return plan.PrepareComponentResources(c.ctx, c.cli, &iParams)
+		return plan.PrepareComponentResources(reqCtx, c.Client, &iParams)
 	}
 
-	for _, compDef := range c.cc.cd.Spec.ComponentDefs {
+	for _, compDef := range transCtx.ClusterDef.Spec.ComponentDefs {
 		compDefName := compDef.Name
 		compVer := clusterCompVerMap[compDefName]
 		compSpecs := clusterCompSpecMap[compDefName]
 		for _, compSpec := range compSpecs {
-			if err := prepareComp(component.BuildComponent(c.ctx, *cluster, c.cc.cd, compDef, compSpec, compVer)); err != nil {
+			if err := prepareComp(component.BuildComponent(reqCtx, *cluster, *transCtx.ClusterDef, compDef, compSpec, compVer)); err != nil {
 				return err
 			}
 		}
@@ -119,12 +117,16 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 
 	// replication set will create duplicate env configmap and headless service
 	// dedup them
+	root, err := findRootVertex(dag)
+	if err != nil {
+		return err
+	}
 	objects := deDupResources(*task.Resources)
 	// now task.Resources to DAG vertices
 	for _, object := range objects {
 		vertex := &lifecycleVertex{obj: object}
 		dag.AddVertex(vertex)
-		dag.Connect(rootVertex, vertex)
+		dag.Connect(root, vertex)
 	}
 	return nil
 }
@@ -166,3 +168,5 @@ func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string
 	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
 	return compBackupMap, err
 }
+
+var _ graph.Transformer = &ClusterTransformer{}

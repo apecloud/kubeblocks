@@ -58,6 +58,8 @@ func getResource(res corev1.ResourceRequirements, name corev1.ResourceName) inte
 }
 
 var _ = Describe("create", func() {
+	var componentClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance
+
 	Context("setMonitor", func() {
 		var components []map[string]interface{}
 		BeforeEach(func() {
@@ -153,7 +155,7 @@ var _ = Describe("create", func() {
 	It("build default cluster component without environment", func() {
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
-		comps, err := buildClusterComp(cd, nil)
+		comps, err := buildClusterComp(cd, nil, componentClasses)
 		Expect(err).ShouldNot(HaveOccurred())
 		checkComponent(comps, "20Gi", 1, "1", "1Gi")
 	})
@@ -165,7 +167,7 @@ var _ = Describe("create", func() {
 		viper.Set("CLUSTER_DEFAULT_MEMORY", "2Gi")
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
-		comps, err := buildClusterComp(cd, nil)
+		comps, err := buildClusterComp(cd, nil, componentClasses)
 		Expect(err).ShouldNot(HaveOccurred())
 		checkComponent(comps, "5Gi", 1, "2", "2Gi")
 	})
@@ -181,13 +183,13 @@ var _ = Describe("create", func() {
 				keyReplicas: "10",
 			},
 		}
-		comps, err := buildClusterComp(cd, setsMap)
+		comps, err := buildClusterComp(cd, setsMap, componentClasses)
 		Expect(err).Should(Succeed())
 		checkComponent(comps, "10Gi", 10, "10", "2Gi")
 
 		setsMap[testing.ComponentDefName][keySwitchPolicy] = "invalid"
 		cd.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
-		_, err = buildClusterComp(cd, setsMap)
+		_, err = buildClusterComp(cd, setsMap, componentClasses)
 		Expect(err).Should(HaveOccurred())
 	})
 

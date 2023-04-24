@@ -137,10 +137,10 @@ func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 	return yamlDataList, nil
 }
 
-func (p *PreflightOptions) complete(factory cmdutil.Factory, args []string) error {
+func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) error {
 	// default no args, and run default validating vendor
 	if len(args) == 0 {
-		clientSet, err := factory.KubernetesClientSet()
+		clientSet, err := f.KubernetesClientSet()
 		if err != nil {
 			return errors.New("init k8s client failed, and please check kubeconfig")
 		}
@@ -205,7 +205,7 @@ func (p *PreflightOptions) run() error {
 		return err
 	}
 	// 2. collect data
-	collectResults, err = kbpreflight.CollectPreflight(ctx, kbPreflight, kbHostPreflight, progressCh)
+	collectResults, err = kbpreflight.CollectPreflight(p.factory, ctx, kbPreflight, kbHostPreflight, progressCh)
 	if err != nil {
 		return err
 	}

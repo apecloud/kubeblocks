@@ -186,36 +186,6 @@ var _ = Describe("DataProtection", func() {
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql (deleted)"))
 	})
 
-	It("delete-restore", func() {
-		By("test delete-restore cmd")
-		cmd := NewDeleteRestoreCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-
-		args := []string{"test1"}
-		clusterLabel := util.BuildLabelSelectorByNames("", args)
-
-		By("test delete-restore with cluster")
-		o := delete.NewDeleteOptions(tf, streams, types.BackupGVR())
-		Expect(completeForDeleteRestore(o, args)).Should(HaveOccurred())
-
-		By("test delete-restore with cluster and force")
-		o.Force = true
-		Expect(completeForDeleteRestore(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
-
-		By("test delete-restore with cluster and force and labels")
-		o.Force = true
-		customLabel := "test=test"
-		o.LabelSelector = customLabel
-		Expect(completeForDeleteRestore(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == customLabel+","+clusterLabel).Should(BeTrue())
-	})
-
-	It("list-restore", func() {
-		cmd := NewListRestoreCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-	})
-
 	It("restore", func() {
 		timestamp := time.Now().Format("20060102150405")
 		backupName := "backup-test-" + timestamp

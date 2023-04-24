@@ -17,20 +17,36 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package graph
+package lifecycle
 
-// Validator validate everything is ok before Build the plan
-type Validator interface {
-	Validate() error
+import (
+	"fmt"
+	"sync"
+
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+)
+
+type ParallelTransformers struct {
+	transformers []graph.Transformer
 }
 
-type ValidatorChain []Validator
-
-func (v *ValidatorChain) WalkThrough() error {
-	for _, validator := range *v {
-		if err := validator.Validate(); err != nil {
-			return err
-		}
+func (t *ParallelTransformers) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	var group sync.WaitGroup
+	var errs error
+	for _, transformer := range t.transformers {
+		transformer := transformer
+		group.Add(1)
+		go func() {
+			err := transformer.Transform(ctx, dag)
+			if err != nil {
+				// TODO: sync.Mutex errs
+				errs = fmt.Errorf("%v; %v", errs, err)
+			}
+			group.Done()
+		}()
 	}
-	return nil
+	group.Wait()
+	return errs
 }
+
+var _ graph.Transformer = &ParallelTransformers{}

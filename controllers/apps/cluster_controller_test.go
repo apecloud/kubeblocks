@@ -1109,6 +1109,10 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	Context("when creating cluster with multiple kinds of components", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+			createBackupPolicyTpl(clusterDefObj)
+		})
 
 		createNWaitClusterObj := func(components map[string]string,
 			addedComponentProcessor func(compName string, factory *testapps.MockClusterFactory)) {
@@ -1613,6 +1617,11 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	When("creating cluster with workloadType=consensus component", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+			createBackupPolicyTpl(clusterDefObj)
+		})
+
 		const (
 			compName    = consensusCompName
 			compDefName = consensusCompDefName

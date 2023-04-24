@@ -188,7 +188,7 @@ func (o *CreateOptions) Run() error {
 			return err
 		}
 		if dryRunStrategy != DryRunServer {
-			o.Name = unstructuredObj.GetName()
+			o.Name = previewObj.GetName()
 			if o.Quiet {
 				return nil
 			}

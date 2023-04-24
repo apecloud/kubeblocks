@@ -108,7 +108,8 @@ func isSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
 		return false
 	}
 	vsList := snapshotv1.VolumeSnapshotList{}
-	getVSErr := cli.List(ctx, &vsList)
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+	getVSErr := compatClient.List(&vsList)
 	return getVSErr == nil
 }
 
@@ -126,7 +127,8 @@ func deleteSnapshot(cli types2.ReadonlyClient,
 	}
 
 	vs := &snapshotv1.VolumeSnapshot{}
-	if err := cli.Get(reqCtx.Ctx, snapshotKey, vs); err != nil && !apierrors.IsNotFound(err) {
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: reqCtx.Ctx}
+	if err := compatClient.Get(snapshotKey, vs); err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 	objs = append(objs, vs)
@@ -277,7 +279,8 @@ func isVolumeSnapshotExists(cli types2.ReadonlyClient,
 	component *component.SynthesizedComponent) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
-	if err := cli.List(ctx, &vsList, ml); err != nil {
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+	if err := compatClient.List(&vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 	for _, vs := range vsList.Items {
@@ -333,7 +336,8 @@ func isVolumeSnapshotReadyToUse(cli types2.ReadonlyClient,
 	component *component.SynthesizedComponent) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
-	if err := cli.List(ctx, &vsList, ml); err != nil {
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+	if err := compatClient.List(&vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 	if len(vsList.Items) == 0 || vsList.Items[0].Status == nil {
@@ -364,7 +368,8 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 		}
 		ml := getBackupMatchingLabels(cluster.Name, component.Name)
 		vsList := snapshotv1.VolumeSnapshotList{}
-		if err := cli.List(ctx, &vsList, ml); err != nil {
+		compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+		if err := compatClient.List(&vsList, ml); err != nil {
 			return nil, err
 		}
 		if len(vsList.Items) == 0 {

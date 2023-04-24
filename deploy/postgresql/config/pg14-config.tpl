@@ -67,7 +67,7 @@ log_directory = 'log'
 log_filename = 'postgresql-%Y-%m-%d.log'
 {{ end -}}
 {{ end -}}
-{{ end -}}
+{{ end }}
 
 log_lock_waits = 'True'
 log_min_duration_statement = '100'

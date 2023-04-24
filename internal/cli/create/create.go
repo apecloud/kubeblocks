@@ -263,14 +263,14 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 			return err
 		}
 		if dryRunStrategy != DryRunServer {
-			o.Name = unstructuredObj.GetName()
+			o.Name = previewObj.GetName()
 			if o.Quiet {
 				return nil
 			}
 			if inputs.CustomOutPut != nil {
 				inputs.CustomOutPut(o)
 			} else {
-				fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+				fmt.Fprintf(o.Out, "%s %s created\n", previewObj.GetKind(), previewObj.GetName())
 			}
 			return nil
 		}

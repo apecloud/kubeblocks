@@ -289,6 +289,7 @@ func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *bindings.In
 	}
 	if mysqlOps.OriRole == LEADER {
 		result["event"] = OperationSuccess
+		result["lag"] = 0
 		result["message"] = "This is leader instance, leader has no lag"
 		return result, nil
 	}

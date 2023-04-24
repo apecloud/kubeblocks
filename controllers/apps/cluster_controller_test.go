@@ -74,10 +74,15 @@ var _ = Describe("Cluster Controller", func() {
 	)
 
 	var (
-		randomStr              = testCtx.GetRandomStr()
-		clusterNameRand        = "mysql-" + randomStr
-		clusterDefNameRand     = "mysql-definition-" + randomStr
-		clusterVersionNameRand = "mysql-cluster-version-" + randomStr
+		randomStr                        = testCtx.GetRandomStr()
+		clusterNameRand                  = "mysql-" + randomStr
+		clusterDefNameRand               = "mysql-definition-" + randomStr
+		clusterVersionNameRand           = "mysql-cluster-version-" + randomStr
+		clusterDefObj                    *appsv1alpha1.ClusterDefinition
+		clusterVersionObj                *appsv1alpha1.ClusterVersion
+		clusterObj                       *appsv1alpha1.Cluster
+		clusterKey                       types.NamespacedName
+		createAllWorkloadTypesClusterDef func(noCreateAssociateCV ...bool)
 	)
 
 	// Cleanups
@@ -113,15 +118,8 @@ var _ = Describe("Cluster Controller", func() {
 		cleanEnv()
 	})
 
-	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
-		clusterObj        *appsv1alpha1.Cluster
-		clusterKey        types.NamespacedName
-	)
-
 	// test function helpers
-	createAllWorkloadTypesClusterDef := func(noCreateAssociateCV ...bool) {
+	createAllWorkloadTypesClusterDef = func(noCreateAssociateCV ...bool) {
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
@@ -201,11 +199,21 @@ var _ = Describe("Cluster Controller", func() {
 		g.Expect(len(expectServices)).Should(Equal(len(svcList.Items)))
 	}
 
-	testWipeOut := func() {
+	createClusterObj := func(compName, compDefName string) {
 		By("Creating a cluster")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(compName, compDefName).
+			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster enter running phase")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+	}
+
+	testWipeOut := func(compName, compDefName string) {
+		createClusterObj(compName, compDefName)
 
 		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -220,15 +228,8 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 	}
 
-	testDoNotTermintate := func() {
-		By("Creating a cluster")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster enter running phase")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+	testDoNotTermintate := func(compName, compDefName string) {
+		createClusterObj(compName, compDefName)
 
 		// REVIEW: this test flow
 
@@ -276,15 +277,8 @@ var _ = Describe("Cluster Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 	}
 
-	testChangeReplicas := func() {
-		By("Creating a cluster")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster enter running phase")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+	testChangeReplicas := func(compName, compDefName string) {
+		createClusterObj(compName, compDefName)
 
 		replicasSeq := []int32{5, 3, 1, 0, 2, 4}
 		expectedOG := int64(1)
@@ -510,7 +504,6 @@ var _ = Describe("Cluster Controller", func() {
 
 					Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
 						&dataprotectionv1alpha1.BackupPolicy{}, true)).Should(Succeed())
-
 				}
 			})()).ShouldNot(HaveOccurred())
 		//
@@ -580,7 +573,7 @@ var _ = Describe("Cluster Controller", func() {
 		horizontalScale(int(updatedReplicas))
 	}
 
-	testVerticalScale := func(compName, compDefName string) {
+	testStorageExpansion := func(compName, compDefName string) {
 		const storageClassName = "sc-mock"
 		const replicas = 3
 
@@ -611,6 +604,8 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
 		By("Checking the replicas")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 		sts := &stsList.Items[0]
@@ -632,18 +627,19 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(k8sClient.Status().Update(testCtx.Ctx, pvc)).Should(Succeed())
 		}
 
+		By("mock pods/sts of component are available")
+		testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, compName)
+		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			testk8s.MockStatefulSetReady(sts)
+		})).ShouldNot(HaveOccurred())
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
+
 		By("Updating the PVC storage size")
 		newStorageValue := resource.MustParse("2Gi")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			comp := &cluster.Spec.ComponentSpecs[0]
 			comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
 		})()).ShouldNot(HaveOccurred())
-
-		By("mock pods/sts of component are available")
-		testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, compName)
-		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-			testk8s.MockStatefulSetReady(sts)
-		})).ShouldNot(HaveOccurred())
 
 		By("Checking the resize operation finished")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
@@ -1023,7 +1019,6 @@ var _ = Describe("Cluster Controller", func() {
 	// Scenarios
 	Context("when creating cluster without clusterversion", func() {
 		BeforeEach(func() {
-			By("Create a clusterDefinition obj")
 			createAllWorkloadTypesClusterDef(true)
 		})
 
@@ -1044,6 +1039,10 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	Context("when creating cluster with multiple kinds of components", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+			createBackupPolicyTpl(clusterDefObj)
+		})
 
 		createNWaitClusterObj := func(components map[string]string,
 			addedComponentProcessor func(compName string, factory *testapps.MockClusterFactory)) {
@@ -1292,12 +1291,6 @@ var _ = Describe("Cluster Controller", func() {
 			horizontalScale(int(updatedReplicas), consensusCompDefName, replicationCompDefName)
 		}
 
-		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
-			By("Creating a BackupPolicyTemplate")
-			createBackupPolicyTpl(clusterDefObj)
-		})
-
 		It("should create all sub-resources successfully", func() {
 			checkAllResourcesCreated()
 		})
@@ -1315,108 +1308,111 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	When("creating cluster with workloadType=stateful component", func() {
-		const (
-			compName    = statefulCompName
-			compDefName = statefulCompDefName
-		)
+	When("creating cluster with workloadType=[Stateful|Consensus|Replication] component", func() {
 		BeforeEach(func() {
-			By("Create a clusterDefinition obj")
 			createAllWorkloadTypesClusterDef()
-
-			By("Creating a BackupPolicyTemplate")
 			createBackupPolicyTpl(clusterDefObj)
 		})
 
-		It("should delete cluster resources immediately if deleting cluster with WipeOut termination policy", func() {
-			testWipeOut()
-		})
+		compNameNDef := map[string]string{
+			statefulCompName:    statefulCompDefName,
+			consensusCompName:   consensusCompDefName,
+			replicationCompName: replicationCompDefName,
+		}
 
-		It("should not terminate immediately if deleting cluster with DoNotTerminate termination policy", func() {
-			testDoNotTermintate()
-		})
-
-		It("should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", func() {
-			testChangeReplicas()
-		})
-
-		Context("and with cluster affinity set", func() {
-			It("should create pod with cluster affinity", func() {
-				testClusterAffinity(compName, compDefName)
+		for compName, compDefName := range compNameNDef {
+			It(fmt.Sprintf("[comp: %s] should delete cluster resources immediately if deleting cluster with WipeOut termination policy", compName), func() {
+				testWipeOut(compName, compDefName)
 			})
-		})
 
-		Context("and with both cluster affinity and component affinity set", func() {
-			It("Should observe the component affinity will override the cluster affinity", func() {
-				testComponentAffinity(compName, compDefName)
+			It(fmt.Sprintf("[comp: %s] should not terminate immediately if deleting cluster with DoNotTerminate termination policy", compName), func() {
+				testDoNotTermintate(compName, compDefName)
 			})
-		})
 
-		Context("and with cluster tolerations set", func() {
-			It("Should create pods with cluster tolerations", func() {
-				testClusterToleration(compName, compDefName)
+			It(fmt.Sprintf("[comp: %s] should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", compName), func() {
+				testChangeReplicas()
 			})
-		})
 
-		Context("and with both cluster tolerations and component tolerations set", func() {
-			It("Should observe the component tolerations will override the cluster tolerations", func() {
-				testComponentToleration(compName, compDefName)
+			Context(fmt.Sprintf("[comp: %s] and with cluster affinity set", compName), func() {
+				It("should create pod with cluster affinity", func() {
+					testClusterAffinity(compName, compDefName)
+				})
 			})
-		})
 
-		Context("with pvc", func() {
-			It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
-				testHorizontalScale(compName, compDefName)
+			Context(fmt.Sprintf("[comp: %s] and with both cluster affinity and component affinity set", compName), func() {
+				It("Should observe the component affinity will override the cluster affinity", func() {
+					testComponentAffinity(compName, compDefName)
+				})
 			})
-		})
 
-		Context("with pvc and dynamic-provisioning storage class", func() {
-			It("should update PVC request storage size accordingly when vertical scale the cluster", func() {
-				testVerticalScale(compName, compDefName)
+			Context(fmt.Sprintf("[comp: %s] and with cluster tolerations set", compName), func() {
+				It("Should create pods with cluster tolerations", func() {
+					testClusterToleration(compName, compDefName)
+				})
 			})
-		})
+
+			Context(fmt.Sprintf("[comp: %s] and with both cluster tolerations and component tolerations set", compName), func() {
+				It("Should observe the component tolerations will override the cluster tolerations", func() {
+					testComponentToleration(compName, compDefName)
+				})
+			})
+
+			Context(fmt.Sprintf("[comp: %s] with pvc", compName), func() {
+				It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
+					testHorizontalScale(compName, compDefName)
+				})
+			})
+
+			Context(fmt.Sprintf("[comp: %s] with pvc and dynamic-provisioning storage class", compName), func() {
+				It("should update PVC request storage size accordingly", func() {
+					testStorageExpansion(compName, compDefName)
+				})
+			})
+		}
 	})
 
 	When("creating cluster with workloadType=consensus component", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+			createBackupPolicyTpl(clusterDefObj)
+		})
+
 		const (
 			compName    = consensusCompName
 			compDefName = consensusCompDefName
 		)
-		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
-
-			By("Creating a BackupPolicyTemplate")
-			createBackupPolicyTpl(clusterDefObj)
-		})
 
 		It("Should success with one leader pod and two follower pods", func() {
 			testThreeReplicas(compName, compDefName)
 		})
 
-		It("should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", func() {
-			testChangeReplicas()
-		})
+		// // duplicated with "creating cluster with workloadType=[Stateful|Consensus|Replication] component" context
+		// It("should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", func() {
+		// 	testChangeReplicas()
+		// })
+		//
+		// // duplicated with "creating cluster with workloadType=[Stateful|Consensus|Replication] component" context
+		// Context("with pvc", func() {
+		// 	It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
+		// 		testHorizontalScale(compName, compDefName)
+		// 	})
+		// })
+		//
+		// // duplicated with "creating cluster with workloadType=[Stateful|Consensus|Replication] component" context
+		// Context("with pvc and dynamic-provisioning storage class", func() {
+		// 	It("should update PVC request storage size accordingly", func() {
+		// 		testStorageExpansion(compName, compDefName)
+		// 	})
+		// })
 
-		Context("with pvc", func() {
-			It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
-				testHorizontalScale(compName, compDefName)
-			})
-		})
-
-		Context("with pvc and dynamic-provisioning storage class", func() {
-			It("should update PVC request storage size accordingly when vertical scale the cluster", func() {
-				testVerticalScale(compName, compDefName)
-			})
-		})
-
-		Context("with horizontalScale after verticalScale", func() {
-			It("should succeed", func() {
-				testVerticalScale(compName, compDefName)
+		Context("with horizontal scale after storage expansion", func() {
+			It("should succeed with horizontal scale to 5 replicas", func() {
+				testStorageExpansion(compName, compDefName)
 				horizontalScale(5)
 			})
 		})
 
-		It("should report error if backup error during h-scale", func() {
+		It("should report error if backup error during horizontal scale", func() {
 			testBackupError(compName, compDefName)
 		})
 

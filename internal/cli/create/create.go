@@ -130,47 +130,13 @@ func (o *CreateOptions) Complete() error {
 
 // Run execute command. the options of parameter contain the command flags and args.
 func (o *CreateOptions) Run() error {
-	var (
-		cueValue        cue.Value
-		err             error
-		unstructuredObj *unstructured.Unstructured
-		optionsByte     []byte
-	)
-
-	if optionsByte, err = json.Marshal(o.Options); err != nil {
-		return err
-	}
-
-	// append namespace and name to options and marshal to json
-	m := make(map[string]interface{})
-	if err = json.Unmarshal(optionsByte, &m); err != nil {
-		return err
-	}
-	m["namespace"] = o.Namespace
-	m["name"] = o.Name
-	if optionsByte, err = json.Marshal(m); err != nil {
-		return err
-	}
-
-	if cueValue, err = newCueValue(o.CueTemplateName); err != nil {
-		return err
-	}
-
-	if cueValue, err = fillOptions(cueValue, optionsByte); err != nil {
-		return err
-	}
-
-	if unstructuredObj, err = convertContentToUnstructured(cueValue); err != nil {
-		return err
-	}
-
+	resObj, err := o.buildResourceObj()
 	if o.PreCreate != nil {
-		if err = o.PreCreate(unstructuredObj); err != nil {
+		if err = o.PreCreate(resObj); err != nil {
 			return err
 		}
 	}
 
-	previewObj := unstructuredObj
 	dryRunStrategy, err := GetDryRunStrategy(o.Cmd)
 	if err != nil {
 		return err
@@ -183,19 +149,19 @@ func (o *CreateOptions) Run() error {
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		// create k8s resource
-		previewObj, err = o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Create(context.TODO(), previewObj, createOptions)
+		resObj, err = o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Create(context.TODO(), resObj, createOptions)
 		if err != nil {
 			return err
 		}
 		if dryRunStrategy != DryRunServer {
-			o.Name = previewObj.GetName()
+			o.Name = resObj.GetName()
 			if o.Quiet {
 				return nil
 			}
 			if o.CustomOutPut != nil {
 				o.CustomOutPut(o)
 			} else {
-				fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+				fmt.Fprintf(o.Out, "%s %s created\n", resObj.GetKind(), resObj.GetName())
 			}
 			return nil
 		}
@@ -204,59 +170,70 @@ func (o *CreateOptions) Run() error {
 	if err != nil {
 		return err
 	}
-	return printer.PrintObj(previewObj, o.Out)
+	return printer.PrintObj(resObj, o.Out)
 }
 
 // RunAsApply execute command. the options of parameter contain the command flags and args.
 // if the resource exists, run as "kubectl apply".
 func (o *CreateOptions) RunAsApply() error {
-	var (
-		cueValue        cue.Value
-		err             error
-		unstructuredObj *unstructured.Unstructured
-		optionsByte     []byte
-	)
-
-	if optionsByte, err = json.Marshal(o.Options); err != nil {
-		return err
-	}
-
-	if cueValue, err = newCueValue(o.CueTemplateName); err != nil {
-		return err
-	}
-
-	if cueValue, err = fillOptions(cueValue, optionsByte); err != nil {
-		return err
-	}
-
-	if unstructuredObj, err = convertContentToUnstructured(cueValue); err != nil {
+	resObj, err := o.buildResourceObj()
+	if err != nil {
 		return err
 	}
 
 	// create k8s resource
-	objectName, _, err := unstructured.NestedString(unstructuredObj.Object, "metadata", "name")
+	objectName, _, err := unstructured.NestedString(resObj.Object, "metadata", "name")
 	if err != nil {
 		return err
 	}
-	objectByte, err := json.Marshal(unstructuredObj)
-	if err != nil {
-		return err
-	}
-	if _, err := o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Patch(
-		context.TODO(), objectName, k8sapitypes.MergePatchType,
-		objectByte, metav1.PatchOptions{}); err != nil {
 
-		// create object if not found
-		if errors.IsNotFound(err) {
-			if _, err = o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Create(
-				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
+	objectByte, err := json.Marshal(resObj)
+	if err != nil {
+		return err
 	}
-	return nil
+
+	_, err = o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Patch(context.TODO(),
+		objectName, k8sapitypes.MergePatchType, objectByte, metav1.PatchOptions{})
+	if !errors.IsNotFound(err) {
+		return err
+	}
+
+	// create object if not found
+	_, err = o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Create(context.TODO(),
+		resObj, metav1.CreateOptions{})
+	return err
+}
+
+func (o *CreateOptions) buildResourceObj() (*unstructured.Unstructured, error) {
+	var (
+		cueValue    cue.Value
+		err         error
+		optionsByte []byte
+	)
+
+	if optionsByte, err = json.Marshal(o.Options); err != nil {
+		return nil, err
+	}
+
+	// append namespace and name to options and marshal to json
+	m := make(map[string]interface{})
+	if err = json.Unmarshal(optionsByte, &m); err != nil {
+		return nil, err
+	}
+	m["namespace"] = o.Namespace
+	m["name"] = o.Name
+	if optionsByte, err = json.Marshal(m); err != nil {
+		return nil, err
+	}
+
+	if cueValue, err = newCueValue(o.CueTemplateName); err != nil {
+		return nil, err
+	}
+
+	if cueValue, err = fillOptions(cueValue, optionsByte); err != nil {
+		return nil, err
+	}
+	return convertContentToUnstructured(cueValue)
 }
 
 // NewCueValue convert cue template  to cue Value which holds any value like Boolean,Struct,String and more cue type.

@@ -135,7 +135,7 @@ var _ = Describe("create", func() {
 		})
 	})
 
-	checkComponent := func(comps []*appsv1alpha1.ClusterComponentSpec, storage string, replicas int32, cpu string, memory string, StorageClassName string) {
+	checkComponent := func(comps []*appsv1alpha1.ClusterComponentSpec, storage string, replicas int32, cpu string, memory string, storageClassName string) {
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
 
@@ -148,10 +148,10 @@ var _ = Describe("create", func() {
 		Expect(getResource(resources, corev1.ResourceCPU)).Should(Equal(cpu))
 		Expect(getResource(resources, corev1.ResourceMemory)).Should(Equal(memory))
 
-		if StorageClassName == "" {
+		if storageClassName == "" {
 			Expect(comp.VolumeClaimTemplates[0].Spec.StorageClassName).Should(BeNil())
 		} else {
-			Expect(*comp.VolumeClaimTemplates[0].Spec.StorageClassName).Should(Equal(StorageClassName))
+			Expect(*comp.VolumeClaimTemplates[0].Spec.StorageClassName).Should(Equal(storageClassName))
 		}
 
 	}

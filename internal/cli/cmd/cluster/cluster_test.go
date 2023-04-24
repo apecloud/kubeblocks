@@ -48,7 +48,7 @@ var _ = Describe("Cluster", func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
 		cd := testing.FakeClusterDef()
-		fakeDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.ISDefautl)
+		fakeDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsDefautl)
 		tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeDefaultStorageClass, testing.FakeClusterVersion())
 		tf.Client = &clientfake.RESTClient{}
 	})
@@ -96,7 +96,7 @@ var _ = Describe("Cluster", func() {
 			clusterDef := testing.FakeClusterDef()
 			tf.FakeDynamicClient = testing.FakeDynamicClient(
 				clusterDef,
-				testing.FakeStorageClass(testing.StorageClassName, testing.ISDefautl),
+				testing.FakeStorageClass(testing.StorageClassName, testing.IsDefautl),
 				testing.FakeComponentClassDef(fmt.Sprintf("custom-%s", testing.ComponentDefName), clusterDef.Name, testing.ComponentDefName),
 				testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
 			)

@@ -55,7 +55,7 @@ const (
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupToolName      = "fake-backup-tool"
 
-	ISDefautl    = true
+	IsDefautl    = true
 	IsNotDefault = false
 )
 

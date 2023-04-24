@@ -783,11 +783,13 @@ func validateStorageClass(dynamic dynamic.Interface, components []map[string]int
 		}
 		for _, vct := range compObj.VolumeClaimTemplates {
 			name := vct.Spec.StorageClassName
-			if name != nil { // 1. validate the specified StorageClass whether exist
+			if name != nil {
+				// validate the specified StorageClass whether exist
 				if _, ok := existedStorageClasses[*name]; !ok {
 					return fmt.Errorf("failed to find the specified storageClass \"%s\"", *name)
 				}
-			} else if !existedDefault { // 2. validate the default StorageClass
+			} else if !existedDefault {
+				// validate the default StorageClass
 				return fmt.Errorf("failed to find the default storageClass, use '--set storageClass=NAME' to set it")
 			}
 		}
@@ -795,7 +797,7 @@ func validateStorageClass(dynamic dynamic.Interface, components []map[string]int
 	return nil
 }
 
-// getStorageClasses return all StorageClasses in K8S and return true if the cluster have a defalut StorageClasses
+// getStorageClasses return all StorageClasses in K8S and return true if the cluster have a default StorageClasses
 func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, error) {
 	gvr := types.StorageClassGVR()
 	allStorageClasses := make(map[string]struct{})
@@ -807,9 +809,8 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 	for _, item := range list.Items {
 		allStorageClasses[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
-		if annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == "true" || annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true") {
+		if !existedDefault && annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == "true" || annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true") {
 			existedDefault = true
-			break
 		}
 	}
 	return allStorageClasses, existedDefault, nil

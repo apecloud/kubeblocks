@@ -308,7 +308,8 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Name).ShouldNot(BeEmpty())
 			Expect(o.Validate()).Should(Succeed())
 			o.Name = ""
-			Expect(o.Validate()).Should(Succeed()) // Expected to generate a random name
+			// Expected to generate a random name
+			Expect(o.Validate()).Should(Succeed())
 		})
 
 		It("can validate whether the name is not longer than 16 characters when create a new cluster", func() {

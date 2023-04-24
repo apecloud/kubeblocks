@@ -165,7 +165,7 @@ var _ = Describe("operations", func() {
 	It("Restart ops", func() {
 		o := initCommonOperationOps(appsv1alpha1.RestartType, clusterName, true)
 		By("expect for not found error")
-		inputs := buildOperationsInputs(tf, o)
+		inputs := buildCreateOptions(tf, o)
 		Expect(o.Complete(inputs, []string{clusterName + "2"}))
 		Expect(o.CompleteRestartOps().Error()).Should(ContainSubstring("not found"))
 

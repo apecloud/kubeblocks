@@ -100,7 +100,7 @@ var _ = Describe("reconfigure test", func() {
 		o := &configOpsOptions{
 			// nil cannot be set to a map struct in CueLang, so init the map of KeyValues.
 			OperationsOptions: &OperationsOptions{
-				BaseOptions: *ops,
+				CreateOptions: *ops,
 			},
 		}
 		o.KeyValues = make(map[string]string)
@@ -124,7 +124,7 @@ var _ = Describe("reconfigure test", func() {
 		in := &bytes.Buffer{}
 		in.Write([]byte("yes\n"))
 
-		o.BaseOptions.In = io.NopCloser(in)
+		o.CreateOptions.In = io.NopCloser(in)
 		Expect(o.Validate()).Should(Succeed())
 	})
 

@@ -295,7 +295,7 @@ func (o *ConnectOptions) getTargetPod() error {
 		return fmt.Errorf("component name is not set yet")
 	}
 
-	// get instantces for given cluster name and component name
+	// get instances for given cluster name and component name
 	infos := cluster.GetSimpleInstanceInfosForComponent(o.Dynamic, o.clusterName, o.componentName, o.Namespace)
 	if len(infos) == 0 || infos[0].Name == computil.ComponentStatusDefaultPodName {
 		return fmt.Errorf("failed to find the instance to connect, please check cluster status")

@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -72,7 +71,7 @@ func (o *configOpsOptions) Complete() error {
 		o.KeyValues = kvs
 	}
 
-	wrapper, err := newConfigWrapper(o.BaseOptions, o.Name, o.ComponentName, o.CfgTemplateName, o.CfgFile, o.KeyValues)
+	wrapper, err := newConfigWrapper(o.CreateOptions, o.Name, o.ComponentName, o.CfgTemplateName, o.CfgFile, o.KeyValues)
 	if err != nil {
 		return err
 	}
@@ -190,9 +189,9 @@ func (o *configOpsOptions) printConfigureTips() {
 		printer.NewPair("ClusterName", o.Name))
 }
 
-// buildCommonFlags build common flags for operations command
+// addCommonFlags build common flags for operations command
 func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command) {
-	o.buildCommonFlags(cmd)
+	o.addCommonFlags(cmd)
 	cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-config'.")
 	cmd.Flags().StringVar(&o.ComponentName, "component", "", "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
 	cmd.Flags().StringVar(&o.CfgTemplateName, "config-spec", "", "Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.")
@@ -203,17 +202,21 @@ func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command) {
 func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &configOpsOptions{
 		editMode:          false,
-		OperationsOptions: newBaseOperationsOptions(streams, appsv1alpha1.ReconfiguringType, false),
+		OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, false),
 	}
-	inputs := buildOperationsInputs(f, o.OperationsOptions)
-	inputs.Use = "configure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file]"
-	inputs.Short = "Reconfigure parameters with the specified components in the cluster."
-	inputs.Example = createReconfigureExample
-	inputs.BuildFlags = func(cmd *cobra.Command) {
-		o.buildReconfigureCommonFlags(cmd)
+	cmd := &cobra.Command{
+		Use:               "reconfigure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file]",
+		Short:             "Reconfigure parameters with the specified components in the cluster.",
+		Example:           createReconfigureExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Cmd, o.Args = cmd, args
+			cmdutil.CheckErr(o.CreateOptions.Complete())
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
+		},
 	}
-
-	inputs.Complete = o.Complete
-	inputs.Validate = o.Validate
-	return create.BuildCommand(inputs)
+	o.buildReconfigureCommonFlags(cmd)
+	return cmd
 }

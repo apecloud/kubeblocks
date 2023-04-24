@@ -55,7 +55,7 @@ var (
 
 func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error) error {
 	wrapper := o.wrapper
-	cfgEditContext := newConfigContext(o.BaseOptions, o.Name, wrapper.ComponentName(), wrapper.ConfigSpecName(), wrapper.ConfigFile())
+	cfgEditContext := newConfigContext(o.CreateOptions, o.Name, wrapper.ComponentName(), wrapper.ConfigSpecName(), wrapper.ConfigFile())
 	if err := cfgEditContext.prepare(); err != nil {
 		return err
 	}
@@ -158,40 +158,32 @@ func (o *editConfigOptions) confirmReconfigure(promptStr string) (bool, error) {
 
 // NewEditConfigureCmd shows the difference between two configuration version.
 func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	editOptions := &editConfigOptions{
+	o := &editConfigOptions{
 		configOpsOptions: configOpsOptions{
 			editMode:          true,
-			OperationsOptions: newBaseOperationsOptions(streams, appsv1alpha1.ReconfiguringType, false),
+			OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, false),
 		}}
-	inputs := buildOperationsInputs(f, editOptions.OperationsOptions)
-	inputs.Use = editConfigUse
-	inputs.Short = "Edit the config file of the component."
-	inputs.Example = editConfigExample
-	inputs.BuildFlags = func(cmd *cobra.Command) {
-		editOptions.buildReconfigureCommonFlags(cmd)
-		cmd.Flags().BoolVar(&editOptions.replaceFile, "replace", false, "Specify whether to replace the config file. Default to false.")
-	}
-	inputs.Complete = editOptions.Complete
-	inputs.Validate = editOptions.Validate
 
 	cmd := &cobra.Command{
-		Use:     inputs.Use,
-		Short:   inputs.Short,
-		Example: inputs.Example,
+		Use:               editConfigUse,
+		Short:             "Edit the config file of the component.",
+		Example:           editConfigExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
-			util.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
-			util.CheckErr(editOptions.Run(func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error {
+			o.Cmd, o.Args = cmd, args
+			cmdutil.CheckErr(o.CreateOptions.Complete())
+			util.CheckErr(o.Complete())
+			util.CheckErr(o.Validate())
+			util.CheckErr(o.Run(func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error {
 				// generate patch for config
 				formatterConfig := cc.FormatterConfig
 				params := cfgcore.GenerateVisualizedParamsList(info, formatterConfig, nil)
-				editOptions.KeyValues = fromKeyValuesToMap(params, editOptions.CfgFile)
-				return inputs.BaseOptionsObj.Run(inputs)
+				o.KeyValues = fromKeyValuesToMap(params, o.CfgFile)
+				return o.CreateOptions.Run()
 			}))
 		},
 	}
-	if inputs.BuildFlags != nil {
-		inputs.BuildFlags(cmd)
-	}
+	o.buildReconfigureCommonFlags(cmd)
+	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Specify whether to replace the config file. Default to false.")
 	return cmd
 }

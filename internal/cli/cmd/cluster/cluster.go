@@ -86,10 +86,10 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			Commands: []*cobra.Command{
 				NewListBackupPolicyCmd(f, streams),
 				NewEditBackupPolicyCmd(f, streams),
-				NewCreateBackupCmd(f, streams),
+				NewBackupCmd(f, streams),
 				NewListBackupCmd(f, streams),
 				NewDeleteBackupCmd(f, streams),
-				NewCreateRestoreCmd(f, streams),
+				NewRestoreCmd(f, streams),
 			},
 		},
 		{

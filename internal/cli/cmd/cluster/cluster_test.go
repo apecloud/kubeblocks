@@ -65,7 +65,7 @@ var _ = Describe("Cluster", func() {
 				UpdatableFlags: UpdatableFlags{
 					TerminationPolicy: "Delete",
 				},
-				BaseOptions: create.BaseOptions{
+				CreateOptions: create.CreateOptions{
 					Dynamic: tf.FakeDynamicClient,
 				},
 			}
@@ -99,7 +99,7 @@ var _ = Describe("Cluster", func() {
 				testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
 			)
 			o = &CreateOptions{
-				BaseOptions:       create.BaseOptions{IOStreams: streams, Name: "test", Dynamic: tf.FakeDynamicClient},
+				CreateOptions:     create.CreateOptions{IOStreams: streams, Name: "test", Dynamic: tf.FakeDynamicClient},
 				SetFile:           "",
 				ClusterDefRef:     testing.ClusterDefName,
 				ClusterVersionRef: "cluster-version",
@@ -122,7 +122,7 @@ var _ = Describe("Cluster", func() {
 				Factory:         tf,
 			}
 
-			Expect(o.BaseOptions.Complete(inputs, []string{"test"})).Should(Succeed())
+			Expect(o.CreateOptions.Complete(inputs, []string{"test"})).Should(Succeed())
 			Expect(o.Namespace).To(Equal("default"))
 			Expect(o.Name).To(Equal("test"))
 
@@ -256,7 +256,7 @@ var _ = Describe("Cluster", func() {
 				UpdatableFlags: UpdatableFlags{
 					TerminationPolicy: "Delete",
 				},
-				BaseOptions: create.BaseOptions{
+				CreateOptions: create.CreateOptions{
 					Namespace: "default",
 					Name:      "mycluster",
 					Dynamic:   tf.FakeDynamicClient,

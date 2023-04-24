@@ -37,14 +37,14 @@ var _ = Describe("Create", func() {
 	var (
 		tf          *cmdtesting.TestFactory
 		streams     genericclioptions.IOStreams
-		baseOptions BaseOptions
+		baseOptions CreateOptions
 	)
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 		tf.Client = &clientfake.RESTClient{}
-		baseOptions = BaseOptions{
+		baseOptions = CreateOptions{
 			Name:      "test",
 			IOStreams: streams,
 		}
@@ -65,29 +65,15 @@ var _ = Describe("Create", func() {
 				"terminationPolicy": "Halt",
 			}
 
-			inputs := Inputs{
+			options := CreateOptions{
 				CueTemplateName: "create_template_test.cue",
-				ResourceName:    types.ResourceClusters,
-				BaseOptionsObj:  &baseOptions,
+				GVR:             types.ClusterGVR(),
 				Options:         clusterOptions,
 				Factory:         tf,
-				Validate: func() error {
-					return nil
-				},
-				Complete: func() error {
-					return nil
-				},
-				BuildFlags: func(cmd *cobra.Command) {
-					cmd.Flags().StringVar(&baseOptions.Namespace, "clusterDefRef", "", "cluster definition")
-				},
+				Name:            "test",
+				Namespace:       testing.Namespace,
 			}
-			cmd := BuildCommand(inputs)
-			Expect(cmd).ShouldNot(BeNil())
-			Expect(cmd.Flags().Lookup("clusterDefRef")).ShouldNot(BeNil())
-
-			Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
-			Expect(baseOptions.Validate(inputs)).Should(Succeed())
-			Expect(baseOptions.Run(inputs)).Should(Succeed())
+			Expect(options.Complete([]string{})).Should(Succeed())
 		})
 
 		It("test create dry-run", func() {

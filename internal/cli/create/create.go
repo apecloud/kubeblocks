@@ -42,9 +42,6 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -52,73 +49,35 @@ var (
 	cueTemplate embed.FS
 )
 
-type Inputs struct {
-	// Use cobra command use
-	Use string
+// CreateOptions the options of creation command should inherit baseOptions
+type CreateOptions struct {
+	Factory   cmdutil.Factory
+	Namespace string
 
-	// Short is the short description shown in the 'help' output.
-	Short string
+	// Name Resource name of the command line operation
+	Name      string
+	Dynamic   dynamic.Interface
+	Client    kubernetes.Interface
+	Format    printer.Format
+	ToPrinter func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
+	Args      []string
+	Cmd       *cobra.Command
 
-	// Example is examples of how to use the command.
-	Example string
-
-	// BaseOptionsObj
-	BaseOptionsObj *BaseOptions
-
-	// Options a command options object which extends BaseOptions
-	Options interface{}
-
-	// CueTemplateName cue template file name
+	// CueTemplateName cue template file name to render the resource
 	CueTemplateName string
 
-	// ResourceName k8s resource name
-	ResourceName string
+	// Options a command options object which extends CreateOptions that will be used
+	// to render the cue template
+	Options interface{}
 
-	// Group of API, default is apps
-	Group string
+	// GVR is the GroupVersionResource of the resource to be created
+	GVR schema.GroupVersionResource
 
-	// Group of Version, default is v1alpha1
-	Version string
-
-	// Command of input
-	Cmd *cobra.Command
-
-	// Factory
-	Factory cmdutil.Factory
-
-	// ValidateFunc optional, custom validate func
-	Validate func() error
-
-	// Complete optional, do custom complete options
-	Complete func() error
-
-	BuildFlags func(*cobra.Command)
+	// CustomOutPut will be executed after creating successfully.
+	CustomOutPut func(options *CreateOptions)
 
 	// PreCreate optional, make changes on yaml before create
 	PreCreate func(*unstructured.Unstructured) error
-
-	// CustomOutPut will be executed after creating successfully.
-	CustomOutPut func(options *BaseOptions)
-
-	// ResourceNameGVRForCompletion resource name for completion.
-	ResourceNameGVRForCompletion schema.GroupVersionResource
-}
-
-// BaseOptions the options of creation command should inherit baseOptions
-type BaseOptions struct {
-	// Namespace k8s namespace
-	Namespace string `json:"namespace"`
-
-	// Name Resource name of the command line operation
-	Name string `json:"name"`
-
-	Dynamic dynamic.Interface `json:"-"`
-
-	Client kubernetes.Interface `json:"-"`
-
-	ToPrinter func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error) `json:"-"`
-
-	Format printer.Format `json:"-"`
 
 	// Quiet minimize unnecessary output
 	Quiet bool
@@ -126,41 +85,22 @@ type BaseOptions struct {
 	genericclioptions.IOStreams
 }
 
-// BuildCommand build create command
-func BuildCommand(inputs Inputs) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:               inputs.Use,
-		Short:             inputs.Short,
-		Example:           inputs.Example,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(inputs.Factory, inputs.ResourceNameGVRForCompletion),
-		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
-			util.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
-			util.CheckErr(inputs.BaseOptionsObj.Run(inputs))
-		},
-	}
-	inputs.Cmd = cmd
-	if inputs.BuildFlags != nil {
-		inputs.BuildFlags(cmd)
-	}
-	return cmd
-}
-
-func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
+func (o *CreateOptions) Complete() error {
 	var err error
-	if o.Namespace, _, err = inputs.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
+	if o.Namespace, _, err = o.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
 	}
 
-	if len(args) > 0 {
-		o.Name = args[0]
+	// now we use the first argument as the resource name
+	if len(o.Args) > 0 {
+		o.Name = o.Args[0]
 	}
 
-	if o.Dynamic, err = inputs.Factory.DynamicClient(); err != nil {
+	if o.Dynamic, err = o.Factory.DynamicClient(); err != nil {
 		return err
 	}
 
-	if o.Client, err = inputs.Factory.KubernetesClientSet(); err != nil {
+	if o.Client, err = o.Factory.KubernetesClientSet(); err != nil {
 		return err
 	}
 
@@ -182,27 +122,11 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 		return p.PrintObj, nil
 	}
 
-	// do custom options complete
-	if inputs.Complete != nil {
-		if err = inputs.Complete(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (o *BaseOptions) Validate(inputs Inputs) error {
-	// do options validate
-	if inputs.Validate != nil {
-		if err := inputs.Validate(); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
 // Run execute command. the options of parameter contain the command flags and args.
-func (o *BaseOptions) Run(inputs Inputs) error {
+func (o *CreateOptions) Run() error {
 	var (
 		cueValue        cue.Value
 		err             error
@@ -210,11 +134,21 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 		optionsByte     []byte
 	)
 
-	if optionsByte, err = json.Marshal(inputs.Options); err != nil {
+	// append namespace and name to options and marshal to json
+	if optionsByte, err = json.Marshal(
+		struct {
+			Namespace string `json:"namespace"`
+			Name      string `json:"name"`
+			Options
+		}{
+			Namespace: o.Namespace,
+			Name:      o.Name,
+			Options:   o.Options,
+		}); err != nil {
 		return err
 	}
 
-	if cueValue, err = newCueValue(inputs.CueTemplateName); err != nil {
+	if cueValue, err = newCueValue(o.CueTemplateName); err != nil {
 		return err
 	}
 
@@ -226,36 +160,26 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 		return err
 	}
 
-	if inputs.PreCreate != nil {
-		if err = inputs.PreCreate(unstructuredObj); err != nil {
+	if o.PreCreate != nil {
+		if err = o.PreCreate(unstructuredObj); err != nil {
 			return err
 		}
 	}
-	group := inputs.Group
-	if len(group) == 0 {
-		group = types.AppsAPIGroup
-	}
-
-	version := inputs.Version
-	if len(version) == 0 {
-		version = types.AppsAPIVersion
-	}
 
 	previewObj := unstructuredObj
-	dryRunStrategy, err := GetDryRunStrategy(inputs.Cmd)
+	dryRunStrategy, err := GetDryRunStrategy(o.Cmd)
 	if err != nil {
 		return err
 	}
 
 	if dryRunStrategy != DryRunClient {
-		gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
 		createOptions := metav1.CreateOptions{}
 
 		if dryRunStrategy == DryRunServer {
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		// create k8s resource
-		previewObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), previewObj, createOptions)
+		previewObj, err = o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Create(context.TODO(), previewObj, createOptions)
 		if err != nil {
 			return err
 		}
@@ -264,8 +188,8 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 			if o.Quiet {
 				return nil
 			}
-			if inputs.CustomOutPut != nil {
-				inputs.CustomOutPut(o)
+			if o.CustomOutPut != nil {
+				o.CustomOutPut(o)
 			} else {
 				fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
 			}
@@ -281,7 +205,7 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 
 // RunAsApply execute command. the options of parameter contain the command flags and args.
 // if the resource exists, run as "kubectl apply".
-func (o *BaseOptions) RunAsApply(inputs Inputs) error {
+func (o *CreateOptions) RunAsApply() error {
 	var (
 		cueValue        cue.Value
 		err             error
@@ -289,11 +213,11 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 		optionsByte     []byte
 	)
 
-	if optionsByte, err = json.Marshal(inputs.Options); err != nil {
+	if optionsByte, err = json.Marshal(o.Options); err != nil {
 		return err
 	}
 
-	if cueValue, err = newCueValue(inputs.CueTemplateName); err != nil {
+	if cueValue, err = newCueValue(o.CueTemplateName); err != nil {
 		return err
 	}
 
@@ -305,17 +229,7 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 		return err
 	}
 
-	group := inputs.Group
-	if len(group) == 0 {
-		group = types.AppsAPIGroup
-	}
-
-	version := inputs.Version
-	if len(version) == 0 {
-		version = types.AppsAPIVersion
-	}
 	// create k8s resource
-	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
 	objectName, _, err := unstructured.NestedString(unstructuredObj.Object, "metadata", "name")
 	if err != nil {
 		return err
@@ -324,13 +238,13 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 	if err != nil {
 		return err
 	}
-	if _, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).Patch(
+	if _, err := o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Patch(
 		context.TODO(), objectName, k8sapitypes.MergePatchType,
 		objectByte, metav1.PatchOptions{}); err != nil {
 
 		// create object if not found
 		if errors.IsNotFound(err) {
-			if _, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(
+			if _, err = o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Create(
 				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 				return err
 			}

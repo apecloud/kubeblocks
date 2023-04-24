@@ -22,6 +22,8 @@ package app
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,8 +75,9 @@ func (m *mockClient) Get(ctx context.Context, key client.ObjectKey, obj client.O
 	objKey.Namespace = ""
 	if object, ok := m.objects[objKey]; ok {
 		testutil.SetGetReturnedObject(obj, object)
+		return nil
 	}
-	return nil
+	return apierrors.NewNotFound(corev1.SchemeGroupVersion.WithResource("mock_resource").GroupResource(), key.String())
 }
 
 func (m *mockClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {

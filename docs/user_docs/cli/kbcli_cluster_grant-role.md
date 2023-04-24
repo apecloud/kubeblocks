@@ -12,7 +12,11 @@ kbcli cluster grant-role [flags]
 
 ```
   # grant role to user
-  kbcli cluster grant-role NAME --component COMPNAME --username NAME --role ROLENAME
+  kbcli cluster grant-role NAME --component COMPNAME --name USERNAME --role ROLENAME
+  # grant role to user with default component
+  kbcli cluster grant-role NAME --name USERNAME --role ROLENAME
+  # grant role to user for instance
+  kbcli cluster grant-role --instance INSTANCE --name USERNAME --role ROLENAME
 ```
 
 ### Options

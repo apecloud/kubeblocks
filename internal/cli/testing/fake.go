@@ -290,6 +290,9 @@ func FakeComponentClassDef(clusterDef *appsv1alpha1.ClusterDefinition, def []byt
 
 func FakeClusterVersion() *appsv1alpha1.ClusterVersion {
 	cv := &appsv1alpha1.ClusterVersion{}
+	gvr := types.ClusterVersionGVR()
+	cv.TypeMeta.APIVersion = gvr.GroupVersion().String()
+	cv.TypeMeta.Kind = gvr.Resource
 	cv.Name = ClusterVersionName
 	cv.SetLabels(map[string]string{
 		constant.ClusterDefLabelKey:   ClusterDefName,

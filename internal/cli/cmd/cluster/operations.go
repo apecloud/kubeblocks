@@ -88,15 +88,30 @@ type OperationsOptions struct {
 
 func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStreams,
 	opsType appsv1alpha1.OpsType, hasComponentNamesFlag bool) *OperationsOptions {
+	customOutPut := func(opt *create.CreateOptions) {
+		output := fmt.Sprintf("OpsRequest %s created successfully, you can view the progress:", opt.Name)
+		printer.PrintLine(output)
+		nextLine := fmt.Sprintf("\tkbcli cluster describe-ops %s -n %s", opt.Name, opt.Namespace)
+		printer.PrintLine(nextLine)
+	}
+
 	o := &OperationsOptions{
 		// nil cannot be set to a map struct in CueLang, so init the map of KeyValues.
-		KeyValues:             map[string]string{},
-		CreateOptions:         create.CreateOptions{IOStreams: streams},
+		KeyValues: map[string]string{},
+		CreateOptions: create.CreateOptions{
+			Factory:         f,
+			IOStreams:       streams,
+			CueTemplateName: "cluster_operations_template.cue",
+			GVR:             types.OpsGVR(),
+			CustomOutPut:    customOutPut,
+		},
 		OpsType:               opsType,
 		HasComponentNamesFlag: hasComponentNamesFlag,
 		RequireConfirm:        true,
 	}
-	o.buildCreateOptions(f)
+
+	o.OpsTypeLower = strings.ToLower(string(o.OpsType))
+	o.CreateOptions.Options = o
 	return o
 }
 
@@ -213,12 +228,12 @@ func (o *OperationsOptions) Validate() error {
 	}
 
 	// check if cluster exist
-	unstructuredObj, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	obj, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	var cluster appsv1alpha1.Cluster
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, &cluster); err != nil {
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &cluster); err != nil {
 		return err
 	}
 
@@ -249,24 +264,6 @@ func (o *OperationsOptions) Validate() error {
 		return delete.Confirm([]string{o.Name}, o.In)
 	}
 	return nil
-}
-
-// buildCreateOptions builds create options for operation
-func (o *OperationsOptions) buildCreateOptions(f cmdutil.Factory) {
-	o.OpsTypeLower = strings.ToLower(string(o.OpsType))
-	customOutPut := func(opt *create.CreateOptions) {
-		output := fmt.Sprintf("OpsRequest %s created successfully, you can view the progress:", opt.Name)
-		printer.PrintLine(output)
-		nextLine := fmt.Sprintf("\tkbcli cluster describe-ops %s -n %s", opt.Name, opt.Namespace)
-		printer.PrintLine(nextLine)
-	}
-	o.CreateOptions = create.CreateOptions{
-		CueTemplateName: "cluster_operations_template.cue",
-		GVR:             types.OpsGVR(),
-		Options:         o,
-		Factory:         f,
-		CustomOutPut:    customOutPut,
-	}
 }
 
 func (o *OperationsOptions) validateExpose() error {

@@ -59,12 +59,12 @@ type CreateOptions struct {
 
 	// Name Resource name of the command line operation
 	Name      string
+	Args      []string
+	Cmd       *cobra.Command
 	Dynamic   dynamic.Interface
 	Client    kubernetes.Interface
 	Format    printer.Format
 	ToPrinter func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
-	Args      []string
-	Cmd       *cobra.Command
 
 	// CueTemplateName cue template file name to render the resource
 	CueTemplateName string

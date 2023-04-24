@@ -71,9 +71,9 @@ func clusterPreDeleteHook(object runtime.Object) error {
 		klog.V(1).Infof("object %s is not of kind %s, skip PreDeleteHook.", object.GetObjectKind().GroupVersionKind().Kind, appsv1alpha1.ClusterKind)
 		return nil
 	}
-	unstructed := object.(*unstructured.Unstructured)
+	unstructured := object.(*unstructured.Unstructured)
 	cluster := &appsv1alpha1.Cluster{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructed.Object, cluster); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.Object, cluster); err != nil {
 		return err
 	}
 	if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {

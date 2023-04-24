@@ -41,6 +41,7 @@ require (
 	github.com/jedib0t/go-pretty/v6 v6.4.4
 	github.com/json-iterator/go v1.1.12
 	github.com/k3d-io/k3d/v5 v5.4.4
+	github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.2.0
 	github.com/leaanthony/debme v1.2.1
 	github.com/manifoldco/promptui v0.9.0

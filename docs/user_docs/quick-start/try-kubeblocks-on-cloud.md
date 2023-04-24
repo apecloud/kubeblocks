@@ -1,6 +1,7 @@
 ---
 title: Try out basic functions of KubeBlocks on Cloud
 description: How to run KubeBlocks on Playground
+keywords: [Playground, try out, cloud]
 sidebar_position: 1
 sidebar_label: Try out KubeBlocks on cloud
 ---
@@ -8,12 +9,15 @@ sidebar_label: Try out KubeBlocks on cloud
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Try out basic functions of KubeBlocks on Cloud 
-This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to easily create a demo environment (Playground) with simply one `kbcli` command. 
-With Playground, you can try out KubeBlocks both on your local host and on a cloud environment. And KubeBlocks supports multiple cloud platforms.
+# Try out basic functions of KubeBlocks on Cloud
+
+This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to easily create a demo environment (Playground) with simply one `kbcli` command.
+
+With Playground, you can try out KubeBlocks both on your local host (macOS) and on a cloud environment. And KubeBlocks supports multiple cloud platforms.
 
 ## Preparation
-When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find the script at [Github repository](https://github.com/apecloud/cloud-provider).
+
+When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find this script at [Github repository](https://github.com/apecloud/cloud-provider).
 
 When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repository to the local host, calls the terraform commands to initialize the cluster, then deploys KubeBlocks on this cluster.
 
@@ -22,19 +26,24 @@ When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repos
 
 ### Before you start to try KubeBlocks on Cloud (AWS)
 
-* Install AWS CLI. Refer to [Installing or updating the latest version of the AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) for details.
+Make sure you have all the followings prepared.
+
+* [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
 * Make sure the following tools are installed.
-  * `kubectl`: It is used to interact with Kubernetes clusters. For installation details, refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
-  * `kbcli`: It is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. Follow the steps below to install `kbcli`.
+  * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
+  * [Install kbcli](./../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kbcli): It is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. Follow the steps below to install `kbcli`.
     1. Install `kbcli`.
+
          ```bash
          curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
          ```
+
     2. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.
 
 ### Configure access key
 
 Configure the Access Key of cloud resources.
+
 For AWS, there are two options.
 
 **Option 1.** Use `aws configure`.
@@ -64,7 +73,7 @@ Initialize Playground.
 kbcli playground init --cloud-provider aws --region cn-northwest-1
 ```
 
-* `cloud-provider` specifies the cloud provider. 
+* `cloud-provider` specifies the cloud provider.
 * `region` specifies the region to deploy a Kubernetes cluster.
    Frequently used regions are as follows. You can find the full region list on [the official website](https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/?nc1=h_ls).
   * Americas
@@ -87,7 +96,7 @@ kbcli playground init --cloud-provider aws --region cn-northwest-1
 
 During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground` and calls the terraform script to create cloud resources. And then `kbcli` deploys KubeBlocks automatically and installs a MySQL cluster.
 
-After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the deployed cluster.
+After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the created cluster.
 
 ```bash
 # View kbcli version
@@ -107,18 +116,20 @@ The initialization lasts about 20 minutes. If the installation fails after a lon
 <TabItem value="GCP" label="GCP">
 
 ### Before you start to try KubeBlocks on Cloud (GCP)
-Make sure you have all the followings prepared.
-* Google cloud account.
-* `kubectl`: to interact with Kubernetes clusters. For installation details, refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
-* `kbcli`: the command line tool of KubeBlocks and is used for the interaction with KubeBlocks. 
-  
 
+Make sure you have all the followings prepared.
+
+* Google Cloud account.
+* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
+* [Install kbcli](./../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kbcli): It is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+  
 ### Configure GCP environment
 
 ***Steps：***
-1. Install gcloud SDK.
 
-   ```
+1. Install Google Cloud SDK.
+
+   ```bash
    # macOS brew install
    brew install --cask google-cloud-sdk
 
@@ -128,39 +139,42 @@ Make sure you have all the followings prepared.
 
 2. Initialize GCP.
 
-   ```
+   ```bash
    gcloud init
    ```
+
 3. Log in to GCP.
 
-   ```
+   ```bash
    gcloud auth application-default login
    ```
+
 4. Configure GOOGLE_PROJECT environment variables，```kbcli playground``` creates GKE cluster in the project.
 
-   ```
+   ```bash
    export GOOGLE_PROJECT=<project-name>
    ```
 
 ### Initialize Playground
+
 :::note
 
-Execute ``` export GOOGLE_PROJECT=<project-name>``` to specify project name.
+Execute `export GOOGLE_PROJECT=<project-name>` to specify the project name.
 
 :::
 
-The following command deploys a GKE service in available region ```us-central1 ``` on google cloud, and installs KubeBlocks.
+The following command deploys a GKE service in the available region `us-central1` on Google Cloud, and installs KubeBlocks.
 
 ```bash
 kbcli playground init --cloud-provider gcp --region us-central1
 ```
 
-* `cloud-provider` specifies the cloud provider. 
+* `cloud-provider` specifies the cloud provider.
 * `region` specifies the region to deploy a Kubernetes cluster.
 
 During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground` and calls the terraform script to create cloud resources. And then `kbcli` deploys KubeBlocks automatically and installs a MySQL cluster.
 
-After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the deployed cluster.
+After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the created cluster.
 
 ```bash
 # View kbcli version
@@ -175,7 +189,6 @@ kbcli cluster list
 The initialization takes about 20 minutes. If the installation fails after a long time, please check your network environment.
 
 :::
-
 
 </TabItem>
 <TabItem value="TKE" label="TKE">
@@ -184,17 +197,18 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 
 Make sure you have all the followings prepared.
 
-* Tencent cloud account.
-* `kubectl`: to interact with Kubernetes clusters. For installation details, refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
-* `kbcli`: the command line tool of KubeBlocks and is used for the interaction with KubeBlocks. 
+* Tencent Cloud account.
+* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
+* [Install kbcli](./../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kbcli): It is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
   
 ### Configure TKE environment
 
 ***Steps：***
+
 1. Log in to Tencent Cloud.
 2. Go to [Tencent Kubernetes Engine (TKE)](https://console.cloud.tencent.com/tke2) to grant resource operation permission to your account before using the container service.
-3. Go to [API Console](https://console.cloud.tencent.com/cam/overview) > **Access Key** > **API Keys** and click **Create Key** to create a pair of Secret ID and Secret Key.
-   
+3. Go to [API Console](https://console.cloud.tencent.com/cam/overview) -> **Access Key** -> **API Keys** and click **Create Key** to create a pair of Secret ID and Secret Key.
+
    :::note
 
    If you have an available security certificate, skip Step 3 and 4.
@@ -202,25 +216,26 @@ Make sure you have all the followings prepared.
    :::
 
 4. Add the Secret ID and Secret Key to the environment variables.
-   ```
+
+   ```bash
    export TENCENTCLOUD_SECRET_ID=YOUR_SECRET_ID
    export TENCENTCLOUD_SECRET_KEY=YOUR_SECRET_KEY
    ```
 
 ### Initialize Playground
 
-The following command deploys a Kubernetes service in the available region `ap-chengdu` on Tencent Cloud, and installs KubeBlocks.
+The following command deploys a Kubernetes service in the available region `ap-chengdu` on Tencent Cloud and installs KubeBlocks.
 
 ```bash
 kbcli playground init --cloud-provider tencentcloud --region ap-chengdu
 ```
 
-* `cloud-provider` specifies the cloud provider. 
+* `cloud-provider` specifies the cloud provider.
 * `region` specifies the region to deploy a Kubernetes cluster.
 
 During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground` and calls the terraform script to create cloud resources. And then `kbcli` deploys KubeBlocks automatically and installs a MySQL cluster.
 
-After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the deployed cluster.
+After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the created cluster.
 
 ```bash
 # View kbcli version
@@ -236,7 +251,6 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 
 :::
 
-
 </TabItem>
 <TabItem value="ACK" label="ACK">
 
@@ -244,34 +258,36 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 
 Make sure you have all the followings prepared.
 
-* Alibaba cloud account.
-* `kubectl`: to interact with Kubernetes clusters. For installation details, refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
-* `kbcli`: the command line tool of KubeBlocks and is used for the interaction with KubeBlocks. 
+* Alibaba Cloud account.
+* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
+* [Install kbcli](./../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kbcli): It is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
   
 ### Configure ACK environment
 
 ***Steps：***
+
 1. Log in to Alibaba Cloud.
-2. Follow the instructions in [Quick start for first-time users](https://www.alibabacloud.com/help/en/container-service-for-kubernetes/latest/quick-start-for-first-time-users) to check whether you have activated Alibaba Cloud Container Service for Kubernetes (ACK) and assigned roles. 
-3. Click [AliyunOOSLifecycleHook4CSRole](https://ram.console.aliyun.com/role/authorize?spm=5176.2020520152.0.0.5b4716ddI6QevL&request=%7B%22ReturnUrl%22%3A%22https%3A%2F%2Fram.console.aliyun.com%22%2C%22Services%22%3A%5B%7B%22Roles%22%3A%5B%7B%22RoleName%22%3A%22AliyunOOSLifecycleHook4CSRole%22%2C%22TemplateId%22%3A%22AliyunOOSLifecycleHook4CSRole%22%7D%5D%2C%22Service%22%3A%22OOS%22%7D%5D%7D) and click **Agree to Authorization** to create an AliyunOOSLifecycleHook4CSRole role. 
-   
+2. Follow the instructions in [Quick start for first-time users](https://www.alibabacloud.com/help/en/container-service-for-kubernetes/latest/quick-start-for-first-time-users) to check whether you have activated Alibaba Cloud Container Service for Kubernetes (ACK) and assigned roles.
+3. Click [AliyunOOSLifecycleHook4CSRole](https://ram.console.aliyun.com/role/authorize?spm=5176.2020520152.0.0.5b4716ddI6QevL&request=%7B%22ReturnUrl%22%3A%22https%3A%2F%2Fram.console.aliyun.com%22%2C%22Services%22%3A%5B%7B%22Roles%22%3A%5B%7B%22RoleName%22%3A%22AliyunOOSLifecycleHook4CSRole%22%2C%22TemplateId%22%3A%22AliyunOOSLifecycleHook4CSRole%22%7D%5D%2C%22Service%22%3A%22OOS%22%7D%5D%7D) and click **Agree to Authorization** to create an AliyunOOSLifecycleHook4CSRole role.
+
    This operation grant permissions to access Operation Orchestration Service (OOS) and to access the resources in other cloud products since creating and managing a node pool is required for creating an ACK cluster.
 
    Refer to [Scale a node pool](https://www.alibabacloud.com/help/zh/container-service-for-kubernetes/latest/scale-up-and-down-node-pools) for details.
-4. Create a AccessKey ID and the corresponding AccessKey secret.
+4. Create an AccessKey ID and the corresponding AccessKey secret.
 
    1. Go to [Alibaba Cloud Management Console](https://homenew.console.aliyun.com/home/dashboard/ProductAndService). Hover the pointer over your account console and click **AccessKey Management**.
    2. Click **Create AccessKey** to create the AccessKey ID and the corresponding AccessKey secret.
    3. Add the AccessKey ID and AccessKey secret to the environment variable to configure identity authorization information.
-       ```
+
+       ```bash
        export ALICLOUD_ACCESS_KEY="************"
        export ALICLOUD_SECRET_KEY="************"
        ```
-   
+
    :::note
 
    Refer to [Create an AccessKey pair](https://www.alibabacloud.com/help/en/resource-access-management/latest/accesskey-pairs-create-an-accesskey-pair-for-a-ram-user) for details.
-   
+
    :::
 
 ### Initialize Playground
@@ -282,12 +298,12 @@ The following command deploys an ACK cluster in the available region `cn-hangzho
 kbcli playground init --cloud-provider alicloud --region cn-hangzhou
 ```
 
-* `cloud-provider` specifies the cloud provider. 
+* `cloud-provider` specifies the cloud provider.
 * `region` specifies the region to deploy a Kubernetes cluster.
 
 During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground` and calls the terraform script to create cloud resources. And then `kbcli` deploys KubeBlocks automatically and installs a MySQL cluster.
 
-After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the deployed cluster.
+After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the created cluster.
 
 ```bash
 # View kbcli version
@@ -308,19 +324,22 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 
 ## Try KubeBlocks with Playground
 
-KubeBlocks supports the complete life cycle management of a database cluster. Go through the following instruction to try basic features of KubeBlocks. 
+KubeBlocks supports the complete life cycle management of a database cluster. Go through the following instructions to try basic features of KubeBlocks.
+
 For the full feature set, refer to [KubeBlocks Documentation](./../introduction/introduction.md) for details.
 
 ### View an ApeCloud MySQL cluster
 
 ***Steps:***
 
-1. Run the command below to view the database cluster list.
+1. View the database cluster list.
+
     ```bash
     kbcli cluster list
     ```
 
-2. Run `kbcli cluster describe` to view the details of a specified database cluster, such as `STATUS`, `Endpoints`, `Topology`, `Images`, and `Events`.
+2. View the details of a specified database cluster, such as `STATUS`, `Endpoints`, `Topology`, `Images`, and `Events`.
+
     ```bash
     kbcli cluster describe mycluster
     ```
@@ -329,14 +348,15 @@ For the full feature set, refer to [KubeBlocks Documentation](./../introduction/
 
 **Option 1.** Connect database inside Kubernetes cluster.
 
-If a database cluster has been created and its status is `Running`, run `kbcli cluster connect` to access a specified database cluster. For example, 
+Wait until the status of this cluster is `Running`, then run `kbcli cluster connect` to access a specified database cluster. For example,
+
 ```bash
 kbcli cluster connect mycluster
 ```
 
 **Option 2.** Connect database outside Kubernetes cluster.
 
-Get the MySQL client connection example.
+Get the MySQL Client connection example.
 
 ```bash
 kbcli cluster connect --show-example --client=cli mycluster
@@ -344,67 +364,75 @@ kbcli cluster connect --show-example --client=cli mycluster
 
 **Example**
 
-```bash
-kubectl port-forward service/mycluster-mysql 3306:3306
->
-Forwarding from 127.0.0.1:3306 -> 3306
-Forwarding from [::1]:3306 -> 3306
+1. Run `port-forward` to connect the cluster from the local host.
 
+   ```bash
+   kubectl port-forward service/mycluster-mysql 3306:3306
+   >
+   Forwarding from 127.0.0.1:3306 -> 3306
+   Forwarding from [::1]:3306 -> 3306
+   ```
 
-mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
->
-...
-Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+2. Open another terminal tab to connect the MySQL Client.
 
-mysql> show databases;
->
-+--------------------+
-| Database           |
-+--------------------+
-| information_schema |
-| mydb               |
-| mysql              |
-| performance_schema |
-| sys                |
-+--------------------+
-5 rows in set (0.02 sec)
-```
+   ```bash
+   mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
+   >
+   ...
+   Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+   mysql> show databases;
+   >
+   +--------------------+
+   | Database           |
+   +--------------------+
+   | information_schema |
+   | mydb               |
+   | mysql              |
+   | performance_schema |
+   | sys                |
+   +--------------------+
+   5 rows in set (0.02 sec)
+   ```
 
 ### Observability
 
-KubeBlocks has complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks. 
+KubeBlocks has complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks.
 
 ***Steps:***
 
-1. Run the command below to view the monitoring page to observe the service running status.
+1. View the monitoring page to observe the service running status.
+
    ```bash
    kbcli dashboard open kubeblocks-grafana
    ```
 
    ***Result***
 
-   A monitoring page on Grafana website is loaded automatically after the command is executed. 
+   A monitoring page on Grafana website is loaded automatically after the command is executed.
 
 2. Click the Dashboard icon on the left bar and two monitoring panels show on the page.
    ![Dashboards](./../../img/quick_start_dashboards.png)
-3. Click **General** -> **MySQL** to monitor the status of the ApeCloud MySQL cluster deployed by Playground.
+3. Click **General** -> **MySQL** to monitor the status of the ApeCloud MySQL cluster created by Playground.
    ![MySQL_panel](./../../img/quick_start_mysql_panel.png)
 
 ### High availability of ApeCloud MySQL
 
-ApeCloud MySQL Paxos Group delivers high availability with RPO=0 and RTO in less than 30 seconds.
+ApeCloud MySQL Raft Group delivers high availability with RPO=0 and RTO in less than 30 seconds.
+
 This section uses a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
 
 #### Delete ApeCloud MySQL Standalone
 
 Delete the ApeCloud MySQL Standalone before trying out high availability.
+
 ```bash
 kbcli cluster delete mycluster
 ```
 
-#### Create an ApeCloud MySQL Paxos Group
+#### Create an ApeCloud MySQL Raft Group
 
-Playground creates an ApeCloud MySQL Standalone by default. You can also use `kbcli` to create a new Paxos Group. The following is an example of creating an ApeCloud MySQL Paxos Group with default configurations.
+Playground creates an ApeCloud MySQL Standalone by default. You can use `kbcli` to create a new Raft Group. The following is an example of creating an ApeCloud MySQL Raft Group with default configurations.
 
 ```bash
 kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
@@ -412,11 +440,11 @@ kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
 
 #### Simulate leader pod failure recovery
 
-In this example, we delete the leader pod to simulate a failure.
+In this example, delete the leader pod to simulate a failure.
 
 ***Steps:***
 
-1. Run `kbcli cluster describe ` to view the ApeCloud MySQL Paxos group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
+1. View the ApeCloud MySQL Raft group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
 
    ```bash
    kbcli cluster describe maple05
@@ -446,14 +474,17 @@ In this example, we delete the leader pod to simulate a failure.
    Events(last 5 warnings, see more:kbcli cluster list-events -n default mycluster):
    TIME        TYPE        REASON        OBJECT        MESSAGE
    ```
+
 2. Delete the leader pod.
+
    ```bash
    kubectl delete pod maple05-mysql-1
    >
    pod "maple05-mysql-1" deleted
    ```
 
-3. Run `kbcli cluster connect maple05` to connect to the ApeCloud MySQL Paxos Group to test its availability. You can find this group can still be accessed within seconds due to our HA strategy.
+3. Connect to the ApeCloud MySQL Raft Group to test its availability. You can find this group can still be accessed within seconds due to our HA strategy.
+
    ```bash
    kbcli cluster connect maple05
    >
@@ -474,12 +505,15 @@ In this example, we delete the leader pod to simulate a failure.
    ```
 
 #### Demonstrate availability failure by NON-STOP NYAN CAT (for fun)
+
 The above example uses `kbcli cluster connect` to test availability, in which the changes are not obvious to see.
+
 NON-STOP NYAN CAT is a demo application to observe how the database cluster exceptions affect actual businesses. Animations and real-time key information display provided by NON-STOP NYAN CAT can directly show the availability influences of database services.
 
 ***Steps:***
 
-1. Run the command below to install the NYAN CAT demo application.
+1. Install the NYAN CAT demo application.
+
    ```bash
    kbcli addon enable nyancat
    ```
@@ -489,52 +523,58 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
    ```
    addon.extensions.kubeblocks.io/nyancat patched
    ```
+
 2. Check the NYAN CAT add-on status and when its status is `Enabled`, this application is ready.
+
    ```bash
    kbcli addon list | grep nyancat 
    ```
+
 3. Open the web page.
+
    ```bash
    kbcli dashboard open kubeblocks-nyancat
    ```
+
 4. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
-   
+
+   ```bash
+   kubectl delete pod maple05-mysql-1
+   ```
+
    ![NYAN CAT](./../../img/quick_start_nyan_cat.png)
 
 5. Uninstall the NYAN CAT demo application after your trial.
+
    ```bash
    kbcli addon disable nyancat
    ```
 
 ## Destroy Playground
 
-Before destroying Playground, it is recommended to delete the clusters created by KubeBlocks.
+1. Before destroying Playground, it is recommended to delete the clusters created by KubeBlocks.
 
-```bash
-# View all clusters
-kbcli cluster list -A
+   ```bash
+   # View all clusters
+   kbcli cluster list -A
 
-# Delete a cluster
-# A double-check is required and you can add --auto-approve to check it automatically
-kbcli cluster delete <my-cluster>
+   # Delete a cluster
+   # A double-check is required and you can add --auto-approve to check it automatically
+   kbcli cluster delete <name>
 
-# Uninstall KubeBlocks
-# A double-check is required and you can add --auto-approve to check it automatically
-kbcli kubeblocks uninstall --remove-pvcs --remove-pvs
-```
+   # Uninstall KubeBlocks
+   # A double-check is required and you can add --auto-approve to check it automatically
+   kbcli kubeblocks uninstall --remove-pvcs --remove-pvs
+   ```
 
-Run the command below to destroy Playground.
+2. Destroy Playground.
 
-```bash
-kbcli playground destroy 
-```
-
+   ```bash
+   kbcli playground destroy 
+   ```
 
 :::caution
 
-`kbcli playground destroy` directly deletes the Kubernetes cluster on the cloud but there might be residual resources on the cloud, such as volumes. Please confirm whether there are residual resources after uninstalling and delete them in time to avoid unnecessary fees.
+`kbcli playground destroy` directly deletes the Kubernetes cluster on the cloud but there might be residual resources on the cloud, such as volumes. Please confirm whether there are residual resources after uninstallation and delete them in time to avoid unnecessary fees.
 
 :::
-
-
-

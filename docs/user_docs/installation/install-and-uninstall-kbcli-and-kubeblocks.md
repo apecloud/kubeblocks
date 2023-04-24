@@ -11,13 +11,13 @@ import TabItem from '@theme/TabItem';
 
 # Install and uninstall kbcli and KubeBlocks
 
-This guide introduces how to install KubeBlocks by `kbcli`, the command line tool of KubeBlocks.
+This guide introduces how to install KubeBlocks by `kbcli` and KubeBlocks. Install `kbcli` first and then install KubeBlocks.
 
 ## Before you start
 
 1. A Kubernetes environment is required.
 
-2. `kubectl` is required and can connect to your Kubernetes clusters. Refer to [Install and Set Up kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) for installation details.
+2. [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): it is required and can connect to your Kubernetes clusters.
 
 3. For macOS:
 
@@ -33,19 +33,13 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 
 ## Install kbcli
 
-:::note
-
-Install `kbcli` first.
-
-:::
-
 `kbcli` can be installed on macOS and Windows.
 
 <Tabs>
 
 <TabItem value="macOS" label="macOS" default>
 
-For macOS, cURL and Homebrew options are supported.
+For macOS, cURL and Homebrew are supported.
 
 <TabItem value="cURL" label="cURL" default>
 
@@ -192,9 +186,9 @@ If you want to install a specified version,
 
 <TabItem value="Windows" label="Windows">
 
-The script option installs `kbcli` under the `C:\Program Files\kbcli-windows-amd64` path by default and this path cannot be changed.
+The script installs `kbcli` under the `C:\Program Files\kbcli-windows-amd64` path by default and this path cannot be changed.
 
-If you want to customize the installation path, use the Zip file option.
+If you want to customize the installation path, use the Zip file.
 
 <TabItem value="Script" label="Script">
 
@@ -219,13 +213,13 @@ If you want to customize the installation path, use the Zip file option.
 <TabItem value="Zip" label="Zip">
 
 1. Download a Zip file of `kbcli` that suits your host from [the GitHub repository](https://github.com/apecloud/kubeblocks/releases).
-2. Decompress the package under your prefferred path.
+2. Decompress the package under your preferred path.
 3. Add this path to the system environment variable.
 
    1. Click the Windows icon and click **System**.
    2. Go to **Settings** -> **Related Settings** -> **Advanced system settings**.
    3. On the **Advanced** tab, click **Environment Variables**.
-   4. Click **New** to add the path under which you decompress the `kbcli` package in **User variables** or **System variables**.
+   4. Click **New** to add the path under which you decompress the `kbcli` package in **User variables** or **System variables** according to your need.
    5. Click **Apply** and then **OK** to apply the change.
 </TabItem>
 
@@ -241,7 +235,7 @@ For the local environment, it is recommended to run `kbcli playground init` to i
 
 ***Steps:***
 
-1. Run the command below to install KubeBlocks. Both `kbcli` and Helm installation options are supported.
+1. Install KubeBlocks. Both `kbcli` and Helm are supported.
 
     <TabItem value="kbcli" label="kbcli" default>
 
@@ -253,7 +247,7 @@ For the local environment, it is recommended to run `kbcli playground init` to i
 
     * KubeBlocks is installed with built-in toleration which tolerates the node with the `kb-controller=true:NoSchedule` taint.
     * KubeBlocks is installed with built-in node affinity which first deploys the node with the `kb-controller:true` label.
-    * This command installs the latest release version in your Kubernetes environment under the default namespace `kb-system` since your `kubectl` can connect to your Kubernetes clusters. If you want to install KubeBlocks in a specified namespace, run the command below.
+    * This command installs the same version of KubeBlocks as that of `kbcli` in your Kubernetes environment under the default namespace `kb-system` since your `kubectl` can connect to your Kubernetes clusters. If you want to install KubeBlocks in a specified namespace, run the command below.
 
        ```bash
        kbcli kubeblocks install -n <name> --create-namespace=true
@@ -272,8 +266,8 @@ For the local environment, it is recommended to run `kbcli playground init` to i
     ```
 
    * `-namespace` and its abbreviated version `-n` is used to name a namespace. `--create-namespace` is used to specify whether to create a namespace if it does not exist. `-n` is a global command line option. For global command line options, run `kbcli options` to list all options (applies to all commands).
-   * Use `monitor` to specify whether to install the add-ons relevant to database monitoring and visualization.
-   * Use `version` to specify the version you want to install. Find the supported version in [KubeBlocks Helm Charts](https://github.com/apecloud/helm-charts).
+   * Use `--monitor` to specify whether to install the add-ons relevant to database monitoring and visualization.
+   * Use `--version` to specify the version you want to install. Find the supported version in [KubeBlocks Helm Charts](https://github.com/apecloud/helm-charts).
 
    </TabItem>
 
@@ -287,7 +281,7 @@ For the local environment, it is recommended to run `kbcli playground init` to i
 
    </TabItem>
 
-2. Run the command below to verify whether KubeBlocks is installed successfully.
+2. Verify whether KubeBlocks is installed successfully.
 
     ```bash
     kubectl get pod -n <namespace>
@@ -296,7 +290,7 @@ For the local environment, it is recommended to run `kbcli playground init` to i
     ***Example***
 
     ```bash
-    kubectl get pod -n kubeblocks
+    kubectl get pod -n kb-system
     ```
 
     ***Result***
@@ -330,8 +324,8 @@ kbcli kubeblocks preflight --verbose
 
 There are three types of results:
 
-* `warn`: The target environment affects the stability and performance of KubeBlocks and clusters, but running KubeBlocks and clusters is not affected, and you can continue the following installation.
 * `fail`: The environment requirements for installing KubeBlocks are not met, and KubeBlocks can only be installed after these requirements are met. It is required to check these items again and re-run the preflight checks.
+* `warn`: The target environment affects the stability and performance of KubeBlocks and clusters, but running KubeBlocks and clusters is not affected, and you can continue the following installation.
 * `congratulation`: All checks pass and you can continue the following installation.
 
 ## Enable add-ons
@@ -368,7 +362,7 @@ You can perform the following steps to check and enable the add-on.
 
     For certain add-ons, the installable part might say when the kubeGitVersion content includes *eks* and *ack*, the auto-install is enabled.
 
-    In this case, you can check the version of the Kubernetes cluster, and run the following command.
+    In this case, you can check the version of the Kubernetes cluster.
 
     ```bash
     kubectl version -ojson | jq '.serverVersion.gitVersion'
@@ -377,7 +371,7 @@ You can perform the following steps to check and enable the add-on.
     >
     ```
 
-    As the printed output suggested, *eks* is included. And you can go on with the next step. In case that *eks* is not included, it is invalid to enable the add-on.
+    As the printed output suggested, *eks* is included. And you can go on with the next step. In the case that *eks* is not included, it is invalid to enable the add-on.
 
 2. To enable the add-on, use `kbcli addon enable`.
 
@@ -395,18 +389,18 @@ You can perform the following steps to check and enable the add-on.
 
 ## (Optional) Enable kbcli automatic command line completion
 
-`kbcli` supports automatic command line completion. You can run the command below to enable this function.
+`kbcli` supports automatic command line completion. You can run the command below to view the user guide and enable this function.
 
 ```bash
 # Configure SHELL-TYPE as one type from bash, fish, PowerShell, and zsh
 kbcli completion SHELL-TYPE -h
 ```
 
-Here we take zsh as an example.
+For example, enable command line completion for zsh.
 
 ***Steps:***
 
-1. Run the command below.
+1. Check the user guide.
 
     ```bash
     kbcli completion zsh -h
@@ -418,7 +412,7 @@ Here we take zsh as an example.
     echo "autoload -U compinit; compinit" >> ~/.zshrc
     ```
 
-3. Run the command below to enable the `kbcli` automatic completion function.
+3. Enable the `kbcli` automatic completion function.
 
     ```bash
     echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
@@ -428,7 +422,7 @@ Here we take zsh as an example.
 
 :::note
 
-Uninstallation steps:
+Uninstallation order:
 
 1. Delete your cluster if you have created a cluster.
 
@@ -464,7 +458,7 @@ helm uninstall kubeblocks -n kb-system
 
 ### Uninstall kbcli
 
-Uninstall `kbcli` if you want to delete KubeBlocks after your trial.
+Uninstall `kbcli` if you want to delete `kbcli` after your trial.
 
 <TabItem value="macOS" label="macOS" default>
 
@@ -489,8 +483,9 @@ brew uninstall kbcli
 <TabItem value="Windows" label="Windows">
 
 1. Go to the `kbcli` installation path and delete the installation folder.
+
    * If you install `kbcli` by script, go to `C:\Program Files` and delete the `kbcli-windows-amd64` folder.
-   * If you customize the installation path, go to your path and delete the installation folder.
+   * If you customize the installation path, go to your specified path and delete the installation folder.
 
 2. Delete the environment variable.
 

@@ -21,7 +21,6 @@ package apps
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -154,6 +153,9 @@ var _ = Describe("Cluster Controller", func() {
 		svcType  corev1.ServiceType
 	}
 
+	// getHeadlessSvcPorts returns the component's headless service ports by gathering all container's ports in the
+	// ClusterComponentDefinition.PodSpec, it's a subset of the real ports as some containers can be dynamically
+	// injected into the pod by the lifecycle controller, such as the probe container.
 	getHeadlessSvcPorts := func(g Gomega, compDefName string) []corev1.ServicePort {
 		comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *clusterObj, compDefName)
 		g.Expect(err).ShouldNot(HaveOccurred())
@@ -195,7 +197,9 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(svc.Spec.ClusterIP).ShouldNot(Equal(corev1.ClusterIPNone))
 			case svc.Spec.Type == corev1.ServiceTypeClusterIP && svcSpec.headless:
 				g.Expect(svc.Spec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
-				g.Expect(reflect.DeepEqual(svc.Spec.Ports, getHeadlessSvcPorts(g, compDefName))).Should(BeTrue())
+				for _, port := range getHeadlessSvcPorts(g, compDefName) {
+					Expect(slices.Index(svc.Spec.Ports, port) >= 0).Should(BeTrue())
+				}
 			}
 		}
 		g.Expect(len(expectServices)).Should(Equal(len(svcList.Items)))

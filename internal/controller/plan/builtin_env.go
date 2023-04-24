@@ -56,10 +56,13 @@ const maxReferenceCount = 10
 func wrapGetEnvByName(templateBuilder *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []coreclient.Object) envBuildInFunc {
 	wrapper := &envWrapper{
 		configTemplateBuilder: templateBuilder,
-		clusterName:           component.ClusterName,
-		componentName:         component.Name,
 		localObjects:          localObjs,
 		cache:                 make(map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object),
+	}
+	// hack for test cases of cli update cmd...
+	if component != nil {
+		wrapper.clusterName = component.ClusterName
+		wrapper.componentName = component.Name
 	}
 	return func(args interface{}, envName string) (string, error) {
 		container, err := fromJSONObject[corev1.Container](args)

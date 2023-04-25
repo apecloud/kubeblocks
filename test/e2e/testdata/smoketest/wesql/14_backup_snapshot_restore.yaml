@@ -6,10 +6,10 @@ metadata:
     kubeblocks.io/restore-from-backup: "{\"mysql\":\"backup-sbapshot-mycluster\"}"
 spec:
   clusterDefinitionRef:  apecloud-mysql
-  clusterVersionRef: ac-mysql-8.0.30-latest
+  clusterVersionRef: ac-mysql-8.0.30
   terminationPolicy: WipeOut
   componentSpecs:
-    - name: wesql
+    - name: mysql
       componentDefRef: mysql
       monitor: false
       replicas: 1
@@ -20,4 +20,4 @@ spec:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 1Gi
+                storage: 2Gi

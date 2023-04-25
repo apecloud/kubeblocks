@@ -164,7 +164,7 @@ func buildVolumeClaimTemplatesWithSnapshot(component *SynthesizedComponent,
 	if err != nil {
 		return err
 	}
-	if vct.Spec.Resources.Requests.Storage().Size() < backupTotalSize.Size() {
+	if vct.Spec.Resources.Requests.Storage().Value() < backupTotalSize.Value() {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeStorageNotMatch,
 			"requests storage %s is less than source backup storage %s.",
 			vct.Spec.Resources.Requests.Storage(), backupTotalSize.String())

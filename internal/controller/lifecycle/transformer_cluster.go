@@ -62,7 +62,6 @@ func (c *ClusterTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 
 	clusterBackupResourceMap, err := getClusterBackupSourceMap(cluster)
 	if err != nil {
-		cluster.Status.Phase = appsv1alpha1.FailedClusterPhase
 		return err
 	}
 
@@ -95,7 +94,6 @@ func (c *ClusterTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 				return err
 			}
 			if err := component.BuildRestoredInfo2(synthesizedComp, backup, backupTool); err != nil {
-				cluster.Status.Phase = appsv1alpha1.FailedClusterPhase
 				return err
 			}
 		}

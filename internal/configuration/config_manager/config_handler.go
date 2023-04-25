@@ -284,9 +284,8 @@ func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgRe
 	}
 }
 
-func CreateExecHandler(command string, mountPoint string, configMeta *ConfigSpecMeta, backupPath string) (ConfigHandler, error) {
-	args := strings.Fields(command)
-	if len(args) == 0 {
+func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSpecMeta, backupPath string) (ConfigHandler, error) {
+	if len(command) == 0 {
 		return nil, cfgcore.MakeError("invalid command: %s", command)
 	}
 	filter, err := createFileRegex(fromConfigSpecMeta(configMeta))
@@ -302,8 +301,8 @@ func CreateExecHandler(command string, mountPoint string, configMeta *ConfigSpec
 		formatterConfig = &configMeta.FormatterConfig
 	}
 	shellTrigger := &shellCommandHandler{
-		command:                args[0],
-		arg:                    args[1:],
+		command:                command[0],
+		arg:                    command[1:],
 		backupPath:             backupPath,
 		configMeta:             configMeta,
 		filter:                 filter,
@@ -339,7 +338,7 @@ func fromDownwardCommand(meta *ConfigSpecMeta) []string {
 	if meta == nil || meta.ReloadOptions == nil || meta.ReloadOptions.ShellTrigger == nil {
 		return nil
 	}
-	return meta.ReloadOptions.ShellTrigger.DownwardAPIExec
+	return meta.ReloadOptions.ShellTrigger.DownwardAPICommand
 }
 
 type tplScriptHandler struct {
@@ -422,7 +421,7 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 			return nil, cfgcore.MakeError("shell trigger is nil")
 		}
 		shellTrigger := configMeta.ShellTrigger
-		return CreateExecHandler(shellTrigger.Exec, configMeta.MountPoint, &configMeta, filepath.Join(backupPath, configMeta.ConfigSpec.Name))
+		return CreateExecHandler(shellTrigger.Command, configMeta.MountPoint, &configMeta, filepath.Join(backupPath, configMeta.ConfigSpec.Name))
 	}
 	signalHandler := func(signalTrigger *appsv1alpha1.UnixSignalTrigger, mountPoint string) (ConfigHandler, error) {
 		if signalTrigger == nil {

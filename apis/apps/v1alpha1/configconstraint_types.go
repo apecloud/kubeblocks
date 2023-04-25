@@ -180,13 +180,13 @@ type DownwardAPIOption struct {
 }
 
 type ShellTrigger struct {
-	// exec used to execute for reload.
+	// command used to execute for reload.
 	// +kubebuilder:validation:Required
-	Exec string `json:"exec"`
+	Command []string `json:"command"`
 
-	// exec used to execute for downwrad api.
+	// downwardAPICommand used to execute for downwrad api.
 	// +optional
-	DownwardAPIExec []string `json:"downwardAPIExec,omitempty"`
+	DownwardAPICommand []string `json:"downwardAPICommand,omitempty"`
 
 	// scriptConfigMapRef used to execute for reload.
 	// +kubebuilder:validation:Required

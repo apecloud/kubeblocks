@@ -40,11 +40,11 @@ func TestCreateSignalHandler(t *testing.T) {
 }
 
 func TestCreateExecHandler(t *testing.T) {
-	_, err := CreateExecHandler("", "", nil, "")
+	_, err := CreateExecHandler(nil, "", nil, "")
 	require.ErrorContains(t, err, "invalid command")
-	_, err = CreateExecHandler(" ", "", nil, "")
+	_, err = CreateExecHandler([]string{}, "", nil, "")
 	require.ErrorContains(t, err, "invalid command")
-	c, err := CreateExecHandler("go 	version", "", nil, "")
+	c, err := CreateExecHandler([]string{"go", "version"}, "", nil, "")
 	require.Nil(t, err)
 	require.Nil(t, c.VolumeHandle(context.Background(), fsnotify.Event{}))
 }

@@ -214,14 +214,17 @@ spec:
                   shellTrigger:
                     description: shellTrigger performs the reload command.
                     properties:
-                      downwardAPIExec:
-                        description: exec used to execute for downwrad api.
+                      command:
+                        description: command used to execute for reload.
                         items:
                           type: string
                         type: array
-                      exec:
-                        description: exec used to execute for reload.
-                        type: string
+                      downwardAPICommand:
+                        description: downwardAPICommand used to execute for downwrad
+                          api.
+                        items:
+                          type: string
+                        type: array
                       namespace:
                         default: default
                         description: Specify the namespace of the referenced the tpl
@@ -233,7 +236,7 @@ spec:
                         description: scriptConfigMapRef used to execute for reload.
                         type: string
                     required:
-                    - exec
+                    - command
                     - scriptConfigMapRef
                     type: object
                   tplScriptTrigger:

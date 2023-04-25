@@ -91,7 +91,7 @@ func checkTPLScriptTrigger(options *appsv1alpha1.TPLScriptTrigger, cli client.Cl
 }
 
 func checkShellTrigger(options *appsv1alpha1.ShellTrigger) error {
-	if options.Exec == "" {
+	if len(options.Command) == 0 {
 		return cfgutil.MakeError("required shell trigger")
 	}
 	return nil

@@ -99,7 +99,7 @@ var _ = Describe("ConfigManager Test", func() {
 				args: args{
 					reloadOptions: &appsv1alpha1.ReloadOptions{
 						ShellTrigger: &appsv1alpha1.ShellTrigger{
-							Exec: "pwd",
+							Command: []string{"pwd"},
 						}},
 					volumeDirs: []corev1.VolumeMount{
 						{
@@ -117,7 +117,7 @@ var _ = Describe("ConfigManager Test", func() {
 				args: args{
 					reloadOptions: &appsv1alpha1.ReloadOptions{
 						ShellTrigger: &appsv1alpha1.ShellTrigger{
-							Exec:               "pwd",
+							Command:            []string{"pwd"},
 							Namespace:          "default",
 							ScriptConfigMapRef: "script_cm",
 						}},

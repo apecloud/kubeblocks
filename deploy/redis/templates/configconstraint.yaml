@@ -41,8 +41,9 @@ spec:
   ## for tools
   reloadOptions:
     shellTrigger:
-      exec: "redis-update.sh"
-      downwardAPIExec:
+      command:
+      - "redis-update.sh"
+      downwardAPICommand:
       - "redis-process-pod.sh"
       scriptConfigMapRef: redis-reload-script
       namespace: {{ .Release.Namespace }}

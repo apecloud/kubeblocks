@@ -21,6 +21,7 @@ package configmanager
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -69,7 +70,7 @@ func TestIsSupportReload(t *testing.T) {
 		args: args{
 			reload: &appsv1alpha1.ReloadOptions{
 				ShellTrigger: &appsv1alpha1.ShellTrigger{
-					Exec: "pg_ctl reload",
+					Command: strings.Fields("pg_ctl reload"),
 				},
 			},
 		},
@@ -147,7 +148,7 @@ var _ = Describe("Handler Util Test", func() {
 				args: args{
 					reloadOptions: &appsv1alpha1.ReloadOptions{
 						ShellTrigger: &appsv1alpha1.ShellTrigger{
-							Exec: "",
+							Command: nil,
 						}},
 				},
 				wantErr: true,
@@ -156,7 +157,7 @@ var _ = Describe("Handler Util Test", func() {
 				args: args{
 					reloadOptions: &appsv1alpha1.ReloadOptions{
 						ShellTrigger: &appsv1alpha1.ShellTrigger{
-							Exec: "go",
+							Command: strings.Fields("go"),
 						}},
 				},
 				wantErr: false,

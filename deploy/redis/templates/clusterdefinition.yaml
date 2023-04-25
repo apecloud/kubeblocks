@@ -71,6 +71,10 @@ spec:
           constraintRef: redis7-config-constraints
           namespace: {{ .Release.Namespace }}
           volumeName: redis-config
+          secondaryRenderedConfigSpec:
+            templateRef: redis7-config-template-second
+            namespace: {{ .Release.Namespace }}
+            policy: none
       scriptSpecs:
         - name: redis-scripts
           templateRef: redis-scripts

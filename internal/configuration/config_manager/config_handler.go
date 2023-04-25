@@ -26,45 +26,11 @@ import (
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
-	"k8s.io/apimachinery/pkg/util/yaml"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
-
-type ConfigHandler interface {
-	OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error
-	VolumeHandle(ctx context.Context, event fsnotify.Event) error
-	MountPoint() []string
-}
-
-type ConfigSpecMeta struct {
-	*appsv1alpha1.ReloadOptions `json:",inline"`
-
-	ReloadType appsv1alpha1.CfgReloadType       `json:"reloadType"`
-	ConfigSpec appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
-
-	ToolConfigs        []appsv1alpha1.ToolConfig
-	DownwardAPIOptions []appsv1alpha1.DownwardAPIOption
-
-	// config volume mount path
-	TPLConfig  string `json:"tplConfig"`
-	MountPoint string `json:"mountPoint"`
-	// EngineType string `json:"engineType"`
-	// DSN        string `json:"dsn"`
-
-	FormatterConfig appsv1alpha1.FormatterConfig `json:"formatterConfig"`
-}
-
-type TPLScriptConfig struct {
-	Scripts   string `json:"scripts"`
-	FileRegex string `json:"fileRegex"`
-	DataType  string `json:"dataType"`
-	DSN       string `json:"dsn"`
-
-	FormatterConfig appsv1alpha1.FormatterConfig `json:"formatterConfig"`
-}
 
 type configVolumeHandleMeta struct {
 	ConfigHandler
@@ -377,15 +343,8 @@ func (u *tplScriptHandler) VolumeHandle(ctx context.Context, event fsnotify.Even
 }
 
 func CreateTPLScriptHandler(name, configPath string, dirs []string, backupPath string) (ConfigHandler, error) {
-	if _, err := os.Stat(configPath); err != nil {
-		return nil, err
-	}
-	b, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
 	tplConfig := TPLScriptConfig{}
-	if err := yaml.Unmarshal(b, &tplConfig); err != nil {
+	if err := cfgutil.FromYamlConfig(configPath, &tplConfig); err != nil {
 		return nil, err
 	}
 

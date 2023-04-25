@@ -51,7 +51,7 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 	localObjs []client.Object,
 	ctx context.Context,
 	cli client.Client) ([]client.Object, error) {
-	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
+	// Need to Merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
 	if len(component.ConfigTemplates) == 0 && len(component.ScriptTemplates) == 0 {
 		return nil, nil
@@ -137,7 +137,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	if len(configSpecMetas) == 0 {
 		return nil
 	}
-	if buildParams, err = buildConfigManagerParams(cli, ctx, cluster, component, configSpecMetas, volumeDirs); err != nil {
+	if buildParams, err = buildConfigManagerParams(cli, ctx, cluster, component, configSpecMetas, volumeDirs, podSpec); err != nil {
 		return err
 	}
 	if buildParams == nil {
@@ -233,9 +233,8 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1a
 	return volumeDirs, usingConfigSpecs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster,
-	comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount) (*cfgcm.CfgManagerBuildParams, error) {
-	configManagerParams := &cfgcm.CfgManagerBuildParams{
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
+	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:            constant.ConfigSidecarName,
 		CharacterType:          comp.CharacterType,
 		SecreteName:            component.GenerateConnCredential(cluster.Name),
@@ -268,7 +267,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		}
 	}
 	if len(toolContainers) != 0 {
-		cfgManagerParams.ToolsContainers = builder.BuildCfgManagerToolsContainer(cfgManagerParams, params, toolContainers)
+		cfgManagerParams.ToolsContainers = builder.BuildCfgManagerToolsContainer(cfgManagerParams, comp, toolContainers)
 	}
 	return cfgManagerParams, nil
 }

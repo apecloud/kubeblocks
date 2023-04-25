@@ -113,6 +113,35 @@ spec:
                               is equivalent to the "default" namespace.
                             maxLength: 63
                             type: string
+                          secondaryRenderedConfigSpec:
+                            description: 'secondaryRenderedConfigSpec is optional:
+                              specify the secondary rendered config spec.'
+                            properties:
+                              namespace:
+                                default: default
+                                description: Specify the namespace of the referenced
+                                  the configuration template ConfigMap object. An
+                                  empty namespace is equivalent to the "default" namespace.
+                                maxLength: 63
+                                type: string
+                              policy:
+                                default: patch
+                                description: policy defines how to merge external
+                                  imported templates into component templates.
+                                enum:
+                                - patch
+                                - replace
+                                - none
+                                type: string
+                              templateRef:
+                                description: Specify the name of the referenced the
+                                  configuration template ConfigMap object.
+                                maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                            required:
+                            - templateRef
+                            type: object
                           templateRef:
                             description: Specify the name of the referenced the configuration
                               template ConfigMap object.

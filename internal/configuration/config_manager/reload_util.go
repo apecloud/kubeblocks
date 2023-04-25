@@ -232,6 +232,11 @@ func scanConfigFiles(dirs []string, filter regexFilter) ([]string, error) {
 	return configs, nil
 }
 
+func ScanConfigVolume(mountPoint string) ([]string, error) {
+	filter, _ := createFileRegex("")
+	return scanConfigFiles([]string{mountPoint}, filter)
+}
+
 func backupConfigFiles(dirs []string, filter regexFilter, backupPath string) error {
 	fileInfo, err := os.Stat(backupPath)
 	if err != nil && !os.IsNotExist(err) {

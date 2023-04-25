@@ -59,7 +59,7 @@ spec:
     volumeName: redis-tools
 
   downwardAPIOptions:
-    - name: "pod_info"
+    - name: "pod-info"
       mountPoint: "/etc/pod_info"
       items:
         - path: "labels/workload-type"

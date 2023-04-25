@@ -29,3 +29,14 @@ data:
     {{- .Files.Get "scripts/redis-reload.sh" | nindent 4 }}
   redis-process-pod.sh: |-
     {{- .Files.Get "scripts/redis-process-pod.sh" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis7-config-template-second
+  labels:
+    {{- include "redis.labels" . | nindent 4 }}
+data:
+  redis.conf: |-
+    {{- .Files.Get "config/redis7-config-secondary-render.tpl" | nindent 4 }}
+---

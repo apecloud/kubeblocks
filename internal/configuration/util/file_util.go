@@ -22,6 +22,8 @@ package util
 import (
 	"os"
 	"path/filepath"
+
+	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 func FromConfigFiles(files []string) (map[string]string, error) {
@@ -42,4 +44,26 @@ func ToArgs(m map[string]string) []string {
 		args = append(args, k, v)
 	}
 	return args
+}
+
+func FromYamlConfig[T any](yamlConfig string, obj T) error {
+	if _, err := os.Stat(yamlConfig); err != nil {
+		return err
+	}
+	b, err := os.ReadFile(yamlConfig)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal(b, obj)
+}
+
+func CheckPathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }

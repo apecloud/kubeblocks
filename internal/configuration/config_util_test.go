@@ -233,8 +233,8 @@ func TestMergeUpdatedConfig(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := mergeUpdatedConfig(tt.args.baseMap, tt.args.updatedMap); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("mergeUpdatedConfig() = %v, want %v", got, tt.want)
+			if got := MergeUpdatedConfig(tt.args.baseMap, tt.args.updatedMap); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("MergeUpdatedConfig() = %v, want %v", got, tt.want)
 			}
 		})
 	}

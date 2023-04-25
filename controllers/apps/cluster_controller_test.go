@@ -1385,7 +1385,7 @@ var _ = Describe("Cluster Controller", func() {
 			testBackupError()
 		})
 
-		FIt("test restore cluster from backup", func() {
+		It("test restore cluster from backup", func() {
 			By("mock backup")
 			backupPolicyName := "test-backup-policy"
 			backupName := "test-backup"

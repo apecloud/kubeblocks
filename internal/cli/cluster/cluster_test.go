@@ -81,11 +81,11 @@ var _ = Describe("cluster util", func() {
 			Expect(len(objs.GetComponentInfo())).Should(Equal(1))
 		}
 
-		By("when node is available")
+		By("when node is not found")
 		testFn(testing.FakeClientSet(baseObjs...))
 		Expect(len(objs.Nodes)).Should(Equal(0))
 
-		By("when node id not found")
+		By("when node is available")
 		baseObjs = append(baseObjs, testing.FakeNode())
 		testFn(testing.FakeClientSet(baseObjs...))
 		Expect(len(objs.Nodes)).Should(Equal(1))

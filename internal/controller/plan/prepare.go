@@ -174,8 +174,8 @@ func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildPar
 	}
 	if len(scriptPath) != 0 {
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "PATH",
-			Value: fmt.Sprintf("$PATH:%s", strings.Join(scriptPath, ":")),
+			Name:  "TOOLS_PATH",
+			Value: strings.Join(scriptPath, ":"),
 		})
 	}
 }

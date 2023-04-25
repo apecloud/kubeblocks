@@ -27,3 +27,5 @@ metadata:
 data:
   redis-update.sh: |-
     {{- .Files.Get "scripts/redis-reload.sh" | nindent 4 }}
+  redis-process-pod.sh: |-
+    {{- .Files.Get "scripts/redis-process-pod.sh" | nindent 4 }}

@@ -48,6 +48,8 @@ const (
 )
 
 func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, cmBuildParams *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
+	allVolumeMounts := make([]corev1.VolumeMount, 0)
+	allVolumeMounts = append(allVolumeMounts, volumeDirs...)
 	for i := range cmBuildParams.ConfigSpecsBuildParams {
 		buildParam := &cmBuildParams.ConfigSpecsBuildParams[i]
 		volumeMount := FindVolumeMount(cmBuildParams.Volumes, buildParam.ConfigSpec.VolumeName)
@@ -60,7 +62,21 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, c
 			return err
 		}
 	}
-	return buildConfigManagerArgs(cmBuildParams, volumeDirs)
+	downwardAPIVolumes := buildPodDownwardAPI(cmBuildParams)
+	allVolumeMounts = append(allVolumeMounts, downwardAPIVolumes...)
+	cmBuildParams.Volumes = append(cmBuildParams.Volumes, downwardAPIVolumes...)
+	return buildConfigManagerArgs(cmBuildParams, allVolumeMounts)
+}
+
+func buildPodDownwardAPI(params *CfgManagerBuildParams) []corev1.VolumeMount {
+	for _, buildParam := range params.ConfigSpecsBuildParams {
+		for _, info := range buildParam.WatchPodField {
+			if FindVolumeMount(params.WatchPodFieldsVolumes, info.Name) == nil {
+				buildDownwardAPIVolume(params, info)
+			}
+		}
+	}
+	return params.WatchPodFieldsVolumes
 }
 
 func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
@@ -132,6 +148,20 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	buildReloadScriptVolume(scriptCMKey.Name, manager, mountPoint, volumeName)
 	configSpecBuildMeta.TPLConfig = filepath.Join(mountPoint, configTemplateName)
 	return nil
+}
+
+func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1alpha1.WatchPodField) {
+	manager.WatchPodFieldsVolumes = append(manager.WatchPodFieldsVolumes, corev1.VolumeMount{
+		Name:      fieldInfo.Name,
+		MountPath: fieldInfo.MountPoint,
+	})
+	manager.ScriptVolume = append(manager.ScriptVolume, corev1.Volume{
+		Name: fieldInfo.Name,
+		VolumeSource: corev1.VolumeSource{
+			DownwardAPI: &corev1.DownwardAPIVolumeSource{
+				Items: fieldInfo.Items,
+			}},
+	})
 }
 
 func buildReloadScriptVolume(scriptCMName string, manager *CfgManagerBuildParams, mountPoint, volumeName string) {

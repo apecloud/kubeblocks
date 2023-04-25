@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -32,6 +33,9 @@ type ConfigConstraintSpec struct {
 	// toolConfig used to config init container.
 	// +optional
 	ToolsConfig []ToolConfig `json:"toolsConfig,omitempty"`
+
+	// watchPodFields is used to watch pod fields.
+	WatchPodFields []WatchPodField `json:"watchPodFields,omitempty"`
 
 	// cfgSchemaTopLevelName is cue type name, which generates openapi schema.
 	// +optional
@@ -139,7 +143,8 @@ type ToolConfig struct {
 
 	// Specify the name of initContainer.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name,omitempty"`
 
 	// tools Container image name.
@@ -156,10 +161,31 @@ type ToolConfig struct {
 	Command []string `json:"command"`
 }
 
+type WatchPodField struct {
+	// Specify the name of the field.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// mountPoint is the mount point of the scripts file.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	MountPoint string `json:"mountPoint"`
+
+	// Items is a list of downward API volume file
+	// +kubebuilder:validation:Required
+	Items []corev1.DownwardAPIVolumeFile `json:"items"`
+}
+
 type ShellTrigger struct {
 	// exec used to execute for reload.
 	// +kubebuilder:validation:Required
 	Exec string `json:"exec"`
+
+	// exec used to execute for downwrad api.
+	// +optional
+	DownwardAPIExec []string `json:"downwardAPIExec,omitempty"`
 
 	// scriptConfigMapRef used to execute for reload.
 	// +kubebuilder:validation:Required

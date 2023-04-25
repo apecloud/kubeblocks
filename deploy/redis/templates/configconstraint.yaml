@@ -42,14 +42,28 @@ spec:
   reloadOptions:
     shellTrigger:
       exec: "redis-update.sh"
+      downwardAPIExec:
+      - "redis-process-pod.sh"
       scriptConfigMapRef: redis-reload-script
       namespace: {{ .Release.Namespace }}
 
   toolsConfig:
-  - name: "init-redis-tools"
-    volumeName: "redis-tools"
-    mountPoint: "/kb/tools"
-    command:
-      - cp
-      - /usr/bin/redis-cli
-      - /kb/tools/redis-cli
+  - command:
+    - cp
+    - /usr/local/bin/redis-cli
+    - /kb/tools/redis-cli
+    image: docker.io/library/redis:7.0.11-alpine
+    mountPoint: /kb/tools
+    name: init-redis-tools
+    volumeName: redis-tools
+
+  watchPodFields:
+    - name: "pod_info"
+      mountPoint: "/etc/pod_info"
+      items:
+        - path: "labels"
+          fieldRef:
+            fieldPath: metadata.labels
+        - path: "annotations"
+          fieldRef:
+            fieldPath: metadata.annotations

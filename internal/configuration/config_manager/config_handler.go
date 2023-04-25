@@ -36,15 +36,17 @@ import (
 type ConfigHandler interface {
 	OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error
 	VolumeHandle(ctx context.Context, event fsnotify.Event) error
-	MountPoint() string
+	MountPoint() []string
 }
 
 type ConfigSpecMeta struct {
 	*appsv1alpha1.ReloadOptions `json:",inline"`
 
-	ReloadType  appsv1alpha1.CfgReloadType       `json:"reloadType"`
-	ConfigSpec  appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
-	ToolsConfig []appsv1alpha1.ToolConfig        `json:"toolConfig"`
+	ReloadType appsv1alpha1.CfgReloadType       `json:"reloadType"`
+	ConfigSpec appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
+
+	ToolsConfig   []appsv1alpha1.ToolConfig
+	WatchPodField []appsv1alpha1.WatchPodField
 
 	// config volume mount path
 	TPLConfig  string `json:"tplConfig"`
@@ -67,7 +69,7 @@ type TPLScriptConfig struct {
 type configVolumeHandleMeta struct {
 	ConfigHandler
 
-	mountPoint string
+	mountPoint []string
 	reloadType appsv1alpha1.CfgReloadType
 	configSpec appsv1alpha1.ComponentTemplateSpec
 
@@ -107,7 +109,7 @@ func (s *configVolumeHandleMeta) prepare(backupPath string, filter regexFilter, 
 	return updatedParams, currFiles, nil
 }
 
-func (s *configVolumeHandleMeta) MountPoint() string {
+func (s *configVolumeHandleMeta) MountPoint() []string {
 	return s.mountPoint
 }
 
@@ -115,8 +117,12 @@ type multiHandler struct {
 	handlers map[string]ConfigHandler
 }
 
-func (m *multiHandler) MountPoint() string {
-	return ""
+func (m *multiHandler) MountPoint() []string {
+	var mountPoints []string
+	for _, handler := range m.handlers {
+		mountPoints = append(mountPoints, handler.MountPoint()...)
+	}
+	return mountPoints
 }
 
 func (m *multiHandler) OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error {
@@ -127,9 +133,18 @@ func (m *multiHandler) OnlineUpdate(ctx context.Context, name string, updatedPar
 	return nil
 }
 
+func isOwnerEvent(volumeDirs []string, event fsnotify.Event) bool {
+	for _, dir := range volumeDirs {
+		if strings.HasPrefix(event.Name, dir) {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *multiHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
 	for _, handler := range m.handlers {
-		if strings.HasPrefix(event.Name, handler.MountPoint()) {
+		if isOwnerEvent(handler.MountPoint(), event) {
 			return handler.VolumeHandle(ctx, event)
 		}
 	}
@@ -158,8 +173,8 @@ func (u *unixSignalHandler) VolumeHandle(ctx context.Context, event fsnotify.Eve
 	return sendSignal(pid, u.signal)
 }
 
-func (u *unixSignalHandler) MountPoint() string {
-	return u.mountPoint
+func (u *unixSignalHandler) MountPoint() []string {
+	return []string{u.mountPoint}
 }
 
 func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string, mountPoint string) (ConfigHandler, error) {
@@ -184,12 +199,18 @@ type shellCommandHandler struct {
 	command string
 	arg     []string
 
+	downwardAPICommand    []string
+	downwardAPIMountPoint []string
+
 	backupPath string
 	configMeta *ConfigSpecMeta
 	filter     regexFilter
 }
 
 func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
+	if mountPoint, ok := s.downwardAPIVolume(event); ok {
+		return s.processDownwardAPI(ctx, mountPoint)
+	}
 	args := make([]string, len(s.arg))
 	for i, v := range s.arg {
 		args[i] = strings.ReplaceAll(v, "$volume_dir", event.Name)
@@ -214,6 +235,10 @@ func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.E
 	return err
 }
 
+func (s *shellCommandHandler) MountPoint() []string {
+	return append(s.mountPoint, s.downwardAPIMountPoint...)
+}
+
 func (s *shellCommandHandler) checkAndPrepareUpdate(event fsnotify.Event) (map[string]string, []string, error) {
 	if s.configMeta == nil || s.backupPath == "" {
 		return nil, nil, nil
@@ -225,7 +250,30 @@ func (s *shellCommandHandler) checkAndPrepareUpdate(event fsnotify.Event) (map[s
 	return updatedParams, files, nil
 }
 
-func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgReloadType, mountPoint string, formatterConfig *appsv1alpha1.FormatterConfig) configVolumeHandleMeta {
+func (s *shellCommandHandler) downwardAPIVolume(event fsnotify.Event) (string, bool) {
+	for _, v := range s.downwardAPIMountPoint {
+		if strings.HasPrefix(event.Name, v) {
+			return v, true
+		}
+	}
+	return "", false
+}
+
+func (s *shellCommandHandler) processDownwardAPI(ctx context.Context, mountPoint string) error {
+	if len(s.downwardAPICommand) == 0 {
+		logger.Info("not found downward api command, and pass.")
+		return nil
+	}
+
+	args := s.downwardAPICommand[1:]
+	args = append(args, mountPoint)
+	command := exec.CommandContext(ctx, s.downwardAPICommand[0], args...)
+	stdout, err := cfgutil.ExecShellCommand(command)
+	logger.V(1).Info(fmt.Sprintf("exec: [%s], stdout: [%s], stderr:%v", command.String(), stdout, err))
+	return err
+}
+
+func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgReloadType, mountPoint []string, formatterConfig *appsv1alpha1.FormatterConfig) configVolumeHandleMeta {
 	return configVolumeHandleMeta{
 		reloadType: reloadType,
 		mountPoint: mountPoint,
@@ -259,7 +307,9 @@ func CreateExecHandler(command string, mountPoint string, configMeta *ConfigSpec
 		backupPath:             backupPath,
 		configMeta:             configMeta,
 		filter:                 filter,
-		configVolumeHandleMeta: createConfigVolumeMeta("", appsv1alpha1.ShellType, mountPoint, formatterConfig),
+		downwardAPICommand:     fromDownwardCommand(configMeta),
+		downwardAPIMountPoint:  fromDownwardMountPoint(configMeta),
+		configVolumeHandleMeta: createConfigVolumeMeta("", appsv1alpha1.ShellType, []string{mountPoint}, formatterConfig),
 	}
 	return shellTrigger, nil
 }
@@ -272,6 +322,24 @@ func fromConfigSpecMeta(meta *ConfigSpecMeta) string {
 		return meta.ConfigSpec.Keys[0]
 	}
 	return "( " + strings.Join(meta.ConfigSpec.Keys, " | ") + " )"
+}
+
+func fromDownwardMountPoint(meta *ConfigSpecMeta) []string {
+	if meta == nil || len(meta.WatchPodField) == 0 {
+		return nil
+	}
+	var mountPoints []string
+	for _, field := range meta.WatchPodField {
+		mountPoints = append(mountPoints, field.MountPoint)
+	}
+	return mountPoints
+}
+
+func fromDownwardCommand(meta *ConfigSpecMeta) []string {
+	if meta == nil || meta.ReloadOptions == nil || meta.ReloadOptions.ShellTrigger == nil {
+		return nil
+	}
+	return meta.ReloadOptions.ShellTrigger.DownwardAPIExec
 }
 
 type tplScriptHandler struct {
@@ -295,11 +363,15 @@ func (u *tplScriptHandler) OnlineUpdate(ctx context.Context, name string, update
 }
 
 func (u *tplScriptHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
+	if isOwnerEvent(u.MountPoint(), event) {
+		logger.Info(fmt.Sprintf("ignore event: %s, current watch volume: %s", event.String(), u.mountPoint))
+		return nil
+	}
 	updatedParams, files, err := u.prepare(u.backupPath, u.fileFilter, event)
 	if err != nil {
 		return err
 	}
-	if err := u.OnlineUpdate(ctx, "", updatedParams); err != nil {
+	if err := u.OnlineUpdate(ctx, event.Name, updatedParams); err != nil {
 		return err
 	}
 	return backupLastConfigFiles(files, u.backupPath)
@@ -334,7 +406,7 @@ func CreateTPLScriptHandler(name, configPath string, dirs []string, backupPath s
 		return nil, err
 	}
 	tplHandler := &tplScriptHandler{
-		configVolumeHandleMeta: createConfigVolumeMeta(name, appsv1alpha1.TPLScriptType, dirs[0], &tplConfig.FormatterConfig),
+		configVolumeHandleMeta: createConfigVolumeMeta(name, appsv1alpha1.TPLScriptType, dirs, &tplConfig.FormatterConfig),
 		tplContent:             string(tplContent),
 		fileFilter:             filter,
 		engineType:             tplConfig.DataType,

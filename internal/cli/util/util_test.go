@@ -111,7 +111,10 @@ var _ = Describe("util", func() {
 
 		testFn := func(name string) bool {
 			n := GetNodeByName(nodes, name)
-			return n.Name == name
+			if n != nil {
+				return n.Name == name
+			}
+			return false
 		}
 		Expect(testFn("test")).Should(BeTrue())
 		Expect(testFn("non-exists")).Should(BeFalse())

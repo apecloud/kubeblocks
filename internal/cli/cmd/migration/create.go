@@ -68,16 +68,16 @@ type CreateMigrationOptions struct {
 	Resources            []string                 `json:"resources,omitempty"`
 	ResourceModel        map[string]interface{}   `json:"resourceModel,omitempty"`
 	ServerID             uint32                   `json:"serverId,omitempty"`
-	create.CreateOptions
+	create.CreateOptions `json:"-"`
 }
 
 func NewMigrationCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateMigrationOptions{
 		CreateOptions: create.CreateOptions{
+			Factory:         f,
 			IOStreams:       streams,
 			CueTemplateName: "migration_template.cue",
 			GVR:             types.MigrationTaskGVR(),
-			Factory:         f,
 		}}
 	o.CreateOptions.Options = o
 

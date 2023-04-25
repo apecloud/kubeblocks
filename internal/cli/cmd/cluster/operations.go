@@ -97,7 +97,10 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 
 	o := &OperationsOptions{
 		// nil cannot be set to a map struct in CueLang, so init the map of KeyValues.
-		KeyValues: map[string]string{},
+		KeyValues:             map[string]string{},
+		OpsType:               opsType,
+		HasComponentNamesFlag: hasComponentNamesFlag,
+		RequireConfirm:        true,
 		CreateOptions: create.CreateOptions{
 			Factory:         f,
 			IOStreams:       streams,
@@ -105,9 +108,6 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 			GVR:             types.OpsGVR(),
 			CustomOutPut:    customOutPut,
 		},
-		OpsType:               opsType,
-		HasComponentNamesFlag: hasComponentNamesFlag,
-		RequireConfirm:        true,
 	}
 
 	o.OpsTypeLower = strings.ToLower(string(o.OpsType))
@@ -115,7 +115,7 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 	return o
 }
 
-// addCommonFlags build common flags for operations command
+// addCommonFlags add common flags for operations command
 func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command) {
 	// add print flags
 	printer.AddOutputFlagForCreate(cmd, &o.Format)

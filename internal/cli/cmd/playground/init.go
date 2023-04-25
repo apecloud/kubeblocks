@@ -441,18 +441,12 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 
 // createCluster construct a cluster create options and run
 func (o *initOptions) createCluster() error {
-	f := util.NewFactory()
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
 	options := &cmdcluster.CreateOptions{
 		CreateOptions: create.CreateOptions{
-			Factory:         f,
+			Factory:         util.NewFactory(),
 			IOStreams:       genericclioptions.NewTestIOStreamsDiscard(),
 			Namespace:       defaultNamespace,
 			Name:            kbClusterName,
-			Dynamic:         dynamicClient,
 			CueTemplateName: cmdcluster.CueTemplateName,
 			GVR:             types.ClusterGVR(),
 		},
@@ -473,10 +467,13 @@ func (o *initOptions) createCluster() error {
 		options.Values = append(options.Values, "replicas=3")
 	}
 
-	if err = options.Validate(); err != nil {
+	if err := options.CreateOptions.Complete(); err != nil {
 		return err
 	}
-	if err = options.Complete(); err != nil {
+	if err := options.Validate(); err != nil {
+		return err
+	}
+	if err := options.Complete(); err != nil {
 		return err
 	}
 	return options.Run()

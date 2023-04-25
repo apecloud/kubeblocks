@@ -184,9 +184,10 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Example: clusterCreateExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Cmd, o.Args = cmd, args
+			cmdutil.CheckErr(o.CreateOptions.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Complete())
-			cmdutil.CheckErr(o.Create())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
@@ -214,10 +215,10 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *CreateOptions {
 	o := &CreateOptions{CreateOptions: create.CreateOptions{
+		Factory:         f,
 		IOStreams:       streams,
 		CueTemplateName: CueTemplateName,
 		GVR:             types.ClusterGVR(),
-		Factory:         f,
 	}}
 	o.CreateOptions.PreCreate = o.PreCreate
 	o.CreateOptions.Options = o
@@ -277,10 +278,6 @@ func (o *CreateOptions) Validate() error {
 		return fmt.Errorf("a valid termination policy is needed, use --termination-policy to specify one of: DoNotTerminate, Halt, Delete, WipeOut")
 	}
 
-	if err := o.CreateOptions.Complete(); err != nil {
-		return err
-	}
-
 	if o.ClusterVersionRef == "" {
 		version, err := cluster.GetLatestVersion(o.Dynamic, o.ClusterDefRef)
 		if err != nil {
@@ -329,10 +326,6 @@ func (o *CreateOptions) Complete() error {
 		o.Tolerations = tolerations
 	}
 	return nil
-}
-
-func (o *CreateOptions) Create() error {
-	return o.CreateOptions.Run()
 }
 
 // buildComponents build components from file or set values

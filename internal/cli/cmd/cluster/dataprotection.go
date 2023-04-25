@@ -57,7 +57,7 @@ var (
 		# list all backup policy
 		kbcli cluster list-backup-policy 
         
-		# using short cmd to list backup policy of specified cluster 
+		# using short cmd to list backup policy of the specified cluster 
         kbcli cluster list-bp mycluster
 	`)
 	editExample = templates.Examples(`
@@ -69,16 +69,16 @@ var (
 	`)
 	createBackupExample = templates.Examples(`
 		# create a backup
-		kbcli cluster backup cluster-name
+		kbcli cluster backup mycluster
 
 		# create a snapshot backup
-		kbcli cluster backup cluster-name --backup-type snapshot
+		kbcli cluster backup mycluster --backup-type snapshot
 
 		# create a full backup
-		kbcli cluster backup cluster-name --backup-type full
+		kbcli cluster backup mycluster --backup-type full
 
 		# create a backup with specified backup policy
-		kbcli cluster backup cluster-name --backup-policy <backup-policy-name>
+		kbcli cluster backup mycluster --backup-policy <backup-policy-name>
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backup
@@ -99,7 +99,7 @@ var (
 
 const annotationTrueValue = "true"
 
-type BackupOptions struct {
+type CreateBackupOptions struct {
 	BackupType   string `json:"backupType"`
 	BackupName   string `json:"backupName"`
 	Role         string `json:"role,omitempty"`
@@ -113,19 +113,16 @@ type ListBackupOptions struct {
 	BackupName string
 }
 
-func (o *BackupOptions) Complete() error {
+func (o *CreateBackupOptions) Complete() error {
 	// generate backupName
 	if len(o.BackupName) == 0 {
 		o.BackupName = strings.Join([]string{"backup", o.Namespace, o.Name, time.Now().Format("20060102150405")}, "-")
 	}
-	return nil
+
+	return o.CreateOptions.Complete()
 }
 
-func (o *BackupOptions) Validate() error {
-	if err := o.CreateOptions.Complete(); err != nil {
-		return err
-	}
-
+func (o *CreateBackupOptions) Validate() error {
 	// validate
 	if o.Name == "" {
 		return fmt.Errorf("missing cluster name")
@@ -140,7 +137,7 @@ func (o *BackupOptions) Validate() error {
 }
 
 // completeDefaultBackupPolicy completes the default backup policy.
-func (o *BackupOptions) completeDefaultBackupPolicy() error {
+func (o *CreateBackupOptions) completeDefaultBackupPolicy() error {
 	defaultBackupPolicyName, err := o.getDefaultBackupPolicy()
 	if err != nil {
 		return err
@@ -149,7 +146,7 @@ func (o *BackupOptions) completeDefaultBackupPolicy() error {
 	return nil
 }
 
-func (o *BackupOptions) getDefaultBackupPolicy() (string, error) {
+func (o *CreateBackupOptions) getDefaultBackupPolicy() (string, error) {
 	clusterObj, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -184,7 +181,7 @@ func (o *BackupOptions) getDefaultBackupPolicy() (string, error) {
 	return defaultBackupPolicies[0].GetName(), nil
 }
 
-func NewBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	customOutPut := func(opt *create.CreateOptions) {
 		output := fmt.Sprintf("Backup %s created successfully, you can view the progress:", opt.Name)
 		printer.PrintLine(output)
@@ -192,24 +189,26 @@ func NewBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		printer.PrintLine(nextLine)
 	}
 
-	o := &BackupOptions{}
-	o.CreateOptions = create.CreateOptions{
-		IOStreams:       streams,
-		Factory:         f,
-		GVR:             types.BackupGVR(),
-		CueTemplateName: "backup_template.cue",
-		CustomOutPut:    customOutPut,
-		Options:         o,
+	o := &CreateBackupOptions{
+		CreateOptions: create.CreateOptions{
+			IOStreams:       streams,
+			Factory:         f,
+			GVR:             types.BackupGVR(),
+			CueTemplateName: "backup_template.cue",
+			CustomOutPut:    customOutPut,
+		},
 	}
+	o.CreateOptions.Options = o
 
 	cmd := &cobra.Command{
-		Use:     "backup",
-		Short:   "Create a backup.",
-		Example: createBackupExample,
+		Use:               "backup NAME",
+		Short:             "Create a backup for the cluster.",
+		Example:           createBackupExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Cmd, o.Args = cmd, args
-			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -531,7 +530,7 @@ func (o *CreateRestoreOptions) Validate() error {
 	return nil
 }
 
-func NewRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateRestoreOptions{}
 	o.CreateOptions = create.CreateOptions{
 		IOStreams: streams,

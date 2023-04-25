@@ -101,7 +101,7 @@ var _ = Describe("DataProtection", func() {
 
 		It("validate create backup", func() {
 			By("without cluster name")
-			o := &BackupOptions{
+			o := &CreateBackupOptions{
 				CreateOptions: create.CreateOptions{
 					Dynamic:   testing.FakeDynamicClient(),
 					IOStreams: streams,
@@ -133,7 +133,7 @@ var _ = Describe("DataProtection", func() {
 			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
 			initClient(defaultBackupPolicy)
 			By("test with specified backupPolicy")
-			cmd := NewBackupCmd(tf, streams)
+			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
 			_ = cmd.Flags().Set("backup-policy", defaultBackupPolicy.Name)
@@ -207,7 +207,7 @@ var _ = Describe("DataProtection", func() {
 			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterDef, cluster, backupPolicy)
 		tf.Client = &clientfake.RESTClient{}
 		// create backup
-		cmd := NewBackupCmd(tf, streams)
+		cmd := NewCreateBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 		_ = cmd.Flags().Set("backup-type", "snapshot")
 		_ = cmd.Flags().Set("backup-name", backupName)
@@ -216,7 +216,7 @@ var _ = Describe("DataProtection", func() {
 		By("restore new cluster from source cluster which is not deleted")
 		// mock backup is ok
 		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName, nil)
-		cmdRestore := NewRestoreCmd(tf, streams)
+		cmdRestore := NewCreateRestoreCmd(tf, streams)
 		Expect(cmdRestore != nil).To(BeTrue())
 		_ = cmdRestore.Flags().Set("backup", backupName)
 		cmdRestore.Run(nil, []string{newClusterName})
@@ -269,7 +269,7 @@ var _ = Describe("DataProtection", func() {
 		tf.Client = &clientfake.RESTClient{}
 
 		By("restore new cluster from source cluster which is not deleted")
-		cmdRestore := NewRestoreCmd(tf, streams)
+		cmdRestore := NewCreateRestoreCmd(tf, streams)
 		Expect(cmdRestore != nil).To(BeTrue())
 		_ = cmdRestore.Flags().Set("restore-to-time", util.TimeFormatWithDuration(&now, time.Second))
 		_ = cmdRestore.Flags().Set("source-cluster", clusterName)

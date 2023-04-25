@@ -192,7 +192,7 @@ func (o *configOpsOptions) printConfigureTips() {
 		printer.NewPair("ClusterName", o.Name))
 }
 
-// addCommonFlags build common flags for operations command
+// buildReconfigureCommonFlags build common flags for reconfigure command
 func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command) {
 	o.addCommonFlags(cmd)
 	cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-config'.")

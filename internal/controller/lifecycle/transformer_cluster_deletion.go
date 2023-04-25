@@ -76,6 +76,22 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
+
+	// find all vertices of StatefulSet and Deployment, and connect them to ConfigMap,
+	// this is to ensure that ConfigMap is deleted after StatefulSet and Deployment Workloads are deleted.
+	vertices := findAll[*appsv1.StatefulSet](dag)
+	deployVertices := findAll[*appsv1.Deployment](dag)
+	vertices = append(vertices, deployVertices...)
+	cmVertices := findAll[*corev1.ConfigMap](dag)
+	if len(vertices) > 0 && len(cmVertices) > 0 {
+		for _, vertex := range vertices {
+			dag.RemoveEdge(graph.RealEdge(root, vertex))
+			for _, cmVertex := range cmVertices {
+				dag.Connect(cmVertex, vertex)
+			}
+		}
+	}
+
 	root.action = actionPtr(DELETE)
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly

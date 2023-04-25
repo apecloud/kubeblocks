@@ -350,7 +350,12 @@ func (o *ClusterObjects) getStorageInfo(component *appsv1alpha1.ClusterComponent
 			if labels[constant.VolumeClaimTemplateNameLabelKey] != vcTpl.Name {
 				continue
 			}
-			return *pvc.Spec.StorageClassName
+			if pvc.Spec.StorageClassName != nil {
+				return *pvc.Spec.StorageClassName
+			} else {
+				return ""
+			}
+
 		}
 
 		return types.None

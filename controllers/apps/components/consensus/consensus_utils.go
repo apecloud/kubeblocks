@@ -416,8 +416,8 @@ func updateConsensusRoleInfo(ctx context.Context,
 	if len(configList.Items) > 0 {
 		for _, config := range configList.Items {
 			patch := client.MergeFrom(config.DeepCopy())
-			config.Data["KB_"+strings.ToUpper(componentName)+"_LEADER"] = leader
-			config.Data["KB_"+strings.ToUpper(componentName)+"_FOLLOWERS"] = followers
+			config.Data["KB_"+strings.ToUpper(componentDef.Name)+"_LEADER"] = leader
+			config.Data["KB_"+strings.ToUpper(componentDef.Name)+"_FOLLOWERS"] = followers
 			if err := cli.Patch(ctx, &config, patch); err != nil {
 				return err
 			}

@@ -353,7 +353,7 @@ func (o *ClusterObjects) getStorageInfo(component *appsv1alpha1.ClusterComponent
 			if pvc.Spec.StorageClassName != nil {
 				return *pvc.Spec.StorageClassName
 			} else {
-				return ""
+				return types.None
 			}
 
 		}

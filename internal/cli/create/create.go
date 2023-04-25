@@ -31,12 +31,10 @@ import (
 	cuejson "cuelang.org/go/encoding/json"
 	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
@@ -175,37 +173,6 @@ func (o *CreateOptions) Run() error {
 		return err
 	}
 	return printer.PrintObj(resObj, o.Out)
-}
-
-// RunAsApply execute command. the options of parameter contain the command flags and args.
-// if the resource exists, run as "kubectl apply".
-func (o *CreateOptions) RunAsApply() error {
-	resObj, err := o.buildResourceObj()
-	if err != nil {
-		return err
-	}
-
-	// create k8s resource
-	objectName, _, err := unstructured.NestedString(resObj.Object, "metadata", "name")
-	if err != nil {
-		return err
-	}
-
-	objectByte, err := json.Marshal(resObj)
-	if err != nil {
-		return err
-	}
-
-	_, err = o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Patch(context.TODO(),
-		objectName, k8sapitypes.MergePatchType, objectByte, metav1.PatchOptions{})
-	if !errors.IsNotFound(err) {
-		return err
-	}
-
-	// create object if not found
-	_, err = o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Create(context.TODO(),
-		resObj, metav1.CreateOptions{})
-	return err
 }
 
 func (o *CreateOptions) buildResourceObj() (*unstructured.Unstructured, error) {

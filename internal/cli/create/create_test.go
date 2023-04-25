@@ -149,13 +149,5 @@ var _ = Describe("Create", func() {
 				}
 			}
 		})
-
-		It("test Create runAsApply", func() {
-			Expect(options.Complete()).Should(Succeed())
-			// create
-			Expect(options.RunAsApply()).Should(Succeed())
-			// apply if exists
-			Expect(options.RunAsApply()).Should(Succeed())
-		})
 	})
 })

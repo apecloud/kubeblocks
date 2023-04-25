@@ -333,12 +333,18 @@ func (r *BackupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.Common
 			Namespace: globalPVConfigMapNamespace,
 		}
 	}
+	globalStorageClass := viper.GetString(constant.CfgKeyBackupPVCStorageClass)
+	var storageClassName *string
+	if globalStorageClass != "" {
+		storageClassName = &globalStorageClass
+	}
 	return &dataprotectionv1alpha1.CommonBackupPolicy{
 		BackupToolName: bp.BackupToolName,
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
 			InitCapacity:              resource.MustParse(defaultInitCapacity),
 			CreatePolicy:              defaultCreatePolicy,
 			PersistentVolumeConfigMap: persistentVolumeConfigMap,
+			StorageClassName:          storageClassName,
 		},
 		BasePolicy: r.convertBasePolicy(bp.BasePolicy, clusterName, component, workloadType),
 	}

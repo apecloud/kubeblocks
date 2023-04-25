@@ -27,8 +27,22 @@ spec:
       serviceAccountName: {{ include "delphic.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+      - name: postgres-init
+        image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.postgres.repository }}:{{ .Values.image.postgres.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          PGPASSWORD=${POSTGRES_PASSWORD} psql -h${POSTGRES_HOST} -U ${POSTGRES_USER} -p ${POSTGRES_PORT} -tc "SELECT 1 FROM pg_database WHERE datname = '${POSTGRES_DB}'"
+          if [ $? != 0 ]; then
+            PGPASSWORD=${POSTGRES_PASSWORD} psql -h${POSTGRES_HOST} -U ${POSTGRES_USER} -p ${POSTGRES_PORT} -c "CREATE DATABASE ${POSTGRES_DB}"
+          fi
+        env:
+        {{ include "delphic.common.envs" . | nindent 12}}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: django
           command:
           - /entrypoint
           - /start
@@ -39,32 +53,9 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           env:
-          - name: REDIS_URL
-            value: redis://{{ .Release.Name }}-{{ .Values.redis.nameOverride }}-redis:6379
-          - name: OPENAI_API_KEY
-            value: {{ .Values.openai_api_key }}
-          - name: POSTGRES_HOST
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Release.Name }}-{{ .Values.postgres.nameOverride }}-conn-credential
-                key: host
-          - name: POSTGRES_PORT
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Release.Name }}-{{ .Values.postgres.nameOverride }}-conn-credential
-                key: port
-          - name: POSTGRES_USER
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Release.Name }}-{{ .Values.postgres.nameOverride }}-conn-credential
-                key: username
-          - name: POSTGRES_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Release.Name }}-{{ .Values.postgres.nameOverride }}-conn-credential
-                key: password
-          - name: POSTGRES_DB
-            value: delphic
+            - name: OPENAI_API_KEY
+              value: {{ .Values.openai_api_key }}
+          {{ include "delphic.common.envs" . | nindent 12}}
         - name: frontend
           image: "{{ .Values.image.frontend.repository }}:{{ .Values.image.frontend.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -78,6 +69,8 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
             {{- toYaml .Values.celeryWorker.resources | nindent 12 }}
+          env:
+          {{ include "delphic.common.envs" . | nindent 12}}
         - name: celerybeat
           command:
           - /entrypoint
@@ -86,6 +79,8 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
             {{- toYaml .Values.celeryBeat.resources | nindent 12 }}
+          env:
+          {{ include "delphic.common.envs" . | nindent 12}}
         - name: flower
           command:
           - /entrypoint
@@ -94,6 +89,18 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
             {{- toYaml .Values.flower.resources | nindent 12 }}
+          env:
+            - name: CELERY_FLOWER_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "delphic.fullname" . }}-celery-flower-secret
+                  key: username
+            - name: CELERY_FLOWER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "delphic.fullname" . }}-celery-flower-secret
+                  key: password
+          {{ include "delphic.common.envs" . | nindent 12}}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

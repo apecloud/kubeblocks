@@ -60,3 +60,36 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "delphic.common.envs" }}
+- name: REDIS_URL
+  value: redis://{{ .Release.Name }}-{{ .Values.redis.nameOverride }}-redis:6379
+- name: MODEL_NAME
+  value: text-davinci-003
+- name: MAX_TOKENS
+  value: "512"
+- name: USE_DOCKER
+  value: "yes"
+- name: POSTGRES_HOST
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Release.Name }}-{{ .Values.postgres.nameOverride }}-conn-credential
+      key: host
+- name: POSTGRES_PORT
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Release.Name }}-{{ .Values.postgres.nameOverride }}-conn-credential
+      key: port
+- name: POSTGRES_USER
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Release.Name }}-{{ .Values.postgres.nameOverride }}-conn-credential
+      key: username
+- name: POSTGRES_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Release.Name }}-{{ .Values.postgres.nameOverride }}-conn-credential
+      key: password
+- name: POSTGRES_DB
+  value: delphic
+{{- end }}

@@ -5,6 +5,7 @@
 replicaCount: 1
 
 image:
+  registry: registry.cn-hangzhou.aliyuncs.com
   repository: apecloud/delphic
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
@@ -12,6 +13,10 @@ image:
   frontend:
     repository: apecloud/delphic-frontend
     tag: v1.0.0
+
+  postgres:
+    repository: apecloud/spilo
+    tag: 14.7.1
 
 imagePullSecrets: []
 nameOverride: ""

@@ -355,7 +355,6 @@ func (o *ClusterObjects) getStorageInfo(component *appsv1alpha1.ClusterComponent
 			} else {
 				return types.None
 			}
-
 		}
 
 		return types.None

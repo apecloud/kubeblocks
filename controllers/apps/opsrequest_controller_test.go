@@ -334,9 +334,18 @@ var _ = Describe("OpsRequest Controller", func() {
 			testVerticalScaleCPUAndMemory(testapps.ConsensusMySQLComponent, ctx)
 		})
 
-		It("HorizontalScaling when not support snapshot", func() {
-			By("init backup policy template")
-			viper.Set("VOLUMESNAPSHOT", false)
+		mockCompRunning := func(replicas int32) {
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, mysqlCompName)
+			sts := &stsList.Items[0]
+			Expect(int(*sts.Spec.Replicas)).To(BeEquivalentTo(replicas))
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				testk8s.MockStatefulSetReady(sts)
+			})).ShouldNot(HaveOccurred())
+			testapps.MockConsensusComponentPods(testCtx, sts, clusterKey.Name, mysqlCompName)
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		}
+
+		mockMysqlCluster := func() {
 			createBackupPolicyTpl(clusterDefObj)
 			replicas := int32(3)
 
@@ -356,14 +365,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 			By("mock component is Running")
-			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, mysqlCompName)
-			sts := &stsList.Items[0]
-			Expect(int(*sts.Spec.Replicas)).To(BeEquivalentTo(replicas))
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-				testk8s.MockStatefulSetReady(sts)
-			})).ShouldNot(HaveOccurred())
-			testapps.MockConsensusComponentPods(testCtx, sts, clusterKey.Name, mysqlCompName)
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			mockCompRunning(replicas)
 
 			By("mock pvc created")
 			for i := 0; i < int(replicas); i++ {
@@ -378,7 +380,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			// wait for cluster observed generation
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 			mockSetClusterStatusPhaseToRunning(clusterKey)
+		}
 
+		mockHscaleOps := func(replicas int32) *appsv1alpha1.OpsRequest {
 			By("create a opsRequest to horizontal scale")
 			opsName := "hscale-ops-" + testCtx.GetRandomStr()
 			ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
@@ -386,11 +390,19 @@ var _ = Describe("OpsRequest Controller", func() {
 			ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
 				{
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
-					Replicas:     int32(5),
+					Replicas:     replicas,
 				},
 			}
-			opsKey := client.ObjectKeyFromObject(ops)
 			Expect(testCtx.CreateObj(testCtx.Ctx, ops)).Should(Succeed())
+			return ops
+		}
+
+		It("HorizontalScaling when not support snapshot", func() {
+			By("init backup policy template, mysql cluster and hscale ops")
+			viper.Set("VOLUMESNAPSHOT", false)
+			mockMysqlCluster()
+			ops := mockHscaleOps(int32(5))
+			opsKey := client.ObjectKeyFromObject(ops)
 
 			By("expect component is Running if don't support volume snapshot during doing h-scale ops")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
@@ -409,6 +421,32 @@ var _ = Describe("OpsRequest Controller", func() {
 				cluster.Spec.ComponentSpecs[0].Replicas = int32(3)
 			})()).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
+		})
+
+		It("HorizontalScaling when support snapshot", func() {
+			By("init backup policy template, mysql cluster and hscale ops")
+			viper.Set("VOLUMESNAPSHOT", true)
+			mockMysqlCluster()
+			replicas := int32(5)
+			ops := mockHscaleOps(replicas)
+			opsKey := client.ObjectKeyFromObject(ops)
+
+			By("expect component is Running")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
+			// cluster phase changes to HorizontalScalingPhase first. then, it will be ConditionsError because it does not support snapshot backup after a period of time.
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+			// component phase should be running during snapshot backup
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+
+			By("mock snapshot created and ready to use, component phase should change to Updating to do horizontalScaling")
+			mockVolumeSnapshotAndReadyToUse(clusterObj, mysqlCompName)
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+
+			By("mock component is Running and expect cluster is Running")
+			mockCompRunning(replicas)
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
 	})
 

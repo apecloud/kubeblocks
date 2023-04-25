@@ -7,4 +7,4 @@ spec:
   ttlSecondsAfterSucceed: 3600
   type: Restart
   restart:
-    - componentName: redis-repl
+    - componentName: redis

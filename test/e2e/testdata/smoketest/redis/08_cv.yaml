@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: redis-7.0.6-latest
+  name: redis-7.0.10-latest
 spec:
   clusterDefinitionRef: redis
   componentVersions:
@@ -9,4 +9,4 @@ spec:
       versionsContext:
         containers:
           - name: redis
-            image: docker.io/apecloud/redis:latest
+            image: docker.io/apecloud/redis:7.0.10

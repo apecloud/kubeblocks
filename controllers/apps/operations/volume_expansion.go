@@ -22,6 +22,8 @@ package operations
 import (
 	"fmt"
 	"reflect"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -39,6 +41,8 @@ import (
 type volumeExpansionOpsHandler struct{}
 
 var _ OpsHandler = volumeExpansionOpsHandler{}
+
+var pvcNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
 const (
 	// VolumeExpansionTimeOut volume expansion timeout.
@@ -299,11 +303,25 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	}, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
 		return
 	}
+	comp := opsRes.Cluster.Spec.GetComponentByName(componentName)
+	if comp == nil {
+		err = fmt.Errorf("comp %s of cluster %s not found", componentName, opsRes.Cluster.Name)
+		return
+	}
+	expectCount = int(comp.Replicas)
 	vctKey := getComponentVCTKey(componentName, vctName)
 	requestStorage := storageMap[vctKey]
-	expectCount = len(pvcList.Items)
 	var completedCount int
+	var ordinal int
 	for _, v := range pvcList.Items {
+		// filter PVC(s) with ordinal larger than comp.Replicas - 1, which left by scale-in
+		ordinal, err = getPVCOrdinal(v.Name)
+		if err != nil {
+			return
+		}
+		if ordinal > expectCount-1 {
+			continue
+		}
 		objectKey := getPVCProgressObjectKey(v.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: vctName}
 		// if the volume expand succeed
@@ -327,7 +345,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 			completedCount += 1
 		}
 	}
-	isCompleted = completedCount == len(pvcList.Items)
+	isCompleted = completedCount == expectCount
 	return succeedCount, expectCount, isCompleted, nil
 }
 
@@ -337,4 +355,12 @@ func getComponentVCTKey(componentName, vctName string) string {
 
 func getPVCProgressObjectKey(pvcName string) string {
 	return fmt.Sprintf("PVC/%s", pvcName)
+}
+
+func getPVCOrdinal(pvcName string) (int, error) {
+	subMatches := pvcNameRegex.FindStringSubmatch(pvcName)
+	if len(subMatches) < 3 {
+		return 0, fmt.Errorf("wrong pvc name: %s", pvcName)
+	}
+	return strconv.Atoi(subMatches[2])
 }

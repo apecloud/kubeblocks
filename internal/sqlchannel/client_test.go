@@ -237,7 +237,8 @@ func TestParseSqlChannelResult(t *testing.T) {
 	{"errorCode":"ERR_INVOKE_OUTPUT_BINDING","message":"error when invoke output binding mongodb: binding mongodb does not support operation listUsers. supported operations:checkRunning checkRole getRole"}
 	`
 		sqlResposne, err := parseResponse(([]byte)(result), "listUsers", "mongodb")
-		assert.Nil(t, err)
+		assert.NotNil(t, err)
+		assert.True(t, IsUnSupportedError(err))
 		assert.Equal(t, sqlResposne.Event, RespEveFail)
 		assert.Contains(t, sqlResposne.Message, "not supported")
 	})

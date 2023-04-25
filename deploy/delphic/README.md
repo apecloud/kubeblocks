@@ -12,8 +12,8 @@
    postgresql       postgresql            Available   6h42m
    ```
 3. Install the delphic with helm.
-
    ```shell
+   # TODO publish the delphic to public helm repository
    helm install delphic ./deploy/delphic
    ```
 4. Check whether the plugin is installed successfully.

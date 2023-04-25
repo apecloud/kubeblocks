@@ -28,9 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -84,43 +82,6 @@ func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkName, error) 
 		ns:   object.GetNamespace(),
 		name: object.GetName(),
 	}, nil
-}
-
-func isOwnerOf(owner, obj client.Object, scheme *runtime.Scheme) bool {
-	ro, ok := owner.(runtime.Object)
-	if !ok {
-		return false
-	}
-	gvk, err := apiutil.GVKForObject(ro, scheme)
-	if err != nil {
-		return false
-	}
-	ref := metav1.OwnerReference{
-		APIVersion: gvk.GroupVersion().String(),
-		Kind:       gvk.Kind,
-		UID:        owner.GetUID(),
-		Name:       owner.GetName(),
-	}
-	owners := obj.GetOwnerReferences()
-	referSameObject := func(a, b metav1.OwnerReference) bool {
-		aGV, err := schema.ParseGroupVersion(a.APIVersion)
-		if err != nil {
-			return false
-		}
-
-		bGV, err := schema.ParseGroupVersion(b.APIVersion)
-		if err != nil {
-			return false
-		}
-
-		return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
-	}
-	for _, ownerRef := range owners {
-		if referSameObject(ownerRef, ref) {
-			return true
-		}
-	}
-	return false
 }
 
 func actionPtr(action Action) *Action {
@@ -201,14 +162,26 @@ func ownKinds() []client.ObjectList {
 	}
 }
 
+func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
+	return client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name,
+	}
+}
+
+func getAppInstanceAndManagedByML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
+	return client.MatchingLabels{
+		constant.AppInstanceLabelKey:  cluster.Name,
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+}
+
 // read all objects owned by our cluster
-func readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster, kinds ...client.ObjectList) (clusterSnapshot, error) {
+func readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster, matchLabels client.MatchingLabels, kinds ...client.ObjectList) (clusterSnapshot, error) {
 	// list what kinds of object cluster owns
 	snapshot := make(clusterSnapshot)
-	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
 	inNS := client.InNamespace(cluster.Namespace)
 	for _, list := range kinds {
-		if err := transCtx.Client.List(transCtx.Context, list, inNS, ml); err != nil {
+		if err := transCtx.Client.List(transCtx.Context, list, inNS, matchLabels); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items
@@ -217,16 +190,11 @@ func readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.C
 		for i := 0; i < l; i++ {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
-			// put to snapshot if owned by our cluster
-			// pvcs created by sts don't have cluster in ownerReferences
-			_, isPVC := object.(*corev1.PersistentVolumeClaim)
-			if isPVC || isOwnerOf(&cluster, object, scheme) {
-				name, err := getGVKName(object, scheme)
-				if err != nil {
-					return nil, err
-				}
-				snapshot[*name] = object
+			name, err := getGVKName(object, scheme)
+			if err != nil {
+				return nil, err
 			}
+			snapshot[*name] = object
 		}
 	}
 

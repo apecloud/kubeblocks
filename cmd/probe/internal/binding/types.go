@@ -69,6 +69,10 @@ const (
 	SECONDARY = "secondary"
 	MASTER    = "master"
 	SLAVE     = "slave"
+	LEADER    = "Leader"
+	FOLLOWER  = "Follower"
+	LEARNER   = "Learner"
+	CANDIDATE = "Candidate"
 )
 
 type RoleType string
@@ -118,3 +122,7 @@ var (
 	ErrInvalidRoleName = fmt.Errorf(errMsgInvalidRoleName)
 	ErrNoSuchUser      = fmt.Errorf(errMsgNoSuchUser)
 )
+
+type SlaveStatus struct {
+	SecondsBehindMaster int64 `json:"Seconds_Behind_Master"`
+}

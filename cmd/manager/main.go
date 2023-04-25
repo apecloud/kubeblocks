@@ -30,6 +30,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	"github.com/fsnotify/fsnotify"
+	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -79,6 +80,7 @@ func init() {
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
+	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
@@ -92,6 +94,7 @@ func init() {
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 100)
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault("VOLUMESNAPSHOT", false)
+	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("PROBE_SERVICE_HTTP_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)

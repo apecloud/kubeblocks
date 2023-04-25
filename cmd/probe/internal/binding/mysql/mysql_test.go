@@ -166,6 +166,10 @@ func TestGetLagOps(t *testing.T) {
 		col2 := sqlmock.NewColumn("ROLE").OfType("VARCHAR", "")
 		col3 := sqlmock.NewColumn("SERVER_ID").OfType("INT", 0)
 		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow("wesql-main-1.wesql-main-headless:13306", "Follower", 1)
+		getRoleRows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow("wesql-main-1.wesql-main-headless:13306", "Follower", 1)
+		if mysqlOps.OriRole == "" {
+			mock.ExpectQuery("select .* from information_schema.wesql_cluster_local").WillReturnRows(getRoleRows)
+		}
 		mock.ExpectQuery("show slave status").WillReturnRows(rows)
 
 		result, err := mysqlOps.GetLagOps(context.Background(), req, &bindings.InvokeResponse{})
@@ -363,7 +367,7 @@ func TestQuery(t *testing.T) {
 		ret, err := mysqlOps.query(context.Background(), `SELECT * FROM foo WHERE id < 4`)
 		assert.Nil(t, err)
 		t.Logf("query result: %s", ret)
-		assert.Contains(t, string(ret), "\"id\":1")
+		assert.Contains(t, string(ret), "\"id\":\"1")
 		var result []interface{}
 		err = json.Unmarshal(ret, &result)
 		assert.Nil(t, err)

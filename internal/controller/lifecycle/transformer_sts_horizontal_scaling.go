@@ -329,7 +329,8 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 	// by sts: we only handle the pvc deletion which occurs in cluster deletion.
 	// by h-scale transformer: we handle the pvc creation and deletion, the creation is handled in h-scale funcs.
 	// so all in all, here we should only handle the pvc deletion of both types.
-	oldSnapshot, err := readCacheSnapshot(transCtx, *cluster, &corev1.PersistentVolumeClaimList{})
+	ml := getAppInstanceML(*cluster)
+	oldSnapshot, err := readCacheSnapshot(transCtx, *cluster, ml, &corev1.PersistentVolumeClaimList{})
 	if err != nil {
 		return err
 	}
@@ -541,7 +542,8 @@ func isSnapshotAvailable(cli roclient.ReadonlyClient, ctx context.Context) bool 
 		return false
 	}
 	vsList := snapshotv1.VolumeSnapshotList{}
-	getVSErr := cli.List(ctx, &vsList)
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+	getVSErr := compatClient.List(&vsList)
 	return getVSErr == nil
 }
 
@@ -581,7 +583,8 @@ func deleteSnapshot(cli roclient.ReadonlyClient,
 	}
 	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotKey.Name)
 	vs := &snapshotv1.VolumeSnapshot{}
-	if err := cli.Get(ctx, snapshotKey, vs); err != nil {
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+	if err := compatClient.Get(snapshotKey, vs); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 	vertex := &lifecycleVertex{obj: vs, oriObj: vs, action: actionPtr(DELETE)}
@@ -621,7 +624,8 @@ func isVolumeSnapshotExists(cli roclient.ReadonlyClient,
 	component *component.SynthesizedComponent) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
-	if err := cli.List(ctx, &vsList, ml); err != nil {
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+	if err := compatClient.List(&vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 	for _, vs := range vsList.Items {
@@ -684,7 +688,8 @@ func isVolumeSnapshotReadyToUse(cli roclient.ReadonlyClient,
 	component *component.SynthesizedComponent) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
-	if err := cli.List(ctx, &vsList, ml); err != nil {
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+	if err := compatClient.List(&vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 	if len(vsList.Items) == 0 || vsList.Items[0].Status == nil {
@@ -717,7 +722,8 @@ func checkedCreatePVCFromSnapshot(cli roclient.ReadonlyClient,
 		}
 		ml := getBackupMatchingLabels(cluster.Name, component.Name)
 		vsList := snapshotv1.VolumeSnapshotList{}
-		if err := cli.List(ctx, &vsList, ml); err != nil {
+		compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+		if err := compatClient.List(&vsList, ml); err != nil {
 			return err
 		}
 		if len(vsList.Items) == 0 {

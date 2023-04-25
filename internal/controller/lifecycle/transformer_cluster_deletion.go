@@ -68,7 +68,8 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	// there is chance that objects leak occurs because of cache stale
 	// ignore the problem currently
 	// TODO: GC the leaked objects
-	snapshot, err := readCacheSnapshot(transCtx, *cluster, kinds...)
+	ml := getAppInstanceML(*cluster)
+	snapshot, err := readCacheSnapshot(transCtx, *cluster, ml, kinds...)
 	if err != nil {
 		return err
 	}

@@ -263,7 +263,7 @@ func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
 			return node
 		}
 	}
-	return &corev1.Node{}
+	return nil
 }
 
 // ResourceIsEmpty check if resource is empty or not

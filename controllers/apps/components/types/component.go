@@ -48,6 +48,7 @@ type Component interface {
 	GetName() string
 	GetNamespace() string
 	GetClusterName() string
+	GetDefinitionName() string
 	GetWorkloadType() appsv1alpha1.WorkloadType
 
 	GetCluster() *appsv1alpha1.Cluster

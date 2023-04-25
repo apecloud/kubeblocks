@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -88,6 +89,7 @@ func listResources[T any](dynamic dynamic.Interface, gvr schema.GroupVersionReso
 // Get all kubernetes objects belonging to the database cluster
 func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	var err error
+
 	objs := NewClusterObjects()
 	ctx := context.TODO()
 	corev1 := o.Client.CoreV1()
@@ -184,10 +186,13 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 			}
 
 			node, err := corev1.Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-			if err != nil {
+			if err != nil && !apierrors.IsNotFound(err) {
 				return nil, err
 			}
-			objs.Nodes = append(objs.Nodes, node)
+
+			if node != nil {
+				objs.Nodes = append(objs.Nodes, node)
+			}
 		}
 	}
 
@@ -211,15 +216,16 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 			}
 		}
 	}
+
 	if o.WithDataProtection {
-		dplistOpts := metav1.ListOptions{
+		dpListOpts := metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s",
 				constant.AppInstanceLabelKey, o.Name),
 		}
-		if err := listResources(o.Dynamic, types.BackupPolicyGVR(), o.Namespace, dplistOpts, &objs.BackupPolicies); err != nil {
+		if err = listResources(o.Dynamic, types.BackupPolicyGVR(), o.Namespace, dpListOpts, &objs.BackupPolicies); err != nil {
 			return nil, err
 		}
-		if err := listResources(o.Dynamic, types.BackupGVR(), o.Namespace, dplistOpts, &objs.Backups); err != nil {
+		if err = listResources(o.Dynamic, types.BackupGVR(), o.Namespace, dpListOpts, &objs.Backups); err != nil {
 			return nil, err
 		}
 	}
@@ -350,7 +356,11 @@ func (o *ClusterObjects) getStorageInfo(component *appsv1alpha1.ClusterComponent
 			if labels[constant.VolumeClaimTemplateNameLabelKey] != vcTpl.Name {
 				continue
 			}
-			return *pvc.Spec.StorageClassName
+			if pvc.Spec.StorageClassName != nil {
+				return *pvc.Spec.StorageClassName
+			} else {
+				return types.None
+			}
 		}
 
 		return types.None

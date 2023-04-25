@@ -364,13 +364,14 @@ func BuildConnCredentialLow(clusterDefiniiton *appsv1alpha1.ClusterDefinition, c
 	uuidStrB64 := base64.RawStdEncoding.EncodeToString([]byte(strings.ReplaceAll(uuidStr, "-", "")))
 	uuidHex := hex.EncodeToString(uuidBytes)
 	m := map[string]string{
-		"$(RANDOM_PASSWD)":     randomString(8),
-		"$(UUID)":              uuidStr,
-		"$(UUID_B64)":          uuidB64,
-		"$(UUID_STR_B64)":      uuidStrB64,
-		"$(UUID_HEX)":          uuidHex,
-		"$(SVC_FQDN)":          fmt.Sprintf("%s-%s.%s.svc", cluster.Name, component.Name, cluster.Namespace),
-		"$(HEADLESS_SVC_FQDN)": fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name, component.Name, cluster.Namespace),
+		"$(RANDOM_PASSWD)":        randomString(8),
+		"$(UUID)":                 uuidStr,
+		"$(UUID_B64)":             uuidB64,
+		"$(UUID_STR_B64)":         uuidStrB64,
+		"$(UUID_HEX)":             uuidHex,
+		"$(SVC_FQDN)":             fmt.Sprintf("%s-%s.%s.svc", cluster.Name, component.Name, cluster.Namespace),
+		"$(KB_CLUSTER_COMP_NAME)": cluster.Name + "-" + component.Name,
+		"$(HEADLESS_SVC_FQDN)":    fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name, component.Name, cluster.Namespace),
 	}
 	if len(component.Services) > 0 {
 		for _, p := range component.Services[0].Spec.Ports {

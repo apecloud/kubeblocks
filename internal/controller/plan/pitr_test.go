@@ -49,6 +49,10 @@ var _ = Describe("PITR Functions", func() {
 		randomStr      = testCtx.GetRandomStr()
 		clusterName    = "cluster-for-pitr-" + randomStr
 		backupToolName string
+
+		now       = metav1.Now()
+		startTime = metav1.Time{Time: now.Add(-time.Hour * 2)}
+		stopTime  = metav1.Time{Time: now.Add(time.Hour * 2)}
 	)
 
 	cleanEnv := func() {
@@ -110,7 +114,7 @@ var _ = Describe("PITR Functions", func() {
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				AddRestorePointInTime(metav1.Time{Time: metav1.Now().Time}, sourceCluster).
+				AddRestorePointInTime(metav1.Time{Time: stopTime.Time}, sourceCluster).
 				Create(&testCtx).GetObject()
 
 			By("By mocking a pvc")
@@ -156,7 +160,6 @@ var _ = Describe("PITR Functions", func() {
 			}
 
 			By("By creating base backup: ")
-			now := metav1.Now()
 			backupLabels := map[string]string{
 				constant.AppInstanceLabelKey:    sourceCluster,
 				constant.KBAppComponentLabelKey: mysqlCompName,
@@ -167,8 +170,8 @@ var _ = Describe("PITR Functions", func() {
 				SetBackupPolicyName("test-fake").
 				SetBackupType(dpv1alpha1.BackupTypeSnapshot).
 				Create(&testCtx).GetObject()
-			baseStartTime := &metav1.Time{Time: now.Add(-time.Hour * 3)}
-			baseStopTime := &metav1.Time{Time: now.Add(-time.Hour * 2)}
+			baseStartTime := &startTime
+			baseStopTime := &now
 			backupStatus := dpv1alpha1.BackupStatus{
 				Phase:               dpv1alpha1.BackupCompleted,
 				StartTimestamp:      baseStartTime,
@@ -180,7 +183,6 @@ var _ = Describe("PITR Functions", func() {
 					},
 				},
 			}
-			backupStatus.CompletionTimestamp = &metav1.Time{Time: now.Add(-time.Hour * 2)}
 			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backup))
 
 			By("By creating remote pvc: ")
@@ -195,8 +197,8 @@ var _ = Describe("PITR Functions", func() {
 				constant.KBAppComponentLabelKey: mysqlCompName,
 				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeIncremental),
 			}
-			incrStartTime := &metav1.Time{Time: now.Add(-time.Hour * 3)}
-			incrStopTime := &metav1.Time{Time: now.Add(time.Hour * 2)}
+			incrStartTime := &startTime
+			incrStopTime := &stopTime
 			backupIncr := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(incrBackupLabels).
 				SetBackupPolicyName("test-fake").
@@ -219,8 +221,13 @@ var _ = Describe("PITR Functions", func() {
 		})
 
 		It("Test PITR prepare", func() {
+			By("restore time is in range")
 			Expect(DoPITRPrepare(ctx, testCtx.Cli, cluster, synthesizedComponent)).Should(Succeed())
 			Expect(synthesizedComponent.PodSpec.InitContainers).ShouldNot(BeEmpty())
+
+			By("restore time is at base backup stop time")
+			cluster.Annotations[constant.RestoreFromTimeAnnotationKey] = now.Format(time.RFC3339)
+			Expect(DoPITRPrepare(ctx, testCtx.Cli, cluster, synthesizedComponent)).Should(Succeed())
 		})
 		It("Test PITR job run and cleanup", func() {
 			By("when data pvc is pending")

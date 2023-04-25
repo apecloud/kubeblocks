@@ -138,13 +138,12 @@ func PlaygroundDestroy() {
 }
 
 func checkPlaygroundCluster() {
-	commond := "kubectl get pod -n default -l 'app.kubernetes.io/instance in (mycluster)'| grep mycluster |" +
-		" awk '{print $3}'"
-	log.Println(commond)
 	Eventually(func(g Gomega) {
-		podStatus := e2eutil.ExecCommand(commond)
-		log.Println("podStatus is " + e2eutil.StringStrip(podStatus))
-		g.Expect(e2eutil.StringStrip(podStatus)).Should(Equal("Running"))
+		e2eutil.WaitTime(100000)
+		podStatusResult := e2eutil.CheckPodStatus()
+		for _, result := range podStatusResult {
+			g.Expect(result).Should(BeTrue())
+		}
 	}, time.Second*180, time.Second*1).Should(Succeed())
 	cmd := "kbcli cluster list | grep mycluster | awk '{print $6}'"
 	log.Println(cmd)

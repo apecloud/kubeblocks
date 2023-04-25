@@ -259,7 +259,8 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 		//	err := c.cli.Delete(c.ctx.Ctx, node.Obj)
 		// delete secondary objects
 		if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
-			err := c.cli.Delete(c.transCtx.Context, node.Obj)
+			err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.Obj)
+			// err := c.cli.Delete(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}

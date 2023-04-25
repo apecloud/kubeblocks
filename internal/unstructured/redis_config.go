@@ -50,7 +50,7 @@ func (r *redisConfig) Update(key string, value any) error {
 }
 
 func (r *redisConfig) setString(key string, value string) error {
-	keys := strings.Split(key, ".")
+	keys := strings.Split(key, " ")
 	v := r.GetItem(keys)
 	lineNo := math.MaxInt32
 	if v != nil {
@@ -107,7 +107,7 @@ func (r *redisConfig) GetItem(keys []string) *redis.Item {
 }
 
 func (r *redisConfig) GetString(key string) (string, error) {
-	keys := strings.Split(key, ".")
+	keys := strings.Split(key, " ")
 	item := r.GetItem(keys)
 	if item == nil {
 		return "", nil

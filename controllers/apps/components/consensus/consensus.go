@@ -50,6 +50,13 @@ func (r *ConsensusSet) getName() string {
 	return r.ComponentSpec.Name
 }
 
+func (r *ConsensusSet) getDefName() string {
+	if r.Component != nil {
+		return r.Component.GetDefinitionName()
+	}
+	return r.ComponentDef.Name
+}
+
 func (r *ConsensusSet) getWorkloadType() appsv1alpha1.WorkloadType {
 	if r.Component != nil {
 		return r.Component.GetWorkloadType()
@@ -258,7 +265,7 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 		// TODO: does the update order between cluster and env configmap matter?
 
 		// add consensus role info to pod env
-		if err := updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, r.getConsensusSpec(), componentName, pods, vertexes); err != nil {
+		if err := updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, r.getConsensusSpec(), r.getDefName(), componentName, pods, vertexes); err != nil {
 			return nil, err
 		}
 	}

@@ -125,7 +125,7 @@ func SmokeTest() {
 func runTestCases(files []string) {
 	for _, file := range files {
 		By("test " + file)
-		b := e2eutil.OpsYaml(file, "apply")
+		b := e2eutil.OpsYaml(file, "create")
 		Expect(b).Should(BeTrue())
 		Eventually(func(g Gomega) {
 			e2eutil.WaitTime(100000)

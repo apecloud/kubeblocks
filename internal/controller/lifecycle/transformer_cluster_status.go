@@ -341,20 +341,22 @@ func (t *ClusterStatusTransformer) cleanupAnnotationsAfterRunning(cluster *appsv
 //	var doRemoveInitContainers bool
 //	for _, vertex := range vertexList {
 //		v, _ := vertex.(*lifecycleVertex)
-//		sts, _ := v.obj.(*appsv1.StatefulSet)
-//		initContainers := sts.Spec.Template.Spec.InitContainers
+//		if v.oriObj == nil {
+//			continue
+//		}
+//		originSts, _ := v.oriObj.(*appsv1.StatefulSet)
+//		initContainers := originSts.Spec.Template.Spec.InitContainers
 //		restoreInitContainerName := component.GetRestoredInitContainerName(backupName)
 //		restoreInitContainerIndex, _ := intctrlutil.GetContainerByName(initContainers, restoreInitContainerName)
 //		if restoreInitContainerIndex == -1 {
 //			continue
 //		}
+//		sts, _ := v.obj.(*appsv1.StatefulSet)
 //		doRemoveInitContainers = true
 //		initContainers = append(initContainers[:restoreInitContainerIndex], initContainers[restoreInitContainerIndex+1:]...)
 //		sts.Spec.Template.Spec.InitContainers = initContainers
-//		if v.oriObj != nil {
-//			v.immutable = false
-//			v.action = actionPtr(UPDATE)
-//		}
+//		v.immutable = false
+//		v.action = actionPtr(UPDATE)
 //	}
 //	if doRemoveInitContainers {
 //		// if need to remove init container, reset component to Creating.

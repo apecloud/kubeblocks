@@ -445,6 +445,7 @@ func updateConsensusRoleInfo(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	consensusSpec *appsv1alpha1.ConsensusSetSpec,
 	componentName string,
+	compDefName string,
 	pods []corev1.Pod,
 	vertexes []graph.Vertex) error {
 	leader, followers := composeRoleEnv(consensusSpec, pods)
@@ -462,11 +463,26 @@ func updateConsensusRoleInfo(ctx context.Context,
 	for idx := range configList.Items {
 		config := configList.Items[idx]
 		configDeepCopy := config.DeepCopy()
-		config.Data["KB_"+strings.ToUpper(componentName)+"_LEADER"] = leader
-		config.Data["KB_"+strings.ToUpper(componentName)+"_FOLLOWERS"] = followers
+		config.Data["KB_"+strings.ToUpper(compDefName)+"_LEADER"] = leader
+		config.Data["KB_"+strings.ToUpper(compDefName)+"_FOLLOWERS"] = followers
 		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
 			Obj:     &config,
 			ObjCopy: configDeepCopy,
+			Action:  ictrltypes.ActionPatchPtr(),
+		})
+	}
+
+	// patch pods' annotations
+	for idx := range pods {
+		pod := pods[idx]
+		podDeepCopy := pod.DeepCopy()
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		pod.Annotations[constant.LeaderAnnotationKey] = leader
+		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+			Obj:     &pod,
+			ObjCopy: podDeepCopy,
 			Action:  ictrltypes.ActionPatchPtr(),
 		})
 	}

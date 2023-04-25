@@ -72,6 +72,10 @@ func (c *ComponentBase) GetClusterName() string {
 	return c.Cluster.Name
 }
 
+func (c *ComponentBase) GetDefinitionName() string {
+	return c.Component.ComponentDef
+}
+
 func (c *ComponentBase) GetCluster() *appsv1alpha1.Cluster {
 	return c.Cluster
 }

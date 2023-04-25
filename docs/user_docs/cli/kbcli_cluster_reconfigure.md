@@ -1,36 +1,36 @@
 ---
-title: kbcli cluster backup
+title: kbcli cluster reconfigure
 ---
 
-Create a backup for the cluster.
+Reconfigure parameters with the specified components in the cluster.
 
 ```
-kbcli cluster backup NAME [flags]
+kbcli cluster reconfigure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file] [flags]
 ```
 
 ### Examples
 
 ```
-  # create a backup
-  kbcli cluster backup mycluster
+  # update component params
+  kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
   
-  # create a snapshot backup
-  kbcli cluster backup mycluster --backup-type snapshot
-  
-  # create a full backup
-  kbcli cluster backup mycluster --backup-type full
-  
-  # create a backup with specified backup policy
-  kbcli cluster backup mycluster --backup-policy <backup-policy-name>
+  # if only one component, and one config spec, and one config file, simplify the use of configure. e.g:
+  # update mysql max_connections, cluster name is mycluster
+  kbcli cluster configure mycluster --set max_connections=2000
 ```
 
 ### Options
 
 ```
-      --backup-name string     Backup name
-      --backup-policy string   Backup policy name, this flag will be ignored when backup-type is snapshot
-      --backup-type string     Backup type (default "snapshot")
-  -h, --help                   help for backup
+      --component string               Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.
+      --config-file string             Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.
+      --config-spec string             Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.
+      --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+  -h, --help                           help for reconfigure
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --set strings                    Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-config'.
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands

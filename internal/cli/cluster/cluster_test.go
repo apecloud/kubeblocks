@@ -23,52 +23,71 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
 var _ = Describe("cluster util", func() {
-	client := testing.FakeClientSet(
+	baseObjs := []runtime.Object{
 		testing.FakePods(3, testing.Namespace, testing.ClusterName),
-		testing.FakeNode(),
 		testing.FakeSecrets(testing.Namespace, testing.ClusterName),
 		testing.FakeServices(),
-		testing.FakePVCs())
+		testing.FakePVCs(),
+	}
 
 	dynamic := testing.FakeDynamicClient(
 		testing.FakeCluster(testing.ClusterName, testing.Namespace),
 		testing.FakeClusterDef(),
 		testing.FakeClusterVersion())
 
+	getOptions := GetOptions{
+		WithClusterDef:     true,
+		WithClusterVersion: true,
+		WithConfigMap:      true,
+		WithService:        true,
+		WithSecret:         true,
+		WithPVC:            true,
+		WithPod:            true,
+	}
+
 	It("get cluster objects", func() {
-		clusterName := testing.ClusterName
-		getter := ObjectsGetter{
-			Client:    client,
-			Dynamic:   dynamic,
-			Name:      clusterName,
-			Namespace: testing.Namespace,
-			GetOptions: GetOptions{
-				WithClusterDef:     true,
-				WithClusterVersion: true,
-				WithConfigMap:      true,
-				WithService:        true,
-				WithSecret:         true,
-				WithPVC:            true,
-				WithPod:            true,
-			},
+		var (
+			err  error
+			objs *ClusterObjects
+		)
+
+		testFn := func(client kubernetes.Interface) {
+			clusterName := testing.ClusterName
+			getter := ObjectsGetter{
+				Client:     client,
+				Dynamic:    dynamic,
+				Name:       clusterName,
+				Namespace:  testing.Namespace,
+				GetOptions: getOptions,
+			}
+
+			objs, err = getter.Get()
+			Expect(err).Should(Succeed())
+			Expect(objs).ShouldNot(BeNil())
+			Expect(objs.Cluster.Name).Should(Equal(clusterName))
+			Expect(objs.ClusterDef.Name).Should(Equal(testing.ClusterDefName))
+			Expect(objs.ClusterVersion.Name).Should(Equal(testing.ClusterVersionName))
+			Expect(len(objs.Pods.Items)).Should(Equal(3))
+			Expect(len(objs.Secrets.Items)).Should(Equal(1))
+			Expect(len(objs.Services.Items)).Should(Equal(4))
+			Expect(len(objs.PVCs.Items)).Should(Equal(1))
+			Expect(len(objs.GetComponentInfo())).Should(Equal(1))
 		}
 
-		objs, err := getter.Get()
-		Expect(err).Should(Succeed())
-		Expect(objs).ShouldNot(BeNil())
-		Expect(objs.Cluster.Name).Should(Equal(clusterName))
-		Expect(objs.ClusterDef.Name).Should(Equal(testing.ClusterDefName))
-		Expect(objs.ClusterVersion.Name).Should(Equal(testing.ClusterVersionName))
+		By("when node is available")
+		testFn(testing.FakeClientSet(baseObjs...))
+		Expect(len(objs.Nodes)).Should(Equal(0))
 
-		Expect(len(objs.Pods.Items)).Should(Equal(3))
+		By("when node id not found")
+		baseObjs = append(baseObjs, testing.FakeNode())
+		testFn(testing.FakeClientSet(baseObjs...))
 		Expect(len(objs.Nodes)).Should(Equal(1))
-		Expect(len(objs.Secrets.Items)).Should(Equal(1))
-		Expect(len(objs.Services.Items)).Should(Equal(4))
-		Expect(len(objs.PVCs.Items)).Should(Equal(1))
-		Expect(len(objs.GetComponentInfo())).Should(Equal(1))
 	})
 })

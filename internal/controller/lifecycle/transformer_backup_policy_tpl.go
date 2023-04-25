@@ -110,6 +110,7 @@ func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 	}
 	backupPolicy.Labels[constant.AppInstanceLabelKey] = cluster.Name
 	backupPolicy.Labels[constant.KBAppComponentDefRefLabelKey] = policyTPL.ComponentDefRef
+	backupPolicy.Labels[constant.AppManagedByLabelKey] = constant.AppName
 
 	// only update the role labelSelector of the backup target instance when component workload is Replication/Consensus.
 	// because the replicas of component will change, such as 2->1. then if the target role is 'follower' and replicas is 1,
@@ -234,6 +235,7 @@ func (r *BackupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolic
 				MatchLabels: map[string]string{
 					constant.AppInstanceLabelKey:    clusterName,
 					constant.KBAppComponentLabelKey: component.Name,
+					constant.AppManagedByLabelKey:   constant.AppName,
 				},
 			},
 		},

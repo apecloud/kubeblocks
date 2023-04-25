@@ -1142,6 +1142,7 @@ var _ = Describe("Cluster Controller", func() {
 	testBackupError := func() {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
+		viper.Set("VOLUMESNAPSHOT", true)
 
 		By("Creating a cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
@@ -1179,7 +1180,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Expect(testCtx.Create(ctx, &backup)).Should(Succeed())
 
-		By("Checking backup status to failed, because VolumeSnapshot disabled")
+		By("Checking backup status to failed, because pvc not exist")
 		Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {
 			g.Expect(backup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
 		})).Should(Succeed())
@@ -1443,20 +1444,19 @@ var _ = Describe("Cluster Controller", func() {
 			By("remove init container after all components are Running")
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(clusterObj))).Should(BeEquivalentTo(1))
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
-				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-					replicationCompName: {Phase: appsv1alpha1.RunningClusterCompPhase},
-				}
-			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
 				g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 			})).Should(Succeed())
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, replicationCompName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 
 			By("clean up annotations after cluster running")
-			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
-				clusterObj.Status.Phase = appsv1alpha1.RunningClusterPhase
-			})).ShouldNot(HaveOccurred())
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
+				compStatus := tmpCluster.Status.Components[replicationCompName]
+				compStatus.Phase = appsv1alpha1.RunningClusterCompPhase
+				tmpCluster.Status.Components[replicationCompName] = compStatus
+			})()).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())
 		})

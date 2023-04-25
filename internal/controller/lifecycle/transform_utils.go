@@ -162,14 +162,26 @@ func ownKinds() []client.ObjectList {
 	}
 }
 
+func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
+	return client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name,
+	}
+}
+
+func getAppInstanceAndManagedByML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
+	return client.MatchingLabels{
+		constant.AppInstanceLabelKey:  cluster.Name,
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+}
+
 // read all objects owned by our cluster
-func readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster, kinds ...client.ObjectList) (clusterSnapshot, error) {
+func readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster, matchLabels client.MatchingLabels, kinds ...client.ObjectList) (clusterSnapshot, error) {
 	// list what kinds of object cluster owns
 	snapshot := make(clusterSnapshot)
-	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
 	inNS := client.InNamespace(cluster.Namespace)
 	for _, list := range kinds {
-		if err := transCtx.Client.List(transCtx.Context, list, inNS, ml); err != nil {
+		if err := transCtx.Client.List(transCtx.Context, list, inNS, matchLabels); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items

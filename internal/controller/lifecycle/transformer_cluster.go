@@ -166,6 +166,11 @@ func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string
 	}
 	compBackupMap := map[string]string{}
 	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
+	for k := range compBackupMap {
+		if cluster.Spec.GetComponentByName(k) == nil {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNotFound, "restore: not found componentSpecs[*].name %s", k)
+		}
+	}
 	return compBackupMap, err
 }
 

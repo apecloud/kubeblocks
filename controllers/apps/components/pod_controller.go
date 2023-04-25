@@ -73,7 +73,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	// skip if pod is being deleted
-	if pod.DeletionTimestamp != nil {
+	if !pod.DeletionTimestamp.IsZero() {
 		return intctrlutil.Reconciled()
 	}
 

@@ -48,6 +48,9 @@ import (
 type CreateOptions struct {
 	genericclioptions.IOStreams
 
+	// REVIEW: make this field a parameter which can be set by user
+	objectName string
+
 	Factory       cmdutil.Factory
 	dynamic       dynamic.Interface
 	ClusterDefRef string
@@ -123,14 +126,9 @@ func (o *CreateOptions) complete(f cmdutil.Factory) error {
 }
 
 func (o *CreateOptions) run() error {
-	componentClasses, err := class.ListClassesByClusterDefinition(o.dynamic, o.ClusterDefRef)
+	clsMgr, err := class.GetManager(o.dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
-	}
-
-	classes, ok := componentClasses[o.ComponentType]
-	if !ok {
-		classes = make(map[string]*v1alpha1.ComponentClassInstance)
 	}
 
 	constraints, err := class.GetResourceConstraints(o.dynamic)
@@ -162,10 +160,7 @@ func (o *CreateOptions) run() error {
 			classInstances = append(classInstances, cls)
 		}
 	} else {
-		if _, ok = classes[o.ClassName]; ok {
-			return fmt.Errorf("class name conflicted %s", o.ClassName)
-		}
-		if _, ok = constraints[o.Constraint]; !ok {
+		if _, ok := constraints[o.Constraint]; !ok {
 			return fmt.Errorf("resource constraint %s is not found", o.Constraint)
 		}
 		cls := v1alpha1.ComponentClass{Name: o.ClassName, CPU: resource.MustParse(o.CPU), Memory: resource.MustParse(o.Memory)}
@@ -185,13 +180,21 @@ func (o *CreateOptions) run() error {
 		classInstances = append(classInstances, &v1alpha1.ComponentClassInstance{ComponentClass: cls, ResourceConstraintRef: o.Constraint})
 	}
 
-	var classNames []string
+	var (
+		classNames []string
+		objName    = o.objectName
+	)
+	if objName == "" {
+		objName = class.GetCustomClassObjectName(o.ClusterDefRef, o.ComponentType)
+	}
 	for _, item := range classInstances {
 		constraint, ok := constraints[item.ResourceConstraintRef]
 		if !ok {
 			return fmt.Errorf("resource constraint %s is not found", item.ResourceConstraintRef)
 		}
-		if _, ok = classes[item.Name]; ok {
+		clsDefRef := v1alpha1.ClassDefRef{Name: objName, Class: item.Name}
+
+		if clsMgr.HasClass(o.ComponentType, clsDefRef) {
 			return fmt.Errorf("class name conflicted %s", item.Name)
 		}
 		if !constraint.MatchClass(item) {
@@ -200,7 +203,6 @@ func (o *CreateOptions) run() error {
 		classNames = append(classNames, item.Name)
 	}
 
-	objName := class.GetCustomClassObjectName(o.ClusterDefRef, o.ComponentType)
 	obj, err := o.dynamic.Resource(types.ComponentClassDefinitionGVR()).Get(context.TODO(), objName, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err

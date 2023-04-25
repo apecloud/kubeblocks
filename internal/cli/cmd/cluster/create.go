@@ -398,12 +398,11 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 		compSpecs []*appsv1alpha1.ClusterComponentSpec
 	)
 
-	compClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, o.ClusterDefRef)
+	cd, err = cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
 	if err != nil {
 		return nil, err
 	}
-
-	cd, err = cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
+	clsMgr, err := class.GetManager(o.Dynamic, o.ClusterDefRef)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +418,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 			return nil, err
 		}
 
-		compSpecs, err = buildClusterComp(cd, compSets, compClasses)
+		compSpecs, err = buildClusterComp(cd, compSets, clsMgr)
 		if err != nil {
 			return nil, err
 		}
@@ -428,7 +427,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 	var comps []map[string]interface{}
 	for _, compSpec := range compSpecs {
 		// validate component classes
-		if _, err = class.ValidateComponentClass(compSpec, compClasses); err != nil {
+		if _, err = clsMgr.ChooseClass(compSpec); err != nil {
 			return nil, err
 		}
 
@@ -679,8 +678,7 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 	}
 }
 
-func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string,
-	componentClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string, clsMgr *class.Manager) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	// get value from set values and environment variables, the second return value is
 	// true if the value is from environment variables
 	getVal := func(c *appsv1alpha1.ClusterComponentDefinition, key setKey, sets map[setKey]string) string {
@@ -771,9 +769,17 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 
 		// class has higher priority than other resource related parameters
 		resourceList := make(corev1.ResourceList)
-		if _, ok := componentClasses[c.Name]; ok {
+		if clsMgr.HasClass(compObj.ComponentDefRef, class.Any) {
 			if className := getVal(&c, keyClass, sets); className != "" {
-				compObj.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: className}
+				clsDefRef := appsv1alpha1.ClassDefRef{}
+				parts := strings.SplitN(className, ":", 2)
+				if len(parts) == 1 {
+					clsDefRef.Class = parts[0]
+				} else {
+					clsDefRef.Name = parts[0]
+					clsDefRef.Class = parts[1]
+				}
+				compObj.ClassDefRef = &clsDefRef
 			} else {
 				if cpu, ok := sets[keyCPU]; ok {
 					resourceList[corev1.ResourceCPU] = resource.MustParse(cpu)

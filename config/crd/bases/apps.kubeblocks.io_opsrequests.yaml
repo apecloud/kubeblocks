@@ -318,9 +318,19 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    class:
-                      description: class specifies the class name of the component
-                      type: string
+                    classDefRef:
+                      description: classDefRef reference class defined in ComponentClassDefinition.
+                      properties:
+                        class:
+                          description: class refers to the name of the class that
+                            is defined in the ComponentClassDefinition.
+                          type: string
+                        name:
+                          description: name refers to the name of the ComponentClassDefinition.
+                          type: string
+                      required:
+                      - class
+                      type: object
                     componentName:
                       description: componentName cluster component name.
                       type: string
@@ -583,9 +593,19 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                        class:
-                          description: the last class name of the component.
-                          type: string
+                        classDefRef:
+                          description: classDefRef reference class defined in ComponentClassDefinition.
+                          properties:
+                            class:
+                              description: class refers to the name of the class that
+                                is defined in the ComponentClassDefinition.
+                              type: string
+                            name:
+                              description: name refers to the name of the ComponentClassDefinition.
+                              type: string
+                          required:
+                          - class
+                          type: object
                         limits:
                           additionalProperties:
                             anyOf:

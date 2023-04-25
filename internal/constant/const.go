@@ -143,8 +143,8 @@ const (
 	// CMInsEnableRerenderTemplateKey is used to enable rerender template
 	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 
-	// ClassAnnotationKey is used to specify the class of components
-	ClassAnnotationKey = "cluster.kubeblocks.io/component-class"
+	// IgnoreClassAnnotationKey is used to specify the components that ignore class constraint
+	IgnoreClassAnnotationKey = "class.kubeblocks.io/ignore-components"
 )
 
 const (

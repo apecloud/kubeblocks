@@ -296,7 +296,7 @@ func FakeComponentClassDef(name string, clusterDefRef string, componentDefRef st
 		GetObject()
 
 	componentClassDefinition := testapps.NewComponentClassDefinitionFactory(name, clusterDefRef, componentDefRef).
-		AddClasses(constraint.Name, []string{testapps.Class1c1gName, testapps.Class2c4gName}).
+		AddClasses(constraint.Name, []appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
 		GetObject()
 
 	return componentClassDefinition

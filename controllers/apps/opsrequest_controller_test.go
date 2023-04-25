@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -152,7 +153,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Create(&testCtx).GetObject()
 
 		testapps.NewComponentClassDefinitionFactory("custom", clusterDefObj.Name, mysqlCompDefName).
-			AddClasses(constraint.Name, []string{testapps.Class1c1gName, testapps.Class2c4gName}).
+			AddClasses(constraint.Name, []appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
 			Create(&testCtx)
 
 		By("Create a cluster obj")
@@ -199,7 +200,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			verticalScalingOpsRequest.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
 				{
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
-					Class:        scalingCtx.target.class.Name,
+					ClassDefRef: &appsv1alpha1.ClassDefRef{
+						Class: scalingCtx.target.class.Name,
+					},
 				},
 			}
 		} else {
@@ -254,9 +257,9 @@ var _ = Describe("OpsRequest Controller", func() {
 		} else {
 			targetRequests = scalingCtx.target.resource.Requests
 		}
-		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
-			g.Expect(fetched.Spec.ComponentSpecs[0].Resources.Requests).To(Equal(targetRequests))
-		})).Should(Succeed())
+		stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, mysqlCompName)
+		mysqlSts = stsList.Items[0]
+		Expect(reflect.DeepEqual(mysqlSts.Spec.Template.Spec.Containers[0].Resources.Requests, targetRequests)).Should(BeTrue())
 
 		By("check OpsRequest reclaimed after ttl")
 		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {

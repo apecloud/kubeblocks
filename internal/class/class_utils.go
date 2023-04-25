@@ -24,9 +24,11 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/ghodss/yaml"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,36 +39,90 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-// ValidateComponentClass check if component classDefRef or resource is invalid
-func ValidateComponentClass(comp *v1alpha1.ClusterComponentSpec, compClasses map[string]map[string]*v1alpha1.ComponentClassInstance) (*v1alpha1.ComponentClassInstance, error) {
-	classes := compClasses[comp.ComponentDefRef]
-	var cls *v1alpha1.ComponentClassInstance
+var (
+	Any = v1alpha1.ClassDefRef{}
+)
+
+type Manager struct {
+	sync.RWMutex
+
+	classes map[string][]*ComponentClassWithRef
+}
+
+func NewManager(classDefinitionList v1alpha1.ComponentClassDefinitionList) (*Manager, error) {
+	classes, err := GetClasses(classDefinitionList)
+	if err != nil {
+		return nil, err
+	}
+	return &Manager{classes: classes}, nil
+}
+
+// HasClass returns true if the component has the specified class
+func (r *Manager) HasClass(compType string, classDefRef v1alpha1.ClassDefRef) bool {
+	compClasses, ok := r.classes[compType]
+	if !ok || len(compClasses) == 0 {
+		return false
+	}
+	if classDefRef == Any {
+		return true
+	}
+
+	idx := slices.IndexFunc(compClasses, func(v *ComponentClassWithRef) bool {
+		if classDefRef.Name != "" && classDefRef.Name != v.ClassDefRef.Name {
+			return false
+		}
+		if classDefRef.Class != v.ClassDefRef.Class {
+			return false
+		}
+		return true
+	})
+	return idx >= 0
+}
+
+// ChooseClass Choose the class to be used for a given component with some constraints
+func (r *Manager) ChooseClass(comp *v1alpha1.ClusterComponentSpec) (*ComponentClassWithRef, error) {
+	var (
+		cls     *ComponentClassWithRef
+		classes = r.classes[comp.ComponentDefRef]
+	)
 	switch {
 	case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
 		if classes == nil {
 			return nil, fmt.Errorf("can not find classes for component %s", comp.ComponentDefRef)
 		}
-		cls = classes[comp.ClassDefRef.Class]
+		for _, v := range classes {
+			if comp.ClassDefRef.Name != "" && comp.ClassDefRef.Name != v.ClassDefRef.Name {
+				continue
+			}
+
+			if comp.ClassDefRef.Class != v.ClassDefRef.Class {
+				continue
+			}
+
+			if cls == nil || cls.Cmp(&v.ComponentClassInstance) > 0 {
+				cls = v
+			}
+		}
 		if cls == nil {
 			return nil, fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
 		}
 	case classes != nil:
-		cls = ChooseComponentClasses(classes, comp.Resources.Requests)
-		if cls == nil {
+		candidates := filterClassByResources(classes, comp.Resources.Requests)
+		if len(candidates) == 0 {
 			return nil, fmt.Errorf("can not find matching class for component %s", comp.Name)
 		}
+		sort.Sort(ByClassResource(candidates))
+		cls = candidates[0]
 	}
 	return cls, nil
 }
 
-// GetCustomClassObjectName Returns the name of the ComponentClassDefinition object containing the custom classes
-func GetCustomClassObjectName(cdName string, componentName string) string {
-	return fmt.Sprintf("kb.classes.custom.%s.%s", cdName, componentName)
+func (r *Manager) GetClasses() map[string][]*ComponentClassWithRef {
+	return r.classes
 }
 
-// ChooseComponentClasses Choose the classes to be used for a given component with some constraints
-func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance, resources corev1.ResourceList) *v1alpha1.ComponentClassInstance {
-	var candidates []*v1alpha1.ComponentClassInstance
+func filterClassByResources(classes []*ComponentClassWithRef, resources corev1.ResourceList) []*ComponentClassWithRef {
+	var candidates []*ComponentClassWithRef
 	for _, cls := range classes {
 		if !resources.Cpu().IsZero() && !resources.Cpu().Equal(cls.CPU) {
 			continue
@@ -76,17 +132,34 @@ func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance,
 		}
 		candidates = append(candidates, cls)
 	}
-	if len(candidates) == 0 {
-		return nil
-	}
-	sort.Sort(ByClassCPUAndMemory(candidates))
-	return candidates[0]
+	return candidates
 }
 
-func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string]map[string]*v1alpha1.ComponentClassInstance, error) {
+// GetManager get class manager which manages kubeblocks default classes and user custom classes
+func GetManager(client dynamic.Interface, cdName string) (*Manager, error) {
+	selector := fmt.Sprintf("%s=%s,%s", constant.ClusterDefLabelKey, cdName, types.ClassProviderLabelKey)
+	objs, err := client.Resource(types.ComponentClassDefinitionGVR()).Namespace("").List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selector,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var classDefinitionList v1alpha1.ComponentClassDefinitionList
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &classDefinitionList); err != nil {
+		return nil, err
+	}
+	return NewManager(classDefinitionList)
+}
+
+// GetCustomClassObjectName Returns the name of the ComponentClassDefinition object containing the custom classes
+func GetCustomClassObjectName(cdName string, componentName string) string {
+	return fmt.Sprintf("kb.classes.custom.%s.%s", cdName, componentName)
+}
+
+func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string][]*ComponentClassWithRef, error) {
 	var (
 		compTypeLabel    = "apps.kubeblocks.io/component-def-ref"
-		componentClasses = make(map[string]map[string]*v1alpha1.ComponentClassInstance)
+		componentClasses = make(map[string][]*ComponentClassWithRef)
 	)
 	for _, classDefinition := range classDefinitionList.Items {
 		componentType := classDefinition.GetLabels()[compTypeLabel]
@@ -94,31 +167,30 @@ func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[
 			return nil, fmt.Errorf("can not find component type label %s", compTypeLabel)
 		}
 		var (
-			err     error
-			classes = make(map[string]*v1alpha1.ComponentClassInstance)
+			classes []*ComponentClassWithRef
 		)
 		if classDefinition.GetGeneration() != 0 &&
 			classDefinition.Status.ObservedGeneration == classDefinition.GetGeneration() {
 			for idx := range classDefinition.Status.Classes {
 				cls := classDefinition.Status.Classes[idx]
-				classes[cls.Name] = &cls
+				classes = append(classes, &ComponentClassWithRef{
+					ComponentClassInstance: cls,
+					ClassDefRef:            v1alpha1.ClassDefRef{Name: classDefinition.Name, Class: cls.Name},
+				})
 			}
 		} else {
-			classes, err = ParseComponentClasses(classDefinition)
+			classMap, err := ParseComponentClasses(classDefinition)
 			if err != nil {
 				return nil, err
 			}
-		}
-		if _, ok := componentClasses[componentType]; !ok {
-			componentClasses[componentType] = classes
-		} else {
-			for k, v := range classes {
-				if _, exists := componentClasses[componentType][k]; exists {
-					return nil, fmt.Errorf("duplicate component class %s", k)
-				}
-				componentClasses[componentType][k] = v
+			for k, v := range classMap {
+				classes = append(classes, &ComponentClassWithRef{
+					ClassDefRef:            k,
+					ComponentClassInstance: *v,
+				})
 			}
 		}
+		componentClasses[componentType] = append(componentClasses[componentType], classes...)
 	}
 
 	return componentClasses, nil
@@ -148,24 +220,8 @@ func GetResourceConstraints(dynamic dynamic.Interface) (map[string]*v1alpha1.Com
 	return result, nil
 }
 
-// ListClassesByClusterDefinition get all classes, including kubeblocks default classes and user custom classes
-func ListClassesByClusterDefinition(client dynamic.Interface, cdName string) (map[string]map[string]*v1alpha1.ComponentClassInstance, error) {
-	selector := fmt.Sprintf("%s=%s,%s", constant.ClusterDefLabelKey, cdName, types.ClassProviderLabelKey)
-	objs, err := client.Resource(types.ComponentClassDefinitionGVR()).Namespace("").List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selector,
-	})
-	if err != nil {
-		return nil, err
-	}
-	var classDefinitionList v1alpha1.ComponentClassDefinitionList
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &classDefinitionList); err != nil {
-		return nil, err
-	}
-	return GetClasses(classDefinitionList)
-}
-
 // ParseComponentClasses parse ComponentClassDefinition to component classes
-func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (map[string]*v1alpha1.ComponentClassInstance, error) {
+func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (map[v1alpha1.ClassDefRef]*v1alpha1.ComponentClassInstance, error) {
 	genClass := func(nameTpl string, bodyTpl string, vars []string, args []string) (v1alpha1.ComponentClass, error) {
 		var result v1alpha1.ComponentClass
 		values := make(map[string]interface{})
@@ -214,7 +270,7 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 		return result, nil
 	}
 
-	result := make(map[string]*v1alpha1.ComponentClassInstance)
+	result := make(map[v1alpha1.ClassDefRef]*v1alpha1.ComponentClassInstance)
 	for _, group := range classDefinition.Spec.Groups {
 		for _, series := range group.Series {
 			for _, class := range series.Classes {
@@ -222,10 +278,11 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 				if err != nil {
 					return nil, err
 				}
-				if _, exists := result[out.Name]; exists {
-					return nil, fmt.Errorf("duplicate component class name: %s", out.Name)
+				key := v1alpha1.ClassDefRef{Name: classDefinition.Name, Class: out.Name}
+				if _, exists := result[key]; exists {
+					return nil, fmt.Errorf("component class name conflict: %s", out.Name)
 				}
-				result[out.Name] = out
+				result[key] = out
 			}
 		}
 	}

@@ -60,6 +60,14 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, classDefinition, constant.DBClusterFinalizerName, func() (*ctrl.Result, error) {
+		// TODO validate if existing cluster reference classes being deleted
+		return nil, nil
+	})
+	if res != nil {
+		return *res, err
+	}
+
 	ml := []client.ListOption{
 		client.HasLabels{types.ResourceConstraintProviderLabelKey},
 	}
@@ -76,26 +84,18 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 		constraintsMap[cf.GetName()] = cf
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, classDefinition, constant.DBClusterFinalizerName, func() (*ctrl.Result, error) {
-		// TODO validate if existing cluster reference classes being deleted
-		return nil, nil
-	})
-	if res != nil {
-		return *res, err
-	}
-
 	if classDefinition.Status.ObservedGeneration == classDefinition.Generation {
 		return intctrlutil.Reconciled()
 	}
 
-	classInstances, err := class.ParseComponentClasses(*classDefinition)
+	classes, err := class.ParseComponentClasses(*classDefinition)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "parse component classes failed")
 	}
 
 	patch := client.MergeFrom(classDefinition.DeepCopy())
 	var classList []appsv1alpha1.ComponentClassInstance
-	for _, v := range classInstances {
+	for _, v := range classes {
 		constraint, ok := constraintsMap[v.ResourceConstraintRef]
 		if !ok {
 			return intctrlutil.CheckedRequeueWithError(nil, reqCtx.Log, fmt.Sprintf("resource constraint %s not found", v.ResourceConstraintRef))

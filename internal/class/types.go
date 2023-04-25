@@ -86,15 +86,15 @@ func (m ByConstraintList) Swap(i, j int) {
 	m[i], m[j] = m[j], m[i]
 }
 
-var _ sort.Interface = ByClassCPUAndMemory{}
+var _ sort.Interface = ByClassResource{}
 
-type ByClassCPUAndMemory []*appsv1alpha1.ComponentClassInstance
+type ByClassResource []*ComponentClassWithRef
 
-func (b ByClassCPUAndMemory) Len() int {
+func (b ByClassResource) Len() int {
 	return len(b)
 }
 
-func (b ByClassCPUAndMemory) Less(i, j int) bool {
+func (b ByClassResource) Less(i, j int) bool {
 	if out := b[i].CPU.Cmp(b[j].CPU); out != 0 {
 		return out < 0
 	}
@@ -106,6 +106,12 @@ func (b ByClassCPUAndMemory) Less(i, j int) bool {
 	return false
 }
 
-func (b ByClassCPUAndMemory) Swap(i, j int) {
+func (b ByClassResource) Swap(i, j int) {
 	b[i], b[j] = b[j], b[i]
+}
+
+type ComponentClassWithRef struct {
+	appsv1alpha1.ComponentClassInstance
+
+	ClassDefRef appsv1alpha1.ClassDefRef
 }

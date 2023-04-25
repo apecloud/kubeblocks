@@ -276,3 +276,6 @@ ingress:
   ##             name: http
   ##
   extraRules: []
+
+nameOverride: ""
+fullnameOverride: ""

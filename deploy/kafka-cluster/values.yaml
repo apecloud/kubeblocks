@@ -186,3 +186,6 @@ topologyKeys:
 ## @param affinity is affinity setting for Kafka cluster pods assignment
 ##
 affinity: {}
+
+nameOverride: ""
+fullnameOverride: ""

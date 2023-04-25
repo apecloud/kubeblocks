@@ -50,7 +50,7 @@ func (r mongodb) ConnectCommand(connectInfo *AuthInfo) []string {
 		userPass = connectInfo.UserPasswd
 	}
 
-	mongodbCmd := []string{fmt.Sprintf("%s -u %s -p %s", r.info.Client, userName, userPass)}
+	mongodbCmd := []string{fmt.Sprintf("%s mongodb://%s:%s@$KB_POD_FQDN:27017/admin?replicaSet=$KB_CLUSTER_COMP_NAME", r.info.Client, userName, userPass)}
 
 	return []string{"sh", "-c", strings.Join(mongodbCmd, " ")}
 }

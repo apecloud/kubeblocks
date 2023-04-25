@@ -31,10 +31,18 @@
    delphic-postgres-postgresql-1      4/4     Running     0             42m
    ```
 5. Find the username and password of web console.
-    ```
+   On Mac OS X:
+   ```
    kubectl get secret delphic-django-secret -o jsonpath='{.data.username}' | base64 -D
    kubectl get secret delphic-django-secret -o jsonpath='{.data.password}' | base64 -D
    ```
+   
+   On Linux:
+   ```
+   kubectl get secret delphic-django-secret -o jsonpath='{.data.username}' | base64 -d
+   kubectl get secret delphic-django-secret -o jsonpath='{.data.password}' | base64 -d
+   ```
+    
 6. Port-forward the Plugin Portal to access it.
    ```shell
    kubectl port-forward port-forward deployment/delphic 3000:3000 8000:8000

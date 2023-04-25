@@ -9,12 +9,12 @@ spec:
   connectionCredential:
     username: root
     password: {{ (include "mongodb.password" .) | quote  }}
-    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mongodb)"
     host: "$(SVC_FQDN)"
-    port: "$(SVC_PORT_tcp-monogdb)"
-    headlessEndpoint: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
-    headlessHost: "$(POD_NAME_PREFIX)-0.$(HEADLESS_SVC_FQDN)"
-    headlessPort: "$(SVC_PORT_tcp-monogdb)"
+    port: "$(SVC_PORT_mongodb)"
+    headlessEndpoint: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN):$(SVC_PORT_mongodb)"
+    headlessHost: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN)"
+    headlessPort: "$(SVC_PORT_mongodb)"
   componentDefs:
     - name: mongodb
       characterType: mongodb
@@ -64,7 +64,8 @@ spec:
           timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       service:
         ports:
-          - protocol: TCP
+          - name: mongodb
+            protocol: TCP
             port: 27017
       volumeTypes:
         - name: data

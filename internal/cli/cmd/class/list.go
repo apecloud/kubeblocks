@@ -31,7 +31,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -72,15 +71,15 @@ func (o *ListOptions) complete(f cmdutil.Factory) error {
 }
 
 func (o *ListOptions) run() error {
-	componentClasses, err := class.ListClassesByClusterDefinition(o.dynamic, o.ClusterDefRef)
+	clsMgr, err := class.GetManager(o.dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
-	constraintClassMap := make(map[string]map[string][]*appsv1alpha1.ComponentClassInstance)
-	for compName, items := range componentClasses {
+	constraintClassMap := make(map[string]map[string][]*class.ComponentClassWithRef)
+	for compName, items := range clsMgr.GetClasses() {
 		for _, item := range items {
 			if _, ok := constraintClassMap[item.ResourceConstraintRef]; !ok {
-				constraintClassMap[item.ResourceConstraintRef] = make(map[string][]*appsv1alpha1.ComponentClassInstance)
+				constraintClassMap[item.ResourceConstraintRef] = make(map[string][]*class.ComponentClassWithRef)
 			}
 			constraintClassMap[item.ResourceConstraintRef][compName] = append(constraintClassMap[item.ResourceConstraintRef][compName], item)
 		}
@@ -99,11 +98,11 @@ func (o *ListOptions) run() error {
 	return nil
 }
 
-func (o *ListOptions) printClass(constraintName string, compName string, classes []*appsv1alpha1.ComponentClassInstance) {
+func (o *ListOptions) printClass(constraintName string, compName string, classes []*class.ComponentClassWithRef) {
 	tbl := printer.NewTablePrinter(o.Out)
 	_, _ = fmt.Fprintf(o.Out, "\nConstraint %s:\n", constraintName)
 	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY", "STORAGE")
-	sort.Sort(class.ByClassCPUAndMemory(classes))
+	sort.Sort(class.ByClassResource(classes))
 	for _, cls := range classes {
 		var volumes []string
 		for _, volume := range cls.Volumes {

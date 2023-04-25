@@ -58,7 +58,7 @@ func (r *FillClassTransformer) fillClass(transCtx *ClusterTransformContext) erro
 	if err := transCtx.Client.List(transCtx.Context, &classDefinitionList, ml...); err != nil {
 		return err
 	}
-	compClasses, err := class.GetClasses(classDefinitionList)
+	clsMgr, err := class.NewManager(classDefinitionList)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (r *FillClassTransformer) fillClass(transCtx *ClusterTransformContext) erro
 	}
 
 	for idx, comp := range cluster.Spec.ComponentSpecs {
-		cls, err := class.ValidateComponentClass(&comp, compClasses)
+		cls, err := clsMgr.ChooseClass(&comp)
 		if err != nil {
 			return err
 		}
@@ -104,7 +104,7 @@ func (r *FillClassTransformer) fillClass(transCtx *ClusterTransformContext) erro
 			continue
 		}
 
-		comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: cls.Name}
+		comp.ClassDefRef = &cls.ClassDefRef
 		requests := corev1.ResourceList{
 			corev1.ResourceCPU:    cls.CPU,
 			corev1.ResourceMemory: cls.Memory,
@@ -124,7 +124,7 @@ func (r *FillClassTransformer) fillClass(transCtx *ClusterTransformContext) erro
 	return nil
 }
 
-func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
+func buildVolumeClaimByClass(cls *class.ComponentClassWithRef) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
 	var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
 	for _, volume := range cls.Volumes {
 		volumes = append(volumes, appsv1alpha1.ClusterComponentVolumeClaimTemplate{

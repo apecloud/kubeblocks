@@ -58,22 +58,24 @@ spec:
 `
 
 func TestResourceConstraint_ByClassCPUAndMemory(t *testing.T) {
-	buildClass := func(cpu string, memory string) *appsv1alpha1.ComponentClassInstance {
-		return &appsv1alpha1.ComponentClassInstance{
-			ComponentClass: appsv1alpha1.ComponentClass{
-				CPU:    resource.MustParse(cpu),
-				Memory: resource.MustParse(memory),
+	buildClass := func(cpu string, memory string) *ComponentClassWithRef {
+		return &ComponentClassWithRef{
+			ComponentClassInstance: appsv1alpha1.ComponentClassInstance{
+				ComponentClass: appsv1alpha1.ComponentClass{
+					CPU:    resource.MustParse(cpu),
+					Memory: resource.MustParse(memory),
+				},
 			},
 		}
 	}
-	classes := []*appsv1alpha1.ComponentClassInstance{
+	classes := []*ComponentClassWithRef{
 		buildClass("1", "2Gi"),
 		buildClass("1", "1Gi"),
 		buildClass("2", "0.5Gi"),
 		buildClass("1", "1Gi"),
 		buildClass("0.5", "10Gi"),
 	}
-	sort.Sort(ByClassCPUAndMemory(classes))
+	sort.Sort(ByClassResource(classes))
 	candidate := classes[0]
 	if !candidate.CPU.Equal(resource.MustParse("0.5")) || !candidate.Memory.Equal(resource.MustParse("10Gi")) {
 		t.Errorf("case failed")

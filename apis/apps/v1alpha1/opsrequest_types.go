@@ -116,9 +116,9 @@ type VerticalScaling struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
 
-	// class specifies the class name of the component
+	// classDefRef reference class defined in ComponentClassDefinition.
 	// +optional
-	Class string `json:"class,omitempty"`
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 }
 
 // VolumeExpansion defines the variables of volume expansion operation.
@@ -346,9 +346,9 @@ type LastComponentConfiguration struct {
 	// +optional
 	corev1.ResourceRequirements `json:",inline,omitempty"`
 
-	// the last class name of the component.
+	// classDefRef reference class defined in ComponentClassDefinition.
 	// +optional
-	Class string `json:"class,omitempty"`
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
 	// volumeClaimTemplates records the last volumeClaimTemplates of the component.
 	// +optional

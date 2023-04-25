@@ -57,7 +57,7 @@ var _ = Describe("operations", func() {
 			clusterWithOneComp.Spec.ComponentSpecs[0],
 		}
 		classDef := testapps.NewComponentClassDefinitionFactory("custom", clusterWithOneComp.Spec.ClusterDefRef, testing.ComponentDefName).
-			AddClasses(testapps.DefaultResourceConstraintName, []string{testapps.Class1c1gName}).
+			AddClasses(testapps.DefaultResourceConstraintName, []appsv1alpha1.ComponentClass{testapps.Class1c1g}).
 			GetObject()
 		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(),
 			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp, classDef)
@@ -117,16 +117,18 @@ var _ = Describe("operations", func() {
 		By("test CompleteComponentsFlag function")
 		o.ComponentNames = nil
 		By("expect to auto complete components when cluster has only one component")
-		Expect(o.CompleteComponentsFlag()).Should(Succeed())
+		Expect(o.fillVScale()).Should(Succeed())
 		Expect(o.ComponentNames[0]).Should(Equal(testing.ComponentName))
 
 		By("validate invalid class")
 		o.Class = "class-not-exists"
+		Expect(o.fillVScale()).Should(Succeed())
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(HaveOccurred())
 
 		By("expect to validate success with class")
 		o.Class = testapps.Class1c1gName
+		Expect(o.fillVScale()).Should(Succeed())
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).ShouldNot(HaveOccurred())
 

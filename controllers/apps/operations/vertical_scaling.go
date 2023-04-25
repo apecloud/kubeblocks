@@ -62,8 +62,9 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 		if !ok {
 			continue
 		}
-		if verticalScaling.Class != "" {
-			component.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: verticalScaling.Class}
+		// TODO: support specify class object name in the Class field
+		if verticalScaling.ClassDefRef != nil {
+			component.ClassDefRef = verticalScaling.ClassDefRef
 		} else {
 			// clear old class ref
 			component.ClassDefRef = &appsv1alpha1.ClassDefRef{}
@@ -92,7 +93,7 @@ func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.Reques
 			ResourceRequirements: v.Resources,
 		}
 		if v.ClassDefRef != nil {
-			lastConfiguration.Class = v.ClassDefRef.Class
+			lastConfiguration.ClassDefRef = v.ClassDefRef
 		}
 		lastComponentInfo[v.Name] = lastConfiguration
 	}
@@ -109,7 +110,8 @@ func (vs verticalScalingHandler) GetRealAffectedComponentMap(opsRequest *appsv1a
 		if !ok {
 			continue
 		}
-		if !reflect.DeepEqual(currVs.ResourceRequirements, v.ResourceRequirements) || currVs.Class != v.Class {
+		if !reflect.DeepEqual(currVs.ResourceRequirements, v.ResourceRequirements) ||
+			!reflect.DeepEqual(currVs.ClassDefRef, v.ClassDefRef) {
 			realChangedMap[k] = struct{}{}
 		}
 	}

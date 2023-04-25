@@ -63,9 +63,10 @@ type OperationsOptions struct {
 	ClusterVersionRef string `json:"clusterVersionRef"`
 
 	// VerticalScaling options
-	CPU    string `json:"cpu"`
-	Memory string `json:"memory"`
-	Class  string `json:"class"`
+	CPU         string                   `json:"cpu"`
+	Memory      string                   `json:"memory"`
+	Class       string                   `json:"class"`
+	ClassDefRef appsv1alpha1.ClassDefRef `json:"classDefRef,omitempty"`
 
 	// HorizontalScaling options
 	Replicas int `json:"replicas"`
@@ -168,14 +169,14 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 }
 
 func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error {
-	componentClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, cluster.Spec.ClusterDefRef)
+	clsMgr, err := class.GetManager(o.Dynamic, cluster.Spec.ClusterDefRef)
 	if err != nil {
 		return err
 	}
 
 	fillClassParams := func(comp *appsv1alpha1.ClusterComponentSpec) {
 		if o.Class != "" {
-			comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: o.Class}
+			comp.ClassDefRef = &o.ClassDefRef
 		}
 
 		requests := make(corev1.ResourceList)
@@ -195,11 +196,32 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 				continue
 			}
 			fillClassParams(&comp)
-			if _, err = class.ValidateComponentClass(&comp, componentClasses); err != nil {
+			if _, err = clsMgr.ChooseClass(&comp); err != nil {
 				return err
 			}
 		}
 	}
+	return nil
+}
+
+func (o *OperationsOptions) fillVScale() error {
+	if err := o.CompleteComponentsFlag(); err != nil {
+		return err
+	}
+
+	if o.Class == "" {
+		return nil
+	}
+
+	clsDefRef := appsv1alpha1.ClassDefRef{}
+	parts := strings.SplitN(o.Class, ":", 2)
+	if len(parts) == 1 {
+		clsDefRef.Class = parts[0]
+	} else {
+		clsDefRef.Name = parts[0]
+		clsDefRef.Class = parts[1]
+	}
+	o.ClassDefRef = clsDefRef
 	return nil
 }
 
@@ -413,7 +435,7 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	inputs.Use = "vscale"
 	inputs.Short = "Vertically scale the specified components in the cluster."
 	inputs.Example = verticalScalingExample
-	inputs.Complete = o.CompleteComponentsFlag
+	inputs.Complete = o.fillVScale
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringVar(&o.CPU, "cpu", "", "Requested and limited size of component cpu")

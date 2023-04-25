@@ -169,6 +169,7 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 			Labels: map[string]string{
 				constant.AppInstanceLabelKey:          cluster.Name,
 				constant.KBAppComponentDefRefLabelKey: policyTPL.ComponentDefRef,
+				constant.AppManagedByLabelKey:         constant.AppName,
 			},
 			Annotations: map[string]string{
 				constant.DefaultBackupPolicyAnnotationKey:  "true",

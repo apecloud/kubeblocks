@@ -1439,20 +1439,19 @@ var _ = Describe("Cluster Controller", func() {
 			By("remove init container after all components are Running")
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(clusterObj))).Should(BeEquivalentTo(1))
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
-				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-					replicationCompName: {Phase: appsv1alpha1.RunningClusterCompPhase},
-				}
-			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
 				g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 			})).Should(Succeed())
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, replicationCompName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 
 			By("clean up annotations after cluster running")
-			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
-				clusterObj.Status.Phase = appsv1alpha1.RunningClusterPhase
-			})).ShouldNot(HaveOccurred())
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
+				compStatus := tmpCluster.Status.Components[replicationCompName]
+				compStatus.Phase = appsv1alpha1.RunningClusterCompPhase
+				tmpCluster.Status.Components[replicationCompName] = compStatus
+			})()).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())
 		})

@@ -306,10 +306,8 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("By creating a backupPolicy with empty secret")
 				pvcName := "backup-data"
 				pvcInitCapacity := "10Gi"
-				pvcStorageClass := "standard"
 				viper.SetDefault(constant.CfgKeyBackupPVCName, pvcName)
 				viper.SetDefault(constant.CfgKeyBackupPVCInitCapacity, pvcInitCapacity)
-				viper.SetDefault(constant.CfgKeyBackupPVCStorageClass, pvcStorageClass)
 				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					AddFullPolicy().
 					SetBackupToolName(backupToolName).
@@ -321,7 +319,6 @@ var _ = Describe("Backup Policy Controller", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 					g.Expect(fetched.Spec.Full.PersistentVolumeClaim.Name).To(Equal(pvcName))
-					g.Expect(*fetched.Spec.Full.PersistentVolumeClaim.StorageClassName).To(Equal(pvcStorageClass))
 					g.Expect(fetched.Spec.Full.PersistentVolumeClaim.InitCapacity.String()).To(Equal(pvcInitCapacity))
 				})).Should(Succeed())
 			})

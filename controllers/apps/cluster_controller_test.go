@@ -805,6 +805,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("Checking the replicas")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -827,18 +828,21 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(k8sClient.Status().Update(testCtx.Ctx, pvc)).Should(Succeed())
 		}
 
+		By("mock pods/sts of component are available")
+		testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, replicationCompName)
+		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			testk8s.MockStatefulSetReady(sts)
+		})).ShouldNot(HaveOccurred())
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, replicationCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
+
 		By("Updating the PVC storage size")
 		newStorageValue := resource.MustParse("2Gi")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			comp := &cluster.Spec.ComponentSpecs[0]
 			comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
 		})()).ShouldNot(HaveOccurred())
-
-		By("mock pods/sts of component are available")
-		testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, replicationCompName)
-		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-			testk8s.MockStatefulSetReady(sts)
-		})).ShouldNot(HaveOccurred())
 
 		By("Checking the resize operation finished")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))

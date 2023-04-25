@@ -147,7 +147,7 @@ func (o *AccountBaseOptions) Complete(f cmdutil.Factory) error {
 	return nil
 }
 
-func (o *AccountBaseOptions) Run(cmd cobra.Command, f cmdutil.Factory, streams genericclioptions.IOStreams) error {
+func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams genericclioptions.IOStreams) error {
 	var err error
 	response, err := o.Do()
 	if err != nil {

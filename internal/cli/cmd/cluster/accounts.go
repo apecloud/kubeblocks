@@ -97,7 +97,7 @@ func NewCreateAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(*cmd, f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)
@@ -114,7 +114,7 @@ func NewDeleteAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(*cmd, f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)
@@ -131,7 +131,7 @@ func NewDescAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(*cmd, f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)
@@ -150,7 +150,7 @@ func NewListAccountsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(*cmd, f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)
@@ -169,7 +169,7 @@ func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(*cmd, f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)
@@ -188,7 +188,7 @@ func NewRevokeOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(*cmd, f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)

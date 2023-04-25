@@ -67,6 +67,11 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getPVCError")
 	}
 
+	// skip if pvc is being deleted
+	if !pvc.DeletionTimestamp.IsZero() {
+		return intctrlutil.Reconciled()
+	}
+
 	for _, handlePVC := range PersistentVolumeClaimHandlerMap {
 		// ignores the not found error.
 		if err := handlePVC(reqCtx, r.Client, pvc); err != nil && !apierrors.IsNotFound(err) {

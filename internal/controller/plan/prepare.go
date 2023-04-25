@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
@@ -186,7 +185,7 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	for i := firstCfg; i < len(cfgTemplates); i++ {
 		tpl := cfgTemplates[i]
 		// Ignore config template, e.g scripts configmap
-		if !cfgutil.NeedReloadVolume(tpl) {
+		if !cfgcore.NeedReloadVolume(tpl) {
 			continue
 		}
 		volume := intctrlutil.GetVolumeMountByVolume(container, tpl.VolumeName)
@@ -214,7 +213,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		Cluster:       cluster,
 	}
 
-	if reloadOptions, formatterConfig, err = cfgutil.GetReloadOptions(cli, ctx, configSpec); err != nil {
+	if reloadOptions, formatterConfig, err = cfgcore.GetReloadOptions(cli, ctx, configSpec); err != nil {
 		return nil, err
 	}
 	if reloadOptions == nil || formatterConfig == nil {

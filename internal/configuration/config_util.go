@@ -23,6 +23,7 @@ import (
 	"context"
 
 	"github.com/StudioSol/set"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -134,4 +135,29 @@ func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]string, forma
 	}
 	mergedConfig := configWrapper.getConfigObject(mergedOptions)
 	return mergedConfig.Marshal()
+}
+
+func NeedReloadVolume(config appsv1alpha1.ComponentConfigSpec) bool {
+	// TODO distinguish between scripts and configuration
+	return config.ConfigConstraintRef != ""
+}
+
+func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ReloadOptions, *appsv1alpha1.FormatterConfig, error) {
+	for _, configSpec := range configSpecs {
+		if !NeedReloadVolume(configSpec) {
+			continue
+		}
+		ccKey := client.ObjectKey{
+			Namespace: "",
+			Name:      configSpec.ConfigConstraintRef,
+		}
+		cfgConst := &appsv1alpha1.ConfigConstraint{}
+		if err := cli.Get(ctx, ccKey, cfgConst); err != nil {
+			return nil, nil, WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
+		}
+		if cfgConst.Spec.ReloadOptions != nil {
+			return cfgConst.Spec.ReloadOptions, cfgConst.Spec.FormatterConfig, nil
+		}
+	}
+	return nil, nil, nil
 }

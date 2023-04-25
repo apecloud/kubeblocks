@@ -17,14 +17,13 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package stateful1
+package stateful
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -44,7 +43,7 @@ func NewStatefulComponent(cli client.Client,
 				Cluster:        cluster,
 				ClusterVersion: clusterVersion,
 				Component:      synthesizedComponent,
-				ComponentSet: &stateful.Stateful{
+				ComponentSet: &Stateful{
 					ComponentSetBase: types.ComponentSetBase{
 						Cli:           cli,
 						Cluster:       cluster,

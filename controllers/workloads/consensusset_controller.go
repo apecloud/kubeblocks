@@ -89,7 +89,7 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//    Which means transformers' order is not important in most cases.
 	//    If you don't know where to put your transformer, append it to the end and that would be ok.
 	// 4. don't use client.Client for object write, use client.ReadonlyClient for object read.
-	//    If you do need to create/update/delete object, make your intent operation a lifecycleVertex and put it into the DAG.
+	//    If you do need to create/update/delete object, make your intent operation a model.ObjectVertex and put it into the DAG.
 	//
 	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
 	plan, errBuild := planBuilder.

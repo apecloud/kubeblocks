@@ -32,10 +32,11 @@ type ConfigConstraintSpec struct {
 
 	// toolConfig used to config init container.
 	// +optional
-	ToolsConfig []ToolConfig `json:"toolsConfig,omitempty"`
+	ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
 
-	// watchPodFields is used to watch pod fields.
-	WatchPodFields []WatchPodField `json:"watchPodFields,omitempty"`
+	// downwardAPIOptions is used to watch pod fields.
+	// +optional
+	DownwardAPIOptions []DownwardAPIOption `json:"downwardAPIOptions,omitempty"`
 
 	// cfgSchemaTopLevelName is cue type name, which generates openapi schema.
 	// +optional
@@ -161,7 +162,7 @@ type ToolConfig struct {
 	Command []string `json:"command"`
 }
 
-type WatchPodField struct {
+type DownwardAPIOption struct {
 	// Specify the name of the field.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63

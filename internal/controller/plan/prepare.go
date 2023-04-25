@@ -253,7 +253,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 	// construct config manager tools volume
 	toolContainers := make(map[string]appsv1alpha1.ToolConfig)
 	for _, buildParam := range cfgManagerParams.ConfigSpecsBuildParams {
-		for _, toolConfig := range buildParam.ToolsConfig {
+		for _, toolConfig := range buildParam.ToolConfigs {
 			if _, ok := toolContainers[toolConfig.Name]; ok {
 				continue
 			}

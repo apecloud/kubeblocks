@@ -62,21 +62,21 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, c
 			return err
 		}
 	}
-	downwardAPIVolumes := buildPodDownwardAPI(cmBuildParams)
+	downwardAPIVolumes := buildDownwardAPIVolumes(cmBuildParams)
 	allVolumeMounts = append(allVolumeMounts, downwardAPIVolumes...)
 	cmBuildParams.Volumes = append(cmBuildParams.Volumes, downwardAPIVolumes...)
 	return buildConfigManagerArgs(cmBuildParams, allVolumeMounts)
 }
 
-func buildPodDownwardAPI(params *CfgManagerBuildParams) []corev1.VolumeMount {
+func buildDownwardAPIVolumes(params *CfgManagerBuildParams) []corev1.VolumeMount {
 	for _, buildParam := range params.ConfigSpecsBuildParams {
-		for _, info := range buildParam.WatchPodField {
-			if FindVolumeMount(params.WatchPodFieldsVolumes, info.Name) == nil {
+		for _, info := range buildParam.DownwardAPIOptions {
+			if FindVolumeMount(params.DownwardAPIVolumes, info.Name) == nil {
 				buildDownwardAPIVolume(params, info)
 			}
 		}
 	}
-	return params.WatchPodFieldsVolumes
+	return params.DownwardAPIVolumes
 }
 
 func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
@@ -150,8 +150,8 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	return nil
 }
 
-func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1alpha1.WatchPodField) {
-	manager.WatchPodFieldsVolumes = append(manager.WatchPodFieldsVolumes, corev1.VolumeMount{
+func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1alpha1.DownwardAPIOption) {
+	manager.DownwardAPIVolumes = append(manager.DownwardAPIVolumes, corev1.VolumeMount{
 		Name:      fieldInfo.Name,
 		MountPath: fieldInfo.MountPoint,
 	})

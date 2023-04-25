@@ -45,8 +45,8 @@ type ConfigSpecMeta struct {
 	ReloadType appsv1alpha1.CfgReloadType       `json:"reloadType"`
 	ConfigSpec appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
 
-	ToolsConfig   []appsv1alpha1.ToolConfig
-	WatchPodField []appsv1alpha1.WatchPodField
+	ToolConfigs        []appsv1alpha1.ToolConfig
+	DownwardAPIOptions []appsv1alpha1.DownwardAPIOption
 
 	// config volume mount path
 	TPLConfig  string `json:"tplConfig"`
@@ -325,11 +325,11 @@ func fromConfigSpecMeta(meta *ConfigSpecMeta) string {
 }
 
 func fromDownwardMountPoint(meta *ConfigSpecMeta) []string {
-	if meta == nil || len(meta.WatchPodField) == 0 {
+	if meta == nil || len(meta.DownwardAPIOptions) == 0 {
 		return nil
 	}
 	var mountPoints []string
-	for _, field := range meta.WatchPodField {
+	for _, field := range meta.DownwardAPIOptions {
 		mountPoints = append(mountPoints, field.MountPoint)
 	}
 	return mountPoints

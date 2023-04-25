@@ -47,7 +47,7 @@ spec:
       scriptConfigMapRef: redis-reload-script
       namespace: {{ .Release.Namespace }}
 
-  toolsConfig:
+  toolConfigs:
   - command:
     - cp
     - /usr/local/bin/redis-cli
@@ -57,13 +57,13 @@ spec:
     name: init-redis-tools
     volumeName: redis-tools
 
-  watchPodFields:
+  downwardAPIOptions:
     - name: "pod_info"
       mountPoint: "/etc/pod_info"
       items:
-        - path: "labels"
+        - path: "labels/workload-type"
           fieldRef:
-            fieldPath: metadata.labels
+            fieldPath: metadata.labels['apps.kubeblocks.io/workload-type']
         - path: "annotations"
           fieldRef:
             fieldPath: metadata.annotations

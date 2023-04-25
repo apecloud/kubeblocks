@@ -15,7 +15,7 @@ kbcli cluster vscale NAME [flags]
   kbcli cluster vscale mycluster --components=mysql --cpu=500m --memory=500Mi
   
   # scale the computing resources of specified components by class, run command 'kbcli class list --cluster-definition cluster-definition-name' to get available classes
-  kbcli cluster vscale mycluster --components=mysql --class=<class-name>
+  kbcli cluster vscale mycluster --components=mysql --class=general-2c4g
 ```
 
 ### Options

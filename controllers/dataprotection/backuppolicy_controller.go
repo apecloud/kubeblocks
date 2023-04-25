@@ -449,11 +449,6 @@ func (r *BackupPolicyReconciler) setGlobalPersistentVolumeClaim(backupPolicy *da
 		backupPolicy.PersistentVolumeClaim.Name = globalPVCName
 	}
 
-	globalStorageClass := viper.GetString(constant.CfgKeyBackupPVCStorageClass)
-	if pvcCfg.StorageClassName == nil && globalStorageClass != "" {
-		backupPolicy.PersistentVolumeClaim.StorageClassName = &globalStorageClass
-	}
-
 	globalInitCapacity := viper.GetString(constant.CfgKeyBackupPVCInitCapacity)
 	if pvcCfg.InitCapacity.IsZero() && globalInitCapacity != "" {
 		backupPolicy.PersistentVolumeClaim.InitCapacity = resource.MustParse(globalInitCapacity)

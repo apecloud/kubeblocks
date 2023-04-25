@@ -1138,6 +1138,7 @@ var _ = Describe("Cluster Controller", func() {
 	testBackupError := func() {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
+		viper.Set("VOLUMESNAPSHOT", true)
 
 		By("Creating a cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
@@ -1352,8 +1353,6 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Creating a BackupPolicyTemplate")
 			createBackupPolicyTpl(clusterDefObj)
-
-			viper.Set("VOLUMESNAPSHOT", true)
 		})
 
 		It("Should success with one leader pod and two follower pods", func() {

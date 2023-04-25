@@ -22,58 +22,59 @@ package class
 import (
 	"sort"
 
-	"gopkg.in/inf.v0"
-	"k8s.io/apimachinery/pkg/api/resource"
+	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func GetMinCPUAndMemory(model appsv1alpha1.ResourceConstraint) (*resource.Quantity, *resource.Quantity) {
-	var (
-		minCPU    resource.Quantity
-		minMemory resource.Quantity
-	)
+var _ sort.Interface = ByResourceList{}
 
-	if len(model.CPU.Slots) > 0 {
-		minCPU = model.CPU.Slots[0]
-	}
+type ByResourceList []corev1.ResourceList
 
-	if model.CPU.Min != nil && minCPU.Cmp(*model.CPU.Min) < 0 {
-		minCPU = *model.CPU.Min
-	}
-	var memory *inf.Dec
-	if model.Memory.MinPerCPU != nil {
-		memory = inf.NewDec(1, 0).Mul(minCPU.AsDec(), model.Memory.MinPerCPU.AsDec())
-	} else {
-		memory = inf.NewDec(1, 0).Mul(minCPU.AsDec(), model.Memory.SizePerCPU.AsDec())
-	}
-	minMemory = resource.MustParse(memory.String())
-	return &minCPU, &minMemory
+func (b ByResourceList) Len() int {
+	return len(b)
 }
 
-type ConstraintWithName struct {
-	Name       string
-	Constraint appsv1alpha1.ResourceConstraint
+func (b ByResourceList) Less(i, j int) bool {
+	switch b[i].Cpu().Cmp(*b[j].Cpu()) {
+	case 1:
+		return false
+	case -1:
+		return true
+	}
+	switch b[i].Memory().Cmp(*b[j].Memory()) {
+	case 1:
+		return false
+	case -1:
+		return true
+	}
+	return false
+}
+
+func (b ByResourceList) Swap(i, j int) {
+	b[i], b[j] = b[j], b[i]
 }
 
 var _ sort.Interface = ByConstraintList{}
 
-type ByConstraintList []ConstraintWithName
+type ByConstraintList []appsv1alpha1.ResourceConstraint
 
 func (m ByConstraintList) Len() int {
 	return len(m)
 }
 
 func (m ByConstraintList) Less(i, j int) bool {
-	cpu1, mem1 := GetMinCPUAndMemory(m[i].Constraint)
-	cpu2, mem2 := GetMinCPUAndMemory(m[j].Constraint)
-	switch cpu1.Cmp(*cpu2) {
+	var (
+		resource1 = m[i].GetMinimalResources()
+		resource2 = m[j].GetMinimalResources()
+	)
+	switch resource1.Cpu().Cmp(*resource2.Cpu()) {
 	case 1:
 		return false
 	case -1:
 		return true
 	}
-	switch mem1.Cmp(*mem2) {
+	switch resource1.Memory().Cmp(*resource2.Memory()) {
 	case 1:
 		return false
 	case -1:
@@ -86,15 +87,15 @@ func (m ByConstraintList) Swap(i, j int) {
 	m[i], m[j] = m[j], m[i]
 }
 
-var _ sort.Interface = ByClassCPUAndMemory{}
+var _ sort.Interface = ByClassResource{}
 
-type ByClassCPUAndMemory []*appsv1alpha1.ComponentClassInstance
+type ByClassResource []*ComponentClassWithRef
 
-func (b ByClassCPUAndMemory) Len() int {
+func (b ByClassResource) Len() int {
 	return len(b)
 }
 
-func (b ByClassCPUAndMemory) Less(i, j int) bool {
+func (b ByClassResource) Less(i, j int) bool {
 	if out := b[i].CPU.Cmp(b[j].CPU); out != 0 {
 		return out < 0
 	}
@@ -106,6 +107,12 @@ func (b ByClassCPUAndMemory) Less(i, j int) bool {
 	return false
 }
 
-func (b ByClassCPUAndMemory) Swap(i, j int) {
+func (b ByClassResource) Swap(i, j int) {
 	b[i], b[j] = b[j], b[i]
+}
+
+type ComponentClassWithRef struct {
+	appsv1alpha1.ComponentClassInstance
+
+	ClassDefRef appsv1alpha1.ClassDefRef
 }

@@ -39,10 +39,15 @@ spec:
       step: 0.5
     memory:
       sizePerCPU: 4Gi
+    storage:
+      min: 20Gi
   - cpu:
       slots: [0.1, 0.2, 0.4, 0.6, 0.8, 1]
     memory:
       minPerCPU: 200Mi
+    storage:
+      min: 20Gi
+      max: 100Ti
   - cpu:
       min: 0.1
       max: 64
@@ -50,6 +55,8 @@ spec:
     memory:
       minPerCPU: 4Gi
       maxPerCPU: 8Gi
+    storage:
+      max: 100Ti
 `
 
 var (
@@ -64,10 +71,11 @@ func init() {
 
 func TestResourceConstraints(t *testing.T) {
 	cases := []struct {
-		desc   string
-		cpu    string
-		memory string
-		expect bool
+		desc    string
+		cpu     string
+		memory  string
+		expect  bool
+		storage string
 	}{
 		{
 			desc:   "test memory constraint with sizePerCPU",
@@ -117,27 +125,44 @@ func TestResourceConstraints(t *testing.T) {
 			memory: "6Gi",
 			expect: false,
 		},
+		{
+			desc:    "test invalid storage",
+			cpu:     "1",
+			memory:  "200Mi",
+			expect:  false,
+			storage: "10Gi",
+		},
+		{
+			desc:    "test invalid storage",
+			cpu:     "1",
+			memory:  "200Mi",
+			expect:  false,
+			storage: "2000Ti",
+		},
 	}
 
 	for _, item := range cases {
-		var (
-			cpu    = resource.MustParse(item.cpu)
-			memory = resource.MustParse(item.memory)
-		)
-		requirements := &corev1.ResourceRequirements{
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    cpu,
-				corev1.ResourceMemory: memory,
-			},
+		requests := corev1.ResourceList{}
+		if item.cpu != "" {
+			requests[corev1.ResourceCPU] = resource.MustParse(item.cpu)
 		}
-		assert.Equal(t, item.expect, len(cf.FindMatchingConstraints(requirements)) > 0)
+		if item.memory != "" {
+			requests[corev1.ResourceMemory] = resource.MustParse(item.memory)
+		}
+		if item.storage != "" {
+			requests[corev1.ResourceStorage] = resource.MustParse(item.storage)
+		}
+		assert.Equal(t, item.expect, len(cf.FindMatchingConstraints(requests)) > 0)
 
-		class := &ComponentClassInstance{
-			ComponentClass: ComponentClass{
-				CPU:    cpu,
-				Memory: memory,
-			},
+		// if storage is empty, we should also validate function MatchClass which only consider cpu and memory
+		if item.storage == "" {
+			class := &ComponentClassInstance{
+				ComponentClass: ComponentClass{
+					CPU:    *requests.Cpu(),
+					Memory: *requests.Memory(),
+				},
+			}
+			assert.Equal(t, item.expect, cf.MatchClass(class))
 		}
-		assert.Equal(t, item.expect, cf.MatchClass(class))
 	}
 }

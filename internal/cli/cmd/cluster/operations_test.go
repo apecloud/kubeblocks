@@ -62,10 +62,13 @@ var _ = Describe("operations", func() {
 		}
 		clusterWithOneComp.Spec.ComponentSpecs[0].ClassDefRef = &appsv1alpha1.ClassDefRef{Class: testapps.Class1c1gName}
 		classDef := testapps.NewComponentClassDefinitionFactory("custom", clusterWithOneComp.Spec.ClusterDefRef, testing.ComponentDefName).
-			AddClasses(testapps.DefaultResourceConstraintName, []string{testapps.Class1c1gName}).
+			AddClasses(testapps.DefaultResourceConstraintName, []appsv1alpha1.ComponentClass{testapps.Class1c1g}).
+			GetObject()
+		resourceConstraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+			AddConstraints(testapps.ProductionResourceConstraint).
 			GetObject()
 		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(),
-			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp, classDef)
+			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp, classDef, resourceConstraint)
 		tf.Client = &clientfake.RESTClient{}
 	})
 
@@ -176,7 +179,7 @@ var _ = Describe("operations", func() {
 
 	It("Vscale Ops", func() {
 		o := initCommonOperationOps(appsv1alpha1.VerticalScalingType, clusterName1, true)
-		By("test CompleteComponentsFlag function")
+
 		o.ComponentNames = nil
 		By("expect to auto complete components when cluster has only one component")
 		Expect(o.CompleteComponentsFlag()).Should(Succeed())

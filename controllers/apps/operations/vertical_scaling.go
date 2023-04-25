@@ -23,7 +23,6 @@ import (
 	"reflect"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -65,9 +64,9 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 		if !ok {
 			continue
 		}
-		if verticalScaling.Class != "" {
-			component.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: verticalScaling.Class}
-			component.Resources = corev1.ResourceRequirements{}
+		// TODO: support specify class object name in the Class field
+		if verticalScaling.ClassDefRef != nil {
+			component.ClassDefRef = verticalScaling.ClassDefRef
 		} else {
 			// clear old class ref
 			component.ClassDefRef = &appsv1alpha1.ClassDefRef{}
@@ -96,7 +95,7 @@ func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.Reques
 			ResourceRequirements: v.Resources,
 		}
 		if v.ClassDefRef != nil {
-			lastConfiguration.Class = v.ClassDefRef.Class
+			lastConfiguration.ClassDefRef = v.ClassDefRef
 		}
 		lastComponentInfo[v.Name] = lastConfiguration
 	}
@@ -113,7 +112,8 @@ func (vs verticalScalingHandler) GetRealAffectedComponentMap(opsRequest *appsv1a
 		if !ok {
 			continue
 		}
-		if !reflect.DeepEqual(currVs.ResourceRequirements, v.ResourceRequirements) || currVs.Class != v.Class {
+		if !reflect.DeepEqual(currVs.ResourceRequirements, v.ResourceRequirements) ||
+			!reflect.DeepEqual(currVs.ClassDefRef, v.ClassDefRef) {
 			realChangedMap[k] = struct{}{}
 		}
 	}
@@ -123,8 +123,10 @@ func (vs verticalScalingHandler) GetRealAffectedComponentMap(opsRequest *appsv1a
 // Cancel this function defines the cancel verticalScaling action.
 func (vs verticalScalingHandler) Cancel(reqCxt intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return cancelComponentOps(reqCxt.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) error {
-		comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: lastConfig.Class}
 		comp.Resources = lastConfig.ResourceRequirements
+		if lastConfig.ClassDefRef != nil {
+			comp.ClassDefRef = lastConfig.ClassDefRef
+		}
 		return nil
 	})
 }

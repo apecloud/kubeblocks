@@ -93,12 +93,16 @@ var _ = Describe("Cluster", func() {
 
 		BeforeEach(func() {
 			clusterDef := testing.FakeClusterDef()
+			resourceConstraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+				AddConstraints(testapps.ProductionResourceConstraint).
+				GetObject()
 			tf.FakeDynamicClient = testing.FakeDynamicClient(
 				clusterDef,
 				testing.FakeStorageClass(testing.StorageClassName, testing.IsDefault),
 				testing.FakeClusterVersion(),
 				testing.FakeComponentClassDef(fmt.Sprintf("custom-%s", testing.ComponentDefName), clusterDef.Name, testing.ComponentDefName),
 				testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
+				resourceConstraint,
 			)
 			o = &CreateOptions{
 				CreateOptions: create.CreateOptions{
@@ -155,54 +159,55 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 
-		It("should succeed if component with resource matching to one class", func() {
+		It("should succeed if component with resource meets the resource constraint", func() {
 			o.Values = []string{fmt.Sprintf("type=%s,cpu=1,memory=1Gi", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 			Run()
 		})
 
-		It("should succeed if component with resource equivalent to class", func() {
+		It("should succeed if component with resource with smaller unit meets the constraint", func() {
 			o.Values = []string{fmt.Sprintf("type=%s,cpu=1000m,memory=1024Mi", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 			Run()
 		})
 
-		It("should fail if component with resource not matching any class", func() {
-			o.Values = []string{fmt.Sprintf("type=%s,cpu=1,memory=2Gi", testing.ComponentDefName)}
+		It("should fail if component with resource not meets the constraint", func() {
+			o.Values = []string{fmt.Sprintf("type=%s,cpu=1,memory=100Gi", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 
-		It("should succeed if component with cpu matching one class", func() {
+		It("should succeed if component with cpu meets the constraint", func() {
 			o.Values = []string{fmt.Sprintf("type=%s,cpu=1", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 			Run()
 		})
 
-		It("should fail if component with cpu not matching any class", func() {
-			o.Values = []string{fmt.Sprintf("type=%s,cpu=3", testing.ComponentDefName)}
+		It("should fail if component with cpu not meets the constraint", func() {
+			o.Values = []string{fmt.Sprintf("type=%s,cpu=1024", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 
-		It("should succeed if component with memory matching one class", func() {
-			o.Values = []string{fmt.Sprintf("type=%s,memory=1Gi", testing.ComponentDefName)}
-			Expect(o.Complete()).Should(Succeed())
-			Expect(o.Validate()).Should(Succeed())
-			Run()
-		})
-
-		It("should fail if component with memory not matching any class", func() {
-			o.Values = []string{fmt.Sprintf("type=%s,memory=7Gi", testing.ComponentDefName)}
+		It("should fail if component with memory not meets the constraint", func() {
+			o.Values = []string{fmt.Sprintf("type=%s,memory=1Ti", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 
-		It("should succeed if component hasn't class definition", func() {
+		It("should succeed if component doesn't have class definition", func() {
 			o.Values = []string{fmt.Sprintf("type=%s,cpu=3,memory=7Gi", testing.ExtraComponentDefName)}
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 			Run()
+		})
+
+		It("should fail if component with storage not meets the constraint", func() {
+			o.Values = []string{fmt.Sprintf("type=%s,storage=500Mi", testing.ExtraComponentDefName)}
+			Expect(o.Complete()).Should(HaveOccurred())
+
+			o.Values = []string{fmt.Sprintf("type=%s,storage=1Pi", testing.ExtraComponentDefName)}
+			Expect(o.Complete()).Should(HaveOccurred())
 		})
 
 		It("should fail if create cluster by non-existed file", func() {
@@ -240,11 +245,6 @@ var _ = Describe("Cluster", func() {
 
 		It("should fail if create cluster by file with non-existed class", func() {
 			o.SetFile = testComponentWithInvalidClassPath
-			Expect(o.Complete()).Should(HaveOccurred())
-		})
-
-		It("should fail if create cluster by file with resource not matching any class", func() {
-			o.SetFile = testComponentWithInvalidResourcePath
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 

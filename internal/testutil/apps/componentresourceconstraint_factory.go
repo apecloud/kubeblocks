@@ -31,6 +31,7 @@ type ResourceConstraintTplType string
 const (
 	GeneralResourceConstraint         ResourceConstraintTplType = "general"
 	MemoryOptimizedResourceConstraint ResourceConstraintTplType = "memory-optimized"
+	ProductionResourceConstraint      ResourceConstraintTplType = "production"
 
 	generalResourceConstraintTemplate = `
 - cpu:
@@ -62,6 +63,19 @@ const (
   memory:
     sizePerCPU: 16Gi
 `
+
+	productionResourceConstraintTemplate = `
+- cpu:
+    min: "0.5"
+    max: 64
+    step: "0.5"
+  memory:
+    minPerCPU: 1Gi
+    maxPerCPU: 32Gi
+  storage:
+    min: 1Gi
+    max: 10Ti
+`
 )
 
 type MockComponentResourceConstraintFactory struct {
@@ -92,6 +106,8 @@ func (factory *MockComponentResourceConstraintFactory) AddConstraints(constraint
 		tpl = generalResourceConstraintTemplate
 	case MemoryOptimizedResourceConstraint:
 		tpl = memoryResourceConstraintTemplate
+	case ProductionResourceConstraint:
+		tpl = productionResourceConstraintTemplate
 	}
 	if err := yaml.Unmarshal([]byte(tpl), &newConstraints); err != nil {
 		panic(err)

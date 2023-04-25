@@ -477,13 +477,13 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
-// GetVolumeClaimNames gets all PVC names
+// GetVolumeClaimNames gets all PVC names of component compName
 //
 // r.Spec.GetComponentByName(compName).VolumeClaimTemplates[*].Name will be used if no claimNames provided
 //
 // nil return if:
-// 1. r.Spec.GetComponentByName(compName) is nil or
-// 2. len(claimNames) == 0 and len(VolumeClaimTemplates)==0 or
+// 1. component compName not found or
+// 2. len(VolumeClaimTemplates)==0 or
 // 3. any claimNames not found
 func (r *Cluster) GetVolumeClaimNames(compName string, claimNames ...string) []string {
 	if r == nil {

@@ -147,10 +147,13 @@ func (o *AccountBaseOptions) Complete(f cmdutil.Factory) error {
 	return nil
 }
 
-func (o *AccountBaseOptions) Run(f cmdutil.Factory, streams genericclioptions.IOStreams) error {
+func (o *AccountBaseOptions) Run(cmd cobra.Command, f cmdutil.Factory, streams genericclioptions.IOStreams) error {
 	var err error
 	response, err := o.Do()
 	if err != nil {
+		if sqlchannel.IsUnSupportedError(err) {
+			return fmt.Errorf("command `%s` on characterType `%s` (defined in cluster: %s, component: %s) is not supported yet", cmd.Use, o.CharType, o.ClusterName, o.ComponentName)
+		}
 		return err
 	}
 

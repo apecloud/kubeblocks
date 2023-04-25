@@ -78,3 +78,29 @@ type SQLChannelMeta struct {
 	EndTime   time.Time `json:"endTime,omitempty"`
 	Extra     string    `json:"extra,omitempty"`
 }
+
+type errorReason string
+
+const (
+	UnsupportedOps errorReason = "unsupported operation"
+)
+
+type SQLChannelError struct {
+	Reason errorReason
+}
+
+func (e SQLChannelError) Error() string {
+	return string(e.Reason)
+}
+
+var _ error = SQLChannelError{}
+
+func IsUnSupportedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if e, ok := err.(SQLChannelError); ok {
+		return e.Reason == UnsupportedOps
+	}
+	return false
+}

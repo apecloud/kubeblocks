@@ -22,6 +22,7 @@ package sqlchannel
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -268,6 +269,16 @@ func TestParseSqlChannelResult(t *testing.T) {
 		_, err := parseResponse(([]byte)(result), "listUsers", "mongodb")
 		assert.NotNil(t, err)
 	})
+}
+
+func TestErrMsg(t *testing.T) {
+	err := SQLChannelError{
+		Reason: UnsupportedOps,
+	}
+	assert.True(t, strings.Contains(err.Error(), "unsupported"))
+	assert.False(t, IsUnSupportedError(nil))
+	assert.True(t, IsUnSupportedError(err))
+	assert.False(t, IsUnSupportedError(errors.New("test")))
 }
 
 func newTCPServer(t *testing.T, daprServer pb.DaprServer, port int) (int, func()) {

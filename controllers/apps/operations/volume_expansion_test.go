@@ -123,16 +123,14 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		mockDoOperationOnCluster(clusterObject, ops.Name, appsv1alpha1.VolumeExpansionType)
 
 		// create-pvc
-		pvcNames := make([]string, 0)
-		for i := 0; i < replicas; i++ {
-			pvcName := fmt.Sprintf("%s-%s-%s-%d", vctName, clusterObject.Name, consensusCompName, i)
+		pvcNames := opsRes.Cluster.GetVolumeClaimNames(consensusCompName)
+		for _, pvcName := range pvcNames {
 			createPVC(clusterObject.Name, storageClassName, vctName, pvcName)
 			// trigger pvc controller reconcile if pvc already exists
 			pvcKey := client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}
 			Expect(testapps.GetAndChangeObj(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 				pvc.Labels[testCtx.GetRandomStr()] = "trigger-reconcile"
 			})()).ShouldNot(HaveOccurred())
-			pvcNames = append(pvcNames, pvcName)
 		}
 		// waiting pvc controller mark annotation to OpsRequest
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {

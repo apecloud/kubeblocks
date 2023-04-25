@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -72,6 +73,7 @@ var _ = Describe("probe_utils", func() {
 				backup.Status.BackupToolName = backupToolName
 				backup.Status.PersistentVolumeClaimName = "backup-pvc"
 				backup.Status.Phase = expectPhase
+				backup.Status.TotalSize = "1Gi"
 			})).Should(Succeed())
 		}
 
@@ -115,6 +117,16 @@ var _ = Describe("probe_utils", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "data",
 						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							AccessModes: []corev1.PersistentVolumeAccessMode{
+								corev1.ReadWriteOnce,
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
 					},
 				},
 			}
@@ -135,6 +147,10 @@ var _ = Describe("probe_utils", func() {
 				Name:     backupName,
 			}
 			Expect(reflect.DeepEqual(expectDataSource, vct.Spec.DataSource)).Should(BeTrue())
+
+			By("error if request storage is less than backup storage")
+			component.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("512Mi")
+			Expect(BuildRestoredInfo(reqCtx, k8sClient, testCtx.DefaultNamespace, component, backupName)).Should(HaveOccurred())
 		})
 
 	})

@@ -24,6 +24,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -78,7 +79,7 @@ func BuildRestoredInfo2(
 	case dataprotectionv1alpha1.BackupTypeFull:
 		return buildInitContainerWithFullBackup(component, backup, backupTool)
 	case dataprotectionv1alpha1.BackupTypeSnapshot:
-		buildVolumeClaimTemplatesWithSnapshot(component, backup)
+		return buildVolumeClaimTemplatesWithSnapshot(component, backup)
 	}
 	return nil
 }
@@ -153,11 +154,21 @@ func buildInitContainerWithFullBackup(
 
 // buildVolumeClaimTemplatesWithSnapshot builds the volumeClaimTemplate if it needs to restore from volumeSnapshot
 func buildVolumeClaimTemplatesWithSnapshot(component *SynthesizedComponent,
-	backup *dataprotectionv1alpha1.Backup) {
+	backup *dataprotectionv1alpha1.Backup) error {
 	if len(component.VolumeClaimTemplates) == 0 {
-		return
+		return intctrlutil.NewError(intctrlutil.ErrorTypeBackupNotSupported,
+			"need specified volumeClaimTemplates to restore.")
 	}
 	vct := component.VolumeClaimTemplates[0]
+	backupTotalSize, err := resource.ParseQuantity(backup.Status.TotalSize)
+	if err != nil {
+		return err
+	}
+	if vct.Spec.Resources.Requests.Storage().Value() < backupTotalSize.Value() {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeStorageNotMatch,
+			"requests storage %s is less than source backup storage %s.",
+			vct.Spec.Resources.Requests.Storage(), backupTotalSize.String())
+	}
 	snapshotAPIGroup := snapshotv1.GroupName
 	vct.Spec.DataSource = &corev1.TypedLocalObjectReference{
 		APIGroup: &snapshotAPIGroup,
@@ -165,4 +176,5 @@ func buildVolumeClaimTemplatesWithSnapshot(component *SynthesizedComponent,
 		Name:     backup.Name,
 	}
 	component.VolumeClaimTemplates[0] = vct
+	return nil
 }

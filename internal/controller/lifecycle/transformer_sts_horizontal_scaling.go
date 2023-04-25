@@ -333,7 +333,8 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 	// by sts: we only handle the pvc deletion which occurs in cluster deletion.
 	// by h-scale transformer: we handle the pvc creation and deletion, the creation is handled in h-scale funcs.
 	// so all in all, here we should only handle the pvc deletion of both types.
-	oldSnapshot, err := readCacheSnapshot(transCtx, *cluster, &corev1.PersistentVolumeClaimList{})
+	ml := getAppInstanceML(*cluster)
+	oldSnapshot, err := readCacheSnapshot(transCtx, *cluster, ml, &corev1.PersistentVolumeClaimList{})
 	if err != nil {
 		return err
 	}

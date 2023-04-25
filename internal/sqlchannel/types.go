@@ -85,16 +85,18 @@ const (
 	UnsupportedOps errorReason = "unsupported operation"
 )
 
+// SQLChannelError is the error for sqlchannel, it implements error interface
 type SQLChannelError struct {
 	Reason errorReason
 }
+
+var _ error = SQLChannelError{}
 
 func (e SQLChannelError) Error() string {
 	return string(e.Reason)
 }
 
-var _ error = SQLChannelError{}
-
+// IsUnSupportedError checks if the error is unsupported operation error
 func IsUnSupportedError(err error) bool {
 	if err == nil {
 		return false

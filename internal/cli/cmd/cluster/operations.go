@@ -104,7 +104,7 @@ func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
-	cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().StringVar(&o.DryRunStrategy, "dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	if o.HasComponentNamesFlag {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "components", nil, " Component names to this operations")
@@ -242,7 +242,7 @@ func (o *OperationsOptions) Validate() error {
 			return err
 		}
 	}
-	if o.RequireConfirm {
+	if o.RequireConfirm && o.DryRunStrategy == "none" {
 		return delete.Confirm([]string{o.Name}, o.In)
 	}
 	return nil

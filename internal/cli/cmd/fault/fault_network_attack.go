@@ -1,15 +1,16 @@
 package fault
 
 import (
-	"github.com/apecloud/kubeblocks/internal/cli/create"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 type NetworkAttackOptions struct {
@@ -19,14 +20,15 @@ type NetworkAttackOptions struct {
 
 	TargetNamespaceSelector string `json:"targetNamespaceSelector"`
 
-	TargetMode string `json:"targetMode"`
+	TargetMode  string `json:"targetMode"`
+	TargetValue string `json:"targetValue"`
 
 	FaultBaseOptions
 
 	create.BaseOptions
 }
 
-func (o *NetworkAttackOptions) createInputs(f cmdutil.Factory, use string, short string, BuildFlags func(*cobra.Command)) *create.Inputs {
+func (o *NetworkAttackOptions) createInputs(f cmdutil.Factory, use string, short string, buildFlags func(*cobra.Command)) *create.Inputs {
 	return &create.Inputs{
 		Use:             use,
 		Short:           short,
@@ -41,7 +43,7 @@ func (o *NetworkAttackOptions) createInputs(f cmdutil.Factory, use string, short
 		Validate:        o.Validate,
 		Complete:        o.Complete,
 		PreCreate:       o.PreCreate,
-		BuildFlags:      BuildFlags,
+		BuildFlags:      buildFlags,
 	}
 }
 
@@ -66,6 +68,7 @@ func NewPartitionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		BaseOptions:      create.BaseOptions{IOStreams: streams},
 		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.PartitionAction)},
 	}
+	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
 		util.CheckErr(cmd.MarkFlagRequired("label"))
@@ -85,6 +88,7 @@ func NewLossCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		BaseOptions:      create.BaseOptions{IOStreams: streams},
 		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.LossAction)},
 	}
+	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
 		util.CheckErr(cmd.MarkFlagRequired("label"))
@@ -104,6 +108,7 @@ func NewDelayCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		BaseOptions:      create.BaseOptions{IOStreams: streams},
 		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.DelayAction)},
 	}
+	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
 		util.CheckErr(cmd.MarkFlagRequired("label"))
@@ -123,6 +128,7 @@ func NewDuplicateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		BaseOptions:      create.BaseOptions{IOStreams: streams},
 		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.DuplicateAction)},
 	}
+	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
 		util.CheckErr(cmd.MarkFlagRequired("label"))
@@ -142,6 +148,7 @@ func NewCorruptCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		BaseOptions:      create.BaseOptions{IOStreams: streams},
 		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.CorruptAction)},
 	}
+	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
 		util.CheckErr(cmd.MarkFlagRequired("label"))
@@ -161,6 +168,7 @@ func NewBandwidthCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		BaseOptions:      create.BaseOptions{IOStreams: streams},
 		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.BandwidthAction)},
 	}
+	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
 		util.CheckErr(cmd.MarkFlagRequired("label"))
@@ -181,9 +189,16 @@ func (o *NetworkAttackOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.Value, "value", "1", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
 
 	cmd.Flags().IntVar(&o.GracePeriod, "grace-period", 0, "Grace period represents the duration in seconds before the pod should be killed")
+	cmd.Flags().StringVar(&o.Duration, "duration", "10s", "Supported formats of the duration are: ms / s / m / h.")
 
 	cmd.Flags().StringToStringVar(&o.Label, "label", nil, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
 	cmd.Flags().StringVar(&o.NamespaceSelector, "namespace-selector", "", `Specifies the namespace into which you want to inject faults.`)
+
+	cmd.Flags().StringVar(&o.Direction, "direction", "to", `You can select "to"" or "from"" or "both"".`)
+	cmd.Flags().StringVar(&o.TargetMode, "target-mode", "one", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
+	cmd.Flags().StringVar(&o.TargetValue, "target-value", "1", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
+	cmd.Flags().StringToStringVar(&o.TargetLabel, "target-label", nil, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
+	cmd.Flags().StringVar(&o.TargetNamespaceSelector, "target-namespace-selector", "", `Specifies the namespace into which you want to inject faults.`)
 
 	cmd.Flags().String("dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"

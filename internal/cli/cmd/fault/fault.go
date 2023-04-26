@@ -2,11 +2,12 @@ package fault
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"regexp"
-	"strconv"
 )
 
 type FaultBaseOptions struct {
@@ -53,6 +54,7 @@ func (o *FaultBaseOptions) BaseValidate() error {
 	return nil
 }
 
+// BaseComplete TODO
 func (o *FaultBaseOptions) BaseComplete() error {
 	return nil
 }

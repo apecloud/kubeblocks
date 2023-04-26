@@ -10,7 +10,16 @@ const (
 
 const (
 	CueTemplatePodChaosName     = "podChaos_template.cue"
-	CueTemplateNetworkChaosName = "podChaos_template.cue"
+	CueTemplateNetworkChaosName = "networkAttack_template.cue"
+)
+
+const (
+	Kill               = "kill"
+	KillShort          = "kill a pod"
+	Failure            = "failure"
+	FailureShort       = "failure a pod"
+	KillContainer      = "kill-container"
+	KillContainerShort = "kill a container"
 )
 
 // NetWorkChaos Command

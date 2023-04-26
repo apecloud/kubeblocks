@@ -138,7 +138,7 @@ var _ = Describe("create", func() {
 		})
 	})
 
-	checkComponent := func(comps []*appsv1alpha1.ClusterComponentSpec, storage string, replicas int32, cpu string, memory string) {
+	checkComponent := func(comps []*appsv1alpha1.ClusterComponentSpec, storage string, replicas int32, cpu string, memory string, storageClassName string) {
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
 
@@ -150,6 +150,13 @@ var _ = Describe("create", func() {
 		Expect(resources).ShouldNot(BeNil())
 		Expect(getResource(resources, corev1.ResourceCPU)).Should(Equal(cpu))
 		Expect(getResource(resources, corev1.ResourceMemory)).Should(Equal(memory))
+
+		if storageClassName == "" {
+			Expect(comp.VolumeClaimTemplates[0].Spec.StorageClassName).Should(BeNil())
+		} else {
+			Expect(*comp.VolumeClaimTemplates[0].Spec.StorageClassName).Should(Equal(storageClassName))
+		}
+
 	}
 
 	It("build default cluster component without environment", func() {
@@ -157,7 +164,7 @@ var _ = Describe("create", func() {
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		comps, err := buildClusterComp(cd, nil, componentClasses)
 		Expect(err).ShouldNot(HaveOccurred())
-		checkComponent(comps, "20Gi", 1, "1", "1Gi")
+		checkComponent(comps, "20Gi", 1, "1", "1Gi", "")
 	})
 
 	It("build default cluster component with environment", func() {
@@ -169,7 +176,7 @@ var _ = Describe("create", func() {
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		comps, err := buildClusterComp(cd, nil, componentClasses)
 		Expect(err).ShouldNot(HaveOccurred())
-		checkComponent(comps, "5Gi", 1, "2", "2Gi")
+		checkComponent(comps, "5Gi", 1, "2", "2Gi", "")
 	})
 
 	It("build cluster component with set values", func() {
@@ -177,15 +184,16 @@ var _ = Describe("create", func() {
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		setsMap := map[string]map[setKey]string{
 			testing.ComponentDefName: {
-				keyCPU:      "10",
-				keyMemory:   "2Gi",
-				keyStorage:  "10Gi",
-				keyReplicas: "10",
+				keyCPU:          "10",
+				keyMemory:       "2Gi",
+				keyStorage:      "10Gi",
+				keyReplicas:     "10",
+				keyStorageClass: "test",
 			},
 		}
 		comps, err := buildClusterComp(cd, setsMap, componentClasses)
 		Expect(err).Should(Succeed())
-		checkComponent(comps, "10Gi", 10, "10", "2Gi")
+		checkComponent(comps, "10Gi", 10, "10", "2Gi", "test")
 
 		setsMap[testing.ComponentDefName][keySwitchPolicy] = "invalid"
 		cd.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
@@ -322,6 +330,16 @@ var _ = Describe("create", func() {
 				map[string]map[setKey]string{
 					"my-comp": {
 						keySwitchPolicy: "MaximumAvailability",
+					},
+				},
+				true,
+			},
+			{
+				[]string{"storageClass=test"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keyStorageClass: "test",
 					},
 				},
 				true,

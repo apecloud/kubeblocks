@@ -241,19 +241,6 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			}
 			return nil
 		}
-		updateClusterPhase := func() {
-			if *stsObj.Spec.Replicas == *stsProto.Spec.Replicas {
-				return
-			}
-			clusterPhase := cluster.Status.Phase
-			if clusterPhase == "" {
-				cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
-			} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
-				cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
-			}
-		}
-
-		updateClusterPhase()
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
 		var err error
@@ -408,12 +395,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
 		if !isSnapshotAvailable(cli, ctx) {
-			reqCtx.Recorder.Eventf(cluster,
-				corev1.EventTypeWarning,
-				"HorizontalScaleFailed",
-				"volume snapshot not support")
 			// TODO: add ut
-			return fmt.Errorf("volume snapshot not support")
+			return fmt.Errorf("HorizontalScaleFailed: volume snapshot not support")
 		}
 		vcts := component.VolumeClaimTemplates
 		if len(vcts) == 0 {
@@ -578,10 +561,9 @@ func deleteSnapshot(cli roclient.ReadonlyClient,
 	dag *graph.DAG,
 	root graph.Vertex) error {
 	ctx := reqCtx.Ctx
-	if err := deleteBackup(ctx, cli, cluster.Name, component.Name, dag, root); err != nil {
+	if err := deleteBackup(reqCtx, cli, cluster, component.Name, snapshotKey.Name, dag, root); err != nil {
 		return client.IgnoreNotFound(err)
 	}
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotKey.Name)
 	vs := &snapshotv1.VolumeSnapshot{}
 	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
 	if err := compatClient.Get(snapshotKey, vs); err != nil {
@@ -595,17 +577,23 @@ func deleteSnapshot(cli roclient.ReadonlyClient,
 }
 
 // deleteBackup will delete all backup related resources created during horizontal scaling,
-func deleteBackup(ctx context.Context, cli roclient.ReadonlyClient, clusterName string, componentName string, dag *graph.DAG, root graph.Vertex) error {
-	ml := getBackupMatchingLabels(clusterName, componentName)
+func deleteBackup(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient,
+	cluster *appsv1alpha1.Cluster, componentName, snapshotName string,
+	dag *graph.DAG, root graph.Vertex) error {
+	ml := getBackupMatchingLabels(cluster.Name, componentName)
 	backupList := dataprotectionv1alpha1.BackupList{}
-	if err := cli.List(ctx, &backupList, ml); err != nil {
+	if err := cli.List(reqCtx.Ctx, &backupList, ml); err != nil {
 		return err
+	}
+	if len(backupList.Items) == 0 {
+		return nil
 	}
 	for _, backup := range backupList.Items {
 		vertex := &lifecycleVertex{obj: &backup, oriObj: &backup, action: actionPtr(DELETE)}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
+	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotName)
 	return nil
 }
 
@@ -772,10 +760,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if len(backupList.Items) > 0 {
 			// check backup status, if failed return error
 			if backupList.Items[0].Status.Phase == dataprotectionv1alpha1.BackupFailed {
-				reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning,
-					"HorizontalScaleFailed", "backup %s status failed", backupKey.Name)
-				return fmt.Errorf("cluster %s h-scale failed, backup error: %s",
-					cluster.Name, backupList.Items[0].Status.FailureReason)
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupFailed, "backup for horizontalScaling failed: %s", backupList.Items[0].Status.FailureReason)
 			}
 			return nil
 		}

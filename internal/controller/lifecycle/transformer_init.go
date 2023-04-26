@@ -41,7 +41,19 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	if !isClusterDeleting(*t.cluster) {
 		t.handleLatestOpsRequestProcessingCondition()
 	}
+	if isClusterUpdating(*t.cluster) {
+		t.handleClusterPhase()
+	}
 	return nil
+}
+
+func (t *initTransformer) handleClusterPhase() {
+	clusterPhase := t.cluster.Status.Phase
+	if clusterPhase == "" {
+		t.cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
+	} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
+		t.cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
+	}
 }
 
 // updateLatestOpsRequestProcessingCondition handles the latest opsRequest processing condition.

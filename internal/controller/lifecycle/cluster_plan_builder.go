@@ -142,6 +142,14 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 			return
 		}
 		setApplyResourceCondition(&c.transCtx.Cluster.Status.Conditions, c.transCtx.Cluster.Generation, err)
+		if err != nil && !IsRequeueError(err) {
+			reason := ReasonApplyResourcesFailed
+			controllerErr := intctrlutil.ToControllerError(err)
+			if controllerErr != nil {
+				reason = string(controllerErr.Type)
+			}
+			c.transCtx.GetRecorder().Event(c.transCtx.Cluster, corev1.EventTypeWarning, reason, err.Error())
+		}
 	}()
 
 	// new a DAG and apply chain on it, after that we should get the final Plan

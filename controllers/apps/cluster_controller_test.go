@@ -49,7 +49,8 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -95,14 +96,15 @@ var _ = Describe("Cluster Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
+		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
+		testapps.ClearResources(&testCtx, generics.BackupToolSignature, ml)
+		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 	}
 
 	BeforeEach(func() {
@@ -142,7 +144,7 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, replicationCompName)
 
 		By("Check deployment workload has been created")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.DeploymentSignature,
+		Eventually(testapps.GetListLen(&testCtx, generics.DeploymentSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey: clusterKey.Name,
 			}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEquivalentTo(0))
@@ -171,7 +173,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("Check associated PDB has been created")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.PodDisruptionBudgetSignature,
+		Eventually(testapps.GetListLen(&testCtx, generics.PodDisruptionBudgetSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey: clusterKey.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
@@ -191,7 +193,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
 
 		By("Check should create env configmap")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.ConfigMapSignature,
+		Eventually(testapps.GetListLen(&testCtx, generics.ConfigMapSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey:   clusterKey.Name,
 				constant.AppConfigTypeLabelKey: "kubeblocks-env",
@@ -554,7 +556,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("Checking Backup created")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
+		Eventually(testapps.GetListLen(&testCtx, generics.BackupSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: comp.Name,
@@ -601,7 +603,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("Check backup job cleanup")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
+		Eventually(testapps.GetListLen(&testCtx, generics.BackupSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: comp.Name,
@@ -639,36 +641,6 @@ var _ = Describe("Cluster Controller", func() {
 
 					By("Checking backup policy created from backup policy template")
 					policyName := lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDef.Name)
-					// REVIEW/TODO: (chantu)
-					//  caught following error, it appears that BackupPolicy is statically setup or only work with 1st
-					//  componentDefs?
-					//
-					//       Unexpected error:
-					//          <*errors.StatusError | 0x140023b5b80>: {
-					//              ErrStatus: {
-					//                  TypeMeta: {Kind: "", APIVersion: ""},
-					//                  ListMeta: {
-					//                      SelfLink: "",
-					//                      ResourceVersion: "",
-					//                      Continue: "",
-					//                      RemainingItemCount: nil,
-					//                  },
-					//                  Status: "Failure",
-					//                  Message: "backuppolicies.dataprotection.kubeblocks.io \"test-clusterstqcba-consensus-backup-policy\" not found",
-					//                  Reason: "NotFound",
-					//                  Details: {
-					//                      Name: "test-clusterstqcba-consensus-backup-policy",
-					//                      Group: "dataprotection.kubeblocks.io",
-					//                      Kind: "backuppolicies",
-					//                      UID: "",
-					//                      Causes: nil,
-					//                      RetryAfterSeconds: 0,
-					//                  },
-					//                  Code: 404,
-					//              },
-					//          }
-					//          backuppolicies.dataprotection.kubeblocks.io "test-clusterstqcba-consensus-backup-policy" not found
-					//      occurred
 					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
 						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
 							BackupPolicyTemplateName: backupPolicyTPLName}
@@ -1196,14 +1168,27 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			hasBackupError := false
 			for _, cond := range cluster.Status.Conditions {
-				if strings.Contains(cond.Message, "backup error") {
+				if strings.Contains(cond.Message, "backup for horizontalScaling failed") {
 					hasBackupError = true
 					break
 				}
 			}
 			g.Expect(hasBackupError).Should(BeTrue())
-
 		})).Should(Succeed())
+
+		By("expect for backup error event")
+		Eventually(func(g Gomega) {
+			eventList := corev1.EventList{}
+			Expect(k8sClient.List(ctx, &eventList, client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
+			hasBackupErrorEvent := false
+			for _, v := range eventList.Items {
+				if v.Reason == string(intctrlutil.ErrorTypeBackupFailed) {
+					hasBackupErrorEvent = true
+					break
+				}
+			}
+			g.Expect(hasBackupErrorEvent).Should(BeTrue())
+		}).Should(Succeed())
 	}
 
 	updateClusterAnnotation := func(cluster *appsv1alpha1.Cluster) {

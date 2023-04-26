@@ -99,6 +99,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.VolumeSnapshotSignature, inNS)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
@@ -639,36 +640,6 @@ var _ = Describe("Cluster Controller", func() {
 
 					By("Checking backup policy created from backup policy template")
 					policyName := lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDef.Name)
-					// REVIEW/TODO: (chantu)
-					//  caught following error, it appears that BackupPolicy is statically setup or only work with 1st
-					//  componentDefs?
-					//
-					//       Unexpected error:
-					//          <*errors.StatusError | 0x140023b5b80>: {
-					//              ErrStatus: {
-					//                  TypeMeta: {Kind: "", APIVersion: ""},
-					//                  ListMeta: {
-					//                      SelfLink: "",
-					//                      ResourceVersion: "",
-					//                      Continue: "",
-					//                      RemainingItemCount: nil,
-					//                  },
-					//                  Status: "Failure",
-					//                  Message: "backuppolicies.dataprotection.kubeblocks.io \"test-clusterstqcba-consensus-backup-policy\" not found",
-					//                  Reason: "NotFound",
-					//                  Details: {
-					//                      Name: "test-clusterstqcba-consensus-backup-policy",
-					//                      Group: "dataprotection.kubeblocks.io",
-					//                      Kind: "backuppolicies",
-					//                      UID: "",
-					//                      Causes: nil,
-					//                      RetryAfterSeconds: 0,
-					//                  },
-					//                  Code: 404,
-					//              },
-					//          }
-					//          backuppolicies.dataprotection.kubeblocks.io "test-clusterstqcba-consensus-backup-policy" not found
-					//      occurred
 					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
 						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
 							BackupPolicyTemplateName: backupPolicyTPLName}

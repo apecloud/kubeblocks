@@ -162,12 +162,6 @@ func (p *PointInTimeRecoveryManager) doPrepare(component *component.SynthesizedC
 	} else if !need {
 		return nil
 	}
-	// prepare init container
-	container := corev1.Container{}
-	container.Name = initContainerName
-	container.Image = viper.GetString(constant.KBToolsImage)
-	container.Command = []string{"sleep", "infinity"}
-	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, container)
 
 	// prepare data pvc
 	if len(component.VolumeClaimTemplates) == 0 {
@@ -177,6 +171,24 @@ func (p *PointInTimeRecoveryManager) doPrepare(component *component.SynthesizedC
 	if err != nil {
 		return err
 	}
+
+	// recovery time start time boundary processing, this scenario is converted to back up recovery function
+	if latestBackup.Status.Manifests.BackupLog.StopTime.Format(time.RFC3339) == p.restoreTime.Format(time.RFC3339) {
+		if latestBackup.Spec.BackupType == dpv1alpha1.BackupTypeSnapshot {
+			delete(p.Cluster.Annotations, constant.RestoreFromSrcClusterAnnotationKey)
+			delete(p.Cluster.Annotations, constant.RestoreFromTimeAnnotationKey)
+			return p.doPrepareSnapshotBackup(component, latestBackup)
+		}
+		// TODO: support restore with full backup.
+		return nil
+	}
+	// prepare init container
+	container := corev1.Container{}
+	container.Name = initContainerName
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.Command = []string{"sleep", "infinity"}
+	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, container)
+
 	if latestBackup.Spec.BackupType == dpv1alpha1.BackupTypeSnapshot {
 		return p.doPrepareSnapshotBackup(component, latestBackup)
 	}
@@ -250,8 +262,8 @@ func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, 
 	// 2. get the latest backup object
 	var latestBackup *dpv1alpha1.Backup
 	for _, item := range backups {
-		if item.Status.Manifests.BackupLog.StopTime != nil &&
-			p.restoreTime.After(item.Status.Manifests.BackupLog.StopTime.Time) {
+		if item.Spec.BackupType != dpv1alpha1.BackupTypeIncremental &&
+			item.Status.Manifests.BackupLog.StopTime != nil && !p.restoreTime.Before(item.Status.Manifests.BackupLog.StopTime) {
 			latestBackup = &item
 			break
 		}

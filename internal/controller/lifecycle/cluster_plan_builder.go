@@ -263,7 +263,8 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		}
 		// delete secondary objects
 		if _, ok := node.obj.(*appsv1alpha1.Cluster); !ok {
-			err := c.cli.Delete(c.transCtx.Context, node.obj)
+			err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.obj)
+			// err := c.cli.Delete(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}

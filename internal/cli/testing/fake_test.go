@@ -86,4 +86,11 @@ var _ = Describe("test fake", func() {
 		events := FakeEvents()
 		Expect(events).ShouldNot(BeNil())
 	})
+
+	It("fake storageClass", func() {
+		StorageClassDefault := FakeStorageClass(StorageClassName, IsDefautl)
+		Expect(StorageClassDefault).ShouldNot(BeNil())
+		StorageClassNotDefault := FakeStorageClass(StorageClassName, IsDefautl)
+		Expect(StorageClassNotDefault).ShouldNot(BeNil())
+	})
 })

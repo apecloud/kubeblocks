@@ -22,6 +22,7 @@ package sqlchannel
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -236,7 +237,8 @@ func TestParseSqlChannelResult(t *testing.T) {
 	{"errorCode":"ERR_INVOKE_OUTPUT_BINDING","message":"error when invoke output binding mongodb: binding mongodb does not support operation listUsers. supported operations:checkRunning checkRole getRole"}
 	`
 		sqlResposne, err := parseResponse(([]byte)(result), "listUsers", "mongodb")
-		assert.Nil(t, err)
+		assert.NotNil(t, err)
+		assert.True(t, IsUnSupportedError(err))
 		assert.Equal(t, sqlResposne.Event, RespEveFail)
 		assert.Contains(t, sqlResposne.Message, "not supported")
 	})
@@ -268,6 +270,16 @@ func TestParseSqlChannelResult(t *testing.T) {
 		_, err := parseResponse(([]byte)(result), "listUsers", "mongodb")
 		assert.NotNil(t, err)
 	})
+}
+
+func TestErrMsg(t *testing.T) {
+	err := SQLChannelError{
+		Reason: UnsupportedOps,
+	}
+	assert.True(t, strings.Contains(err.Error(), "unsupported"))
+	assert.False(t, IsUnSupportedError(nil))
+	assert.True(t, IsUnSupportedError(err))
+	assert.False(t, IsUnSupportedError(errors.New("test")))
 }
 
 func newTCPServer(t *testing.T, daprServer pb.DaprServer, port int) (int, func()) {

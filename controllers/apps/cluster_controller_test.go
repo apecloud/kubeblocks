@@ -990,6 +990,19 @@ var _ = Describe("Cluster Controller", func() {
 		updatedReplicas := int32(3)
 		viper.Set("VOLUMESNAPSHOT", true)
 
+		By("Set HorizontalScalePolicy")
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+			func(clusterDef *appsv1alpha1.ClusterDefinition) {
+				for i, def := range clusterDef.Spec.ComponentDefs {
+					if def.Name != compDefName {
+						continue
+					}
+					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
+						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
+							BackupPolicyTemplateName: backupPolicyTPLName}
+				}
+			})()).ShouldNot(HaveOccurred())
+
 		By("Creating a cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -1003,6 +1016,10 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
+		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
 		// REVIEW: this test flow, should wait/fake still Running phase?
 		By("Creating backup")

@@ -36,6 +36,9 @@ spec:
           memory: {{ .memory | quote }}
         {{- end }}
       {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}-{{ .Release.Name }}
+      {{- end }}
       {{- if .Values.persistence.enabled }}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name

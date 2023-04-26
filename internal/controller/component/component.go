@@ -63,6 +63,7 @@ func BuildComponent(
 		VolumeTypes:           clusterCompDefObj.VolumeTypes,
 		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
 		ComponentDef:          clusterCompSpec.ComponentDefRef,
+		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
 	}
 
 	// resolve component.ConfigTemplates
@@ -125,6 +126,11 @@ func BuildComponent(
 			service.Spec.Type = item.ServiceType
 			component.Services = append(component.Services, service)
 		}
+	}
+
+	// set component.PodSpec.ServiceAccountName
+	if component.ServiceAccountName != "" {
+		component.PodSpec.ServiceAccountName = component.ServiceAccountName
 	}
 
 	component.PrimaryIndex = clusterCompSpec.PrimaryIndex

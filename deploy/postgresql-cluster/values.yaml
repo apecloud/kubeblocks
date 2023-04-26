@@ -15,6 +15,20 @@ switchPolicy:
 monitor:
   enabled: false
 
+## ServiceAccount settings
+##
+## @param serviceAccount.create
+## @param serviceAccount.annotations
+## @param serviceAccount.name
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: "postgres-patroni-service-account"
+
 resources: { }
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little

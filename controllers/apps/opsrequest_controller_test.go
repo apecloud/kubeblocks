@@ -25,6 +25,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -62,6 +64,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.VolumeSnapshotSignature, inNS)
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
 		testapps.ClearClusterResources(&testCtx)
@@ -341,7 +344,16 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				testk8s.MockStatefulSetReady(sts)
 			})).ShouldNot(HaveOccurred())
-			testapps.MockConsensusComponentPods(testCtx, sts, clusterKey.Name, mysqlCompName)
+			for i := 0; i < int(replicas); i++ {
+				podName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, mysqlCompName, i)
+				podRole := "follower"
+				accessMode := "Readonly"
+				if i == 0 {
+					podRole = "leader"
+					accessMode = "ReadWrite"
+				}
+				testapps.MockConsensusComponentStsPod(testCtx, sts, clusterObj.Name, mysqlCompName, podName, podRole, accessMode)
+			}
 			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		}
 
@@ -439,7 +451,13 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 			By("mock snapshot created and ready to use, component phase should change to Updating to do horizontalScaling")
-			mockVolumeSnapshotAndReadyToUse(clusterObj, mysqlCompName)
+			snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
+				clusterKey.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}
+			volumeSnapshot := &snapshotv1.VolumeSnapshot{}
+			Expect(k8sClient.Get(testCtx.Ctx, snapshotKey, volumeSnapshot)).Should(Succeed())
+			readyToUse := true
+			volumeSnapshot.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
+			Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
 

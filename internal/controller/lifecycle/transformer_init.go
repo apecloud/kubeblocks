@@ -39,8 +39,10 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	dag.AddVertex(rootVertex)
 
 	if !isClusterDeleting(*t.cluster) {
-		t.handleClusterPhase()
 		t.handleLatestOpsRequestProcessingCondition()
+	}
+	if isClusterUpdating(*t.cluster) {
+		t.handleClusterPhase()
 	}
 	return nil
 }

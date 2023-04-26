@@ -99,6 +99,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.VolumeSnapshotSignature, inNS)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
@@ -474,6 +475,10 @@ var _ = Describe("Cluster Controller", func() {
 			compName, "data").SetStorage("1Gi").CheckedCreate(&testCtx)
 	}
 
+	getPVCName := func(compName string, i int) string {
+		return fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterObj.Name, compName, i)
+	}
+
 	mockPodsForConsensusTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
 		componentName := cluster.Spec.ComponentSpecs[0].Name
 		clusterName := cluster.Name
@@ -507,7 +512,7 @@ var _ = Describe("Cluster Controller", func() {
 		for i := 0; i < int(comp.Replicas); i++ {
 			pvcKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
-				Name:      getPVCName(clusterObj.Name, comp.Name, i),
+				Name:      getPVCName(comp.Name, i),
 			}
 			createPVC(clusterKey.Name, pvcKey.Name, comp.Name)
 			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
@@ -556,13 +561,38 @@ var _ = Describe("Cluster Controller", func() {
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(1))
 
 		By("Mocking VolumeSnapshot and set it as ReadyToUse")
-		volumeSnapshot := mockVolumeSnapshotAndReadyToUse(clusterObj, comp.Name)
+		snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
+			clusterKey.Name, comp.Name),
+			Namespace: testCtx.DefaultNamespace}
+		pvcName := getPVCName(comp.Name, 0)
+		volumeSnapshot := &snapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      snapshotKey.Name,
+				Namespace: snapshotKey.Namespace,
+				Labels: map[string]string{
+					constant.KBManagedByKey:         "cluster",
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: comp.Name,
+				}},
+			Spec: snapshotv1.VolumeSnapshotSpec{
+				Source: snapshotv1.VolumeSnapshotSource{
+					PersistentVolumeClaimName: &pvcName,
+				},
+			},
+		}
+		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+		Expect(controllerruntime.SetControllerReference(clusterObj, volumeSnapshot, scheme)).Should(Succeed())
+		Expect(testCtx.CreateObj(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
+		readyToUse := true
+		volumeSnapshotStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
+		volumeSnapshot.Status = &volumeSnapshotStatus
+		Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
 
 		By("Mock PVCs status to bound")
 		for i := 0; i < updatedReplicas; i++ {
 			pvcKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
-				Name:      getPVCName(clusterObj.Name, comp.Name, i),
+				Name:      getPVCName(comp.Name, i),
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
@@ -625,7 +655,7 @@ var _ = Describe("Cluster Controller", func() {
 			for i := 0; i < int(comp.Replicas); i++ {
 				pvcKey := types.NamespacedName{
 					Namespace: clusterKey.Namespace,
-					Name:      getPVCName(clusterObj.Name, comp.Name, i),
+					Name:      getPVCName(comp.Name, i),
 				}
 				createPVC(clusterKey.Name, pvcKey.Name, comp.Name)
 				Eventually(testapps.CheckObjExists(&testCtx, pvcKey,
@@ -755,7 +785,7 @@ var _ = Describe("Cluster Controller", func() {
 		for i := 0; i < replicas; i++ {
 			pvc := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      getPVCName(clusterObj.Name, replicationCompName, i),
+					Name:      getPVCName(replicationCompName, i),
 					Namespace: clusterKey.Namespace,
 					Labels: map[string]string{
 						constant.AppInstanceLabelKey: clusterKey.Name,
@@ -792,7 +822,7 @@ var _ = Describe("Cluster Controller", func() {
 			pvc := &corev1.PersistentVolumeClaim{}
 			pvcKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
-				Name:      getPVCName(clusterObj.Name, replicationCompName, int(i)),
+				Name:      getPVCName(replicationCompName, int(i)),
 			}
 			Expect(k8sClient.Get(testCtx.Ctx, pvcKey, pvc)).Should(Succeed())
 			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newStorageValue))
@@ -1304,7 +1334,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		Context("with pvc", func() {
-			FIt("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
+			It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
 				testHorizontalScale()
 			})
 		})
@@ -1565,39 +1595,4 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 		}
 	}
 	bpt.Create(&testCtx)
-}
-
-func getPVCName(clusterName, compName string, i int) string {
-	return fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterName, compName, i)
-}
-
-func mockVolumeSnapshotAndReadyToUse(clusterObj *appsv1alpha1.Cluster, compName string) *snapshotv1.VolumeSnapshot {
-	clusterKey := client.ObjectKeyFromObject(clusterObj)
-	snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
-		clusterKey.Name, compName),
-		Namespace: testCtx.DefaultNamespace}
-	pvcName := getPVCName(clusterObj.Name, compName, 0)
-	volumeSnapshot := &snapshotv1.VolumeSnapshot{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      snapshotKey.Name,
-			Namespace: snapshotKey.Namespace,
-			Labels: map[string]string{
-				constant.KBManagedByKey:         "cluster",
-				constant.AppInstanceLabelKey:    clusterKey.Name,
-				constant.KBAppComponentLabelKey: compName,
-			}},
-		Spec: snapshotv1.VolumeSnapshotSpec{
-			Source: snapshotv1.VolumeSnapshotSource{
-				PersistentVolumeClaimName: &pvcName,
-			},
-		},
-	}
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	Expect(controllerruntime.SetControllerReference(clusterObj, volumeSnapshot, scheme)).Should(Succeed())
-	Expect(testCtx.CreateObj(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
-	readyToUse := true
-	volumeSnapshotStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
-	volumeSnapshot.Status = &volumeSnapshotStatus
-	Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
-	return volumeSnapshot
 }

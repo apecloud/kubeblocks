@@ -486,7 +486,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).ShouldNot(HaveOccurred())
 			for i := int32(0); i < *sts.Spec.Replicas; i++ {
 				podName := fmt.Sprintf("%s-%d", sts.Name, i)
-				pod := testapps.MockReplicationComponentStsPod(nil, testCtx, sts, clusterObj.Name,
+				pod := testapps.MockReplicationComponentPod(nil, testCtx, sts, clusterObj.Name,
 					testapps.DefaultRedisCompName, podName, replication.DefaultRole(i))
 				podList = append(podList, pod)
 			}

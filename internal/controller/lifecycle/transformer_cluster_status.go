@@ -142,6 +142,19 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 			if isChanged {
 				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
 			}
+			// TODO(free6om): pvc expansion is not allowed by sts, but ops supports it by update the under pvc directly,
+			// which causes different behavior between volume expansion ops and cluster spec Update.
+			// should make them act same.
+			//
+			// compare sts storage
+			// if _, ok := v.obj.(*appsv1.StatefulSet); ok {
+			//	oldSts, _ := v.oriObj.(*appsv1.StatefulSet)
+			//	newSts, _ := v.obj.(*appsv1.StatefulSet)
+			//	if !isStorageUpdated(oldSts, newSts) {
+			//		continue
+			//	}
+			// }
+			// updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
 		}
 	}
 

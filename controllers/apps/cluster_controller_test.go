@@ -674,7 +674,14 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("mock pods/sts of component are available")
-		testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, compName)
+		switch compDefName {
+		case statelessCompDefName:
+			// ignore
+		case replicationCompDefName:
+			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterObj.Name, compDefName, nil)
+		case statefulCompDefName, consensusCompDefName:
+			testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, compName)
+		}
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
@@ -1166,7 +1173,7 @@ var _ = Describe("Cluster Controller", func() {
 			})
 
 			By("Check deployment workload has been created")
-			Eventually(testapps.GetListLen(&testCtx, intctrlutil.DeploymentSignature,
+			Eventually(testapps.GetListLen(&testCtx, generics.DeploymentSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterKey.Name,
 				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEquivalentTo(0))
@@ -1195,7 +1202,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 
 			By("Check associated PDB has been created")
-			Eventually(testapps.GetListLen(&testCtx, intctrlutil.PodDisruptionBudgetSignature,
+			Eventually(testapps.GetListLen(&testCtx, generics.PodDisruptionBudgetSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterKey.Name,
 				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
@@ -1215,26 +1222,11 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
 
 			By("Check should create env configmap")
-			Eventually(testapps.GetListLen(&testCtx, intctrlutil.ConfigMapSignature,
+			Eventually(testapps.GetListLen(&testCtx, generics.ConfigMapSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey:   clusterKey.Name,
 					constant.AppConfigTypeLabelKey: "kubeblocks-env",
 				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
-
-			// REVIEW/TODO:
-			// remove hardcoded `if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {` ?
-			By("Make sure the cluster controller has set the cluster status to Running")
-			for i, comp := range clusterObj.Spec.ComponentSpecs {
-				if comp.ComponentDefRef != consensusCompDefName || comp.Name != consensusCompName {
-					continue
-				}
-				stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), clusterObj.Spec.ComponentSpecs[i].Name)
-				for _, v := range stsList.Items {
-					Expect(testapps.ChangeObjStatus(&testCtx, &v, func() {
-						testk8s.MockStatefulSetReady(&v)
-					})).ShouldNot(HaveOccurred())
-				}
-			}
 		}
 
 		checkAllServicesCreate := func() {
@@ -1377,18 +1369,24 @@ var _ = Describe("Cluster Controller", func() {
 			switch compName {
 			case statefulCompName, consensusCompName, replicationCompName:
 				Context(fmt.Sprintf("[comp: %s] with pvc and dynamic-provisioning storage class", compName), func() {
-					// +failed test case
-					PIt(fmt.Sprintf("[comp: %s] should update PVC request storage size accordingly", compName), func() {
+					It(fmt.Sprintf("[comp: %s] should update PVC request storage size accordingly", compName), func() {
 						testStorageExpansion(compName, compDefName)
 					})
 				})
 
-				// +failed test case
-				PIt(fmt.Sprintf("[comp: %s] should report error if backup error during horizontal scale", compName), func() {
+				It(fmt.Sprintf("[comp: %s] should report error if backup error during horizontal scale", compName), func() {
 					testBackupError(compName, compDefName)
+				})
+
+				Context(fmt.Sprintf("[comp: %s] with horizontal scale after storage expansion", compName), func() {
+					It("should succeed with horizontal scale to 5 replicas", func() {
+						testStorageExpansion(compName, compDefName)
+						horizontalScale(5, compDefName)
+					})
 				})
 			default:
 			}
+
 		}
 	})
 
@@ -1406,20 +1404,6 @@ var _ = Describe("Cluster Controller", func() {
 		It("Should success with one leader pod and two follower pods", func() {
 			testThreeReplicas(compName, compDefName)
 		})
-
-		Context("with horizontal scale after storage expansion", func() {
-			// +failed test case
-			PIt("should succeed with horizontal scale to 5 replicas", func() {
-				testStorageExpansion(compName, compDefName)
-				horizontalScale(5, compDefName)
-			})
-		})
-
-		// duplicated setup in When("creating cluster with workloadType=[Stateless|Stateful|Consensus|Replication] component")
-		// // +failed test case
-		// PIt("should report error if backup error during horizontal scale", func() {
-		// 	testBackupError(compName, compDefName)
-		// })
 
 		It("test restore cluster from backup", func() {
 			By("mock backuptool object")
@@ -1508,6 +1492,7 @@ var _ = Describe("Cluster Controller", func() {
 		)
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
+			createBackupPolicyTpl(clusterDefObj)
 		})
 
 		// REVIEW/TODO: following test always failed at cluster.phase.observerGeneration=1
@@ -1536,7 +1521,7 @@ var _ = Describe("Cluster Controller", func() {
 			})).ShouldNot(HaveOccurred())
 			for i := int32(0); i < *sts.Spec.Replicas; i++ {
 				podName := fmt.Sprintf("%s-%d", sts.Name, i)
-				testapps.MockReplicationComponentStsPod(nil, testCtx, sts, clusterObj.Name,
+				testapps.MockReplicationComponentPod(nil, testCtx, sts, clusterObj.Name,
 					compDefName, podName, replication.DefaultRole(i))
 			}
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))

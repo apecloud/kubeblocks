@@ -2,6 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: oss-persistent-volume-template
+  namespace: {{ .Release.Namespace }}
   labels:
     kubeblocks.io/persistent-volume-template: "true"
 data:

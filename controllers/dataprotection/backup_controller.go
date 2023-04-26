@@ -58,7 +58,7 @@ import (
 
 const (
 	backupPathBase                 = "/backupdata"
-	deleteBackupFilesJobNamePrefix = "delete-backup-files-"
+	deleteBackupFilesJobNamePrefix = "delete-"
 )
 
 // BackupReconciler reconciles a Backup object

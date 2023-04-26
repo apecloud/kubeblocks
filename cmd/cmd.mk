@@ -42,7 +42,7 @@ clean-reloader: ## Clean bin/reloader.
 CONFIG_RENDER_TOOL_LD_FLAGS = "-s -w"
 
 bin/config_render.%: ## Cross build bin/config_render.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CONFIG_RENDER_TOOL_LD_FLAGS} -o $@ ./cmd/reloader/template/main.go
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CONFIG_RENDER_TOOL_LD_FLAGS} -o $@ ./cmd/reloader/template/*.go
 
 .PHONY: config_render
 config_render: OS=$(shell $(GO) env GOOS)

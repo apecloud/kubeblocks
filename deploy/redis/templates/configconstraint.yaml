@@ -38,6 +38,10 @@ spec:
   formatterConfig:
     format: redis
 
+  #  shared_volume:
+  #    name: redis-config
+  #    mountPath: /etc/redis
+
   ## for tools
   reloadOptions:
     shellTrigger:
@@ -49,22 +53,27 @@ spec:
       namespace: {{ .Release.Namespace }}
 
   toolConfigs:
-  - command:
-    - cp
-    - /usr/local/bin/redis-cli
-    - /kb/tools/redis-cli
-    image: docker.io/library/redis:7.0.11-alpine
-    mountPoint: /kb/tools
-    name: init-redis-tools
-    volumeName: redis-tools
+    - name: init-redis-tools
+      command:
+        - cp
+        - /usr/local/bin/redis-cli
+        - /kb/tools/redis-cli
+      image: docker.io/library/redis:7.0.11-alpine
+      mountPoint: /kb/tools
+      volumeName: redis-tools
+    - name: init-secondary-render-tools
+      command:
+        - cp
+        - /bin/config_render
+        - /kb/tools/config_render
+      image: "$(KUBEBLOCKS_TOOLS_IMAGE)"
+      mountPoint: /kb/tools
+      volumeName: redis-tools
 
   downwardAPIOptions:
     - name: "pod-info"
       mountPoint: "/etc/pod_info"
       items:
-        - path: "labels/workload-type"
+        - path: "labels/role"
           fieldRef:
-            fieldPath: metadata.labels['apps.kubeblocks.io/workload-type']
-        - path: "annotations"
-          fieldRef:
-            fieldPath: metadata.annotations
+            fieldPath: metadata.labels['kubeblocks.io/role']

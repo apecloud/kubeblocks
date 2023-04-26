@@ -35,17 +35,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
 	configTemplateName   = "reload.yaml"
-	scriptVolumeName     = "reload-manager-reload"
-	scriptVolumePath     = "/opt/config/reload"
+	scriptVolumePrefix   = "cm-script-"
+	configVolumePrefix   = "cm-config-"
+	kbScriptVolumePath   = "/opt/kb-tools/reload"
+	kbConfigVolumePath   = "/opt/kb-tools/config"
 	scriptConfigField    = "scripts"
 	formatterConfigField = "formatterConfig"
 )
+
+const KBConfigSpecYamlFile = "kb-cm-config.yaml"
 
 func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, cmBuildParams *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
 	allVolumeMounts := make([]corev1.VolumeMount, 0)
@@ -61,11 +66,49 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, c
 		if err := buildConfigSpecHandleMeta(cli, ctx, buildParam, cmBuildParams); err != nil {
 			return err
 		}
+		if err := buildConfigSpecSecondaryRenderConfig(cli, ctx, buildParam, cmBuildParams); err != nil {
+			return err
+		}
 	}
 	downwardAPIVolumes := buildDownwardAPIVolumes(cmBuildParams)
 	allVolumeMounts = append(allVolumeMounts, downwardAPIVolumes...)
 	cmBuildParams.Volumes = append(cmBuildParams.Volumes, downwardAPIVolumes...)
 	return buildConfigManagerArgs(cmBuildParams, allVolumeMounts)
+}
+
+// buildConfigSpecSecondaryRenderConfig prepare secondary render config and volume
+func buildConfigSpecSecondaryRenderConfig(cli client.Client, ctx context.Context, param *ConfigSpecMeta, manager *CfgManagerBuildParams) error {
+	processYamlConfig := func(cm *corev1.ConfigMap) error {
+		renderMeta := ConfigSecondaryRenderMeta{
+			ComponentConfigSpec: &param.ConfigSpec,
+			Templates:           cfgutil.ToSet(cm.Data).AsSlice(),
+			FormatterConfig:     param.FormatterConfig,
+		}
+		b, err := cfgutil.ToYamlConfig(renderMeta)
+		if err != nil {
+			return err
+		}
+		cm.Data[KBConfigSpecYamlFile] = string(b)
+		return nil
+	}
+
+	secondaryTemplate := param.ConfigSpec.SecondaryRenderedConfigSpec
+	if secondaryTemplate == nil {
+		return nil
+	}
+	referenceCMKey := client.ObjectKey{
+		Namespace: secondaryTemplate.Namespace,
+		Name:      secondaryTemplate.TemplateRef,
+	}
+	configCMKey := client.ObjectKey{
+		Namespace: manager.Cluster.GetNamespace(),
+		Name:      fmt.Sprintf("%s-%s", secondaryTemplate.TemplateRef, manager.Cluster.GetName()),
+	}
+	if err := checkOrCreateConfigMap(referenceCMKey, configCMKey, cli, ctx, manager.Cluster, processYamlConfig); err != nil {
+		return err
+	}
+	buildConfigSecondaryRenderVolume(configCMKey.Name, manager, GetConfigMountPoint(param.ConfigSpec), GetConfigVolumeName(param.ConfigSpec), param.ConfigSpec)
+	return nil
 }
 
 func buildDownwardAPIVolumes(params *CfgManagerBuildParams) []corev1.VolumeMount {
@@ -107,7 +150,7 @@ func FindVolumeMount(volumeDirs []corev1.VolumeMount, volumeName string) *corev1
 func buildConfigSpecHandleMeta(cli client.Client, ctx context.Context, buildParam *ConfigSpecMeta, cmBuildParam *CfgManagerBuildParams) error {
 	switch buildParam.ReloadType {
 	default:
-		return cfgutil.MakeError("not support reload type: %s", buildParam.ReloadType)
+		return cfgcore.MakeError("not support reload type: %s", buildParam.ReloadType)
 	case appsv1alpha1.UnixSignalType:
 		return nil
 	case appsv1alpha1.ShellType:
@@ -121,8 +164,7 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	var (
 		options      = configSpecBuildMeta.TPLScriptTrigger
 		formatConfig = configSpecBuildMeta.FormatterConfig
-		mountPoint   = filepath.Join(scriptVolumePath, configSpecBuildMeta.ConfigSpec.Name)
-		volumeName   = fmt.Sprintf("%s-%s", scriptVolumeName, configSpecBuildMeta.ConfigSpec.Name)
+		mountPoint   = GetScriptsMountPoint(configSpecBuildMeta.ConfigSpec)
 	)
 
 	reloadYamlFn := func(cm *corev1.ConfigMap) error {
@@ -142,10 +184,10 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 		Namespace: manager.Cluster.GetNamespace(),
 		Name:      fmt.Sprintf("%s-%s", options.ScriptConfigMapRef, manager.Cluster.GetName()),
 	}
-	if err := checkOrCreateScriptCM(referenceCMKey, scriptCMKey, cli, ctx, manager.Cluster, reloadYamlFn); err != nil {
+	if err := checkOrCreateConfigMap(referenceCMKey, scriptCMKey, cli, ctx, manager.Cluster, reloadYamlFn); err != nil {
 		return err
 	}
-	buildReloadScriptVolume(scriptCMKey.Name, manager, mountPoint, volumeName)
+	buildReloadScriptVolume(scriptCMKey.Name, manager, mountPoint, GetScriptsVolumeName(configSpecBuildMeta.ConfigSpec))
 	configSpecBuildMeta.TPLConfig = filepath.Join(mountPoint, configTemplateName)
 	return nil
 }
@@ -155,7 +197,7 @@ func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1alph
 		Name:      fieldInfo.Name,
 		MountPath: fieldInfo.MountPoint,
 	})
-	manager.ScriptVolume = append(manager.ScriptVolume, corev1.Volume{
+	manager.CMConfigVolumes = append(manager.CMConfigVolumes, corev1.Volume{
 		Name: fieldInfo.Name,
 		VolumeSource: corev1.VolumeSource{
 			DownwardAPI: &corev1.DownwardAPIVolumeSource{
@@ -181,7 +223,24 @@ func buildReloadScriptVolume(scriptCMName string, manager *CfgManagerBuildParams
 	})
 }
 
-func checkOrCreateScriptCM(referenceCM client.ObjectKey, scriptCMKey client.ObjectKey, cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, fn func(cm *corev1.ConfigMap) error) error {
+func buildConfigSecondaryRenderVolume(cmName string, manager *CfgManagerBuildParams, mountPoint, volumeName string, configSpec appsv1alpha1.ComponentConfigSpec) {
+	n := len(manager.Volumes)
+	manager.Volumes = append(manager.Volumes, corev1.VolumeMount{
+		Name:      volumeName,
+		MountPath: mountPoint,
+	})
+	manager.CMConfigVolumes = append(manager.CMConfigVolumes, corev1.Volume{
+		Name: volumeName,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+			},
+		},
+	})
+	manager.ConfigSecondaryVolumes[configSpec.VolumeName] = manager.Volumes[n]
+}
+
+func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.ObjectKey, cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, fn func(cm *corev1.ConfigMap) error) error {
 	var (
 		err error
 
@@ -224,7 +283,7 @@ func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, forma
 		}
 	}
 	if res, _, _ := unstructured.NestedFieldNoCopy(configObject, scriptConfigField); res == nil {
-		return nil, cfgutil.MakeError("reload.yaml required field: %s", scriptConfigField)
+		return nil, cfgcore.MakeError("reload.yaml required field: %s", scriptConfigField)
 	}
 
 	formatObject, err := apiruntime.DefaultUnstructuredConverter.ToUnstructured(&formatterConfig)
@@ -243,7 +302,7 @@ func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, forma
 }
 
 func buildShellScriptCM(options *appsv1alpha1.ShellTrigger, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1alpha1.ComponentConfigSpec) error {
-	mountPoint := filepath.Join(scriptVolumePath, configSpec.Name)
+	mountPoint := filepath.Join(kbScriptVolumePath, configSpec.Name)
 	referenceCMKey := client.ObjectKey{
 		Namespace: options.Namespace,
 		Name:      options.ScriptConfigMapRef,
@@ -252,17 +311,33 @@ func buildShellScriptCM(options *appsv1alpha1.ShellTrigger, manager *CfgManagerB
 		Namespace: manager.Cluster.GetNamespace(),
 		Name:      fmt.Sprintf("%s-%s", options.ScriptConfigMapRef, manager.Cluster.GetName()),
 	}
-	if err := checkOrCreateScriptCM(referenceCMKey, scriptsCMKey, cli, ctx, manager.Cluster, nil); err != nil {
+	if err := checkOrCreateConfigMap(referenceCMKey, scriptsCMKey, cli, ctx, manager.Cluster, nil); err != nil {
 		return err
 	}
-	buildReloadScriptVolume(scriptsCMKey.Name, manager, mountPoint, fmt.Sprintf("%s-%s", scriptVolumeName, configSpec.Name))
+	buildReloadScriptVolume(scriptsCMKey.Name, manager, mountPoint, GetScriptsVolumeName(configSpec))
 	return nil
+}
+
+func GetConfigMountPoint(configSpec appsv1alpha1.ComponentConfigSpec) string {
+	return filepath.Join(kbConfigVolumePath, configSpec.Name)
+}
+
+func GetScriptsMountPoint(configSpec appsv1alpha1.ComponentConfigSpec) string {
+	return filepath.Join(kbScriptVolumePath, configSpec.Name)
+}
+
+func GetScriptsVolumeName(configSpec appsv1alpha1.ComponentConfigSpec) string {
+	return fmt.Sprintf("%s%s", scriptVolumePrefix, configSpec.Name)
+}
+
+func GetConfigVolumeName(configSpec appsv1alpha1.ComponentConfigSpec) string {
+	return fmt.Sprintf("%s%s", configVolumePrefix, configSpec.Name)
 }
 
 func buildConfigManagerCommonArgs(volumeDirs []corev1.VolumeMount) []string {
 	args := make([]string, 0)
 	// set grpc port
-	// args = append(args, "--tcp", viper.GetString(cfgutil.ConfigManagerGPRCPortEnv))
+	// args = append(args, "--tcp", viper.GetString(cfgcore.ConfigManagerGPRCPortEnv))
 	args = append(args, "--log-level", viper.GetString(constant.ConfigManagerLogLevel))
 	for _, volume := range volumeDirs {
 		args = append(args, "--volume-dir", volume.MountPath)

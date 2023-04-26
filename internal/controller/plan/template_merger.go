@@ -115,29 +115,14 @@ func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[
 	return nil, cfgcore.MakeError("not implemented")
 }
 
-func NewTemplateMerger(template appsv1alpha1.SecondaryRenderedTemplateSpec, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1alpha1.ComponentConfigSpec) (TemplateMerger, error) {
-	if configSpec.ConfigConstraintRef == "" {
-		return nil, cfgcore.MakeError("ConfigConstraintRef require not empty, configSpec[%v]", configSpec.Name)
-	}
-	ccObj := &appsv1alpha1.ConfigConstraint{}
-	ccKey := client.ObjectKey{
-		Namespace: "",
-		Name:      configSpec.ConfigConstraintRef,
-	}
-	if err := cli.Get(ctx, ccKey, ccObj); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
-	}
-	if ccObj.Spec.FormatterConfig == nil {
-		return nil, cfgcore.MakeError("importedConfigTemplate require ConfigConstraint.Spec.FormatterConfig, configSpec[%v]", configSpec)
-	}
-
+func NewTemplateMerger(template appsv1alpha1.SecondaryRenderedTemplateSpec, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1alpha1.ComponentConfigSpec, ccSpec *appsv1alpha1.ConfigConstraintSpec) (TemplateMerger, error) {
 	templateData := &mergeContext{
 		configSpec: configSpec,
 		template:   template,
 		ctx:        ctx,
 		client:     cli,
 		builder:    builder,
-		ccSpec:     &ccObj.Spec,
+		ccSpec:     ccSpec,
 	}
 
 	var merger TemplateMerger
@@ -161,7 +146,22 @@ func mergerConfigTemplate(template *appsv1alpha1.SecondaryRenderedTemplateSpec,
 	configSpec appsv1alpha1.ComponentConfigSpec,
 	baseData map[string]string,
 	ctx context.Context, cli client.Client) (map[string]string, error) {
-	templateMerger, err := NewTemplateMerger(*template, ctx, cli, builder, configSpec)
+	if configSpec.ConfigConstraintRef == "" {
+		return nil, cfgcore.MakeError("ConfigConstraintRef require not empty, configSpec[%v]", configSpec.Name)
+	}
+	ccObj := &appsv1alpha1.ConfigConstraint{}
+	ccKey := client.ObjectKey{
+		Namespace: "",
+		Name:      configSpec.ConfigConstraintRef,
+	}
+	if err := cli.Get(ctx, ccKey, ccObj); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
+	}
+	if ccObj.Spec.FormatterConfig == nil {
+		return nil, cfgcore.MakeError("importedConfigTemplate require ConfigConstraint.Spec.FormatterConfig, configSpec[%v]", configSpec)
+	}
+
+	templateMerger, err := NewTemplateMerger(*template, ctx, cli, builder, configSpec, &ccObj.Spec)
 	if err != nil {
 		return nil, err
 	}

@@ -13,6 +13,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
@@ -60,6 +62,18 @@ func failed(err error, msg string) {
 func main() {
 	installFlags()
 
+	if configSpecMountPoint == "" {
+		failed(cfgcore.MakeError("config volume mount point is empty"), "")
+	}
+
+	if configSpecYaml == "" {
+		failed(cfgcore.MakeError("config spec yaml is empty"), "")
+	}
+
+	if outputDir == "" {
+		failed(cfgcore.MakeError("output dir is empty"), "")
+	}
+
 	files, err := cfgcm.ScanConfigVolume(configSpecMountPoint)
 	if err != nil {
 		failed(err, "failed to scan config volume")
@@ -69,20 +83,21 @@ func main() {
 		failed(err, "failed to create data map")
 	}
 
-	configRenderMeta := cfgcm.ConfigRenderMeta{}
+	configRenderMeta := cfgcm.ConfigSecondaryRenderMeta{}
 	if err := cfgutil.FromYamlConfig(configSpecYaml, &configRenderMeta); err != nil {
 		failed(err, "failed to parse config spec")
 	}
 
 	mergePolicy, err := plan.NewTemplateMerger(*configRenderMeta.SecondaryRenderedConfigSpec,
-		context.TODO(), nil, nil, *configRenderMeta.ComponentConfigSpec)
+		context.TODO(), nil, nil, *configRenderMeta.ComponentConfigSpec, &appsv1alpha1.ConfigConstraintSpec{
+			FormatterConfig: &configRenderMeta.FormatterConfig,
+		})
 	if err != nil {
 		failed(err, "failed to create template merger")
 	}
 	engine := gotemplate.NewTplEngine(&gotemplate.TplValues{
 		builtinConfigMountPathObject: configSpecMountPoint,
-	}, nil,
-		fmt.Sprintf("secondary template %s", configRenderMeta.Name), nclient, context.TODO())
+	}, nil, fmt.Sprintf("secondary template %s", configRenderMeta.Name), nclient, context.TODO())
 
 	renderedData, err := secondaryRender(engine, configRenderMeta.Templates)
 	if err != nil {

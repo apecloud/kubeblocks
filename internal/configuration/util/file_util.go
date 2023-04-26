@@ -20,9 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 
+	oyaml "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
@@ -55,6 +57,19 @@ func FromYamlConfig[T any](yamlConfig string, obj T) error {
 		return err
 	}
 	return yaml.Unmarshal(b, obj)
+}
+
+func ToYamlConfig(obj interface{}) ([]byte, error) {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	var jsonObj interface{}
+	if err := yaml.Unmarshal(b, &jsonObj); err != nil {
+		return nil, err
+	}
+	return oyaml.Marshal(jsonObj)
 }
 
 func CheckPathExists(path string) (bool, error) {

@@ -149,7 +149,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 		return err
 	}
 	updateEnvPath(container, buildParams)
-	updateTPLScriptVolume(podSpec, buildParams)
+	updateCfgManagerVolumes(podSpec, buildParams)
 
 	// Add sidecar to podTemplate
 	podSpec.Containers = append(podSpec.Containers, *container)
@@ -180,19 +180,31 @@ func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildPar
 	}
 }
 
-func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.CfgManagerBuildParams) {
+func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgManagerBuildParams) {
 	scriptVolumes := configManager.ScriptVolume
-	if len(scriptVolumes) == 0 {
+	if len(scriptVolumes) == 0 && len(configManager.CMConfigVolumes) == 0 {
 		return
 	}
 
 	podVolumes := podSpec.Volumes
-	for _, volume := range scriptVolumes {
-		podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, volume.Name, func(volumeName string) corev1.Volume {
-			return volume
-		}, nil)
+	for _, vm := range []*[]corev1.Volume{
+		&configManager.ScriptVolume,
+		&configManager.CMConfigVolumes,
+	} {
+		for i := range *vm {
+			podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, (*vm)[i].Name, func(string) corev1.Volume {
+				return (*vm)[i]
+			}, nil)
+		}
 	}
 	podSpec.Volumes = podVolumes
+
+	for volumeName, volume := range configManager.ConfigSecondaryVolumes {
+		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, volumeName)
+		for _, container := range usingContainers {
+			container.VolumeMounts = append(container.VolumeMounts, volume)
+		}
+	}
 }
 
 func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1alpha1.ComponentConfigSpec) ([]corev1.VolumeMount, []appsv1alpha1.ComponentConfigSpec) {
@@ -243,45 +255,12 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		Volumes:                volumeDirs,
 		Cluster:                cluster,
 		ConfigSpecsBuildParams: configSpecBuildParams,
+		ConfigSecondaryVolumes: make(map[string]corev1.VolumeMount),
 	}
 
 	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {
 		return nil, err
 	}
-
-	// construct config manager tools volume
-	toolContainers := make(map[string]appsv1alpha1.ToolConfig)
-	for _, buildParam := range cfgManagerParams.ConfigSpecsBuildParams {
-		for _, toolConfig := range buildParam.ToolConfigs {
-			if _, ok := toolContainers[toolConfig.Name]; ok {
-				continue
-			}
-			if toolConfig.Image == "" {
-				usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, buildParam.ConfigSpec.VolumeName)
-				if len(usingContainers) != 0 {
-					toolConfig.Image = usingContainers[0].Image
-				}
-			}
-			buildToolsVolumeMount(cfgManagerParams, toolConfig)
-			toolContainers[toolConfig.Name] = toolConfig
-		}
-	}
-	if len(toolContainers) != 0 {
-		cfgManagerParams.ToolsContainers = builder.BuildCfgManagerToolsContainer(cfgManagerParams, comp, toolContainers)
-	}
+	buildConfigToolsContainer(cfgManagerParams, podSpec, params)
 	return cfgManagerParams, nil
-}
-
-func buildToolsVolumeMount(cfgManagerParams *cfgcm.CfgManagerBuildParams, toolConfig appsv1alpha1.ToolConfig) {
-	cfgManagerParams.ScriptVolume = append(cfgManagerParams.ScriptVolume, corev1.Volume{
-		Name: toolConfig.VolumeName,
-		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{},
-		},
-	})
-
-	cfgManagerParams.Volumes = append(cfgManagerParams.Volumes, corev1.VolumeMount{
-		Name:      toolConfig.VolumeName,
-		MountPath: toolConfig.MountPoint,
-	})
 }

@@ -35,7 +35,7 @@ content: {
   }
   spec:{
     selector:{
-    	namespace: options.namespaceSelector
+    	namespace: [options.namespaceSelector]
     	labelSelectors:{
     			options.label
     	}

@@ -40,9 +40,9 @@ serviceAccount:
   create: true
   # Annotations to add to the service account
   annotations: {}
-  # The name of the service account to use.
+  # The namePrefix of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
-  name: "kb-postgres-service-account"
+  namePrefix: "kb-postgres"
 
 ## Authentication parameters
 ##

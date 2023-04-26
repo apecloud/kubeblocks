@@ -472,7 +472,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	getPVCName := func(compName string, i int) string {
-		return fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterObj.Name, compName, i)
+		return fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, compName, i)
 	}
 
 	createPVC := func(clusterName, pvcName, compName string) {

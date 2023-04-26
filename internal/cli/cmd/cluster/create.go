@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
+	"k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -119,6 +120,7 @@ const (
 	keyMemory       setKey = "memory"
 	keyReplicas     setKey = "replicas"
 	keyStorage      setKey = "storage"
+	keyStorageClass setKey = "storageClass"
 	keySwitchPolicy setKey = "switchPolicy"
 	keyUnknown      setKey = "unknown"
 )
@@ -249,6 +251,13 @@ func (o *CreateOptions) Validate() error {
 	if len(o.Name) > 16 {
 		return fmt.Errorf("cluster name should be less than 16 characters")
 	}
+
+	// validate default storageClassName
+	err := validateStorageClass(o.Dynamic, o.ComponentSpecs)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -519,7 +528,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 	}
 
 	var comps []*appsv1alpha1.ClusterComponentSpec
-	for _, c := range cd.Spec.ComponentDefs {
+	for i, c := range cd.Spec.ComponentDefs {
 		sets := map[setKey]string{}
 		if setsMap != nil {
 			sets = setsMap[c.Name]
@@ -577,6 +586,10 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				},
 			},
 		}}
+		storageClass := getVal(&c, keyStorageClass, sets)
+		if len(storageClass) != 0 {
+			compObj.VolumeClaimTemplates[i].Spec.StorageClassName = &storageClass
+		}
 		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err
 		}
@@ -589,7 +602,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 // specified in the set, use the cluster definition default component name.
 func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
-	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keySwitchPolicy)}
+	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keyStorageClass), string(keySwitchPolicy)}
 	parseKey := func(key string) setKey {
 		for _, k := range keys {
 			if strings.EqualFold(k, key) {
@@ -730,4 +743,52 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 				"DedicatedNode\teach pod of the cluster will run on their own dedicated node",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}))
+}
+
+// validateStorageClass check whether the StorageClasses we need are exist in K8S or
+// the default StorageClasses are exist
+func validateStorageClass(dynamic dynamic.Interface, components []map[string]interface{}) error {
+	existedStorageClasses, existedDefault, err := getStorageClasses(dynamic)
+	if err != nil {
+		return err
+	}
+	for _, comp := range components {
+		compObj := appsv1alpha1.ClusterComponentSpec{}
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(comp, &compObj)
+		if err != nil {
+			return err
+		}
+		for _, vct := range compObj.VolumeClaimTemplates {
+			name := vct.Spec.StorageClassName
+			if name != nil {
+				// validate the specified StorageClass whether exist
+				if _, ok := existedStorageClasses[*name]; !ok {
+					return fmt.Errorf("failed to find the specified storageClass \"%s\"", *name)
+				}
+			} else if !existedDefault {
+				// validate the default StorageClass
+				return fmt.Errorf("failed to find the default storageClass, use '--set storageClass=NAME' to set it")
+			}
+		}
+	}
+	return nil
+}
+
+// getStorageClasses return all StorageClasses in K8S and return true if the cluster have a default StorageClasses
+func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, error) {
+	gvr := types.StorageClassGVR()
+	allStorageClasses := make(map[string]struct{})
+	existedDefault := false
+	list, err := dynamic.Resource(gvr).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+	for _, item := range list.Items {
+		allStorageClasses[item.GetName()] = struct{}{}
+		annotations := item.GetAnnotations()
+		if !existedDefault && annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == "true" || annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true") {
+			existedDefault = true
+		}
+	}
+	return allStorageClasses, existedDefault, nil
 }

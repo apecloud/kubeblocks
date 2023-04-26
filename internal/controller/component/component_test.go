@@ -62,9 +62,9 @@ var _ = Describe("component module", func() {
 				AddComponentDef(testapps.StatelessNginxComponent, proxyCompDefName).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompDefName).
+				AddComponentVersion(mysqlCompDefName).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				AddComponent(proxyCompDefName).
+				AddComponentVersion(proxyCompDefName).
 				AddInitContainerShort("nginx-init", testapps.NginxImage).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()

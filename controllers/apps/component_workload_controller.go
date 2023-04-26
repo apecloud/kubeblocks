@@ -84,6 +84,11 @@ func (r *componentWorkloadReconciler[T, PT, S, PS]) Reconcile(ctx context.Contex
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	// skip if workload is being deleted
+	if !pObj.GetDeletionTimestamp().IsZero() {
+		return intctrlutil.Reconciled()
+	}
+
 	handler := func(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec,
 		compDef *appsv1alpha1.ClusterComponentDefinition) (ctrl.Result, error) {
 		// patch the current componentSpec workload's custom labels

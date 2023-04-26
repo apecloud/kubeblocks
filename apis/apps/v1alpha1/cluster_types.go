@@ -489,6 +489,58 @@ func (r Cluster) IsStatusUpdating() bool {
 	return !r.IsDeleting() && !r.IsUpdating()
 }
 
+// GetVolumeClaimNames gets all PVC names of component compName
+//
+// r.Spec.GetComponentByName(compName).VolumeClaimTemplates[*].Name will be used if no claimNames provided
+//
+// nil return if:
+// 1. component compName not found or
+// 2. len(VolumeClaimTemplates)==0 or
+// 3. any claimNames not found
+func (r *Cluster) GetVolumeClaimNames(compName string, claimNames ...string) []string {
+	if r == nil {
+		return nil
+	}
+	comp := r.Spec.GetComponentByName(compName)
+	if comp == nil {
+		return nil
+	}
+	if len(comp.VolumeClaimTemplates) == 0 {
+		return nil
+	}
+	if len(claimNames) == 0 {
+		for _, template := range comp.VolumeClaimTemplates {
+			claimNames = append(claimNames, template.Name)
+		}
+	}
+	allExist := true
+	for _, name := range claimNames {
+		found := false
+		for _, template := range comp.VolumeClaimTemplates {
+			if template.Name == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			allExist = false
+			break
+		}
+	}
+	if !allExist {
+		return nil
+	}
+
+	pvcNames := make([]string, 0)
+	for _, claimName := range claimNames {
+		for i := 0; i < int(comp.Replicas); i++ {
+			pvcName := fmt.Sprintf("%s-%s-%s-%d", claimName, r.Name, compName, i)
+			pvcNames = append(pvcNames, pvcName)
+		}
+	}
+	return pvcNames
+}
+
 // GetComponentByName gets component by name.
 func (r ClusterSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
 	for _, v := range r.ComponentSpecs {

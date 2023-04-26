@@ -68,15 +68,6 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		cluster.Status.ClusterDefGeneration = transCtx.ClusterDef.Generation
 	}
 
-	updateClusterPhase := func() {
-		clusterPhase := cluster.Status.Phase
-		if clusterPhase == "" {
-			cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
-		} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
-			cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
-		}
-	}
-
 	initClusterStatusParams := func() {
 		t.phaseSyncLevel = clusterPhaseNoChange
 		t.notReadyCompNames = map[string]struct{}{}
@@ -99,8 +90,6 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	case origCluster.IsUpdating():
 		transCtx.Logger.Info("update cluster status after applying resources ")
 		updateObservedGeneration()
-		updateClusterPhase()
-		// update components' phase in cluster.status
 		rootVertex.Action = ictrltypes.ActionStatusPtr()
 	case origCluster.IsStatusUpdating():
 		initClusterStatusParams()
@@ -198,24 +187,6 @@ func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(dag *graph.DA
 	}
 }
 
-// func isComponentInHorizontalScaling(dag *graph.DAG, componentName string) bool {
-//	stsVertices := findAll[*appsv1.StatefulSet](dag)
-//	for _, v := range stsVertices {
-//		vertex, _ := v.(*lifecycleVertex)
-//		if vertex.action == nil || *vertex.action != UPDATE {
-//			continue
-//		}
-//		name := vertex.obj.GetLabels()[constant.KBAppComponentLabelKey]
-//		if name != componentName {
-//			continue
-//		}
-//		oldSts, _ := vertex.oriObj.(*appsv1.StatefulSet)
-//		newSts, _ := vertex.obj.(*appsv1.StatefulSet)
-//		return *oldSts.Spec.Replicas != *newSts.Spec.Replicas
-//	}
-//	return false
-// }
-
 // handleOpsRequestProcessedCondition syncs the condition that OpsRequest has been processed.
 func (t *ClusterStatusTransformer) syncOpsRequestProcessedCondition(cluster *appsv1alpha1.Cluster) {
 	opsCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
@@ -278,94 +249,6 @@ func (t *ClusterStatusTransformer) cleanupAnnotationsAfterRunning(cluster *appsv
 	}
 	delete(cluster.Annotations, constant.RestoreFromBackUpAnnotationKey)
 }
-
-//// REVIEW: this handling is rather hackish, call for refactor.
-//// handleRestoreGarbageBeforeRunning handles the garbage for restore before cluster phase changes to Running.
-//// @return ErrNoOps if no operation
-//// Deprecated: to be removed by PITR feature.
-// func (t *ClusterStatusTransformer) handleGarbageOfRestoreBeforeRunning(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
-//	clusterBackupResourceMap, err := getClusterBackupSourceMap(cluster)
-//	if err != nil {
-//		return err
-//	}
-//	if clusterBackupResourceMap == nil {
-//		return nil
-//	}
-//	// check if all components are running.
-//	for _, v := range cluster.Status.Components {
-//		if v.Phase != appsv1alpha1.RunningClusterCompPhase {
-//			return nil
-//		}
-//	}
-//	// remove the garbage for restore if the cluster restores from backup.
-//	return t.removeGarbageWithRestore(transCtx, cluster, clusterBackupResourceMap, dag)
-// }
-//
-//// REVIEW: this handling is rather hackish, call for refactor.
-//// removeGarbageWithRestore removes the garbage for restore when all components are Running.
-//// @return ErrNoOps if no operation
-//// Deprecated:
-// func (t *ClusterStatusTransformer) removeGarbageWithRestore(
-//	transCtx *ClusterTransformContext,
-//	cluster *appsv1alpha1.Cluster,
-//	clusterBackupResourceMap map[string]string,
-//	dag *graph.DAG) error {
-//	var (
-//		err error
-//	)
-//	vertices := findAll[*appsv1.StatefulSet](dag)
-//	for k, v := range clusterBackupResourceMap {
-//		// get the vertex list which contains sts owned by componentName
-//		vertexList := make([]graph.Vertex, 0)
-//		for _, vertex := range vertices {
-//			v, _ := vertex.(*lifecycleVertex)
-//			labels := v.obj.GetLabels()
-//			if labels != nil && labels[constant.KBAppComponentLabelKey] == k {
-//				vertexList = append(vertexList, vertex)
-//			}
-//		}
-//		// remove the init container for restore
-//		if _, err = t.removeStsInitContainerForRestore(cluster, k, v, vertexList); err != nil {
-//			return err
-//		}
-//	}
-//	return nil
-// }
-//
-//// removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
-// func (t *ClusterStatusTransformer) removeStsInitContainerForRestore(
-//	cluster *appsv1alpha1.Cluster,
-//	componentName,
-//	backupName string,
-//	vertexList []graph.Vertex) (bool, error) {
-//	var doRemoveInitContainers bool
-//	for _, vertex := range vertexList {
-//		v, _ := vertex.(*lifecycleVertex)
-//		if v.oriObj == nil {
-//			continue
-//		}
-//		originSts, _ := v.oriObj.(*appsv1.StatefulSet)
-//		initContainers := originSts.Spec.Template.Spec.InitContainers
-//		restoreInitContainerName := component.GetRestoredInitContainerName(backupName)
-//		restoreInitContainerIndex, _ := intctrlutil.GetContainerByName(initContainers, restoreInitContainerName)
-//		if restoreInitContainerIndex == -1 {
-//			continue
-//		}
-//		sts, _ := v.obj.(*appsv1.StatefulSet)
-//		doRemoveInitContainers = true
-//		initContainers = append(initContainers[:restoreInitContainerIndex], initContainers[restoreInitContainerIndex+1:]...)
-//		sts.Spec.Template.Spec.InitContainers = initContainers
-//		v.immutable = false
-//		v.action = actionPtr(UPDATE)
-//	}
-//	if doRemoveInitContainers {
-//		// if need to remove init container, reset component to Creating.
-//		compStatus := cluster.Status.Components[componentName]
-//		compStatus.Phase = appsv1alpha1.CreatingClusterCompPhase
-//		cluster.Status.Components[componentName] = compStatus
-//	}
-//	return doRemoveInitContainers, nil
-// }
 
 // handleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.
 // REVIEW: seem duplicated handling

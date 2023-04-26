@@ -88,6 +88,12 @@ func (r *realRequeueError) Reason() string {
 	return r.reason
 }
 
+// IsRequeueError checks if the error is a RequeueError
+func IsRequeueError(err error) bool {
+	_, ok := err.(RequeueError)
+	return ok
+}
+
 type delegateClient struct {
 	client.Client
 }

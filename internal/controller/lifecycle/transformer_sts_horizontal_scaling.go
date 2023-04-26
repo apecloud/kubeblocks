@@ -569,10 +569,9 @@ func deleteSnapshot(cli roclient.ReadonlyClient,
 	dag *graph.DAG,
 	root graph.Vertex) error {
 	ctx := reqCtx.Ctx
-	if err := deleteBackup(ctx, cli, cluster.Name, component.Name, dag, root); err != nil {
+	if err := deleteBackup(reqCtx, cli, cluster, component.Name, snapshotKey.Name, dag, root); err != nil {
 		return client.IgnoreNotFound(err)
 	}
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotKey.Name)
 	vs := &snapshotv1.VolumeSnapshot{}
 	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
 	if err := compatClient.Get(snapshotKey, vs); err != nil {
@@ -586,17 +585,23 @@ func deleteSnapshot(cli roclient.ReadonlyClient,
 }
 
 // deleteBackup will delete all backup related resources created during horizontal scaling,
-func deleteBackup(ctx context.Context, cli roclient.ReadonlyClient, clusterName string, componentName string, dag *graph.DAG, root graph.Vertex) error {
-	ml := getBackupMatchingLabels(clusterName, componentName)
+func deleteBackup(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient,
+	cluster *appsv1alpha1.Cluster, componentName, snapshotName string,
+	dag *graph.DAG, root graph.Vertex) error {
+	ml := getBackupMatchingLabels(cluster.Name, componentName)
 	backupList := dataprotectionv1alpha1.BackupList{}
-	if err := cli.List(ctx, &backupList, ml); err != nil {
+	if err := cli.List(reqCtx.Ctx, &backupList, ml); err != nil {
 		return err
+	}
+	if len(backupList.Items) == 0 {
+		return nil
 	}
 	for _, backup := range backupList.Items {
 		vertex := &lifecycleVertex{obj: &backup, oriObj: &backup, action: actionPtr(DELETE)}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
+	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotName)
 	return nil
 }
 

@@ -49,7 +49,8 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -119,14 +120,15 @@ var _ = Describe("Cluster Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
+		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
+		testapps.ClearResources(&testCtx, generics.BackupToolSignature, ml)
+		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		resetTestContext()
 	}
 
@@ -473,7 +475,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("Checking Backup created")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
+		Eventually(testapps.GetListLen(&testCtx, generics.BackupSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: comp.Name,
@@ -520,7 +522,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("Check backup job cleanup")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
+		Eventually(testapps.GetListLen(&testCtx, generics.BackupSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: comp.Name,
@@ -1048,8 +1050,8 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(cluster.Status.Conditions).ShouldNot(BeEmpty())
 			var err error
 			for _, cond := range cluster.Status.Conditions {
-				if strings.Contains(cond.Message, "backup error") {
-					g.Expect(cond.Message).Should(ContainSubstring("backup error"))
+				if strings.Contains(cond.Message, "backup for horizontalScaling failed") {
+					g.Expect(cond.Message).Should(ContainSubstring("backup for horizontalScaling failed"))
 					err = errors.New("has backup error")
 					break
 				}
@@ -1060,6 +1062,20 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			g.Expect(err).Should(HaveOccurred())
 		})).Should(Succeed())
+
+		By("expect for backup error event")
+		Eventually(func(g Gomega) {
+			eventList := corev1.EventList{}
+			Expect(k8sClient.List(ctx, &eventList, client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
+			hasBackupErrorEvent := false
+			for _, v := range eventList.Items {
+				if v.Reason == string(intctrlutil.ErrorTypeBackupFailed) {
+					hasBackupErrorEvent = true
+					break
+				}
+			}
+			g.Expect(hasBackupErrorEvent).Should(BeTrue())
+		}).Should(Succeed())
 	}
 
 	updateClusterAnnotation := func(cluster *appsv1alpha1.Cluster) {

@@ -324,15 +324,14 @@ var _ = Describe("builder", func() {
 			reqCtx := newReqCtx()
 			params := newParams()
 
-			By("creating pvc to make it looks like recreation")
-			pvcName := "test-pvc"
-			testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
-				params.Component.Name, testapps.DataVolumeName).SetStorage("1Gi").CheckedCreate(&testCtx)
+			uuid := "12345"
+			By("mock a cluster uuid")
+			params.Cluster.UID = types.UID(uuid)
 
 			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_RECREATE"]).Should(Equal("true"))
+			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_CLUSTER_UID"]).Should(Equal(uuid))
 		})
 
 		It("builds Env Config with ConsensusSet status correctly", func() {

@@ -992,6 +992,9 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	}
 
 	jobName := deleteBackupFilesJobNamePrefix + backup.Name
+	if len(jobName) > 60 {
+		jobName = jobName[:60]
+	}
 	jobKey := types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
 	job := batchv1.Job{}
 	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, jobKey, &job)

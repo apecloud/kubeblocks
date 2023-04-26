@@ -27,8 +27,7 @@ spec:
           echo "${DATA_DIR} is not empty! Please make sure that the directory is empty before restoring the backup."
           exit 1
         fi
-        tar -xvf ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz -C ${DATA_DIR}/../
-        mv ${DATA_DIR}/../${BACKUP_NAME}/* ${DATA_DIR}
+        tar -xvf ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz -C ${DATA_DIR}
         PORT=27017
         MONGODB_ROOT=/data/mongodb
         RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
@@ -52,9 +51,6 @@ spec:
     incrementalRestoreCommands: []
   backupCommands:
     - |
-     mkdir -p ${BACKUP_DIR}/${BACKUP_NAME}
-     cp -R ${DATA_DIR}/* ${BACKUP_DIR}/${BACKUP_NAME}/
-     cd  ${BACKUP_DIR}
-     tar -czvf ${BACKUP_NAME}.tar.gz ./${BACKUP_NAME}
-     rm -rf ${BACKUP_DIR}/${BACKUP_NAME}
+     mkdir -p ${BACKUP_DIR} && cd ${DATA_DIR}
+     tar -czvf ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz ./
   incrementalBackupCommands: []

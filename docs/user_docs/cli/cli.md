@@ -111,6 +111,7 @@ List and open the KubeBlocks dashboards.
 
 inject fault.
 
+* [kbcli fault network](kbcli_fault_network.md)	 - network attack.
 * [kbcli fault pod](kbcli_fault_pod.md)	 - inject fault to pod.
 
 

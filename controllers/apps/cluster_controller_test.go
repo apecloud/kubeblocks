@@ -470,13 +470,14 @@ var _ = Describe("Cluster Controller", func() {
 			}).Should(Succeed())
 		}
 	}
-	createPVC := func(clusterName, pvcName, compName string) {
-		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
-			compName, "data").SetStorage("1Gi").CheckedCreate(&testCtx)
-	}
 
 	getPVCName := func(compName string, i int) string {
 		return fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterObj.Name, compName, i)
+	}
+
+	createPVC := func(clusterName, pvcName, compName string) {
+		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
+			compName, "data").SetStorage("1Gi").CheckedCreate(&testCtx)
 	}
 
 	mockPodsForConsensusTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
@@ -606,7 +607,7 @@ var _ = Describe("Cluster Controller", func() {
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: comp.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
-		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(volumeSnapshot), &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
 		checkUpdatedStsReplicas()
 	}

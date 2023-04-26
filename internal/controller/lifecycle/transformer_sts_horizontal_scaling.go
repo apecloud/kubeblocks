@@ -399,12 +399,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
 		if !isSnapshotAvailable(cli, ctx) {
-			reqCtx.Recorder.Eventf(cluster,
-				corev1.EventTypeWarning,
-				"HorizontalScaleFailed",
-				"volume snapshot not support")
 			// TODO: add ut
-			return fmt.Errorf("volume snapshot not support")
+			return fmt.Errorf("HorizontalScaleFailed: volume snapshot not support")
 		}
 		vcts := component.VolumeClaimTemplates
 		if len(vcts) == 0 {
@@ -763,10 +759,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if len(backupList.Items) > 0 {
 			// check backup status, if failed return error
 			if backupList.Items[0].Status.Phase == dataprotectionv1alpha1.BackupFailed {
-				reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning,
-					"HorizontalScaleFailed", "backup %s status failed", backupKey.Name)
-				return fmt.Errorf("cluster %s h-scale failed, backup error: %s",
-					cluster.Name, backupList.Items[0].Status.FailureReason)
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupFailed, "backup for horizontalScaling failed: %s", backupList.Items[0].Status.FailureReason)
 			}
 			return nil
 		}

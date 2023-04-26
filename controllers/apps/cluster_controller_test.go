@@ -1000,6 +1000,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		// REVIEW: this test flow, should wait/fake still Running phase?
 		By("Creating backup")
@@ -1039,17 +1040,23 @@ var _ = Describe("Cluster Controller", func() {
 
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
 		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
 		By("Checking cluster status failed with backup error")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			g.Expect(viper.GetBool("VOLUMESNAPSHOT")).Should(BeTrue())
+			g.Expect(cluster.Status.Conditions).ShouldNot(BeEmpty())
 			var err error
 			for _, cond := range cluster.Status.Conditions {
 				if strings.Contains(cond.Message, "backup error") {
 					g.Expect(cond.Message).Should(ContainSubstring("backup error"))
-					err = errors.New("backup error")
+					err = errors.New("has backup error")
 					break
 				}
+			}
+			if err == nil {
+				// this expect is intended for print all cluster.Status.Conditions
+				g.Expect(cluster.Status.Conditions).Should(BeEmpty())
 			}
 			g.Expect(err).Should(HaveOccurred())
 		})).Should(Succeed())

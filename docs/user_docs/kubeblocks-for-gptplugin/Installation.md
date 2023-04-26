@@ -26,16 +26,16 @@ kbcli addon list
 kubectl get clusterdefintion
 
 NAME                MAIN-COMPONENT-NAME   STATUS      AGE
-qdrant-standalone   qdrant                Available   6m14s
+qdrant              qdrant                Available   6m14s
 ```
 4. create a qdrant cluster
 ```shell
-kbcli cluster create  --cluster-definition=qdrant-standalone
+kbcli cluster create  --cluster-definition=qdrant
 
 Warning: cluster version is not specified, use the recently created ClusterVersion qdrant-1.1.0
 Cluster lilac26 created
 ```
-a qdrant standalone cluster is created successfully
+a qdrant cluster is created successfully
 #### Step 2: Start the plugin with qdrant as store
 with helm to install 
 ```shell

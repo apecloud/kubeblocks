@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: qdrant-standalone-config-template
+  name: qdrant-config-template
   namespace: {{ .Release.Namespace | quote }}
   labels:
   {{- include "qdrant.labels" . | nindent 4 }}

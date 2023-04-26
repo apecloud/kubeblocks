@@ -1,12 +1,12 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: milvus-standalone-backup-policy-template
+  name: milvus-backup-policy-template
   labels:
-    clusterdefinition.kubeblocks.io/name: milvus-standalone
+    clusterdefinition.kubeblocks.io/name: milvus
     {{- include "milvus.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: milvus-standalone
+  clusterDefinitionRef: milvus
   backupPolicies:
   - componentDefRef: milvus
     ttl: 7d

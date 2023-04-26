@@ -2,14 +2,14 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  namespace: default
-  name: operator
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Values.serviceAccount.name }}-{{ .Release.Name }}
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: operator
+  name: kb-postgres-patroni-cluster-role
 rules:
   - apiGroups:
       - ""
@@ -63,12 +63,12 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: operator
+  name: {{ .Values.serviceAccount.name }}-{{ .Release.Name }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: operator
+  name: kb-postgres-patroni-cluster-role
 subjects:
   - kind: ServiceAccount
-    name: operator
-    namespace: default
+    name: {{ .Values.serviceAccount.name }}-{{ .Release.Name }}
+    namespace: {{ .Release.Namespace }}

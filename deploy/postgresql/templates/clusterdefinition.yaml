@@ -70,7 +70,7 @@ spec:
         - name: data
           type: data
       podSpec:
-        serviceAccountName: operator
+        serviceAccountName: {{ .Values.serviceAccount.name }}-{{ .Release.Name }}
         securityContext:
           runAsUser: 0
           fsGroup: 103

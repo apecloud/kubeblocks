@@ -988,6 +988,19 @@ var _ = Describe("Cluster Controller", func() {
 		updatedReplicas := int32(3)
 		viper.Set("VOLUMESNAPSHOT", true)
 
+		By("Set HorizontalScalePolicy")
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+			func(clusterDef *appsv1alpha1.ClusterDefinition) {
+				for i, def := range clusterDef.Spec.ComponentDefs {
+					if def.Name != compDefName {
+						continue
+					}
+					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
+						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
+							BackupPolicyTemplateName: backupPolicyTPLName}
+				}
+			})()).ShouldNot(HaveOccurred())
+
 		By("Creating a cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -1001,6 +1014,10 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
+		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
 		// REVIEW: this test flow, should wait/fake still Running phase?
 		By("Creating backup")
@@ -1029,18 +1046,6 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {
 			g.Expect(backup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
 		})).Should(Succeed())
-
-		By("Set HorizontalScalePolicy")
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-			func(clusterDef *appsv1alpha1.ClusterDefinition) {
-				clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
-					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
-						BackupPolicyTemplateName: backupPolicyTPLName}
-			})()).ShouldNot(HaveOccurred())
-
-		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
-		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
 		By("Checking cluster status failed with backup error")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
@@ -1351,7 +1356,7 @@ var _ = Describe("Cluster Controller", func() {
 				})
 
 				// +failed test case
-				PIt(fmt.Sprintf("[comp: %s] should report error if backup error during horizontal scale", compName), func() {
+				It(fmt.Sprintf("[comp: %s] should report error if backup error during horizontal scale", compName), func() {
 					testBackupError(compName, compDefName)
 				})
 			default:
@@ -1376,17 +1381,17 @@ var _ = Describe("Cluster Controller", func() {
 
 		Context("with horizontal scale after storage expansion", func() {
 			// +failed test case
-			PIt("should succeed with horizontal scale to 5 replicas", func() {
+			It("should succeed with horizontal scale to 5 replicas", func() {
 				testStorageExpansion(compName, compDefName)
 				horizontalScale(5, compDefName)
 			})
 		})
 
 		// duplicated setup in When("creating cluster with workloadType=[Stateless|Stateful|Consensus|Replication] component")
-		// // +failed test case
-		// PIt("should report error if backup error during horizontal scale", func() {
-		// 	testBackupError(compName, compDefName)
-		// })
+		// +failed test case
+		It("should report error if backup error during horizontal scale", func() {
+			testBackupError(compName, compDefName)
+		})
 
 		It("test restore cluster from backup", func() {
 			By("mock backuptool object")

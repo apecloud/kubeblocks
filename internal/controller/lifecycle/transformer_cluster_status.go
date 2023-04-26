@@ -70,14 +70,38 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		cluster.Status.ClusterDefGeneration = transCtx.ClusterDef.Generation
 	}
 
-	updateClusterPhase := func() {
-		clusterPhase := cluster.Status.Phase
-		if clusterPhase == "" {
-			cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
-		} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
-			cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
+	compareContainersAttribute := func(oldContainer, newContainer reflect.Value, attributeNames ...string) bool {
+		for _, name := range attributeNames {
+			oldValue := oldContainer.FieldByName(name).Interface()
+			newValue := newContainer.FieldByName(name).Interface()
+			if !reflect.DeepEqual(oldValue, newValue) {
+				return true
+			}
 		}
+		return false
 	}
+
+	// isStorageUpdated := func(oldSts, newSts *appsv1.StatefulSet) bool {
+	//	if oldSts == nil || newSts == nil {
+	//		return false
+	//	}
+	//	for _, oldVct := range oldSts.Spec.VolumeClaimTemplates {
+	//		var newVct *corev1.PersistentVolumeClaim
+	//		for _, v := range newSts.Spec.VolumeClaimTemplates {
+	//			if v.Name == oldVct.Name {
+	//				newVct = &v
+	//				break
+	//			}
+	//		}
+	//		if newVct == nil {
+	//			continue
+	//		}
+	//		if oldVct.Spec.Resources.Requests[corev1.ResourceStorage] != newVct.Spec.Resources.Requests[corev1.ResourceStorage] {
+	//			return true
+	//		}
+	//	}
+	//	return false
+	// }
 
 	updateComponentsPhase := func() {
 		vertices := findAll[*appsv1.StatefulSet](dag)
@@ -99,26 +123,24 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 			newSpec := reflect.ValueOf(v.obj).Elem().FieldByName("Spec")
 
 			// compare replicas
-			// oldReplicas := oldSpec.FieldByName("Replicas").Interface()
-			// newReplicas := newSpec.FieldByName("Replicas").Interface()
-			// if !reflect.DeepEqual(oldReplicas, newReplicas) {
-			//	updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
-			//	continue
-			// }
-			// compare cpu & memory
-			oldResources := oldSpec.FieldByName("Template").
-				FieldByName("Spec").
-				FieldByName("Containers").
-				Index(0).
-				FieldByName("Resources").Interface()
-			newResources := newSpec.FieldByName("Template").
-				FieldByName("Spec").
-				FieldByName("Containers").
-				Index(0).
-				FieldByName("Resources").Interface()
-			if !reflect.DeepEqual(oldResources, newResources) {
+			oldReplicas := oldSpec.FieldByName("Replicas").Interface()
+			newReplicas := newSpec.FieldByName("Replicas").Interface()
+			if !reflect.DeepEqual(oldReplicas, newReplicas) && !v.immutable {
 				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
 				continue
+			}
+			// compare containers attributes
+			oldContainers := oldSpec.FieldByName("Template").
+				FieldByName("Spec").
+				FieldByName("Containers").
+				Index(0)
+			newContainers := newSpec.FieldByName("Template").
+				FieldByName("Spec").
+				FieldByName("Containers").
+				Index(0)
+			isChanged := compareContainersAttribute(oldContainers, newContainers, "Resources", "Image")
+			if isChanged {
+				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
 			}
 		}
 	}
@@ -136,13 +158,13 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	case isClusterUpdating(*origCluster):
 		transCtx.Logger.Info("update cluster status after applying resources ")
 		updateObservedGeneration()
-		updateClusterPhase()
 		updateComponentsPhase()
 		// update components' phase in cluster.status
 		rootVertex.action = actionPtr(STATUS)
 	case isClusterStatusUpdating(*origCluster):
 		initClusterStatusParams()
 		defer func() { rootVertex.action = actionPtr(STATUS) }()
+		updateComponentsPhase()
 		// checks if the controller is handling the garbage of restore.
 		if err := t.handleGarbageOfRestoreBeforeRunning(transCtx, cluster, dag); err != nil {
 			return err

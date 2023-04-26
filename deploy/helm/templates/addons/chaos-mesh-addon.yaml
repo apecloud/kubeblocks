@@ -1,0 +1,36 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: chaos-mesh
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'Chaos Mesh is an open-source chaos engineering tool that facilitates testing the resiliency and reliability of distributed systems by introducing various failure scenarios in a controlled manner.'
+
+  type: Helm
+
+  helm:
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/chaos-mesh-0.1.0-beta.0.tgz
+    valuesMapping:
+      valueMap:
+        replicaCount: controllerManager.replicaCount
+
+      jsonMap:
+        tolerations: controllerManager.tolerations
+
+      resources:
+        cpu:
+          requests: controllerManager.resources.requests.cpu
+        memory:
+          requests: controllerManager.resources.requests.memory
+
+  installable:
+    autoInstall: false
+
+  defaultInstallValues:
+    - enabled: false

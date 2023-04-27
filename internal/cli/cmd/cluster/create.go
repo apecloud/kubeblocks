@@ -39,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
@@ -291,11 +293,17 @@ func (o *CreateOptions) Complete() error {
 // buildComponents build components from file or set values
 func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 	var (
-		componentByte []byte
-		err           error
+		err       error
+		cd        *appsv1alpha1.ClusterDefinition
+		compSpecs []*appsv1alpha1.ClusterComponentSpec
 	)
 
-	componentClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, o.ClusterDefRef)
+	compClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return nil, err
+	}
+
+	cd, err = cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
 	if err != nil {
 		return nil, err
 	}
@@ -303,13 +311,14 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 	// build components from file
 	components := o.ComponentSpecs
 	if len(o.SetFile) > 0 {
-		if componentByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
+		var compByte []byte
+		if compByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
 			return nil, err
 		}
-		if componentByte, err = yaml.YAMLToJSON(componentByte); err != nil {
+		if compByte, err = yaml.YAMLToJSON(compByte); err != nil {
 			return nil, err
 		}
-		if err = json.Unmarshal(componentByte, &components); err != nil {
+		if err = json.Unmarshal(compByte, &components); err != nil {
 			return nil, err
 		}
 		for _, item := range components {
@@ -317,41 +326,96 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item, &comp); err != nil {
 				return nil, err
 			}
-			if _, err = class.ValidateComponentClass(&comp, componentClasses); err != nil {
-				return nil, err
-			}
+			compSpecs = append(compSpecs, &comp)
 		}
-		return components, nil
 	}
 
 	// build components from set values or environment variables
 	if len(components) == 0 {
-		cd, err := cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
-		if err != nil {
-			return nil, err
-		}
-
 		compSets, err := buildCompSetsMap(o.Values, cd)
 		if err != nil {
 			return nil, err
 		}
 
-		componentObjs, err := buildClusterComp(cd, compSets, componentClasses)
+		compSpecs, err = buildClusterComp(cd, compSets, compClasses)
 		if err != nil {
 			return nil, err
 		}
-		for _, compObj := range componentObjs {
-			if _, err = class.ValidateComponentClass(compObj, componentClasses); err != nil {
-				return nil, err
-			}
-			comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compObj)
+		for _, compSpec := range compSpecs {
+			comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compSpec)
 			if err != nil {
 				return nil, err
 			}
 			components = append(components, comp)
 		}
 	}
+
+	for _, compSpec := range compSpecs {
+		// validate component classes
+		if _, err = class.ValidateComponentClass(compSpec, compClasses); err != nil {
+			return nil, err
+		}
+
+		// build component dependencies
+		if err = o.buildCompDependencies(cd, compSpec); err != nil {
+			return nil, err
+		}
+	}
+
 	return components, nil
+}
+
+// buildDependencies create dependencies for components, e.g. postgresql depends on
+// a service account, a role and a rolebinding
+func (o *CreateOptions) buildCompDependencies(cd *appsv1alpha1.ClusterDefinition,
+	compSpec *appsv1alpha1.ClusterComponentSpec) error {
+	const (
+		saName          = "kb-postgres-sa"
+		roleName        = "kb-postgres-role"
+		roleBindingName = "kb-postgres-rolebinding"
+	)
+
+	var compDef *appsv1alpha1.ClusterComponentDefinition
+
+	// HACK: now we only support postgresql cluster definition
+	if cd.Spec.Type != "postgresql" {
+		return nil
+	}
+
+	// get cluster component definition
+	for i, def := range cd.Spec.ComponentDefs {
+		if def.Name == compSpec.ComponentDefRef {
+			compDef = &cd.Spec.ComponentDefs[i]
+		}
+	}
+
+	if compDef == nil {
+		return fmt.Errorf("failed to find component definition for componnet %s", compSpec.Name)
+	}
+
+	// for postgresql, we need to create a service account, a role and a rolebinding
+	if compDef.CharacterType != "postgresql" {
+		return nil
+	}
+
+	// create service account
+	sa := corev1ac.ServiceAccount(saName, o.Namespace)
+	if _, err := o.Client.CoreV1().ServiceAccounts(o.Namespace).Apply(context.TODO(), sa, metav1.ApplyOptions{}); err != nil {
+		return err
+	}
+
+	// create role
+	role := rbacv1ac.Role(roleName, o.Namespace).WithRules([]*rbacv1ac.PolicyRuleApplyConfiguration{
+		{
+			APIGroups: []string{""},
+			Resources: []string{"services"},
+			Verbs:     []string{"create"},
+		},
+	}...)
+	if _, err := o.Client.RbacV1().Roles(o.Namespace).Apply(context.TODO(), role, metav1.ApplyOptions{}); err != nil {
+		return err
+	}
+
 }
 
 // MultipleSourceComponents get component data from multiple source, such as stdin, URI and local file
@@ -485,7 +549,8 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 	}
 }
 
-func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string, componentClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string,
+	componentClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	// get value from set values and environment variables, the second return value is
 	// true if the value is from environment variables
 	getVal := func(c *appsv1alpha1.ClusterComponentDefinition, key setKey, sets map[setKey]string) string {

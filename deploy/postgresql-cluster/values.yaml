@@ -1,4 +1,4 @@
-# Default values for wesqlcluster.
+# Default values for PostgreSQL (with Patroni HA).
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -14,6 +14,14 @@ switchPolicy:
 
 monitor:
   enabled: false
+
+# PostgreSQL (with Patroni HA) needs the corresponding RBAC permission to create a cluster(refer to role.yaml, rolebinding.yaml, serviceaccount.yaml)
+# If you need to automatically create RBAC, please ensure serviceAccount.enabled=true.
+# Otherwise, the user needs to create the corresponding serviceAccount, role and roleBinding permissions manually to use PostgreSQL (with Patroni HA) normally.
+serviceAccount:
+  enabled: true
+  # if enabled is false, the name is required
+  name: ""
 
 resources: { }
   # We usually recommend not to specify default resources and to leave this as a conscious

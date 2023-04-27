@@ -70,7 +70,6 @@ spec:
         - name: data
           type: data
       podSpec:
-        serviceAccountName: operator
         securityContext:
           runAsUser: 0
           fsGroup: 103

@@ -1,8 +1,11 @@
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
-  name: kb-postgres-cluster-role
+  name: kb-role-{{ .Release.Namespace }}-{{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{ include "postgresqlcluster.labels" . | nindent 4 }}
 rules:
   - apiGroups:
       - ""

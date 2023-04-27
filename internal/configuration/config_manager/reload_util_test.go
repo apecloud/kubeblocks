@@ -164,7 +164,7 @@ func TestOnlineUpdateParamsHandle(t *testing.T) {
 				t.Errorf("OnlineUpdateParamsHandle() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			err = got(context.Background(), map[string]string{"key_buffer_size": "128M", "max_connections": "666"})
+			err = got(context.Background(), "", map[string]string{"key_buffer_size": "128M", "max_connections": "666"})
 			require.Nil(t, err)
 		})
 	}

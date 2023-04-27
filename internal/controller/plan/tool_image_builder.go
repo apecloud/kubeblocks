@@ -24,10 +24,11 @@ import (
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, podSpec *corev1.PodSpec, params builder.BuilderParams) {
+func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, podSpec *corev1.PodSpec, comp *component.SynthesizedComponent) {
 	if len(cfgManagerParams.ConfigSpecsBuildParams) == 0 {
 		return
 	}
@@ -46,7 +47,7 @@ func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 	if len(toolContainers) == 0 {
 		return
 	}
-	cfgManagerParams.ToolsContainers = builder.BuildCfgManagerToolsContainer(cfgManagerParams, params, toolContainers)
+	cfgManagerParams.ToolsContainers = builder.BuildCfgManagerToolsContainer(cfgManagerParams, comp, toolContainers)
 }
 
 func replaceToolImageHolder(toolConfig *appsv1alpha1.ToolConfig, podSpec *corev1.PodSpec, volumeName string) {

@@ -46,7 +46,7 @@ const (
 	buildInFilesObjectName = "Files"
 )
 
-type DynamicUpdater = func(ctx context.Context, updatedParams map[string]string) error
+type DynamicUpdater = func(ctx context.Context, configSpec string, updatedParams map[string]string) error
 
 func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *appsv1alpha1.FormatterConfig, dataType, dsn string) (DynamicUpdater, error) {
 	tplContent, err := os.ReadFile(tplScriptPath)
@@ -56,7 +56,7 @@ func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *appsv1alpha1.F
 	if err := checkTPLScript(tplScriptPath, string(tplContent)); err != nil {
 		return nil, err
 	}
-	return func(ctx context.Context, updatedParams map[string]string) error {
+	return func(ctx context.Context, configSpec string, updatedParams map[string]string) error {
 		return wrapGoTemplateRun(ctx, tplScriptPath, string(tplContent), updatedParams, formatConfig, dataType, dsn)
 	}, nil
 }

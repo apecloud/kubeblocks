@@ -8,7 +8,6 @@ metadata:
 spec:
 
   cfgSchemaTopLevelName: RedisParameter
-
   # ConfigurationSchema that impose restrictions on engine parameter's rule
   configurationSchema:
     cue: |-

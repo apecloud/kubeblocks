@@ -24,8 +24,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -34,7 +32,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
-	"k8s.io/apimachinery/pkg/util/yaml"
 
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
@@ -71,7 +68,7 @@ func runConfigManagerCommand(ctx context.Context, opt *VolumeWatcherOpts) error 
 		return err
 	}
 
-	if (opt.NotifyHandType == TPLScript || opt.NotifyHandType == Comb) && opt.BackupPath == "" {
+	if opt.BackupPath == "" {
 		tmpDir, err := os.MkdirTemp(os.TempDir(), "reload-backup-")
 		if err != nil {
 			return err
@@ -79,7 +76,6 @@ func runConfigManagerCommand(ctx context.Context, opt *VolumeWatcherOpts) error 
 		opt.BackupPath = tmpDir
 		defer os.RemoveAll(tmpDir)
 	}
-
 	return run(ctx, opt)
 }
 
@@ -90,7 +86,7 @@ func run(ctx context.Context, opt *VolumeWatcherOpts) error {
 		configHandler cfgcore.ConfigHandler
 	)
 
-	if configHandler, err = createConfigHandle(opt); err != nil {
+	if configHandler, err = cfgcore.CreateCombinedHandler(opt.CombConfig, opt.BackupPath); err != nil {
 		return err
 	}
 	if volumeWatcher, err = startVolumeWatcher(ctx, opt, configHandler); err != nil {
@@ -137,7 +133,7 @@ func startGRPCService(opt *VolumeWatcherOpts, ctx context.Context, handler cfgco
 		proxy  = &reconfigureProxy{opt: opt.ServiceOpt, ctx: ctx, logger: logger.Named("grpcProxy")}
 	)
 
-	if err := proxy.Init(opt, handler); err != nil {
+	if err := proxy.Init(handler); err != nil {
 		return err
 	}
 
@@ -168,51 +164,9 @@ func logUnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.
 }
 
 func checkOptions(opt *VolumeWatcherOpts) error {
-	if len(opt.VolumeDirs) == 0 && opt.NotifyHandType != TPLScript {
-		return cfgutil.MakeError("required volume directory is null.")
-	}
-
-	if opt.NotifyHandType == Comb && opt.CombConfig == "" {
+	if opt.CombConfig == "" {
 		return cfgutil.MakeError("required config is empty.")
 	}
-
-	if opt.NotifyHandType == TPLScript {
-		return checkTPLScriptOptions(opt)
-	}
-
-	if opt.NotifyHandType == ShellTool && opt.Command == "" {
-		return cfgutil.MakeError("required command is null.")
-	}
-
-	if len(opt.ProcessName) == 0 {
-		return cfgutil.MakeError("required process name is null.")
-	}
-	return nil
-}
-
-func checkTPLScriptOptions(opt *VolumeWatcherOpts) error {
-	if opt.TPLConfig == "" {
-		return cfgutil.MakeError("required tpl config is null")
-	}
-
-	if _, err := os.Stat(opt.TPLConfig); err != nil {
-		return err
-	}
-
-	b, err := os.ReadFile(opt.TPLConfig)
-	if err != nil {
-		return err
-	}
-	tplConfig := cfgcore.TPLScriptConfig{}
-	if err := yaml.Unmarshal(b, &tplConfig); err != nil {
-		return err
-	}
-
-	opt.FormatterConfig = &tplConfig.FormatterConfig
-	opt.DSN = tplConfig.DSN
-	opt.DataType = tplConfig.DataType
-	opt.FileRegex = tplConfig.FileRegex
-	opt.TPLScriptPath = filepath.Join(filepath.Dir(opt.TPLConfig), tplConfig.Scripts)
 	return nil
 }
 
@@ -242,23 +196,4 @@ func initLog(level string) *zap.Logger {
 	// to refactor this logging lib to anything else. Check FAQ - https://github.com/uber-go/zap/blob/master/FAQ.md
 	zapLog := zap.New(zapcore.NewCore(zaplogfmt.NewEncoder(logCfg), os.Stdout, levelStrings[level]))
 	return zapLog
-}
-
-func createConfigHandle(opt *VolumeWatcherOpts) (cfgcore.ConfigHandler, error) {
-	// func createHandlerWithVolumeWatch(opt *VolumeWatcherOpts) (cfgcore.WatchEventHandler, error) {
-	logger.Infof("access info: [%d] [%s]", opt.NotifyHandType, opt.ProcessName)
-	switch opt.NotifyHandType {
-	case UnixSignal:
-		return cfgcore.CreateSignalHandler(opt.Signal, opt.ProcessName, "")
-	case ShellTool:
-		return cfgcore.CreateExecHandler(strings.Fields(opt.Command), "", nil, "")
-	case TPLScript:
-		return cfgcore.CreateTPLScriptHandler("", opt.TPLConfig, opt.VolumeDirs, opt.BackupPath)
-	case Comb:
-		return cfgcore.CreateCombinedHandler(opt.CombConfig, opt.BackupPath)
-	case SQL, WebHook:
-		return nil, cfgutil.MakeError("event type[%s]: not supported", opt.NotifyHandType.String())
-	default:
-		return nil, cfgutil.MakeError("not supported event type.")
-	}
 }

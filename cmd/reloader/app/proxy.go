@@ -44,8 +44,8 @@ type reconfigureProxy struct {
 
 var stopContainerSignal = viper.GetString(cfgutil.KillContainerSignalEnvName)
 
-func (r *reconfigureProxy) Init(opt *VolumeWatcherOpts, handler cfgcm.ConfigHandler) error {
-	if err := r.initOnlineUpdater(opt, handler); err != nil {
+func (r *reconfigureProxy) Init(handler cfgcm.ConfigHandler) error {
+	if err := r.initOnlineUpdater(handler); err != nil {
 		r.logger.Errorf("init online updater failed: %+v", err)
 		return err
 	}
@@ -95,25 +95,19 @@ func (r *reconfigureProxy) OnlineUpgradeParams(ctx context.Context, request *cfg
 	if len(params) == 0 {
 		return nil, cfgcore.MakeError("update params is empty.")
 	}
-	if err := r.updater(ctx, params); err != nil {
+	if err := r.updater(ctx, request.ConfigSpec, params); err != nil {
 		return nil, err
 	}
 	return &cfgproto.OnlineUpgradeParamsResponse{}, nil
 }
 
-func (r *reconfigureProxy) initOnlineUpdater(opt *VolumeWatcherOpts, handler cfgcm.ConfigHandler) error {
-	if opt.NotifyHandType != TPLScript || !r.opt.RemoteOnlineUpdateEnable {
+func (r *reconfigureProxy) initOnlineUpdater(handler cfgcm.ConfigHandler) error {
+	if !r.opt.RemoteOnlineUpdateEnable {
 		return nil
 	}
 
-	r.updater = func(ctx context.Context, updatedParams map[string]string) error {
-		return handler.OnlineUpdate(ctx, "", updatedParams)
+	r.updater = func(ctx context.Context, name string, updatedParams map[string]string) error {
+		return handler.OnlineUpdate(ctx, name, updatedParams)
 	}
-
-	// updater, err := cfgcm.OnlineUpdateParamsHandle(opt.TPLScriptPath, opt.FormatterConfig, opt.DataType, opt.DSN)
-	// if err != nil {
-	//	return cfgcore.WrapError(err, "failed to create online updating process")
-	// }
-	// r.updater = updater
 	return nil
 }

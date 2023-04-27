@@ -555,7 +555,7 @@ var _ = Describe("Cluster Controller", func() {
 					}
 
 					By("Checking backup policy created from backup policy template")
-					policyName := lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDef.Name)
+					policyName := lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDef.Name, "")
 					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
 						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
 							BackupPolicyTemplateName: backupPolicyTPLName}
@@ -1066,7 +1066,7 @@ var _ = Describe("Cluster Controller", func() {
 				},
 			},
 			Spec: dataprotectionv1alpha1.BackupSpec{
-				BackupPolicyName: lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDefName),
+				BackupPolicyName: lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDefName, ""),
 				BackupType:       "snapshot",
 			},
 		}

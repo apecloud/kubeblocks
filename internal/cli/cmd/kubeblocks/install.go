@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	OS "runtime"
 	"sort"
 	"strings"
 	"time"
@@ -219,6 +220,11 @@ func (o *InstallOptions) Install() error {
 // waitAddonsEnabled waits for auto-install addons status to be enabled
 func (o *InstallOptions) waitAddonsEnabled() error {
 	addons := make(map[string]bool)
+	OS := OS.GOOS
+	var (
+		allEnabled bool
+		err        error
+	)
 	checkAddons := func() (bool, error) {
 		allEnabled := true
 		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
@@ -264,6 +270,47 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		return allEnabled, nil
 	}
 
+	progressInWindows := func() error {
+		fmt.Println("Wait for addons to be ready...")
+		newReadyInWin := make(map[string]bool)
+
+		checkProgressInWindows := func() {
+			if len(addons) == 0 {
+				return
+			}
+			for k, v := range addons {
+				_, ok := newReadyInWin[k]
+				if v && !ok {
+					out := fmt.Sprintf("%-50s %s\n", "Addon "+k, printer.BoldGreen("OK"))
+					fmt.Print(out)
+					newReadyInWin[k] = true
+				}
+			}
+		}
+
+		for i := 0; i < viper.GetInt("KB_WAIT_ADDON_TIMES"); i++ {
+			allEnabled, err = checkAddons()
+			if err != nil {
+				out := fmt.Sprintf("%-50s %s\n", "Wait for addons to be ready", printer.BoldRed("FAIL"))
+				fmt.Println(out)
+				return err
+			}
+			checkProgressInWindows()
+			if allEnabled {
+				return nil
+			}
+			time.Sleep(5 * time.Second)
+		}
+		//Timeout
+		for k, v := range addons {
+			if !v && OS == types.GoosWindows {
+				out := fmt.Sprintf("%-50s %s\n", "Addon "+k, printer.BoldRed("FAIL"))
+				fmt.Print(out)
+			}
+		}
+		return nil
+	}
+
 	okMsg := func(msg string) string {
 		return fmt.Sprintf("%-50s %s\n", msg, printer.BoldGreen("OK"))
 	}
@@ -274,6 +321,9 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		return fmt.Sprintf(" %-50s", msg)
 	}
 
+	if OS == types.GoosWindows {
+		return progressInWindows()
+	}
 	// create spinner
 	msg := "Wait for addons to be ready"
 	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
@@ -311,10 +361,6 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		prevUnready = unready
 	}
 
-	var (
-		allEnabled bool
-		err        error
-	)
 	// wait for all auto-install addons to be enabled
 	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_TIMES"); i++ {
 		allEnabled, err = checkAddons()

@@ -11,7 +11,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 :::note
 
-All pods restart in the order of learner -> follower -> leader and the leader may change after the cluster restarts.
+A concurrent restart is triggered and the leader may change after the cluster restarts.
 
 :::
 

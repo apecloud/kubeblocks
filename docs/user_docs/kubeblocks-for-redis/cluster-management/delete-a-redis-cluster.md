@@ -12,7 +12,7 @@ sidebar_label: Delete protection
 
 :::note
 
-The termination policy determines how you delete a cluster.
+The termination policy determines how a cluster is deleted.
 
 :::
 
@@ -34,8 +34,8 @@ kbcli cluster list <name>
 ```bash
 kbcli cluster list redis-cluster
 >
-NAME   	        NAMESPACE	CLUSTER-DEFINITION	VERSION        	TERMINATION-POLICY	STATUS 	CREATED-TIME
-redis-cluster	default  	redis    	        redis-7.0.x	    Delete            	Running	     Apr 10,2023 20:27 UTC+0800
+NAME   	        NAMESPACE	CLUSTER-DEFINITION	VERSION        	TERMINATION-POLICY	STATUS 	     CREATED-TIME
+redis-cluster	default  	redis    	        redis-7.0.6	    Delete            	Running	     Apr 10,2023 20:27 UTC+0800
 ```
 
 ## Option 1. Use kbcli

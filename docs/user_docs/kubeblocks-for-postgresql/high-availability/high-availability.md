@@ -18,12 +18,14 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
   * Check whether the switch policy is `Noop`.
 
     ```bash
-    kubectl get cluster redis-cluster -o yaml
+    kubectl get cluster pg-cluster -o yaml
     >
     spec:
-      - componentDefRef: postgresql
+      componentSpecs:
+      - name: postgresql
+        componentDefRef: postgresql
         switchPolicy:
-          type: Noop
+        type: Noop
     ```
 
   * Check whether the following role probe parameters exist to verify the role probe is enabled.
@@ -46,10 +48,31 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
    kbcli cluster describe pg-cluster
    ```
 
+   <details>
+
+   <summary>Output</summary>
+
+   ```bash
+   Name: pg-cluster	 Created Time: Apr 27,2023 11:13 UTC+0800
+   NAMESPACE   CLUSTER-DEFINITION   VERSION             STATUS    TERMINATION-POLICY
+   default     postgresql           postgresql-14.7.0   Running   Delete
+
+   Endpoints:
+   COMPONENT    MODE        INTERNAL                                               EXTERNAL
+   postgresql   ReadWrite   pg-cluster-postgresql.default.svc.cluster.local:5432   <none>
+
+   Topology:
+   COMPONENT    INSTANCE                  ROLE        STATUS    AZ       NODE                    CREATED-TIME
+   postgresql   pg-cluster-postgresql-0   primary     Running   <none>   minikube/192.168.49.2   Apr 27,2023 11:13 UTC+0800
+   postgresql   pg-cluster-postgresql-1   secondary   Running   <none>   minikube/192.168.49.2   Apr 27,2023 11:13 UTC+0800
+   ```
+
+   </details>
+
    Currently, `pg-cluster-postgresql-0` is the primary pod and `pg-cluster-postgresql-1` is the secondary pod.
 
 2. Simulate a primary pod exception.
-   
+
    ```bash
    # Enter the primary pod
    kubectl exec -it pg-cluster-postgresql-0  -- bash
@@ -58,7 +81,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
    root@postgres-postgresql-0:/home/postgres# rm -fr /home/postgres/pgdata/pgroot/data
    ```
 
-3. View logs to observe how the exception switches.
+3. View logs to observe how the roles of pods switch  when an exception occurs.
 
    ```bash
    # View the primary pod logs
@@ -67,7 +90,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
    In the logs, the leader lock is released from the primary pod and an HA switch occurs.
 
-   ```
+   ```bash
    2023-04-18 08:06:52,338 INFO: Lock owner: pg-cluster-postgresql-0; I am pg-cluster-postgresql-0
    2023-04-18 08:06:52,460 INFO: Leader key released
    2023-04-18 08:06:52,552 INFO: released leader key voluntarily as data dir empty and currently leader
@@ -88,7 +111,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
    ```
 
 4. Connect to the PostgreSQL cluster to view the replication information.
-   
+
    ```bash
    kbcli cluster connect pg-cluster
    ```
@@ -96,6 +119,16 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
    ```bash
    postgres=# select * from pg_stat_replication;
    ```
+
+   <details>
+
+   <summary>Output</summary>
+
+   ```bash
+
+   ```
+
+   </details>
 
    From the output, `pg-cluster-postgresql-0` has been assigned as the secondary's pod.
 

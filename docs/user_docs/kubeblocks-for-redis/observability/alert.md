@@ -7,7 +7,7 @@ sidebar_position: 2
 
 # Configure IM alert
 
-Alerts are mainly used for daily error response to improve system availability. KubeBlocks integrates a set of generic alert rules and multiple notification channels to meet the operation and maintenance requirements of online production-level clusters.
+Alerts are mainly used for daily error notification to improve system availability. KubeBlocks integrates a set of generic alert rules and multiple notification channels to meet the operation and maintenance requirements of online production-level clusters.
 
 ## Alert rules
 
@@ -86,6 +86,7 @@ Add an alert receiver.
 ***Example***
 
    The following commands show how to add a receiver to Feishu based on different requirements.
+
    The webhook URL below is an example and you need to replace it with the actual address before running the command.
 
    ```bash

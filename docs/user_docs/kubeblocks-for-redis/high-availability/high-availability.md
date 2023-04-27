@@ -11,7 +11,7 @@ KubeBlocks integrates [the official Redis Sentinel solution](https://redis.io/do
 
 Redis Sentinel is the high availability solution for a Redis PrimarySecondary, which is recommended by Redis and is also the main-stream solution in the community.
 
-In the Redis PrimarySecondary provided by KubeBlocks, Sentinel is deployed as an independent component 
+In the Redis PrimarySecondary provided by KubeBlocks, Sentinel is deployed as an independent component.
 
 ## Before you start
 
@@ -30,9 +30,11 @@ In the Redis PrimarySecondary provided by KubeBlocks, Sentinel is deployed as an
     kubectl get cluster redis-cluster -o yaml
     >
     spec:
-      - componentDefRef: redis
+      componentSpecs:
+      - name: redis
+        componentDefRef: redis
         switchPolicy:
-          type: Noop
+        type: Noop
     ```
 
   * Check whether the following role probe parameters exist to verify the role probe is enabled.
@@ -75,7 +77,7 @@ In the Redis PrimarySecondary provided by KubeBlocks, Sentinel is deployed as an
 
    In the logs, we can view when a high-availability switch occurs.
 
-   ```
+   ```bash
    1:X 18 Apr 2023 06:13:17.072 # +switch-master redis-cluster-redis-sentinel redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
    1:X 18 Apr 2023 06:13:17.074 * +slave slave redis-cluster-redis-0.redis-cluster-redis-headless.default.svc:6379 redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 @ redis-cluster-redis-sentinel redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
    1:X 18 Apr 2023 06:13:17.077 * Sentinel new configuration saved on disk

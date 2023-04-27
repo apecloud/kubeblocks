@@ -88,9 +88,14 @@ The example below reconfigures `acllog-max-len`.
    Make sure the value you set is within the Allowed Values of this parameter. If you set a value that does not meet the value range, the system prompts an error. For example,
 
    ```bash
-   kbcli cluster configure redis-cluster  --set=acllog-max-len=20000
-   error: failed to validate updated config: [failed to cue template render configure: [redis.acllog-max-len: invalid value 10001 (out of bound >=10000):  #TODO: Confirm the error prompt
-    343:34
+   kbcli cluster configure redis-cluster  --set=acllog-max-len=1000000
+   >
+   error: failed to validate updated config: [failed to cue template render configure: [configuration."acllog-max-len": 2 errors in empty disjunction:
+   configuration."acllog-max-len": conflicting values 128 and 1000000:
+       20:43
+       155:16
+   configuration."acllog-max-len": invalid value 1000000 (out of bound <=10000):
+       20:32
    ]
    ]
    ```
@@ -178,9 +183,14 @@ The example below reconfigures `maxclients` and `databases`.
    Make sure the value you set is within the Allowed Values of this parameter. If you set a value that does not meet the value range, the system prompts an error. For example,
 
    ```bash
-   kbcli cluster configure redis-cluster  --set=maxclients=65001,databases=32
-   error: failed to validate updated config: [failed to cue template render configure: [redis.maxclients: invalid value 65001 (out of bound >=65000):
-    343:34
+   kbcli cluster configure redis-cluster  --component=redis --set=maxclients=65001
+   >
+   error: failed to validate updated config: [failed to cue template render configure: [configuration.maxclients: 2 errors in empty disjunction:
+   configuration.maxclients: conflicting values 65000 and 65001:
+       100:37
+       155:16
+   configuration.maxclients: invalid value 65001 (out of bound <=65000):
+       100:26
    ]
    ]
    ```

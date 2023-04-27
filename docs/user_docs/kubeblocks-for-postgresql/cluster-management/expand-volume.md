@@ -10,7 +10,7 @@ You can expand the storage volume size of each pod.
 
 :::note
 
-Volume expansion triggers pod restart, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the operation.
+Volume expansion triggers pod restart, a concurrent restart is triggered and the leader pod may change after the operation.
 
 :::
 

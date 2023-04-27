@@ -34,7 +34,6 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: redis-cluster
   generateName: stop-
 spec:
   # cluster ref
@@ -51,22 +50,35 @@ Configure replicas as 0 to delete pods.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-    name: redis-cluster
+  name: redis-cluster
 spec:
   clusterDefinitionRef: redis
   clusterVersionRef: redis-7.0.6
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: redis
     componentDefRef: redis
-    monitor: false  
+    monitor: true  
     replicas: 0
     volumeClaimTemplates:
     - name: data
       spec:
         storageClassName: standard
         accessModes:
-          - ReadWriteOnce
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  - name: redis-sentinel
+    componentDefRef: redis-sentinel
+    monitor: true  
+    replicas: 0
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        storageClassName: standard
+        accessModes:
+        - ReadWriteOnce
         resources:
           requests:
             storage: 1Gi
@@ -92,12 +104,11 @@ kbcli cluster start redis-cluster
 
 Run the command below to start a cluster.
 
-```bash
+```yaml
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: redis-cluster
   generateName: start-
 spec:
   # cluster ref
@@ -118,18 +129,31 @@ metadata:
 spec:
   clusterDefinitionRef: redis
   clusterVersionRef: redis-7.0.6
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: redis
     componentDefRef: redis
-    monitor: false  
-    replicas: 1
+    monitor: true  
+    replicas: 2
     volumeClaimTemplates:
     - name: data
       spec:
         storageClassName: standard
         accessModes:
-          - ReadWriteOnce
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  - name: redis-sentinel
+    componentDefRef: redis-sentinel
+    monitor: true  
+    replicas: 3
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        storageClassName: standard
+        accessModes:
+        - ReadWriteOnce
         resources:
           requests:
             storage: 1Gi

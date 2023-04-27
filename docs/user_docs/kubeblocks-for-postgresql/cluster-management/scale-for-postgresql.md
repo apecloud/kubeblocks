@@ -13,7 +13,7 @@ You can vertically scale a cluster by changing resource requirements and limits 
 
 :::note
 
-During the vertical scaling process, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the restarting.
+During the vertical scaling process, a concurrent restart is triggered and the leader pod may change after the restarting.
 
 :::
 

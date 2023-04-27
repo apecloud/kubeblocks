@@ -1,7 +1,7 @@
 ---
-title: Backup and restore for a Redis cluster
-description: Guide for backup and restore for a Redis cluster
-keywords: [redis, backup, restore]
+title: Snapshot backup and restore
+description: Guide for backup and restore for a Redis cluster by snapshot
+keywords: [redis, backup, restore, snapshot]
 sidebar_position: 2
 sidebar_label: Redis
 ---

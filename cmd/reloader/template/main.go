@@ -22,19 +22,21 @@ import (
 )
 
 const (
-	builtinConfigMountPathObject = "configMountPath"
+	builtinConfigMountPathObject = "ConfigMountPath"
 )
 
 var configSpecMountPoint string
-var configSpecYaml string
+var secondaryRenderConfig string
 
 // for rendered output
 var outputDir string
+var setParams []string
 
 func installFlags() {
-	pflag.StringVar(&configSpecYaml, "config", "", "specify the config spec to be rendered")
+	pflag.StringVar(&secondaryRenderConfig, "config", "", "specify the config spec to be rendered")
 	pflag.StringVar(&configSpecMountPoint, "config-volume", "", "config volume mount point")
 	pflag.StringVar(&outputDir, "output-dir", "", "secondary rendered output dir")
+	pflag.StringSliceVar(&setParams, "set", nil, "set parameter")
 
 	opts := zap.Options{
 		Development: true,
@@ -59,6 +61,20 @@ func failed(err error, msg string) {
 	os.Exit(-1)
 }
 
+func buildTplValues() *gotemplate.TplValues {
+	values := gotemplate.TplValues{}
+	for _, param := range setParams {
+		fields := strings.SplitN(param, "=", 2)
+		if len(fields) == 2 {
+			values[fields[0]] = fields[1]
+		} else if len(fields) == 1 {
+			values[fields[0]] = nil
+		}
+	}
+	values[builtinConfigMountPathObject] = configSpecMountPoint
+	return &values
+}
+
 func main() {
 	installFlags()
 
@@ -66,7 +82,7 @@ func main() {
 		failed(cfgcore.MakeError("config volume mount point is empty"), "")
 	}
 
-	if configSpecYaml == "" {
+	if secondaryRenderConfig == "" {
 		failed(cfgcore.MakeError("config spec yaml is empty"), "")
 	}
 
@@ -84,7 +100,7 @@ func main() {
 	}
 
 	configRenderMeta := cfgcm.ConfigSecondaryRenderMeta{}
-	if err := cfgutil.FromYamlConfig(configSpecYaml, &configRenderMeta); err != nil {
+	if err := cfgutil.FromYamlConfig(filepath.Join(secondaryRenderConfig, cfgcm.KBConfigSpecYamlFile), &configRenderMeta); err != nil {
 		failed(err, "failed to parse config spec")
 	}
 
@@ -95,9 +111,8 @@ func main() {
 	if err != nil {
 		failed(err, "failed to create template merger")
 	}
-	engine := gotemplate.NewTplEngine(&gotemplate.TplValues{
-		builtinConfigMountPathObject: configSpecMountPoint,
-	}, nil, fmt.Sprintf("secondary template %s", configRenderMeta.Name), nclient, context.TODO())
+
+	engine := gotemplate.NewTplEngine(buildTplValues(), nil, fmt.Sprintf("secondary template %s", configRenderMeta.Name), nclient, context.TODO())
 
 	renderedData, err := secondaryRender(engine, configRenderMeta.Templates)
 	if err != nil {
@@ -140,7 +155,7 @@ func secondaryRender(engine *gotemplate.TplEngine, templates []string) (map[stri
 			continue
 		}
 		if !filepath.IsAbs(tpl) {
-			tpl = filepath.Join(filepath.Dir(configSpecYaml), tpl)
+			tpl = filepath.Join(filepath.Dir(secondaryRenderConfig), tpl)
 		}
 
 		b, err := os.ReadFile(tpl)

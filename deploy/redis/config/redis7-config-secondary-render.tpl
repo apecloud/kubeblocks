@@ -12,7 +12,7 @@
     {{- $isPrimary = true }}
 {{- end }}
 
-include "{{ .configMountPath }}/redis.conf"
+include "{{ $.ConfigMountPath }}/redis.conf"
 
 {{ if $isPrimary -}}
 appendonly yes

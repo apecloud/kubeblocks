@@ -73,7 +73,7 @@ spec:
             targetPort: delvedebug
       horizontalScalePolicy:
         type: Snapshot
-        backupPolicyTemplateName: apecloud-mysql-backup-policy-template
+        backupPolicyTemplateName: apecloud-mysql-scale-backup-policy-template-for-hscale
       podSpec:
         containers:
           - name: mysql

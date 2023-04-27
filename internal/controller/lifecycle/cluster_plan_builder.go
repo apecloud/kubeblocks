@@ -139,17 +139,11 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		}
 		// if pre-check failed, this is a fast return, no need to set apply resource condition
 		if preCheckCondition.Status != metav1.ConditionTrue {
+			sendWaringEventWithError(c.transCtx.GetRecorder(), c.transCtx.Cluster, ReasonPreCheckFailed, err)
 			return
 		}
 		setApplyResourceCondition(&c.transCtx.Cluster.Status.Conditions, c.transCtx.Cluster.Generation, err)
-		if err != nil && !IsRequeueError(err) {
-			reason := ReasonApplyResourcesFailed
-			controllerErr := intctrlutil.ToControllerError(err)
-			if controllerErr != nil {
-				reason = string(controllerErr.Type)
-			}
-			c.transCtx.GetRecorder().Event(c.transCtx.Cluster, corev1.EventTypeWarning, reason, err.Error())
-		}
+		sendWaringEventWithError(c.transCtx.GetRecorder(), c.transCtx.Cluster, ReasonApplyResourcesFailed, err)
 	}()
 
 	// new a DAG and apply chain on it, after that we should get the final Plan
@@ -183,7 +177,7 @@ func (p *clusterPlan) Execute() error {
 func (p *clusterPlan) handlePlanExecutionError(err error) error {
 	condition := newFailedApplyResourcesCondition(err.Error())
 	meta.SetStatusCondition(&p.transCtx.Cluster.Status.Conditions, condition)
-	p.transCtx.EventRecorder.Event(p.transCtx.Cluster, corev1.EventTypeWarning, condition.Reason, condition.Message)
+	sendWaringEventWithError(p.transCtx.GetRecorder(), p.transCtx.Cluster, ReasonApplyResourcesFailed, err)
 	return p.cli.Status().Patch(p.transCtx.Context, p.transCtx.Cluster, client.MergeFrom(p.transCtx.OrigCluster.DeepCopy()))
 }
 

@@ -6,4 +6,12 @@ type: application
 
 version: 0.5.0-beta.9
 
-appVersion: "14.7.0"
+# appVersion specifies the version of the PostgreSQL (with Patroni HA) database to be created,
+# and this value should be consistent with an existing clusterVersion.
+# All supported clusterVersion versions can be viewed through `kubectl get clusterVersion`.
+# The current default value is the highest version of the PostgreSQL (with Patroni HA) supported in KubeBlocks.
+appVersion: "14.7.1"
+
+annotations:
+  kubeblocks.io/clusterVersions: "14.7.1,12.14.0"
+  kubeblocks.io/multiCV: "true"

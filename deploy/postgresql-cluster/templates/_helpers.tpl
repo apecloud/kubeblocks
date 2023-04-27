@@ -54,9 +54,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the name of the service account to use
 */}}
 {{- define "postgresqlcluster.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "postgresqlcluster.fullname" .) .Values.serviceAccount.name }}
+{{- if .Values.serviceAccount.enabled }}
+{{- printf "kb-postgres-%s" .Release.Name | trunc 63 | trimSuffix "-"  }}
 {{- else }}
-{{- default "default" .Values.serviceAccount.name }}
+{{- .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}

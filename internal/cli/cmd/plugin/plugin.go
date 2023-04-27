@@ -62,6 +62,7 @@ func NewPluginCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	if err := EnsureDirs(paths.BasePath(),
 		paths.BinPath(),
+		paths.InstallPath(),
 		paths.IndexBase(),
 		paths.InstallReceiptsPath()); err != nil {
 		klog.Fatal(err)

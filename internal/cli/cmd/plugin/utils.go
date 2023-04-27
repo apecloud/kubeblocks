@@ -40,6 +40,8 @@ import (
 
 var (
 	ErrIsAlreadyInstalled = errors.New("can't install, the newest version is already installed")
+	ErrIsNotInstalled     = errors.New("plugin is not installed")
+	ErrIsAlreadyUpgraded  = errors.New("can't upgrade, the newest version is already installed")
 )
 
 func GetKbcliPluginPath() *Paths {
@@ -146,14 +148,6 @@ func Exec(pwd string, args ...string) (string, error) {
 	return strings.TrimSpace(buf.String()), nil
 }
 
-func CanonicalPluginName(in string) (string, string) {
-	if strings.Count(in, "/") == 0 {
-		return DefaultIndexName, in
-	}
-	p := strings.SplitN(in, "/", 2)
-	return p[0], p[1]
-}
-
 func LoadPluginByName(pluginsDir, pluginName string) (Plugin, error) {
 	klog.V(4).Infof("Reading plugin %q from %s", pluginName, pluginsDir)
 	return ReadPluginFromFile(filepath.Join(pluginsDir, pluginName+ManifestExtension))
@@ -222,7 +216,8 @@ func Install(p *Paths, plugin Plugin, indexName string, opts InstallOpts) error 
 		pluginName: plugin.Name,
 		platform:   candidate,
 
-		binDir: p.BinPath(),
+		binDir:     p.BinPath(),
+		installDir: p.PluginVersionInstallPath(plugin.Name, plugin.Spec.Version),
 	}, opts); err != nil {
 		return errors.Wrap(err, "install failed")
 	}
@@ -246,33 +241,56 @@ func install(op installOperation, opts InstallOpts) error {
 			klog.Warningf("failed to clean up download staging directory: %s", err)
 		}
 	}()
-	if err := downloadAndExtract(downloadStagingDir, op.platform.URI, op.platform.Sha256, opts.ArchiveFileOverride); err != nil {
+	if err := download.DownloadAndExtract(downloadStagingDir, op.platform.URI, op.platform.Sha256, opts.ArchiveFileOverride); err != nil {
 		return errors.Wrap(err, "failed to unpack into staging dir")
 	}
 
-	binName := op.platform.Bin
-	if !strings.HasPrefix(binName, "kbcli-") && !strings.HasPrefix(binName, "kubectl") {
-		binName = "kbcli-" + binName
-	}
-	if err := copyData(filepath.Join(downloadStagingDir, op.platform.Bin), filepath.Join(paths.BinPath(), binName)); err != nil {
-		return errors.Wrap(err, "failed copy file into bin")
+	applyDefaults(&op.platform)
+	if err := moveToInstallDir(downloadStagingDir, op.installDir, op.platform.Files); err != nil {
+		return errors.Wrap(err, "failed while moving files to the installation directory")
 	}
 
-	return nil
+	subPathAbs, err := filepath.Abs(op.installDir)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get the absolute fullPath of %q", op.installDir)
+	}
+	fullPath := filepath.Join(op.installDir, filepath.FromSlash(op.platform.Bin))
+	pathAbs, err := filepath.Abs(fullPath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get the absolute fullPath of %q", fullPath)
+	}
+	if _, ok := IsSubPath(subPathAbs, pathAbs); !ok {
+		return errors.Wrapf(err, "the fullPath %q does not extend the sub-fullPath %q", fullPath, op.installDir)
+	}
+	err = createOrUpdateLink(op.binDir, fullPath, op.pluginName)
+	return errors.Wrap(err, "failed to link installed plugin")
 }
 
-// downloadAndExtract downloads the specified archive uri (or uses the provided overrideFile, if a non-empty value)
-// while validating its checksum with the provided sha256sum, and extracts its contents to extractDir that must be.
-// created.
-func downloadAndExtract(extractDir, uri, sha256sum, overrideFile string) error {
-	var fetcher download.Fetcher = download.HTTPFetcher{}
-	if overrideFile != "" {
-		fetcher = download.NewFileFetcher(overrideFile)
+func Uninstall(p *Paths, name string) error {
+	if _, err := ReadReceiptFromFile(p.PluginInstallReceiptPath(name)); err != nil {
+		if os.IsNotExist(err) {
+			return ErrIsNotInstalled
+		}
+		return errors.Wrapf(err, "failed to look up install receipt for plugin %q", name)
 	}
 
-	verifier := download.NewSha256Verifier(sha256sum)
-	err := download.NewDownloader(verifier, fetcher).Get(uri, extractDir)
-	return errors.Wrap(err, "failed to unpack the plugin archive")
+	klog.V(1).Infof("Deleting plugin %s", name)
+
+	symlinkPath := filepath.Join(p.BinPath(), pluginNameToBin(name, IsWindows()))
+	klog.V(3).Infof("Unlink %q", symlinkPath)
+	if err := removeLink(symlinkPath); err != nil {
+		return errors.Wrap(err, "could not uninstall symlink of plugin")
+	}
+
+	pluginInstallPath := p.PluginInstallPath(name)
+	klog.V(3).Infof("Deleting path %q", pluginInstallPath)
+	if err := os.RemoveAll(pluginInstallPath); err != nil {
+		return errors.Wrapf(err, "could not remove plugin directory %q", pluginInstallPath)
+	}
+	pluginReceiptPath := p.PluginInstallReceiptPath(name)
+	klog.V(3).Infof("Deleting plugin receipt %q", pluginReceiptPath)
+	err := os.Remove(pluginReceiptPath)
+	return errors.Wrapf(err, "could not remove plugin receipt %q", pluginReceiptPath)
 }
 
 func indent(s string) string {
@@ -283,15 +301,9 @@ func indent(s string) string {
 	return out
 }
 
-func copyData(sourcePath, targetPath string) error {
-	data, err := os.ReadFile(sourcePath)
-	if err != nil {
-		return errors.New("read file err")
+func applyDefaults(platform *Platform) {
+	if platform.Files == nil {
+		platform.Files = []FileOperation{{From: "*", To: "."}}
+		klog.V(4).Infof("file operation not specified, assuming %v", platform.Files)
 	}
-
-	err = os.WriteFile(targetPath, data, 0777)
-	if err != nil {
-		return errors.New("write file err")
-	}
-	return nil
 }

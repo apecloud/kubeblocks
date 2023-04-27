@@ -20,12 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plugin
 
 import (
-	"os"
-	"path/filepath"
-
-	"github.com/pkg/errors"
+	"github.com/cockroachdb/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -52,34 +50,10 @@ func NewPluginUninstallCmd(_ genericclioptions.IOStreams) *cobra.Command {
 
 func uninstallPlugins(names []string) error {
 	for _, name := range names {
-		if _, err := ReadReceiptFromFile(paths.PluginInstallReceiptPath(name)); err != nil {
-			if os.IsNotExist(err) {
-				return nil
-			}
-			return errors.Wrapf(err, "failed to look up install receipt for plugin %q", name)
-		}
-		if IsWindows() {
-			name += ".exe"
-		}
-		if err := removeBinFile(name); err != nil {
-			return err
-		}
-		if err := os.Remove(paths.PluginInstallReceiptPath(name)); err != nil {
-			return err
+		klog.V(4).Infof("Going to uninstall plugin %s\n", name)
+		if err := Uninstall(paths, name); err != nil {
+			return errors.Wrapf(err, "failed to uninstall plugin %s", name)
 		}
 	}
-	return nil
-}
-
-func removeBinFile(name string) error {
-	kubectlPluginName := "kubectl-" + name
-	kbcliPluginName := "kbcli-" + name
-	if _, err := os.Stat(filepath.Join(paths.BinPath(), kubectlPluginName)); !os.IsNotExist(err) {
-		return os.Remove(filepath.Join(paths.BinPath(), kubectlPluginName))
-	}
-	if _, err := os.Stat(filepath.Join(paths.BinPath(), kbcliPluginName)); !os.IsNotExist(err) {
-		return os.Remove(filepath.Join(paths.BinPath(), kbcliPluginName))
-	}
-
 	return nil
 }

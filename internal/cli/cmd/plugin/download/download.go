@@ -236,3 +236,17 @@ func (d Downloader) Get(uri, dst string) error {
 	}
 	return extractArchive(dst, body, size)
 }
+
+// DownloadAndExtract downloads the specified archive uri (or uses the provided overrideFile, if a non-empty value)
+// while validating its checksum with the provided sha256sum, and extracts its contents to extractDir that must be.
+// created.
+func DownloadAndExtract(extractDir, uri, sha256sum, overrideFile string) error {
+	var fetcher Fetcher = HTTPFetcher{}
+	if overrideFile != "" {
+		fetcher = NewFileFetcher(overrideFile)
+	}
+
+	verifier := NewSha256Verifier(sha256sum)
+	err := NewDownloader(verifier, fetcher).Get(uri, extractDir)
+	return errors.Wrap(err, "failed to unpack the plugin archive")
+}

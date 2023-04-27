@@ -64,6 +64,18 @@ func (p *Paths) BinPath() string {
 	return filepath.Join(p.base, "bin")
 }
 
+func (p *Paths) InstallPath() string {
+	return filepath.Join(p.base, "store")
+}
+
+func (p *Paths) PluginInstallPath(plugin string) string {
+	return filepath.Join(p.InstallPath(), plugin)
+}
+
+func (p *Paths) PluginVersionInstallPath(plugin, version string) string {
+	return filepath.Join(p.InstallPath(), plugin, version)
+}
+
 func (p *Paths) PluginInstallReceiptPath(plugin string) string {
 	return filepath.Join(p.InstallReceiptsPath(), plugin+".yaml")
 }
@@ -139,7 +151,8 @@ type installOperation struct {
 	pluginName string
 	platform   Platform
 
-	binDir string
+	binDir     string
+	installDir string
 }
 
 // NewReceipt returns a new receipt with the given plugin and index name.

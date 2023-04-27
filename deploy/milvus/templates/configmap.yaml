@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: milvus-standalone-config-template
+  name: milvus-config-template
   namespace: {{ .Release.Namespace | quote }}
   labels:
   {{- include "milvus.labels" . | nindent 4 }}

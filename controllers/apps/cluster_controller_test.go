@@ -766,7 +766,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
-		By("Checking the Affinity and TopologySpreadConstraints")
+		By("Checking the podSpec.serviceAccountName")
 		Eventually(func(g Gomega) {
 			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 			podSpec := stsList.Items[0].Spec.Template.Spec

@@ -53,8 +53,7 @@ const (
 const KBConfigSpecYamlFile = "kb-cm-config.yaml"
 
 func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, cmBuildParams *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
-	allVolumeMounts := make([]corev1.VolumeMount, 0)
-	allVolumeMounts = append(allVolumeMounts, volumeDirs...)
+	allVolumeMounts := getWatchedVolume(volumeDirs, cmBuildParams.ConfigSpecsBuildParams)
 	for i := range cmBuildParams.ConfigSpecsBuildParams {
 		buildParam := &cmBuildParams.ConfigSpecsBuildParams[i]
 		volumeMount := FindVolumeMount(cmBuildParams.Volumes, buildParam.ConfigSpec.VolumeName)
@@ -74,6 +73,30 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, c
 	allVolumeMounts = append(allVolumeMounts, downwardAPIVolumes...)
 	cmBuildParams.Volumes = append(cmBuildParams.Volumes, downwardAPIVolumes...)
 	return buildConfigManagerArgs(cmBuildParams, allVolumeMounts)
+}
+
+func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecMeta) []corev1.VolumeMount {
+	enableWatchVolume := func(volume corev1.VolumeMount) bool {
+		for _, param := range buildParams {
+			if param.ReloadType != appsv1alpha1.TPLScriptType || param.ConfigSpec.VolumeName != volume.Name {
+				continue
+			}
+			triggerOptions := param.ReloadOptions.TPLScriptTrigger
+			if triggerOptions == nil || triggerOptions.Sync == nil {
+				return true
+			}
+			return !*triggerOptions.Sync
+		}
+		return true
+	}
+
+	allVolumeMounts := make([]corev1.VolumeMount, 0, len(volumeDirs))
+	for _, volume := range volumeDirs {
+		if enableWatchVolume(volume) {
+			allVolumeMounts = append(allVolumeMounts, volume)
+		}
+	}
+	return allVolumeMounts
 }
 
 // buildConfigSpecSecondaryRenderConfig prepare secondary render config and volume

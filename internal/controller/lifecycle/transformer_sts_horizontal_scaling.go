@@ -243,25 +243,24 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 		}
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
-		var err error
 		switch {
 		// scale out
 		case *stsObj.Spec.Replicas < *stsProto.Spec.Replicas:
-			err = scaleOut()
+			if err := scaleOut(); err != nil {
+				return err
+			}
 		case *stsObj.Spec.Replicas > *stsProto.Spec.Replicas:
-			err = scaleIn()
-		}
-		if err != nil {
-			return err
+			if err := scaleIn(); err != nil {
+				return err
+			}
 		}
 		emitHorizontalScalingEvent()
-
-		if err = postScaleOut(); err != nil {
+		if err := postScaleOut(); err != nil {
 			return err
 		}
-
 		return nil
 	}
+
 	findPVCsToBeDeleted := func(pvcSnapshot clusterSnapshot) []*corev1.PersistentVolumeClaim {
 		stsToBeDeleted := make([]*appsv1.StatefulSet, 0)
 		// list sts to be deleted
@@ -636,21 +635,12 @@ func doSnapshot(cli roclient.ReadonlyClient,
 	backupPolicyTemplateName string,
 	dag *graph.DAG,
 	root graph.Vertex) error {
-
 	ctx := reqCtx.Ctx
-
 	backupPolicyTemplate := &appsv1alpha1.BackupPolicyTemplate{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: backupPolicyTemplateName}, backupPolicyTemplate); err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-	if len(backupPolicyTemplate.Name) > 0 {
-		// if there is backuppolicytemplate created by provider
-		// create backupjob CR, will ignore error if already exists
-		err := createBackup(reqCtx, cli, stsObj, componentDef, backupPolicyTemplateName, snapshotKey, cluster, dag, root)
-		if err != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: backupPolicyTemplateName}, backupPolicyTemplate); err != nil {
+		if !apierrors.IsNotFound(err) {
 			return err
 		}
-	} else {
 		// no backuppolicytemplate, then try native volumesnapshot
 		pvcName := strings.Join([]string{vcts[0].Name, stsObj.Name, "0"}, "-")
 		snapshot, err := builder.BuildVolumeSnapshot(snapshotKey, pvcName, stsObj)
@@ -663,8 +653,14 @@ func doSnapshot(cli roclient.ReadonlyClient,
 		vertex := &lifecycleVertex{obj: snapshot, action: actionPtr(CREATE)}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
-
 		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
+		return nil
+	}
+
+	// if there is backuppolicytemplate created by provider
+	// create backupjob CR, will ignore error if already exists
+	if err := createBackup(reqCtx, cli, stsObj, componentDef, backupPolicyTemplateName, snapshotKey, cluster, dag, root); err != nil {
+		return err
 	}
 	return nil
 }

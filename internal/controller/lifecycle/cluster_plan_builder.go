@@ -149,15 +149,14 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		sendWaringEventWithError(c.transCtx.GetRecorder(), c.transCtx.Cluster, ReasonApplyResourcesFailed, err)
 	}()
 
-	// new a DAG and apply chain on it, after that we should get the final Plan
+	// new a DAG and apply chain on it
 	dag := graph.NewDAG()
 	err = c.transformers.ApplyTo(c.transCtx, dag)
-	// log for debug
-	c.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
+	c.transCtx.Logger.V(1).Info(fmt.Sprintf("DAG: %s", dag))
 	// add dag to clusterPlanBuilder
 	c.dag = dag
 
-	// we got the execution plan
+	// construct execution plan
 	plan := &clusterPlan{
 		dag:      dag,
 		walkFunc: c.defaultWalkFunc,

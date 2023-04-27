@@ -50,11 +50,8 @@ type TransformerChain []Transformer
 var ErrFastReturn = errors.New("fast return")
 
 // ApplyTo applies TransformerChain t to dag
-func (t *TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
-	if t == nil {
-		return nil
-	}
-	for _, transformer := range *t {
+func (r TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
+	for _, transformer := range r {
 		if err := transformer.Transform(ctx, dag); err != nil {
 			return fastReturnErrorToNil(err)
 		}

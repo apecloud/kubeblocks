@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 func TestCreateSignalHandler(t *testing.T) {
@@ -56,9 +57,14 @@ func TestCreateTPLScriptHandler(t *testing.T) {
 
 	createTestConfigureDirectory(t, filepath.Join(tmpDir, "config"), "my.cnf", "xxxx")
 	tplFile := filepath.Join(tmpDir, "test.tpl")
-	require.Nil(t, os.WriteFile(tplFile, []byte("xxx"), fs.ModePerm))
+	configFile := filepath.Join(tmpDir, "config.yaml")
+	require.Nil(t, os.WriteFile(tplFile, []byte(``), fs.ModePerm))
 
-	_, err = CreateTPLScriptHandler("", tplFile, []string{filepath.Join(tmpDir, "config")}, "")
+	tplConfig := TPLScriptConfig{Scripts: "test.tpl"}
+	b, _ := util.ToYamlConfig(tplConfig)
+	require.Nil(t, os.WriteFile(configFile, b, fs.ModePerm))
+
+	_, err = CreateTPLScriptHandler("", configFile, []string{filepath.Join(tmpDir, "config")}, "")
 	require.Nil(t, err)
 }
 

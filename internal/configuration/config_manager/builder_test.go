@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -88,9 +89,6 @@ var _ = Describe("ConfigManager Test", func() {
 						}},
 				},
 				expectedArgs: []string{
-					`--notify-type`, `signal`,
-					`--process`, `postgres`,
-					`--signal`, `SIGHUP`,
 					`--volume-dir`, `/postgresql/conf`,
 					`--volume-dir`, `/postgresql/conf2`,
 				},
@@ -108,9 +106,7 @@ var _ = Describe("ConfigManager Test", func() {
 						}},
 				},
 				expectedArgs: []string{
-					`--notify-type`, `exec`,
 					`--volume-dir`, `/postgresql/conf`,
-					`---command`, `pwd`,
 				},
 			}, {
 				name: "buildCfgContainerParams",
@@ -135,12 +131,26 @@ var _ = Describe("ConfigManager Test", func() {
 								Namespace: "default",
 							},
 						},
+						Volumes: []corev1.VolumeMount{
+							{
+								Name:      "pg_config",
+								MountPath: "/postgresql/conf",
+							},
+						},
+						ConfigSpecsBuildParams: []ConfigSpecMeta{
+							{
+								ConfigSpec: appsv1alpha1.ComponentConfigSpec{
+									ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+										Name:       "pg_config",
+										VolumeName: "pg_config",
+									},
+								},
+							},
+						},
 					},
 				},
 				expectedArgs: []string{
-					`--notify-type`, `exec`,
 					`--volume-dir`, `/postgresql/conf`,
-					`---command`, `pwd`,
 				},
 			}, {
 				name: "buildCfgContainerParams",
@@ -167,8 +177,6 @@ var _ = Describe("ConfigManager Test", func() {
 					},
 				},
 				expectedArgs: []string{
-					`--notify-type`, `tpl`,
-					`--tpl-config`, `/opt/config/reload/reload.yaml`,
 					`--operator-update-enable`,
 				},
 				wantErr: false,
@@ -197,8 +205,6 @@ var _ = Describe("ConfigManager Test", func() {
 					},
 				},
 				expectedArgs: []string{
-					`--notify-type`, `tpl`,
-					`--tpl-config`, `/opt/config/reload/reload.yaml`,
 					`--volume-dir`, `/postgresql/conf`,
 				},
 				wantErr: false,
@@ -207,6 +213,11 @@ var _ = Describe("ConfigManager Test", func() {
 				param := tt.args.param
 				if param == nil {
 					param = &CfgManagerBuildParams{}
+				}
+				for i := range param.ConfigSpecsBuildParams {
+					buildParam := &param.ConfigSpecsBuildParams[i]
+					buildParam.ReloadOptions = tt.args.reloadOptions
+					buildParam.ReloadType = FromReloadTypeConfig(tt.args.reloadOptions)
 				}
 				err := BuildConfigManagerContainerParams(tt.args.cli, tt.args.ctx, param, tt.args.volumeDirs)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))

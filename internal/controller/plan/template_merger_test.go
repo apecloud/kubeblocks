@@ -132,9 +132,10 @@ max_connections=666
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
-			Expect(mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())).To(Succeed())
+			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
+			Expect(err).To(Succeed())
 
-			configReaders, err := cfgcore.LoadRawConfigObject(tmpCM.Data, configConstraintObj.Spec.FormatterConfig, configSpec.Keys)
+			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FormatterConfig, configSpec.Keys)
 			Expect(err).Should(Succeed())
 			Expect(configReaders).Should(HaveLen(1))
 			configObject := configReaders["my.cnf"]
@@ -157,10 +158,11 @@ max_connections=666
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
-			Expect(mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())).To(Succeed())
-			Expect(reflect.DeepEqual(tmpCM.Data, updatedCMObject.Data)).Should(BeTrue())
+			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
+			Expect(err).Should(Succeed())
+			Expect(reflect.DeepEqual(mergedData, updatedCMObject.Data)).Should(BeTrue())
 
-			configReaders, err := cfgcore.LoadRawConfigObject(tmpCM.Data, configConstraintObj.Spec.FormatterConfig, configSpec.Keys)
+			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FormatterConfig, configSpec.Keys)
 			Expect(err).Should(Succeed())
 			Expect(configReaders).Should(HaveLen(1))
 			configObject := configReaders["my.cnf"]
@@ -180,7 +182,8 @@ max_connections=666
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
-			Expect(mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())).ShouldNot(Succeed())
+			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
+			Expect(err).ShouldNot(Succeed())
 		})
 	})
 })

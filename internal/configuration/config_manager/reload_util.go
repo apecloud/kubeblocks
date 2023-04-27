@@ -238,6 +238,9 @@ func ScanConfigVolume(mountPoint string) ([]string, error) {
 }
 
 func backupConfigFiles(dirs []string, filter regexFilter, backupPath string) error {
+	if backupPath == "" {
+		return nil
+	}
 	fileInfo, err := os.Stat(backupPath)
 	if err != nil && !os.IsNotExist(err) {
 		return err

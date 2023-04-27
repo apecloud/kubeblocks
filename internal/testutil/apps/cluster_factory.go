@@ -85,7 +85,6 @@ func (factory *MockClusterFactory) SetServiceAccountName(serviceAccountName stri
 	if len(comps) > 0 {
 		comps[len(comps)-1].ServiceAccountName = serviceAccountName
 	}
-	factory.get().Spec.ComponentSpecs = comps
 	return factory
 }
 

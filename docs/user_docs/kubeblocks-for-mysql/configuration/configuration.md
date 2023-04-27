@@ -11,12 +11,13 @@ The KubeBlocks configuration function provides a set of consistent default confi
 
 ## Before you start
 
-1. Install KubeBlocks. For details, refer to [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md). 
-2. Create a MySQL standalone and wait until the cluster status is Running.
+1. [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kubeblocks).
+2. [Create a MySQL standalone](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) and wait until the cluster status is Running.
 
 ## View parameter information
 
 View the current configuration file of a cluster.
+
 ```bash
 kbcli cluster describe-config mysql-cluster  
 ```
@@ -32,6 +33,7 @@ You can also view the details of this configuration file and parameters.
    ```
 
 * View the parameter description.
+
   ```bash
   kbcli cluster explain-config mysql-cluster |head -n 20
   ```
@@ -62,7 +64,7 @@ You can also view the details of this configuration file and parameters.
   </details>
 
   * Allowed Values: It defines the valid value range of this parameter.
-  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. There are two different reconfiguration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**. 
+  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. There are two different reconfiguration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
     * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be updated online. Follow the instructions in [Reconfigure dynamic parameters](#reconfigure-dynamic-parameters).
     * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make reconfiguration effective. Follow the instructions in [Reconfigure static parameters](#reconfigure-static-parameters).
   * Description: It describes the parameter definition.
@@ -72,6 +74,7 @@ You can also view the details of this configuration file and parameters.
 The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
 
 1. View the current values of `max_connection` and `innodb_buffer_pool_size`.
+
    ```bash
    kbcli cluster connect mysql-cluster
    ```
@@ -99,14 +102,15 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
    ```
 
 2. Adjust the values of `max_connections` and `innodb_buffer_pool_size`.
+
    ```bash
    kbcli cluster configure mysql-cluster --set=max_connections=600,innodb_buffer_pool_size=512M
    ```
-   
+
    :::note
 
    Make sure the value you set is within the Allowed Values of this parameter. If you set a value that does not meet the value range, the system prompts an error. For example,
-   
+
    ```bash
    kbcli cluster configure mysql-cluster  --set=max_connections=200,innodb_buffer_pool_size=2097152
    error: failed to validate updated config: [failed to cue template render configure: [mysqld.innodb_buffer_pool_size: invalid value 2097152 (out of bound >=5242880):
@@ -118,7 +122,7 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
    :::
 
 3. Search the status of the parameter reconfiguration.
-   
+
    `Status.Progress` shows the overall status of the parameter reconfiguration and `Conditions` show the details.
 
    ```bash
@@ -155,8 +159,8 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
 
     </details>
 
-4. Connect to the database to verify whether the parameters are modified. 
-   
+4. Connect to the database to verify whether the parameters are modified.
+
    The whole searching process has a 30-second delay since it takes some time for kubelete to synchronize modifications to the volume of the pod.
 
    ```bash
@@ -211,18 +215,23 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
     ```
 
 2. Adjust the value of `ngram_token_size`.
+
    ```bash
    kbcli cluster configure mysql-cluster  --set=ngram_token_size=6
    ```
-   
+
    :::note
 
    Make sure the value you set is within the Allowed Values of this parameter. Otherwise, the reconfiguration may fail.
 
    :::
 
-3. Watch the progress of searching parameter reconfiguration and pay attention to the output of `Status.Progress` and `Status.Status`.
-   
+3. View the status of the parameter reconfiguration.
+
+   `Status.Progress` and `Status.Status` shows the overall status of the parameter reconfiguration and Conditions show the details.
+
+   When the `Status.Status` shows `Succeed`, the reconfiguration is completed.
+
    <details>
 
    <summary>Output</summary>
@@ -266,7 +275,10 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
 
    </details>
 
-4. Connect to the database and verify the modifications after the reconfiguration is completed.
+4. Connect to the database to verify whether the parameters are modified.
+
+   The whole searching process has a 30-second delay since it takes some time for kubelete to synchronize modifications to the volume of the pod.
+
    ```bash
    kbcli cluster connect mysql-cluster
    ```
@@ -287,6 +299,7 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
 After the reconfiguration is completed, you can search the reconfiguration history and compare the parameter differences.
 
 View the parameter reconfiguration history.
+
 ```bash
 kbcli cluster describe-config mysql-cluster
 >
@@ -301,7 +314,7 @@ mysql-cluster-reconfiguring-cclvm   mysql-cluster   mysql       mysql-consensuss
 mysql-cluster-reconfiguring-gx58r   mysql-cluster   mysql       mysql-consensusset-config   my.cnf   Succeed            -/-        Mar 16,2023 17:28 UTC+0800                       
 ```
 
-From the above results, there are three parameter modifications. 
+From the above results, there are three parameter modifications.
 
 Compare these modifications to view the configured parameters and their different values for different versions.
 

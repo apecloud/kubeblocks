@@ -212,7 +212,7 @@ In this example, data inserted before 19:56:40 is restored.
 
 
 7. (Caution) Delete the PostgreSQL cluster and clean up the backup.
-⚠ Data deleted here is only for test. In real senario, deleting backup is a critallt high risk operation.
+⚠ Data deleted here is only for test. In real scenarios, deleting backup is a critallt high risk operation.
 
    
     :::note

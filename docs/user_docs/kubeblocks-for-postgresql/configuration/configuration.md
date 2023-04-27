@@ -11,7 +11,7 @@ The KubeBlocks configuration function provides a set of consistent default confi
 
 ## Before you start
 
-1.  [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md).
+1. [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md).
 2. [Create a PostgreSQL cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md) and wait until the cluster status is Running.
 
 ## View parameter information
@@ -42,7 +42,13 @@ You can also view the details of this configuration file and parameters.
   
   ```bash
   kbcli cluster explain-config pg-cluster --param=max_connections
-  >
+  ```
+  
+  <details>
+
+  <summary>Output</summary>
+  
+  ```bash
   template meta:
     ConfigSpec: postgresql-configuration ComponentName: postgresql ClusterName: pg-cluster
 
@@ -54,6 +60,7 @@ You can also view the details of this configuration file and parameters.
     Type:               integer
     Description:        Sets the maximum number of concurrent connections.
   ```
+  </details>
 
   * Allowed Values: It defines the valid value range of this parameter.
   * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. There are two different reconfiguration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.

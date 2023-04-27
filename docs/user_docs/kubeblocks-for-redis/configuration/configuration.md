@@ -11,8 +11,8 @@ The KubeBlocks configuration function provides a set of consistent default confi
 
 ## Before you start
 
-1. Install KubeBlocks. For details, refer to [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md).
-2. Create a Redis cluster and wait until the cluster status is Running. For details, refer to [Create and connect a Redis cluster](./../cluster-management/create-and-connect-a-redis-cluster.md)
+1. [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kubeblocks).
+2. [Create a Redis cluster](./../cluster-management/create-and-connect-a-redis-cluster.md) and wait until the cluster status is Running.
 
 ## View parameter information
 
@@ -42,7 +42,13 @@ You can also view the details of this configuration file and parameters.
   
   ```bash
   kbcli cluster explain-config redis-cluster --component=redis --param=acllog-max-len
-  >
+  ```
+  
+  <details>
+
+  <summary>Output</summary>
+  
+  ```bash
   template meta:
     ConfigSpec: redis-replication-config	ComponentName: redis	ClusterName: redis-cluster
 
@@ -54,6 +60,7 @@ You can also view the details of this configuration file and parameters.
     Type:               integer
     Description: 
   ```
+  </details>
 
   * Allowed Values: It defines the valid value range of this parameter.
   * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. There are two different reconfiguration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.

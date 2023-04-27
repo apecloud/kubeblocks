@@ -125,6 +125,7 @@ The KubeBlocks log enhancement function uses methods similar to `kubectl exec` a
    </details>
 
 4. (Optional) Troubleshooting.
+
    The log enhancement function does not affect the core process of KubeBlocks. If a configuration exception occurs, a warning shows to help troubleshoot.
    
    `warning` is recorded in the `event` and `status.Conditions` of the target database cluster.

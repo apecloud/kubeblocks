@@ -1,6 +1,7 @@
 ---
 title: Create and connect to a MySQL Cluster
 description: How to create and connect to a MySQL cluster
+keywords: [mysql, create a cluster, connect a cluster]
 sidebar_position: 1
 sidebar_label: Create and connect
 ---
@@ -13,9 +14,9 @@ This document shows how to create and connect to a MySQL cluster.
 
 ### Before you start
 
-* `kbcli`: Install `kbcli` on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
-* KubeBlocks: Install KubeBlocks on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
-* Run the command below to view all the database types available for creating a cluster.
+* [Install `kbcli`](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kbcli).
+* [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kubeblocks).
+* View all the database types available for creating a cluster.
 
   ```bash
   kbcli clusterdefinition list
@@ -25,7 +26,7 @@ This document shows how to create and connect to a MySQL cluster.
 
 ***Steps***
 
- Run the command below to create a MySQL cluster with default settings.
+ Create a MySQL cluster with default settings.
 
    ```bash
    kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
@@ -41,36 +42,38 @@ This document shows how to create and connect to a MySQL cluster.
      kbcli cluster create -n demo --cluster-definition='apecloud-mysql'
      ```
 
-* The cluster created is with built-in toleration which tolerates the node with the `kb-data=true:NoSchedule` taint.
-* The cluster has built-in node affinity which first deploys the node with the `kb-data:true` label.
+* This cluster is created with built-in toleration which tolerates the node with the `kb-data=true:NoSchedule` taint.
+* This cluster has built-in node affinity which first deploys the node with the `kb-data:true` label.
 * For configuring pod affinity for a cluster, refer to [Configure pod affinity for database cluster](../../resource-scheduling/resource-scheduling.md).
-* The CPU and memory set for the cluster are 1 core and 1g.
+* The CPU and memory set for the cluster are 1C1G.
   
 ### (Recommended) Create a cluster with specified class type
 
-   A class is a set of resource configurations of CPU, memory and storage, to offer convenience and also set a constraints on the resources applied to the cluster. See [Cluster types](user_docs/kubeblocks-for-mysql/cluster-type/cluster-types.md).
-  ***Steps:***
+A class is a set of resource configurations of CPU, memory and storage, to offer convenience and also set a constraints on the resources applied to the cluster. See [Cluster types](./../cluster-type/cluster-types.md).
 
-  1. List all classes with ```kbcli class list``` command and choose the one you need, or check [class type](user_docs/kubeblocks-for-mysql/cluster-type/cluster-types.md) document for reference.
+***Steps:***
 
-    ```
-    kbcli class list --cluster-definition apecloud-mysql  
-    ```
+1. List all classes with `kbcli class list` command and choose the one you need, or check [class type](./../cluster-type/cluster-types.md) document for reference.
 
-  :::note
+   ```bash
+   kbcli class list --cluster-definition apecloud-mysql  
+   ```
+
+   :::note
   
-   If there is no suitable class listed, you can [customize your own class](user_docs/kubeblocks-for-mysql/cluster-type/customize-class-type.md) template and apply the class here.
-    Creating clusters that does not meet the constraints is invalid and system creates the cluster with the minimum CPU value specified.
+   If there is no suitable class listed, you can [customize your own class](./../cluster-type/customize-class-type.md) template and apply the class here.
 
-  :::
+   Creating clusters that does not meet the constraints is invalid and system creates the cluster with the minimum CPU value specified.
 
-   2. Use --set option with `kbcli cluster create` command.
+   :::
 
-    ```bash
-      kbcli cluster create myclsuter --cluster-definition apecloud-mysql --set class=general-2c2g
-    ```
+2. Use `--set` option with `kbcli cluster create` command.
 
-Except for the --set options, there are many options you can create cluster with, see Table 1.
+   ```bash
+   kbcli cluster create myclsuter --cluster-definition apecloud-mysql --set class=general-2c2g
+   ```
+
+Except for the `--set` options, there are many options you can create cluster with, see Table 1.
 📎 Table 1. kbcli cluster create options description
 
 | Option                 | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |

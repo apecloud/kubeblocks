@@ -86,7 +86,7 @@ The KubeBlocks log enhancement function uses methods similar to `kubectl exec` a
    <details>
 
    <summary>Output</summary>
-   
+
    ```bash
    kbcli cluster logs -h
    >
@@ -123,15 +123,15 @@ The KubeBlocks log enhancement function uses methods similar to `kubectl exec` a
    </details>
 
 4. (Optional) Troubleshooting.
-   
+
    The log enhancement function does not affect the core process of KubeBlocks. If a configuration exception occurs, a warning shows to help troubleshoot.
-   
+
    `warning` is recorded in the `event` and `status.Conditions` of the target database cluster.
-   
+
    View `warning` information.
 
      - Run `kbcli cluster describe <cluster-name>` to view the status of the target cluster. You can also run `kbcli cluster list-events <cluster-name>` to view the event information of the target cluster directly.
-       
+
        ```bash
        kbcli cluster describe pg-cluster
        ```
@@ -141,7 +141,7 @@ The KubeBlocks log enhancement function uses methods similar to `kubectl exec` a
        ```
 
      - Run `kubectl describe cluster <cluster-name>` to view the warning.
-         
+
          ```bash
          kubectl describe cluster pg-cluster
          ```

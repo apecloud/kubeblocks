@@ -11,7 +11,7 @@ Alerts are mainly used for daily error notification to improve system availabili
 
 ## Alert rules
 
-The built-in generic alert rules of KubeBlocks meet the needs of various data products and provide an out-of-the-box experience without further configurations. These alert rules provide the best practice for cluster operation and maintenance, which further improve alert accuracy and reduce the probability of false negatives and false positives by experience-based smoothing windows, alarm thresholds, alarm levels, and alarm indicators.
+The built-in generic alert rules of KubeBlocks meet the needs of various data products and provide an out-of-the-box experience without further configurations. These alert rules provide the best practice for cluster operation and maintenance, which further improve alert accuracy and reduce the probability of false negatives and false positives by experience-based smoothing windows, alert thresholds, alert levels, and alert indicators.
 
 Taking PostgreSQL as an example, the alert rules have built-in common abnormal events, such as instance down, instance restart, slow query, connection amount, deadlock, and cache hit rate.
 
@@ -38,7 +38,7 @@ You can view all the built-in alert rules in **Alerts Tab** of **Prometheus Dash
 kbcli dashboard list
 
 # Open Prometheus Dashboards
-kbcli dashboard open kubeblocks-prometheus-server # Here is an example and fill in the actual name based on the above dashboard list
+kbcli dashboard open kubeblocks-prometheus-server # Here is an example and fill in it with the actual name based on the above dashboard list
 ```
 
 ## Configure IM alert
@@ -98,13 +98,13 @@ Add an alert receiver.
    kbcli alert add-receiver \
    --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=sign'
 
-   # Only receive the alerts from a cluster named mysql
+   # Only receive the alerts from a cluster named redis-cluster
    kbcli alert add-receiver \
-   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=mysql
+   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=redis-cluster
 
-   # Only receive the critical alerts from a cluster named mysql
+   # Only receive the critical alerts from a cluster named redis-cluster
    kbcli alert add-receiver \
-   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=mysql --severity=critical
+   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=redis-cluster --severity=critical
    ```
 
 :::note

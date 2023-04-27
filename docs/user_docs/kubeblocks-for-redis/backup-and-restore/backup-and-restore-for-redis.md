@@ -14,7 +14,7 @@ This section shows how to use `kbcli` to back up and restore a Redis cluster.
 
 - Prepare a clean EKS cluster, and install ebs csi driver plug-in, with at least one node and the memory of each node is not less than 4GB.
 - [Install `kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl) to ensure that you can connect to the EKS cluster.
-- Install `kbcli`. Refer to [Install kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
+- [Install `kbcli`](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kbcli).
 
 ***Steps:***
 

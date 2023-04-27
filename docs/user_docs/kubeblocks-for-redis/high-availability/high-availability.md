@@ -57,6 +57,8 @@ In the Redis PrimarySecondary provided by KubeBlocks, Sentinel is deployed as an
    kbcli cluster describe redis-cluster
    ```
 
+   ![Redis cluster original status](../../../img/redis-ha-before.png)
+
    Currently, `redis-cluster-redis-0` is the primary pod and `redis-cluster-redis-1` is the secondary pod.
 
 2. Simulate a primary pod exception.
@@ -94,6 +96,8 @@ In the Redis PrimarySecondary provided by KubeBlocks, Sentinel is deployed as an
    127.0.0.1:6379> info replication
    ```
 
+   ![Redis info replication](../../../img/redis-ha-info-replication.png)
+
    From the output, `redis-cluster-redis-1` has been assigned as the secondary's pod.
 
 5. Describe the cluster and check the instance role.
@@ -101,3 +105,7 @@ In the Redis PrimarySecondary provided by KubeBlocks, Sentinel is deployed as an
    ```bash
    kbcli cluster describe redis-cluster
    ```
+
+   ![Redis cluster status after HA](./../../../img/redis-ha-after.png)
+
+   After the failover, `redis-cluster-redis-0` becomes the secondary pod and `redis-cluster-redis-1` becomes the primary pod.

@@ -1,6 +1,7 @@
 ---
 title: Migrate data to ApeCloud MySQL by AWS DMS
 description: How to migrate data to ApeCloud MySQL by AWS DMS
+keywords: [mysql, migration, aws dms]
 sidebar_position: 1
 ---
 
@@ -20,7 +21,9 @@ sidebar_position: 1
 The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS environment. But the migration task of DMS  (Database Migration Service) runs in an independent Replication Instance, in which the Replication Instance can be set with the same VPC used by the Kubernetes clusters, but visiting ClusterIP still fails. This solution aims to connect this part of the network.
 
 #### KubeBlocks native solution
+
 1. Check whether the loadbalancer add-on is enabled.
+
    ```bash
    kbcli addon list
    ```
@@ -29,11 +32,13 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
    Build your EKS environment, and refer to [Enable add-ons](./../../installation/enable-add-ons.md) to enable the loadbalancer add-on.
 2. Install ApeCloud MySQL. Refer to [Create an ApeCloud MySQL cluster on AWS](./../../quick-start/create-a-mysql-cluster-on-aws.md) for details.
 3. Fill in the cluster name and run the command below to expose the external IP of the cluster.
+
    ```bash
    kbcli cluster expose ${mysql clustrName} --enable=true --type=vpc
    ```
-    
+
    Run the command below to view the external IP:Port address which can be accessed by the same VPC machine but outside the EKS cluster.
+
    ```bash
    kbcli cluster describe ${clustrName} | grep -A 3 Endpoints
    ```
@@ -49,15 +54,17 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
    COMPONENT       MODE            INTERNAL                EXTERNAL
    mysql           ReadWrite       10.100.51.xxx:3306      172.31.35.xxx:3306 
    ```
+
 4. Configure the external IP:Port as the target endpoint on AWS DMS.
    This operation generates an ENI (Elastic Network Interface) on EC2. If the quota of the low-spec machine is small, pay more attention to the available level of ENI.
    For the corresponding ENI specifications, refer to [Elastic network interfaces - Amazon Elastic Compute Cloud](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html).
 
 #### Use Network Load Balancer (NLB) to expose the service
+
 1. Install Load Balancer Controller on EKS.
    For installation details, refer to [Installing the AWS Load Balancer Controller add-on](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html).
    For how to create NLB in a cluster, refer to [Network load balancing on Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html).
-2. Create and use the NLB service to expose the ApeCloud MySQL service. 
+2. Create and use the NLB service to expose the ApeCloud MySQL service.
    Configure `metadata.name`, `metadata.annotations`, `metadata.labels`, and `spec.selector` according to your actual environment.
 
    ```bash
@@ -89,8 +96,10 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
              port: 3306
              targetPort: mysql 
    EOF
-   ```   
+   ```
+
 3. Run the command below to make sure the service and NLB run normally.
+
    ```bash
    kubectl get svc 
    >
@@ -111,7 +120,7 @@ There exist four different conditions for the source network. Choose one method 
 
 * RDS within the same VPC in AWS
   
-   You only need to specify an RDS when creating an endpoint in DMS and no extra operation is required. 
+   You only need to specify an RDS when creating an endpoint in DMS and no extra operation is required.
    For creating an endpoint, refer to step 2 in [Configure AWS DMS tasks](#step-2-configure-aws-dms-tasks).
 
 * RDS within different VPCs in AWS
@@ -126,7 +135,7 @@ There exist four different conditions for the source network. Choose one method 
      For installation details, refer to [Installing the AWS Load Balancer Controller add-on](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html).
      For how to create NLB in a cluster, refer to [Network load balancing on Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html).
   2. Create the service using NLB
-     Make sure the value of `some.label.key` in `metadata.labels` is consistent with the value of ApeCloud MySQL you created. 
+     Make sure the value of `some.label.key` in `metadata.labels` is consistent with the value of ApeCloud MySQL you created.
      Configure `port` and `targetPort` in `spec.ports` according to your current environment.
 
      ```bash
@@ -153,12 +162,14 @@ There exist four different conditions for the source network. Choose one method 
                targetPort: 3306 
      EOF
      ```
+
   3. Make sure Service and NLB run normally.
      Refer to step 3 in [Use Network Load Balancer (NLB) to expose the service](#use-network-load-balancer-nlb-to-expose-the-service) for details.
 
 ## Step 2. Configure AWS DMS tasks
 
 Pay attention to the following potential issues during the migration task.
+
 * Double write
   
    During the migration, make sure no business is writing to the target data instance. Otherwise, double write occurs.
@@ -176,7 +187,7 @@ Pay attention to the following potential issues during the migration task.
 
 * binlog retention hours
   
-   The process of migrating data transmission changes depends on the binlog of the source database. 
+   The process of migrating data transmission changes depends on the binlog of the source database.
    It is recommended to extend the binlog retention hours to avoid a long-term interruption and the situation that the binlog of the source database is cleared during recovery, resulting in the migration not being resumed.
    For example, in AWS RDS, connect to the database and run the command below:
 
@@ -201,8 +212,8 @@ Pay attention to the following potential issues during the migration task.
 ***Steps:***
 
 1. Create a Replication Instance for migration.
-   
-   Go to **DMS** -> **Replication Instance** and click **Create replication instance**. 
+
+   Go to **DMS** -> **Replication Instance** and click **Create replication instance**.
 
    :::caution
 
@@ -213,7 +224,7 @@ Pay attention to the following potential issues during the migration task.
    ![Create replication instance](./../../../img/mysql_migration_replication_instance.png)
 
 2. Create endpoints.
-   
+
    Go to **DMS** -> **Endpoints** and click **Create endpoint**.
 
    ![Create endpoint](./../../../img/mysql_migration_create_endpoints.png)
@@ -227,20 +238,20 @@ Pay attention to the following potential issues during the migration task.
    ![Test connection](./../../../img/mysql_migration_test_connection.png)
 
 3. Create migration tasks.
-   
+
    ![Create task](./../../../img/mysql_migration_create_task.png)
-   
-   Click **Create task** and configure the task according to the instructions. 
-   
+
+   Click **Create task** and configure the task according to the instructions.
+
    Pay attention to the following parameters.
 
    * Migration Type
-    
+
      ![Migration type](./../../../img/mysql_migration_migration_type.png)
 
-     AWS DMS provides three migration types: 
+     AWS DMS provides three migration types:
 
-     * Migrate existing data: AWS DMS migrates only your existing data. Changes to your source data aren’t captured and applied to your target. 
+     * Migrate existing data: AWS DMS migrates only your existing data. Changes to your source data aren’t captured and applied to your target.
      * Migrate existing data and replicate ongoing changes: AWS DMS migrates both existing data and ongoing data changes, i.e. the existing data before the migration task and the data changes during the migration task will be synchronized to the target instance.
      * Replicate data changes only: AWS DMS only migrates the ongoing data changes. If you select this type, you can use **CDC start mode for source transactions** to specify a location and migrate the data changes.
     For this tutorial, select **Migrate existing data and replicate ongoing changes**.
@@ -265,32 +276,32 @@ Pay attention to the following potential issues during the migration task.
      ![Batch-optimized apply](./../../../img/mysql_migration_batch_optimized_apply.png)
 
    * Full load tuning settings: Maximum number of tables to load in parallel
-     
+
      This number decides how many concurrencies DMS uses to get source table data. Theoretically speaking, this will cause pressure on the source table during the full-load migration. Lower this number when the business in the source table is delicate.
 
      ![Full load tuning settings](./../../../img/mysql_migration_full_load_tuning_settings.png)
 
    * Table Mapping
-     
+
      Table mapping decides which tables in the database are used for migration and can also apply easy conversions. It is recommended to enable **Wizard** mode to configure this parameter.
 4. Click the button to start the migration task.
-   
+
 ## Step 3. Switch applications
 
 ***Before you start***
 
 * DMS migration tasks run normally. If you perform a validation task, make sure the results are as expected.
-* To differentiate conversation and improve data security, it is recommended to create and authorize a database account solely for migration. 
+* To differentiate conversation and improve data security, it is recommended to create and authorize a database account solely for migration.
 * It is recommended to switch applications during business off-peak hours because for the sake of safety during the switching process, it is necessary to stop business write.
 
 ***Steps:***
 
 1. Make sure the transmission task runs normally.
-   
+
    Pay attention to **Status**, **Last updated in Table statistics**, and **CDC latency target** in **CloudWatch metrics**.
-   
+
    You can also refer to [this document](https://aws.amazon.com/premiumsupport/knowledge-center/dms-stuck-task-progress/?nc1=h_ls) to verify the migration task.
-   
+
    ![Status](./../../../img/mysql_migration_application_status.png)
 
    ![CDC](./../../../img/mysql_migration_application_cdc.png)

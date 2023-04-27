@@ -48,26 +48,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
    kbcli cluster describe pg-cluster
    ```
 
-   <details>
-
-   <summary>Output</summary>
-
-   ```bash
-   Name: pg-cluster	 Created Time: Apr 27,2023 11:13 UTC+0800
-   NAMESPACE   CLUSTER-DEFINITION   VERSION             STATUS    TERMINATION-POLICY
-   default     postgresql           postgresql-14.7.0   Running   Delete
-
-   Endpoints:
-   COMPONENT    MODE        INTERNAL                                               EXTERNAL
-   postgresql   ReadWrite   pg-cluster-postgresql.default.svc.cluster.local:5432   <none>
-
-   Topology:
-   COMPONENT    INSTANCE                  ROLE        STATUS    AZ       NODE                    CREATED-TIME
-   postgresql   pg-cluster-postgresql-0   primary     Running   <none>   minikube/192.168.49.2   Apr 27,2023 11:13 UTC+0800
-   postgresql   pg-cluster-postgresql-1   secondary   Running   <none>   minikube/192.168.49.2   Apr 27,2023 11:13 UTC+0800
-   ```
-
-   </details>
+   ![PostgreSQL cluster original status](../../../img/pgsql-ha-before.png)
 
    Currently, `pg-cluster-postgresql-0` is the primary pod and `pg-cluster-postgresql-1` is the secondary pod.
 
@@ -120,15 +101,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
    postgres=# select * from pg_stat_replication;
    ```
 
-   <details>
-
-   <summary>Output</summary>
-
-   ```bash
-
-   ```
-
-   </details>
+   ![PostgreSQL replication info](../../../img/pgsql-ha-pg_stat_replication.png)
 
    From the output, `pg-cluster-postgresql-0` has been assigned as the secondary's pod.
 
@@ -137,3 +110,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
    ```bash
    kbcli cluster describe pg-cluster
    ```
+
+   ![PostgreSQL cluster status after HA](../../../img/pgsql-ha-after.png)
+
+   After the failover, `pg-cluster-postgresql-0` becomes the secondary pod and `pg-cluster-postgresql-1` becomes the primary pod.

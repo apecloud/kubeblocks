@@ -1,5 +1,5 @@
 apiVersion: v2
-name: milvus-standalone
+name: milvus
 description: .
 
 type: application

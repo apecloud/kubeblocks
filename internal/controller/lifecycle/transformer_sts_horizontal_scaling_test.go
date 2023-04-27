@@ -54,7 +54,7 @@ var _ = Describe("sts horizontal scaling test", func() {
 				AddComponentDef(apps.ConsensusMySQLComponent, componentDefName).
 				GetObject()
 			cv := apps.NewClusterVersionFactory(clusterVerName, cd.Name).
-				AddComponent(componentDefName).
+				AddComponentVersion(componentDefName).
 				GetObject()
 			cluster := apps.NewClusterFactory(namespace, clusterName, cd.Name, cv.Name).
 				AddComponent(componentName, componentDefName).

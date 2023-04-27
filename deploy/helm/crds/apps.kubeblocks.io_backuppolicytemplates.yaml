@@ -397,6 +397,13 @@ spec:
                   this is an immutable attribute.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
+              identifier:
+                description: Identifier is a unique identifier for this BackupPolicyTemplate.
+                  this identifier will be the suffix of the automatically generated
+                  backupPolicy name. and must be added when multiple BackupPolicyTemplates
+                  exist, otherwise the generated backupPolicy override will occur.
+                maxLength: 20
+                type: string
             required:
             - backupPolicies
             - clusterDefinitionRef

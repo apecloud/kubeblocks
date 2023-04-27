@@ -753,7 +753,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	}
 
-	testCLusterServiceAccount := func(compName, compDefName string) {
+	testClusterServiceAccount := func(compName, compDefName string) {
 		By("Creating a cluster with target service account name")
 
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -1356,7 +1356,7 @@ var _ = Describe("Cluster Controller", func() {
 			})
 
 			It(fmt.Sprintf("[comp: %s] should add serviceAccountName correctly", compName), func() {
-				testCLusterServiceAccount(compName, compDefName)
+				testClusterServiceAccount(compName, compDefName)
 			})
 
 			Context(fmt.Sprintf("[comp: %s] and with cluster affinity set", compName), func() {

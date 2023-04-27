@@ -81,9 +81,9 @@ var _ = Describe("builder", func() {
 	allFieldsClusterVersionObj := func(needCreate bool) *appsv1alpha1.ClusterVersion {
 		By("By assure an clusterVersion obj")
 		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(mysqlCompDefName).
+			AddComponentVersion(mysqlCompDefName).
 			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponent(proxyCompDefName).
+			AddComponentVersion(proxyCompDefName).
 			AddInitContainerShort("nginx-init", testapps.NginxImage).
 			AddContainerShort("nginx", testapps.NginxImage).
 			GetObject()

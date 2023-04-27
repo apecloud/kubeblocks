@@ -33,8 +33,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
-// MockReplicationComponentStsPod mocks to create pod of the replication StatefulSet, just using in envTest
-func MockReplicationComponentStsPod(
+// MockReplicationComponentPod mocks to create pod of the replication StatefulSet, just using in envTest
+func MockReplicationComponentPod(
 	g gomega.Gomega,
 	testCtx testutil.TestContext,
 	sts *appsv1.StatefulSet,
@@ -85,7 +85,7 @@ func MockReplicationComponentPods(
 		} else if i == 0 {
 			role = "primary"
 		}
-		pods = append(pods, MockReplicationComponentStsPod(g, testCtx, sts, clusterName, compName, podName, role))
+		pods = append(pods, MockReplicationComponentPod(g, testCtx, sts, clusterName, compName, podName, role))
 	}
 	return pods
 }

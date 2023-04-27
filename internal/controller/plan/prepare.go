@@ -125,6 +125,9 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		return nil
 	}
 
+	// REVIEW/TODO:
+	// - need higher level abstraction handling
+	// - or move this module to part operator controller handling
 	switch task.Component.WorkloadType {
 	case appsv1alpha1.Stateless:
 		if err := workloadProcessor(
@@ -195,6 +198,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		return err
 	}
 	for _, svc := range svcList {
+		// REVIEW/TODO: need higher level abstraction handling
 		switch task.Component.WorkloadType {
 		case appsv1alpha1.Consensus:
 			addLeaderSelectorLabels(svc, task.Component)

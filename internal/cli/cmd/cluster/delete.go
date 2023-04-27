@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -44,6 +43,7 @@ var deleteExample = templates.Examples(`
 func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := delete.NewDeleteOptions(f, streams, types.ClusterGVR())
 	o.PreDeleteHook = clusterPreDeleteHook
+	o.PostDeleteHook = clusterPostDeleteHook
 
 	cmd := &cobra.Command{
 		Use:               "delete NAME",
@@ -67,17 +67,35 @@ func deleteCluster(o *delete.DeleteOptions, args []string) error {
 }
 
 func clusterPreDeleteHook(object runtime.Object) error {
-	if object.GetObjectKind().GroupVersionKind().Kind != appsv1alpha1.ClusterKind {
-		klog.V(1).Infof("object %s is not of kind %s, skip PreDeleteHook.", object.GetObjectKind().GroupVersionKind().Kind, appsv1alpha1.ClusterKind)
-		return nil
-	}
-	unstructed := object.(*unstructured.Unstructured)
-	cluster := &appsv1alpha1.Cluster{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructed.Object, cluster); err != nil {
+	cluster, err := getClusterFromObject(object)
+	if err != nil {
 		return err
 	}
 	if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {
 		return fmt.Errorf("cluster %s is protected by termination policy %s, skip deleting", cluster.Name, appsv1alpha1.DoNotTerminate)
 	}
 	return nil
+}
+
+func clusterPostDeleteHook(object runtime.Object) error {
+	cluster, err := getClusterFromObject(object)
+	if err != nil {
+		return err
+	}
+
+	// HACK: for a postgresql cluster, we need to delete the sa, role and rolebinding
+
+	return nil
+}
+
+func getClusterFromObject(object runtime.Object) (*appsv1alpha1.Cluster, error) {
+	if object.GetObjectKind().GroupVersionKind().Kind != appsv1alpha1.ClusterKind {
+		return nil, fmt.Errorf("object %s is not of kind %s", object.GetObjectKind().GroupVersionKind().Kind, appsv1alpha1.ClusterKind)
+	}
+	unstructured := object.(*unstructured.Unstructured)
+	cluster := &appsv1alpha1.Cluster{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.Object, cluster); err != nil {
+		return nil, err
+	}
+	return cluster, nil
 }

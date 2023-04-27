@@ -271,6 +271,10 @@ func (o *CreateOptions) Validate() error {
 }
 
 func (o *CreateOptions) Complete() error {
+	if err := o.Validate(); err != nil {
+		return err
+	}
+
 	components, err := o.buildComponents()
 	if err != nil {
 		return err
@@ -365,17 +369,23 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 	return components, nil
 }
 
+const (
+	saNamePrefix          = "kb-sa-"
+	roleNamePrefix        = "kb-role-"
+	roleBindingNamePrefix = "kb-rolebinding-"
+)
+
 // buildDependencies create dependencies for components, e.g. postgresql depends on
 // a service account, a role and a rolebinding
 func (o *CreateOptions) buildCompDependencies(cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
-	const (
-		saName          = "kb-postgres-sa"
-		roleName        = "kb-postgres-role"
-		roleBindingName = "kb-postgres-rolebinding"
-	)
+	var (
+		saName          = saNamePrefix + o.Name
+		roleName        = roleNamePrefix + o.Name
+		roleBindingName = roleBindingNamePrefix + o.Name
 
-	var compDef *appsv1alpha1.ClusterComponentDefinition
+		compDef *appsv1alpha1.ClusterComponentDefinition
+	)
 
 	// HACK: now we only support postgresql cluster definition
 	if cd.Spec.Type != "postgresql" {
@@ -408,14 +418,43 @@ func (o *CreateOptions) buildCompDependencies(cd *appsv1alpha1.ClusterDefinition
 	role := rbacv1ac.Role(roleName, o.Namespace).WithRules([]*rbacv1ac.PolicyRuleApplyConfiguration{
 		{
 			APIGroups: []string{""},
-			Resources: []string{"services"},
-			Verbs:     []string{"create"},
+			Resources: []string{"configmaps"},
+			Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"endpoints"},
+			Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+			Verbs:     []string{"get", "list", "patch", "update", "watch"},
 		},
 	}...)
 	if _, err := o.Client.RbacV1().Roles(o.Namespace).Apply(context.TODO(), role, metav1.ApplyOptions{}); err != nil {
 		return err
 	}
 
+	// create role binding
+	rbacAPIGroup := "rbac.authorization.k8s.io"
+	rbacKind := "Role"
+	saKind := "ServiceAccount"
+	roleBinding := rbacv1ac.RoleBinding(roleBindingName, o.Namespace).
+		WithSubjects([]*rbacv1ac.SubjectApplyConfiguration{
+			{
+				Kind:      &saKind,
+				Name:      &saName,
+				Namespace: &o.Namespace,
+			},
+		}...).
+		WithRoleRef(&rbacv1ac.RoleRefApplyConfiguration{
+			APIGroup: &rbacAPIGroup,
+			Kind:     &rbacKind,
+			Name:     &roleName,
+		})
+	_, err := o.Client.RbacV1().RoleBindings(o.Namespace).Apply(context.TODO(), roleBinding, metav1.ApplyOptions{})
+	return err
 }
 
 // MultipleSourceComponents get component data from multiple source, such as stdin, URI and local file
@@ -453,7 +492,6 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		BaseOptionsObj:  &o.BaseOptions,
 		Options:         o,
 		Factory:         f,
-		Validate:        o.Validate,
 		Complete:        o.Complete,
 		PreCreate:       o.PreCreate,
 		BuildFlags: func(cmd *cobra.Command) {

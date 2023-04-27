@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 const (
@@ -56,7 +57,7 @@ func conditionIsChanged(oldCondition *metav1.Condition, newCondition metav1.Cond
 func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName string, clusterGeneration int64, err error) {
 	condition := newProvisioningStartedCondition(clusterName, clusterGeneration)
 	if err != nil {
-		condition = newFailedProvisioningStartedCondition(err.Error(), ReasonPreCheckFailed)
+		condition = newFailedProvisioningStartedCondition(err)
 	}
 	meta.SetStatusCondition(conditions, condition)
 }
@@ -72,20 +73,31 @@ func newProvisioningStartedCondition(clusterName string, clusterGeneration int64
 	}
 }
 
+func getConditionReasonWithError(defaultReason string, err error) string {
+	if err == nil {
+		return defaultReason
+	}
+	controllerErr := intctrlutil.ToControllerError(err)
+	if controllerErr != nil {
+		defaultReason = string(controllerErr.Type)
+	}
+	return defaultReason
+}
+
 // newApplyResourcesCondition creates a condition when applied resources succeed.
-func newFailedProvisioningStartedCondition(message, reason string) metav1.Condition {
+func newFailedProvisioningStartedCondition(err error) metav1.Condition {
 	return metav1.Condition{
 		Type:    appsv1alpha1.ConditionTypeProvisioningStarted,
 		Status:  metav1.ConditionFalse,
-		Message: message,
-		Reason:  reason,
+		Message: err.Error(),
+		Reason:  getConditionReasonWithError(ReasonPreCheckFailed, err),
 	}
 }
 
 func setApplyResourceCondition(conditions *[]metav1.Condition, clusterGeneration int64, err error) {
 	condition := newApplyResourcesCondition(clusterGeneration)
 	if err != nil {
-		condition = newFailedApplyResourcesCondition(err.Error())
+		condition = newFailedApplyResourcesCondition(err)
 	}
 	meta.SetStatusCondition(conditions, condition)
 }
@@ -102,12 +114,12 @@ func newApplyResourcesCondition(clusterGeneration int64) metav1.Condition {
 }
 
 // newApplyResourcesCondition creates a condition when applied resources succeed.
-func newFailedApplyResourcesCondition(message string) metav1.Condition {
+func newFailedApplyResourcesCondition(err error) metav1.Condition {
 	return metav1.Condition{
 		Type:    appsv1alpha1.ConditionTypeApplyResources,
 		Status:  metav1.ConditionFalse,
-		Message: message,
-		Reason:  ReasonApplyResourcesFailed,
+		Message: err.Error(),
+		Reason:  getConditionReasonWithError(ReasonApplyResourcesFailed, err),
 	}
 }
 

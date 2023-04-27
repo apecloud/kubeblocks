@@ -1,7 +1,8 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: postgresql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  # major version of the component defined in values.yaml
+  name: postgresql-{{ .Values.image.tag }}
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
@@ -15,4 +16,33 @@ spec:
       containers:
       - name: postgresql
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: postgresql-12.14.0
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: postgresql
+  componentVersions:
+    - componentDefRef: postgresql
+      configSpecs:
+        # name needs to consistent with the name of the configmap defined in clusterDefinition, and replace the templateRef with postgres v12.14.0 configmap
+        - name: postgresql-configuration
+          templateRef: postgresql12-configuration
+          constraintRef: postgresql12-cc
+          keys:
+            - postgresql.conf
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-config
+          defaultMode: 0777
+      versionsContext:
+        initContainers:
+          - name: pg-init-container
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0
+        containers:
+          - name: postgresql
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0
 ---

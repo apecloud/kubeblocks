@@ -128,12 +128,9 @@ func BuildComponent(
 		}
 	}
 
-	// set component.PodSpec.ServiceAccountName
-	if component.ServiceAccountName != "" {
-		component.PodSpec.ServiceAccountName = component.ServiceAccountName
-	}
-
 	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
+	// set component.PodSpec.ServiceAccountName
+	component.PodSpec.ServiceAccountName = component.ServiceAccountName
 
 	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
 	// At present, it is possible to distinguish between ConfigMap volume and normal volume,

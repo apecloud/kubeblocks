@@ -273,7 +273,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
@@ -322,7 +322,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
@@ -483,7 +483,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).ShouldNot(HaveOccurred())
 			for i := int32(0); i < *sts.Spec.Replicas; i++ {
 				podName := fmt.Sprintf("%s-%d", sts.Name, i)
-				pod := testapps.MockReplicationComponentStsPod(nil, testCtx, sts, clusterObj.Name,
+				pod := testapps.MockReplicationComponentPod(nil, testCtx, sts, clusterObj.Name,
 					testapps.DefaultRedisCompName, podName, replication.DefaultRole(i))
 				podList = append(podList, pod)
 			}
@@ -499,7 +499,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("Create a clusterVersion obj with replication workloadType.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(testapps.DefaultRedisCompDefName).AddContainerShort(testapps.DefaultRedisContainerName,
+				AddComponentVersion(testapps.DefaultRedisCompDefName).AddContainerShort(testapps.DefaultRedisContainerName,
 				testapps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 

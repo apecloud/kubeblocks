@@ -103,9 +103,9 @@ var _ = Describe("PITR Functions", func() {
 				AddComponentDef(testapps.StatelessNginxComponent, nginxCompType).
 				Create(&testCtx).GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompType).
+				AddComponentVersion(mysqlCompType).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				AddComponent(nginxCompType).
+				AddComponentVersion(nginxCompType).
 				AddInitContainerShort("nginx-init", testapps.NginxImage).
 				AddContainerShort("nginx", testapps.NginxImage).
 				Create(&testCtx).GetObject()

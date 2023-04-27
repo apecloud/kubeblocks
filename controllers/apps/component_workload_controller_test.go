@@ -193,7 +193,7 @@ var _ = Describe("Deployment Controller", func() {
 				Create(&testCtx).GetObject()
 
 			testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(statelessCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
+				AddComponentVersion(statelessCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
 				Create(&testCtx).GetObject()
 
 			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).

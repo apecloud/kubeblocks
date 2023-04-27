@@ -15,7 +15,7 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/weaviate-standalone-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/weaviate-{{ default .Chart.Version .Values.versionOverride }}.tgz
 
   installable:
     autoInstall: true

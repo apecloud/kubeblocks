@@ -94,9 +94,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	createClusterVersion := func() {
 		_ = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(statefulMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-			AddComponent(consensusMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-			AddComponent(nginxCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
+			AddComponentVersion(statefulMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			AddComponentVersion(consensusMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			AddComponentVersion(nginxCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
 			Create(&testCtx)
 	}
 

@@ -135,13 +135,12 @@ var _ = Describe("Create", func() {
 				},
 				BuildFlags: func(cmd *cobra.Command) {
 					cmd.Flags().StringVar(&baseOptions.Namespace, "clusterDefRef", "", "cluster definition")
-					cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+					cmd.Flags().StringVar(&baseOptions.DryRunStrategy, "dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 					cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 					printer.AddOutputFlagForCreate(cmd, &baseOptions.Format)
 				},
 			}
 			cmd := BuildCommand(inputs)
-			inputs.Cmd = cmd
 
 			testCases := []struct {
 				clusterName   string
@@ -200,7 +199,7 @@ var _ = Describe("Create", func() {
 				Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
 				Expect(baseOptions.Validate(inputs)).Should(Succeed())
 
-				dryRunStrateg, _ := GetDryRunStrategy(cmd)
+				dryRunStrateg, _ := baseOptions.GetDryRunStrategy()
 				if t.success {
 					Expect(dryRunStrateg == t.dryRunStrateg).Should(BeTrue())
 					Expect(baseOptions.Run(inputs)).Should(Succeed())

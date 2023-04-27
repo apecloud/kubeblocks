@@ -35,7 +35,7 @@ package plan
 //	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 //	"github.com/apecloud/kubeblocks/internal/generics"
 //	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-//)
+// )
 //
 // const (
 //	mysqlCompDefName = "replicasets"
@@ -44,7 +44,7 @@ package plan
 //	nginxCompName    = "nginx"
 //	redisCompDefName = "replicasets"
 //	redisCompName    = "redis"
-//)
+// )
 //
 // var _ = Describe("Cluster Controller", func() {
 //
@@ -90,7 +90,7 @@ package plan
 //				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 //				GetObject()
 //			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-//				AddComponent(nginxCompDefName).
+//				AddComponentVersion(nginxCompDefName).
 //				AddContainerShort("nginx", testapps.NginxImage).
 //				GetObject()
 //			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
@@ -129,7 +129,7 @@ package plan
 //				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 //				GetObject()
 //			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-//				AddComponent(mysqlCompDefName).
+//				AddComponentVersion(mysqlCompDefName).
 //				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 //				GetObject()
 //			pvcSpec := testapps.NewPVCSpec("1Gi")
@@ -181,7 +181,7 @@ package plan
 //				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config").
 //				GetObject()
 //			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-//				AddComponent(mysqlCompDefName).
+//				AddComponentVersion(mysqlCompDefName).
 //				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 //				GetObject()
 //			pvcSpec := testapps.NewPVCSpec("1Gi")
@@ -230,7 +230,7 @@ package plan
 //				AddContainerVolumeMounts("mysql", []corev1.VolumeMount{{Name: "mysql-config", MountPath: "/mnt/config"}}).
 //				GetObject()
 //			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-//				AddComponent(mysqlCompDefName).
+//				AddComponentVersion(mysqlCompDefName).
 //				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 //				GetObject()
 //			pvcSpec := testapps.NewPVCSpec("1Gi")
@@ -286,9 +286,9 @@ package plan
 //				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 //				GetObject()
 //			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-//				AddComponent(mysqlCompDefName).
+//				AddComponentVersion(mysqlCompDefName).
 //				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-//				AddComponent(nginxCompDefName).
+//				AddComponentVersion(nginxCompDefName).
 //				AddContainerShort("nginx", testapps.NginxImage).
 //				GetObject()
 //			pvcSpec := testapps.NewPVCSpec("1Gi")
@@ -337,9 +337,9 @@ package plan
 //				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 //				GetObject()
 //			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-//				AddComponent(redisCompDefName).
+//				AddComponentVersion(redisCompDefName).
 //				AddContainerShort("redis", testapps.DefaultRedisImageName).
-//				AddComponent(nginxCompDefName).
+//				AddComponentVersion(nginxCompDefName).
 //				AddContainerShort("nginx", testapps.NginxImage).
 //				GetObject()
 //			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
@@ -392,15 +392,15 @@ package plan
 //	// 			AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 //	// 			GetObject()
 //	// 		clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-//	// 			AddComponent(redisCompDefName).
+//	// 			AddComponentVersion(redisCompDefName).
 //	// 			AddContainerShort("redis", testapps.DefaultRedisImageName).
-//	// 			AddComponent(nginxCompDefName).
+//	// 			AddComponentVersion(nginxCompDefName).
 //	// 			AddContainerShort("nginx", testapps.NginxImage).
 //	// 			GetObject()
 //	// 		pvcSpec := testapps.NewPVCSpec("1Gi")
 //	// 		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 //	// 			clusterDef.Name, clusterVersion.Name).
-//	// 			AddComponent(redisCompName, redisCompDefName).
+//	// 			AddComponentVersion(redisCompName, redisCompDefName).
 //	// 			SetReplicas(2).
 //	// 			SetPrimaryIndex(0).
 //	// 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).

@@ -104,7 +104,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 		By("Create a clusterVersion obj")
 		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(statefulCompDefName).
+			AddComponentVersion(statefulCompDefName).
 			Create(&testCtx).GetObject()
 	})
 

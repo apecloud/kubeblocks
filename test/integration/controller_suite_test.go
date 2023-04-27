@@ -201,7 +201,7 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 
 	By("Create a clusterVersion obj")
 	clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-		AddComponent(mysqlCompDefName).
+		AddComponentVersion(mysqlCompDefName).
 		AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 		AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(mysqlConfigName), configmap.Name,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).

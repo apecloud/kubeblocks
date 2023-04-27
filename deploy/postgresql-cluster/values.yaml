@@ -20,6 +20,8 @@ monitor:
 # Otherwise, the user needs to create the corresponding serviceAccount, role and roleBinding permissions manually to use PostgreSQL (with Patroni HA) normally.
 serviceAccount:
   enabled: true
+  # if enabled is false, the name is required
+  name: ""
 
 resources: { }
   # We usually recommend not to specify default resources and to leave this as a conscious

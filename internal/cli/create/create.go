@@ -315,6 +315,10 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 }
 
 func (o *BaseOptions) CleanUp(inputs Inputs) error {
+	if inputs.CreateDependencies == nil {
+		return nil
+	}
+
 	if inputs.CleanUpFn != nil {
 		return inputs.CleanUpFn()
 	}

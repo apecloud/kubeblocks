@@ -222,7 +222,7 @@ func (o *NetworkChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringToStringVar(&o.TargetLabel, "target-label", nil, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
 	cmd.Flags().StringVar(&o.TargetNamespaceSelector, "target-namespace-selector", "", `Specifies the namespace into which you want to inject faults.`)
 
-	cmd.Flags().String("dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().StringVar(&o.DryRunStrategy, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
 
 	printer.AddOutputFlagForCreate(cmd, &o.Format)

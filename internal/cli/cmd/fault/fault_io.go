@@ -153,7 +153,7 @@ func (o *IOChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringArrayVar(&o.ContainerNames, "container-names", nil, "the name of the container, such as mysql, prometheus.If it's empty, the first container will be injected.")
 	cmd.Flags().StringArrayVar(&o.Methods, "methods", nil, "Types of file system calls that need to inject faults.")
 
-	cmd.Flags().String("dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().StringVar(&o.DryRunStrategy, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
 
 	printer.AddOutputFlagForCreate(cmd, &o.Format)

@@ -41,6 +41,9 @@ spec:
 
   defaultInstallValues:
   - replicas: 1
+    {{- with .Values.tolerations }}
+    tolerations: {{ toJson . | quote }}
+    {{- end }}
 
   installable:
     autoInstall: {{ index .Values "aws-load-balancer-controller" "enabled" }}

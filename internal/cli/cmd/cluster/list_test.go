@@ -37,6 +37,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -61,8 +62,12 @@ var _ = Describe("list", func() {
 
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		cluster := testing.FakeCluster(clusterName, namespace)
-		clusterWithCondition := testing.FakeCluster(clusterName1, namespace, metav1.Condition{
+		cluster := testing.FakeCluster(clusterName, namespace, metav1.Condition{
+			Type:   appsv1alpha1.ConditionTypeApplyResources,
+			Status: metav1.ConditionFalse,
+			Reason: "HorizontalScaleFailed",
+		})
+		clusterWithVerticalScaling := testing.FakeCluster(clusterName1, namespace, metav1.Condition{
 			Type:   appsv1alpha1.ConditionTypeLatestOpsRequestProcessed,
 			Status: metav1.ConditionFalse,
 			Reason: verticalScalingReason,
@@ -80,7 +85,7 @@ var _ = Describe("list", func() {
 				return map[string]*http.Response{
 					"/namespaces/" + namespace + "/clusters":                 httpResp(&appsv1alpha1.ClusterList{Items: []appsv1alpha1.Cluster{*cluster}}),
 					"/namespaces/" + namespace + "/clusters/" + clusterName:  httpResp(cluster),
-					"/namespaces/" + namespace + "/clusters/" + clusterName1: httpResp(clusterWithCondition),
+					"/namespaces/" + namespace + "/clusters/" + clusterName1: httpResp(clusterWithVerticalScaling),
 					"/namespaces/" + namespace + "/secrets":                  httpResp(testing.FakeSecrets(namespace, clusterName)),
 					"/api/v1/nodes/" + testing.NodeName:                      httpResp(testing.FakeNode()),
 					urlPrefix + "/services":                                  httpResp(&corev1.ServiceList{}),
@@ -92,7 +97,7 @@ var _ = Describe("list", func() {
 		}
 
 		tf.Client = tf.UnstructuredClient
-		tf.FakeDynamicClient = testing.FakeDynamicClient(cluster, clusterWithCondition, testing.FakeClusterDef(), testing.FakeClusterVersion())
+		tf.FakeDynamicClient = testing.FakeDynamicClient(cluster, clusterWithVerticalScaling, testing.FakeClusterDef(), testing.FakeClusterVersion())
 	})
 
 	AfterEach(func() {
@@ -108,6 +113,7 @@ var _ = Describe("list", func() {
 
 		cmd.Run(cmd, []string{clusterName1})
 		Expect(out.String()).Should(ContainSubstring(verticalScalingReason))
+		Expect(out.String()).Should(ContainSubstring(cluster.ConditionsError))
 	})
 
 	It("list instances", func() {

@@ -62,11 +62,16 @@ data:
     echo "cluster_info=$cluster_info"; 
     mkdir -p /data/mysql/data /data/mysql/log
     chmod +777 -R /data/mysql; 
-    echo "KB_MYSQL_RECREATE=$KB_MYSQL_RECREATE"
-    if [ "$KB_MYSQL_RECREATE" == "true" ]; then 
-      echo "recreate from existing volumes, touch /data/mysql/data/.resetup_db"
-      touch /data/mysql/data/.resetup_db
+    echo "KB_MYSQL_CLUSTER_UID=$KB_MYSQL_CLUSTER_UID"
+    cluster_uid_path=/data/mysql/data/.kb_cluster_uid
+    if [ -f $cluster_uid_path ]; then
+      last_cluster_uid=`cat $cluster_uid_path`
+      if [ "$last_cluster_uid" != "$KB_MYSQL_CLUSTER_UID" ]; then
+        echo "recreate from existing volumes, touch /data/mysql/data/.resetup_db"
+        touch /data/mysql/data/.resetup_db
+      fi
     fi
+    echo "$KB_MYSQL_CLUSTER_UID" > $cluster_uid_path
     if [ -z $leader ] || [ ! -f "/data/mysql/data/.restore" ]; then
       echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$cluster_info\" --cluster-id=$CLUSTER_ID"
       exec docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID

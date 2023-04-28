@@ -43,6 +43,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -53,7 +54,7 @@ var (
 	infoExample = templates.Examples(`
 	# list workloads owned by KubeBlocks
 	kbcli kubeblocks status
-	
+
 	# list all resources owned by KubeBlocks, such as workloads, cluster definitions, backup template.
 	kbcli kubeblocks status --all`)
 )
@@ -77,6 +78,14 @@ var (
 		types.ConfigmapGVR(),
 		types.SecretGVR(),
 		types.ServiceGVR(),
+	}
+
+	kubeBlocksRBAC = []schema.GroupVersionResource{
+		types.ClusterRoleGVR(),
+		types.ClusterRoleBindingGVR(),
+		types.RoleGVR(),
+		types.RoleBindingGVR(),
+		types.ServiceAccountGVR(),
 	}
 
 	kubeBlocksStorages = []schema.GroupVersionResource{
@@ -161,6 +170,7 @@ func (o *statusOptions) run() error {
 	if o.showAll {
 		o.showKubeBlocksResources(ctx, &allErrs)
 		o.showKubeBlocksConfig(ctx, &allErrs)
+		o.showKubeBlocksRBAC(ctx, &allErrs)
 		o.showKubeBlocksStorage(ctx, &allErrs)
 		o.showHelmResources(ctx, &allErrs)
 	}
@@ -221,6 +231,19 @@ func (o *statusOptions) showKubeBlocksConfig(ctx context.Context, allErrs *[]err
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME")
 	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksConfigurations, selectorList, allErrs)
+	for _, resourceList := range unstructuredList {
+		for _, resource := range resourceList.Items {
+			tblPrinter.AddRow(resource.GetNamespace(), resource.GetKind(), resource.GetName())
+		}
+	}
+	tblPrinter.Print()
+}
+
+func (o *statusOptions) showKubeBlocksRBAC(ctx context.Context, allErrs *[]error) {
+	fmt.Fprintln(o.Out, "\nKubeBlocks RBAC:")
+	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME")
+	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksRBAC, selectorList, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			tblPrinter.AddRow(resource.GetNamespace(), resource.GetKind(), resource.GetName())
@@ -374,6 +397,9 @@ func listResourceByGVR(ctx context.Context, client dynamic.Interface, namespace 
 	unstructuredList := make([]*unstructured.UnstructuredList, 0)
 	for _, gvr := range gvrlist {
 		for _, labelSelector := range selector {
+			if klog.V(1).Enabled() {
+				klog.Infof("listResourceByGVR: namespace=%s, gvrlist=%v, selector=%v", namespace, gvr, labelSelector)
+			}
 			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, labelSelector)
 			if err != nil {
 				appendErrIgnoreNotFound(allErrs, err)

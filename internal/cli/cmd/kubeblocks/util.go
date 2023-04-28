@@ -141,9 +141,23 @@ func buildResourceLabelSelectors(addons []*extensionsv1alpha1.Addon) []string {
 	return selectors
 }
 
-// buildAddonLabelSelector builds labelSelector that can be used to get all build-in addons
-func buildAddonLabelSelector() string {
+// buildAddonLabelSelector builds labelSelector that can be used to get all kubeBlocks resources,
+// including CRDs, addons (but not resources created by addons).
+// and it should be consistent with the labelSelectors defined in chart.
+// for example:
+// {{- define "kubeblocks.selectorLabels" -}}
+// app.kubernetes.io/name: {{ include "kubeblocks.name" . }}
+// app.kubernetes.io/instance: {{ .Release.Name }}
+// {{- end }}
+func buildKubeBlocksSelectorLabels() string {
 	return fmt.Sprintf("%s=%s,%s=%s",
 		constant.AppInstanceLabelKey, types.KubeBlocksReleaseName,
 		constant.AppNameLabelKey, types.KubeBlocksChartName)
+}
+
+// buildConfig builds labelSelector that can be used to get all configmaps that are used to store config templates.
+// and it should be consistent with the labelSelectors defined used
+// in `configuration.updateConfigMapFinalizerImpl`.
+func buildConfigTypeSelectorLabels() string {
+	return fmt.Sprintf("%s=%s", constant.CMConfigurationTypeLabelKey, constant.ConfigTemplateType)
 }

@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: kb-postgres-{{ .Release.Namespace }}-{{ .Release.Name }}
+  name: kb-rolebinding-{{ .Release.Namespace }}-{{ .Release.Name }}
   labels:
     {{ include "postgresqlcluster.labels" . | nindent 4 }}
 roleRef:
@@ -11,6 +11,6 @@ roleRef:
   name: kb-role-{{ .Release.Namespace }}-{{ .Release.Name }}
 subjects:
   - kind: ServiceAccount
-    name: kb-postgres-{{ .Release.Name }}
+    name: kb-sa-{{ .Release.Name }}
     namespace: {{ .Release.Namespace }}
 {{- end }}

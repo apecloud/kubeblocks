@@ -175,7 +175,7 @@ type CreateOptions struct {
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
 
-	dependenciesCreated bool `json:"-"`
+	shouldCreateDependencies bool `json:"-"`
 
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
@@ -294,10 +294,6 @@ func (o *CreateOptions) Complete() error {
 }
 
 func (o *CreateOptions) CleanUp() error {
-	if !o.dependenciesCreated {
-		return nil
-	}
-
 	if o.Client == nil {
 		return nil
 	}
@@ -366,7 +362,7 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 		}
 
 		// create component dependencies
-		if err = o.createCompDependencies(cd, compSpec); err != nil {
+		if err = o.buildDependenciesFn(cd, compSpec); err != nil {
 			return nil, err
 		}
 
@@ -385,15 +381,10 @@ const (
 	roleBindingNamePrefix = "kb-rolebinding-"
 )
 
-// buildDependencies create dependencies for components, e.g. postgresql depends on
+// buildDependenciesFn create dependencies function for components, e.g. postgresql depends on
 // a service account, a role and a rolebinding
-func (o *CreateOptions) createCompDependencies(cd *appsv1alpha1.ClusterDefinition,
+func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
-	var (
-		saName          = saNamePrefix + o.Name
-		roleName        = roleNamePrefix + o.Name
-		roleBindingName = roleBindingNamePrefix + o.Name
-	)
 
 	// HACK: now we only support postgresql cluster definition
 	if c, err := shouldCreateDependencies(cd, compSpec); err != nil {
@@ -403,15 +394,26 @@ func (o *CreateOptions) createCompDependencies(cd *appsv1alpha1.ClusterDefinitio
 	}
 
 	// set component service account name
-	compSpec.ServiceAccountName = saName
+	compSpec.ServiceAccountName = saNamePrefix + o.Name
+	o.shouldCreateDependencies = true
+	return nil
+}
 
-	// set dependencies created flag, if any error occurs, we will clean up the dependencies
-	o.dependenciesCreated = true
+func (o *CreateOptions) CreateDependencies(dryRun []string) error {
+	var (
+		saName          = saNamePrefix + o.Name
+		roleName        = roleNamePrefix + o.Name
+		roleBindingName = roleBindingNamePrefix + o.Name
+	)
 
-	klog.V(1).Infof("create dependencies for cluster %s, component %s", o.Name, compSpec.Name)
+	if !o.shouldCreateDependencies {
+		return nil
+	}
+
+	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
 	// create service account
-	labels := buildResourceLabels(o.Name, compSpec.Name)
-	applyOptions := metav1.ApplyOptions{FieldManager: "kbcli"}
+	labels := buildResourceLabels(o.Name)
+	applyOptions := metav1.ApplyOptions{FieldManager: "kbcli", DryRun: dryRun}
 	sa := corev1ac.ServiceAccount(saName, o.Namespace).WithLabels(labels)
 
 	klog.V(1).Infof("create service account %s", saName)
@@ -491,17 +493,18 @@ func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
-		Use:             "create [NAME]",
-		Short:           "Create a cluster.",
-		Example:         clusterCreateExample,
-		CueTemplateName: CueTemplateName,
-		ResourceName:    types.ResourceClusters,
-		BaseOptionsObj:  &o.BaseOptions,
-		Options:         o,
-		Factory:         f,
-		Complete:        o.Complete,
-		PreCreate:       o.PreCreate,
-		CleanUpFn:       o.CleanUp,
+		Use:                "create [NAME]",
+		Short:              "Create a cluster.",
+		Example:            clusterCreateExample,
+		CueTemplateName:    CueTemplateName,
+		ResourceName:       types.ResourceClusters,
+		BaseOptionsObj:     &o.BaseOptions,
+		Options:            o,
+		Factory:            f,
+		Complete:           o.Complete,
+		PreCreate:          o.PreCreate,
+		CleanUpFn:          o.CleanUp,
+		CreateDependencies: o.CreateDependencies,
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cd list\" to show all available cluster definitions")
 			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
@@ -955,10 +958,9 @@ func shouldCreateDependencies(cd *appsv1alpha1.ClusterDefinition, compSpec *apps
 	return true, nil
 }
 
-func buildResourceLabels(clusterName string, compName string) map[string]string {
+func buildResourceLabels(clusterName string) map[string]string {
 	return map[string]string{
-		constant.AppInstanceLabelKey:    clusterName,
-		constant.KBAppComponentLabelKey: compName,
-		constant.AppManagedByLabelKey:   "kbcli",
+		constant.AppInstanceLabelKey:  clusterName,
+		constant.AppManagedByLabelKey: "kbcli",
 	}
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -54,6 +55,8 @@ var (
 	//go:embed template/*
 	cueTemplate embed.FS
 )
+
+type CreateDependency func(dryRun []string) error
 
 type DryRunStrategy int
 
@@ -112,6 +115,9 @@ type Inputs struct {
 	// CleanUpFn will be executed after creating failed.
 	CleanUpFn func() error
 
+	// CreateDependencies will be executed before creating.
+	CreateDependencies CreateDependency
+
 	// ResourceNameGVRForCompletion resource name for completion.
 	ResourceNameGVRForCompletion schema.GroupVersionResource
 }
@@ -148,22 +154,9 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 		Example:           inputs.Example,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(inputs.Factory, inputs.ResourceNameGVRForCompletion),
 		Run: func(cmd *cobra.Command, args []string) {
-			err := inputs.BaseOptionsObj.Complete(inputs, args)
-			if err == nil {
-				err = inputs.BaseOptionsObj.Validate(inputs)
-			}
-			if err == nil {
-				err = inputs.BaseOptionsObj.Run(inputs)
-			}
-			if err == nil {
-				return
-			}
-
-			// if err is not nil, clean up
-			if cleanErr := inputs.BaseOptionsObj.CleanUp(inputs); cleanErr != nil {
-				fmt.Fprintf(inputs.BaseOptionsObj.ErrOut, "clean up failed: %v\n", cleanErr)
-			}
-			util.CheckErr(err)
+			util.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
+			util.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
+			util.CheckErr(inputs.BaseOptionsObj.Run(inputs))
 		},
 	}
 	if inputs.BuildFlags != nil {
@@ -280,11 +273,28 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 		if dryRunStrategy == DryRunServer {
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
-		// create k8s resource
+
+		// create dependencies
+		if inputs.CreateDependencies != nil {
+			if err = inputs.CreateDependencies(createOptions.DryRun); err != nil {
+				return err
+			}
+		}
+
+		// create kubernetes resource
 		previewObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), previewObj, createOptions)
 		if err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				return err
+			}
+
+			// for other errors, clean up dependencies
+			if cleanErr := o.CleanUp(inputs); cleanErr != nil {
+				fmt.Fprintf(o.ErrOut, "clean up denpendencies failed: %v\n", cleanErr)
+			}
 			return err
 		}
+
 		if dryRunStrategy != DryRunServer {
 			o.Name = previewObj.GetName()
 			if o.Quiet {

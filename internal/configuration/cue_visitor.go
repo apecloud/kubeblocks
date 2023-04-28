@@ -223,6 +223,10 @@ func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Va
 			if !exist {
 				return nil
 			}
-			return transNumberOrBoolType(typeTransformer.fieldTypes[fieldPath], obj, fn, typeTransformer.fieldUnits[fieldPath], trimString)
+			err := transNumberOrBoolType(typeTransformer.fieldTypes[fieldPath], obj, fn, typeTransformer.fieldUnits[fieldPath], trimString)
+			if err != nil {
+				return WrapError(err, "failed to parse field %s", fieldPath)
+			}
+			return nil
 		}, false)
 }

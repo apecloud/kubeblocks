@@ -179,8 +179,8 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
   			--memory alertmanager:16Mi/256Mi --storage: alertmanager:1Gi --replicas alertmanager:2 
 
         # Enabled "prometheus" addon with tolerations 
-    	kbcli addon enable prometheus --tolerations '[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]' \
-			--tolerations 'alertmanager:[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]'
+    	kbcli addon enable prometheus --tolerations '[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
+			--tolerations 'alertmanager:[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]'
 
 		# Enabled "prometheus" addon with helm like custom settings
 		kbcli addon enable prometheus --set prometheus.alertmanager.image.tag=v0.24.0
@@ -490,15 +490,13 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 		return pItem, nil
 	}
 
-	twoTuplesProcessor := func(s, flag string,
+	_tuplesProcessor := func(t []string, s, flag string,
 		valueTransformer func(s, flag string) (interface{}, error),
 		valueAssigner func(*extensionsv1alpha1.AddonInstallSpecItem, interface{}),
 	) error {
-		t := strings.SplitN(s, ":", 2)
 		l := len(t)
 		var name string
 		var result interface{}
-		var err error
 		switch l {
 		case 2:
 			name = t[0]
@@ -526,6 +524,31 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			valueAssigner(&pItem.AddonInstallSpecItem, result)
 		}
 		return nil
+	}
+
+	twoTuplesProcessor := func(s, flag string,
+		valueTransformer func(s, flag string) (interface{}, error),
+		valueAssigner func(*extensionsv1alpha1.AddonInstallSpecItem, interface{}),
+	) error {
+		t := strings.SplitN(s, ":", 2)
+		return _tuplesProcessor(t, s, flag, valueTransformer, valueAssigner)
+	}
+
+	twoTuplesJSONProcessor := func(s, flag string,
+		valueTransformer func(s, flag string) (interface{}, error),
+		valueAssigner func(*extensionsv1alpha1.AddonInstallSpecItem, interface{}),
+	) error {
+		var jsonArrary []map[string]interface{}
+		var t []string
+
+		err := json.Unmarshal([]byte(s), &jsonArrary)
+		if err != nil {
+			// not a valid JSON array treat it a 2 tuples
+			t = strings.SplitN(s, ":", 2)
+		} else {
+			t = []string{s}
+		}
+		return _tuplesProcessor(t, s, flag, valueTransformer, valueAssigner)
 	}
 
 	reqLimitResTransformer := func(s, flag string) (interface{}, error) {
@@ -578,7 +601,7 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 	}
 
 	for _, v := range f.TolerationsSet {
-		if err := twoTuplesProcessor(v, "tolerations", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
+		if err := twoTuplesJSONProcessor(v, "tolerations", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
 			item.Tolerations = i.(string)
 		}); err != nil {
 			return err

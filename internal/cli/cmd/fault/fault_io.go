@@ -1,51 +1,57 @@
 package fault
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-// TODO
-var faultPodExample = templates.Examples(`
-	# --label is required to specify the pods that need to be killed. 
-	kbcli fault pod kill --label statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2
-	
-	kbcli fault pod kill --mode=fixed --value=2 --label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2
+type IOChaosOptions struct {
+	Delay string `json:"delay"`
+	Errno int    `json:"errno"`
 
-	kbcli fault pod kill-container --container-names=mysql --label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2
-`)
+	// Atrr           v1alpha1.AttrOverrideSpec `json:"attr_override_spec,omitempty"`
+	VolumePath string `json:"volumePath"`
+	Path       string `json:"path"`
+	Percent    int    `json:"percent"`
 
-type PodChaosOptions struct {
-	// GracePeriod waiting time, after which fault injection is performed
-	GracePeriod    int      `json:"gracePeriod"`
 	ContainerNames []string `json:"containerNames,omitempty"`
+	Methods        []string `json:"methods,omitempty"`
 
 	FaultBaseOptions
 
 	create.BaseOptions
 }
 
-func (o *PodChaosOptions) createInputs(f cmdutil.Factory, use string, short string, buildFlags func(*cobra.Command)) *create.Inputs {
+func NewIOChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "IO",
+		Short: "inject fault to pod.",
+	}
+	cmd.AddCommand(
+		NewIOLatencyCmd(f, streams),
+		NewIOFaultCmd(f, streams),
+		NewIOAttrOverrideCmd(f, streams),
+	)
+	return cmd
+}
+
+func (o *IOChaosOptions) createInputs(f cmdutil.Factory, use string, short string, buildFlags func(*cobra.Command)) *create.Inputs {
 	return &create.Inputs{
 		Use:             use,
 		Short:           short,
 		Example:         faultPodExample,
-		CueTemplateName: CueTemplatePodChaos,
+		CueTemplateName: CueTemplateIOChaos,
 		Group:           Group,
 		Version:         Version,
-		ResourceName:    ResourcePodChaos,
+		ResourceName:    ResourceIOChaos,
 		BaseOptionsObj:  &o.BaseOptions,
 		Options:         o,
 		Factory:         f,
@@ -56,120 +62,96 @@ func (o *PodChaosOptions) createInputs(f cmdutil.Factory, use string, short stri
 	}
 }
 
-func NewPodChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "pod",
-		Short: "inject fault to pod.",
-	}
-	cmd.AddCommand(
-		NewPodKillCmd(f, streams),
-		NewPodFailureCmd(f, streams),
-		NewContainerKillCmd(f, streams),
-	)
-	return cmd
-}
-
-func NewPodKillCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &PodChaosOptions{
+func NewIOLatencyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &IOChaosOptions{
 		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.PodKillAction)},
+		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.IoLatency)},
 	}
 
 	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
-		cmd.Flags().IntVar(&o.GracePeriod, "grace-period", 0, "Grace period represents the duration in seconds before the pod should be killed")
+		cmd.Flags().StringVar(&o.Delay, "delay", "", `specific delay time.`)
+
+		util.CheckErr(cmd.MarkFlagRequired("delay"))
+		util.CheckErr(cmd.MarkFlagRequired("volume-path"))
 
 		// register flag completion func
 		registerFlagCompletionFunc(cmd, f)
 	}
 	inputs := o.createInputs(
 		f,
-		Kill,
-		KillShort,
+		Latency,
+		LatencyShort,
 		BuildFlags,
 	)
 
 	return create.BuildCommand(*inputs)
 }
 
-func NewPodFailureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &PodChaosOptions{
+func NewIOFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &IOChaosOptions{
 		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.PodFailureAction)},
+		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.IoFaults)},
 	}
 
 	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
+		cmd.Flags().IntVar(&o.Errno, "errno", 0, `the returned error number.`)
 
-		util.CheckErr(cmd.MarkFlagRequired("duration"))
+		util.CheckErr(cmd.MarkFlagRequired("errno"))
+		util.CheckErr(cmd.MarkFlagRequired("volume-path"))
 
 		// register flag completion func
 		registerFlagCompletionFunc(cmd, f)
 	}
 	inputs := o.createInputs(
 		f,
-		Failure,
-		FailureShort,
+		Fault,
+		FaultShort,
 		BuildFlags,
 	)
 
 	return create.BuildCommand(*inputs)
 }
 
-func NewContainerKillCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &PodChaosOptions{
+func NewIOAttrOverrideCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &IOChaosOptions{
 		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.ContainerKillAction)},
+		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.IoAttrOverride)},
 	}
 
 	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
-
 		o.AddCommonFlag(cmd)
-		cmd.Flags().StringArrayVar(&o.ContainerNames, "container-names", nil, "the name of the container you want to kill, such as mysql, prometheus.")
-
-		util.CheckErr(cmd.MarkFlagRequired("container-names"))
 
 		// register flag completion func
 		registerFlagCompletionFunc(cmd, f)
 	}
 	inputs := o.createInputs(
 		f,
-		KillContainer,
-		KillContainerShort,
+		AttrOverride,
+		AttrOverrideShort,
 		BuildFlags,
 	)
 
 	return create.BuildCommand(*inputs)
 }
 
-// TODO
-func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
-	var formatsWithDesc = map[string]string{
-		"JSON": "Output result in JSON format",
-		"YAML": "Output result in YAML format",
-	}
-	util.CheckErr(cmd.RegisterFlagCompletionFunc("output",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			var names []string
-			for format, desc := range formatsWithDesc {
-				if strings.HasPrefix(format, toComplete) {
-					names = append(names, fmt.Sprintf("%s\t%s", format, desc))
-				}
-			}
-			return names, cobra.ShellCompDirectiveNoFileComp
-		}))
-}
-
-func (o *PodChaosOptions) AddCommonFlag(cmd *cobra.Command) {
+func (o *IOChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(&o.Mode, "mode", "all", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
 	cmd.Flags().StringVar(&o.Value, "value", "", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
 	cmd.Flags().StringVar(&o.Duration, "duration", "10s", "Supported formats of the duration are: ms / s / m / h.")
 	cmd.Flags().StringToStringVar(&o.Label, "label", map[string]string{}, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
 	cmd.Flags().StringArrayVar(&o.NamespaceSelector, "namespace-selector", []string{"default"}, `Specifies the namespace into which you want to inject faults.`)
+
+	cmd.Flags().StringVar(&o.VolumePath, "volume-path", "", `The mount point of the volume in the target container must be the root directory of the mount.`)
+	cmd.Flags().StringVar(&o.Path, "path", "", `The effective scope of the injection error can be a wildcard or a single file.`)
+	cmd.Flags().IntVar(&o.Percent, "percent", 0, `Probability of failure per operation, in %.`)
+	cmd.Flags().StringArrayVar(&o.ContainerNames, "container-names", nil, "the name of the container, such as mysql, prometheus.If it's empty, the first container will be injected.")
+	cmd.Flags().StringArrayVar(&o.Methods, "methods", nil, "Types of file system calls that need to inject faults.")
 
 	cmd.Flags().String("dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
@@ -178,7 +160,7 @@ func (o *PodChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 }
 
 // Validate TODO
-func (o *PodChaosOptions) Validate() error {
+func (o *IOChaosOptions) Validate() error {
 	err := o.BaseValidate()
 	if err != nil {
 		return err
@@ -187,7 +169,7 @@ func (o *PodChaosOptions) Validate() error {
 }
 
 // Complete TODO
-func (o *PodChaosOptions) Complete() error {
+func (o *IOChaosOptions) Complete() error {
 	err := o.BaseComplete()
 	if err != nil {
 		return err
@@ -195,8 +177,8 @@ func (o *PodChaosOptions) Complete() error {
 	return nil
 }
 
-func (o *PodChaosOptions) PreCreate(obj *unstructured.Unstructured) error {
-	c := &v1alpha1.PodChaos{}
+func (o *IOChaosOptions) PreCreate(obj *unstructured.Unstructured) error {
+	c := &v1alpha1.IOChaos{}
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, c); err != nil {
 		return err
 	}

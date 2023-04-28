@@ -16,49 +16,51 @@
 options: {
 	namespace:        string
 	action:						string
-	label:						{}
-	namespaceSelector: string
+
+	namespaceSelector: [...]
 	mode:							string
 	value:						string
-	gracePeriod: 			int
 	duration: 				string
+	label?:						{}
 
-	direction: 				string
+	delay:				 		string
+	errno:				 		int
+	volumePath:				string
+	path:				 			string
+	percent:				 	int
 
-	targetLabel:			string
-	targetNamespaceSelector: string
-	targetMode:				string
+	methods:					[...]
+	containerNames: 	[...]
 }
 
 // required, k8s api resource content
 content: {
-  kind: "PodChaos"
+  kind: "IOChaos"
   apiVersion: "chaos-mesh.org/v1alpha1"
   metadata:{
-  	generateName: "pod-chaos-"
+  	generateName: "io-chaos-"
     namespace: options.namespace
   }
   spec:{
     selector:{
-    	namespace: [options.namespaceSelector]
-    	labelSelectors:{
+    	namespaces: options.namespaceSelector
+    	if options.label != _|_ {
+    		labelSelectors:{
     			options.label
+				}
     	}
     }
     mode: options.mode
     value: options.value
     action: options.action
-    gracePeriod: options.gracePeriod
     duration: options.duration
-    direction: options.direction
-    target:{
-    	selector:{
-    		namespace: [options.targetNamespaceSelector]
-    		labelSelectors:{
-    				options.targetLabel
-    		}
-    	}
-    	mode: options.targetMode
-  	}
+
+		delay: options.delay
+		errno: options.errno
+    volumePath: options.volumePath
+    path: options.path
+    percent: options.percent
+    methods: options.methods
+    containerNames: options.containerNames
   }
 }

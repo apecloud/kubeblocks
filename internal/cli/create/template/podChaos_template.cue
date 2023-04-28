@@ -16,8 +16,8 @@
 options: {
 	namespace:        string
 	action:						string
-	label:						{}
-	namespaceSelector: string
+	label?:						{}
+	namespaceSelector: [...]
 	mode:							string
 	value:						string
 	gracePeriod: 			int
@@ -35,9 +35,11 @@ content: {
   }
   spec:{
     selector:{
-    	namespace: [options.namespaceSelector]
-    	labelSelectors:{
+    	namespaces: options.namespaceSelector
+    	if options.label != _|_ {
+    		labelSelectors:{
     			options.label
+    		}
     	}
     }
     mode: options.mode

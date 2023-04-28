@@ -17,11 +17,10 @@ type FaultBaseOptions struct {
 	// Value The number and percentage of fault injection pods
 	Value string `json:"value"`
 
-	NamespaceSelector string `json:"namespaceSelector"`
+	NamespaceSelector []string `json:"namespaceSelector"`
 
-	Label map[string]string `json:"label,omitempty"`
-	// GracePeriod waiting time, after which fault injection is performed
-	GracePeriod int `json:"gracePeriod"`
+	Label map[string]string `json:"label"`
+
 	// Duration the duration of the Pod Failure experiment
 	Duration string `json:"duration"`
 }
@@ -32,23 +31,24 @@ func NewFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Short: "inject fault.",
 	}
 	cmd.AddCommand(
-		NewFaultPodCmd(f, streams),
-		NewNetworkAttackCmd(f, streams),
+		NewPodChaosCmd(f, streams),
+		NewNetworkChaosCmd(f, streams),
+		NewIOChaosCmd(f, streams),
 	)
 	return cmd
 }
 
 func (o *FaultBaseOptions) BaseValidate() error {
-	if o.Label == nil {
-		return fmt.Errorf("a valid label is needed, use --label to specify one, run \"kubectl get pod --show-labels\" to show all labels ")
-	}
-
 	pattern := regexp.MustCompile(`^\d+(ms|s|m|h)$`)
 	if o.Duration != "" && !pattern.MatchString(o.Duration) {
 		return fmt.Errorf("invalid duration:%s; input format must be in the form of number + time unit, like 10s, 10m", o.Duration)
 	}
 
-	if _, err := strconv.Atoi(o.Value); err != nil {
+	if o.Value == "" && (o.Mode == "fixed" || o.Mode == "fixed-percent" || o.Mode == "random-max-percent") {
+		return fmt.Errorf("you must use --value to specify an integer")
+	}
+
+	if _, err := strconv.Atoi(o.Value); o.Value != "" && err != nil {
 		return fmt.Errorf("invalid value:%s; must be an integer", o.Value)
 	}
 	return nil

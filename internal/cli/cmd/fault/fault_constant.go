@@ -1,16 +1,24 @@
 package fault
 
 const (
+	Unchanged = "unchanged"
+)
+
+var Options = []string{"PodChaosOptions", "NetworkChaosOptions", "IOChaosOptions"}
+
+const (
 	Group   = "chaos-mesh.org"
 	Version = "v1alpha1"
 
 	ResourcePodChaos     = "podchaos"
 	ResourceNetworkChaos = "networkchaos"
+	ResourceIOChaos      = "iochaos"
 )
 
 const (
-	CueTemplatePodChaosName     = "podChaos_template.cue"
-	CueTemplateNetworkChaosName = "networkAttack_template.cue"
+	CueTemplatePodChaos     = "podChaos_template.cue"
+	CueTemplateNetworkChaos = "networkChaos_template.cue"
+	CueTemplateIOChaos      = "IOChaos_template.cue"
 )
 
 const (
@@ -36,4 +44,13 @@ const (
 	CorruptShort   = "corrupt attack"
 	Bandwidth      = "bandwidth"
 	BandwidthShort = "bandwidth attack"
+)
+
+const (
+	Latency           = "latency"
+	LatencyShort      = "IO Latency attack."
+	Fault             = "fault"
+	FaultShort        = "IO Fault attack."
+	AttrOverride      = "attr-override"
+	AttrOverrideShort = "IO AttrOverrideShort attack."
 )

@@ -68,6 +68,11 @@ spec:
                 description: downwardAPIOptions is used to watch pod fields.
                 items:
                   properties:
+                    command:
+                      description: command used to execute for downwrad api.
+                      items:
+                        type: string
+                      type: array
                     items:
                       description: Items is a list of downward API volume file
                       items:
@@ -219,25 +224,8 @@ spec:
                         items:
                           type: string
                         type: array
-                      downwardAPICommand:
-                        description: downwardAPICommand used to execute for downwrad
-                          api.
-                        items:
-                          type: string
-                        type: array
-                      namespace:
-                        default: default
-                        description: Specify the namespace of the referenced the tpl
-                          script ConfigMap object. An empty namespace is equivalent
-                          to the "default" namespace.
-                        maxLength: 63
-                        type: string
-                      scriptConfigMapRef:
-                        description: scriptConfigMapRef used to execute for reload.
-                        type: string
                     required:
                     - command
-                    - scriptConfigMapRef
                     type: object
                   tplScriptTrigger:
                     description: goTplTrigger performs the reload command.
@@ -308,6 +296,28 @@ spec:
                     - signal
                     type: object
                 type: object
+              scriptConfigs:
+                description: scriptConfigs, list of ScriptConfig, witch these scripts
+                  can be used by volume trigger,downward trigger, or tool image
+                items:
+                  properties:
+                    namespace:
+                      default: default
+                      description: Specify the namespace of the referenced the tpl
+                        script ConfigMap object. An empty namespace is equivalent
+                        to the "default" namespace.
+                      maxLength: 63
+                      type: string
+                    scriptConfigMapRef:
+                      description: scriptConfigMapRef used to execute for reload.
+                      type: string
+                  required:
+                  - scriptConfigMapRef
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - scriptConfigMapRef
+                x-kubernetes-list-type: map
               selector:
                 description: selector is used to match the label on the pod, for example,
                   a pod of the primary is match on the patroni cluster.

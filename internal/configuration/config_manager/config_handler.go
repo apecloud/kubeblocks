@@ -165,8 +165,8 @@ type shellCommandHandler struct {
 	command string
 	arg     []string
 
-	downwardAPICommand    []string
 	downwardAPIMountPoint []string
+	downwardAPIHandler    map[string]ConfigHandler
 
 	backupPath string
 	configMeta *ConfigSpecMeta
@@ -175,7 +175,7 @@ type shellCommandHandler struct {
 
 func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
 	if mountPoint, ok := s.downwardAPIVolume(event); ok {
-		return s.processDownwardAPI(ctx, mountPoint)
+		return s.processDownwardAPI(ctx, mountPoint, event)
 	}
 	args := make([]string, len(s.arg))
 	for i, v := range s.arg {
@@ -225,18 +225,12 @@ func (s *shellCommandHandler) downwardAPIVolume(event fsnotify.Event) (string, b
 	return "", false
 }
 
-func (s *shellCommandHandler) processDownwardAPI(ctx context.Context, mountPoint string) error {
-	if len(s.downwardAPICommand) == 0 {
-		logger.Info("not found downward api command, and pass.")
-		return nil
+func (s *shellCommandHandler) processDownwardAPI(ctx context.Context, mountPoint string, event fsnotify.Event) error {
+	if handle, ok := s.downwardAPIHandler[mountPoint]; ok {
+		return handle.VolumeHandle(ctx, event)
 	}
-
-	args := s.downwardAPICommand[1:]
-	args = append(args, mountPoint)
-	command := exec.CommandContext(ctx, s.downwardAPICommand[0], args...)
-	stdout, err := cfgutil.ExecShellCommand(command)
-	logger.V(1).Info(fmt.Sprintf("exec: [%s], stdout: [%s], stderr:%v", command.String(), stdout, err))
-	return err
+	logger.Info(fmt.Sprintf("not found downward api command, and pass. path: %s", event.Name))
+	return nil
 }
 
 func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgReloadType, mountPoint []string, formatterConfig *appsv1alpha1.FormatterConfig) configVolumeHandleMeta {
@@ -266,14 +260,19 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 		}
 		formatterConfig = &configMeta.FormatterConfig
 	}
+	handler, err := createDownwardHandler(configMeta)
+	if err != nil {
+		return nil, err
+	}
 	shellTrigger := &shellCommandHandler{
-		command:                command[0],
-		arg:                    command[1:],
-		backupPath:             backupPath,
-		configMeta:             configMeta,
-		filter:                 filter,
-		downwardAPICommand:     fromDownwardCommand(configMeta),
-		downwardAPIMountPoint:  fromDownwardMountPoint(configMeta),
+		command:    command[0],
+		arg:        command[1:],
+		backupPath: backupPath,
+		configMeta: configMeta,
+		filter:     filter,
+		// for downward api watch
+		downwardAPIMountPoint:  cfgutil.ToSet(handler).AsSlice(),
+		downwardAPIHandler:     handler,
 		configVolumeHandleMeta: createConfigVolumeMeta("", appsv1alpha1.ShellType, []string{mountPoint}, formatterConfig),
 	}
 	return shellTrigger, nil
@@ -289,22 +288,19 @@ func fromConfigSpecMeta(meta *ConfigSpecMeta) string {
 	return "( " + strings.Join(meta.ConfigSpec.Keys, " | ") + " )"
 }
 
-func fromDownwardMountPoint(meta *ConfigSpecMeta) []string {
+func createDownwardHandler(meta *ConfigSpecMeta) (map[string]ConfigHandler, error) {
 	if meta == nil || len(meta.DownwardAPIOptions) == 0 {
-		return nil
+		return nil, nil
 	}
-	var mountPoints []string
+	handlers := make(map[string]ConfigHandler)
 	for _, field := range meta.DownwardAPIOptions {
-		mountPoints = append(mountPoints, field.MountPoint)
+		h, err := CreateExecHandler(field.Command, field.MountPoint, nil, "")
+		if err != nil {
+			return nil, err
+		}
+		handlers[field.MountPoint] = h
 	}
-	return mountPoints
-}
-
-func fromDownwardCommand(meta *ConfigSpecMeta) []string {
-	if meta == nil || meta.ReloadOptions == nil || meta.ReloadOptions.ShellTrigger == nil {
-		return nil
-	}
-	return meta.ReloadOptions.ShellTrigger.DownwardAPICommand
+	return handlers, nil
 }
 
 type tplScriptHandler struct {

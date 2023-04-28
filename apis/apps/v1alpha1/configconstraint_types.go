@@ -38,6 +38,14 @@ type ConfigConstraintSpec struct {
 	// +optional
 	DownwardAPIOptions []DownwardAPIOption `json:"downwardAPIOptions,omitempty"`
 
+	// scriptConfigs, list of ScriptConfig, witch these scripts can be used by volume trigger,downward trigger, or tool image
+	// +optional
+	// +patchMergeKey=scriptConfigMapRef
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=scriptConfigMapRef
+	ScriptConfigs []ScriptConfig `json:"scriptConfigs,omitempty"`
+
 	// cfgSchemaTopLevelName is cue type name, which generates openapi schema.
 	// +optional
 	CfgSchemaTopLevelName string `json:"cfgSchemaTopLevelName,omitempty"`
@@ -177,40 +185,33 @@ type DownwardAPIOption struct {
 	// Items is a list of downward API volume file
 	// +kubebuilder:validation:Required
 	Items []corev1.DownwardAPIVolumeFile `json:"items"`
+
+	// command used to execute for downwrad api.
+	// +optional
+	Command []string `json:"command,omitempty"`
+}
+
+type ScriptConfig struct {
+	// scriptConfigMapRef used to execute for reload.
+	// +kubebuilder:validation:Required
+	ScriptConfigMapRef string `json:"scriptConfigMapRef"`
+
+	// Specify the namespace of the referenced the tpl script ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
 
 type ShellTrigger struct {
 	// command used to execute for reload.
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
-
-	// downwardAPICommand used to execute for downwrad api.
-	// +optional
-	DownwardAPICommand []string `json:"downwardAPICommand,omitempty"`
-
-	// scriptConfigMapRef used to execute for reload.
-	// +kubebuilder:validation:Required
-	ScriptConfigMapRef string `json:"scriptConfigMapRef"`
-
-	// Specify the namespace of the referenced the tpl script ConfigMap object.
-	// An empty namespace is equivalent to the "default" namespace.
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:default="default"
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
 }
 
 type TPLScriptTrigger struct {
-	// scriptConfigMapRef used to execute for reload.
-	// +kubebuilder:validation:Required
-	ScriptConfigMapRef string `json:"scriptConfigMapRef"`
-
-	// Specify the namespace of the referenced the tpl script ConfigMap object.
-	// An empty namespace is equivalent to the "default" namespace.
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:default="default"
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
+	ScriptConfig `json:",inline"`
 
 	// Specify synchronize updates parameters to the config manager.
 	// +optional

@@ -113,9 +113,7 @@ var _ = Describe("ConfigManager Test", func() {
 				args: args{
 					reloadOptions: &appsv1alpha1.ReloadOptions{
 						ShellTrigger: &appsv1alpha1.ShellTrigger{
-							Command:            []string{"pwd"},
-							Namespace:          "default",
-							ScriptConfigMapRef: "script_cm",
+							Command: []string{"pwd"},
 						}},
 					volumeDirs: []corev1.VolumeMount{
 						{
@@ -145,6 +143,12 @@ var _ = Describe("ConfigManager Test", func() {
 										VolumeName: "pg_config",
 									},
 								},
+								ScriptConfig: []appsv1alpha1.ScriptConfig{
+									{
+										Namespace:          "default",
+										ScriptConfigMapRef: "script_cm",
+									},
+								},
 							},
 						},
 					},
@@ -157,9 +161,11 @@ var _ = Describe("ConfigManager Test", func() {
 				args: args{
 					reloadOptions: &appsv1alpha1.ReloadOptions{
 						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-							ScriptConfigMapRef: "script_cm",
-							Namespace:          "default",
-							Sync:               func() *bool { b := true; return &b }()}},
+							ScriptConfig: appsv1alpha1.ScriptConfig{
+								ScriptConfigMapRef: "script_cm",
+								Namespace:          "default",
+							},
+							Sync: func() *bool { b := true; return &b }()}},
 					volumeDirs: []corev1.VolumeMount{
 						{
 							MountPath: "/postgresql/conf",
@@ -185,8 +191,10 @@ var _ = Describe("ConfigManager Test", func() {
 				args: args{
 					reloadOptions: &appsv1alpha1.ReloadOptions{
 						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-							ScriptConfigMapRef: "script_cm",
-							Namespace:          "default",
+							ScriptConfig: appsv1alpha1.ScriptConfig{
+								ScriptConfigMapRef: "script_cm",
+								Namespace:          "default",
+							},
 						}},
 					volumeDirs: []corev1.VolumeMount{
 						{

@@ -36,6 +36,7 @@ type ConfigSpecMeta struct {
 	ReloadType appsv1alpha1.CfgReloadType       `json:"reloadType"`
 	ConfigSpec appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
 
+	ScriptConfig       []appsv1alpha1.ScriptConfig
 	ToolConfigs        []appsv1alpha1.ToolConfig
 	DownwardAPIOptions []appsv1alpha1.DownwardAPIOption
 

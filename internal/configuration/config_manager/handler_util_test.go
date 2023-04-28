@@ -80,8 +80,10 @@ func TestIsSupportReload(t *testing.T) {
 		args: args{
 			reload: &appsv1alpha1.ReloadOptions{
 				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-					Namespace:          "default",
-					ScriptConfigMapRef: "cm",
+					ScriptConfig: appsv1alpha1.ScriptConfig{
+						ScriptConfigMapRef: "cm",
+						Namespace:          "default",
+					},
 				},
 			},
 		},
@@ -166,7 +168,9 @@ var _ = Describe("Handler Util Test", func() {
 				args: args{
 					reloadOptions: &appsv1alpha1.ReloadOptions{
 						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-							ScriptConfigMapRef: "test",
+							ScriptConfig: appsv1alpha1.ScriptConfig{
+								ScriptConfigMapRef: "test",
+							},
 						}},
 					cli: mockK8sCli.Client(),
 					ctx: context.TODO(),
@@ -177,7 +181,9 @@ var _ = Describe("Handler Util Test", func() {
 				args: args{
 					reloadOptions: &appsv1alpha1.ReloadOptions{
 						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-							ScriptConfigMapRef: "test",
+							ScriptConfig: appsv1alpha1.ScriptConfig{
+								ScriptConfigMapRef: "test",
+							},
 						}},
 					cli: mockK8sCli.Client(),
 					ctx: context.TODO(),

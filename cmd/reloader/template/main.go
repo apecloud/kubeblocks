@@ -155,7 +155,7 @@ func secondaryRender(engine *gotemplate.TplEngine, templates []string) (map[stri
 			continue
 		}
 		if !filepath.IsAbs(tpl) {
-			tpl = filepath.Join(filepath.Dir(secondaryRenderConfig), tpl)
+			tpl = filepath.Join(secondaryRenderConfig, tpl)
 		}
 
 		b, err := os.ReadFile(tpl)

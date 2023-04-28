@@ -46,9 +46,9 @@ spec:
     shellTrigger:
       command:
       - "redis-update.sh"
-      downwardAPICommand:
-      - "redis-process-pod.sh"
-      scriptConfigMapRef: redis-reload-script
+
+  scriptConfigs:
+    - scriptConfigMapRef: redis-reload-script
       namespace: {{ .Release.Namespace }}
 
   toolConfigs:
@@ -72,6 +72,8 @@ spec:
   downwardAPIOptions:
     - name: "pod-info"
       mountPoint: "/etc/pod_info"
+      command:
+      - "redis-process-pod.sh"
       items:
         - path: "labels/role"
           fieldRef:

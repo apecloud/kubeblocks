@@ -151,10 +151,13 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 			continue
 		}
 		reloadConfigSpecMeta = append(reloadConfigSpecMeta, ConfigSpecMeta{
-			ReloadOptions:   cc.Spec.ReloadOptions,
-			ConfigSpec:      configSpec,
-			ReloadType:      FromReloadTypeConfig(reloadOptions),
-			FormatterConfig: *cc.Spec.FormatterConfig,
+			ReloadOptions:      cc.Spec.ReloadOptions,
+			ConfigSpec:         configSpec,
+			ReloadType:         FromReloadTypeConfig(reloadOptions),
+			ToolConfigs:        cc.Spec.ToolConfigs,
+			ScriptConfig:       cc.Spec.ScriptConfigs,
+			DownwardAPIOptions: cc.Spec.DownwardAPIOptions,
+			FormatterConfig:    *cc.Spec.FormatterConfig,
 		})
 	}
 	return reloadConfigSpecMeta, nil

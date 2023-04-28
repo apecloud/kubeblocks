@@ -171,16 +171,15 @@ func FindVolumeMount(volumeDirs []corev1.VolumeMount, volumeName string) *corev1
 }
 
 func buildConfigSpecHandleMeta(cli client.Client, ctx context.Context, buildParam *ConfigSpecMeta, cmBuildParam *CfgManagerBuildParams) error {
-	switch buildParam.ReloadType {
-	default:
-		return cfgcore.MakeError("not support reload type: %s", buildParam.ReloadType)
-	case appsv1alpha1.UnixSignalType:
-		return nil
-	case appsv1alpha1.ShellType:
-		return buildShellScriptCM(buildParam.ShellTrigger, cmBuildParam, cli, ctx, buildParam.ConfigSpec)
-	case appsv1alpha1.TPLScriptType:
+	for _, script := range buildParam.ScriptConfig {
+		if err := buildCfgManagerScripts(script, cmBuildParam, cli, ctx, buildParam.ConfigSpec); err != nil {
+			return err
+		}
+	}
+	if buildParam.ReloadType == appsv1alpha1.TPLScriptType {
 		return buildTPLScriptCM(buildParam, cmBuildParam, cli, ctx)
 	}
+	return nil
 }
 
 func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context) error {
@@ -324,7 +323,7 @@ func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, forma
 	return data, nil
 }
 
-func buildShellScriptCM(options *appsv1alpha1.ShellTrigger, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1alpha1.ComponentConfigSpec) error {
+func buildCfgManagerScripts(options appsv1alpha1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1alpha1.ComponentConfigSpec) error {
 	mountPoint := filepath.Join(kbScriptVolumePath, configSpec.Name)
 	referenceCMKey := client.ObjectKey{
 		Namespace: options.Namespace,

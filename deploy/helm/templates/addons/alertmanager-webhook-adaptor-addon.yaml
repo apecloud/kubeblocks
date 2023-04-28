@@ -39,6 +39,9 @@ spec:
 
   defaultInstallValues:
     - replicas: 1
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
 
   installable:
     autoInstall: {{ .Values.prometheus.enabled }}

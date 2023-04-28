@@ -94,6 +94,9 @@ const (
 	RBACAPIVersion      = "v1"
 	ClusterRoles        = "clusterroles"
 	ClusterRoleBindings = "clusterrolebindings"
+	Roles               = "roles"
+	RoleBindings        = "rolebindings"
+	ServiceAccounts     = "serviceaccounts"
 )
 
 // Annotations
@@ -309,6 +312,18 @@ func ClusterRoleGVR() schema.GroupVersionResource {
 }
 func ClusterRoleBindingGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: ClusterRoleBindings}
+}
+
+func RoleGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: Roles}
+}
+
+func RoleBindingGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: RoleBindings}
+}
+
+func ServiceAccountGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: K8sCoreAPIVersion, Resource: ServiceAccounts}
 }
 
 func MigrationTaskGVR() schema.GroupVersionResource {

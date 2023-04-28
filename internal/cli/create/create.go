@@ -31,7 +31,6 @@ import (
 	cuejson "cuelang.org/go/encoding/json"
 	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -372,7 +371,7 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 		objectByte, metav1.PatchOptions{}); err != nil {
 
 		// create object if not found
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			if _, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(
 				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 				return err

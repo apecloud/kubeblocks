@@ -67,10 +67,17 @@ func CreateTypedObjectFromYamlByte[T generics.Object, PT generics.PObject[T],
 }
 
 func GetTypedResourceObjectBySignature[T generics.Object, PT generics.PObject[T],
-	L generics.ObjList[T]](objects []client.Object, _ func(T, L)) PT {
+	L generics.ObjList[T]](objects []client.Object, _ func(T, L), filters ...func(obj PT) bool) PT {
 	for _, object := range objects {
 		if cd, ok := object.(PT); ok {
-			return cd
+			if len(filters) == 0 {
+				return cd
+			}
+			for _, filter := range filters {
+				if filter(cd) {
+					return cd
+				}
+			}
 		}
 	}
 	return nil

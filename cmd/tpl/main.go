@@ -64,6 +64,7 @@ func installFlags() {
 	pflag.StringVar(&opts.CPU, "cpu", "", "specify the cpu of the component")
 	pflag.StringVar(&opts.Memory, "memory", "", "specify the memory of the component")
 	pflag.BoolVar(&clearOutputDir, "clean", false, "specify whether to clear the output dir")
+	pflag.StringVar(&opts.ClusterVerName, "cluster-version", "", "specify the cluster version name")
 
 	opts := zap.Options{
 		Development: true,

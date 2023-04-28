@@ -34,6 +34,8 @@ type RenderedOptions struct {
 	ConfigSpec     string
 	AllConfigSpecs bool
 
+	ClusterVerName string
+
 	// mock cluster object
 	Name      string
 	Namespace string

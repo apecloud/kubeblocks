@@ -50,6 +50,7 @@ type templateRenderWorkflow struct {
 	clusterDefObj *appsv1alpha1.ClusterDefinition
 	localObjects  []client.Object
 
+	clusterVerName       string
 	clusterDefComponents []appsv1alpha1.ClusterComponentDefinition
 }
 
@@ -155,7 +156,9 @@ func (w *templateRenderWorkflow) createClusterObject() (*appsv1alpha1.Cluster, e
 		return CustomizedObjFromYaml(w.clusterYaml, generics.ClusterSignature)
 	}
 
-	clusterVersionObj := GetTypedResourceObjectBySignature(w.localObjects, generics.ClusterVersionSignature)
+	clusterVersionObj := GetTypedResourceObjectBySignature(w.localObjects, generics.ClusterVersionSignature, func(obj *appsv1alpha1.ClusterVersion) bool {
+		return w.clusterVerName == "" || w.clusterVerName == obj.Name
+	})
 	return mockClusterObject(w.clusterDefObj, w.renderedOpts, clusterVersionObj), nil
 }
 
@@ -189,6 +192,7 @@ func NewWorkflowTemplateRender(helmTemplateDir string, opts RenderedOptions) (*t
 		clusterDefObj:        clusterDefObj,
 		localObjects:         allObjects,
 		clusterDefComponents: components,
+		clusterVerName:       opts.ClusterVerName,
 	}, nil
 }
 

@@ -1,17 +1,28 @@
 ---
-title: kbcli plugin index
+title: kbcli plugin upgrade
 ---
 
-Manage custom plugin indexes
+Upgrade kbcli or kubectl plugins
 
-### Synopsis
+```
+kbcli plugin upgrade [flags]
+```
 
-Manage which repositories are used to discover plugins and install plugins from
+### Examples
+
+```
+  # upgrade installed plugins with specified name
+  kbcli plugin upgrade myplugin
+  
+  # upgrade installed plugin to a newer version
+  kbcli plugin upgrade --all
+```
 
 ### Options
 
 ```
-  -h, --help   help for index
+      --all    Upgrade all installed plugins
+  -h, --help   help for upgrade
 ```
 
 ### Options inherited from parent commands
@@ -41,10 +52,6 @@ Manage which repositories are used to discover plugins and install plugins from
 ### SEE ALSO
 
 * [kbcli plugin](kbcli_plugin.md)	 - Provides utilities for interacting with plugins.
-* [kbcli plugin index add](kbcli_plugin_index_add.md)	 - Add a new index
-* [kbcli plugin index delete](kbcli_plugin_index_delete.md)	 - Remove a configured index
-* [kbcli plugin index list](kbcli_plugin_index_list.md)	 - List configured indexes
-* [kbcli plugin index update](kbcli_plugin_index_update.md)	 - update all configured indexes
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

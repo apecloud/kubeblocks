@@ -10,6 +10,7 @@ require (
 	github.com/StudioSol/set v1.0.0
 	github.com/authzed/controller-idioms v0.7.0
 	github.com/bhmj/jsonslice v1.1.2
+	github.com/blang/semver/v4 v4.0.0
 	github.com/briandowns/spinner v1.23.0
 	github.com/chaos-mesh/chaos-mesh/api v0.0.0-20230423031423-0b31a519b502
 	github.com/clbanning/mxj/v2 v2.5.7
@@ -127,7 +128,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/bhmj/xpression v0.9.1 // indirect
-	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/c9s/goprocinfo v0.0.0-20170724085704-0010a05ce49f // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect

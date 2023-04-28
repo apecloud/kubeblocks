@@ -87,6 +87,7 @@ func NewPluginCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		NewPluginUninstallCmd(streams),
 		NewPluginSearchCmd(streams),
 		NewPluginDescribeCmd(streams),
+		NewPluginUpgradeCmd(streams),
 	)
 	return cmd
 }

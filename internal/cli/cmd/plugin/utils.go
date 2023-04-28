@@ -20,22 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plugin
 
 import (
-	"bytes"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
 
 	"github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
-
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin/download"
 )
 
 var (
@@ -60,92 +55,6 @@ func EnsureDirs(paths ...string) error {
 
 func NewPaths(base string) *Paths {
 	return &Paths{base: base, tmp: os.TempDir()}
-}
-
-// ListIndexes returns a slice of Index objects. The path argument is used as
-// the base path of the index.
-func ListIndexes(paths *Paths) ([]Index, error) {
-	entries, err := os.ReadDir(paths.IndexBase())
-	if err != nil {
-		return nil, err
-	}
-
-	var indexes []Index
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		indexName := e.Name()
-		remote, err := GitGetRemoteURL(paths.IndexPath(indexName))
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to list the remote URL for index %s", indexName)
-		}
-
-		indexes = append(indexes, Index{
-			Name: indexName,
-			URL:  remote,
-		})
-	}
-	return indexes, nil
-}
-
-// AddIndex initializes a new index to install plugins from.
-func AddIndex(paths *Paths, name, url string) error {
-	dir := paths.IndexPath(name)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return EnsureCloned(url, dir)
-	} else if err != nil {
-		return err
-	}
-	return errors.New("index already exists")
-}
-
-// DeleteIndex removes specified index name. If index does not exist, returns an error that can be tested by os.IsNotExist.
-func DeleteIndex(paths *Paths, name string) error {
-	dir := paths.IndexPath(name)
-	if _, err := os.Stat(dir); err != nil {
-		return err
-	}
-
-	return os.RemoveAll(dir)
-}
-
-func GitGetRemoteURL(dir string) (string, error) {
-	return Exec(dir, "config", "--get", "remote.origin.url")
-}
-
-func EnsureCloned(uri, destinationPath string) error {
-	if ok, err := IsGitCloned(destinationPath); err != nil {
-		return err
-	} else if !ok {
-		_, err = Exec("", "clone", "-v", uri, destinationPath)
-		return err
-	}
-	return nil
-}
-
-func IsGitCloned(gitPath string) (bool, error) {
-	f, err := os.Stat(filepath.Join(gitPath, ".git"))
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return err == nil && f.IsDir(), err
-}
-
-func Exec(pwd string, args ...string) (string, error) {
-	klog.V(4).Infof("Going to run git %s", strings.Join(args, " "))
-	cmd := exec.Command("git", args...)
-	cmd.Dir = pwd
-	buf := bytes.Buffer{}
-	var w io.Writer = &buf
-	if klog.V(2).Enabled() {
-		w = io.MultiWriter(w, os.Stderr)
-	}
-	cmd.Stdout, cmd.Stderr = w, w
-	if err := cmd.Run(); err != nil {
-		return "", errors.Wrapf(err, "command execution failure, output=%q", buf.String())
-	}
-	return strings.TrimSpace(buf.String()), nil
 }
 
 func LoadPluginByName(pluginsDir, pluginName string) (Plugin, error) {
@@ -189,110 +98,6 @@ func decodeFile(r io.ReadCloser, as interface{}) error {
 	return yaml.Unmarshal(b, &as)
 }
 
-// Install will download and install a plugin. The operation tries
-// to not get the plugin dir in a bad state if it fails during the process.
-func Install(p *Paths, plugin Plugin, indexName string, opts InstallOpts) error {
-	klog.V(2).Infof("Looking for installed versions")
-	_, err := ReadReceiptFromFile(p.PluginInstallReceiptPath(plugin.Name))
-	if err == nil {
-		return ErrIsAlreadyInstalled
-	} else if !os.IsNotExist(err) {
-		return errors.Wrap(err, "failed to look up plugin receipt")
-	}
-
-	// Find available installation candidate
-	candidate, ok, err := GetMatchingPlatform(plugin.Spec.Platforms)
-	if err != nil {
-		return errors.Wrap(err, "failed trying to find a matching platform in plugin spec")
-	}
-	if !ok {
-		return errors.Errorf("plugin %q does not offer installation for this platform", plugin.Name)
-	}
-
-	// The actual install should be the last action so that a failure during receipt
-	// saving does not result in an installed plugin without receipt.
-	klog.V(3).Infof("Install plugin %s at version=%s", plugin.Name, plugin.Spec.Version)
-	if err := install(installOperation{
-		pluginName: plugin.Name,
-		platform:   candidate,
-
-		binDir:     p.BinPath(),
-		installDir: p.PluginVersionInstallPath(plugin.Name, plugin.Spec.Version),
-	}, opts); err != nil {
-		return errors.Wrap(err, "install failed")
-	}
-
-	klog.V(3).Infof("Storing install receipt for plugin %s", plugin.Name)
-	err = StoreReceipt(NewReceipt(plugin, indexName, metav1.Now()), p.PluginInstallReceiptPath(plugin.Name))
-	return errors.Wrap(err, "installation receipt could not be stored, uninstall may fail")
-}
-
-func install(op installOperation, opts InstallOpts) error {
-	// Download and extract
-	klog.V(3).Infof("Creating download staging directory")
-	downloadStagingDir, err := os.MkdirTemp("", "kbcli-downloads")
-	if err != nil {
-		return errors.Wrapf(err, "could not create staging dir %q", downloadStagingDir)
-	}
-	klog.V(3).Infof("Successfully created download staging directory %q", downloadStagingDir)
-	defer func() {
-		klog.V(3).Infof("Deleting the download staging directory %s", downloadStagingDir)
-		if err := os.RemoveAll(downloadStagingDir); err != nil {
-			klog.Warningf("failed to clean up download staging directory: %s", err)
-		}
-	}()
-	if err := download.DownloadAndExtract(downloadStagingDir, op.platform.URI, op.platform.Sha256, opts.ArchiveFileOverride); err != nil {
-		return errors.Wrap(err, "failed to unpack into staging dir")
-	}
-
-	applyDefaults(&op.platform)
-	if err := moveToInstallDir(downloadStagingDir, op.installDir, op.platform.Files); err != nil {
-		return errors.Wrap(err, "failed while moving files to the installation directory")
-	}
-
-	subPathAbs, err := filepath.Abs(op.installDir)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get the absolute fullPath of %q", op.installDir)
-	}
-	fullPath := filepath.Join(op.installDir, filepath.FromSlash(op.platform.Bin))
-	pathAbs, err := filepath.Abs(fullPath)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get the absolute fullPath of %q", fullPath)
-	}
-	if _, ok := IsSubPath(subPathAbs, pathAbs); !ok {
-		return errors.Wrapf(err, "the fullPath %q does not extend the sub-fullPath %q", fullPath, op.installDir)
-	}
-	err = createOrUpdateLink(op.binDir, fullPath, op.pluginName)
-	return errors.Wrap(err, "failed to link installed plugin")
-}
-
-func Uninstall(p *Paths, name string) error {
-	if _, err := ReadReceiptFromFile(p.PluginInstallReceiptPath(name)); err != nil {
-		if os.IsNotExist(err) {
-			return ErrIsNotInstalled
-		}
-		return errors.Wrapf(err, "failed to look up install receipt for plugin %q", name)
-	}
-
-	klog.V(1).Infof("Deleting plugin %s", name)
-
-	symlinkPath := filepath.Join(p.BinPath(), pluginNameToBin(name, IsWindows()))
-	klog.V(3).Infof("Unlink %q", symlinkPath)
-	if err := removeLink(symlinkPath); err != nil {
-		return errors.Wrap(err, "could not uninstall symlink of plugin")
-	}
-
-	pluginInstallPath := p.PluginInstallPath(name)
-	klog.V(3).Infof("Deleting path %q", pluginInstallPath)
-	if err := os.RemoveAll(pluginInstallPath); err != nil {
-		return errors.Wrapf(err, "could not remove plugin directory %q", pluginInstallPath)
-	}
-	pluginReceiptPath := p.PluginInstallReceiptPath(name)
-	klog.V(3).Infof("Deleting plugin receipt %q", pluginReceiptPath)
-	err := os.Remove(pluginReceiptPath)
-	return errors.Wrapf(err, "could not remove plugin receipt %q", pluginReceiptPath)
-}
-
 func indent(s string) string {
 	out := "\\\n"
 	s = strings.TrimRightFunc(s, unicode.IsSpace)
@@ -306,4 +111,23 @@ func applyDefaults(platform *Platform) {
 		platform.Files = []FileOperation{{From: "*", To: "."}}
 		klog.V(4).Infof("file operation not specified, assuming %v", platform.Files)
 	}
+}
+
+// GetInstalledPluginReceipts returns a list of receipts.
+func GetInstalledPluginReceipts(receiptsDir string) ([]Receipt, error) {
+	files, err := filepath.Glob(filepath.Join(receiptsDir, "*"+ManifestExtension))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to glob receipts directory (%s) for manifests", receiptsDir)
+	}
+	out := make([]Receipt, 0, len(files))
+	for _, f := range files {
+		r, err := ReadReceiptFromFile(f)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to parse plugin install receipt %s", f)
+		}
+		out = append(out, r)
+		klog.V(4).Infof("parsed receipt for %s: version=%s", r.GetObjectMeta().GetName(), r.Spec.Version)
+
+	}
+	return out, nil
 }

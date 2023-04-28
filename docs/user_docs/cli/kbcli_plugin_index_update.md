@@ -1,17 +1,17 @@
 ---
-title: kbcli plugin index
+title: kbcli plugin index update
 ---
 
-Manage custom plugin indexes
+update all configured indexes
 
-### Synopsis
-
-Manage which repositories are used to discover plugins and install plugins from
+```
+kbcli plugin index update [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for index
+  -h, --help   help for update
 ```
 
 ### Options inherited from parent commands
@@ -40,11 +40,7 @@ Manage which repositories are used to discover plugins and install plugins from
 
 ### SEE ALSO
 
-* [kbcli plugin](kbcli_plugin.md)	 - Provides utilities for interacting with plugins.
-* [kbcli plugin index add](kbcli_plugin_index_add.md)	 - Add a new index
-* [kbcli plugin index delete](kbcli_plugin_index_delete.md)	 - Remove a configured index
-* [kbcli plugin index list](kbcli_plugin_index_list.md)	 - List configured indexes
-* [kbcli plugin index update](kbcli_plugin_index_update.md)	 - update all configured indexes
+* [kbcli plugin index](kbcli_plugin_index.md)	 - Manage custom plugin indexes
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

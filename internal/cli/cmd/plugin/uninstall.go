@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plugin
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/cockroachdb/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -51,9 +54,36 @@ func NewPluginUninstallCmd(_ genericclioptions.IOStreams) *cobra.Command {
 func uninstallPlugins(names []string) error {
 	for _, name := range names {
 		klog.V(4).Infof("Going to uninstall plugin %s\n", name)
-		if err := Uninstall(paths, name); err != nil {
+		if err := uninstall(paths, name); err != nil {
 			return errors.Wrapf(err, "failed to uninstall plugin %s", name)
 		}
 	}
 	return nil
+}
+
+func uninstall(p *Paths, name string) error {
+	if _, err := ReadReceiptFromFile(p.PluginInstallReceiptPath(name)); err != nil {
+		if os.IsNotExist(err) {
+			return ErrIsNotInstalled
+		}
+		return errors.Wrapf(err, "failed to look up install receipt for plugin %q", name)
+	}
+
+	klog.V(1).Infof("Deleting plugin %s", name)
+
+	symlinkPath := filepath.Join(p.BinPath(), pluginNameToBin(name, IsWindows()))
+	klog.V(3).Infof("Unlink %q", symlinkPath)
+	if err := removeLink(symlinkPath); err != nil {
+		return errors.Wrap(err, "could not uninstall symlink of plugin")
+	}
+
+	pluginInstallPath := p.PluginInstallPath(name)
+	klog.V(3).Infof("Deleting path %q", pluginInstallPath)
+	if err := os.RemoveAll(pluginInstallPath); err != nil {
+		return errors.Wrapf(err, "could not remove plugin directory %q", pluginInstallPath)
+	}
+	pluginReceiptPath := p.PluginInstallReceiptPath(name)
+	klog.V(3).Infof("Deleting plugin receipt %q", pluginReceiptPath)
+	err := os.Remove(pluginReceiptPath)
+	return errors.Wrapf(err, "could not remove plugin receipt %q", pluginReceiptPath)
 }

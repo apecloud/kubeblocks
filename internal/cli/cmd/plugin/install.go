@@ -22,14 +22,18 @@ package plugin
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin/download"
 )
 
 var (
@@ -125,4 +129,81 @@ func (o *pluginInstallOption) install() error {
 func IsWindows() bool {
 	goos := runtime.GOOS
 	return goos == "windows"
+}
+
+// Install will download and install a plugin. The operation tries
+// to not get the plugin dir in a bad state if it fails during the process.
+func Install(p *Paths, plugin Plugin, indexName string, opts InstallOpts) error {
+	klog.V(2).Infof("Looking for installed versions")
+	_, err := ReadReceiptFromFile(p.PluginInstallReceiptPath(plugin.Name))
+	if err == nil {
+		return ErrIsAlreadyInstalled
+	} else if !os.IsNotExist(err) {
+		return errors.Wrap(err, "failed to look up plugin receipt")
+	}
+
+	// Find available installation candidate
+	candidate, ok, err := GetMatchingPlatform(plugin.Spec.Platforms)
+	if err != nil {
+		return errors.Wrap(err, "failed trying to find a matching platform in plugin spec")
+	}
+	if !ok {
+		return errors.Errorf("plugin %q does not offer installation for this platform", plugin.Name)
+	}
+
+	// The actual install should be the last action so that a failure during receipt
+	// saving does not result in an installed plugin without receipt.
+	klog.V(3).Infof("Install plugin %s at version=%s", plugin.Name, plugin.Spec.Version)
+	if err := install(installOperation{
+		pluginName: plugin.Name,
+		platform:   candidate,
+
+		binDir:     p.BinPath(),
+		installDir: p.PluginVersionInstallPath(plugin.Name, plugin.Spec.Version),
+	}, opts); err != nil {
+		return errors.Wrap(err, "install failed")
+	}
+
+	klog.V(3).Infof("Storing install receipt for plugin %s", plugin.Name)
+	err = StoreReceipt(NewReceipt(plugin, indexName, metav1.Now()), p.PluginInstallReceiptPath(plugin.Name))
+	return errors.Wrap(err, "installation receipt could not be stored, uninstall may fail")
+}
+
+func install(op installOperation, opts InstallOpts) error {
+	// Download and extract
+	klog.V(3).Infof("Creating download staging directory")
+	downloadStagingDir, err := os.MkdirTemp("", "kbcli-downloads")
+	if err != nil {
+		return errors.Wrapf(err, "could not create staging dir %q", downloadStagingDir)
+	}
+	klog.V(3).Infof("Successfully created download staging directory %q", downloadStagingDir)
+	defer func() {
+		klog.V(3).Infof("Deleting the download staging directory %s", downloadStagingDir)
+		if err := os.RemoveAll(downloadStagingDir); err != nil {
+			klog.Warningf("failed to clean up download staging directory: %s", err)
+		}
+	}()
+	if err := download.DownloadAndExtract(downloadStagingDir, op.platform.URI, op.platform.Sha256, opts.ArchiveFileOverride); err != nil {
+		return errors.Wrap(err, "failed to unpack into staging dir")
+	}
+
+	applyDefaults(&op.platform)
+	if err := moveToInstallDir(downloadStagingDir, op.installDir, op.platform.Files); err != nil {
+		return errors.Wrap(err, "failed while moving files to the installation directory")
+	}
+
+	subPathAbs, err := filepath.Abs(op.installDir)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get the absolute fullPath of %q", op.installDir)
+	}
+	fullPath := filepath.Join(op.installDir, filepath.FromSlash(op.platform.Bin))
+	pathAbs, err := filepath.Abs(fullPath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get the absolute fullPath of %q", fullPath)
+	}
+	if _, ok := IsSubPath(subPathAbs, pathAbs); !ok {
+		return errors.Wrapf(err, "the fullPath %q does not extend the sub-fullPath %q", fullPath, op.installDir)
+	}
+	err = createOrUpdateLink(op.binDir, fullPath, op.pluginName)
+	return errors.Wrap(err, "failed to link installed plugin")
 }

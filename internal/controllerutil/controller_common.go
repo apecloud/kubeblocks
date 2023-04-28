@@ -216,7 +216,8 @@ func WorkloadFilterPredicate(object client.Object) bool {
 	if objLabels == nil {
 		return false
 	}
-	return objLabels[constant.AppManagedByLabelKey] == constant.AppName
+	_, containCompNameLabelKey := objLabels[constant.KBAppComponentLabelKey]
+	return objLabels[constant.AppManagedByLabelKey] == constant.AppName && containCompNameLabelKey
 }
 
 // IgnoreIsAlreadyExists return errors that is not AlreadyExists

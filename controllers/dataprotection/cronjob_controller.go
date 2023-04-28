@@ -91,6 +91,6 @@ func (r *CronJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&batchv1.CronJob{}).
 		Owns(&batchv1.Job{}).
-		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate)).
+		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.ManagedByKubeBlocksFilterPredicate)).
 		Complete(r)
 }

@@ -1783,3 +1783,6 @@ aws-load-balancer-controller:
             operator: In
             values:
             - "true"
+
+agamotto:
+  enabled: false

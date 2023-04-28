@@ -408,19 +408,19 @@ func (o *CreateOptions) createCompDependencies(cd *appsv1alpha1.ClusterDefinitio
 	// set dependencies created flag, if any error occurs, we will clean up the dependencies
 	o.dependenciesCreated = true
 
-	klog.V(1).Infof("creating dependencies for cluster %s, component %s", o.Name, compSpec.Name)
+	klog.V(1).Infof("create dependencies for cluster %s, component %s", o.Name, compSpec.Name)
 	// create service account
 	labels := buildResourceLabels(o.Name, compSpec.Name)
 	applyOptions := metav1.ApplyOptions{FieldManager: "kbcli"}
 	sa := corev1ac.ServiceAccount(saName, o.Namespace).WithLabels(labels)
 
-	klog.V(1).Infof("creating service account %s", saName)
+	klog.V(1).Infof("create service account %s", saName)
 	if _, err := o.Client.CoreV1().ServiceAccounts(o.Namespace).Apply(context.TODO(), sa, applyOptions); err != nil {
 		return err
 	}
 
 	// create role
-	klog.V(1).Infof("creating role %s", roleName)
+	klog.V(1).Infof("create role %s", roleName)
 	role := rbacv1ac.Role(roleName, o.Namespace).WithRules([]*rbacv1ac.PolicyRuleApplyConfiguration{
 		{
 			APIGroups: []string{""},
@@ -459,7 +459,7 @@ func (o *CreateOptions) createCompDependencies(cd *appsv1alpha1.ClusterDefinitio
 			Kind:     &rbacKind,
 			Name:     &roleName,
 		})
-	klog.V(1).Infof("creating role binding %s", roleBindingName)
+	klog.V(1).Infof("create role binding %s", roleBindingName)
 	_, err := o.Client.RbacV1().RoleBindings(o.Namespace).Apply(context.TODO(), roleBinding, applyOptions)
 	return err
 }

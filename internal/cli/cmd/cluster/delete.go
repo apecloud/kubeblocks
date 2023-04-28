@@ -124,7 +124,7 @@ func deleteCompDependencies(client kubernetes.Interface, ns string, name string,
 }
 
 func deleteDependencies(client kubernetes.Interface, ns string, name string) error {
-	klog.V(1).Infof("deleting dependencies for cluster %s", name)
+	klog.V(1).Infof("delete dependencies for cluster %s", name)
 	var (
 		saName          = saNamePrefix + name
 		roleName        = roleNamePrefix + name
@@ -144,19 +144,19 @@ func deleteDependencies(client kubernetes.Interface, ns string, name string) err
 	}
 
 	// delete rolebinding
-	klog.V(1).Infof("deleting rolebinding %s", roleBindingName)
+	klog.V(1).Infof("delete rolebinding %s", roleBindingName)
 	if err := client.RbacV1().RoleBindings(ns).Delete(ctx, roleBindingName, deleteOptions); checkErr(err) {
 		allErr = append(allErr, err)
 	}
 
 	// delete service account
-	klog.V(1).Infof("deleting service account %s", saName)
+	klog.V(1).Infof("delete service account %s", saName)
 	if err := client.CoreV1().ServiceAccounts(ns).Delete(ctx, saName, deleteOptions); checkErr(err) {
 		allErr = append(allErr, err)
 	}
 
 	// delete role
-	klog.V(1).Infof("deleting role %s", roleName)
+	klog.V(1).Infof("delete role %s", roleName)
 	if err := client.RbacV1().Roles(ns).Delete(ctx, roleName, deleteOptions); checkErr(err) {
 		allErr = append(allErr, err)
 	}

@@ -1574,7 +1574,7 @@ var _ = Describe("Cluster Controller", func() {
 			})()).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.CheckObj(&testCtx, clusterVersionKey, func(g Gomega, clusterVersion *appsv1alpha1.ClusterVersion) {
-				g.Expect(clusterVersion.Status.Phase == appsv1alpha1.UnavailablePhase).Should(BeTrue())
+				g.Expect(clusterVersion.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
 			})).Should(Succeed())
 
 			// trigger reconcile

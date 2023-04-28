@@ -253,6 +253,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("checking Backup object, it should be deleted")
 				Eventually(testapps.CheckObjExists(&testCtx, backupKey,
 					&dataprotectionv1alpha1.Backup{}, false)).Should(Succeed())
+				// TODO: add delete backup test case with the pvc not exists
 			})
 		})
 

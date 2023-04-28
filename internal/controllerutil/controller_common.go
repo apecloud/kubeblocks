@@ -210,13 +210,15 @@ func RecordCreatedEvent(r record.EventRecorder, cr client.Object) {
 	}
 }
 
-// WorkloadFilterPredicate provide filter predicate for workload objects, i.e., deployment/statefulset/pod/pvc.
+// WorkloadFilterPredicate provides filter predicate for workload objects, i.e., deployment/statefulset/pod/pvc.
 func WorkloadFilterPredicate(object client.Object) bool {
-	objLabels := object.GetLabels()
-	if objLabels == nil {
-		return false
-	}
-	return objLabels[constant.AppManagedByLabelKey] == constant.AppName
+	_, containCompNameLabelKey := object.GetLabels()[constant.KBAppComponentLabelKey]
+	return ManagedByKubeBlocksFilterPredicate(object) && containCompNameLabelKey
+}
+
+// ManagedByKubeBlocksFilterPredicate provides filter predicate for objects managed by kubeBlocks.
+func ManagedByKubeBlocksFilterPredicate(object client.Object) bool {
+	return object.GetLabels()[constant.AppManagedByLabelKey] == constant.AppName
 }
 
 // IgnoreIsAlreadyExists return errors that is not AlreadyExists

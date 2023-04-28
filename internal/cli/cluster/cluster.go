@@ -41,6 +41,9 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
+// ConditionsError cluster will display this status on list cmd when the status of ApplyResources or ProvisioningStarted condition is not "True".
+const ConditionsError = "ConditionsError"
+
 type GetOptions struct {
 	WithClusterDef     bool
 	WithClusterVersion bool
@@ -119,7 +122,15 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	if latestOpsProcessedCondition != nil && latestOpsProcessedCondition.Status == metav1.ConditionFalse {
 		objs.Cluster.Status.Phase = appsv1alpha1.ClusterPhase(latestOpsProcessedCondition.Reason)
 	}
+	provisionCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
+	if provisionCondition != nil && provisionCondition.Status == metav1.ConditionFalse {
+		objs.Cluster.Status.Phase = ConditionsError
+	}
 
+	applyResourcesCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeApplyResources)
+	if applyResourcesCondition != nil && applyResourcesCondition.Status == metav1.ConditionFalse {
+		objs.Cluster.Status.Phase = ConditionsError
+	}
 	// get cluster definition
 	if o.WithClusterDef {
 		cd := &appsv1alpha1.ClusterDefinition{}

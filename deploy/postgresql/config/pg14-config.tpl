@@ -125,7 +125,7 @@ work_mem = '32MB'
 {{- $cert_file := getCertFile }}
 {{- $key_file := getKeyFile }}
 # tls
-ssl=ON
+ssl= 'True'
 ssl_ca_file={{ $ca_file }}
 ssl_cert_file={{ $cert_file }}
 ssl_key_file={{ $key_file }}

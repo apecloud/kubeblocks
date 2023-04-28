@@ -144,6 +144,11 @@ var setKeyEnvMap = map[setKey]envSet{
 	keyReplicas: {"CLUSTER_DEFAULT_REPLICAS", "1"},
 }
 
+var clusterDefinitionToVersionPrefix = map[string]string{
+	"apecloud-mysql": "ac-mysql",
+	"postgresql":     "postgresql",
+}
+
 // UpdatableFlags is the flags that cat be updated by update command
 type UpdatableFlags struct {
 	// Options for cluster termination policy
@@ -426,7 +431,18 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-version",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			clusterVersion := utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete)
+			clusterDefinition, err := cmd.Flags().GetString("cluster-definition")
+			if clusterDefinition == "" || err != nil {
+				return clusterVersion, cobra.ShellCompDirectiveNoFileComp
+			}
+			var newClusterVersion []string
+			for _, cv := range clusterVersion {
+				if strings.HasPrefix(cv, clusterDefinitionToVersionPrefix[clusterDefinition]) {
+					newClusterVersion = append(newClusterVersion, cv)
+				}
+			}
+			return newClusterVersion, cobra.ShellCompDirectiveNoFileComp
 		}))
 
 	var formatsWithDesc = map[string]string{

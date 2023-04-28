@@ -174,7 +174,7 @@ func (p *clusterPlan) Execute() error {
 }
 
 func (p *clusterPlan) handlePlanExecutionError(err error) error {
-	condition := newFailedApplyResourcesCondition(err.Error())
+	condition := newFailedApplyResourcesCondition(err)
 	meta.SetStatusCondition(&p.transCtx.Cluster.Status.Conditions, condition)
 	sendWaringEventWithError(p.transCtx.GetRecorder(), p.transCtx.Cluster, ReasonApplyResourcesFailed, err)
 	return p.cli.Status().Patch(p.transCtx.Context, p.transCtx.Cluster, client.MergeFrom(p.transCtx.OrigCluster.DeepCopy()))

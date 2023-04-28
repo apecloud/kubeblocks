@@ -555,7 +555,7 @@ var _ = Describe("Cluster Controller", func() {
 					}
 
 					By("Checking backup policy created from backup policy template")
-					policyName := lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDef.Name)
+					policyName := lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDef.Name, "")
 					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
 						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
 							BackupPolicyTemplateName: backupPolicyTPLName}
@@ -768,6 +768,27 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
 		}).Should(Succeed())
 
+	}
+
+	testClusterServiceAccount := func(compName, compDefName string) {
+		By("Creating a cluster with target service account name")
+
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).
+			AddComponent(compName, compDefName).SetReplicas(3).
+			SetServiceAccountName("test-service-account").
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compName)
+
+		By("Checking the podSpec.serviceAccountName")
+		Eventually(func(g Gomega) {
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			g.Expect(podSpec.ServiceAccountName).To(Equal("test-service-account"))
+		}).Should(Succeed())
 	}
 
 	testComponentAffinity := func(compName, compDefName string) {
@@ -1062,7 +1083,7 @@ var _ = Describe("Cluster Controller", func() {
 				},
 			},
 			Spec: dataprotectionv1alpha1.BackupSpec{
-				BackupPolicyName: lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDefName),
+				BackupPolicyName: lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDefName, ""),
 				BackupType:       "snapshot",
 			},
 		}
@@ -1349,6 +1370,10 @@ var _ = Describe("Cluster Controller", func() {
 
 			It(fmt.Sprintf("[comp: %s] should add and delete service correctly", compName), func() {
 				testServiceAddAndDelete(compName, compDefName)
+			})
+
+			It(fmt.Sprintf("[comp: %s] should add serviceAccountName correctly", compName), func() {
+				testClusterServiceAccount(compName, compDefName)
 			})
 
 			Context(fmt.Sprintf("[comp: %s] and with cluster affinity set", compName), func() {

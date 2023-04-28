@@ -181,6 +181,10 @@ type ClusterComponentSpec struct {
 	// required when TLS enabled
 	// +optional
 	Issuer *Issuer `json:"issuer,omitempty"`
+
+	// serviceAccountName is the name of the ServiceAccount that component runs depend on.
+	// +optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

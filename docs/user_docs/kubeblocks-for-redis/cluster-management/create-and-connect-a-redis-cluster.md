@@ -81,6 +81,8 @@ kbcli cluster create redis-cluster --cluster-definition="redis" --set-file -<<EO
 - name: redis
   replicas: 2
   componentDefRef: redis
+  switchPolicy:
+    type: Noop
   volumeClaimTemplates:
   - name: data
     spec:

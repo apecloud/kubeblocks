@@ -71,6 +71,8 @@ kbcli cluster create pg-cluster --cluster-definition="postgresql" --set-file -<<
 - name: postgresql
   replicas: 2
   componentDefRef: postgresql
+  switchPolicy:
+    type: Noop
   volumeClaimTemplates:
   - name: data
     spec:

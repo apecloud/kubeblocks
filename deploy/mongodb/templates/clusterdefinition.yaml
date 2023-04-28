@@ -58,6 +58,7 @@ spec:
             accessMode: Readonly
         updateStrategy: Serial
       probes:
+        roleProbeTimeoutAfterPodsReady: 300
         roleProbe:
           failureThreshold: {{ .Values.roleProbe.failureThreshold }}
           periodSeconds: {{ .Values.roleProbe.periodSeconds }}

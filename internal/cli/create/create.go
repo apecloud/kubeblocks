@@ -109,6 +109,9 @@ type Inputs struct {
 	// CustomOutPut will be executed after creating successfully.
 	CustomOutPut func(options *BaseOptions)
 
+	// CleanUpFn will be executed after creating failed.
+	CleanUpFn func() error
+
 	// ResourceNameGVRForCompletion resource name for completion.
 	ResourceNameGVRForCompletion schema.GroupVersionResource
 }
@@ -145,9 +148,22 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 		Example:           inputs.Example,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(inputs.Factory, inputs.ResourceNameGVRForCompletion),
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
-			util.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
-			util.CheckErr(inputs.BaseOptionsObj.Run(inputs))
+			err := inputs.BaseOptionsObj.Complete(inputs, args)
+			if err == nil {
+				err = inputs.BaseOptionsObj.Validate(inputs)
+			}
+			if err == nil {
+				err = inputs.BaseOptionsObj.Run(inputs)
+			}
+			if err == nil {
+				return
+			}
+
+			// if err is not nil, clean up
+			if cleanErr := inputs.BaseOptionsObj.CleanUp(inputs); cleanErr != nil {
+				fmt.Fprintf(inputs.BaseOptionsObj.ErrOut, "clean up failed: %v\n", cleanErr)
+			}
+			util.CheckErr(err)
 		},
 	}
 	if inputs.BuildFlags != nil {
@@ -287,6 +303,13 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 		return err
 	}
 	return printer.PrintObj(previewObj, o.Out)
+}
+
+func (o *BaseOptions) CleanUp(inputs Inputs) error {
+	if inputs.CleanUpFn != nil {
+		return inputs.CleanUpFn()
+	}
+	return nil
 }
 
 // RunAsApply execute command. the options of parameter contain the command flags and args.

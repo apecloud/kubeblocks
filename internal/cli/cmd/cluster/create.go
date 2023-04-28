@@ -175,6 +175,8 @@ type CreateOptions struct {
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
 
+	dependenciesCreated bool `json:"-"`
+
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
 	UpdatableFlags
@@ -291,6 +293,18 @@ func (o *CreateOptions) Complete() error {
 	return validateStorageClass(o.Dynamic, o.ComponentSpecs)
 }
 
+func (o *CreateOptions) CleanUp() error {
+	if !o.dependenciesCreated {
+		return nil
+	}
+
+	if o.Client == nil {
+		return nil
+	}
+
+	return deleteDependencies(o.Client, o.Namespace, o.Name)
+}
+
 // buildComponents build components from file or set values
 func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 	var (
@@ -391,6 +405,9 @@ func (o *CreateOptions) createCompDependencies(cd *appsv1alpha1.ClusterDefinitio
 	// set component service account name
 	compSpec.ServiceAccountName = saName
 
+	// set dependencies created flag, if any error occurs, we will clean up the dependencies
+	o.dependenciesCreated = true
+
 	klog.V(1).Infof("creating dependencies for cluster %s, component %s", o.Name, compSpec.Name)
 	// create service account
 	labels := buildResourceLabels(o.Name, compSpec.Name)
@@ -484,6 +501,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Factory:         f,
 		Complete:        o.Complete,
 		PreCreate:       o.PreCreate,
+		CleanUpFn:       o.CleanUp,
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cd list\" to show all available cluster definitions")
 			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
@@ -598,6 +616,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				return "2"
 			}
 		}
+
 		// the default replicas is 3 if not set by command flag, for Consensus workload
 		if c.WorkloadType == appsv1alpha1.Consensus {
 			if key == keyReplicas {

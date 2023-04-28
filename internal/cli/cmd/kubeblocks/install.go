@@ -80,9 +80,9 @@ type InstallOptions struct {
 
 var (
 	installExample = templates.Examples(`
-	# Install KubeBlocks, the default version is same with the kbcli version, the default namespace is kb-system 
+	# Install KubeBlocks, the default version is same with the kbcli version, the default namespace is kb-system
 	kbcli kubeblocks install
-	
+
 	# Install KubeBlocks with specified version
 	kbcli kubeblocks install --version=0.4.0
 
@@ -222,7 +222,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	checkAddons := func() (bool, error) {
 		allEnabled := true
 		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: buildAddonLabelSelector(),
+			LabelSelector: buildKubeBlocksSelectorLabels(),
 		})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err

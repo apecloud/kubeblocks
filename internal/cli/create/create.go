@@ -55,6 +55,15 @@ var (
 	cueTemplate embed.FS
 )
 
+type DryRunStrategy int
+
+const (
+	// DryRunNone indicates the client will make all mutating calls
+	DryRunNone DryRunStrategy = iota
+	DryRunClient
+	DryRunServer
+)
+
 type Inputs struct {
 	// Use cobra command use
 	Use string
@@ -82,9 +91,6 @@ type Inputs struct {
 
 	// Group of Version, default is v1alpha1
 	Version string
-
-	// Command of input
-	Cmd *cobra.Command
 
 	// Factory
 	Factory cmdutil.Factory
@@ -123,6 +129,8 @@ type BaseOptions struct {
 
 	Format printer.Format `json:"-"`
 
+	DryRunStrategy string `json:"-"`
+
 	// Quiet minimize unnecessary output
 	Quiet bool
 
@@ -142,7 +150,6 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 			util.CheckErr(inputs.BaseOptionsObj.Run(inputs))
 		},
 	}
-	inputs.Cmd = cmd
 	if inputs.BuildFlags != nil {
 		inputs.BuildFlags(cmd)
 	}
@@ -245,7 +252,7 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	}
 
 	previewObj := unstructuredObj
-	dryRunStrategy, err := GetDryRunStrategy(inputs.Cmd)
+	dryRunStrategy, err := o.GetDryRunStrategy()
 	if err != nil {
 		return err
 	}
@@ -344,6 +351,24 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 	return nil
 }
 
+func (o *BaseOptions) GetDryRunStrategy() (DryRunStrategy, error) {
+	if o.DryRunStrategy == "" {
+		return DryRunNone, nil
+	}
+	switch o.DryRunStrategy {
+	case "client":
+		return DryRunClient, nil
+	case "server":
+		return DryRunServer, nil
+	case "unchanged":
+		return DryRunClient, nil
+	case "none":
+		return DryRunNone, nil
+	default:
+		return DryRunNone, fmt.Errorf(`invalid dry-run value (%v). Must be "none", "server", or "client"`, o.DryRunStrategy)
+	}
+}
+
 // NewCueValue convert cue template  to cue Value which holds any value like Boolean,Struct,String and more cue type.
 func newCueValue(cueTemplateName string) (cue.Value, error) {
 	tmplFs, _ := debme.FS(cueTemplate, "template")
@@ -382,35 +407,4 @@ func convertContentToUnstructured(cueValue cue.Value) (*unstructured.Unstructure
 		return nil, err
 	}
 	return unstructuredObj, nil
-}
-
-type DryRunStrategy int
-
-const (
-	// DryRunNone indicates the client will make all mutating calls
-	DryRunNone DryRunStrategy = iota
-	DryRunClient
-	DryRunServer
-)
-
-func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
-	if cmd == nil {
-		return DryRunNone, nil
-	}
-	dryRunFlag, err := cmd.Flags().GetString("dry-run")
-	if err != nil {
-		return DryRunNone, nil
-	}
-	switch dryRunFlag {
-	case cmd.Flag("dry-run").NoOptDefVal:
-		return DryRunClient, nil
-	case "client":
-		return DryRunClient, nil
-	case "server":
-		return DryRunServer, nil
-	case "none":
-		return DryRunNone, nil
-	default:
-		return DryRunNone, fmt.Errorf(`invalid dry-run value (%v). Must be "none", "server", or "client"`, dryRunFlag)
-	}
 }

@@ -57,6 +57,7 @@ type SynthesizedComponent struct {
 	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"VolumeTypes,omitempty"`
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
+	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
 }
 
 // GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is

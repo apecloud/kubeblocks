@@ -38,6 +38,14 @@ type BackupPolicyTemplateSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	BackupPolicies []BackupPolicy `json:"backupPolicies"`
+
+	// Identifier is a unique identifier for this BackupPolicyTemplate.
+	// this identifier will be the suffix of the automatically generated backupPolicy name.
+	// and must be added when multiple BackupPolicyTemplates exist,
+	// otherwise the generated backupPolicy override will occur.
+	// +optional
+	// +kubebuilder:validation:MaxLength=20
+	Identifier string `json:"identifier,omitempty"`
 }
 
 type BackupPolicy struct {

@@ -70,9 +70,9 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			By("create Upgrade Ops")
 			newClusterVersionName := "clusterversion-upgrade-" + randomStr
 			_ = testapps.NewClusterVersionFactory(newClusterVersionName, clusterDefinitionName).
-				AddComponent(statelessComp).AddContainerShort(testapps.DefaultNginxContainerName, "nginx:1.14.2").
-				AddComponent(consensusComp).AddContainerShort(testapps.DefaultMySQLContainerName, mysqlImageForUpdate).
-				AddComponent(statefulComp).AddContainerShort(testapps.DefaultMySQLContainerName, mysqlImageForUpdate).
+				AddComponentVersion(statelessComp).AddContainerShort(testapps.DefaultNginxContainerName, "nginx:1.14.2").
+				AddComponentVersion(consensusComp).AddContainerShort(testapps.DefaultMySQLContainerName, mysqlImageForUpdate).
+				AddComponentVersion(statefulComp).AddContainerShort(testapps.DefaultMySQLContainerName, mysqlImageForUpdate).
 				Create(&testCtx).GetObject()
 			ops := testapps.NewOpsRequestObj("upgrade-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterObject.Name, appsv1alpha1.UpgradeType)

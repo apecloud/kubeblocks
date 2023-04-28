@@ -125,6 +125,9 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		return nil
 	}
 
+	// REVIEW/TODO:
+	// - need higher level abstraction handling
+	// - or move this module to part operator controller handling
 	switch task.Component.WorkloadType {
 	case appsv1alpha1.Stateless:
 		if err := workloadProcessor(
@@ -170,10 +173,6 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			}
 		}
 
-		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
-		//  then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
-		// REVIEW/TODO: why using Max?
-		// replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return buildReplicationSet(reqCtx, task, envConfig.Name)
@@ -195,6 +194,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		return err
 	}
 	for _, svc := range svcList {
+		// REVIEW/TODO: need higher level abstraction handling
 		switch task.Component.WorkloadType {
 		case appsv1alpha1.Consensus:
 			addLeaderSelectorLabels(svc, task.Component)

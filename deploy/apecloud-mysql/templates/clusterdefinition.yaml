@@ -60,7 +60,7 @@ spec:
             targetPort: mysql
       horizontalScalePolicy:
         type: Snapshot
-        backupPolicyTemplateName: apecloud-mysql-backup-policy-template
+        backupPolicyTemplateName: apecloud-mysql-backup-policy-for-hscale
       volumeTypes:
         - name: data
           type: data

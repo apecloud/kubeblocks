@@ -45,6 +45,9 @@ spec:
       resources:
         requests:
           storage: 1Gi
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
 
     - selectors:
         - key: KubeGitVersion
@@ -56,6 +59,9 @@ spec:
       resources:
         requests:
           storage: 20Gi
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
 
   installable:
     autoInstall: {{ .Values.grafana.enabled }}

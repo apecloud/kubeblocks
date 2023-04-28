@@ -105,6 +105,9 @@ func (c *ComponentBase) GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec {
 }
 
 func (c *ComponentBase) GetPrimaryIndex() int32 {
+	if c.Component.PrimaryIndex == nil {
+		return 0
+	}
 	return *c.Component.PrimaryIndex
 }
 

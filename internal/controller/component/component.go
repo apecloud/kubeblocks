@@ -41,18 +41,15 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-	synthesizedComp := BuildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
-	if synthesizedComp == nil {
-		return nil, nil
+	synthesizedComp, err := buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	if err != nil {
+		return nil, err
 	}
 	if err := buildRestoreInfoFromBackup(reqCtx, cli, cluster, synthesizedComp); err != nil {
 		return nil, err
 	}
 	return synthesizedComp, nil
 }
-
-// BuildComponent generates a new Component object, which is a mixture of
-// component-related configs from input Cluster, ClusterDef and ClusterVersion.
 func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	cluster appsv1alpha1.Cluster,
 	clusterDef appsv1alpha1.ClusterDefinition,
@@ -60,7 +57,22 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) *SynthesizedComponent {
+	component, err := buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	if err != nil {
+		reqCtx.Log.Error(err, "build synthesized component failed")
+	}
+	return component
+}
 
+// BuildComponent generates a new Component object, which is a mixture of
+// component-related configs from input Cluster, ClusterDef and ClusterVersion.
+func buildComponent(reqCtx intctrlutil.RequestCtx,
+	cluster appsv1alpha1.Cluster,
+	clusterDef appsv1alpha1.ClusterDefinition,
+	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
+) (*SynthesizedComponent, error) {
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
@@ -161,13 +173,12 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	buildMonitorConfig(&clusterCompDef, &clusterCompSpec, component)
 	err := buildProbeContainers(reqCtx, component)
 	if err != nil {
-		reqCtx.Log.Error(err, "build probe container failed.")
-		return nil
+		return nil, err
 	}
 
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
 
-	return component
+	return component, nil
 }
 
 // appendOrOverrideContainerAttr is used to append targetContainer to compContainers or override the attributes of compContainers with a given targetContainer,

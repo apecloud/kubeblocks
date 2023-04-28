@@ -224,11 +224,9 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	}
 
 	// cluster object has more business to do, handle them here
-	if _, ok := node.Obj.(*appsv1alpha1.Cluster); ok {
-		if done, err := c.reconcileCluster(node); err != nil {
+	if _, ok = node.Obj.(*appsv1alpha1.Cluster); ok {
+		if err := c.reconcileCluster(node); err != nil {
 			return err
-		} else if done {
-			return nil
 		}
 	}
 	return c.reconcileObject(node)
@@ -256,9 +254,6 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 				return err
 			}
 		}
-		// TODO(refactor): merge check
-		// if node.Orphan {
-		//	err := c.cli.Delete(c.ctx.Ctx, node.Obj)
 		// delete secondary objects
 		if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
 			err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.Obj)
@@ -268,10 +263,6 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 			}
 		}
 	case ictrltypes.STATUS:
-		// TODO(refactor): merge check
-		// if node.Immutable {
-		//	return nil
-		// }
 		patch := client.MergeFrom(node.ObjCopy)
 		if err := c.cli.Status().Patch(c.transCtx.Context, node.Obj, patch); err != nil {
 			return err
@@ -288,14 +279,13 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 	return nil
 }
 
-func (c *clusterPlanBuilder) reconcileCluster(node *ictrltypes.LifecycleVertex) (bool, error) {
+func (c *clusterPlanBuilder) reconcileCluster(node *ictrltypes.LifecycleVertex) error {
 	cluster := node.Obj.(*appsv1alpha1.Cluster).DeepCopy()
 	origCluster := node.ObjCopy.(*appsv1alpha1.Cluster)
 	switch *node.Action {
 	// cluster.meta and cluster.spec might change
 	case ictrltypes.STATUS:
-		if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
-			!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
+		if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) || !reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
 			// TODO: we should Update instead of Patch cluster object,
 			// TODO: but Update failure happens too frequently as other controllers are updating cluster object too.
 			// TODO: use Patch here, revert to Update after refactoring done
@@ -310,13 +300,13 @@ func (c *clusterPlanBuilder) reconcileCluster(node *ictrltypes.LifecycleVertex) 
 				// log for debug
 				// TODO:(free6om) make error message smaller when refactor done.
 				c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
-				return false, err
+				return err
 			}
 		}
 	case ictrltypes.CREATE, ictrltypes.UPDATE:
-		return false, fmt.Errorf("cluster can't be created or updated: %s", cluster.Name)
+		return fmt.Errorf("cluster can't be created or updated: %s", cluster.Name)
 	}
-	return false, nil
+	return nil
 }
 
 func (c *clusterPlanBuilder) emitConditionUpdatingEvent(oldConditions, newConditions []metav1.Condition) {

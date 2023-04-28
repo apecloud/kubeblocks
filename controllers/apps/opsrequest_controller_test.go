@@ -334,10 +334,13 @@ var _ = Describe("OpsRequest Controller", func() {
 			testVerticalScaleCPUAndMemory(testapps.ConsensusMySQLComponent, ctx)
 		})
 
-		mockCompRunning := func(replicas int32) {
+		componentWorkload := func() *appsv1.StatefulSet {
 			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, mysqlCompName)
-			sts := &stsList.Items[0]
-			Expect(int(*sts.Spec.Replicas)).To(BeEquivalentTo(replicas))
+			return &stsList.Items[0]
+		}
+
+		mockCompRunning := func(replicas int32) {
+			sts := componentWorkload()
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				testk8s.MockStatefulSetReady(sts)
 			})).ShouldNot(HaveOccurred())
@@ -409,15 +412,26 @@ var _ = Describe("OpsRequest Controller", func() {
 		It("HorizontalScaling when not support snapshot", func() {
 			By("init backup policy template, mysql cluster and hscale ops")
 			viper.Set("VOLUMESNAPSHOT", false)
+
 			mockMysqlCluster()
+			cluster := &appsv1alpha1.Cluster{}
+			Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
+			initGeneration := cluster.Status.ObservedGeneration
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(Equal(initGeneration))
+
 			ops := mockHscaleOps(int32(5))
 			opsKey := client.ObjectKeyFromObject(ops)
 
 			By("expect component is Running if don't support volume snapshot during doing h-scale ops")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-			// cluster phase changes to HorizontalScalingPhase first. then, it will be ConditionsError because it does not support snapshot backup after a period of time.
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase)) // HorizontalScalingPhase
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, lcluster *appsv1alpha1.Cluster) {
+				// the cluster spec has been updated by ops-controller to scale out.
+				g.Expect(lcluster.Generation == initGeneration+1).Should(BeTrue())
+				// but the new spec can't be reconciled successfully because of volume snapshot is disabled.
+				g.Expect(lcluster.Generation > lcluster.Status.ObservedGeneration).Should(BeTrue())
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			})).Should(Succeed())
 
 			By("delete h-scale ops")
 			testapps.DeleteObject(&testCtx, opsKey, ops)
@@ -429,7 +443,11 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 				cluster.Spec.ComponentSpecs[0].Replicas = int32(3)
 			})()).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, lcluster *appsv1alpha1.Cluster) {
+				g.Expect(lcluster.Generation == initGeneration+2).Should(BeTrue())
+				g.Expect(lcluster.Generation == lcluster.Status.ObservedGeneration).Should(BeTrue())
+				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			})).Should(Succeed())
 		})
 
 		It("HorizontalScaling when support snapshot", func() {
@@ -440,14 +458,15 @@ var _ = Describe("OpsRequest Controller", func() {
 			ops := mockHscaleOps(replicas)
 			opsKey := client.ObjectKeyFromObject(ops)
 
-			By("expect component is Running")
+			By("expect cluster and component is reconciling the new spec")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-			// cluster phase changes to HorizontalScalingPhase first. then, it will be ConditionsError because it does not support snapshot backup after a period of time.
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
-			// component phase should be running during snapshot backup
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			fmt.Printf("test - ops request is running, wait cluster and component to reconcile")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+			})).Should(Succeed())
 
-			By("mock snapshot created and ready to use, component phase should change to Updating to do horizontalScaling")
+			By("mock snapshot created and ready to use")
 			snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
 				clusterKey.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}
 			volumeSnapshot := &snapshotv1.VolumeSnapshot{}
@@ -455,12 +474,23 @@ var _ = Describe("OpsRequest Controller", func() {
 			readyToUse := true
 			volumeSnapshot.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
 			Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+			})).Should(Succeed())
 
-			By("mock component is Running and expect cluster is Running")
+			By("wait the underlying workload been updated")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
+				func(g Gomega, sts *appsv1.StatefulSet) {
+					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
+				})).Should(Succeed())
+
+			By("mock component workload is running and expect cluster and component are running")
 			mockCompRunning(replicas)
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			})).Should(Succeed())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
 	})

@@ -34,7 +34,7 @@ In the Redis PrimarySecondary provided by KubeBlocks, Sentinel is deployed as an
       - name: redis
         componentDefRef: redis
         switchPolicy:
-        type: Noop
+          type: Noop
     ```
 
   * Check whether the following role probe parameters exist to verify the role probe is enabled.

@@ -49,29 +49,34 @@ kbcli cluster describe mongodb-cluster
 
 ### (Recommended) Create a cluster with specified class type
 
-   A class is a set of resource configurations of CPU, memory and storage, to offer convenience and also set a constraints on the resources applied to the cluster. See [Cluster types](user_docs/kubeblocks-for-mysql/cluster-type/cluster-types.md).
-  ***Steps:***
+   **Option 1.** (**Recommended**) Use `--set` option
 
-  1. List all classes with ```kbcli class list``` command and choose the one you need, or check [class type](user_docs/kubeblocks-for-mysql/cluster-type/cluster-types.md) document for reference.
+Add the `--set` option when creating a cluster. For example,
 
-    ```
-    kbcli class list --cluster-definition apecloud-mysql  
-    ```
+```bash
+kbcli cluster create mongodb-cluster --cluster-definition mongodb --set cpu=1000m,memory=1Gi,storage=10Gi
+```
 
-  :::note
-  
-   If there is no suitable class listed, you can [customize your own class](user_docs/kubeblocks-for-mysql/cluster-type/customize-class-type.md) template and apply the class here.
-    Creating clusters that does not meet the constraints is invalid and system creates the cluster with the minimum CPU value specified.
+**Option 2.** Change YAML file configurations
 
-  :::
+Change the corresponding parameters in the YAML file.
 
-   2. Use --set option with `kbcli cluster create` command.
+```bash
+kbcli cluster create mongodb-cluster --cluster-definition="mongodb" --set-file -<<EOF
+- name: mongodb-cluster
+  replicas: 2
+  componentDefRef: mongodb
+  volumeClaimTemplates:
+  - name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+EOF
+```
 
-    ```bash
-      kbcli cluster create myclsuter --cluster-definition mongodb --set class=general-2c2g
-    ```
-
-Except for the --set options, there are many options you can create cluster with, see Table 1.
 📎 Table 1. kbcli cluster create options description
 
 | Option                 | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |

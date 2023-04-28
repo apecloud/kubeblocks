@@ -28,14 +28,7 @@ To check the termination policy, execute the following command.
 kbcli cluster list <name>
 ```
 
-***Example***
 
-```bash
-kbcli cluster list mysql-cluster
->
-NAME   	        NAMESPACE	CLUSTER-DEFINITION	VERSION        	TERMINATION-POLICY	STATUS 	CREATED-TIME
-mysql-cluster	default  	apecloud-mysql    	ac-mysql-8.0.30	Delete            	Running	Feb 06,2023 18:27 UTC+0800
-```
 
 ## Option 1. Use kbcli
 
@@ -45,11 +38,6 @@ Configure the cluster name and run the command below to delete the specified clu
 kbcli cluster delete <name>
 ```
 
-***Example***
-
-```bash
-kbcli cluster delete mysql-cluster
-```
 
 ## Option 2. Use kubectl
 
@@ -62,5 +50,5 @@ kubectl delete cluster <name>
 ***Example***
 
 ```bash
-kubectl delete cluster mysql-cluster
+kubectl delete cluster mongodb-cluster
 ```

@@ -117,10 +117,12 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		return nil, err
 	}
 
-	// wrap the cluster phase if the latest ops request is processing
-	latestOpsProcessedCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
-	if latestOpsProcessedCondition != nil && latestOpsProcessedCondition.Status == metav1.ConditionFalse {
-		objs.Cluster.Status.Phase = appsv1alpha1.ClusterPhase(latestOpsProcessedCondition.Reason)
+	if objs.Cluster.Status.Phase == appsv1alpha1.SpecReconcilingClusterPhase {
+		// wrap the cluster phase if the latest ops request is processing
+		latestOpsProcessedCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
+		if latestOpsProcessedCondition != nil && latestOpsProcessedCondition.Status == metav1.ConditionFalse {
+			objs.Cluster.Status.Phase = appsv1alpha1.ClusterPhase(latestOpsProcessedCondition.Reason)
+		}
 	}
 	provisionCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 	if provisionCondition != nil && provisionCondition.Status == metav1.ConditionFalse {

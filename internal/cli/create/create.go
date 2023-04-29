@@ -31,7 +31,7 @@ import (
 	cuejson "cuelang.org/go/encoding/json"
 	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -49,6 +49,8 @@ var (
 	//go:embed template/*
 	cueTemplate embed.FS
 )
+
+type CreateDependency func(dryRun []string) error
 
 type Inputs struct {
 	// Use cobra command use
@@ -94,6 +96,12 @@ type Inputs struct {
 
 	// CustomOutPut will be executed after creating successfully.
 	CustomOutPut func(options *BaseOptions)
+
+	// CleanUpFn will be executed after creating failed.
+	CleanUpFn func() error
+
+	// CreateDependencies will be executed before creating.
+	CreateDependencies CreateDependency
 
 	// ResourceNameGVRForCompletion resource name for completion.
 	ResourceNameGVRForCompletion schema.GroupVersionResource
@@ -212,9 +220,27 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	if len(version) == 0 {
 		version = types.AppsAPIVersion
 	}
+
+	// create dependencies
+	if inputs.CreateDependencies != nil {
+		if err = inputs.CreateDependencies([]string{}); err != nil {
+			return err
+		}
+	}
+
 	// create k8s resource
 	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
-	if unstructuredObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+	unstructuredObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
+	if err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return err
+		}
+
+		// for other errors, clean up dependencies
+		if cleanErr := o.CleanUp(inputs); cleanErr != nil {
+			fmt.Fprintf(o.ErrOut, "clean up denpendencies failed: %v\n", cleanErr)
+		}
+
 		return err
 	}
 	o.Name = unstructuredObj.GetName()
@@ -225,6 +251,17 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 		inputs.CustomOutPut(o)
 	} else {
 		fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+	}
+	return nil
+}
+
+func (o *BaseOptions) CleanUp(inputs Inputs) error {
+	if inputs.CreateDependencies == nil {
+		return nil
+	}
+
+	if inputs.CleanUpFn != nil {
+		return inputs.CleanUpFn()
 	}
 	return nil
 }
@@ -279,7 +316,7 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 		objectByte, metav1.PatchOptions{}); err != nil {
 
 		// create object if not found
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			if _, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(
 				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 				return err

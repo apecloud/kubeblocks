@@ -517,9 +517,6 @@ func (o *initOptions) newCreateOptions() (*cmdcluster.CreateOptions, error) {
 		options.Values = append(options.Values, "replicas=3")
 	}
 
-	if err = options.Validate(); err != nil {
-		return nil, err
-	}
 	if err = options.Complete(); err != nil {
 		return nil, err
 	}

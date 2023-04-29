@@ -188,7 +188,7 @@ var _ = Describe("Delete", func() {
 
 		By("set pre-delete hook")
 		// block cluster deletion
-		fakePreDeleteHook := func(object runtime.Object) error {
+		fakePreDeleteHook := func(o *DeleteOptions, object runtime.Object) error {
 			if object.GetObjectKind().GroupVersionKind().Kind == appsv1alpha1.ClusterKind {
 				return fmt.Errorf("fake pre-delete hook error")
 			} else {

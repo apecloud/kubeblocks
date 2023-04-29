@@ -176,10 +176,11 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
     
         # Enabled "prometheus" addon and its extra alertmanager component with custom resources settings 
     	kbcli addon enable prometheus --memory 512Mi/4Gi --storage 8Gi --replicas 2 \
-  			--memory alertmanager:16Mi/256Mi --storage: alertmanager:1Gi --replicas alertmanager:2 
+  			--memory alertmanager:16Mi/256Mi --storage alertmanager:1Gi --replicas alertmanager:2 
 
         # Enabled "prometheus" addon with tolerations 
-    	kbcli addon enable prometheus --tolerations '[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
+    	kbcli addon enable prometheus \
+			--tolerations '[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
 			--tolerations 'alertmanager:[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]'
 
 		# Enabled "prometheus" addon with helm like custom settings

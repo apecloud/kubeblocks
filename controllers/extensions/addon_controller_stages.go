@@ -114,6 +114,10 @@ type autoInstallCheckStage struct {
 	stageCtx
 }
 
+type enabledWithDefaultValuesStage struct {
+	stageCtx
+}
+
 type progressingHandler struct {
 	stageCtx
 	enablingStage  enablingStage
@@ -270,7 +274,7 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 				Type:               extensionsv1alpha1.ConditionTypeChecked,
 				Status:             metav1.ConditionFalse,
 				ObservedGeneration: addon.Generation,
-				Reason:             AddonSpecInstallableReqUnmatched,
+				Reason:             InstallableRequirementUnmatched,
 				Message:            "spec.installable.selectors has no matching requirement.",
 				LastTransitionTime: metav1.Now(),
 			})
@@ -295,36 +299,23 @@ func (r *autoInstallCheckStage) Handle(ctx context.Context) {
 			return
 		}
 		// proceed if has specified addon.spec.installSpec
-		if addon.Spec.InstallSpec != nil {
+		if addon.Spec.InstallSpec.HasSetValues() {
 			r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
 			return
 		}
+		enabledAddonWithDefaultValues(ctx, &r.stageCtx, addon, AddonAutoInstall, "Addon enabled auto-install")
+	})
+	r.next.Handle(ctx)
+}
 
-		setInstallSpec := func(di *extensionsv1alpha1.AddonDefaultInstallSpecItem) {
-			addon.Spec.InstallSpec = di.AddonInstallSpec.DeepCopy()
-			addon.Spec.InstallSpec.Enabled = true
-			if err := r.reconciler.Client.Update(ctx, addon); err != nil {
-				r.setRequeueWithErr(err, "")
-				return
-			}
-			r.reconciler.Event(addon, "Normal", AddonAutoInstall,
-				"Addon enabled auto-install")
-			r.setReconciled()
+func (r *enabledWithDefaultValuesStage) Handle(ctx context.Context) {
+	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("enabledWithDefaultValuesStage", "phase", addon.Status.Phase)
+		if addon.Spec.InstallSpec.HasSetValues() ||
+			addon.Spec.InstallSpec.IsDisabled() {
+			return
 		}
-
-		for _, di := range addon.Spec.GetSortedDefaultInstallValues() {
-			if len(di.Selectors) == 0 {
-				setInstallSpec(&di)
-				return
-			}
-			for _, s := range di.Selectors {
-				if !s.MatchesFromConfig() {
-					continue
-				}
-				setInstallSpec(&di)
-				return
-			}
-		}
+		enabledAddonWithDefaultValues(ctx, &r.stageCtx, addon, AddonSetDefaultValues, "Addon enabled with default values")
 	})
 	r.next.Handle(ctx)
 }
@@ -431,23 +422,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			// info. from conditions.
 			if helmInstallJob.Status.Failed > 0 {
 				// job failed set terminal state phase
-				patch := client.MergeFrom(addon.DeepCopy())
-				addon.Status.ObservedGeneration = addon.Generation
-				addon.Status.Phase = extensionsv1alpha1.AddonFailed
-				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-					Type:               extensionsv1alpha1.ConditionTypeFailed,
-					Status:             metav1.ConditionFalse,
-					ObservedGeneration: addon.Generation,
-					Reason:             AddonSpecInstallFailed,
-					Message:            "installation failed",
-					LastTransitionTime: metav1.Now(),
-				})
-
-				if err := r.reconciler.Status().Patch(ctx, addon, patch); err != nil {
-					r.setRequeueWithErr(err, "")
-					return
-				}
-				r.reconciler.Event(addon, "Warning", InstallationFailed,
+				setAddonErrorConditions(ctx, &r.stageCtx, addon, InstallationFailed,
 					fmt.Sprintf("Installation failed, do inspect error from jobs.batch %s", key.String()))
 				r.setReconciled()
 				return
@@ -507,7 +482,20 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 				r.setRequeueAfter(time.Second, fmt.Sprintf("ConfigMap %s not found", cmRef.Name))
 				return
 			}
-			// TODO: validate cmRef.key exist in cm
+			hasMatch := false
+			for k := range cm.Data {
+				if k != cmRef.Key {
+					continue
+				}
+				hasMatch = true
+				break
+			}
+			if !hasMatch {
+				setAddonErrorConditions(ctx, &r.stageCtx, addon, AddonRefObjError,
+					fmt.Sprintf("Attach ConfigMap volume source failed, key %s not found", cmRef.Key))
+				r.setReconciled()
+				return
+			}
 			attachVolumeMount(helmJobPodSpec, cmRef, cm.Name, "cm",
 				func() corev1.VolumeSource {
 					return corev1.VolumeSource{
@@ -538,8 +526,20 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 				r.setRequeueAfter(time.Second, fmt.Sprintf("Secret %s not found", secret.Name))
 				return
 			}
-			// TODO: validate secretRef.key exist in secret
-
+			hasMatch := false
+			for k := range secret.Data {
+				if k != secretRef.Key {
+					continue
+				}
+				hasMatch = true
+				break
+			}
+			if !hasMatch {
+				setAddonErrorConditions(ctx, &r.stageCtx, addon, AddonRefObjError,
+					fmt.Sprintf("Attach Secret volume source failed, key %s not found", secretRef.Key))
+				r.setReconciled()
+				return
+			}
 			attachVolumeMount(helmJobPodSpec, secretRef, secret.Name, "secret",
 				func() corev1.VolumeSource {
 					return corev1.VolumeSource{
@@ -882,4 +882,59 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 		}
 	}
 	return helmProtoJob, nil
+}
+
+func enabledAddonWithDefaultValues(ctx context.Context, stageCtx *stageCtx,
+	addon *extensionsv1alpha1.Addon, reason, message string) {
+	setInstallSpec := func(di *extensionsv1alpha1.AddonDefaultInstallSpecItem) {
+		addon.Spec.InstallSpec = di.AddonInstallSpec.DeepCopy()
+		addon.Spec.InstallSpec.Enabled = true
+		if err := stageCtx.reconciler.Client.Update(ctx, addon); err != nil {
+			stageCtx.setRequeueWithErr(err, "")
+			return
+		}
+		stageCtx.reconciler.Event(addon, "Normal", reason, message)
+		stageCtx.setReconciled()
+	}
+
+	for _, di := range addon.Spec.GetSortedDefaultInstallValues() {
+		if len(di.Selectors) == 0 {
+			setInstallSpec(&di)
+			return
+		}
+		for _, s := range di.Selectors {
+			if !s.MatchesFromConfig() {
+				continue
+			}
+			setInstallSpec(&di)
+			return
+		}
+	}
+}
+
+func setAddonErrorConditions(ctx context.Context,
+	stageCtx *stageCtx,
+	addon *extensionsv1alpha1.Addon,
+	reason, message string, eventMessage ...string) {
+	patch := client.MergeFrom(addon.DeepCopy())
+	addon.Status.ObservedGeneration = addon.Generation
+	addon.Status.Phase = extensionsv1alpha1.AddonFailed
+	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+		Type:               extensionsv1alpha1.ConditionTypeChecked,
+		Status:             metav1.ConditionFalse,
+		ObservedGeneration: addon.Generation,
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: metav1.Now(),
+	})
+
+	if err := stageCtx.reconciler.Status().Patch(ctx, addon, patch); err != nil {
+		stageCtx.setRequeueWithErr(err, "")
+		return
+	}
+	if len(eventMessage) > 0 && eventMessage[0] != "" {
+		stageCtx.reconciler.Event(addon, "Warning", reason, eventMessage[0])
+	} else {
+		stageCtx.reconciler.Event(addon, "Warning", reason, message)
+	}
 }

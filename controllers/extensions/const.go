@@ -29,19 +29,19 @@ const (
 	NoDeleteJobs         = "extensions.kubeblocks.io/no-delete-jobs"
 
 	// condition reasons
-	AddonDisabled                    = "AddonDisabled"
-	AddonEnabled                     = "AddonEnabled"
-	AddonSpecInstallFailed           = "AddonSpecInstallFailed"
-	AddonSpecInstallableReqUnmatched = "AddonSpecInstallableRequirementUnmatched"
+	AddonDisabled = "AddonDisabled"
+	AddonEnabled  = "AddonEnabled"
 
 	// event reasons
 	InstallableCheckSkipped         = "InstallableCheckSkipped"
 	InstallableRequirementUnmatched = "InstallableRequirementUnmatched"
 	AddonAutoInstall                = "AddonAutoInstall"
+	AddonSetDefaultValues           = "AddonSetDefaultValues"
 	DisablingAddon                  = "DisablingAddon"
 	EnablingAddon                   = "EnablingAddon"
 	InstallationFailed              = "InstallationFailed"
 	UninstallationFailed            = "UninstallationFailed"
+	AddonRefObjError                = "ReferenceObjectError"
 
 	// config keys used in viper
 	maxConcurrentReconcilesKey = "MAXCONCURRENTRECONCILES_ADDON"

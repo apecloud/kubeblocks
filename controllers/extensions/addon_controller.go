@@ -103,6 +103,10 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrlerihandler.NewTypeHandler(&autoInstallCheckStage{stageCtx: buildStageCtx(next...)})
 	}
 
+	enabledAutoValuesStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
+		return ctrlerihandler.NewTypeHandler(&enabledWithDefaultValuesStage{stageCtx: buildStageCtx(next...)})
+	}
+
 	progressingStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
 		return ctrlerihandler.NewTypeHandler(&progressingHandler{stageCtx: buildStageCtx(next...)})
 	}
@@ -116,6 +120,7 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		genIDProceedStageBuilder,
 		installableCheckStageBuilder,
 		autoInstallCheckStageBuilder,
+		enabledAutoValuesStageBuilder,
 		progressingStageBuilder,
 		terminalStateStageBuilder,
 	).Handler("")

@@ -278,6 +278,26 @@ type AddonInstallSpec struct {
 	ExtraItems []AddonInstallExtraItem `json:"extras,omitempty"`
 }
 
+func (r *AddonInstallSpec) IsDisabled() bool {
+	return r == nil || !r.Enabled
+}
+
+func (r *AddonInstallSpec) HasSetValues() bool {
+	if r == nil {
+		return false
+	}
+
+	if !r.AddonInstallSpecItem.IsEmpty() {
+		return true
+	}
+	for _, i := range r.ExtraItems {
+		if !i.IsEmpty() {
+			return true
+		}
+	}
+	return false
+}
+
 type AddonInstallExtraItem struct {
 	AddonInstallSpecItem `json:",inline"`
 
@@ -306,6 +326,14 @@ type AddonInstallSpecItem struct {
 	// Resource requirements.
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty"`
+}
+
+func (r AddonInstallSpecItem) IsEmpty() bool {
+	return r.Replicas == nil &&
+		r.PVEnabled == nil &&
+		r.StorageClass == "" &&
+		r.Tolerations == "" &&
+		len(r.Resources.Requests) == 0
 }
 
 type ResourceRequirements struct {

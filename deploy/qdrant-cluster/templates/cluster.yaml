@@ -4,7 +4,7 @@ metadata:
   name: {{ .Release.Name }}
   labels: {{ include "qdrant.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: qdrant-standalone # ref clusterdefinition.name
+  clusterDefinitionRef: qdrant # ref clusterdefinition.name
   clusterVersionRef: qdrant-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:

@@ -40,6 +40,15 @@ spec:
 
   defaultInstallValues:
     - enabled: false
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+      extras:
+        - name: node
+          {{- with .Values.tolerations }}
+          tolerations: {{ toJson . | quote }}
+          {{- end }}
+
 
   installable:
     autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "kubeblocks-csi-driver" ) "enabled" }}

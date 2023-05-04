@@ -41,30 +41,49 @@ spec:
 
   defaultInstallValues:
     - enabled: {{ get ( get ( .Values | toYaml | fromYaml ) "snapshot-controller" ) "enabled" }}
-    - storageClass: ebs.csi.aws.com
-      selectors:
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+    - selectors:
         - key: KubeGitVersion
           operator: Contains
           values:
             - eks
-    - storageClass: diskplugin.csi.alibabacloud.com
-      selectors:
+      storageClass: ebs.csi.aws.com
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+    - selectors:
         - key: KubeGitVersion
           operator: Contains
           values:
             - aliyun
-    - storageClass: pd.csi.storage.gke.io
-      selectors:
+      storageClass: diskplugin.csi.alibabacloud.com
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+    - selectors:
         - key: KubeGitVersion
           operator: Contains
           values:
             - gke
-    - storageClass: disk.csi.azure.com
-      selectors:
+      storageClass: pd.csi.storage.gke.io
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+    - selectors:
         - key: KubeGitVersion
           operator: Contains
           values:
             - aks
+      storageClass: disk.csi.azure.com
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
 
   installable:
     autoInstall:  {{ get ( get ( .Values | toYaml | fromYaml ) "snapshot-controller" ) "enabled" }}

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package lifecycle
@@ -238,19 +241,6 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			}
 			return nil
 		}
-		updateClusterPhase := func() {
-			if *stsObj.Spec.Replicas == *stsProto.Spec.Replicas {
-				return
-			}
-			clusterPhase := cluster.Status.Phase
-			if clusterPhase == "" {
-				cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
-			} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
-				cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
-			}
-		}
-
-		updateClusterPhase()
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
 		var err error
@@ -326,7 +316,8 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 	// by sts: we only handle the pvc deletion which occurs in cluster deletion.
 	// by h-scale transformer: we handle the pvc creation and deletion, the creation is handled in h-scale funcs.
 	// so all in all, here we should only handle the pvc deletion of both types.
-	oldSnapshot, err := readCacheSnapshot(transCtx, *cluster, &corev1.PersistentVolumeClaimList{})
+	ml := getAppInstanceML(*cluster)
+	oldSnapshot, err := readCacheSnapshot(transCtx, *cluster, ml, &corev1.PersistentVolumeClaimList{})
 	if err != nil {
 		return err
 	}
@@ -404,12 +395,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
 		if !isSnapshotAvailable(cli, ctx) {
-			reqCtx.Recorder.Eventf(cluster,
-				corev1.EventTypeWarning,
-				"HorizontalScaleFailed",
-				"volume snapshot not support")
 			// TODO: add ut
-			return fmt.Errorf("volume snapshot not support")
+			return fmt.Errorf("HorizontalScaleFailed: volume snapshot not support")
 		}
 		vcts := component.VolumeClaimTemplates
 		if len(vcts) == 0 {
@@ -538,7 +525,8 @@ func isSnapshotAvailable(cli roclient.ReadonlyClient, ctx context.Context) bool 
 		return false
 	}
 	vsList := snapshotv1.VolumeSnapshotList{}
-	getVSErr := cli.List(ctx, &vsList)
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+	getVSErr := compatClient.List(&vsList)
 	return getVSErr == nil
 }
 
@@ -573,12 +561,12 @@ func deleteSnapshot(cli roclient.ReadonlyClient,
 	dag *graph.DAG,
 	root graph.Vertex) error {
 	ctx := reqCtx.Ctx
-	if err := deleteBackup(ctx, cli, cluster.Name, component.Name, dag, root); err != nil {
+	if err := deleteBackup(reqCtx, cli, cluster, component.Name, snapshotKey.Name, dag, root); err != nil {
 		return client.IgnoreNotFound(err)
 	}
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotKey.Name)
 	vs := &snapshotv1.VolumeSnapshot{}
-	if err := cli.Get(ctx, snapshotKey, vs); err != nil {
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+	if err := compatClient.Get(snapshotKey, vs); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 	vertex := &lifecycleVertex{obj: vs, oriObj: vs, action: actionPtr(DELETE)}
@@ -589,17 +577,23 @@ func deleteSnapshot(cli roclient.ReadonlyClient,
 }
 
 // deleteBackup will delete all backup related resources created during horizontal scaling,
-func deleteBackup(ctx context.Context, cli roclient.ReadonlyClient, clusterName string, componentName string, dag *graph.DAG, root graph.Vertex) error {
-	ml := getBackupMatchingLabels(clusterName, componentName)
+func deleteBackup(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient,
+	cluster *appsv1alpha1.Cluster, componentName, snapshotName string,
+	dag *graph.DAG, root graph.Vertex) error {
+	ml := getBackupMatchingLabels(cluster.Name, componentName)
 	backupList := dataprotectionv1alpha1.BackupList{}
-	if err := cli.List(ctx, &backupList, ml); err != nil {
+	if err := cli.List(reqCtx.Ctx, &backupList, ml); err != nil {
 		return err
+	}
+	if len(backupList.Items) == 0 {
+		return nil
 	}
 	for _, backup := range backupList.Items {
 		vertex := &lifecycleVertex{obj: &backup, oriObj: &backup, action: actionPtr(DELETE)}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
+	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotName)
 	return nil
 }
 
@@ -618,7 +612,8 @@ func isVolumeSnapshotExists(cli roclient.ReadonlyClient,
 	component *component.SynthesizedComponent) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
-	if err := cli.List(ctx, &vsList, ml); err != nil {
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+	if err := compatClient.List(&vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 	for _, vs := range vsList.Items {
@@ -681,7 +676,8 @@ func isVolumeSnapshotReadyToUse(cli roclient.ReadonlyClient,
 	component *component.SynthesizedComponent) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
-	if err := cli.List(ctx, &vsList, ml); err != nil {
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+	if err := compatClient.List(&vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 	if len(vsList.Items) == 0 || vsList.Items[0].Status == nil {
@@ -714,7 +710,8 @@ func checkedCreatePVCFromSnapshot(cli roclient.ReadonlyClient,
 		}
 		ml := getBackupMatchingLabels(cluster.Name, component.Name)
 		vsList := snapshotv1.VolumeSnapshotList{}
-		if err := cli.List(ctx, &vsList, ml); err != nil {
+		compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
+		if err := compatClient.List(&vsList, ml); err != nil {
 			return err
 		}
 		if len(vsList.Items) == 0 {
@@ -763,10 +760,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if len(backupList.Items) > 0 {
 			// check backup status, if failed return error
 			if backupList.Items[0].Status.Phase == dataprotectionv1alpha1.BackupFailed {
-				reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning,
-					"HorizontalScaleFailed", "backup %s status failed", backupKey.Name)
-				return fmt.Errorf("cluster %s h-scale failed, backup error: %s",
-					cluster.Name, backupList.Items[0].Status.FailureReason)
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupFailed, "backup for horizontalScaling failed: %s", backupList.Items[0].Status.FailureReason)
 			}
 			return nil
 		}

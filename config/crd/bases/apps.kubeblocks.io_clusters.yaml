@@ -298,6 +298,10 @@ spec:
                           type: object
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
+                    serviceAccountName:
+                      description: serviceAccountName is the name of the ServiceAccount
+                        that component runs depend on.
+                      type: string
                     services:
                       description: services expose endpoints can be accessed by clients
                       items:

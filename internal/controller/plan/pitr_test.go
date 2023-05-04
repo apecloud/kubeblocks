@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package plan
@@ -46,6 +49,10 @@ var _ = Describe("PITR Functions", func() {
 		randomStr      = testCtx.GetRandomStr()
 		clusterName    = "cluster-for-pitr-" + randomStr
 		backupToolName string
+
+		now       = metav1.Now()
+		startTime = metav1.Time{Time: now.Add(-time.Hour * 2)}
+		stopTime  = metav1.Time{Time: now.Add(time.Hour * 2)}
 	)
 
 	cleanEnv := func() {
@@ -96,9 +103,9 @@ var _ = Describe("PITR Functions", func() {
 				AddComponentDef(testapps.StatelessNginxComponent, nginxCompType).
 				Create(&testCtx).GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompType).
+				AddComponentVersion(mysqlCompType).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				AddComponent(nginxCompType).
+				AddComponentVersion(nginxCompType).
 				AddInitContainerShort("nginx-init", testapps.NginxImage).
 				AddContainerShort("nginx", testapps.NginxImage).
 				Create(&testCtx).GetObject()
@@ -107,7 +114,7 @@ var _ = Describe("PITR Functions", func() {
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				AddRestorePointInTime(metav1.Time{Time: metav1.Now().Time}, sourceCluster).
+				AddRestorePointInTime(metav1.Time{Time: stopTime.Time}, sourceCluster).
 				Create(&testCtx).GetObject()
 
 			By("By mocking a pvc")
@@ -153,7 +160,6 @@ var _ = Describe("PITR Functions", func() {
 			}
 
 			By("By creating base backup: ")
-			now := metav1.Now()
 			backupLabels := map[string]string{
 				constant.AppInstanceLabelKey:    sourceCluster,
 				constant.KBAppComponentLabelKey: mysqlCompName,
@@ -164,8 +170,8 @@ var _ = Describe("PITR Functions", func() {
 				SetBackupPolicyName("test-fake").
 				SetBackupType(dpv1alpha1.BackupTypeSnapshot).
 				Create(&testCtx).GetObject()
-			baseStartTime := &metav1.Time{Time: now.Add(-time.Hour * 3)}
-			baseStopTime := &metav1.Time{Time: now.Add(-time.Hour * 2)}
+			baseStartTime := &startTime
+			baseStopTime := &now
 			backupStatus := dpv1alpha1.BackupStatus{
 				Phase:               dpv1alpha1.BackupCompleted,
 				StartTimestamp:      baseStartTime,
@@ -177,7 +183,6 @@ var _ = Describe("PITR Functions", func() {
 					},
 				},
 			}
-			backupStatus.CompletionTimestamp = &metav1.Time{Time: now.Add(-time.Hour * 2)}
 			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backup))
 
 			By("By creating remote pvc: ")
@@ -192,8 +197,8 @@ var _ = Describe("PITR Functions", func() {
 				constant.KBAppComponentLabelKey: mysqlCompName,
 				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeIncremental),
 			}
-			incrStartTime := &metav1.Time{Time: now.Add(-time.Hour * 3)}
-			incrStopTime := &metav1.Time{Time: now.Add(time.Hour * 2)}
+			incrStartTime := &startTime
+			incrStopTime := &stopTime
 			backupIncr := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(incrBackupLabels).
 				SetBackupPolicyName("test-fake").
@@ -216,8 +221,13 @@ var _ = Describe("PITR Functions", func() {
 		})
 
 		It("Test PITR prepare", func() {
+			By("restore time is in range")
 			Expect(DoPITRPrepare(ctx, testCtx.Cli, cluster, synthesizedComponent)).Should(Succeed())
 			Expect(synthesizedComponent.PodSpec.InitContainers).ShouldNot(BeEmpty())
+
+			By("restore time is at base backup stop time")
+			cluster.Annotations[constant.RestoreFromTimeAnnotationKey] = now.Format(time.RFC3339)
+			Expect(DoPITRPrepare(ctx, testCtx.Cli, cluster, synthesizedComponent)).Should(Succeed())
 		})
 		It("Test PITR job run and cleanup", func() {
 			By("when data pvc is pending")

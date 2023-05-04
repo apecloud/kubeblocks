@@ -65,12 +65,19 @@ spec:
           memory: 512Mi
         limits:
           memory: 4Gi
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
       extras:
         - name: alertmanager
           replicas: 1
           resources:
             requests:
               storage: 4Gi
+          {{- with .Values.tolerations }}
+          tolerations: {{ toJson . | quote }}
+          {{- end }}
 
     # for ACK, the smallest storage size is 20Gi, the format of GitVersion is v1.24.6-aliyun.1
     - selectors:
@@ -86,6 +93,10 @@ spec:
           memory: 512Mi
         limits:
           memory: 4Gi
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
       extras:
         - name: alertmanager
           replicas: 1
@@ -93,6 +104,9 @@ spec:
           resources:
             requests:
               storage: 20Gi
+          {{- with .Values.tolerations }}
+          tolerations: {{ toJson . | quote }}
+          {{- end }}
 
     # for TKE, the smallest storage size is 10Gi, the format of GitVersion is v1.24.4-tke.5
     - selectors:
@@ -107,12 +121,19 @@ spec:
           memory: 512Mi
         limits:
           memory: 4Gi
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
       extras:
         - name: alertmanager
           replicas: 1
           resources:
             requests:
               storage: 10Gi
+          {{- with .Values.tolerations }}
+          tolerations: {{ toJson . | quote }}
+          {{- end }}
 
   installable:
     autoInstall: {{ .Values.prometheus.enabled }}

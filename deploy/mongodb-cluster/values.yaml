@@ -87,14 +87,14 @@ shard:
     ##
     tolerations: [ ]
 
-replicaset:
-  ## @param replicaset.replicas Number of MongoDB replicas per replicaset to deploy
+mongodb:
+  ## @param mongodb.replicas Number of MongoDB replicas per replicaset to deploy
   ##
   replicas: 3
   ## MongoDB workload pod resource requests and limits
   ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
-  ## @param replicaset.resources.limits The resources limits for the init container
-  ## @param replicaset.resources.requests The requested resources for the init container
+  ## @param mongodb.resources.limits The resources limits for the init container
+  ## @param mongodb.resources.requests The requested resources for the init container
   ##
   resources: { }
     # We usually recommend not to specify default resources and to leave this as a conscious
@@ -111,13 +111,13 @@ replicaset:
   ## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
   ##
   persistence:
-    ## @param replicaset.persistence.enabled Enable persistence using Persistent Volume Claims
+    ## @param mongodb.persistence.enabled Enable persistence using Persistent Volume Claims
     ##
     enabled: true
     ## `data` volume settings
     ##
     data:
-      ## @param replicaset.persistence.data.storageClassName Storage class of backing PVC
+      ## @param mongodb.persistence.data.storageClassName Storage class of backing PVC
       ## If defined, storageClassName: <storageClass>
       ## If set to "-", storageClassName: "", which disables dynamic provisioning
       ## If undefined (the default) or set to null, no storageClassName spec is
@@ -125,10 +125,10 @@ replicaset:
       ##   GKE, AWS & OpenStack)
       ##
       storageClassName: 
-      ## @param replicaset.persistence.size Size of data volume
+      ## @param mongodb.persistence.size Size of data volume
       ##
       size: 20Gi
-  ## @param replicaset.tolerations Tolerations for MongoDB pods assignment
+  ## @param mongodb.tolerations Tolerations for MongoDB pods assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
   ##
   tolerations: [ ]

@@ -11,7 +11,7 @@ metadata:
   {{- end }}
 spec:
   description: 'Deploys a nyancat application in a cluster.
-  Nyancat is a demo application for showing database cluster availibility.'
+  Nyancat is a demo application for showing database cluster availability.'
   type: Helm
 
   helm:
@@ -33,7 +33,10 @@ spec:
           limits: resources.limits.memory
 
   defaultInstallValues:
-    - replicas: 2
+    - replicas: 1
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
 
   installable:
     autoInstall: false

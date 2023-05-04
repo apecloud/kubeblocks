@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 // Package v1alpha1 contains API Schema definitions for the apps v1alpha1 API group
@@ -29,6 +32,59 @@ const (
 	ClusterKind           = "Cluster"
 	OpsRequestKind        = "OpsRequestKind"
 )
+
+type ComponentTemplateSpec struct {
+	// Specify the name of configuration template.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Specify the name of the referenced the configuration template ConfigMap object.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	TemplateRef string `json:"templateRef"`
+
+	// Specify the namespace of the referenced the configuration template ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
+	// The volume name must be defined in podSpec.containers[*].volumeMounts.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=32
+	VolumeName string `json:"volumeName"`
+
+	// defaultMode is optional: mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// Defaults to 0644.
+	// Directories within the path are not affected by this setting.
+	// This might be in conflict with other options that affect the file
+	// mode, like fsGroup, and the result can be other mode bits set.
+	// +optional
+	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
+}
+
+type ComponentConfigSpec struct {
+	ComponentTemplateSpec `json:",inline"`
+
+	// Specify a list of keys.
+	// If empty, ConfigConstraint takes effect for all keys in configmap.
+	// +listType=set
+	// +optional
+	Keys []string `json:"keys,omitempty"`
+
+	// Specify the name of the referenced the configuration constraints object.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	ConfigConstraintRef string `json:"constraintRef,omitempty"`
+}
 
 // ClusterPhase defines the Cluster CR .status.phase
 // +enum
@@ -88,6 +144,17 @@ type Phase string
 const (
 	AvailablePhase   Phase = "Available"
 	UnavailablePhase Phase = "Unavailable"
+)
+
+// ConfigConstraintPhase defines the ConfigConstraint  CR .status.phase
+// +enum
+// +kubebuilder:validation:Enum={Available,Unavailable, Deleting}
+type ConfigConstraintPhase string
+
+const (
+	CCAvailablePhase   ConfigConstraintPhase = "Available"
+	CCUnavailablePhase ConfigConstraintPhase = "Unavailable"
+	CCDeletingPhase    ConfigConstraintPhase = "Deleting"
 )
 
 // OpsPhase defines opsRequest phase.
@@ -241,7 +308,7 @@ type OpsRecorder struct {
 type ProvisionPolicyType string
 
 const (
-	// CreateByStmt will create account w.r.t. deleteion and creation statement given by provider.
+	// CreateByStmt will create account w.r.t. deletion and creation statement given by provider.
 	CreateByStmt ProvisionPolicyType = "CreateByStmt"
 	// ReferToExisting will not create account, but create a secret by copying data from referred secret file.
 	ReferToExisting ProvisionPolicyType = "ReferToExisting"
@@ -442,6 +509,18 @@ const (
 	VolumeTypeLog  VolumeType = "log"
 )
 
+// BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.
+// +enum
+// +kubebuilder:validation:Enum={full,snapshot}
+type BaseBackupType string
+
+// BackupStatusUpdateStage defines the stage of backup status update.
+// +enum
+// +kubebuilder:validation:Enum={pre,post}
+type BackupStatusUpdateStage string
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }
+
+type ComponentNameSet map[string]struct{}

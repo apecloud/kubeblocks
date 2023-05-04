@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package preflight
@@ -28,7 +31,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -38,16 +40,19 @@ import (
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	preflightTesting "github.com/apecloud/kubeblocks/internal/preflight/testing"
 )
 
 var _ = Describe("collect_test", func() {
 	var (
-		timeOut     = 10 * time.Second
-		namespace   = "test"
-		clusterName = "test"
-		tf          *cmdtesting.TestFactory
-		cluster     = testing.FakeCluster(clusterName, namespace)
-		pods        = testing.FakePods(3, namespace, clusterName)
+		timeOut       = 10 * time.Second
+		namespace     = "test"
+		clusterName   = "test"
+		tf            *cmdtesting.TestFactory
+		cluster       = testing.FakeCluster(clusterName, namespace)
+		pods          = testing.FakePods(3, namespace, clusterName)
+		preflight     *preflightv1beta2.Preflight
+		hostPreflight *preflightv1beta2.HostPreflight
 	)
 
 	BeforeEach(func() {
@@ -78,6 +83,9 @@ var _ = Describe("collect_test", func() {
 
 		tf.Client = tf.UnstructuredClient
 		tf.FakeDynamicClient = testing.FakeDynamicClient(cluster, testing.FakeClusterDef(), testing.FakeClusterVersion())
+
+		preflight = preflightTesting.FakeKbPreflight()
+		hostPreflight = preflightTesting.FakeKbHostPreflight()
 	})
 
 	AfterEach(func() {
@@ -85,55 +93,28 @@ var _ = Describe("collect_test", func() {
 	})
 
 	It("CollectPreflight test, and expect success ", func() {
-		hostByte := `
-apiVersion: troubleshoot.sh/v1beta2
-kind: HostPreflight
-metadata:
-  name: hostCheckTest
-spec:
-  collectors:
-    - cpu: {}
-  extendCollectors:
-    - hostUtility :
-        collectorName: helmCheck
-        utilityName: helm
-`
-		hostSpec := new(preflightv1beta2.HostPreflight)
 		Eventually(func(g Gomega) {
-			g.Expect(yaml.Unmarshal([]byte(hostByte), hostSpec)).Should(Succeed())
 			progressCh := make(chan interface{})
 			go func() {
 				for {
 					g.Expect(<-progressCh).NotTo(BeNil())
 				}
 			}()
-			results, err := CollectPreflight(context.TODO(), nil, hostSpec, progressCh)
+			results, err := CollectPreflight(tf, context.TODO(), preflight, hostPreflight, progressCh)
 			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(len(results)).Should(Equal(1))
+			g.Expect(len(results)).Should(BeNumerically(">=", 3))
 		}).WithTimeout(timeOut).Should(Succeed())
 	})
 
 	It("CollectHostData Test, and expect success", func() {
-		hostByte := `
-apiVersion: troubleshoot.sh/v1beta2
-kind: HostPreflight
-metadata:
-name: cpu
-spec:
-collectors:
-  - cpu: {}
-analyzers:
-`
-		hostSpec := new(preflightv1beta2.HostPreflight)
 		Eventually(func(g Gomega) {
-			g.Expect(yaml.Unmarshal([]byte(hostByte), hostSpec)).Should(Succeed())
 			progressCh := make(chan interface{})
 			go func() {
 				for {
 					g.Expect(<-progressCh).NotTo(BeNil())
 				}
 			}()
-			results, err := CollectHostData(context.TODO(), hostSpec, progressCh)
+			results, err := CollectHostData(context.TODO(), hostPreflight, progressCh)
 			g.Expect(err).NotTo(HaveOccurred())
 			_, ok := (*results).(KBHostCollectResult)
 			g.Expect(ok).Should(BeTrue())
@@ -148,7 +129,7 @@ analyzers:
 					g.Expect(<-progressCh).NotTo(BeNil())
 				}
 			}()
-			collectResult, err := CollectRemoteData(context.TODO(), &preflightv1beta2.HostPreflight{}, progressCh)
+			collectResult, err := CollectRemoteData(context.TODO(), &preflightv1beta2.HostPreflight{}, tf, progressCh)
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(collectResult).NotTo(BeNil())
 		}).WithTimeout(timeOut).Should(Succeed())

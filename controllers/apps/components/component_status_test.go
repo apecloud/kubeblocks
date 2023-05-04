@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package components
@@ -39,8 +42,8 @@ import (
 
 var _ = Describe("ComponentStatusSynchronizer", func() {
 	const (
-		compName = "comp"
-		compType = "comp"
+		compName    = "comp"
+		compDefName = "comp"
 	)
 
 	var (
@@ -85,11 +88,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, compType).
+				AddComponentDef(testapps.StatelessNginxComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(1).
 				GetObject()
 
@@ -198,11 +201,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, compType).
+				AddComponentDef(testapps.StatefulMySQLComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				GetObject()
 
@@ -324,11 +327,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ConsensusMySQLComponent, compType).
+				AddComponentDef(testapps.ConsensusMySQLComponent, compDefName).
 				Create(&testCtx).GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				Create(&testCtx).GetObject()
 
@@ -450,11 +453,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, compType).
+				AddComponentDef(testapps.ReplicationRedisComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(2).
 				GetObject()
 
@@ -589,7 +592,7 @@ func mockContainerError(pod *corev1.Pod) error {
 }
 
 func setPodRole(pod *corev1.Pod, role string) error {
-	return testapps.ChangeObj(&testCtx, pod, func() {
-		pod.Labels[constant.RoleLabelKey] = role
+	return testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+		lpod.Labels[constant.RoleLabelKey] = role
 	})
 }

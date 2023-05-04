@@ -1,0 +1,3 @@
+{{- if and ( not .Values.serviceAccount.enabled ) ( not .Values.serviceAccount.name ) }}
+    {{ fail "serviceAccount.enabled is false, the serviceAccount.name is required." }}
+{{- end }}

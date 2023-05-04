@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
@@ -217,8 +220,8 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, statement []str
 
 func renderSecretWithPwd(key componentUniqueKey, username, passwd string) *corev1.Secret {
 	secretData := map[string][]byte{}
-	secretData[accountNameForSecret] = []byte(username)
-	secretData[accountPasswdForSecret] = []byte(passwd)
+	secretData[constant.AccountNameForSecret] = []byte(username)
+	secretData[constant.AccountPasswdForSecret] = []byte(passwd)
 
 	ml := getLabelsForSecretsAndJobs(key)
 	ml[constant.ClusterAccountLabelKey] = username
@@ -245,8 +248,7 @@ func renderSecret(key componentUniqueKey, username string, labels client.Matchin
 	return secret
 }
 
-func retrieveEndpoints(scope appsv1alpha1.ProvisionScope,
-	svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) []string {
+func retrieveEndpoints(scope appsv1alpha1.ProvisionScope, svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) []string {
 	// parse endpoints
 	endpoints := make([]string, 0)
 	if scope == appsv1alpha1.AnyPods {
@@ -303,10 +305,10 @@ func concatSecretName(key componentUniqueKey, username string) string {
 }
 
 func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.PasswordConfig,
-	accountConfig appsv1alpha1.SystemAccountConfig) ([]string, *corev1.Secret) {
+	accountConfig appsv1alpha1.SystemAccountConfig, strategy updateStrategy) ([]string, *corev1.Secret) {
 	// generated password with mixedcases = true
 	passwd, _ := password.Generate((int)(passConfig.Length), (int)(passConfig.NumDigits), (int)(passConfig.NumSymbols), false, false)
-	// refine pasword to upper or lower cases w.r.t configuration
+	// refine password to upper or lower cases w.r.t configuration
 	switch passConfig.LetterCase {
 	case appsv1alpha1.UpperCases:
 		passwd = strings.ToUpper(passwd)
@@ -319,15 +321,21 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 	namedVars := getEnvReplacementMapForAccount(userName, passwd)
 
 	execStmts := make([]string, 0)
-	// drop if exists + create if not exists
+
 	statements := accountConfig.ProvisionPolicy.Statements
-	if len(statements.DeletionStatement) > 0 {
-		stmt := componetutil.ReplaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
+	if strategy == inPlaceUpdate {
+		// use update statement
+		stmt := componetutil.ReplaceNamedVars(namedVars, statements.UpdateStatement, -1, true)
+		execStmts = append(execStmts, stmt)
+	} else {
+		// drop if exists + create if not exists
+		if len(statements.DeletionStatement) > 0 {
+			stmt := componetutil.ReplaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
+			execStmts = append(execStmts, stmt)
+		}
+		stmt := componetutil.ReplaceNamedVars(namedVars, statements.CreationStatement, -1, true)
 		execStmts = append(execStmts, stmt)
 	}
-	stmt := componetutil.ReplaceNamedVars(namedVars, statements.CreationStatement, -1, true)
-	execStmts = append(execStmts, stmt)
-
 	secret := renderSecretWithPwd(key, userName, passwd)
 	return execStmts, secret
 }

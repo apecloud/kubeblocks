@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -25,6 +28,8 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/spf13/viper"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 var disableAutoTransfer = viper.GetBool("DISABLE_AUTO_TRANSFER")
@@ -45,7 +50,7 @@ func (c *cueTypeExtractor) Visit(val cue.Value) {
 		c.fieldTypes = make(map[string]CueType)
 		c.fieldUnits = make(map[string]string)
 	}
-	c.visitStruct(val)
+	c.visitStruct(val, "")
 }
 
 func (c *cueTypeExtractor) visitValue(x cue.Value, path string) {
@@ -69,13 +74,20 @@ func (c *cueTypeExtractor) visitValue(x cue.Value, path string) {
 		c.visitList(x, path)
 	case k&cue.StructKind == cue.StructKind:
 		c.addFieldType(path, StructType)
-		c.visitStruct(x)
+		c.visitStruct(x, path)
 	default:
 		log.Log.Info(fmt.Sprintf("cannot convert value of type %s", k.String()))
 	}
 }
 
-func (c *cueTypeExtractor) visitStruct(v cue.Value) {
+func (c *cueTypeExtractor) visitStruct(v cue.Value, parentPath string) {
+	joinFieldPath := func(path string, name string) string {
+		if path == "" || strings.HasPrefix(path, "#") {
+			return name
+		}
+		return path + "." + name
+	}
+
 	switch op, v := v.Expr(); op {
 	// SelectorOp refer of other struct type
 	case cue.NoOp, cue.SelectorOp:
@@ -90,7 +102,7 @@ func (c *cueTypeExtractor) visitStruct(v cue.Value) {
 
 	for itr, _ := v.Fields(cue.Optional(true), cue.Definitions(true)); itr.Next(); {
 		name := itr.Label()
-		c.visitValue(itr.Value(), name)
+		c.visitValue(itr.Value(), joinFieldPath(parentPath, name))
 	}
 }
 
@@ -104,7 +116,7 @@ func (c *cueTypeExtractor) visitList(v cue.Value, path string) {
 
 	count := 0
 	for i, _ := v.List(); i.Next(); count++ {
-		c.visitValue(i.Value(), fmt.Sprintf("%s_%d", path, count))
+		c.visitValue(i.Value(), path)
 	}
 }
 
@@ -119,7 +131,21 @@ func (c *cueTypeExtractor) addFieldUnits(path string, t CueType, base string) {
 	}
 }
 
-func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn, expand string, trimString bool) error {
+func (c *cueTypeExtractor) hasFieldType(parent string, cur string) (string, bool) {
+	fieldRef := cur
+	if parent != "" {
+		fieldRef = parent + "." + cur
+	}
+	if _, exist := c.fieldTypes[fieldRef]; exist {
+		return fieldRef, true
+	}
+	if _, exist := c.fieldTypes[cur]; exist {
+		return cur, true
+	}
+	return "", false
+}
+
+func transNumberOrBoolType(t CueType, obj reflect.Value, fn util.UpdateFn, expand string, trimString bool) error {
 	switch t {
 	case IntType:
 		return processTypeTrans[int](obj, strconv.Atoi, fn, trimString)
@@ -145,7 +171,7 @@ func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn, expand str
 	return nil
 }
 
-func trimStringQuotes(obj reflect.Value, fn UpdateFn) {
+func trimStringQuotes(obj reflect.Value, fn util.UpdateFn) {
 	if obj.Type().Kind() != reflect.String {
 		return
 	}
@@ -160,7 +186,7 @@ func trimStringQuotes(obj reflect.Value, fn UpdateFn) {
 	}
 }
 
-func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn UpdateFn, trimString bool) error {
+func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn util.UpdateFn, trimString bool) error {
 	switch obj.Type().Kind() {
 	case reflect.String:
 		str := obj.String()
@@ -188,17 +214,15 @@ func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Va
 		context: context,
 	}
 	typeTransformer.Visit(tpl)
-	return UnstructuredObjectWalk(typeTransformer.data,
-		func(parent, cur string, obj reflect.Value, fn UpdateFn) error {
+	return util.UnstructuredObjectWalk(typeTransformer.data,
+		func(parent, cur string, obj reflect.Value, fn util.UpdateFn) error {
 			if fn == nil || cur == "" || !obj.IsValid() {
 				return nil
 			}
-			if t, exist := typeTransformer.fieldTypes[cur]; exist {
-				err := transNumberOrBoolType(t, obj, fn, typeTransformer.fieldUnits[cur], trimString)
-				if err != nil {
-					return WrapError(err, "failed to type convertor, field[%s]", cur)
-				}
+			fieldPath, exist := typeTransformer.hasFieldType(parent, cur)
+			if !exist {
+				return nil
 			}
-			return nil
+			return transNumberOrBoolType(typeTransformer.fieldTypes[fieldPath], obj, fn, typeTransformer.fieldUnits[fieldPath], trimString)
 		}, false)
 }

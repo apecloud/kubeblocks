@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -55,6 +58,8 @@ func getResource(res corev1.ResourceRequirements, name corev1.ResourceName) inte
 }
 
 var _ = Describe("create", func() {
+	var componentClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance
+
 	Context("setMonitor", func() {
 		var components []map[string]interface{}
 		BeforeEach(func() {
@@ -133,7 +138,7 @@ var _ = Describe("create", func() {
 		})
 	})
 
-	checkComponent := func(comps []*appsv1alpha1.ClusterComponentSpec, storage string, replicas int32, cpu string, memory string) {
+	checkComponent := func(comps []*appsv1alpha1.ClusterComponentSpec, storage string, replicas int32, cpu string, memory string, storageClassName string) {
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
 
@@ -145,14 +150,21 @@ var _ = Describe("create", func() {
 		Expect(resources).ShouldNot(BeNil())
 		Expect(getResource(resources, corev1.ResourceCPU)).Should(Equal(cpu))
 		Expect(getResource(resources, corev1.ResourceMemory)).Should(Equal(memory))
+
+		if storageClassName == "" {
+			Expect(comp.VolumeClaimTemplates[0].Spec.StorageClassName).Should(BeNil())
+		} else {
+			Expect(*comp.VolumeClaimTemplates[0].Spec.StorageClassName).Should(Equal(storageClassName))
+		}
+
 	}
 
 	It("build default cluster component without environment", func() {
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
-		comps, err := buildClusterComp(cd, nil)
+		comps, err := buildClusterComp(cd, nil, componentClasses)
 		Expect(err).ShouldNot(HaveOccurred())
-		checkComponent(comps, "20Gi", 1, "1", "1Gi")
+		checkComponent(comps, "20Gi", 1, "1", "1Gi", "")
 	})
 
 	It("build default cluster component with environment", func() {
@@ -162,9 +174,9 @@ var _ = Describe("create", func() {
 		viper.Set("CLUSTER_DEFAULT_MEMORY", "2Gi")
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
-		comps, err := buildClusterComp(cd, nil)
+		comps, err := buildClusterComp(cd, nil, componentClasses)
 		Expect(err).ShouldNot(HaveOccurred())
-		checkComponent(comps, "5Gi", 1, "2", "2Gi")
+		checkComponent(comps, "5Gi", 1, "2", "2Gi", "")
 	})
 
 	It("build cluster component with set values", func() {
@@ -172,15 +184,21 @@ var _ = Describe("create", func() {
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		setsMap := map[string]map[setKey]string{
 			testing.ComponentDefName: {
-				keyCPU:      "10",
-				keyMemory:   "2Gi",
-				keyStorage:  "10Gi",
-				keyReplicas: "10",
+				keyCPU:          "10",
+				keyMemory:       "2Gi",
+				keyStorage:      "10Gi",
+				keyReplicas:     "10",
+				keyStorageClass: "test",
 			},
 		}
-		comps, err := buildClusterComp(cd, setsMap)
+		comps, err := buildClusterComp(cd, setsMap, componentClasses)
 		Expect(err).Should(Succeed())
-		checkComponent(comps, "10Gi", 10, "10", "2Gi")
+		checkComponent(comps, "10Gi", 10, "10", "2Gi", "test")
+
+		setsMap[testing.ComponentDefName][keySwitchPolicy] = "invalid"
+		cd.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
+		_, err = buildClusterComp(cd, setsMap, componentClasses)
+		Expect(err).Should(HaveOccurred())
 	})
 
 	It("build component and set values map", func() {
@@ -189,7 +207,8 @@ var _ = Describe("create", func() {
 			var comps []appsv1alpha1.ClusterComponentDefinition
 			for _, n := range compDefNames {
 				comp := appsv1alpha1.ClusterComponentDefinition{
-					Name: n,
+					Name:         n,
+					WorkloadType: appsv1alpha1.Replication,
 				}
 				comps = append(comps, comp)
 			}
@@ -286,8 +305,8 @@ var _ = Describe("create", func() {
 				true,
 			},
 			{
-				[]string{"type=comp1,cpu=1,memory=2Gi,class=general-2c4g", "type=comp2,storage=10Gi,cpu=2,class=mo-1c8g"},
-				[]string{"my-comp"},
+				[]string{"type=comp1,cpu=1,memory=2Gi,class=general-2c4g", "type=comp2,storage=10Gi,cpu=2,class=mo-1c8g,replicas=3"},
+				[]string{"comp1", "comp2"},
 				map[string]map[setKey]string{
 					"comp1": {
 						keyType:   "comp1",
@@ -296,10 +315,31 @@ var _ = Describe("create", func() {
 						keyClass:  "general-2c4g",
 					},
 					"comp2": {
-						keyType:    "comp2",
-						keyCPU:     "2",
-						keyStorage: "10Gi",
-						keyClass:   "mo-1c8g",
+						keyType:     "comp2",
+						keyCPU:      "2",
+						keyStorage:  "10Gi",
+						keyClass:    "mo-1c8g",
+						keyReplicas: "3",
+					},
+				},
+				true,
+			},
+			{
+				[]string{"switchPolicy=MaximumAvailability"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keySwitchPolicy: "MaximumAvailability",
+					},
+				},
+				true,
+			},
+			{
+				[]string{"storageClass=test"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keyStorageClass: "test",
 					},
 				},
 				true,
@@ -349,7 +389,7 @@ var _ = Describe("create", func() {
 		Expect(setBackup(o, components).Error()).Should(ContainSubstring("is not completed"))
 
 		By("test backup is completed")
-		mockBackupInfo(dynamic, backupName, clusterName)
+		mockBackupInfo(dynamic, backupName, clusterName, nil)
 		Expect(setBackup(o, components)).Should(Succeed())
 	})
 })

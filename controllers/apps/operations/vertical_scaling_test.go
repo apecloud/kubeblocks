@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package operations
@@ -60,8 +63,8 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 	AfterEach(cleanEnv)
 
 	Context("Test OpsRequest", func() {
-		It("Test verticalScaling OpsRequest", func() {
 
+		testVerticalScaling := func(verticalScaling []appsv1alpha1.VerticalScaling) {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
@@ -69,21 +72,8 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("create VerticalScaling ops")
 			ops := testapps.NewOpsRequestObj("verticalscaling-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.VerticalScalingType)
-			ops.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
-				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-					ResourceRequirements: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("400m"),
-							corev1.ResourceMemory: resource.MustParse("300Mi"),
-						},
-						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("400m"),
-							corev1.ResourceMemory: resource.MustParse("300Mi"),
-						},
-					},
-				},
-			}
+
+			ops.Spec.VerticalScalingList = verticalScaling
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 			By("test save last configuration and OpsRequest phase is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -98,6 +88,35 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 			By("test GetRealAffectedComponentMap function")
 			Expect(len(vsHandler.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(1))
+		}
+
+		It("vertical scaling by resource", func() {
+			verticalScaling := []appsv1alpha1.VerticalScaling{
+				{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					ResourceRequirements: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("400m"),
+							corev1.ResourceMemory: resource.MustParse("300Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("400m"),
+							corev1.ResourceMemory: resource.MustParse("300Mi"),
+						},
+					},
+				},
+			}
+			testVerticalScaling(verticalScaling)
+		})
+
+		It("vertical scaling by class", func() {
+			verticalScaling := []appsv1alpha1.VerticalScaling{
+				{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					Class:        testapps.Class1c1gName,
+				},
+			}
+			testVerticalScaling(verticalScaling)
 		})
 	})
 })

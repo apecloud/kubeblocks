@@ -1,29 +1,39 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
 
 import (
+	"bytes"
+	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
+	"text/template"
 
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -36,6 +46,9 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 var clusterUpdateExample = templates.Examples(`
@@ -232,38 +245,190 @@ func (o *updateOptions) buildComponents(field string, val string) error {
 
 	switch field {
 	case "monitor":
-		return o.setMonitor(val)
+		return o.updateMonitor(val)
 	case "enable-all-logs":
-		return o.setEnabledLog(val)
+		return o.updateEnabledLog(val)
 	default:
 		return nil
 	}
 }
 
-func (o *updateOptions) setEnabledLog(val string) error {
+func (o *updateOptions) updateEnabledLog(val string) error {
 	boolVal, err := strconv.ParseBool(val)
 	if err != nil {
 		return err
 	}
 
-	// disable all monitor
+	// update --enabled-all-logs=false for all components
 	if !boolVal {
-		for _, c := range o.cluster.Spec.ComponentSpecs {
-			c.EnabledLogs = nil
+		for index := range o.cluster.Spec.ComponentSpecs {
+			o.cluster.Spec.ComponentSpecs[index].EnabledLogs = nil
 		}
 		return nil
 	}
 
-	// enable all monitor
+	// update --enabled-all-logs=true for all components
 	cd, err := cluster.GetClusterDefByName(o.dynamic, o.cluster.Spec.ClusterDefRef)
 	if err != nil {
 		return err
 	}
+	// set --enabled-all-logs at cluster components
 	setEnableAllLogs(o.cluster, cd)
+	if err = o.reconfigureLogVariables(o.cluster, cd); err != nil {
+		return errors.Wrap(err, "reconfigure log variables of target cluster failed")
+	}
 	return nil
 }
 
-func (o *updateOptions) setMonitor(val string) error {
+const logsBlockName = "logsBlock"
+const logsTemplateName = "template-logs-block"
+const topTPLLogsObject = "component"
+const defaultSectionName = "default"
+
+// reconfigureLogVariables reconfigures the log variables of db kernel
+func (o *updateOptions) reconfigureLogVariables(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinition) error {
+	var (
+		err             error
+		keyName         string
+		configSpec      *appsv1alpha1.ComponentConfigSpec
+		configTemplate  *corev1.ConfigMap
+		formatter       *appsv1alpha1.FormatterConfig
+		logTPL          *template.Template
+		logValue        *gotemplate.TplValues
+		buf             bytes.Buffer
+		logVariables    map[string]string
+		unstructuredObj *unstructured.Unstructured
+	)
+	for _, compSpec := range c.Spec.ComponentSpecs {
+		if configSpec, err = findFirstConfigSpec(c.Spec.ComponentSpecs, cd.Spec.ComponentDefs, compSpec.Name); err != nil {
+			return err
+		}
+		if configTemplate, formatter, err = findConfigTemplateInfo(o.dynamic, configSpec); err != nil {
+			return err
+		}
+		if keyName, logTPL, err = findLogsBlockTPL(configTemplate.Data); err != nil {
+			return err
+		}
+		if logValue, err = buildLogsTPLValues(&compSpec); err != nil {
+			return err
+		}
+		if err = logTPL.Execute(&buf, logValue); err != nil {
+			return err
+		}
+		formatter.FormatterOptions = appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{SectionName: defaultSectionName}}
+		if logVariables, err = cfgcore.TransformConfigFileToKeyValueMap(keyName, formatter, buf.Bytes()); err != nil {
+			return err
+		}
+		// build OpsRequest and apply this OpsRequest
+		opsRequest := buildLogsReconfiguringOps(c.Name, c.Namespace, compSpec.Name, configSpec.Name, keyName, logVariables)
+		if unstructuredObj, err = util.ConvertObjToUnstructured(opsRequest); err != nil {
+			return err
+		}
+		if err = util.CreateResourceIfAbsent(o.dynamic, types.OpsGVR(), c.Namespace, unstructuredObj); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func findFirstConfigSpec(
+	compSpecs []appsv1alpha1.ClusterComponentSpec,
+	cdCompSpecs []appsv1alpha1.ClusterComponentDefinition,
+	compName string) (*appsv1alpha1.ComponentConfigSpec, error) {
+	configSpecs, err := util.GetConfigTemplateListWithResource(compSpecs, cdCompSpecs, nil, compName, true)
+	if err != nil {
+		return nil, err
+	}
+	if len(configSpecs) == 0 {
+		return nil, errors.Errorf("no config template for component %s", compName)
+	}
+	return &configSpecs[0], nil
+}
+
+func findConfigTemplateInfo(dynamic dynamic.Interface, configSpec *appsv1alpha1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1alpha1.FormatterConfig, error) {
+	if configSpec == nil {
+		return nil, nil, errors.New("configSpec is nil")
+	}
+	configTemplate, err := cluster.GetConfigMapByName(dynamic, configSpec.Namespace, configSpec.TemplateRef)
+	if err != nil {
+		return nil, nil, err
+	}
+	configConstraint, err := cluster.GetConfigConstraintByName(dynamic, configSpec.ConfigConstraintRef)
+	if err != nil {
+		return nil, nil, err
+	}
+	return configTemplate, configConstraint.Spec.FormatterConfig, nil
+}
+
+func newConfigTemplateEngine() *template.Template {
+	customizedFuncMap := plan.BuiltInCustomFunctions(nil, nil)
+	engine := gotemplate.NewTplEngine(nil, customizedFuncMap, logsTemplateName, nil, context.TODO())
+	return engine.GetTplEngine()
+}
+
+func findLogsBlockTPL(confData map[string]string) (string, *template.Template, error) {
+	engine := newConfigTemplateEngine()
+	for key, value := range confData {
+		if !strings.Contains(value, logsBlockName) {
+			continue
+		}
+		tpl, err := engine.Parse(value)
+		if err != nil {
+			return key, nil, err
+		}
+		logTPL := tpl.Lookup(logsBlockName)
+		// find target logs template
+		if logTPL != nil {
+			return key, logTPL, nil
+		}
+	}
+	return "", nil, errors.New("no logs block template found")
+}
+
+func buildLogsTPLValues(compSpec *appsv1alpha1.ClusterComponentSpec) (*gotemplate.TplValues, error) {
+	compMap := map[string]interface{}{}
+	bytesData, err := json.Marshal(compSpec)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(bytesData, &compMap)
+	if err != nil {
+		return nil, err
+	}
+	value := gotemplate.TplValues{
+		topTPLLogsObject: compMap,
+	}
+	return &value, nil
+}
+
+func buildLogsReconfiguringOps(clusterName, namespace, compName, configName, keyName string, variables map[string]string) *appsv1alpha1.OpsRequest {
+	opsName := fmt.Sprintf("%s-%s", "logs-reconfigure", uuid.NewString())
+	opsRequest := util.NewOpsRequestForReconfiguring(opsName, namespace, clusterName)
+	parameterPairs := make([]appsv1alpha1.ParameterPair, 0, len(variables))
+	for key, value := range variables {
+		v := value
+		parameterPairs = append(parameterPairs, appsv1alpha1.ParameterPair{
+			Key:   key,
+			Value: &v,
+		})
+	}
+	var keys []appsv1alpha1.ParameterConfig
+	keys = append(keys, appsv1alpha1.ParameterConfig{
+		Key:        keyName,
+		Parameters: parameterPairs,
+	})
+	var configurations []appsv1alpha1.Configuration
+	configurations = append(configurations, appsv1alpha1.Configuration{
+		Keys: keys,
+		Name: configName,
+	})
+	reconfigure := opsRequest.Spec.Reconfigure
+	reconfigure.ComponentName = compName
+	reconfigure.Configurations = append(reconfigure.Configurations, configurations...)
+	return opsRequest
+}
+
+func (o *updateOptions) updateMonitor(val string) error {
 	boolVal, err := strconv.ParseBool(val)
 	if err != nil {
 		return err

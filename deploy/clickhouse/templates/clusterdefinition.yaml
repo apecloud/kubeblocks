@@ -234,11 +234,11 @@ spec:
       workloadType: Stateful #Consensus
       characterType: zookeeper
       # probes:
-      #   roleChangedProbe:
+      #   roleProbe:
       #     cmd: "stat | grep 'Leader'"
-      #     failureThreshold: {{ .Values.zookeeper.roleChangedProbe.failureThreshold }}
-      #     periodSeconds: {{ .Values.zookeeper.roleChangedProbe.periodSeconds }}
-      #     successThreshold: {{ .Values.zookeeper.roleChangedProbe.successThreshold }}
+      #     failureThreshold: {{ .Values.zookeeper.roleProbe.failureThreshold }}
+      #     periodSeconds: {{ .Values.zookeeper.roleProbe.periodSeconds }}
+      #     successThreshold: {{ .Values.zookeeper.roleProbe.successThreshold }}
       monitor:
         builtIn: false
         exporterConfig:

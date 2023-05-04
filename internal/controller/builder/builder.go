@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package builder
@@ -33,7 +36,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -343,12 +345,14 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 	uuidStrB64 := base64.RawStdEncoding.EncodeToString([]byte(strings.ReplaceAll(uuidStr, "-", "")))
 	uuidHex := hex.EncodeToString(uuidBytes)
 	m := map[string]string{
-		"$(RANDOM_PASSWD)": randomString(8),
-		"$(UUID)":          uuidStr,
-		"$(UUID_B64)":      uuidB64,
-		"$(UUID_STR_B64)":  uuidStrB64,
-		"$(UUID_HEX)":      uuidHex,
-		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+		"$(RANDOM_PASSWD)":        randomString(8),
+		"$(UUID)":                 uuidStr,
+		"$(UUID_B64)":             uuidB64,
+		"$(UUID_STR_B64)":         uuidStrB64,
+		"$(UUID_HEX)":             uuidHex,
+		"$(SVC_FQDN)":             fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+		"$(KB_CLUSTER_COMP_NAME)": params.Cluster.Name + "-" + params.Component.Name,
+		"$(HEADLESS_SVC_FQDN)":    fmt.Sprintf("%s-%s-headless.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
 	}
 	if len(params.Component.Services) > 0 {
 		for _, p := range params.Component.Services[0].Spec.Ports {
@@ -421,45 +425,6 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 // envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
 func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli client.Client) (*corev1.ConfigMap, error) {
 
-	isRecreateFromExistingPVC := func() (bool, error) {
-		ml := client.MatchingLabels{
-			constant.AppInstanceLabelKey:    params.Cluster.Name,
-			constant.KBAppComponentLabelKey: params.Component.Name,
-		}
-		pvcList := corev1.PersistentVolumeClaimList{}
-		if err := cli.List(reqCtx.Ctx, &pvcList, ml); err != nil {
-			return false, err
-		}
-		// no pvc means it's not recreation
-		if len(pvcList.Items) == 0 {
-			return false, nil
-		}
-		// check sts existence
-		stsList := appsv1.StatefulSetList{}
-		if err := cli.List(reqCtx.Ctx, &stsList, ml); err != nil {
-			return false, err
-		}
-		// recreation will not have existing sts
-		if len(stsList.Items) > 0 {
-			return false, nil
-		}
-		// check pod existence
-		for _, pvc := range pvcList.Items {
-			vctName := pvc.Annotations[constant.VolumeClaimTemplateNameLabelKey]
-			podName := strings.TrimPrefix(pvc.Name, vctName+"-")
-			if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: podName, Namespace: params.Cluster.Namespace}, &corev1.Pod{}); err != nil {
-				if apierrors.IsNotFound(err) {
-					continue
-				}
-				return false, err
-			}
-			// any pod exists means it's not a recreation
-			return false, nil
-		}
-		// passed all the above checks, so it's a recreation
-		return true, nil
-	}
-
 	const tplFile = "env_config_template.cue"
 
 	prefix := constant.KBPrefix + "_" + strings.ToUpper(params.Component.Type) + "_"
@@ -516,12 +481,8 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 		}
 	}
 
-	// if created from existing pvc, set env
-	isRecreate, err := isRecreateFromExistingPVC()
-	if err != nil {
-		return nil, err
-	}
-	envData[prefix+"RECREATE"] = strconv.FormatBool(isRecreate)
+	// set cluster uid to let pod know if the cluster is recreated
+	envData[prefix+"CLUSTER_UID"] = string(params.Cluster.UID)
 
 	config := corev1.ConfigMap{}
 	if err := buildFromCUE(tplFile, map[string]any{
@@ -533,22 +494,6 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 	}
 
 	return &config, nil
-}
-
-func BuildBackupPolicy(sts *appsv1.StatefulSet,
-	template *dataprotectionv1alpha1.BackupPolicyTemplate,
-	backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
-	backupKey.Name = backupKey.Name + "-" + randomString(6)
-	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
-	if err := buildFromCUE("backup_policy_template.cue", map[string]any{
-		"sts":        sts,
-		"backup_key": backupKey,
-		"template":   template.Name,
-	}, "backup_policy", &backupPolicy); err != nil {
-		return nil, err
-	}
-
-	return &backupPolicy, nil
 }
 
 func BuildBackup(sts *appsv1.StatefulSet,
@@ -704,4 +649,41 @@ func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secre
 		return nil, err
 	}
 	return secret, nil
+}
+
+func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) (*batchv1.Job, error) {
+	const tplFile = "backup_manifests_template.cue"
+
+	job := &batchv1.Job{}
+	if err := buildFromCUE(tplFile,
+		map[string]any{
+			"job.metadata.name":      key.Name,
+			"job.metadata.namespace": key.Namespace,
+			"backup":                 backup,
+			"podSpec":                podSpec,
+		},
+		"job", job); err != nil {
+		return nil, err
+	}
+	return job, nil
+}
+
+func BuildPITRJob(name string, cluster *appsv1alpha1.Cluster, image string, command []string, args []string,
+	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar) (*batchv1.Job, error) {
+	const tplFile = "pitr_job_template.cue"
+	job := &batchv1.Job{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"job.metadata.name":              name,
+		"job.metadata.namespace":         cluster.Namespace,
+		"job.spec.template.spec.volumes": volumes,
+		"container.image":                image,
+		"container.command":              command,
+		"container.args":                 args,
+		"container.volumeMounts":         volumeMounts,
+		"container.env":                  env,
+	}, "job", job); err != nil {
+		return nil, err
+	}
+
+	return job, nil
 }

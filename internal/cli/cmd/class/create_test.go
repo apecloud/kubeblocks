@@ -1,36 +1,33 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package class
 
 import (
 	"bytes"
-	"net/http"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
-	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -39,59 +36,33 @@ import (
 
 var _ = Describe("create", func() {
 	var (
-		o       *CreateOptions
-		cd      *appsv1alpha1.ClusterDefinition
-		out     *bytes.Buffer
-		tf      *cmdtesting.TestFactory
-		streams genericclioptions.IOStreams
+		createOptions *CreateOptions
+		out           *bytes.Buffer
+		tf            *cmdtesting.TestFactory
+		streams       genericclioptions.IOStreams
 	)
 
 	fillResources := func(o *CreateOptions, cpu string, memory string, storage []string) {
 		o.CPU = cpu
 		o.Memory = memory
 		o.Storage = storage
+		o.ClassName = fmt.Sprintf("custom-%s-%s", cpu, memory)
+		o.Constraint = generalResourceConstraint.Name
 	}
 
 	BeforeEach(func() {
-		cd = testing.FakeClusterDef()
-
 		streams, _, out, _ = genericclioptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
+		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
+		tf.FakeDynamicClient = testing.FakeDynamicClient(&classDef, &generalResourceConstraint, &memoryOptimizedResourceConstraint)
 
-		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		httpResp := func(obj runtime.Object) *http.Response {
-			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
-		}
-		cms := testing.FakeComponentClassDef(cd, classDef)
-
-		resources := map[string]runtime.Object{
-			"/api/v1/configmaps": cms,
-		}
-
-		tf.UnstructuredClient = &clientfake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Group: "core", Version: "v1"},
-			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				if req.Method == "POST" {
-					return httpResp(&corev1.ConfigMap{}), nil
-				}
-				resource, ok := resources[req.URL.Path]
-				if !ok {
-					return nil, errors.NewNotFound(schema.GroupResource{}, req.URL.Path)
-				}
-				return httpResp(resource), nil
-			}),
-		}
-		tf.Client = tf.UnstructuredClient
-		tf.FakeDynamicClient = testing.FakeDynamicClient(&generalClassFamily, &memoryOptimizedClassFamily, cd)
-
-		o = &CreateOptions{
+		createOptions = &CreateOptions{
 			Factory:       tf,
 			IOStreams:     streams,
-			ClusterDefRef: cd.Name,
-			ComponentType: testing.ComponentDefName,
+			ClusterDefRef: "apecloud-mysql",
+			ComponentType: "mysql",
 		}
-		Expect(o.complete(tf)).ShouldNot(HaveOccurred())
+		Expect(createOptions.complete(tf)).ShouldNot(HaveOccurred())
 	})
 
 	AfterEach(func() {
@@ -106,39 +77,59 @@ var _ = Describe("create", func() {
 	Context("with resource arguments", func() {
 
 		It("should fail if required arguments is missing", func() {
-			o.ClassFamily = generalClassFamily.Name
-			fillResources(o, "", "48Gi", nil)
-			Expect(o.validate([]string{"general-12c48g"})).Should(HaveOccurred())
-			fillResources(o, "12", "", nil)
-			Expect(o.validate([]string{"general-12c48g"})).Should(HaveOccurred())
-			fillResources(o, "12", "48g", nil)
-			Expect(o.validate([]string{})).Should(HaveOccurred())
+			fillResources(createOptions, "", "48Gi", nil)
+			Expect(createOptions.validate([]string{"general-12c48g"})).Should(HaveOccurred())
+			fillResources(createOptions, "12", "", nil)
+			Expect(createOptions.validate([]string{"general-12c48g"})).Should(HaveOccurred())
+			fillResources(createOptions, "12", "48g", nil)
+			Expect(createOptions.validate([]string{})).Should(HaveOccurred())
 		})
 
 		It("should succeed with required arguments", func() {
-			o.ClassFamily = generalClassFamily.Name
-			fillResources(o, "12", "48Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
-			Expect(o.validate([]string{"general-12c48g"})).ShouldNot(HaveOccurred())
-			Expect(o.run()).ShouldNot(HaveOccurred())
-			Expect(out.String()).Should(ContainSubstring(o.ClassName))
+			fillResources(createOptions, "96", "384Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
+			Expect(createOptions.validate([]string{"general-96c384g"})).ShouldNot(HaveOccurred())
+			Expect(createOptions.run()).ShouldNot(HaveOccurred())
+			Expect(out.String()).Should(ContainSubstring(createOptions.ClassName))
+		})
+
+		It("should fail if constraint not exist", func() {
+			fillResources(createOptions, "2", "8Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
+			createOptions.Constraint = "constraint-not-exist"
+			Expect(createOptions.run()).Should(HaveOccurred())
+		})
+
+		It("should fail if not conform to constraint", func() {
+			By("memory not conform to constraint")
+			fillResources(createOptions, "2", "9Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
+			Expect(createOptions.run()).Should(HaveOccurred())
+
+			By("cpu with invalid step")
+			fillResources(createOptions, "0.6", "0.6Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
+			Expect(createOptions.run()).Should(HaveOccurred())
 		})
 
 		It("should fail if class name is conflicted", func() {
-			o.ClassName = "general-1c1g"
-			fillResources(o, "1", "1Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
-			Expect(o.run()).Should(HaveOccurred())
+			fillResources(createOptions, "1", "1Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
+			createOptions.ClassName = "general-1c1g"
+			Expect(createOptions.run()).Should(HaveOccurred())
+
+			fillResources(createOptions, "0.5", "0.5Gi", []string{})
+			Expect(createOptions.run()).ShouldNot(HaveOccurred())
+
+			fillResources(createOptions, "0.5", "0.5Gi", []string{})
+			Expect(createOptions.run()).Should(HaveOccurred())
 		})
 	})
 
 	Context("with class definitions file", func() {
 		It("should succeed", func() {
-			o.File = testCustomClassDefsPath
-			Expect(o.run()).ShouldNot(HaveOccurred())
+			createOptions.File = testCustomClassDefsPath
+			Expect(createOptions.run()).ShouldNot(HaveOccurred())
 			Expect(out.String()).Should(ContainSubstring("custom-1c1g"))
-			Expect(out.String()).Should(ContainSubstring("custom-200c400g"))
+			Expect(out.String()).Should(ContainSubstring("custom-4c16g"))
 			// memory optimized classes
-			Expect(out.String()).Should(ContainSubstring("custom-1c32g"))
-			Expect(out.String()).Should(ContainSubstring("custom-2c64g"))
+			Expect(out.String()).Should(ContainSubstring("custom-2c16g"))
+			Expect(out.String()).Should(ContainSubstring("custom-4c64g"))
 		})
 
 	})

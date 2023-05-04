@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package stateful
@@ -24,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -86,20 +90,20 @@ var _ = Describe("Stateful Component", func() {
 			sts := &stsList.Items[0]
 			clusterComponent := cluster.Spec.GetComponentByName(statefulCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-			stateful, err := NewStateful(k8sClient, cluster, clusterComponent, *componentDef)
+			stateful, err := NewStatefulComponent(k8sClient, cluster, clusterComponent, *componentDef)
 			Expect(err).Should(Succeed())
 			phase, _ := stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
 			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("test pods are not ready")
-			updateRevison := fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "6fdd48d9cd")
+			updateRevision := fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "6fdd48d9cd")
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				availableReplicas := *sts.Spec.Replicas - 1
 				sts.Status.AvailableReplicas = availableReplicas
 				sts.Status.ReadyReplicas = availableReplicas
 				sts.Status.Replicas = availableReplicas
 				sts.Status.ObservedGeneration = 1
-				sts.Status.UpdateRevision = updateRevison
+				sts.Status.UpdateRevision = updateRevision
 			})).Should(Succeed())
 			podsReady, _ := stateful.PodsReady(ctx, sts)
 			Expect(podsReady == false).Should(BeTrue())
@@ -121,14 +125,14 @@ var _ = Describe("Stateful Component", func() {
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision
-			Expect(testapps.ChangeObj(&testCtx, pod, func() {
-				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "5wdsd8d9fs")
+			Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+				lpod.Labels[appsv1.ControllerRevisionHashLabelKey] = fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "5wdsd8d9fs")
 			})).Should(Succeed())
 			phase, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
 			Expect(len(phase) == 0).Should(BeTrue())
 			// reset updateRevision
-			Expect(testapps.ChangeObj(&testCtx, pod, func() {
-				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevison
+			Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+				lpod.Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevision
 			})).Should(Succeed())
 
 			By("test pod is available")

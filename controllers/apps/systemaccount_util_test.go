@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
@@ -81,6 +84,7 @@ func mockCreateByStmtSystemAccount(name appsv1alpha1.AccountName) appsv1alpha1.S
 			Type: appsv1alpha1.CreateByStmt,
 			Statements: &appsv1alpha1.ProvisionStatements{
 				CreationStatement: "CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY \"$(PASSWD)\";",
+				UpdateStatement:   "ALTER USER $(USERNAME) IDENTIFIED BY \"$(PASSWD)\";",
 				DeletionStatement: "DROP USER IF EXISTS $(USERNAME);",
 			},
 		},
@@ -146,20 +150,20 @@ func TestRenderJob(t *testing.T) {
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
 		clusterNamePrefix  = "test-cluster"
-		mysqlCompType      = "replicasets"
+		mysqlCompDefName   = "replicasets"
 		mysqlCompName      = "mysql"
 	)
 
 	systemAccount := mockSystemAccountsSpec()
 	clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-		AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+		AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 		AddSystemAccountSpec(systemAccount).
 		GetObject()
 	assert.NotNil(t, clusterDef)
 	assert.NotNil(t, clusterDef.Spec.ComponentDefs[0].SystemAccounts)
 
 	cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDef.Name, clusterVersionName).
-		AddComponent(mysqlCompType, mysqlCompName).GetObject()
+		AddComponent(mysqlCompDefName, mysqlCompName).GetObject()
 	assert.NotNil(t, cluster)
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string, 0)
@@ -195,7 +199,7 @@ func TestRenderJob(t *testing.T) {
 	for _, acc := range accountsSetting.Accounts {
 		switch acc.ProvisionPolicy.Type {
 		case appsv1alpha1.CreateByStmt:
-			creationStmt, secrets := getCreationStmtForAccount(compKey, accountsSetting.PasswordConfig, acc)
+			creationStmt, secrets := getCreationStmtForAccount(compKey, accountsSetting.PasswordConfig, acc, reCreate)
 			// make sure all variables have been replaced
 			for _, stmt := range creationStmt {
 				assert.False(t, strings.Contains(stmt, "$(USERNAME)"))
@@ -306,20 +310,20 @@ func TestAccountDebugMode(t *testing.T) {
 
 func TestRenderCreationStmt(t *testing.T) {
 	var (
-		clusterDefName = "test-clusterdef"
-		clusterName    = "test-cluster"
-		mysqlCompType  = "replicasets"
-		mysqlCompName  = "mysql"
+		clusterDefName   = "test-clusterdef"
+		clusterName      = "test-cluster"
+		mysqlCompDefName = "replicasets"
+		mysqlCompName    = "mysql"
 	)
 
 	systemAccount := mockSystemAccountsSpec()
 	clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-		AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+		AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 		AddSystemAccountSpec(systemAccount).
 		GetObject()
 	assert.NotNil(t, clusterDef)
 
-	compDef := clusterDef.GetComponentDefByName(mysqlCompType)
+	compDef := clusterDef.GetComponentDefByName(mysqlCompDefName)
 	assert.NotNil(t, compDef.SystemAccounts)
 
 	accountsSetting := compDef.SystemAccounts
@@ -340,12 +344,16 @@ func TestRenderCreationStmt(t *testing.T) {
 				account.ProvisionPolicy.Statements.DeletionStatement = ""
 			}
 
-			stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account)
+			stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, reCreate)
 			if toss == 1 {
 				assert.Equal(t, 1, len(stmts))
 			} else {
 				assert.Equal(t, 2, len(stmts))
 			}
+			assert.NotNil(t, secret)
+
+			stmts, secret = getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, inPlaceUpdate)
+			assert.Equal(t, 1, len(stmts))
 			assert.NotNil(t, secret)
 		}
 	}

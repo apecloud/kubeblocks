@@ -12,16 +12,20 @@ kbcli cluster delete-account [flags]
 
 ```
   # delete account by name
-  kbcli cluster delete-account NAME --component-name COMPNAME --username NAME
+  kbcli cluster delete-account NAME --component COMPNAME --name USERNAME
+  # delete account with default component
+  kbcli cluster delete-account NAME --name USERNAME
+  # delete account for instance
+  kbcli cluster delete-account --instance INSTANCE --name USERNAME
 ```
 
 ### Options
 
 ```
-      --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
-  -h, --help                    help for delete-account
-  -i, --instance string         Specify the name of instance to be connected.
-  -u, --username string         Required. Specify the name of user
+      --component string   Specify the name of component to be connected. If not specified, the first component will be used.
+  -h, --help               help for delete-account
+  -i, --instance string    Specify the name of instance to be connected.
+      --name string        Required. Specify the name of user
 ```
 
 ### Options inherited from parent commands

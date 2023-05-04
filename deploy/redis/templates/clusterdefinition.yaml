@@ -16,6 +16,11 @@ spec:
     - name: redis
       workloadType: Replication
       characterType: redis
+      probes:
+        roleProbe:
+          failureThreshold: 2
+          periodSeconds: 2
+          timeoutSeconds: 1
       replicationSpec:
         switchPolicies:
           - type: MaximumAvailability
@@ -60,8 +65,6 @@ spec:
           - name: redis
             port: 6379
             targetPort: redis
-          - name: metrics
-            targetPort: metrics
       configSpecs:
         - name: redis-replication-config
           templateRef: redis7-config-template
@@ -145,33 +148,38 @@ spec:
           - name: kbadmin
             provisionPolicy:
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allcommands allkeys
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbdataprotection
             provisionPolicy:
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allcommands allkeys
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbprobe
             provisionPolicy:
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) +psync +replconf +ping
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) +psync +replconf +ping
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
     - name: redis-sentinel
       workloadType: Stateful
       characterType: redis

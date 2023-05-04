@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -21,8 +24,13 @@ import (
 
 	"github.com/StudioSol/set"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 func TestGetUpdateParameterList(t *testing.T) {
@@ -43,14 +51,17 @@ func TestGetUpdateParameterList(t *testing.T) {
 	],
 	"g": {
 		"cd" : "abcd",
-		"msld" : "cakl"
+		"msld" :  {
+			"cakl": 100,
+			"dg": "abcd"
+		}
 	}}
 `
-	params, err := getUpdateParameterList(newCfgDiffMeta(testData, nil, nil))
+	expected := set.NewLinkedHashSetString("a", "f", "c", "xxx.test1", "xxx.test2", "g.msld.cakl", "g.msld.dg", "g.cd")
+	params, err := getUpdateParameterList(newCfgDiffMeta(testData, nil, nil), "")
 	require.Nil(t, err)
-	require.True(t, EqSet(
-		set.NewLinkedHashSetString("a", "c_1", "c_0", "msld", "cd", "f", "test1", "test2"),
-		set.NewLinkedHashSetString(params...)))
+	require.True(t, util.EqSet(expected,
+		set.NewLinkedHashSetString(params...)), "param: %v, expected: %v", params, expected.AsSlice())
 }
 
 func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *ConfigPatchInfo {
@@ -175,6 +186,53 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("IsUpdateDynamicParameters() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsSchedulableConfigResource(t *testing.T) {
+	tests := []struct {
+		name   string
+		object client.Object
+		want   bool
+	}{{
+		name:   "test",
+		object: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{}},
+		want:   false,
+	}, {
+		name: "test",
+		object: &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					constant.AppNameLabelKey:        "test",
+					constant.AppInstanceLabelKey:    "test",
+					constant.KBAppComponentLabelKey: "component",
+				},
+			},
+		},
+		want: false,
+	}, {
+		name: "test",
+		object: &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					constant.AppNameLabelKey:                        "test",
+					constant.AppInstanceLabelKey:                    "test",
+					constant.KBAppComponentLabelKey:                 "component",
+					constant.CMConfigurationTemplateNameLabelKey:    "test_config_template",
+					constant.CMConfigurationConstraintsNameLabelKey: "test_config_constraint",
+					constant.CMConfigurationSpecProviderLabelKey:    "for_test_config",
+					constant.CMConfigurationTypeLabelKey:            constant.ConfigInstanceType,
+				},
+			},
+		},
+		want: true,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsSchedulableConfigResource(tt.object); got != tt.want {
+				t.Errorf("IsSchedulableConfigResource() = %v, want %v", got, tt.want)
 			}
 		})
 	}

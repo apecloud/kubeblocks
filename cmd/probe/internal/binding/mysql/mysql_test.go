@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package mysql
@@ -163,6 +166,10 @@ func TestGetLagOps(t *testing.T) {
 		col2 := sqlmock.NewColumn("ROLE").OfType("VARCHAR", "")
 		col3 := sqlmock.NewColumn("SERVER_ID").OfType("INT", 0)
 		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow("wesql-main-1.wesql-main-headless:13306", "Follower", 1)
+		getRoleRows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow("wesql-main-1.wesql-main-headless:13306", "Follower", 1)
+		if mysqlOps.OriRole == "" {
+			mock.ExpectQuery("select .* from information_schema.wesql_cluster_local").WillReturnRows(getRoleRows)
+		}
 		mock.ExpectQuery("show slave status").WillReturnRows(rows)
 
 		result, err := mysqlOps.GetLagOps(context.Background(), req, &bindings.InvokeResponse{})
@@ -360,7 +367,7 @@ func TestQuery(t *testing.T) {
 		ret, err := mysqlOps.query(context.Background(), `SELECT * FROM foo WHERE id < 4`)
 		assert.Nil(t, err)
 		t.Logf("query result: %s", ret)
-		assert.Contains(t, string(ret), "\"id\":1")
+		assert.Contains(t, string(ret), "\"id\":\"1")
 		var result []interface{}
 		err = json.Unmarshal(ret, &result)
 		assert.Nil(t, err)
@@ -499,7 +506,7 @@ func TestMySQLAccounts(t *testing.T) {
 		assert.Equal(t, 1, len(users))
 		assert.Equal(t, userName, users[0].UserName)
 		assert.NotEmpty(t, users[0].RoleName)
-		assert.Equal(t, users[0].RoleName, ReadOnlyRole)
+		assert.True(t, ReadOnlyRole.EqualTo(users[0].RoleName))
 	})
 
 	t.Run("List accounts", func(t *testing.T) {
@@ -550,7 +557,7 @@ func TestMySQLAccounts(t *testing.T) {
 		assert.Equal(t, ErrNoRoleName.Error(), result[RespTypMsg])
 
 		req.Metadata["roleName"] = roleName
-		roleDesc, err := mysqlOps.renderRoleByName(req.Metadata["roleName"])
+		roleDesc, err := mysqlOps.role2Priv(req.Metadata["roleName"])
 		assert.Nil(t, err)
 		grantRoleCmd := fmt.Sprintf("GRANT %s TO '%s'@'%%';", roleDesc, req.Metadata["userName"])
 
@@ -580,7 +587,7 @@ func TestMySQLAccounts(t *testing.T) {
 		assert.Equal(t, ErrNoRoleName.Error(), result[RespTypMsg])
 
 		req.Metadata["roleName"] = roleName
-		roleDesc, err := mysqlOps.renderRoleByName(req.Metadata["roleName"])
+		roleDesc, err := mysqlOps.role2Priv(req.Metadata["roleName"])
 		assert.Nil(t, err)
 		revokeRoleCmd := fmt.Sprintf("REVOKE %s FROM '%s'@'%%';", roleDesc, req.Metadata["userName"])
 
@@ -588,6 +595,32 @@ func TestMySQLAccounts(t *testing.T) {
 		result, err = mysqlOps.revokeUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
 		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+	})
+	t.Run("List System Accounts", func(t *testing.T) {
+		var err error
+		var result OpsResult
+
+		req := &bindings.InvokeRequest{}
+		req.Operation = CreateUserOp
+		req.Metadata = map[string]string{}
+
+		col1 := sqlmock.NewColumn("userName").OfType("STRING", "turning")
+
+		rows := sqlmock.NewRowsWithColumnDefinition(col1).
+			AddRow("kbadmin")
+
+		stmt := "SELECT user AS userName FROM mysql.user WHERE host = '%' and user like 'kb%';"
+		mock.ExpectQuery(regexp.QuoteMeta(stmt)).WillReturnRows(rows)
+
+		result, err = mysqlOps.listSystemAccountsOps(ctx, req, resp)
+		assert.Nil(t, err)
+		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+		data := result[RespTypMsg].(string)
+		users := []string{}
+		err = json.Unmarshal([]byte(data), &users)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(users))
+		assert.Equal(t, "kbadmin", users[0])
 	})
 }
 func mockDatabase(t *testing.T) (*MysqlOperations, sqlmock.Sqlmock, error) {

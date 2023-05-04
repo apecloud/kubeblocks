@@ -1,0 +1,23 @@
+DEBUG=${DEBUG:-}
+
+export MILESTONE_ID=${MILESTONE_ID:-5}
+
+export BASE_BRANCH=${BASE_BRANCH:-'release-0.5'}
+export HEAD_BRANCH=${HEAD_BRANCH:-'releasing-0.5'}
+export PR_TITLE=${PR_TITLE:-"chore(releasing): ${BASE_BRANCH} tracker PR (no-need-to-review)"}
+
+
+export REMOTE_URL=$(git config --get remote.origin.url)
+export OWNER=$(dirname ${REMOTE_URL} | awk -F ":" '{print $2}')
+prefix='^//'
+if [[ $OWNER =~ $prefix ]]; then
+export OWNER="${OWNER#*//github.com/}"
+fi
+export REPO=$(basename -s .git ${REMOTE_URL})
+
+
+if [ -n "$DEBUG" ]; then 
+echo "OWNER=${OWNER}"
+echo "REPO=${REPO}"
+echo "MILESTONE_ID=${MILESTONE_ID}"
+fi

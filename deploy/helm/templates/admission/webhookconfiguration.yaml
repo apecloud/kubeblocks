@@ -8,7 +8,7 @@ kind: Secret
 metadata:
   name: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-ca
   labels:
-    {{- include "kubeblocks.selectorLabels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
   annotations:
     self-signed-cert: "true"
 type: kubernetes.io/tls
@@ -33,6 +33,8 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: {{ include "kubeblocks.fullname" . }}-mutating-webhook-configuration
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 webhooks:
 - admissionReviewVersions:
   - v1
@@ -87,6 +89,8 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: {{ include "kubeblocks.fullname" . }}-validating-webhook-configuration
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 webhooks:
 - admissionReviewVersions:
   - v1

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package postgres
@@ -21,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +32,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	. "github.com/apecloud/kubeblocks/cmd/probe/util"
@@ -39,17 +42,15 @@ import (
 const (
 	connectionURLKey = "url"
 	commandSQLKey    = "sql"
-	PRIMARY          = "primary"
-	SECONDARY        = "secondary"
 
 	listUserTpl = `
 	SELECT usename AS userName, valuntil <now() AS expired,  usesuper,
-	ARRAY(SELECT 
-		case 
+	ARRAY(SELECT
+		case
 			when b.rolname = 'pg_read_all_data' THEN 'readonly'
 			when b.rolname = 'pg_write_all_data' THEN 'readwrite'
 		else b.rolname
-		end 
+		end
 	FROM pg_catalog.pg_auth_members m
 	JOIN pg_catalog.pg_roles b ON (m.roleid = b.oid)
 	WHERE m.member = usesysid ) as roles
@@ -59,22 +60,23 @@ const (
 	`
 	descUserTpl = `
 	SELECT usename AS userName,  valuntil <now() AS expired, usesuper,
-	ARRAY(SELECT 
-	 case 
+	ARRAY(SELECT
+	 case
 		 when b.rolname = 'pg_read_all_data' THEN 'readonly'
 		 when b.rolname = 'pg_write_all_data' THEN 'readwrite'
 	 else b.rolname
-	 end 
+	 end
 	FROM pg_catalog.pg_auth_members m
 	JOIN pg_catalog.pg_roles b ON (m.roleid = b.oid)
 	WHERE m.member = usesysid ) as roles
 	FROM pg_user
 	WHERE usename = '%s';
 	`
-	createUserTpl = "CREATE USER %s WITH PASSWORD '%s';"
-	dropUserTpl   = "DROP USER IF EXISTS %s;"
-	grantTpl      = "GRANT %s TO %s;"
-	revokeTpl     = "REVOKE %s FROM %s;"
+	createUserTpl         = "CREATE USER %s WITH PASSWORD '%s';"
+	dropUserTpl           = "DROP USER IF EXISTS %s;"
+	grantTpl              = "GRANT %s TO %s;"
+	revokeTpl             = "REVOKE %s FROM %s;"
+	listSystemAccountsTpl = "SELECT rolname FROM pg_catalog.pg_roles WHERE pg_roles.rolname LIKE 'kb%'"
 )
 
 var (
@@ -126,6 +128,7 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.RegisterOperation(DescribeUserOp, pgOps.describeUserOps)
 	pgOps.RegisterOperation(GrantUserRoleOp, pgOps.grantUserRoleOps)
 	pgOps.RegisterOperation(RevokeUserRoleOp, pgOps.revokeUserRoleOps)
+	pgOps.RegisterOperation(ListSystemAccountsOp, pgOps.listSystemAccountsOps)
 	return nil
 }
 
@@ -214,11 +217,10 @@ func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.
 			return "", err
 		}
 	}
-	pgOps.OriRole = PRIMARY
 	if isRecovery {
-		pgOps.OriRole = SECONDARY
+		return SECONDARY, nil
 	}
-	return pgOps.OriRole, nil
+	return PRIMARY, nil
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
@@ -430,14 +432,14 @@ func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *bind
 		object = UserInfo{}
 
 		sqlTplRend = func(user UserInfo) string {
-			if user.RoleName == SuperUserRole {
+			if SuperUserRole.EqualTo(user.RoleName) {
 				if op == GrantUserRoleOp {
 					return "ALTER USER " + user.UserName + " WITH SUPERUSER;"
 				} else {
 					return "ALTER USER " + user.UserName + " WITH NOSUPERUSER;"
 				}
 			}
-			roleDesc, _ := pgOps.renderRoleByName(user.RoleName)
+			roleDesc, _ := pgOps.role2PGRole(user.RoleName)
 			return fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
 		}
 
@@ -463,8 +465,37 @@ func (pgOps *PostgresOperations) listUsersOps(ctx context.Context, req *bindings
 			return listUserTpl
 		}
 	)
-
 	return QueryObject(ctx, pgOps, req, opsKind, sqlTplRend, pgUserRolesProcessor, UserInfo{})
+}
+
+func (pgOps *PostgresOperations) listSystemAccountsOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	var (
+		opsKind    = ListUsersOp
+		sqlTplRend = func(user UserInfo) string {
+			return listSystemAccountsTpl
+		}
+	)
+	dataProcessor := func(data interface{}) (interface{}, error) {
+		type roleInfo struct {
+			Rolname string `json:"rolname"`
+		}
+		var roles []roleInfo
+		if err := json.Unmarshal(data.([]byte), &roles); err != nil {
+			return nil, err
+		}
+
+		roleNames := make([]string, 0)
+		for _, role := range roles {
+			roleNames = append(roleNames, role.Rolname)
+		}
+		if jsonData, err := json.Marshal(roleNames); err != nil {
+			return nil, err
+		} else {
+			return string(jsonData), nil
+		}
+	}
+
+	return QueryObject(ctx, pgOps, req, opsKind, sqlTplRend, dataProcessor, UserInfo{})
 }
 
 func (pgOps *PostgresOperations) describeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
@@ -504,17 +535,29 @@ func pgUserRolesProcessor(data interface{}) (interface{}, error) {
 	// parse roles
 	users := make([]UserInfo, len(pgUsers))
 	for i := range pgUsers {
-		if pgUsers[i].Super {
-			pgUsers[i].Roles = append(pgUsers[i].Roles, "superuser")
-		}
 		users[i] = UserInfo{
 			UserName: pgUsers[i].UserName,
-			RoleName: strings.Join(pgUsers[i].Roles, ","),
 		}
+
 		if pgUsers[i].Expired {
 			users[i].Expired = "T"
 		} else {
 			users[i].Expired = "F"
+		}
+
+		// parse Super attribute
+		if pgUsers[i].Super {
+			pgUsers[i].Roles = append(pgUsers[i].Roles, string(SuperUserRole))
+		}
+
+		// convert to RoleType and sort by weight
+		roleTypes := make([]RoleType, 0)
+		for _, role := range pgUsers[i].Roles {
+			roleTypes = append(roleTypes, String2RoleType(role))
+		}
+		slices.SortFunc(roleTypes, SortRoleByWeight)
+		if len(roleTypes) > 0 {
+			users[i].RoleName = string(roleTypes[0])
 		}
 	}
 	if jsonData, err := json.Marshal(users); err != nil {
@@ -524,13 +567,13 @@ func pgUserRolesProcessor(data interface{}) (interface{}, error) {
 	}
 }
 
-func (pgOps *PostgresOperations) renderRoleByName(roleName string) (string, error) {
-	switch strings.ToLower(roleName) {
+func (pgOps *PostgresOperations) role2PGRole(roleName string) (string, error) {
+	roleType := String2RoleType(roleName)
+	switch roleType {
 	case ReadWriteRole:
 		return "pg_write_all_data", nil
 	case ReadOnlyRole:
 		return "pg_read_all_data", nil
-	default:
-		return "", fmt.Errorf("role name: %s is not supported", roleName)
 	}
+	return "", fmt.Errorf("role name: %s is not supported", roleName)
 }

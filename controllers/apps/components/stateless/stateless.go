@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package stateless
@@ -42,23 +45,18 @@ import (
 // is at least the minimum available pods that need to run for the deployment.
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
-type Stateless struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
-}
+type StatelessComponent types.ComponentBase
 
-var _ types.Component = &Stateless{}
+var _ types.Component = &StatelessComponent{}
 
-func (stateless *Stateless) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (stateless *StatelessComponent) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if stateless == nil {
 		return false, nil
 	}
 	return stateless.PodsReady(ctx, obj)
 }
 
-func (stateless *Stateless) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+func (stateless *StatelessComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if stateless == nil {
 		return false, nil
 	}
@@ -69,7 +67,7 @@ func (stateless *Stateless) PodsReady(ctx context.Context, obj client.Object) (b
 	return deploymentIsReady(deploy, &stateless.Component.Replicas), nil
 }
 
-func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (stateless *StatelessComponent) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if stateless == nil || pod == nil {
 		return false
 	}
@@ -77,13 +75,13 @@ func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int3
 }
 
 // HandleProbeTimeoutWhenPodsReady the stateless component has no role detection, empty implementation here.
-func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(ctx context.Context,
+func (stateless *StatelessComponent) HandleProbeTimeoutWhenPodsReady(ctx context.Context,
 	recorder record.EventRecorder) (bool, error) {
 	return false, nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
+func (stateless *StatelessComponent) GetPhaseWhenPodsNotReady(ctx context.Context,
 	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	deployList := &appsv1.DeploymentList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, stateless.Cli, *stateless.Cluster, componentName, deployList)
@@ -100,23 +98,23 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil
 }
 
-func (stateless *Stateless) HandleUpdate(ctx context.Context, obj client.Object) error {
+func (stateless *StatelessComponent) HandleUpdate(ctx context.Context, obj client.Object) error {
 	return nil
 }
 
-func NewStateless(
+func NewStatelessComponent(
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (*Stateless, error) {
+	componentDef appsv1alpha1.ClusterComponentDefinition) (types.Component, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
-	return &Stateless{
+	return &StatelessComponent{
 		Cli:          cli,
 		Cluster:      cluster,
 		Component:    component,
-		componentDef: &componentDef,
+		ComponentDef: &componentDef,
 	}, nil
 }
 

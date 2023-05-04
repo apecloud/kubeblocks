@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package stateful
@@ -33,36 +36,31 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type Stateful struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
-}
+type StatefulComponent types.ComponentBase
 
-var _ types.Component = &Stateful{}
+var _ types.Component = &StatefulComponent{}
 
-func (stateful *Stateful) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (r *StatefulComponent) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, stateful.Cli, sts)
+	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
-	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &stateful.Component.Replicas), nil
+	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
 }
 
-func (stateful *Stateful) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+func (r *StatefulComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	return util.StatefulSetPodsAreReady(sts, stateful.Component.Replicas), nil
+	return util.StatefulSetPodsAreReady(sts, r.Component.Replicas), nil
 }
 
-func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (r *StatefulComponent) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if pod == nil {
 		return false
 	}
@@ -70,14 +68,14 @@ func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32)
 }
 
 // HandleProbeTimeoutWhenPodsReady the Stateful component has no role detection, empty implementation here.
-func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
+func (r *StatefulComponent) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
 	return false, nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (stateful *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
+func (r *StatefulComponent) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
 	stsList := &appsv1.StatefulSetList{}
-	podList, err := util.GetCompRelatedObjectList(ctx, stateful.Cli, *stateful.Cluster, componentName, stsList)
+	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
 		return "", err
 	}
@@ -87,27 +85,27 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componen
 		return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
 	}
 	stsObj := stsList.Items[0]
-	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, stateful.Component.Replicas,
+	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, r.Component.Replicas,
 		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil
 }
 
-func (stateful *Stateful) HandleUpdate(ctx context.Context, obj client.Object) error {
+func (r *StatefulComponent) HandleUpdate(ctx context.Context, obj client.Object) error {
 	return nil
 }
 
-func NewStateful(
+func NewStatefulComponent(
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
 	componentDef appsv1alpha1.ClusterComponentDefinition,
-) (*Stateful, error) {
+) (types.Component, error) {
 	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
 		return nil, err
 	}
-	return &Stateful{
+	return &StatefulComponent{
 		Cli:          cli,
 		Cluster:      cluster,
 		Component:    component,
-		componentDef: &componentDef,
+		ComponentDef: &componentDef,
 	}, nil
 }

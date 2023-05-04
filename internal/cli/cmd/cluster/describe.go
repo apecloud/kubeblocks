@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -20,9 +23,11 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -31,6 +36,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -126,11 +132,12 @@ func (o *describeOptions) describeCluster(name string) error {
 		Name:      name,
 		Namespace: o.namespace,
 		GetOptions: cluster.GetOptions{
-			WithClusterDef: true,
-			WithService:    true,
-			WithPod:        true,
-			WithEvent:      true,
-			WithPVC:        true,
+			WithClusterDef:     true,
+			WithService:        true,
+			WithPod:            true,
+			WithEvent:          true,
+			WithPVC:            true,
+			WithDataProtection: true,
 		},
 	}
 
@@ -154,6 +161,9 @@ func (o *describeOptions) describeCluster(name string) error {
 
 	// images
 	showImages(comps, o.Out)
+
+	// data protection info
+	showDataProtection(o.BackupPolicies, o.Backups, o.Out)
 
 	// events
 	showEvents(o.Events, o.Cluster.Name, o.Cluster.Namespace, o.Out)
@@ -234,4 +244,60 @@ func showEndpoints(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList, out io.
 			util.CheckEmpty(strings.Join(externalEndpoints, "\n")))
 	}
 	tbl.Print()
+}
+
+func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1alpha1.Backup, out io.Writer) {
+	if len(backupPolicies) == 0 {
+		return
+	}
+	tbl := newTbl(out, "\nData Protection:", "AUTO-BACKUP", "BACKUP-SCHEDULE", "TYPE", "BACKUP-TTL", "LAST-SCHEDULE", "RECOVERABLE-TIME")
+	for _, policy := range backupPolicies {
+		if policy.Status.Phase != dpv1alpha1.PolicyAvailable {
+			continue
+		}
+		ttlString := printer.NoneString
+		backupSchedule := printer.NoneString
+		backupType := printer.NoneString
+		scheduleEnable := "Disabled"
+		if policy.Spec.Schedule.BaseBackup != nil {
+			if policy.Spec.Schedule.BaseBackup.Enable {
+				scheduleEnable = "Enabled"
+			}
+			backupSchedule = policy.Spec.Schedule.BaseBackup.CronExpression
+			backupType = string(policy.Spec.Schedule.BaseBackup.Type)
+
+		}
+		if policy.Spec.TTL != nil {
+			ttlString = *policy.Spec.TTL
+		}
+		lastScheduleTime := printer.NoneString
+		if policy.Status.LastScheduleTime != nil {
+			lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
+		}
+
+		tbl.AddRow(scheduleEnable, backupSchedule, backupType, ttlString, lastScheduleTime, getBackupRecoverableTime(backups))
+	}
+	tbl.Print()
+}
+
+// getBackupRecoverableTime return the recoverable time range string
+func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
+	recoverabelTime := dpv1alpha1.GetRecoverableTimeRange(backups)
+	var result string
+	for _, i := range recoverabelTime {
+		result = addTimeRange(result, i.StartTime, i.StopTime)
+	}
+	if result == "" {
+		return printer.NoneString
+	}
+	return result
+}
+
+func addTimeRange(result string, start, end *metav1.Time) string {
+	if result != "" {
+		result += ", "
+	}
+	result += fmt.Sprintf("%s ~ %s", util.TimeFormatWithDuration(start, time.Second),
+		util.TimeFormatWithDuration(end, time.Second))
+	return result
 }

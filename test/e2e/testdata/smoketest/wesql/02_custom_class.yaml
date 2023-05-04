@@ -1,0 +1,19 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ComponentClassDefinition
+metadata:
+  name: custom-class
+  labels:
+    class.kubeblocks.io/provider: kubeblocks
+    apps.kubeblocks.io/component-def-ref: mysql
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+spec:
+  groups:
+    - resourceConstraintRef: kb-resource-constraint-custom
+      template: |
+        cpu: "{{ or .cpu 1 }}" 
+        memory: "{{ or .memory 4 }}Gi"
+      vars: [ cpu, memory]
+      series:
+      - namingTemplate: "general-{{ .cpu }}c{{ .memory }}g"
+        classes:
+        - args: [ "0.2", "0.6"]

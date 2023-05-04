@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package component
@@ -21,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +40,6 @@ import (
 
 var _ = Describe("probe_utils", func() {
 	const backupPolicyName = "test-backup-policy"
-	const defaultTTL = "168h0m0s"
 	const backupName = "test-backup-job"
 	var backupToolName string
 
@@ -68,10 +71,9 @@ var _ = Describe("probe_utils", func() {
 		updateBackupStatus := func(backup *dataprotectionv1alpha1.Backup, backupToolName string, expectPhase dataprotectionv1alpha1.BackupPhase) {
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.BackupToolName = backupToolName
-				backup.Status.RemoteVolume = &corev1.Volume{
-					Name: "backup-pvc",
-				}
+				backup.Status.PersistentVolumeClaimName = "backup-pvc"
 				backup.Status.Phase = expectPhase
+				backup.Status.TotalSize = "1Gi"
 			})).Should(Succeed())
 		}
 
@@ -81,7 +83,6 @@ var _ = Describe("probe_utils", func() {
 				Log: logger,
 			}
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-				SetTTL(defaultTTL).
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 				Create(&testCtx).GetObject()
@@ -107,7 +108,6 @@ var _ = Describe("probe_utils", func() {
 				Log: logger,
 			}
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-				SetTTL(defaultTTL).
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
 				Create(&testCtx).GetObject()
@@ -116,6 +116,16 @@ var _ = Describe("probe_utils", func() {
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "data",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							AccessModes: []corev1.PersistentVolumeAccessMode{
+								corev1.ReadWriteOnce,
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Gi"),
+								},
+							},
 						},
 					},
 				},
@@ -137,6 +147,10 @@ var _ = Describe("probe_utils", func() {
 				Name:     backupName,
 			}
 			Expect(reflect.DeepEqual(expectDataSource, vct.Spec.DataSource)).Should(BeTrue())
+
+			By("error if request storage is less than backup storage")
+			component.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("512Mi")
+			Expect(BuildRestoredInfo(reqCtx, k8sClient, testCtx.DefaultNamespace, component, backupName)).Should(HaveOccurred())
 		})
 
 	})

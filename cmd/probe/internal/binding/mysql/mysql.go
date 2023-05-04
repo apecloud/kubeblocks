@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package mysql
@@ -36,6 +39,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	. "github.com/apecloud/kubeblocks/cmd/probe/util"
@@ -79,14 +83,15 @@ const (
 	listUserTpl  = "SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired FROM mysql.user WHERE host = '%' and user <> 'root' and user not like 'kb%';"
 	showGrantTpl = "SHOW GRANTS FOR '%s'@'%%';"
 	getUserTpl   = `
-	SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired 
-	FROM mysql.user 
+	SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired
+	FROM mysql.user
 	WHERE host = '%%' and user <> 'root' and user not like 'kb%%' and user ='%s';"
 	`
-	createUserTpl = "CREATE USER '%s'@'%%' IDENTIFIED BY '%s';"
-	deleteUserTpl = "DROP USER IF EXISTS '%s'@'%%';"
-	grantTpl      = "GRANT %s TO '%s'@'%%';"
-	revokeTpl     = "REVOKE %s FROM '%s'@'%%';"
+	createUserTpl         = "CREATE USER '%s'@'%%' IDENTIFIED BY '%s';"
+	deleteUserTpl         = "DROP USER IF EXISTS '%s'@'%%';"
+	grantTpl              = "GRANT %s TO '%s'@'%%';"
+	revokeTpl             = "REVOKE %s FROM '%s'@'%%';"
+	listSystemAccountsTpl = "SELECT user AS userName FROM mysql.user WHERE host = '%' and user like 'kb%';"
 )
 
 var (
@@ -129,6 +134,7 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.RegisterOperation(DescribeUserOp, mysqlOps.describeUserOps)
 	mysqlOps.RegisterOperation(GrantUserRoleOp, mysqlOps.grantUserRoleOps)
 	mysqlOps.RegisterOperation(RevokeUserRoleOp, mysqlOps.revokeUserRoleOps)
+	mysqlOps.RegisterOperation(ListSystemAccountsOp, mysqlOps.listSystemAccountsOps)
 	return nil
 }
 
@@ -270,15 +276,39 @@ func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.Invo
 
 func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	result := OpsResult{}
+	slaveStatus := make([]SlaveStatus, 0)
+	var err error
+
+	if mysqlOps.OriRole == "" {
+		mysqlOps.OriRole, err = mysqlOps.GetRole(ctx, req, resp)
+		if err != nil {
+			result["event"] = OperationFailed
+			result["message"] = err.Error()
+			return result, nil
+		}
+	}
+	if mysqlOps.OriRole == LEADER {
+		result["event"] = OperationSuccess
+		result["lag"] = 0
+		result["message"] = "This is leader instance, leader has no lag"
+		return result, nil
+	}
+
 	sql := "show slave status"
-	_, err := mysqlOps.query(ctx, sql)
+	data, err := mysqlOps.query(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("GetLagOps error: %v", err)
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = OperationSuccess
-		result["lag"] = 0
+		err = json.Unmarshal(data, &slaveStatus)
+		if err != nil {
+			result["event"] = OperationFailed
+			result["message"] = err.Error()
+		} else {
+			result["event"] = OperationSuccess
+			result["lag"] = slaveStatus[0].SecondsBehindMaster
+		}
 	}
 	return result, nil
 }
@@ -453,7 +483,22 @@ func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
 	}
 	values := make([]interface{}, len(columnTypes))
 	for i := range values {
-		values[i] = reflect.New(types[i]).Interface()
+		switch types[i].Kind() {
+		case reflect.String, reflect.Interface:
+			values[i] = &sql.NullString{}
+		case reflect.Bool:
+			values[i] = &sql.NullBool{}
+		case reflect.Float64:
+			values[i] = &sql.NullFloat64{}
+		case reflect.Int16, reflect.Uint16:
+			values[i] = &sql.NullInt16{}
+		case reflect.Int32, reflect.Uint32:
+			values[i] = &sql.NullInt32{}
+		case reflect.Int64, reflect.Uint64:
+			values[i] = &sql.NullInt64{}
+		default:
+			values[i] = reflect.New(types[i]).Interface()
+		}
 	}
 	return values
 }
@@ -506,6 +551,28 @@ func (mysqlOps *MysqlOperations) listUsersOps(ctx context.Context, req *bindings
 	return QueryObject(ctx, mysqlOps, req, ListUsersOp, sqlTplRend, nil, UserInfo{})
 }
 
+func (mysqlOps *MysqlOperations) listSystemAccountsOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	sqlTplRend := func(user UserInfo) string {
+		return listSystemAccountsTpl
+	}
+	dataProcessor := func(data interface{}) (interface{}, error) {
+		var users []UserInfo
+		if err := json.Unmarshal(data.([]byte), &users); err != nil {
+			return nil, err
+		}
+		userNames := make([]string, 0)
+		for _, user := range users {
+			userNames = append(userNames, user.UserName)
+		}
+		if jsonData, err := json.Marshal(userNames); err != nil {
+			return nil, err
+		} else {
+			return string(jsonData), nil
+		}
+	}
+	return QueryObject(ctx, mysqlOps, req, ListSystemAccountsOp, sqlTplRend, dataProcessor, UserInfo{})
+}
+
 func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	var (
 		object = UserInfo{}
@@ -522,16 +589,22 @@ func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *bindi
 				return nil, err
 			}
 			user := UserInfo{}
-			userRoles := make([]string, 0)
+			// only keep one role name of the highest privilege
+			userRoles := make([]RoleType, 0)
 			for _, roleMap := range roles {
 				for k, v := range roleMap {
 					if len(user.UserName) == 0 {
 						user.UserName = strings.TrimPrefix(strings.TrimSuffix(k, "@%"), "Grants for ")
 					}
-					userRoles = append(userRoles, mysqlOps.inferRoleFromPriv(strings.TrimPrefix(v, "GRANT ")))
+					mysqlRoleType := mysqlOps.priv2Role(strings.TrimPrefix(v, "GRANT "))
+					userRoles = append(userRoles, mysqlRoleType)
 				}
 			}
-			user.RoleName = strings.Join(userRoles, ",")
+			// sort roles by weight
+			slices.SortFunc(userRoles, SortRoleByWeight)
+			if len(userRoles) > 0 {
+				user.RoleName = (string)(userRoles[0])
+			}
 			if jsonData, err := json.Marshal([]UserInfo{user}); err != nil {
 				return nil, err
 			} else {
@@ -618,7 +691,7 @@ func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *bind
 		object     = UserInfo{}
 		sqlTplRend = func(user UserInfo) string {
 			// render sql stmts
-			roleDesc, _ := mysqlOps.renderRoleByName(user.RoleName)
+			roleDesc, _ := mysqlOps.role2Priv(user.RoleName)
 			// update privilege
 			sql := fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
 			return sql
@@ -636,20 +709,20 @@ func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *bind
 	return ExecuteObject(ctx, mysqlOps, req, op, sqlTplRend, msgTplRend, object)
 }
 
-func (mysqlOps *MysqlOperations) renderRoleByName(roleName string) (string, error) {
-	switch strings.ToLower(roleName) {
+func (mysqlOps *MysqlOperations) role2Priv(roleName string) (string, error) {
+	roleType := String2RoleType(roleName)
+	switch roleType {
 	case SuperUserRole:
 		return superUserPriv, nil
 	case ReadWriteRole:
 		return readWritePriv, nil
 	case ReadOnlyRole:
 		return readOnlyRPriv, nil
-	default:
-		return "", fmt.Errorf("role name: %s is not supported", roleName)
 	}
+	return "", fmt.Errorf("role name: %s is not supported", roleName)
 }
 
-func (mysqlOps *MysqlOperations) inferRoleFromPriv(priv string) string {
+func (mysqlOps *MysqlOperations) priv2Role(priv string) RoleType {
 	if strings.HasPrefix(priv, readOnlyRPriv) {
 		return ReadOnlyRole
 	}

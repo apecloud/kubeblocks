@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package playground
@@ -19,13 +22,18 @@ package playground
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -52,20 +60,20 @@ func cloudProviderRepoDir() (string, error) {
 	return filepath.Join(dir, cpDir), err
 }
 
-func initPlaygroundDir() error {
+func initPlaygroundDir() (string, error) {
 	dir, err := playgroundDir()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if _, err = os.Stat(dir); err != nil && os.IsNotExist(err) {
-		return os.MkdirAll(dir, 0750)
+		err = os.MkdirAll(dir, 0750)
 	}
-	return nil
+	return dir, err
 }
 
-// writeClusterInfoToFile writes the cluster info to a state file
-func writeClusterInfoToFile(path string, info *cp.K8sClusterInfo) error {
+// writeClusterInfo writes the cluster info to a state file
+func writeClusterInfo(path string, info *cp.K8sClusterInfo) error {
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
 	if err != nil {
 		return err
@@ -111,10 +119,44 @@ func readClusterInfoFromFile(path string) (*cp.K8sClusterInfo, error) {
 	return &info, nil
 }
 
-func stateFilePath() (string, error) {
-	dir, err := playgroundDir()
-	if err != nil {
-		return "", err
+func writeAndUseKubeConfig(kubeConfig string, kubeConfigPath string, out io.Writer) error {
+	spinner := printer.Spinner(out, fmt.Sprintf("%-50s", "Write kubeconfig to "+kubeConfigPath))
+	defer spinner(false)
+	if err := kubeConfigWrite(kubeConfig, kubeConfigPath, writeKubeConfigOptions{
+		UpdateExisting:       true,
+		UpdateCurrentContext: true,
+		OverwriteExisting:    true}); err != nil {
+		return err
 	}
-	return filepath.Join(dir, stateFileName), nil
+
+	// use the new kubeconfig file
+	if err := util.SetKubeConfig(kubeConfigPath); err != nil {
+		return err
+	}
+
+	spinner(true)
+	return nil
+}
+
+// getKubeClient returns a kubernetes dynamic client and check if the cluster is reachable
+func getKubeClient() (kubernetes.Interface, dynamic.Interface, error) {
+	f := util.NewFactory()
+	client, err := f.KubernetesClientSet()
+	errMsg := kubeClusterUnreachableErr.Error()
+	if err == genericclioptions.ErrEmptyConfig {
+		return nil, nil, kubeClusterUnreachableErr
+	}
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errMsg)
+	}
+
+	if _, err = client.ServerVersion(); err != nil {
+		return nil, nil, errors.Wrap(err, errMsg)
+	}
+
+	dynamic, err := f.DynamicClient()
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errMsg)
+	}
+	return client, dynamic, nil
 }

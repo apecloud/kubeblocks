@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package v1alpha1
@@ -112,6 +115,10 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
+	// classDefRef reference class defined in ComponentClassDefinition.
+	// +optional
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
+
 	// monitor which is a switch to enable monitoring, default is false
 	// KubeBlocks provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
@@ -166,14 +173,18 @@ type ClusterComponentSpec struct {
 	// +optional
 	SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
 
-	// tls should be enabled or not
+	// Enable or disable TLS certs.
 	// +optional
 	TLS bool `json:"tls,omitempty"`
 
-	// issuer who provides tls certs
+	// issuer defines provider context for TLS certs.
 	// required when TLS enabled
 	// +optional
 	Issuer *Issuer `json:"issuer,omitempty"`
+
+	// serviceAccountName is the name of the ServiceAccount that component runs depend on.
+	// +optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 type ComponentMessageMap map[string]string
@@ -273,11 +284,10 @@ type ClusterSwitchPolicy struct {
 }
 
 type ClusterComponentVolumeClaimTemplate struct {
-	// Ref ClusterVersion.spec.components.containers.volumeMounts.name
+	// Reference `ClusterDefinition.spec.componentDefs.containers.volumeMounts.name`.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 	// spec defines the desired characteristics of a volume requested by a pod author.
-	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
@@ -292,6 +302,7 @@ func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.Per
 type PersistentVolumeClaimSpec struct {
 	// accessModes contains the desired access modes the volume should have.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// resources represents the minimum resources the volume should have.
@@ -299,6 +310,7 @@ type PersistentVolumeClaimSpec struct {
 	// that are lower than previous value but must still be higher than capacity recorded in the
 	// status field of the claim.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	// storageClassName is the name of the StorageClass required by the claim.
@@ -371,7 +383,7 @@ type Issuer struct {
 	// +kubebuilder:validation:Required
 	Name IssuerName `json:"name"`
 
-	// secretRef, Tls certs Secret reference
+	// secretRef, TLS certs Secret reference
 	// required when from is UserProvided
 	// +optional
 	SecretRef *TLSSecretRef `json:"secretRef,omitempty"`
@@ -399,6 +411,7 @@ type TLSSecretRef struct {
 type ClusterComponentService struct {
 	// Service name
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=15
 	Name string `json:"name"`
 
 	// serviceType determines how the Service is exposed. Valid
@@ -425,6 +438,16 @@ type ClusterComponentService struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type ClassDefRef struct {
+	// name refers to the name of the ComponentClassDefinition.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// class refers to the name of the class that is defined in the ComponentClassDefinition.
+	// +kubebuilder:validation:Required
+	Class string `json:"class"`
 }
 
 // +kubebuilder:object:root=true
@@ -456,6 +479,58 @@ type ClusterList struct {
 
 func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
+}
+
+// GetVolumeClaimNames gets all PVC names of component compName
+//
+// r.Spec.GetComponentByName(compName).VolumeClaimTemplates[*].Name will be used if no claimNames provided
+//
+// nil return if:
+// 1. component compName not found or
+// 2. len(VolumeClaimTemplates)==0 or
+// 3. any claimNames not found
+func (r *Cluster) GetVolumeClaimNames(compName string, claimNames ...string) []string {
+	if r == nil {
+		return nil
+	}
+	comp := r.Spec.GetComponentByName(compName)
+	if comp == nil {
+		return nil
+	}
+	if len(comp.VolumeClaimTemplates) == 0 {
+		return nil
+	}
+	if len(claimNames) == 0 {
+		for _, template := range comp.VolumeClaimTemplates {
+			claimNames = append(claimNames, template.Name)
+		}
+	}
+	allExist := true
+	for _, name := range claimNames {
+		found := false
+		for _, template := range comp.VolumeClaimTemplates {
+			if template.Name == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			allExist = false
+			break
+		}
+	}
+	if !allExist {
+		return nil
+	}
+
+	pvcNames := make([]string, 0)
+	for _, claimName := range claimNames {
+		for i := 0; i < int(comp.Replicas); i++ {
+			pvcName := fmt.Sprintf("%s-%s-%s-%d", claimName, r.Name, compName, i)
+			pvcNames = append(pvcNames, pvcName)
+		}
+	}
+	return pvcNames
 }
 
 // GetComponentByName gets component by name.

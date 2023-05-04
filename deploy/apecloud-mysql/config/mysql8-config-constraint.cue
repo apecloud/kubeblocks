@@ -1,16 +1,19 @@
-// Copyright ApeCloud, Inc.
+//Copyright (C) 2022-2023 ApeCloud Co., Ltd
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//This file is part of KubeBlocks project
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//This program is free software: you can redistribute it and/or modify
+//it under the terms of the GNU Affero General Public License as published by
+//the Free Software Foundation, either version 3 of the License, or
+//(at your option) any later version.
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+//This program is distributed in the hope that it will be useful
+//but WITHOUT ANY WARRANTY; without even the implied warranty of
+//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//GNU Affero General Public License for more details.
+//
+//You should have received a copy of the GNU Affero General Public License
+//along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #MysqlParameter: {
 
@@ -83,7 +86,7 @@
 	// If this variable is enabled (the default), transactions are committed in the same order they are written to the binary log. If disabled, transactions may be committed in parallel.
 	binlog_order_commits?: string & "0" | "1" | "OFF" | "ON"
 
-	// Whether the server logs full or minmal rows with row-based replication.
+	// Whether the server logs full or minimal rows with row-based replication.
 	binlog_row_image?: string & "FULL" | "MINIMAL" | "NOBLOB"
 
 	// Controls whether metadata is logged using FULL or MINIMAL format. FULL causes all metadata to be logged; MINIMAL means that only metadata actually required by slave is logged. Default: MINIMAL.
@@ -165,6 +168,9 @@
 	// Write a core file if mysqld dies.
 	"core-file"?: string & "0" | "1" | "OFF" | "ON"
 
+	// xengine enable
+	"xengine"?: string & "0" | "1" | "OFF" | "ON"
+
 	// Abort a recursive common table expression if it does more than this number of iterations.
 	cte_max_recursion_depth: int & >=0 & <=4294967295 | *1000
 
@@ -181,7 +187,7 @@
 	default_password_lifetime: int & >=0 & <=65535 | *0
 
 	// The default storage engine (table type).
-	default_storage_engine?: string & "InnoDB" | "MRG_MYISAM" | "BLACKHOLE" | "CSV" | "MEMORY" | "FEDERATED" | "ARCHIVE" | "MyISAM"
+	default_storage_engine?: string & "InnoDB" | "MRG_MYISAM" | "BLACKHOLE" | "CSV" | "MEMORY" | "FEDERATED" | "ARCHIVE" | "MyISAM" | "xengine"
 
 	// Server current time zone
 	default_time_zone?: string
@@ -1526,8 +1532,8 @@
 	// For SQL window functions, determines whether to enable inversion optimization for moving window frames also for floating values.
 	windowing_use_high_precision: string & "0" | "1" | "OFF" | "ON" | *"1"
 
-	// other parmeters
-	// reference mysql parmeters
+	// other parameters
+	// reference mysql parameters
 	...
 }
 

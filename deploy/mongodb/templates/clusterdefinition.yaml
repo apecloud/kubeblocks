@@ -7,42 +7,47 @@ metadata:
 spec:
   type: mongodb
   connectionCredential:
-    username: admin
-    password: ""
+    username: root
+    password: {{ (include "mongodb.password" .) | quote  }}
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mongodb)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_mongodb)"
+    headlessEndpoint: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN):$(SVC_PORT_mongodb)"
+    headlessHost: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN)"
+    headlessPort: "$(SVC_PORT_mongodb)"
   componentDefs:
-    - name: mongos
-      scriptSpecs:
-        - name: mongodb-scripts
-          templateRef: mongodb-scripts
-          volumeName: scripts
-          namespace: {{ .Release.Namespace }}
-          defaultMode: 493
-      workloadType: Stateless
-      service:
-        ports:
-          - name: mongos
-            port: 27017
-            targetPort: mongos
-      podSpec:
-        containers:
-          - name: mongos
-            ports:
-              - name: mongos
-                containerPort: 27017
-            command:
-              - /scripts/mongos-setup.sh
-            volumeMounts:
-              - name: scripts
-                mountPath: /scripts/mongos-setup.sh
-                subPath: mongos-setup.sh
-    - name: configsvr
-      scriptSpecs:
-        - name: mongodb-scripts
-          templateRef: mongodb-scripts
-          volumeName: scripts
-          namespace: {{ .Release.Namespace }}
-          defaultMode: 493
+    - name: mongodb
       characterType: mongodb
+      scriptSpecs:
+        - name: mongodb-scripts
+          templateRef: mongodb-scripts
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 493
+      configSpecs:
+        - name: mongodb-config
+          templateRef: mongodb5.0-config-template
+          namespace: {{ .Release.Namespace }}
+          volumeName: mongodb-config
+          constraintRef: mongodb-config-constraints
+          keys:
+            - mongodb.conf
+          defaultMode: 256
+        - name: mongodb-metrics-config
+          templateRef: mongodb-metrics-config
+          namespace: {{ .Release.Namespace }}
+          volumeName: mongodb-metrics-config
+          defaultMode: 0777
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9216
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
       workloadType: Consensus
       consensusSpec:
         leader:
@@ -53,90 +58,83 @@ spec:
             accessMode: Readonly
         updateStrategy: Serial
       probes:
-        roleChangedProbe:
-          periodSeconds: 2
-          failureThreshold: 3
+        roleProbeTimeoutAfterPodsReady: 300
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       service:
         ports:
-          - name: configsvr
-            port: 27018
-            targetPort: configsvr
+          - name: mongodb
+            protocol: TCP
+            port: 27017
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         containers:
-          - name: configsvr
+          - name: mongodb
             ports:
-              - name: configsvr
-                containerPort: 27018
+              - name: mongodb
+                protocol: TCP
+                containerPort: 27017
             command:
               - /scripts/replicaset-setup.sh
-              - --configsvr
+            env:
+              - name: MONGODB_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MONGODB_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
             lifecycle:
               postStart:
                 exec:
                   command:
                     - /scripts/replicaset-post-start.sh
-                    - CONFIGSVR
-                    - "true"
+                    - MONGODB
             volumeMounts:
+              - mountPath: /data/mongodb
+                name: data
+              - mountPath: /etc/mongodb/mongodb.conf
+                name: mongodb-config
+                subPath: mongodb.conf
+              - mountPath: /etc/mongodb/keyfile
+                name: mongodb-config
+                subPath: keyfile
               - name: scripts
                 mountPath: /scripts/replicaset-setup.sh
                 subPath: replicaset-setup.sh
               - name: scripts
                 mountPath: /scripts/replicaset-post-start.sh
                 subPath: replicaset-post-start.sh
-    - name: shard
-      scriptSpecs:
-        - name: mongodb-scripts
-          templateRef: mongodb-scripts
-          volumeName: scripts
-          namespace: {{ .Release.Namespace }}
-          defaultMode: 493
-      characterType: mongodb
-      workloadType: Consensus
-      consensusSpec:
-        leader:
-          name: "primary"
-          accessMode: ReadWrite
-        followers:
-          - name: "secondary"
-            accessMode: Readonly
-        updateStrategy: BestEffortParallel
-      probes:
-        roleChangedProbe:
-          periodSeconds: 2
-          failureThreshold: 3
-      service:
-        ports:
-          - name: shard
-            port: 27018
-            targetPort: shard
-      podSpec:
-        containers:
-          - name: shard
+          - name: metrics
+            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+            env:
+              - name: MONGODB_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MONGODB_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+            command:
+              - "/bin/agamotto"
+              - "--config=/opt/conf/metrics-config.yaml"
             ports:
-              - name: shard
-                containerPort: 27018
-            command:
-              - /scripts/replicaset-setup.sh
-              - --shardsvr
-            lifecycle:
-              postStart:
-                exec:
-                  command:
-                    - /scripts/replicaset-post-start.sh
-                    - SHARD
-                    - "false"
+              - name: http-metrics
+                containerPort: 9216
             volumeMounts:
-              - name: scripts
-                mountPath: /scripts/replicaset-setup.sh
-                subPath: replicaset-setup.sh
-              - name: scripts
-                mountPath: /scripts/replicaset-post-start.sh
-                subPath: replicaset-post-start.sh
-          - name: agent
-            command:
-              - /scripts/shard-agent.sh
-            volumeMounts:
-              - name: scripts
-                mountPath: /scripts/shard-agent.sh
-                subPath: shard-agent.sh
+              - name: mongodb-metrics-config
+                mountPath: /opt/conf

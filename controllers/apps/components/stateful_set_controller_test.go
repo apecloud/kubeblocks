@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package components
@@ -101,16 +104,16 @@ var _ = Describe("StatefulSet Controller", func() {
 
 		By("Mock a pod without role label and it will wait for HandleProbeTimeoutWhenPodsReady")
 		leaderPod := pods[0]
-		Expect(testapps.ChangeObj(&testCtx, leaderPod, func() {
-			delete(leaderPod.Labels, constant.RoleLabelKey)
+		Expect(testapps.ChangeObj(&testCtx, leaderPod, func(lpod *corev1.Pod) {
+			delete(lpod.Labels, constant.RoleLabelKey)
 		})).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(leaderPod), func(g Gomega, pod *corev1.Pod) {
 			g.Expect(pod.Labels[constant.RoleLabelKey] == "").Should(BeTrue())
 		})).Should(Succeed())
 
 		By("mock restart component to trigger reconcile of StatefulSet controller")
-		Expect(testapps.ChangeObj(&testCtx, sts, func() {
-			sts.Spec.Template.Annotations = map[string]string{
+		Expect(testapps.ChangeObj(&testCtx, sts, func(lsts *appsv1.StatefulSet) {
+			lsts.Spec.Template.Annotations = map[string]string{
 				constant.RestartAnnotationKey: time.Now().Format(time.RFC3339),
 			}
 		})).Should(Succeed())
@@ -127,12 +130,12 @@ var _ = Describe("StatefulSet Controller", func() {
 			g.Expect(compStatus.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // original expecting value RebootingPhase
 			g.Expect(compStatus.PodsReady).ShouldNot(BeNil())
 			g.Expect(*compStatus.PodsReady).Should(BeTrue())
-			// REVIEW/TODO: ought add extra condtion check for RebootingPhase
+			// REVIEW/TODO: ought add extra condition check for RebootingPhase
 		})).Should(Succeed())
 
 		By("add leader role label for leaderPod to mock consensus component to be Running")
-		Expect(testapps.ChangeObj(&testCtx, leaderPod, func() {
-			leaderPod.Labels[constant.RoleLabelKey] = "leader"
+		Expect(testapps.ChangeObj(&testCtx, leaderPod, func(lpod *corev1.Pod) {
+			lpod.Labels[constant.RoleLabelKey] = "leader"
 		})).Should(Succeed())
 		return pods
 	}
@@ -155,8 +158,8 @@ var _ = Describe("StatefulSet Controller", func() {
 				}
 			})).Should(Succeed())
 			_ = testapps.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{consensusCompName})
-			Expect(testapps.ChangeObj(&testCtx, cluster, func() {
-				cluster.Annotations = map[string]string{
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
+				lcluster.Annotations = map[string]string{
 					constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"}]`, opsRequestName),
 				}
 			})).Should(Succeed())
@@ -180,12 +183,12 @@ var _ = Describe("StatefulSet Controller", func() {
 			})()).Should(Succeed())
 
 			By("mock stop operation and processed successfully")
-			Expect(testapps.ChangeObj(&testCtx, cluster, func() {
-				cluster.Spec.ComponentSpecs[0].Replicas = 0
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
+				lcluster.Spec.ComponentSpecs[0].Replicas = 0
 			})).Should(Succeed())
-			Expect(testapps.ChangeObj(&testCtx, sts, func() {
+			Expect(testapps.ChangeObj(&testCtx, sts, func(lsts *appsv1.StatefulSet) {
 				replicas := int32(0)
-				sts.Spec.Replicas = &replicas
+				lsts.Spec.Replicas = &replicas
 			})).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				testk8s.MockStatefulSetReady(sts)

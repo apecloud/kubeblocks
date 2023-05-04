@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package plan
@@ -32,6 +35,15 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+)
+
+const (
+	mysqlCompDefName = "replicasets"
+	mysqlCompName    = "mysql"
+	nginxCompDefName = "nginx"
+	nginxCompName    = "nginx"
+	redisCompDefName = "replicasets"
+	redisCompName    = "redis"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -73,21 +85,17 @@ var _ = Describe("Cluster Controller", func() {
 	)
 
 	Context("with Deployment workload", func() {
-		const (
-			nginxCompType = "nginx"
-			nginxCompName = "nginx"
-		)
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(nginxCompType).
+				AddComponentVersion(nginxCompDefName).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(nginxCompType, nginxCompName).
+				AddComponent(nginxCompDefName, nginxCompName).
 				GetObject()
 		})
 
@@ -116,22 +124,18 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	Context("with Stateful workload and without config template", func() {
-		const (
-			mysqlCompType = "replicasets"
-			mysqlCompName = "mysql"
-		)
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompType).
+				AddComponentVersion(mysqlCompDefName).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
@@ -165,10 +169,6 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	Context("with Stateful workload and with config template", func() {
-		const (
-			mysqlCompType = "replicasets"
-			mysqlCompName = "mysql"
-		)
 		BeforeEach(func() {
 			cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
@@ -177,17 +177,17 @@ var _ = Describe("Cluster Controller", func() {
 				&appsv1alpha1.ConfigConstraint{})
 
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config").
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompType).
+				AddComponentVersion(mysqlCompDefName).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
@@ -217,10 +217,6 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	Context("with Stateful workload and with config template and with config volume mount", func() {
-		const (
-			mysqlCompType = "replicasets"
-			mysqlCompName = "mysql"
-		)
 		BeforeEach(func() {
 			cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
@@ -229,18 +225,18 @@ var _ = Describe("Cluster Controller", func() {
 				&appsv1alpha1.ConfigConstraint{})
 
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config").
 				AddContainerVolumeMounts("mysql", []corev1.VolumeMount{{Name: "mysql-config", MountPath: "/mnt/config"}}).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompType).
+				AddComponentVersion(mysqlCompDefName).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
@@ -278,12 +274,6 @@ var _ = Describe("Cluster Controller", func() {
 
 	// for test GetContainerWithVolumeMount
 	Context("with Consensus workload and with external service", func() {
-		const (
-			mysqlCompType = "replicasets"
-			mysqlCompName = "mysql"
-			nginxCompType = "proxy"
-		)
-
 		var (
 			clusterDef     *appsv1alpha1.ClusterDefinition
 			clusterVersion *appsv1alpha1.ClusterVersion
@@ -292,19 +282,19 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
-				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
+				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(mysqlCompType).
+				AddComponentVersion(mysqlCompDefName).
 				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				AddComponent(nginxCompType).
+				AddComponentVersion(nginxCompDefName).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
@@ -335,12 +325,6 @@ var _ = Describe("Cluster Controller", func() {
 
 	// for test GetContainerWithVolumeMount
 	Context("with Replications workload without pvc", func() {
-		const (
-			redisCompType = "replicasets"
-			redisCompName = "redis"
-			nginxCompType = "proxy"
-		)
-
 		var (
 			clusterDef     *appsv1alpha1.ClusterDefinition
 			clusterVersion *appsv1alpha1.ClusterVersion
@@ -349,24 +333,24 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, redisCompType).
-				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+				AddComponentDef(testapps.ReplicationRedisComponent, redisCompDefName).
+				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(redisCompType).
+				AddComponentVersion(redisCompDefName).
 				AddContainerShort("redis", testapps.DefaultRedisImageName).
-				AddComponent(nginxCompType).
+				AddComponentVersion(nginxCompDefName).
 				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
-				AddComponent(redisCompName, redisCompType).
+				AddComponent(redisCompName, redisCompDefName).
 				SetReplicas(2).
 				SetPrimaryIndex(0).
 				GetObject()
 		})
 
-		It("should construct env, headless service, statefuset objects for each replica, besides an external service object", func() {
+		It("should construct env, headless service, statefuset object, besides an external service object", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -382,79 +366,71 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
 			resources := *task.Resources
-			Expect(len(resources)).Should(Equal(7))
+			// REVIEW: (free6om)
+			//  missing connection credential, TLS secret objs check?
+			Expect(resources).Should(HaveLen(4))
 			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
 			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
 			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("StatefulSet"))
-			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("ConfigMap"))
-			Expect(reflect.TypeOf(resources[4]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[5]).String()).Should(ContainSubstring("StatefulSet"))
-			Expect(reflect.TypeOf(resources[6]).String()).Should(ContainSubstring("Service"))
+			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("Service"))
 		})
 	})
 
-	// for test GetContainerWithVolumeMount
-	Context("with Replications workload with pvc", func() {
-		const (
-			redisCompType = "replicasets"
-			redisCompName = "redis"
-			nginxCompType = "proxy"
-		)
-
-		var (
-			clusterDef     *appsv1alpha1.ClusterDefinition
-			clusterVersion *appsv1alpha1.ClusterVersion
-			cluster        *appsv1alpha1.Cluster
-		)
-
-		BeforeEach(func() {
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, redisCompType).
-				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
-				GetObject()
-			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(redisCompType).
-				AddContainerShort("redis", testapps.DefaultRedisImageName).
-				AddComponent(nginxCompType).
-				AddContainerShort("nginx", testapps.NginxImage).
-				GetObject()
-			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDef.Name, clusterVersion.Name).
-				AddComponent(redisCompName, redisCompType).
-				SetReplicas(2).
-				SetPrimaryIndex(0).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				GetObject()
-		})
-
-		It("should construct pvc objects for each replica", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}
-			component := component.BuildComponent(
-				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
-				&clusterVersion.Spec.ComponentVersions[0])
-			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
-			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
-
-			resources := *task.Resources
-			Expect(len(resources)).Should(Equal(9))
-			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
-			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("PersistentVolumeClaim"))
-			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("StatefulSet"))
-			Expect(reflect.TypeOf(resources[4]).String()).Should(ContainSubstring("ConfigMap"))
-			Expect(reflect.TypeOf(resources[5]).String()).Should(ContainSubstring("PersistentVolumeClaim"))
-			Expect(reflect.TypeOf(resources[6]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[7]).String()).Should(ContainSubstring("StatefulSet"))
-			Expect(reflect.TypeOf(resources[8]).String()).Should(ContainSubstring("Service"))
-		})
-	})
+	// TODO: (free6om)
+	//  uncomment following test case until pre-provisoned PVC work begin
+	// // for test GetContainerWithVolumeMount
+	// Context("with Replications workload with pvc", func() {
+	// 	var (
+	// 		clusterDef     *appsv1alpha1.ClusterDefinition
+	// 		clusterVersion *appsv1alpha1.ClusterVersion
+	// 		cluster        *appsv1alpha1.Cluster
+	// 	)
+	//
+	// 	BeforeEach(func() {
+	// 		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
+	// 			AddComponentDef(testapps.ReplicationRedisComponent, redisCompDefName).
+	// 			AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
+	// 			GetObject()
+	// 		clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+	// 			AddComponentVersion(redisCompDefName).
+	// 			AddContainerShort("redis", testapps.DefaultRedisImageName).
+	// 			AddComponentVersion(nginxCompDefName).
+	// 			AddContainerShort("nginx", testapps.NginxImage).
+	// 			GetObject()
+	// 		pvcSpec := testapps.NewPVCSpec("1Gi")
+	// 		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+	// 			clusterDef.Name, clusterVersion.Name).
+	// 			AddComponentVersion(redisCompName, redisCompDefName).
+	// 			SetReplicas(2).
+	// 			SetPrimaryIndex(0).
+	// 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+	// 			GetObject()
+	// 	})
+	//
+	// 	It("should construct pvc objects for each replica", func() {
+	// 		reqCtx := intctrlutil.RequestCtx{
+	// 			Ctx: ctx,
+	// 			Log: logger,
+	// 		}
+	// 		component := component.BuildComponent(
+	// 			reqCtx,
+	// 			*cluster,
+	// 			*clusterDef,
+	// 			clusterDef.Spec.ComponentDefs[0],
+	// 			cluster.Spec.ComponentSpecs[0],
+	// 			&clusterVersion.Spec.ComponentVersions[0])
+	// 		task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
+	// 		Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
+	//
+	// 		resources := *task.Resources
+	// 		Expect(resources).Should(HaveLen(6))
+	// 		Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
+	// 		Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
+	// 		Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("PersistentVolumeClaim"))
+	// 		Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("PersistentVolumeClaim"))
+	// 		Expect(reflect.TypeOf(resources[4]).String()).Should(ContainSubstring("StatefulSet"))
+	// 		Expect(reflect.TypeOf(resources[5]).String()).Should(ContainSubstring("Service"))
+	// 	})
+	// })
 
 })

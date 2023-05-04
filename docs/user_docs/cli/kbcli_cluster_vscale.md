@@ -13,18 +13,23 @@ kbcli cluster vscale [flags]
 ```
   # scale the computing resources of specified components, separate with commas when <component-name> more than one
   kbcli cluster vscale <my-cluster> --components=<component-name> --cpu=500m --memory=500Mi
+  
+  # scale the computing resources of specified components by class, available classes can be get by executing the command "kbcli class list --cluster-definition <cluster-definition-name>"
+  kbcli cluster vscale <my-cluster> --components=<component-name> --class=<class-name>
 ```
 
 ### Options
 
 ```
-      --class string                 Component class
-      --components strings            Component names to this operations
-      --cpu string                   Requested and limited size of component cpu
-  -h, --help                         help for vscale
-      --memory string                Requested and limited size of component memory
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+      --class string                   Component class
+      --components strings              Component names to this operations
+      --cpu string                     Requested and limited size of component cpu
+      --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+  -h, --help                           help for vscale
+      --memory string                  Requested and limited size of component memory
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands

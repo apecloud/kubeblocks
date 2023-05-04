@@ -1,23 +1,27 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-	http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -32,8 +36,8 @@ const (
 	ScriptsVolumeName   = "scripts"
 	ServiceDefaultName  = ""
 	ServiceHeadlessName = "headless"
-	ServiceVPCName      = "a-vpc-lb-service-for-app"
-	ServiceInternetName = "a-internet-lb-service-for-app"
+	ServiceVPCName      = "vpc-lb"
+	ServiceInternetName = "internet-lb"
 
 	ReplicationPodRoleVolume       = "pod-role"
 	ReplicationRoleLabelFieldPath  = "metadata.labels['kubeblocks.io/role']"
@@ -48,11 +52,15 @@ const (
 	DefaultNginxContainerName = "nginx"
 
 	RedisType                     = "state.redis"
-	DefaultRedisCompType          = "redis"
+	DefaultRedisCompDefName       = "redis"
 	DefaultRedisCompName          = "redis-rsts"
 	DefaultRedisImageName         = "redis:7.0.5"
 	DefaultRedisContainerName     = "redis"
 	DefaultRedisInitContainerName = "redis-init-container"
+
+	Class1c1gName                 = "general-1c1g"
+	Class2c4gName                 = "general-2c4g"
+	DefaultResourceConstraintName = "kb-resource-constraint"
 )
 
 var (
@@ -73,15 +81,16 @@ var (
 	}
 
 	defaultConnectionCredential = map[string]string{
-		"username":      "root",
-		"SVC_FQDN":      "$(SVC_FQDN)",
-		"RANDOM_PASSWD": "$(RANDOM_PASSWD)",
-		"tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
-		"paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
-		"UUID":          "$(UUID)",
-		"UUID_B64":      "$(UUID_B64)",
-		"UUID_STR_B64":  "$(UUID_STR_B64)",
-		"UUID_HEX":      "$(UUID_HEX)",
+		"username":          "root",
+		"SVC_FQDN":          "$(SVC_FQDN)",
+		"HEADLESS_SVC_FQDN": "$(HEADLESS_SVC_FQDN)",
+		"RANDOM_PASSWD":     "$(RANDOM_PASSWD)",
+		"tcpEndpoint":       "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
+		"paxosEndpoint":     "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
+		"UUID":              "$(UUID)",
+		"UUID_B64":          "$(UUID_B64)",
+		"UUID_STR_B64":      "$(UUID_STR_B64)",
+		"UUID_HEX":          "$(UUID_HEX)",
 	}
 
 	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
@@ -187,7 +196,7 @@ var (
 		CharacterType: "mysql",
 		ConsensusSpec: &defaultConsensusSpec,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleChangedProbe: &appsv1alpha1.ClusterDefinitionProbe{
+			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 				FailureThreshold: 3,
 				PeriodSeconds:    1,
 				TimeoutSeconds:   5,
@@ -284,5 +293,42 @@ var (
 			InitContainers: []corev1.Container{defaultRedisInitContainer},
 			Containers:     []corev1.Container{defaultRedisContainer},
 		},
+	}
+
+	Class1c1g = appsv1alpha1.ComponentClass{
+		Name:   Class1c1gName,
+		CPU:    resource.MustParse("1"),
+		Memory: resource.MustParse("1Gi"),
+		Volumes: []appsv1alpha1.Volume{
+			{
+				Name: "data",
+				Size: resource.MustParse("20Gi"),
+			},
+			{
+				Name: "log",
+				Size: resource.MustParse("10Gi"),
+			},
+		},
+	}
+
+	Class2c4g = appsv1alpha1.ComponentClass{
+		Name:   Class2c4gName,
+		CPU:    resource.MustParse("2"),
+		Memory: resource.MustParse("4Gi"),
+		Volumes: []appsv1alpha1.Volume{
+			{
+				Name: "data",
+				Size: resource.MustParse("20Gi"),
+			},
+			{
+				Name: "log",
+				Size: resource.MustParse("10Gi"),
+			},
+		},
+	}
+
+	DefaultClasses = map[string]appsv1alpha1.ComponentClass{
+		Class1c1gName: Class1c1g,
+		Class2c4gName: Class2c4g,
 	}
 )

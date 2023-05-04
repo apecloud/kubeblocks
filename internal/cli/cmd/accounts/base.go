@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package accounts
@@ -26,9 +29,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	klog "k8s.io/klog/v2"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	clusterutil "github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -36,7 +40,6 @@ import (
 )
 
 type AccountBaseOptions struct {
-	Namespace     string
 	ClusterName   string
 	CharType      string
 	ComponentName string
@@ -49,12 +52,13 @@ type AccountBaseOptions struct {
 }
 
 var (
-	errClusterNameNum     = fmt.Errorf("please specify ONE cluster-name at a time")
-	errMissingUserName    = fmt.Errorf("please specify username")
-	errMissingRoleName    = fmt.Errorf("please specify at least ONE role name")
-	errInvalidRoleName    = fmt.Errorf("invalid role name, should be one of [SUPERUSER, READWRITE, READONLY] ")
-	errInvalidOp          = fmt.Errorf("invalid operation")
-	errCompNameOrInstName = fmt.Errorf("please specify either --component-name or --instance, not both")
+	errClusterNameNum        = fmt.Errorf("please specify ONE cluster-name at a time")
+	errMissingUserName       = fmt.Errorf("please specify username")
+	errMissingRoleName       = fmt.Errorf("please specify at least ONE role name")
+	errInvalidRoleName       = fmt.Errorf("invalid role name, should be one of [SUPERUSER, READWRITE, READONLY] ")
+	errInvalidOp             = fmt.Errorf("invalid operation")
+	errCompNameOrInstName    = fmt.Errorf("please specify either --component or --instance, not both")
+	errClusterNameorInstName = fmt.Errorf("specify either cluster name or --instance")
 )
 
 func NewAccountBaseOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op bindings.OperationKind) *AccountBaseOptions {
@@ -65,29 +69,33 @@ func NewAccountBaseOptions(f cmdutil.Factory, streams genericclioptions.IOStream
 }
 
 func (o *AccountBaseOptions) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.ComponentName, "component-name", "", "Specify the name of component to be connected. If not specified, the first component will be used.")
+	cmd.Flags().StringVar(&o.ComponentName, "component", "", "Specify the name of component to be connected. If not specified, the first component will be used.")
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "Specify the name of instance to be connected.")
 }
 
 func (o *AccountBaseOptions) Validate(args []string) error {
-	if len(args) != 1 {
+	if len(args) > 1 {
 		return errClusterNameNum
-	} else {
-		o.ClusterName = args[0]
 	}
 
-	if len(o.PodName) > 0 && len(o.ComponentName) > 0 {
-		return errCompNameOrInstName
+	if len(o.PodName) > 0 {
+		if len(o.ComponentName) > 0 {
+			return errCompNameOrInstName
+		}
+		if len(args) > 0 {
+			return errClusterNameorInstName
+		}
+	} else if len(args) == 0 {
+		return errClusterNameorInstName
+	}
+	if len(args) == 1 {
+		o.ClusterName = args[0]
 	}
 	return nil
 }
 
 func (o *AccountBaseOptions) Complete(f cmdutil.Factory) error {
 	var err error
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
 	err = o.ExecOptions.Complete()
 	if err != nil {
 		return err
@@ -96,27 +104,36 @@ func (o *AccountBaseOptions) Complete(f cmdutil.Factory) error {
 	ctx, cancelFn := context.WithCancel(context.Background())
 	defer cancelFn()
 
-	compInfo, err := fillCompInfoByName(ctx, o.ExecOptions.Dynamic, o.Namespace, o.ClusterName, o.ComponentName)
+	if len(o.PodName) > 0 {
+		// get pod by name
+		o.Pod, err = o.ExecOptions.Client.CoreV1().Pods(o.Namespace).Get(ctx, o.PodName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		o.ClusterName = clusterutil.GetPodClusterName(o.Pod)
+		o.ComponentName = clusterutil.GetPodComponentName(o.Pod)
+	}
+
+	compInfo, err := clusterutil.FillCompInfoByName(ctx, o.ExecOptions.Dynamic, o.Namespace, o.ClusterName, o.ComponentName)
 	if err != nil {
 		return err
 	}
 	// fill component name
 	if len(o.ComponentName) == 0 {
-		o.ComponentName = compInfo.comp.Name
+		o.ComponentName = compInfo.Component.Name
 	}
 	// fill character type
-	o.CharType = compInfo.compDef.CharacterType
+	o.CharType = compInfo.ComponentDef.CharacterType
 
-	// fill pod name
 	if len(o.PodName) == 0 {
-		if o.PodName, err = compInfo.inferPodName(); err != nil {
+		if o.PodName, err = compInfo.InferPodName(); err != nil {
 			return err
 		}
-	}
-	// get pod by name
-	o.Pod, err = o.ExecOptions.Client.CoreV1().Pods(o.Namespace).Get(ctx, o.PodName, metav1.GetOptions{})
-	if err != nil {
-		return err
+		// get pod by name
+		o.Pod, err = o.ExecOptions.Client.CoreV1().Pods(o.Namespace).Get(ctx, o.PodName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 	}
 
 	o.ExecOptions.Pod = o.Pod
@@ -130,10 +147,13 @@ func (o *AccountBaseOptions) Complete(f cmdutil.Factory) error {
 	return nil
 }
 
-func (o *AccountBaseOptions) Run(f cmdutil.Factory, streams genericclioptions.IOStreams) error {
+func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams genericclioptions.IOStreams) error {
 	var err error
 	response, err := o.Do()
 	if err != nil {
+		if sqlchannel.IsUnSupportedError(err) {
+			return fmt.Errorf("command `%s` on characterType `%s` (defined in cluster: %s, component: %s) is not supported yet", cmd.Use, o.CharType, o.ClusterName, o.ComponentName)
+		}
 		return err
 	}
 
@@ -171,13 +191,13 @@ func (o *AccountBaseOptions) Run(f cmdutil.Factory, streams genericclioptions.IO
 func (o *AccountBaseOptions) Do() (sqlchannel.SQLChannelResponse, error) {
 	klog.V(1).Info(fmt.Sprintf("connect to cluster %s, component %s, instance %s\n", o.ClusterName, o.ComponentName, o.PodName))
 	response := sqlchannel.SQLChannelResponse{}
-	sqlClient, err := sqlchannel.NewHTTPClientWithPod(o.ExecOptions, o.Pod, o.CharType)
+	sqlClient, err := sqlchannel.NewHTTPClientWithChannelPod(o.Pod, o.CharType)
 	if err != nil {
 		return response, err
 	}
 
 	request := sqlchannel.SQLChannelRequest{Operation: (string)(o.AccountOp), Metadata: o.RequestMeta}
-	response, err = sqlClient.SendRequest(request)
+	response, err = sqlClient.SendRequest(o.ExecOptions, request)
 	return response, err
 }
 
@@ -208,14 +228,14 @@ func (o *AccountBaseOptions) printUserInfo(response sqlchannel.SQLChannelRespons
 		o.printGeneralInfo(response)
 		return nil
 	}
-	// decode user info from metatdata
+	// decode user info from metadata
 	users := []sqlchannel.UserInfo{}
 	err := json.Unmarshal([]byte(response.Message), &users)
 	if err != nil {
 		return err
 	}
 
-	// render user info with username and pasword expired boolean
+	// render user info with username and password expired boolean
 	tblPrinter := o.newTblPrinterWithStyle("USER INFO", []interface{}{"USERNAME", "EXPIRED"})
 	for _, user := range users {
 		tblPrinter.AddRow(user.UserName, user.Expired)
@@ -231,7 +251,7 @@ func (o *AccountBaseOptions) printRoleInfo(response sqlchannel.SQLChannelRespons
 		return nil
 	}
 
-	// decode role info from metatdata
+	// decode role info from metadata
 	users := []sqlchannel.UserInfo{}
 	err := json.Unmarshal([]byte(response.Message), &users)
 	if err != nil {

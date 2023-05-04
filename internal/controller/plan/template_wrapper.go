@@ -1,23 +1,28 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package plan
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -62,7 +67,7 @@ func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *a
 	}
 }
 
-func (wrapper *renderWrapper) enableRerenderTemplateSpec(cfgCMName string, task *intctrltypes.ReconcileTask) (bool, error) {
+func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, task *intctrltypes.ReconcileTask) (bool, *corev1.ConfigMap, error) {
 	cmKey := client.ObjectKey{
 		Name:      cfgCMName,
 		Namespace: wrapper.cluster.Namespace,
@@ -71,48 +76,50 @@ func (wrapper *renderWrapper) enableRerenderTemplateSpec(cfgCMName string, task 
 	cmObj := &corev1.ConfigMap{}
 	localObject := task.GetLocalResourceWithObjectKey(cmKey, generics.ToGVK(cmObj))
 	if localObject != nil {
-		return false, nil
+		if cm, ok := localObject.(*corev1.ConfigMap); ok {
+			return false, cm, nil
+		}
 	}
 
 	cmErr := wrapper.cli.Get(wrapper.ctx, cmKey, cmObj)
 	if cmErr != nil && !apierrors.IsNotFound(cmErr) {
 		// An unexpected error occurs
-		return false, cmErr
+		return false, nil, cmErr
 	}
 	if cmErr != nil {
 		// Config is not exists
-		return true, nil
+		return true, nil, nil
 	}
 
 	// Config is exists
-	return cfgcore.IsNotUserReconfigureOperation(cmObj), nil
+	return cfgcore.IsNotUserReconfigureOperation(cmObj), cmObj, nil
 }
 
 func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileTask) error {
-	var err error
-	var enableRerender bool
-
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, configSpec := range task.Component.ConfigTemplates {
 		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, configSpec.Name)
-		if enableRerender, err = wrapper.enableRerenderTemplateSpec(cmName, task); err != nil {
+		enableRerender, origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, task)
+		if err != nil {
 			return err
 		}
 		if !enableRerender {
+			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj)
 			continue
 		}
-
 		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef, configSpec.ComponentTemplateSpec,
+		newCMObj, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef, configSpec.ComponentTemplateSpec,
 			wrapper.params, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
 				return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
 			})
 		if err != nil {
 			return err
 		}
-		updateCMConfigSpecLabels(cm, configSpec)
-
-		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, cm, scheme); err != nil {
+		if err := wrapper.checkAndPatchConfigResource(origCMObj, newCMObj.Data); err != nil {
+			return err
+		}
+		updateCMConfigSpecLabels(newCMObj, configSpec)
+		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
 			return err
 		}
 	}
@@ -123,10 +130,12 @@ func (wrapper *renderWrapper) renderScriptTemplate(task *intctrltypes.ReconcileT
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, templateSpec := range task.Component.ScriptTemplates {
 		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, templateSpec.Name)
-		if task.GetLocalResourceWithObjectKey(client.ObjectKey{
+		object := task.GetLocalResourceWithObjectKey(client.ObjectKey{
 			Name:      cmName,
 			Namespace: wrapper.cluster.Namespace,
-		}, generics.ToGVK(&corev1.ConfigMap{})) != nil {
+		}, generics.ToGVK(&corev1.ConfigMap{}))
+		if object != nil {
+			wrapper.addVolumeMountMeta(templateSpec, object)
 			continue
 		}
 
@@ -150,12 +159,37 @@ func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.Compon
 	}
 
 	cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
-
-	cmName := cm.Name
-	wrapper.volumes[cmName] = templateSpec
-	wrapper.renderedObjs = append(wrapper.renderedObjs, cm)
-	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = cmName
+	wrapper.addVolumeMountMeta(templateSpec, cm)
 	return nil
+}
+
+func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.ComponentTemplateSpec, object client.Object) {
+	wrapper.volumes[object.GetName()] = templateSpec
+	wrapper.renderedObjs = append(wrapper.renderedObjs, object)
+	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = object.GetName()
+}
+
+func (wrapper *renderWrapper) checkAndPatchConfigResource(origCMObj *corev1.ConfigMap, newData map[string]string) error {
+	if origCMObj == nil {
+		return nil
+	}
+	if reflect.DeepEqual(origCMObj.Data, newData) {
+		return nil
+	}
+
+	patch := client.MergeFrom(origCMObj.DeepCopy())
+	origCMObj.Data = newData
+	if origCMObj.Annotations == nil {
+		origCMObj.Annotations = make(map[string]string)
+	}
+	cfgcore.SetParametersUpdateSource(origCMObj, constant.ReconfigureManagerSource)
+	rawData, err := json.Marshal(origCMObj.Data)
+	if err != nil {
+		return err
+	}
+
+	origCMObj.Annotations[corev1.LastAppliedConfigAnnotation] = string(rawData)
+	return wrapper.cli.Patch(wrapper.ctx, origCMObj, patch)
 }
 
 func updateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {

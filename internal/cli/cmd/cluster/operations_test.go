@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -21,8 +24,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -32,7 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -56,8 +56,11 @@ var _ = Describe("operations", func() {
 		clusterWithOneComp.Spec.ComponentSpecs = []appsv1alpha1.ClusterComponentSpec{
 			clusterWithOneComp.Spec.ComponentSpecs[0],
 		}
+		classDef := testapps.NewComponentClassDefinitionFactory("custom", clusterWithOneComp.Spec.ClusterDefRef, testing.ComponentDefName).
+			AddClasses(testapps.DefaultResourceConstraintName, []string{testapps.Class1c1gName}).
+			GetObject()
 		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(),
-			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp)
+			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp, classDef)
 		tf.Client = &clientfake.RESTClient{}
 	})
 
@@ -109,6 +112,39 @@ var _ = Describe("operations", func() {
 		Expect(o.Validate()).Should(Succeed())
 	})
 
+	It("Vscale Ops", func() {
+		o := initCommonOperationOps(appsv1alpha1.VerticalScalingType, clusterName1, true)
+		By("test CompleteComponentsFlag function")
+		o.ComponentNames = nil
+		By("expect to auto complete components when cluster has only one component")
+		Expect(o.CompleteComponentsFlag()).Should(Succeed())
+		Expect(o.ComponentNames[0]).Should(Equal(testing.ComponentName))
+
+		By("validate invalid class")
+		o.Class = "class-not-exists"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).Should(HaveOccurred())
+
+		By("expect to validate success with class")
+		o.Class = testapps.Class1c1gName
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).ShouldNot(HaveOccurred())
+
+		By("validate invalid resource")
+		o.Class = ""
+		o.CPU = "100"
+		o.Memory = "100Gi"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).Should(HaveOccurred())
+
+		By("expect to validate success with resource")
+		o.Class = ""
+		o.CPU = "1"
+		o.Memory = "1Gi"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).ShouldNot(HaveOccurred())
+	})
+
 	It("Hscale Ops", func() {
 		o := initCommonOperationOps(appsv1alpha1.HorizontalScalingType, clusterName1, true)
 		By("test CompleteComponentsFlag function")
@@ -147,58 +183,6 @@ var _ = Describe("operations", func() {
 		restartCmd.Run(restartCmd, []string{clusterName})
 		capturedOutput, _ := done()
 		Expect(testing.ContainExpectStrings(capturedOutput, "kbcli cluster describe-ops")).Should(BeTrue())
-	})
-
-	It("check params for reconfiguring operations", func() {
-		const (
-			ns                 = "default"
-			clusterDefName     = "test-clusterdef"
-			clusterVersionName = "test-clusterversion"
-			clusterName        = "test-cluster"
-			statefulCompType   = "replicasets"
-			statefulCompName   = "mysql"
-			configSpecName     = "mysql-config-tpl"
-			configVolumeName   = "mysql-config"
-		)
-
-		By("Create configmap and config constraint obj")
-		configmap := testapps.NewCustomizedObj("resources/mysql-config-template.yaml", &corev1.ConfigMap{}, testapps.WithNamespace(ns))
-		constraint := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
-			&appsv1alpha1.ConfigConstraint{})
-		componentConfig := testapps.NewConfigMap(ns, cfgcore.GetComponentCfgName(clusterName, statefulCompName, configSpecName), testapps.SetConfigMapData("my.cnf", ""))
-		By("Create a clusterDefinition obj")
-		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
-			AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, ns, configVolumeName).
-			GetObject()
-		By("Create a clusterVersion obj")
-		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(statefulCompType).
-			GetObject()
-		By("creating a cluster")
-		clusterObj := testapps.NewClusterFactory(ns, clusterName,
-			clusterDefObj.Name, "").
-			AddComponent(statefulCompName, statefulCompType).GetObject()
-
-		objs := []runtime.Object{configmap, constraint, clusterDefObj, clusterVersionObj, clusterObj, componentConfig}
-		ttf, o := NewFakeOperationsOptions(ns, clusterObj.Name, appsv1alpha1.ReconfiguringType, objs...)
-		defer ttf.Cleanup()
-		o.ComponentNames = []string{"replicasets", "proxy"}
-		By("validate reconfiguring when multi components")
-		Expect(o.Validate()).To(MatchError("reconfiguring only support one component."))
-
-		By("validate reconfiguring parameter")
-		o.ComponentNames = []string{statefulCompName}
-		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
-		o.Parameters = []string{"abcd"}
-
-		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("updated parameter format"))
-		o.Parameters = []string{"abcd=test"}
-		o.CfgTemplateName = configSpecName
-		o.IOStreams = streams
-		in.Write([]byte(o.Name + "\n"))
-
-		Expect(o.Validate()).Should(Succeed())
 	})
 
 	It("list and delete operations", func() {

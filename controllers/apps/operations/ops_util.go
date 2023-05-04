@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package operations
@@ -42,10 +45,10 @@ type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 
 type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationStatus) error
 
-// ReconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
+// reconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // if OpsRequest.spec.componentOps is not null, you can use it to OpsBehaviour.ReconcileAction.
 // return the OpsRequest.status.phase
-func ReconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
+func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	opsMessageKey string,
@@ -55,7 +58,7 @@ func ReconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		return "", 0, nil
 	}
 	opsRequestPhase := appsv1alpha1.OpsRunningPhase
-	clusterDef, err := GetClusterDefByName(reqCtx.Ctx, cli,
+	clusterDef, err := getClusterDefByName(reqCtx.Ctx, cli,
 		opsRes.Cluster.Spec.ClusterDefRef)
 	if err != nil {
 		return opsRequestPhase, 0, err
@@ -68,7 +71,7 @@ func ReconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		completedProgressCount   int32
 		checkAllClusterComponent bool
 	)
-	componentNameMap := opsRequest.GetComponentNameMap()
+	componentNameMap := opsRequest.GetComponentNameSet()
 	// if no specified components, we should check the all components phase of cluster.
 	if len(componentNameMap) == 0 {
 		checkAllClusterComponent = true
@@ -78,7 +81,7 @@ func ReconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	}
-	opsIsCompleted := opsRequestIsComponent(*opsRes)
+	opsIsCompleted := opsRequestHasProcessed(*opsRes)
 	for k, v := range opsRes.Cluster.Status.Components {
 		if _, ok = componentNameMap[k]; !ok && !checkAllClusterComponent {
 			continue
@@ -131,14 +134,14 @@ func ReconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	return appsv1alpha1.OpsSucceedPhase, 0, nil
 }
 
-// opsRequestIsComponent checks if the opsRequest is completed.
-func opsRequestIsComponent(opsRes OpsResource) bool {
+// opsRequestHasProcessed checks if the opsRequest has processed.
+func opsRequestHasProcessed(opsRes OpsResource) bool {
 	return opsRes.ToClusterPhase != opsRes.Cluster.Status.Phase &&
 		opsRes.Cluster.Status.ObservedGeneration >= opsRes.OpsRequest.Status.ClusterGeneration
 }
 
-// GetClusterDefByName gets the ClusterDefinition object by the name.
-func GetClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1alpha1.ClusterDefinition, error) {
+// getClusterDefByName gets the ClusterDefinition object by the name.
+func getClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1alpha1.ClusterDefinition, error) {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: clusterDefName}, clusterDef); err != nil {
 		return nil, err
@@ -151,7 +154,7 @@ func opsRequestIsCompleted(phase appsv1alpha1.OpsPhase) bool {
 	return slices.Index([]appsv1alpha1.OpsPhase{appsv1alpha1.OpsFailedPhase, appsv1alpha1.OpsSucceedPhase}, phase) != -1
 }
 
-func PatchOpsStatusWithOpsDeepCopy(ctx context.Context,
+func patchOpsStatusWithOpsDeepCopy(ctx context.Context,
 	cli client.Client,
 	opsRes *OpsResource,
 	opsRequestDeepCopy *appsv1alpha1.OpsRequest,
@@ -192,7 +195,7 @@ func PatchOpsStatus(ctx context.Context,
 	opsRes *OpsResource,
 	phase appsv1alpha1.OpsPhase,
 	condition ...*metav1.Condition) error {
-	return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsRes.OpsRequest.DeepCopy(), phase, condition...)
+	return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsRes.OpsRequest.DeepCopy(), phase, condition...)
 }
 
 // PatchClusterNotFound patches ClusterNotFound condition to the OpsRequest.status.conditions.
@@ -209,8 +212,8 @@ func patchOpsHandlerNotSupported(ctx context.Context, cli client.Client, opsRes 
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
 
-// PatchValidateErrorCondition patches ValidateError condition to the OpsRequest.status.conditions.
-func PatchValidateErrorCondition(ctx context.Context, cli client.Client, opsRes *OpsResource, errMessage string) error {
+// patchValidateErrorCondition patches ValidateError condition to the OpsRequest.status.conditions.
+func patchValidateErrorCondition(ctx context.Context, cli client.Client, opsRes *OpsResource, errMessage string) error {
 	condition := appsv1alpha1.NewValidateFailedCondition(appsv1alpha1.ReasonValidateFailed, errMessage)
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
@@ -247,7 +250,7 @@ func patchOpsRequestToCreating(ctx context.Context,
 	var condition *metav1.Condition
 	validatePassCondition := appsv1alpha1.NewValidatePassedCondition(opsRes.OpsRequest.Name)
 	condition = opsHandler.ActionStartedCondition(opsRes.OpsRequest)
-	return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCoy, appsv1alpha1.OpsCreatingPhase, validatePassCondition, condition)
+	return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCoy, appsv1alpha1.OpsCreatingPhase, validatePassCondition, condition)
 }
 
 // patchClusterStatusAndRecordEvent records the ops event in the cluster and

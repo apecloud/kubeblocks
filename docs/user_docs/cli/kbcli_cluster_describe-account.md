@@ -12,16 +12,20 @@ kbcli cluster describe-account [flags]
 
 ```
   # describe account and show role information
-  kbcli cluster describe-account NAME --component-name COMPNAME--username NAME
+  kbcli cluster describe-account NAME --component COMPNAME --name USERNAME
+  # describe account with default component
+  kbcli cluster delete-account NAME --name USERNAME
+  # describe account for instance
+  kbcli cluster describe-account --instance INSTANCE --name USERNAME
 ```
 
 ### Options
 
 ```
-      --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
-  -h, --help                    help for describe-account
-  -i, --instance string         Specify the name of instance to be connected.
-  -u, --username string         Required. Specify the name of user
+      --component string   Specify the name of component to be connected. If not specified, the first component will be used.
+  -h, --help               help for describe-account
+  -i, --instance string    Specify the name of instance to be connected.
+      --name string        Required. Specify the name of user
 ```
 
 ### Options inherited from parent commands

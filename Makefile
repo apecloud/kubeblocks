@@ -33,6 +33,7 @@ SKIP_GO_GEN ?= true
 CHART_PATH = deploy/helm
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
+
 # Go setup
 export GO111MODULE = auto
 # export GOPROXY = https://proxy.golang.org
@@ -136,8 +137,6 @@ ifeq ($(SKIP_GO_GEN), false)
 	$(GO) generate -x ./internal/configuration/proto
 endif
 
-
-
 .PHONY: test-go-generate
 test-go-generate: ## Run go generate against test code.
 	$(GO) generate -x ./internal/testutil/k8s/mocks/...
@@ -157,20 +156,20 @@ cue-fmt: cuetool ## Run cue fmt against code.
 	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fmt
 	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fix
 
-.PHONY: fast-lint
-fast-lint: golangci staticcheck vet  # [INTERNAL] fast lint
+.PHONY: lint-fast
+lint-fast: golangci staticcheck vet  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
 lint: test-go-generate generate ## Run golangci-lint against code.
-	$(MAKE) fast-lint
+	$(MAKE) lint-fast
 
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code.
 	$(STATICCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports fast-lint ## Run build checks.
+build-checks: generate fmt vet goimports lint-fast ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -182,7 +181,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.20
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
@@ -206,6 +205,10 @@ test-fast: envtest
 
 .PHONY: test
 test: manifests generate test-go-generate fmt vet add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+
+.PHONY: race
+race:
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -race $(TEST_PACKAGES)
 
 .PHONY: test-integration
 test-integration: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
@@ -264,7 +267,7 @@ kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
 clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 
-.PHONY: doc
+.PHONY: kbcli-doc
 kbcli-doc: generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
@@ -333,7 +336,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.20
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -385,11 +388,10 @@ bump-chart-ver: \
 	bump-single-chart-appver.nyancat \
 	bump-single-chart-ver.postgresql \
 	bump-single-chart-ver.postgresql-cluster \
-	bump-single-chart-ver.postgresql-patroni-ha \
-	bump-single-chart-ver.postgresql-patroni-ha-cluster \
 	bump-single-chart-ver.redis \
 	bump-single-chart-ver.redis-cluster \
 	bump-single-chart-ver.milvus \
+	bump-single-chart-ver.milvus-cluster \
 	bump-single-chart-ver.qdrant \
 	bump-single-chart-ver.qdrant-cluster \
 	bump-single-chart-ver.weaviate \
@@ -748,14 +750,14 @@ endif
 render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
 	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
-	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	$(HELM) template mycluster deploy/redis-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) -C test/e2e run
 
 # NOTE: include must be placed at the end
 include docker/docker.mk
 include cmd/cmd.mk
-

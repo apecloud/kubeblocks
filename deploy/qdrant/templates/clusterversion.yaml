@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "qdrant.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: qdrant-standalone
+  clusterDefinitionRef: qdrant
   componentVersions:
     - componentDefRef: qdrant
       versionsContext:

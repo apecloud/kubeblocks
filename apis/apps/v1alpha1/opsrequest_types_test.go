@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package v1alpha1
@@ -35,9 +38,9 @@ func mockRestartOps() *OpsRequest {
 
 func TestGetRestartComponentNameMap(t *testing.T) {
 	ops := mockRestartOps()
-	componentNameMap := ops.GetRestartComponentNameMap()
+	componentNameMap := ops.Spec.GetRestartComponentNameSet()
 	checkComponentMap(t, componentNameMap, len(ops.Spec.RestartList), componentName)
-	componentNameMap1 := ops.GetComponentNameMap()
+	componentNameMap1 := ops.GetComponentNameSet()
 	checkComponentMap(t, componentNameMap1, len(ops.Spec.RestartList), componentName)
 }
 
@@ -56,9 +59,9 @@ func mockVerticalScalingOps() *OpsRequest {
 
 func TestVerticalScalingComponentNameMap(t *testing.T) {
 	ops := mockVerticalScalingOps()
-	componentNameMap := ops.GetVerticalScalingComponentNameMap()
+	componentNameMap := ops.Spec.GetVerticalScalingComponentNameSet()
 	checkComponentMap(t, componentNameMap, len(ops.Spec.VerticalScalingList), componentName)
-	componentNameMap1 := ops.GetComponentNameMap()
+	componentNameMap1 := ops.GetComponentNameSet()
 	checkComponentMap(t, componentNameMap1, len(ops.Spec.VerticalScalingList), componentName)
 }
 
@@ -77,9 +80,9 @@ func mockHorizontalScalingOps() *OpsRequest {
 
 func TestHorizontalScalingComponentNameMap(t *testing.T) {
 	ops := mockHorizontalScalingOps()
-	componentNameMap := ops.GetHorizontalScalingComponentNameMap()
+	componentNameMap := ops.Spec.GetHorizontalScalingComponentNameSet()
 	checkComponentMap(t, componentNameMap, len(ops.Spec.HorizontalScalingList), componentName)
-	componentNameMap1 := ops.GetComponentNameMap()
+	componentNameMap1 := ops.GetComponentNameSet()
 	checkComponentMap(t, componentNameMap1, len(ops.Spec.HorizontalScalingList), componentName)
 }
 
@@ -98,9 +101,9 @@ func mockVolumeExpansionOps() *OpsRequest {
 
 func TestVolumeExpansionComponentNameMap(t *testing.T) {
 	ops := mockVolumeExpansionOps()
-	componentNameMap := ops.GetVolumeExpansionComponentNameMap()
+	componentNameMap := ops.Spec.GetVolumeExpansionComponentNameSet()
 	checkComponentMap(t, componentNameMap, len(ops.Spec.VolumeExpansionList), componentName)
-	componentNameMap1 := ops.GetComponentNameMap()
+	componentNameMap1 := ops.GetComponentNameSet()
 	checkComponentMap(t, componentNameMap1, len(ops.Spec.VolumeExpansionList), componentName)
 }
 
@@ -113,9 +116,9 @@ func checkComponentMap(t *testing.T, componentNameMap map[string]struct{}, expec
 	}
 }
 
-func TestConvertVerticalScalingListToMap(t *testing.T) {
+func TestToVerticalScalingListToMap(t *testing.T) {
 	ops := mockVerticalScalingOps()
-	verticalScalingMap := ops.ConvertVerticalScalingListToMap()
+	verticalScalingMap := ops.Spec.ToVerticalScalingListToMap()
 	if len(verticalScalingMap) != len(ops.Spec.VerticalScalingList) {
 		t.Error(`Expected vertical scaling map length equals list length`)
 	}
@@ -126,7 +129,7 @@ func TestConvertVerticalScalingListToMap(t *testing.T) {
 
 func TestConvertVolumeExpansionListToMap(t *testing.T) {
 	ops := mockVolumeExpansionOps()
-	volumeExpansionMap := ops.ConvertVolumeExpansionListToMap()
+	volumeExpansionMap := ops.Spec.ToVolumeExpansionListToMap()
 	if len(volumeExpansionMap) != len(ops.Spec.VolumeExpansionList) {
 		t.Error(`Expected volume expansion map length equals list length`)
 	}
@@ -135,9 +138,9 @@ func TestConvertVolumeExpansionListToMap(t *testing.T) {
 	}
 }
 
-func TestConvertHorizontalScalingListToMap(t *testing.T) {
+func TestToHorizontalScalingListToMap(t *testing.T) {
 	ops := mockHorizontalScalingOps()
-	horizontalScalingMap := ops.ConvertHorizontalScalingListToMap()
+	horizontalScalingMap := ops.Spec.ToHorizontalScalingListToMap()
 	if len(horizontalScalingMap) != len(ops.Spec.HorizontalScalingList) {
 		t.Error(`Expected horizontal scaling map length equals list length`)
 	}
@@ -149,7 +152,7 @@ func TestConvertHorizontalScalingListToMap(t *testing.T) {
 func TestGetUpgradeComponentNameMap(t *testing.T) {
 	ops := &OpsRequest{}
 	ops.Spec.Type = UpgradeType
-	componentNameMap := ops.GetUpgradeComponentNameMap()
+	componentNameMap := ops.GetUpgradeComponentNameSet()
 	if componentNameMap != nil {
 		t.Error(`Expected component name map of upgrade ops is nil`)
 	}
@@ -160,9 +163,9 @@ func TestGetUpgradeComponentNameMap(t *testing.T) {
 		componentName: {},
 	}
 
-	componentNameMap = ops.GetUpgradeComponentNameMap()
+	componentNameMap = ops.GetUpgradeComponentNameSet()
 	checkComponentMap(t, componentNameMap, len(ops.Status.Components), componentName)
-	componentNameMap1 := ops.GetComponentNameMap()
+	componentNameMap1 := ops.GetComponentNameSet()
 	checkComponentMap(t, componentNameMap1, len(ops.Status.Components), componentName)
 }
 

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package builder
@@ -34,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -60,17 +62,15 @@ var _ = Describe("builder", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const clusterName = "test-cluster"
-
-	const mysqlCompType = "replicasets"
+	const mysqlCompDefName = "replicasets"
 	const mysqlCompName = "mysql"
-
-	const nginxCompType = "proxy"
+	const proxyCompDefName = "proxy"
 
 	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
-			AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+			AddComponentDef(testapps.StatelessNginxComponent, proxyCompDefName).
 			GetObject()
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterDefObj)).Should(Succeed())
@@ -81,9 +81,9 @@ var _ = Describe("builder", func() {
 	allFieldsClusterVersionObj := func(needCreate bool) *appsv1alpha1.ClusterVersion {
 		By("By assure an clusterVersion obj")
 		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(mysqlCompType).
+			AddComponentVersion(mysqlCompDefName).
 			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponent(nginxCompType).
+			AddComponentVersion(proxyCompDefName).
 			AddInitContainerShort("nginx-init", testapps.NginxImage).
 			AddContainerShort("nginx", testapps.NginxImage).
 			GetObject()
@@ -109,7 +109,7 @@ var _ = Describe("builder", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
+			AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
 			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
@@ -184,16 +184,6 @@ var _ = Describe("builder", func() {
 		return &params
 	}
 
-	newBackupPolicyTemplate := func() *dataprotectionv1alpha1.BackupPolicyTemplate {
-		return testapps.NewBackupPolicyTemplateFactory("backup-policy-template-mysql").
-			SetBackupToolName("mysql-xtrabackup").
-			SetSchedule("0 2 * * *").
-			SetTTL("168h0m0s").
-			AddHookPreCommand("touch /data/mysql/.restore;sync").
-			AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-			Create(&testCtx).GetObject()
-	}
-
 	Context("has helper function which builds specific object from cue template", func() {
 		It("builds PVC correctly", func() {
 			snapshotName := "test-snapshot-name"
@@ -250,11 +240,14 @@ var _ = Describe("builder", func() {
 				"UUID_B64",
 				"UUID_STR_B64",
 				"UUID_HEX",
+				"HEADLESS_SVC_FQDN",
 			} {
 				Expect(credential.StringData[v]).ShouldNot(BeEquivalentTo(fmt.Sprintf("$(%s)", v)))
 			}
 			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
 			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name,
+				params.Cluster.Namespace)
+			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless.%s.svc", params.Cluster.Name, params.Component.Name,
 				params.Cluster.Namespace)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
@@ -267,6 +260,7 @@ var _ = Describe("builder", func() {
 				}
 			}
 			Expect(credential.StringData["SVC_FQDN"]).Should(Equal(svcFQDN))
+			Expect(credential.StringData["HEADLESS_SVC_FQDN"]).Should(Equal(headlessSvcFQDN))
 			Expect(credential.StringData["tcpEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, mysqlPort.Port)))
 			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("paxos:%s:%d", svcFQDN, paxosPort.Port)))
 
@@ -299,7 +293,7 @@ var _ = Describe("builder", func() {
 			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
-			Expect(*sts.Spec.Replicas).Should(Equal(int32(1)))
+			Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(2))
 		})
 
 		It("builds Deploy correctly", func() {
@@ -330,15 +324,14 @@ var _ = Describe("builder", func() {
 			reqCtx := newReqCtx()
 			params := newParams()
 
-			By("creating pvc to make it looks like recreation")
-			pvcName := "test-pvc"
-			testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
-				params.Component.Name, testapps.DataVolumeName).SetStorage("1Gi").CheckedCreate(&testCtx)
+			uuid := "12345"
+			By("mock a cluster uuid")
+			params.Cluster.UID = types.UID(uuid)
 
 			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_RECREATE"]).Should(Equal("true"))
+			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_CLUSTER_UID"]).Should(Equal(uuid))
 		})
 
 		It("builds Env Config with ConsensusSet status correctly", func() {
@@ -410,18 +403,6 @@ var _ = Describe("builder", func() {
 			var newPrimaryIndex = int32(1)
 			params.Component.PrimaryIndex = &newPrimaryIndex
 			checkEnvValues()
-		})
-
-		It("builds BackupPolicy correctly", func() {
-			sts := newStsObj()
-			backupPolicyTemplate := newBackupPolicyTemplate()
-			backupKey := types.NamespacedName{
-				Namespace: "default",
-				Name:      "test-backup",
-			}
-			policy, err := BuildBackupPolicy(sts, backupPolicyTemplate, backupKey)
-			Expect(err).Should(BeNil())
-			Expect(policy).ShouldNot(BeNil())
 		})
 
 		It("builds BackupJob correctly", func() {

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package operations
@@ -52,7 +55,7 @@ func (hs horizontalScalingOpsHandler) ActionStartedCondition(opsRequest *appsv1a
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
 func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
-		horizontalScalingMap = opsRes.OpsRequest.ConvertHorizontalScalingListToMap()
+		horizontalScalingMap = opsRes.OpsRequest.Spec.ToHorizontalScalingListToMap()
 		horizontalScaling    appsv1alpha1.HorizontalScaling
 		ok                   bool
 	)
@@ -79,13 +82,13 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, hs.getExpectReplicas)
 	}
-	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
 	realChangedMap := realAffectedComponentMap{}
-	hsMap := opsRequest.ConvertHorizontalScalingListToMap()
+	hsMap := opsRequest.Spec.ToHorizontalScalingListToMap()
 	for k, v := range opsRequest.Status.LastConfiguration.Components {
 		currHs, ok := hsMap[k]
 		if !ok {
@@ -102,7 +105,7 @@ func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *ap
 func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
-	componentNameMap := opsRequest.ConvertHorizontalScalingListToMap()
+	componentNameMap := opsRequest.Spec.ToHorizontalScalingListToMap()
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
 		hsInfo, ok := componentNameMap[v.Name]
 		if !ok {

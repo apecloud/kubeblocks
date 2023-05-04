@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package operations
@@ -53,12 +56,20 @@ func (vs verticalScalingHandler) ActionStartedCondition(opsRequest *appsv1alpha1
 // Action modifies cluster component resources according to
 // the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
 func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	verticalScalingMap := opsRes.OpsRequest.ConvertVerticalScalingListToMap()
+	verticalScalingMap := opsRes.OpsRequest.Spec.ToVerticalScalingListToMap()
 	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
-		if verticalScaling, ok := verticalScalingMap[component.Name]; ok {
-			component.Resources = verticalScaling.ResourceRequirements
-			opsRes.Cluster.Spec.ComponentSpecs[index] = component
+		verticalScaling, ok := verticalScalingMap[component.Name]
+		if !ok {
+			continue
 		}
+		if verticalScaling.Class != "" {
+			component.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: verticalScaling.Class}
+		} else {
+			// clear old class ref
+			component.ClassDefRef = &appsv1alpha1.ClassDefRef{}
+			component.Resources = verticalScaling.ResourceRequirements
+		}
+		opsRes.Cluster.Spec.ComponentSpecs[index] = component
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
@@ -66,20 +77,24 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for vertical scaling opsRequest.
 func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgress)
+	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	componentNameMap := opsRes.OpsRequest.GetComponentNameMap()
+	componentNameSet := opsRes.OpsRequest.GetComponentNameSet()
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-		if _, ok := componentNameMap[v.Name]; !ok {
+		if _, ok := componentNameSet[v.Name]; !ok {
 			continue
 		}
-		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
+		lastConfiguration := appsv1alpha1.LastComponentConfiguration{
 			ResourceRequirements: v.Resources,
 		}
+		if v.ClassDefRef != nil {
+			lastConfiguration.Class = v.ClassDefRef.Class
+		}
+		lastComponentInfo[v.Name] = lastConfiguration
 	}
 	opsRes.OpsRequest.Status.LastConfiguration.Components = lastComponentInfo
 	return nil
@@ -88,13 +103,13 @@ func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.Reques
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (vs verticalScalingHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
 	realChangedMap := realAffectedComponentMap{}
-	vsMap := opsRequest.ConvertVerticalScalingListToMap()
+	vsMap := opsRequest.Spec.ToVerticalScalingListToMap()
 	for k, v := range opsRequest.Status.LastConfiguration.Components {
 		currVs, ok := vsMap[k]
 		if !ok {
 			continue
 		}
-		if !reflect.DeepEqual(currVs.ResourceRequirements, v.ResourceRequirements) {
+		if !reflect.DeepEqual(currVs.ResourceRequirements, v.ResourceRequirements) || currVs.Class != v.Class {
 			realChangedMap[k] = struct{}{}
 		}
 	}

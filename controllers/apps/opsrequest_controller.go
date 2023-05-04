@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
@@ -63,7 +66,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	opsCtrlHandler := &opsControllerHandler{}
 	return opsCtrlHandler.Handle(reqCtx, &operations.OpsResource{Recorder: r.Recorder},
 		r.fetchOpsRequest,
-		r.handleDeleteEvent,
+		r.handleDeletion,
 		r.fetchCluster,
 		r.addClusterLabelAndSetOwnerReference,
 		r.handleOpsRequestByPhase,
@@ -85,7 +88,7 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
 		}
 		// if the opsRequest is not found, we need to check if this opsRequest is deleted abnormally
-		if err = r.handleOpsDeletedDuringRunning(reqCtx); err != nil {
+		if err = r.handleOpsReqDeletedDuringRunning(reqCtx); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
@@ -94,8 +97,8 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 	return nil, nil
 }
 
-// handleDeleteEvent handles the delete event of the OpsRequest.
-func (r *OpsRequestReconciler) handleDeleteEvent(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+// handleDeletion handles the delete event of the OpsRequest.
+func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
 	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsRunningPhase {
 		return nil, nil
 	}
@@ -223,8 +226,8 @@ func (r *OpsRequestReconciler) doOpsRequestAction(reqCtx intctrlutil.RequestCtx,
 	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }
 
-// handleOpsDeletedDuringRunning handles the cluster annotation if the OpsRequest is deleted during running.
-func (r *OpsRequestReconciler) handleOpsDeletedDuringRunning(reqCtx intctrlutil.RequestCtx) error {
+// handleOpsReqDeletedDuringRunning handles the cluster annotation if the OpsRequest is deleted during running.
+func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlutil.RequestCtx) error {
 	clusterList := &appsv1alpha1.ClusterList{}
 	if err := r.Client.List(reqCtx.Ctx, clusterList, client.InNamespace(reqCtx.Req.Namespace)); err != nil {
 		return err

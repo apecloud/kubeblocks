@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package v1alpha1
@@ -382,10 +385,7 @@ func buildSelectorStrings(selectors []SelectorRequirement) []string {
 }
 
 // GetSelectorsStrings extract selectors to string representations.
-func (r *AddonDefaultInstallSpecItem) GetSelectorsStrings() []string {
-	if r == nil {
-		return nil
-	}
+func (r AddonDefaultInstallSpecItem) GetSelectorsStrings() []string {
 	return buildSelectorStrings(r.Selectors)
 }
 
@@ -397,16 +397,13 @@ func (r *InstallableSpec) GetSelectorsStrings() []string {
 	return buildSelectorStrings(r.Selectors)
 }
 
-func (r *SelectorRequirement) String() string {
+func (r SelectorRequirement) String() string {
 	return fmt.Sprintf("{key=%s,op=%s,values=%v}",
 		r.Key, r.Operator, r.Values)
 }
 
 // MatchesFromConfig matches selector requirement value.
-func (r *SelectorRequirement) MatchesFromConfig() bool {
-	if r == nil {
-		return false
-	}
+func (r SelectorRequirement) MatchesFromConfig() bool {
 	verIf := viper.Get(constant.CfgKeyServerInfo)
 	ver, ok := verIf.(version.Info)
 	if !ok {
@@ -422,7 +419,7 @@ func (r *SelectorRequirement) MatchesFromConfig() bool {
 	return r.matchesLine(l)
 }
 
-func (r *SelectorRequirement) matchesLine(line string) bool {
+func (r SelectorRequirement) matchesLine(line string) bool {
 	processor := func(op bool, predicate func(string) bool) bool {
 		if len(r.Values) == 0 {
 			return !op
@@ -569,10 +566,7 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 
 // GetSortedDefaultInstallValues return DefaultInstallValues items with items that has
 // provided selector first.
-func (r *AddonSpec) GetSortedDefaultInstallValues() []AddonDefaultInstallSpecItem {
-	if r == nil {
-		return nil
-	}
+func (r AddonSpec) GetSortedDefaultInstallValues() []AddonDefaultInstallSpecItem {
 	values := make([]AddonDefaultInstallSpecItem, 0, len(r.DefaultInstallValues))
 	nvalues := make([]AddonDefaultInstallSpecItem, 0, len(r.DefaultInstallValues))
 	for _, i := range r.DefaultInstallValues {

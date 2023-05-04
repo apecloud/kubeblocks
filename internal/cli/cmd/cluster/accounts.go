@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -30,38 +33,57 @@ import (
 
 var (
 	createUserExamples = templates.Examples(`
-		# create account
-		kbcli cluster create-account NAME --component-name COMPNAME --username NAME --password PASSWD
+		# create account with password
+		kbcli cluster create-account NAME --component COMPNAME --name USERNAME --password PASSWD
 		# create account without password
-		kbcli cluster create-account NAME --component-name COMPNAME --username NAME
-		# create account with expired interval
-		kbcli cluster create-account NAME --component-name COMPNAME --username NAME --password PASSWD --expiredAt 2046-01-02T15:04:05Z
+		kbcli cluster create-account NAME --component COMPNAME --name USERNAME
+		# create account with default component
+		kbcli cluster create-account NAME --name USERNAME
+		# create account for instance
+		kbcli cluster create-account --instance INSTANCE --name USERNAME
  `)
 
 	deleteUserExamples = templates.Examples(`
 		# delete account by name
-		kbcli cluster delete-account NAME --component-name COMPNAME --username NAME
+		kbcli cluster delete-account NAME --component COMPNAME --name USERNAME
+		# delete account with default component
+		kbcli cluster delete-account NAME --name USERNAME
+		# delete account for instance
+		kbcli cluster delete-account --instance INSTANCE --name USERNAME
  `)
 
 	descUserExamples = templates.Examples(`
 		# describe account and show role information
-		kbcli cluster describe-account NAME --component-name COMPNAME--username NAME
+		kbcli cluster describe-account NAME --component COMPNAME --name USERNAME
+		# describe account with default component
+		kbcli cluster delete-account NAME --name USERNAME
+		# describe account for instance
+		kbcli cluster describe-account --instance INSTANCE --name USERNAME
  `)
 
 	listUsersExample = templates.Examples(`
-		# list all users from specified component of a cluster
-		kbcli cluster list-accounts NAME --component-name COMPNAME --show-connected-users
-
-		# list all users from cluster's one particular instance
-		kbcli cluster list-accounts NAME -i INSTANCE
+		# list all users for component
+		kbcli cluster list-accounts NAME --component COMPNAME
+		# list all users with default component
+		kbcli cluster list-accounts NAME
+		# list all users from instance
+		kbcli cluster list-accounts --instance INSTANCE
 	`)
 	grantRoleExamples = templates.Examples(`
 		# grant role to user
-		kbcli cluster grant-role NAME --component-name COMPNAME --username NAME --role ROLENAME
+		kbcli cluster grant-role NAME --component COMPNAME --name USERNAME --role ROLENAME
+		# grant role to user with default component
+		kbcli cluster grant-role NAME --name USERNAME --role ROLENAME
+		# grant role to user for instance
+		kbcli cluster grant-role --instance INSTANCE --name USERNAME --role ROLENAME
 	`)
 	revokeRoleExamples = templates.Examples(`
 		# revoke role from user
-		kbcli cluster revoke-role NAME --component-name COMPNAME --role ROLENAME
+		kbcli cluster revoke-role NAME --component COMPNAME --name USERNAME --role ROLENAME
+		# revoke role from user with default component
+		kbcli cluster revoke-role NAME --name USERNAME --role ROLENAME
+		# revoke role from user for instance
+		kbcli cluster revoke-role --instance INSTANCE --name USERNAME --role ROLENAME
 	`)
 )
 
@@ -75,7 +97,7 @@ func NewCreateAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)
@@ -92,7 +114,7 @@ func NewDeleteAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)
@@ -109,7 +131,7 @@ func NewDescAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)
@@ -128,7 +150,7 @@ func NewListAccountsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)
@@ -147,7 +169,7 @@ func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)
@@ -166,7 +188,7 @@ func NewRevokeOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.Run(f, streams))
+			cmdutil.CheckErr(o.Run(cmd, f, streams))
 		},
 	}
 	o.AddFlags(cmd)

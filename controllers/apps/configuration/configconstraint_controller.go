@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -71,6 +74,14 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			r.Recorder.Event(configConstraint, corev1.EventTypeWarning, "ExistsReferencedResources",
 				"cannot be deleted because of existing referencing ClusterDefinition or ClusterVersion.")
 		}
+		if configConstraint.Status.Phase != appsv1alpha1.CCDeletingPhase {
+			err := updateConfigConstraintStatus(r.Client, reqCtx, configConstraint, appsv1alpha1.CCDeletingPhase)
+			// if fail to update ConfigConstraint status, return error,
+			// so that it can be retried
+			if err != nil {
+				return nil, err
+			}
+		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configConstraint,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configConstraint.GetName()),
 			recordEvent, &appsv1alpha1.ClusterDefinitionList{},
@@ -83,7 +94,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return *res, err
 	}
 
-	if configConstraint.Status.ObservedGeneration == configConstraint.Generation {
+	if configConstraint.Status.ObservedGeneration == configConstraint.Generation && configConstraint.Status.IsConfigConstraintTerminalPhases() {
 		return intctrlutil.Reconciled()
 	}
 
@@ -96,14 +107,11 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate openAPISchema")
 	}
 
-	statusPatch := client.MergeFrom(configConstraint.DeepCopy())
-	configConstraint.Status.ObservedGeneration = configConstraint.Generation
-	configConstraint.Status.Phase = appsv1alpha1.AvailablePhase
-	if err = r.Client.Status().Patch(reqCtx.Ctx, configConstraint, statusPatch); err != nil {
+	err = updateConfigConstraintStatus(r.Client, reqCtx, configConstraint, appsv1alpha1.CCAvailablePhase)
+	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	intctrlutil.RecordCreatedEvent(r.Recorder, configConstraint)
-
 	return ctrl.Result{}, nil
 }
 

@@ -1,8 +1,8 @@
 # Build the kubeblocks tools binaries
 # includes kbcli, kubectl, and manager tools.
-FROM --platform=${BUILDPLATFORM} golang:1.19 as builder
+FROM --platform=${BUILDPLATFORM} golang:1.20 as builder
 
-## docker buildx buid injected build-args:
+## docker buildx build injected build-args:
 #BUILDPLATFORM — matches the current machine. (e.g. linux/amd64)
 #BUILDOS — os component of BUILDPLATFORM, e.g. linux
 #BUILDARCH — e.g. amd64, arm64, riscv64
@@ -41,6 +41,7 @@ COPY externalapis/ externalapis/
 COPY version/ version/
 COPY cmd/cli/ cmd/cli/
 COPY apis/ apis/
+COPY test/testdata/testdata.go test/testdata/testdata.go
 
 # Download binaries
 RUN curl -fsSL https://dl.k8s.io/v1.26.3/kubernetes-client-${TARGETOS}-${TARGETARCH}.tar.gz | tar -zxv

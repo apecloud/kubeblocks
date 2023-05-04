@@ -1,15 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package mongodb
@@ -25,6 +30,7 @@ import (
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
+	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -34,14 +40,13 @@ import (
 	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
-// MongoDB is a binding implementation for MongoDB.
-type MongoDB struct {
+// MongoDBOperations is a binding implementation for MongoDB.
+type MongoDBOperations struct {
 	mongoDBMetadata
 	mu               sync.Mutex
 	client           *mongo.Client
 	database         *mongo.Database
 	operationTimeout time.Duration
-	logger           logger.Logger
 	BaseOperations
 }
 
@@ -105,7 +110,7 @@ const (
 
 	defaultTimeout = 5 * time.Second
 
-	defaultDBPort = 27018
+	defaultDBPort = 27017
 
 	// mongodb://<username>:<password@<host>/<database><params>
 	connectionURIFormatWithAuthentication = "mongodb://%s:%s@%s/%s%s"
@@ -124,62 +129,62 @@ const (
 
 // NewMongoDB returns a new MongoDB Binding
 func NewMongoDB(logger logger.Logger) bindings.OutputBinding {
-	return &MongoDB{BaseOperations: BaseOperations{Logger: logger}}
+	return &MongoDBOperations{BaseOperations: BaseOperations{Logger: logger}}
 }
 
 // Init initializes the MongoDB Binding.
-func (m *MongoDB) Init(metadata bindings.Metadata) error {
-	m.Logger.Debug("Initializing MongoDB binding")
-	m.BaseOperations.Init(metadata)
+func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
+	mongoOps.Logger.Debug("Initializing MongoDB binding")
+	mongoOps.BaseOperations.Init(metadata)
 	meta, err := getMongoDBMetaData(metadata)
 	if err != nil {
 		return err
 	}
-	m.mongoDBMetadata = *meta
+	mongoOps.mongoDBMetadata = *meta
 
-	m.DBType = "mongodb"
-	m.InitIfNeed = m.initIfNeed
-	m.DBPort = m.GetRunningPort()
-	m.OperationMap[GetRoleOperation] = m.GetRoleOps
+	mongoOps.DBType = "mongodb"
+	mongoOps.InitIfNeed = mongoOps.initIfNeed
+	mongoOps.DBPort = mongoOps.GetRunningPort()
+	mongoOps.BaseOperations.GetRole = mongoOps.GetRole
+	mongoOps.OperationMap[GetRoleOperation] = mongoOps.GetRoleOps
 	return nil
 }
 
-func (m *MongoDB) Ping() error {
-	if err := m.client.Ping(context.Background(), nil); err != nil {
-		return fmt.Errorf("mongoDB store: error connecting to mongoDB at %s: %s", m.mongoDBMetadata.host, err)
+func (mongoOps *MongoDBOperations) Ping() error {
+	if err := mongoOps.client.Ping(context.Background(), nil); err != nil {
+		return fmt.Errorf("mongoDB binding: error connecting to mongoDB at %s: %s", mongoOps.mongoDBMetadata.host, err)
 	}
 	return nil
 }
 
-// InitIfNeed do the real init
-func (m *MongoDB) initIfNeed() bool {
-	if m.database == nil {
+func (mongoOps *MongoDBOperations) initIfNeed() bool {
+	if mongoOps.database == nil {
 		go func() {
-			err := m.InitDelay()
-			m.Logger.Errorf("MongoDB connection init failed: %v", err)
+			err := mongoOps.InitDelay()
+			mongoOps.Logger.Errorf("MongoDB connection init failed: %v", err)
 		}()
 		return true
 	}
 	return false
 }
 
-func (m *MongoDB) InitDelay() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.database != nil {
+func (mongoOps *MongoDBOperations) InitDelay() error {
+	mongoOps.mu.Lock()
+	defer mongoOps.mu.Unlock()
+	if mongoOps.database != nil {
 		return nil
 	}
-	m.operationTimeout = m.mongoDBMetadata.operationTimeout
+	mongoOps.operationTimeout = mongoOps.mongoDBMetadata.operationTimeout
 
-	client, err := getMongoDBClient(&m.mongoDBMetadata)
+	client, err := getMongoDBClient(&mongoOps.mongoDBMetadata)
 	if err != nil {
-		m.Logger.Errorf("error in creating mongodb client: %s", err)
+		mongoOps.Logger.Errorf("error in creating mongodb client: %s", err)
 		return err
 	}
 
 	if err = client.Ping(context.Background(), nil); err != nil {
 		_ = client.Disconnect(context.Background())
-		m.Logger.Errorf("error in connecting to mongodb, host: %s error: %s", m.mongoDBMetadata.host, err)
+		mongoOps.Logger.Errorf("error in connecting to mongodb, host: %s error: %s", mongoOps.mongoDBMetadata.host, err)
 		return err
 	}
 
@@ -187,18 +192,22 @@ func (m *MongoDB) InitDelay() error {
 	_, err = getReplSetStatus(context.Background(), db)
 	if err != nil {
 		_ = client.Disconnect(context.Background())
-		m.Logger.Errorf("error in getting repl status from mongodb, error: %s", err)
+		mongoOps.Logger.Errorf("error in getting repl status from mongodb, error: %s", err)
 		return err
 	}
 
-	m.client = client
-	m.database = db
+	mongoOps.client = client
+	mongoOps.database = db
 
 	return nil
 }
 
-func (m *MongoDB) GetRunningPort() int {
-	uri := getMongoURI(&m.mongoDBMetadata)
+func (mongoOps *MongoDBOperations) GetRunningPort() int {
+	if viper.IsSet("KB_SERVICE_PORT") {
+		return viper.GetInt("KB_SERVICE_PORT")
+	}
+
+	uri := getMongoURI(&mongoOps.mongoDBMetadata)
 	index := strings.Index(uri, "://")
 	if index < 0 {
 		return defaultDBPort
@@ -213,12 +222,17 @@ func (m *MongoDB) GetRunningPort() int {
 	if index < 0 {
 		return defaultDBPort
 	}
-	uri = uri[:index]
+	uri = uri[index:]
 	index = strings.Index(uri, ":")
 	if index < 0 {
 		return defaultDBPort
 	}
-	port, err := strconv.Atoi(uri[index+1:])
+	portStr := uri[index+1:]
+	if viper.IsSet("KB_SERVICE_PORT") {
+		portStr = viper.GetString("KB_SERVICE_PORT")
+	}
+
+	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		return defaultDBPort
 	}
@@ -226,10 +240,10 @@ func (m *MongoDB) GetRunningPort() int {
 	return port
 }
 
-func (m *MongoDB) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	status, err := getReplSetStatus(ctx, m.database)
+func (mongoOps *MongoDBOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+	status, err := getReplSetStatus(ctx, mongoOps.database)
 	if err != nil {
-		m.Logger.Errorf("rs.status() error: %", err)
+		mongoOps.Logger.Errorf("rs.status() error: %", err)
 		return "", err
 	}
 	for _, member := range status.Members {
@@ -240,8 +254,8 @@ func (m *MongoDB) GetRole(ctx context.Context, request *bindings.InvokeRequest, 
 	return "", errors.New("role not found")
 }
 
-func (m *MongoDB) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	role, err := m.GetRole(ctx, req, resp)
+func (mongoOps *MongoDBOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	role, err := mongoOps.GetRole(ctx, req, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +264,7 @@ func (m *MongoDB) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, r
 	return opsRes, nil
 }
 
-func (m *MongoDB) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) (OpsResult, error) {
+func (mongoOps *MongoDBOperations) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) (OpsResult, error) {
 	// TODO implement me when proposal is passed
 	// proposal: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 	return nil, nil
@@ -306,6 +320,10 @@ func getMongoDBMetaData(metadata bindings.Metadata) (*mongoDBMetadata, error) {
 		meta.host = val
 	}
 
+	if viper.IsSet("KB_SERVICE_PORT") {
+		meta.host = "localhost:" + viper.GetString("KB_SERVICE_PORT")
+	}
+
 	if val, ok := metadata.Properties[server]; ok && val != "" {
 		meta.server = val
 	}
@@ -324,6 +342,14 @@ func getMongoDBMetaData(metadata bindings.Metadata) (*mongoDBMetadata, error) {
 
 	if val, ok := metadata.Properties[password]; ok && val != "" {
 		meta.password = val
+	}
+
+	if viper.IsSet("KB_SERVICE_USER") {
+		meta.username = viper.GetString("KB_SERVICE_USER")
+	}
+
+	if viper.IsSet("KB_SERVICE_PASSWORD") {
+		meta.password = viper.GetString("KB_SERVICE_PASSWORD")
 	}
 
 	meta.databaseName = adminDatabase

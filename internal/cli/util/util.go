@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package util
@@ -21,6 +24,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -38,16 +42,17 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -205,10 +210,6 @@ func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error
 	return err
 }
 
-func GenRequestID() string {
-	return uuid.New().String()
-}
-
 func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
 	tmpl, err := template.New("output").Parse(tpl)
 	if err != nil {
@@ -262,7 +263,7 @@ func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
 			return node
 		}
 	}
-	return &corev1.Node{}
+	return nil
 }
 
 // ResourceIsEmpty check if resource is empty or not
@@ -307,15 +308,41 @@ func OpenBrowser(url string) error {
 }
 
 func TimeFormat(t *metav1.Time) string {
+	return TimeFormatWithDuration(t, time.Minute)
+}
+
+// TimeFormatWithDuration format time with specified precision
+func TimeFormatWithDuration(t *metav1.Time, duration time.Duration) string {
 	if t == nil || t.IsZero() {
 		return ""
 	}
-	return TimeTimeFormat(t.Time)
+	return TimeTimeFormatWithDuration(t.Time, duration)
 }
 
 func TimeTimeFormat(t time.Time) string {
 	const layout = "Jan 02,2006 15:04 UTC-0700"
 	return t.Format(layout)
+}
+
+func timeLayout(precision time.Duration) string {
+	layout := "Jan 02,2006 15:04 UTC-0700"
+	switch precision {
+	case time.Second:
+		layout = "Jan 02,2006 15:04:05 UTC-0700"
+	case time.Millisecond:
+		layout = "Jan 02,2006 15:04:05.000 UTC-0700"
+	}
+	return layout
+}
+
+func TimeTimeFormatWithDuration(t time.Time, precision time.Duration) string {
+	layout := timeLayout(precision)
+	return t.Format(layout)
+}
+
+func TimeParse(t string, precision time.Duration) (time.Time, error) {
+	layout := timeLayout(precision)
+	return time.Parse(layout, t)
 }
 
 // GetHumanReadableDuration returns a succinct representation of the provided startTime and endTime
@@ -396,44 +423,53 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 		clusterVersionObj = appsv1alpha1.ClusterVersion{}
 	)
 
-	if err := GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
+	clusterKey := client.ObjectKey{
 		Namespace: namespace,
 		Name:      clusterName,
-	}, cli, &clusterObj); err != nil {
+	}
+	if err := GetResourceObjectFromGVR(types.ClusterGVR(), clusterKey, cli, &clusterObj); err != nil {
 		return nil, err
 	}
-
-	clusterDefName := clusterObj.Spec.ClusterDefRef
-	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
+	clusterDefKey := client.ObjectKey{
 		Namespace: "",
-		Name:      clusterDefName,
-	}, cli, &clusterDefObj); err != nil {
+		Name:      clusterObj.Spec.ClusterDefRef,
+	}
+	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), clusterDefKey, cli, &clusterDefObj); err != nil {
 		return nil, err
 	}
-	clusterVersionName := clusterObj.Spec.ClusterVersionRef
-	if clusterVersionName != "" {
-		if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
-			Namespace: "",
-			Name:      clusterVersionName,
-		}, cli, &clusterVersionObj); err != nil {
+	clusterVerKey := client.ObjectKey{
+		Namespace: "",
+		Name:      clusterObj.Spec.ClusterVersionRef,
+	}
+	if clusterVerKey.Name != "" {
+		if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), clusterVerKey, cli, &clusterVersionObj); err != nil {
 			return nil, err
 		}
 	}
+	return GetConfigTemplateListWithResource(clusterObj.Spec.ComponentSpecs, clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName, reloadTpl)
+}
 
-	tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs, clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName)
+func GetConfigTemplateListWithResource(cComponents []appsv1alpha1.ClusterComponentSpec,
+	dComponents []appsv1alpha1.ClusterComponentDefinition,
+	vComponents []appsv1alpha1.ClusterComponentVersion,
+	componentName string,
+	reloadTpl bool) ([]appsv1alpha1.ComponentConfigSpec, error) {
+
+	configSpecs, err := cfgcore.GetConfigTemplatesFromComponent(cComponents, dComponents, vComponents, componentName)
 	if err != nil {
 		return nil, err
-	} else if !reloadTpl {
-		return tpls, nil
+	}
+	if !reloadTpl {
+		return configSpecs, nil
 	}
 
-	validTpls := make([]appsv1alpha1.ComponentConfigSpec, 0, len(tpls))
-	for _, tpl := range tpls {
-		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
-			validTpls = append(validTpls, tpl)
+	validConfigSpecs := make([]appsv1alpha1.ComponentConfigSpec, 0, len(configSpecs))
+	for _, configSpec := range configSpecs {
+		if configSpec.ConfigConstraintRef != "" && configSpec.TemplateRef != "" {
+			validConfigSpecs = append(validConfigSpecs, configSpec)
 		}
 	}
-	return validTpls, nil
+	return validConfigSpecs, nil
 }
 
 // GetResourceObjectFromGVR query the resource object using GVR.
@@ -448,8 +484,8 @@ func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.Object
 	return apiruntime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, k8sObj)
 }
 
-// GetComponentsFromClusterCR returns name of component.
-func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]string, error) {
+// GetComponentsFromClusterName returns name of component.
+func GetComponentsFromClusterName(key client.ObjectKey, cli dynamic.Interface) ([]string, error) {
 	clusterObj := appsv1alpha1.Cluster{}
 	clusterDefObj := appsv1alpha1.ClusterDefinition{}
 	if err := GetResourceObjectFromGVR(types.ClusterGVR(), key, cli, &clusterObj); err != nil {
@@ -463,8 +499,13 @@ func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]
 		return nil, err
 	}
 
-	componentNames := make([]string, 0, len(clusterObj.Spec.ComponentSpecs))
-	for _, component := range clusterObj.Spec.ComponentSpecs {
+	return GetComponentsFromResource(clusterObj.Spec.ComponentSpecs, &clusterDefObj)
+}
+
+// GetComponentsFromResource returns name of component.
+func GetComponentsFromResource(componentSpecs []appsv1alpha1.ClusterComponentSpec, clusterDefObj *appsv1alpha1.ClusterDefinition) ([]string, error) {
+	componentNames := make([]string, 0, len(componentSpecs))
+	for _, component := range componentSpecs {
 		cdComponent := clusterDefObj.GetComponentDefByName(component.ComponentDefRef)
 		if enableReconfiguring(cdComponent) {
 			componentNames = append(componentNames, component.Name)
@@ -626,21 +667,101 @@ func GetExposeAnnotations(provider K8sProvider, exposeType ExposeType) (map[stri
 	return annotations, nil
 }
 
-func GetK8SProvider(client kubernetes.Interface) (K8sProvider, error) {
-	versionInfo, err := GetVersionInfo(client)
-	if err != nil {
-		return "", err
-	}
-
-	versionErr := fmt.Errorf("failed to get kubernetes version")
-	k8sVersionStr, ok := versionInfo[KubernetesApp]
-	if !ok {
-		return "", versionErr
-	}
-	return GetK8sProvider(k8sVersionStr, client)
-}
-
 // BuildAddonReleaseName returns the release name of addon, its f
 func BuildAddonReleaseName(addon string) string {
 	return fmt.Sprintf("%s-%s", types.AddonReleasePrefix, addon)
+}
+
+// CombineLabels combines labels into a string
+func CombineLabels(labels map[string]string) string {
+	var labelStr []string
+	for k, v := range labels {
+		labelStr = append(labelStr, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// sort labelStr to make sure the order is stable
+	sort.Strings(labelStr)
+
+	return strings.Join(labelStr, ",")
+}
+
+func BuildComponentNameLabels(prefix string, names []string) string {
+	return buildLabelSelectors(prefix, constant.KBAppComponentLabelKey, names)
+}
+
+// buildLabelSelectors build the label selector by given label key, the label selector is
+// like "label-key in (name1, name2)"
+func buildLabelSelectors(prefix string, key string, names []string) string {
+	if len(names) == 0 {
+		return prefix
+	}
+
+	label := fmt.Sprintf("%s in (%s)", key, strings.Join(names, ","))
+	if len(prefix) == 0 {
+		return label
+	} else {
+		return prefix + "," + label
+	}
+}
+
+// NewOpsRequestForReconfiguring returns a new common OpsRequest for Reconfiguring operation
+func NewOpsRequestForReconfiguring(opsName, namespace, clusterName string) *appsv1alpha1.OpsRequest {
+	return &appsv1alpha1.OpsRequest{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.AppsAPIGroup, types.AppsAPIVersion),
+			Kind:       types.KindOps,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opsName,
+			Namespace: namespace,
+		},
+		Spec: appsv1alpha1.OpsRequestSpec{
+			ClusterRef:  clusterName,
+			Type:        appsv1alpha1.ReconfiguringType,
+			Reconfigure: &appsv1alpha1.Reconfigure{},
+		},
+	}
+}
+func ConvertObjToUnstructured(obj any) (*unstructured.Unstructured, error) {
+	var (
+		contentBytes    []byte
+		err             error
+		unstructuredObj = &unstructured.Unstructured{}
+	)
+
+	if contentBytes, err = json.Marshal(obj); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(contentBytes, unstructuredObj); err != nil {
+		return nil, err
+	}
+	return unstructuredObj, nil
+}
+
+func CreateResourceIfAbsent(
+	dynamic dynamic.Interface,
+	gvr schema.GroupVersionResource,
+	namespace string,
+	unstructuredObj *unstructured.Unstructured) error {
+	objectName, isFound, err := unstructured.NestedString(unstructuredObj.Object, "metadata", "name")
+	if !isFound || err != nil {
+		return err
+	}
+	objectByte, err := json.Marshal(unstructuredObj)
+	if err != nil {
+		return err
+	}
+	if _, err = dynamic.Resource(gvr).Namespace(namespace).Patch(
+		context.TODO(), objectName, k8sapitypes.MergePatchType,
+		objectByte, metav1.PatchOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			if _, err = dynamic.Resource(gvr).Namespace(namespace).Create(
+				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
 }

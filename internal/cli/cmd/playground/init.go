@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package playground
@@ -19,12 +22,14 @@ package playground
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -150,24 +155,29 @@ func (o *initOptions) local() error {
 		}
 	}
 
-	if err = writeClusterInfoToFile(o.stateFilePath, clusterInfo); err != nil {
+	if err = writeClusterInfo(o.stateFilePath, clusterInfo); err != nil {
 		return errors.Wrapf(err, "failed to write kubernetes cluster info to state file %s:\n  %v", o.stateFilePath, clusterInfo)
 	}
 
 	// create a local kubernetes cluster (k3d cluster) to deploy KubeBlocks
-	spinner := printer.Spinner(o.Out, "%-40s", "Create k3d cluster: "+clusterInfo.ClusterName)
+	spinner := printer.Spinner(o.Out, "%-50s", "Create k3d cluster: "+clusterInfo.ClusterName)
 	defer spinner(false)
 	if err = provider.CreateK8sCluster(clusterInfo); err != nil {
 		return errors.Wrap(err, "failed to set up k3d cluster")
 	}
 	spinner(true)
 
-	if err = o.setKubeConfig(provider); err != nil {
+	clusterInfo, err = o.writeStateFile(provider)
+	if err != nil {
+		return err
+	}
+
+	if err = o.setKubeConfig(clusterInfo); err != nil {
 		return err
 	}
 
 	// install KubeBlocks and create a database cluster
-	return o.installKBAndCluster(clusterInfo.ClusterName)
+	return o.installKBAndCluster(clusterInfo)
 }
 
 // bootstraps a playground in the remote cloud
@@ -198,7 +208,7 @@ func (o *initOptions) cloud() error {
 		}
 
 		fmt.Fprintf(o.Out, "\nWrite cluster info to state file %s\n", o.stateFilePath)
-		if err := writeClusterInfoToFile(o.stateFilePath, clusterInfo); err != nil {
+		if err := writeClusterInfo(o.stateFilePath, clusterInfo); err != nil {
 			return errors.Wrapf(err, "failed to write kubernetes cluster info to state file %s:\n  %v", o.stateFilePath, clusterInfo)
 		}
 
@@ -229,12 +239,19 @@ func (o *initOptions) cloud() error {
 	}
 	printer.PrintBlankLine(o.Out)
 
-	// write cluster kubeconfig to local kubeconfig file and switch current context to it
-	if err = o.setKubeConfig(provider); err != nil {
+	// write cluster info to state file and get new cluster info with kubeconfig
+	clusterInfo, err = o.writeStateFile(provider)
+	if err != nil {
 		return err
 	}
 
-	return o.installKBAndCluster(clusterInfo.ClusterName)
+	// write cluster kubeconfig to default kubeconfig file and switch current context to it
+	if err = o.setKubeConfig(clusterInfo); err != nil {
+		return err
+	}
+
+	// install KubeBlocks and create a database cluster
+	return o.installKBAndCluster(clusterInfo)
 }
 
 // confirmToContinue confirms to continue init or not if there is an existed kubernetes cluster
@@ -258,7 +275,7 @@ func (o *initOptions) confirmInitNewKubeCluster() error {
 `)
 
 	fmt.Fprintf(o.Out, `
-The whole process wll take about %s, please wait patiently,
+The whole process will take about %s, please wait patiently,
 if it takes a long time, please check the network environment and try again.
 `, printer.BoldRed("20 minutes"))
 
@@ -276,31 +293,45 @@ func printGuide() {
 	fmt.Fprintf(os.Stdout, guideStr, kbClusterName)
 }
 
-func (o *initOptions) setKubeConfig(provider cp.Interface) error {
-	// get kubernetes cluster info with the kubeconfig and write it to state file
+// writeStateFile writes cluster info to state file and return the new cluster info with kubeconfig
+func (o *initOptions) writeStateFile(provider cp.Interface) (*cp.K8sClusterInfo, error) {
 	clusterInfo, err := provider.GetClusterInfo()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if clusterInfo.KubeConfig == "" {
-		return errors.New("failed to get kubernetes cluster kubeconfig")
+		return nil, errors.New("failed to get kubernetes cluster kubeconfig")
 	}
-	if err = writeClusterInfoToFile(o.stateFilePath, clusterInfo); err != nil {
-		return errors.Wrapf(err, "failed to write kubernetes cluster info to state file %s:\n  %v",
+	if err = writeClusterInfo(o.stateFilePath, clusterInfo); err != nil {
+		return nil, errors.Wrapf(err, "failed to write kubernetes cluster info to state file %s:\n  %v",
 			o.stateFilePath, clusterInfo)
 	}
+	return clusterInfo, nil
+}
 
-	// merge created kubernetes cluster kubeconfig to ~/.kube/config and set it as default
-	spinner := printer.Spinner(o.Out, "Write kubeconfig to %s", defaultKubeConfigPath)
+// merge created kubernetes cluster kubeconfig to ~/.kube/config and set it as default
+func (o *initOptions) setKubeConfig(info *cp.K8sClusterInfo) error {
+	spinner := printer.Spinner(o.Out, "%-50s", "Merge kubeconfig to "+defaultKubeConfigPath)
 	defer spinner(false)
-	if err = kubeConfigWrite(clusterInfo.KubeConfig, defaultKubeConfigPath,
+
+	// check if the default kubeconfig file exists, if not, create it
+	if _, err := os.Stat(defaultKubeConfigPath); os.IsNotExist(err) {
+		if err = os.MkdirAll(filepath.Dir(defaultKubeConfigPath), 0755); err != nil {
+			return errors.Wrapf(err, "failed to create directory %s", filepath.Dir(defaultKubeConfigPath))
+		}
+		if err = os.WriteFile(defaultKubeConfigPath, []byte{}, 0644); err != nil {
+			return errors.Wrapf(err, "failed to create file %s", defaultKubeConfigPath)
+		}
+	}
+
+	if err := kubeConfigWrite(info.KubeConfig, defaultKubeConfigPath,
 		writeKubeConfigOptions{UpdateExisting: true, UpdateCurrentContext: true}); err != nil {
-		return errors.Wrapf(err, "failed to write cluster %s kubeconfig", clusterInfo.ClusterName)
+		return errors.Wrapf(err, "failed to write cluster %s kubeconfig", info.ClusterName)
 	}
 	spinner(true)
 
-	currentContext, err := kubeConfigCurrentContext(clusterInfo.KubeConfig)
-	spinner = printer.Spinner(o.Out, "Switch current context to %s", currentContext)
+	currentContext, err := kubeConfigCurrentContext(info.KubeConfig)
+	spinner = printer.Spinner(o.Out, "%-50s", "Switch current context to "+currentContext)
 	defer spinner(false)
 	if err != nil {
 		return err
@@ -310,7 +341,7 @@ func (o *initOptions) setKubeConfig(provider cp.Interface) error {
 	return nil
 }
 
-func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
+func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	var err error
 
 	// when the kubernetes cluster is not ready, the runtime will output the error
@@ -321,36 +352,33 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 		}
 	}
 
-	// playground always use the default kubeconfig at ~/.kube/config
-	if err = util.SetKubeConfig(defaultKubeConfigPath); err != nil {
+	// write kubeconfig content to a temporary file and use it
+	if err = writeAndUseKubeConfig(info.KubeConfig, o.kubeConfigPath, o.Out); err != nil {
 		return err
 	}
 
 	// create helm config
-	o.helmCfg = helm.NewConfig("", defaultKubeConfigPath, "", klog.V(1).Enabled())
+	o.helmCfg = helm.NewConfig("", o.kubeConfigPath, "", klog.V(1).Enabled())
 
-	// Install KubeBlocks
-	if err = o.installKubeBlocks(k8sClusterName); err != nil {
+	// install KubeBlocks
+	if err = o.installKubeBlocks(info.ClusterName); err != nil {
 		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
 
-	// Install database cluster
+	// install database cluster
 	clusterInfo := "ClusterDefinition: " + o.clusterDef
 	if o.clusterVersion != "" {
 		clusterInfo += ", ClusterVersion: " + o.clusterVersion
 	}
 	spinner := printer.Spinner(o.Out, "Create cluster %s (%s)", kbClusterName, clusterInfo)
 	defer spinner(false)
-	if err = o.createCluster(); err != nil {
+	if err = o.createCluster(); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "failed to create cluster %s", kbClusterName)
 	}
 	spinner(true)
 
-	// Print guide information
 	fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n\n")
-	if k8sClusterName != "" {
-		fmt.Fprintf(os.Stdout, "Kubernetes cluster \"%s\" has been created.\n", k8sClusterName)
-	}
+	fmt.Fprintf(os.Stdout, "Kubernetes cluster \"%s\" has been created.\n", info.ClusterName)
 	fmt.Fprintf(os.Stdout, "Cluster \"%s\" has been created.\n", kbClusterName)
 
 	// output elapsed time
@@ -392,10 +420,6 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			"snapshot-controller.enabled=true",
 			"csi-hostpath-driver.enabled=true",
 
-			// enable aws loadbalancer controller addon automatically on playground
-			"aws-loadbalancer-controller.enabled=true",
-			fmt.Sprintf("aws-loadbalancer-controller.clusterName=%s", k8sClusterName),
-
 			// disable the persistent volume of prometheus, if not, the prometheus
 			// will dependent the hostpath csi driver ready to create persistent
 			// volume, but the order of addon installation is not guaranteed that
@@ -406,9 +430,9 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			"prometheus.alertmanager.statefulSet.enabled=false")
 	} else if o.cloudProvider == cp.AWS {
 		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
-			// enable aws loadbalancer controller addon automatically on playground
-			"aws-loadbalancer-controller.enabled=true",
-			fmt.Sprintf("aws-loadbalancer-controller.clusterName=%s", k8sClusterName),
+			// enable aws-load-balancer-controller addon automatically on playground
+			"aws-load-balancer-controller.enabled=true",
+			fmt.Sprintf("aws-load-balancer-controller.clusterName=%s", k8sClusterName),
 		)
 	}
 
@@ -489,9 +513,6 @@ func (o *initOptions) newCreateOptions() (*cmdcluster.CreateOptions, error) {
 		options.Values = append(options.Values, "replicas=3")
 	}
 
-	if err = options.Validate(); err != nil {
-		return nil, err
-	}
 	if err = options.Complete(); err != nil {
 		return nil, err
 	}

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package create
@@ -28,23 +31,39 @@ import (
 	cuejson "cuelang.org/go/encoding/json"
 	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scheme"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
 	//go:embed template/*
 	cueTemplate embed.FS
+)
+
+type CreateDependency func(dryRun []string) error
+
+type DryRunStrategy int
+
+const (
+	// DryRunNone indicates the client will make all mutating calls
+	DryRunNone DryRunStrategy = iota
+	DryRunClient
+	DryRunServer
 )
 
 type Inputs struct {
@@ -92,6 +111,12 @@ type Inputs struct {
 	// CustomOutPut will be executed after creating successfully.
 	CustomOutPut func(options *BaseOptions)
 
+	// CleanUpFn will be executed after creating failed.
+	CleanUpFn func() error
+
+	// CreateDependencies will be executed before creating.
+	CreateDependencies CreateDependency
+
 	// ResourceNameGVRForCompletion resource name for completion.
 	ResourceNameGVRForCompletion schema.GroupVersionResource
 }
@@ -108,10 +133,14 @@ type BaseOptions struct {
 
 	Client kubernetes.Interface `json:"-"`
 
+	ToPrinter func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error) `json:"-"`
+
+	Format printer.Format `json:"-"`
+
+	DryRunStrategy string `json:"-"`
+
 	// Quiet minimize unnecessary output
 	Quiet bool
-
-	ClientSet kubernetes.Interface
 
 	genericclioptions.IOStreams
 }
@@ -153,8 +182,22 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 		return err
 	}
 
-	if o.ClientSet, err = inputs.Factory.KubernetesClientSet(); err != nil {
-		return err
+	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
+		var p printers.ResourcePrinter
+		switch o.Format {
+		case printer.JSON:
+			p = &printers.JSONPrinter{}
+		case printer.YAML:
+			p = &printers.YAMLPrinter{}
+		default:
+			return nil, genericclioptions.NoCompatiblePrinterError{AllowedFormats: []string{"JSON", "YAML"}}
+		}
+
+		p, err = printers.NewTypeSetter(scheme.Scheme).WrapToPrinter(p, nil)
+		if err != nil {
+			return nil, err
+		}
+		return p.PrintObj, nil
 	}
 
 	// do custom options complete
@@ -215,19 +258,69 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	if len(version) == 0 {
 		version = types.AppsAPIVersion
 	}
-	// create k8s resource
-	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
-	if unstructuredObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+
+	previewObj := unstructuredObj
+	dryRunStrategy, err := o.GetDryRunStrategy()
+	if err != nil {
 		return err
 	}
-	o.Name = unstructuredObj.GetName()
-	if o.Quiet {
+
+	if dryRunStrategy != DryRunClient {
+		gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
+		createOptions := metav1.CreateOptions{}
+
+		if dryRunStrategy == DryRunServer {
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+
+		// create dependencies
+		if inputs.CreateDependencies != nil {
+			if err = inputs.CreateDependencies(createOptions.DryRun); err != nil {
+				return err
+			}
+		}
+
+		// create kubernetes resource
+		previewObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), previewObj, createOptions)
+		if err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				return err
+			}
+
+			// for other errors, clean up dependencies
+			if cleanErr := o.CleanUp(inputs); cleanErr != nil {
+				fmt.Fprintf(o.ErrOut, "clean up denpendencies failed: %v\n", cleanErr)
+			}
+			return err
+		}
+
+		if dryRunStrategy != DryRunServer {
+			o.Name = previewObj.GetName()
+			if o.Quiet {
+				return nil
+			}
+			if inputs.CustomOutPut != nil {
+				inputs.CustomOutPut(o)
+			} else {
+				fmt.Fprintf(o.Out, "%s %s created\n", previewObj.GetKind(), previewObj.GetName())
+			}
+			return nil
+		}
+	}
+	printer, err := o.ToPrinter(nil, false)
+	if err != nil {
+		return err
+	}
+	return printer.PrintObj(previewObj, o.Out)
+}
+
+func (o *BaseOptions) CleanUp(inputs Inputs) error {
+	if inputs.CreateDependencies == nil {
 		return nil
 	}
-	if inputs.CustomOutPut != nil {
-		inputs.CustomOutPut(o)
-	} else {
-		fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+
+	if inputs.CleanUpFn != nil {
+		return inputs.CleanUpFn()
 	}
 	return nil
 }
@@ -282,7 +375,7 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 		objectByte, metav1.PatchOptions{}); err != nil {
 
 		// create object if not found
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			if _, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(
 				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 				return err
@@ -292,6 +385,24 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 		}
 	}
 	return nil
+}
+
+func (o *BaseOptions) GetDryRunStrategy() (DryRunStrategy, error) {
+	if o.DryRunStrategy == "" {
+		return DryRunNone, nil
+	}
+	switch o.DryRunStrategy {
+	case "client":
+		return DryRunClient, nil
+	case "server":
+		return DryRunServer, nil
+	case "unchanged":
+		return DryRunClient, nil
+	case "none":
+		return DryRunNone, nil
+	default:
+		return DryRunNone, fmt.Errorf(`invalid dry-run value (%v). Must be "none", "server", or "client"`, o.DryRunStrategy)
+	}
 }
 
 // NewCueValue convert cue template  to cue Value which holds any value like Boolean,Struct,String and more cue type.

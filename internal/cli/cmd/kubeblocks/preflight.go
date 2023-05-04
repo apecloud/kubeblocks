@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package kubeblocks
@@ -22,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/ahmetalpbalkan/go-cursor"
 	"github.com/fatih/color"
@@ -54,6 +58,9 @@ const (
 	flagDebug                     = "debug"
 	flagNamespace                 = "namespace"
 	flagVerbose                   = "verbose"
+
+	PreflightPattern     = "data/%s_preflight.yaml"
+	HostPreflightPattern = "data/%s_hostpreflight.yaml"
 )
 
 var (
@@ -71,11 +78,6 @@ var (
 
 		# Run preflight checks and display AnalyzeResults with interactive mode
 		kbcli kubeblocks preflight preflight-check.yaml --interactive=true`)
-)
-
-const (
-	EKSHostPreflight = "data/eks_hostpreflight.yaml"
-	EKSPreflight     = "data/eks_preflight.yaml"
 )
 
 // PreflightOptions declares the arguments accepted by the preflight command
@@ -123,27 +125,22 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 
 func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 	var yamlDataList [][]byte
-	switch vendorName {
-	case util.EKSProvider:
-		if data, err := defaultVendorYamlData.ReadFile(EKSHostPreflight); err == nil {
-			yamlDataList = append(yamlDataList, data)
-		}
-		if data, err := defaultVendorYamlData.ReadFile(EKSPreflight); err == nil {
-			yamlDataList = append(yamlDataList, data)
-		}
-	case util.UnknownProvider:
-		fallthrough
-	default:
-		fmt.Println("unsupported k8s provider, and the validation of provider will coming soon")
-		return yamlDataList, errors.New("no supported provider")
+	if data, err := defaultVendorYamlData.ReadFile(newPreflightPath(vendorName)); err == nil {
+		yamlDataList = append(yamlDataList, data)
+	}
+	if data, err := defaultVendorYamlData.ReadFile(newHostPreflightPath(vendorName)); err == nil {
+		yamlDataList = append(yamlDataList, data)
+	}
+	if len(yamlDataList) == 0 {
+		return yamlDataList, errors.New("unsupported k8s provider, and the validation of provider will coming soon")
 	}
 	return yamlDataList, nil
 }
 
-func (p *PreflightOptions) complete(factory cmdutil.Factory, args []string) error {
+func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) error {
 	// default no args, and run default validating vendor
 	if len(args) == 0 {
-		clientSet, err := factory.KubernetesClientSet()
+		clientSet, err := f.KubernetesClientSet()
 		if err != nil {
 			return errors.New("init k8s client failed, and please check kubeconfig")
 		}
@@ -151,7 +148,7 @@ func (p *PreflightOptions) complete(factory cmdutil.Factory, args []string) erro
 		if err != nil {
 			return errors.New("get k8s version of server failed, and please check your k8s accessibility")
 		}
-		vendorName, err := util.GetK8sProvider(versionInfo[util.KubernetesApp], clientSet)
+		vendorName, err := util.GetK8sProvider(versionInfo.Kubernetes, clientSet)
 		if err != nil {
 			return errors.New("get k8s cloud provider failed, and please check your k8s accessibility")
 		}
@@ -195,7 +192,7 @@ func (p *PreflightOptions) run() error {
 		fmt.Print(cursor.Hide())
 		defer fmt.Print(cursor.Show())
 	}
-	// set progress chain
+	// set progress chan
 	progressCh := make(chan interface{})
 	defer close(progressCh)
 	// make sure we shut down progress collection goroutines if an error occurs
@@ -208,7 +205,7 @@ func (p *PreflightOptions) run() error {
 		return err
 	}
 	// 2. collect data
-	collectResults, err = kbpreflight.CollectPreflight(ctx, kbPreflight, kbHostPreflight, progressCh)
+	collectResults, err = kbpreflight.CollectPreflight(p.factory, ctx, kbPreflight, kbHostPreflight, progressCh)
 	if err != nil {
 		return err
 	}
@@ -251,4 +248,12 @@ func CollectProgress(ctx context.Context, progressCh <-chan interface{}, verbose
 			}
 		}
 	}
+}
+
+func newPreflightPath(vendorName util.K8sProvider) string {
+	return fmt.Sprintf(PreflightPattern, strings.ToLower(string(vendorName)))
+}
+
+func newHostPreflightPath(vendorName util.K8sProvider) string {
+	return fmt.Sprintf(HostPreflightPattern, strings.ToLower(string(vendorName)))
 }

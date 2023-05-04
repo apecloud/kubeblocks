@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package kubeblocks
@@ -23,7 +26,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/cli/values"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -88,27 +90,10 @@ var _ = Describe("kubeblocks install", func() {
 			CreateNamespace: true,
 		}
 		Expect(o.Install()).Should(HaveOccurred())
-		Expect(len(o.ValueOpts.Values)).To(Equal(1))
+		Expect(o.ValueOpts.Values).Should(HaveLen(1))
 		Expect(o.ValueOpts.Values[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
 		Expect(o.installChart()).Should(HaveOccurred())
 		o.printNotes()
-	})
-
-	It("create volumeSnapshotClass", func() {
-		o := &InstallOptions{
-			Options: Options{
-				IOStreams: streams,
-				HelmCfg:   helm.NewFakeConfig(namespace),
-				Namespace: "default",
-				Client:    testing.FakeClientSet(),
-				Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
-			},
-			Version:         version.DefaultKubeBlocksVersion,
-			Monitor:         true,
-			CreateNamespace: true,
-			ValueOpts:       values.Options{Values: []string{"snapshot-controller.enabled=true"}},
-		}
-		Expect(o.createVolumeSnapshotClass()).Should(HaveOccurred())
 	})
 
 	It("preCheck", func() {
@@ -120,18 +105,15 @@ var _ = Describe("kubeblocks install", func() {
 			Check: true,
 		}
 		By("kubernetes version is empty")
-		versionInfo := map[util.AppName]string{}
-		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("failed to get kubernetes version"))
-
-		versionInfo[util.KubernetesApp] = ""
-		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("failed to get kubernetes version"))
+		v := util.Version{}
+		Expect(o.preCheck(v).Error()).Should(ContainSubstring("failed to get kubernetes version"))
 
 		By("kubernetes is provided by cloud provider")
-		versionInfo[util.KubernetesApp] = "v1.25.0-eks"
-		Expect(o.preCheck(versionInfo)).Should(Succeed())
+		v.Kubernetes = "v1.25.0-eks"
+		Expect(o.preCheck(v)).Should(Succeed())
 
 		By("kubernetes is not provided by cloud provider")
-		versionInfo[util.KubernetesApp] = "v1.25.0"
-		Expect(o.preCheck(versionInfo)).Should(Succeed())
+		v.Kubernetes = "v1.25.0"
+		Expect(o.preCheck(v)).Should(Succeed())
 	})
 })

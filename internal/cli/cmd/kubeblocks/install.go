@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package kubeblocks
@@ -42,7 +45,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -78,9 +80,9 @@ type InstallOptions struct {
 
 var (
 	installExample = templates.Examples(`
-	# Install KubeBlocks, the default version is same with the kbcli version, the default namespace is kb-system 
+	# Install KubeBlocks, the default version is same with the kbcli version, the default namespace is kb-system
 	kbcli kubeblocks install
-	
+
 	# Install KubeBlocks with specified version
 	kbcli kubeblocks install --version=0.4.0
 
@@ -155,13 +157,13 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 func (o *InstallOptions) Install() error {
 	// check if KubeBlocks has been installed
-	versionInfo, err := util.GetVersionInfo(o.Client)
+	v, err := util.GetVersionInfo(o.Client)
 	if err != nil {
 		return err
 	}
 
-	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
-		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v)
+	if v.KubeBlocks != "" {
+		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v.KubeBlocks)
 		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
 		return nil
 	}
@@ -177,7 +179,7 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
-	if err = o.preCheck(versionInfo); err != nil {
+	if err = o.preCheck(v); err != nil {
 		return err
 	}
 
@@ -185,7 +187,7 @@ func (o *InstallOptions) Install() error {
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// add helm repo
-	spinner := printer.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksRepoName)
+	spinner := printer.Spinner(o.Out, "%-50s", "Add and update repo "+types.KubeBlocksRepoName)
 	defer spinner(false)
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()}); err != nil {
@@ -194,7 +196,7 @@ func (o *InstallOptions) Install() error {
 	spinner(true)
 
 	// install KubeBlocks chart
-	spinner = printer.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
+	spinner = printer.Spinner(o.Out, "%-50s", "Install KubeBlocks "+o.Version)
 	defer spinner(false)
 	if err = o.installChart(); err != nil {
 		return err
@@ -203,11 +205,6 @@ func (o *InstallOptions) Install() error {
 
 	// wait for auto-install addons to be ready
 	if err = o.waitAddonsEnabled(); err != nil {
-		return err
-	}
-
-	// create VolumeSnapshotClass
-	if err = o.createVolumeSnapshotClass(); err != nil {
 		return err
 	}
 
@@ -225,7 +222,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	checkAddons := func() (bool, error) {
 		allEnabled := true
 		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: buildAddonLabelSelector(),
+			LabelSelector: buildKubeBlocksSelectorLabels(),
 		})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -268,13 +265,13 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	}
 
 	okMsg := func(msg string) string {
-		return fmt.Sprintf("%-40s %s\n", msg, printer.BoldGreen("OK"))
+		return fmt.Sprintf("%-50s %s\n", msg, printer.BoldGreen("OK"))
 	}
 	failMsg := func(msg string) string {
-		return fmt.Sprintf("%-40s %s\n", msg, printer.BoldRed("FAIL"))
+		return fmt.Sprintf("%-50s %s\n", msg, printer.BoldRed("FAIL"))
 	}
 	suffixMsg := func(msg string) string {
-		return fmt.Sprintf(" %-40s", msg)
+		return fmt.Sprintf(" %-50s", msg)
 	}
 
 	// create spinner
@@ -336,12 +333,12 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	}
 
 	// timeout to wait for all auto-install addons to be enabled
-	s.FinalMSG = fmt.Sprintf("%-40s %s\n", msg, printer.BoldRed("TIMEOUT"))
+	s.FinalMSG = fmt.Sprintf("%-50s %s\n", msg, printer.BoldRed("TIMEOUT"))
 	s.Stop()
 	return nil
 }
 
-func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
+func (o *InstallOptions) preCheck(v util.Version) error {
 	if !o.Check {
 		return nil
 	}
@@ -355,21 +352,21 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	}
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")
-	k8sVersionStr, ok := versionInfo[util.KubernetesApp]
-	if !ok {
+	k8sVersionStr := v.Kubernetes
+	if k8sVersionStr == "" {
 		return versionErr
 	}
 
-	version := util.GetK8sVersion(k8sVersionStr)
-	if len(version) == 0 {
+	semVer := util.GetK8sSemVer(k8sVersionStr)
+	if len(semVer) == 0 {
 		return versionErr
 	}
 
 	// output kubernetes version
-	fmt.Fprintf(o.Out, "Kubernetes version %s\n", ""+version)
+	fmt.Fprintf(o.Out, "Kubernetes version %s\n", ""+semVer)
 
 	// disable or enable some features according to the kubernetes environment
-	provider, err := util.GetK8sProvider(version, o.Client)
+	provider, err := util.GetK8sProvider(k8sVersionStr, o.Client)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes provider: %v", err)
 	}
@@ -378,7 +375,7 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	}
 
 	// check kbcli version, now do nothing
-	fmt.Fprintf(o.Out, "kbcli version %s\n", versionInfo[util.KBCLIApp])
+	fmt.Fprintf(o.Out, "kbcli version %s\n", v.Cli)
 
 	return nil
 }
@@ -461,46 +458,6 @@ Note: Monitoring add-ons are not installed.
     Use 'kbcli addon enable <addon-name>' to install them later.
 `)
 	}
-}
-
-func (o *InstallOptions) createVolumeSnapshotClass() error {
-	createFunc := func() error {
-		options := cluster.CreateVolumeSnapshotClassOptions{}
-		options.BaseOptions.Dynamic = o.Dynamic
-		options.BaseOptions.IOStreams = o.IOStreams
-		options.BaseOptions.Quiet = true
-
-		spinner := printer.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
-		defer spinner(false)
-
-		if err := options.Complete(); err != nil {
-			return err
-		}
-		if err := options.Create(); err != nil {
-			return err
-		}
-		spinner(true)
-		return nil
-	}
-
-	var sets []string
-	for _, set := range o.ValueOpts.Values {
-		splitSet := strings.Split(set, ",")
-		sets = append(sets, splitSet...)
-	}
-	for _, set := range sets {
-		if set != "snapshot-controller.enabled=true" {
-			continue
-		}
-
-		if err := createFunc(); err != nil {
-			return err
-		} else {
-			// only need to create once
-			return nil
-		}
-	}
-	return nil
 }
 
 func (o *InstallOptions) buildChart() *helm.InstallOpts {

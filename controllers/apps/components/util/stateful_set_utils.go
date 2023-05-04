@@ -1,18 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
-Copyright 2016 The Kubernetes Authors.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package util
@@ -49,7 +51,7 @@ func IsMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name
 }
 
-// IsStsAndPodsRevisionConsistent checks if StatefulSet and pods of the StatefuleSet have the same revison,
+// IsStsAndPodsRevisionConsistent checks if StatefulSet and pods of the StatefulSet have the same revision.
 func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) (bool, error) {
 	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
 	if err != nil {
@@ -123,40 +125,19 @@ func ConvertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 	return nil
 }
 
-// Len is the implementation of the sort.Interface, calculate the length of the list of DescendingOrdinalSts.
-func (dos DescendingOrdinalSts) Len() int {
-	return len(dos)
-}
-
-// Swap is the implementation of the sort.Interface, exchange two items in DescendingOrdinalSts.
-func (dos DescendingOrdinalSts) Swap(i, j int) {
-	dos[i], dos[j] = dos[j], dos[i]
-}
-
-// Less is the implementation of the sort.Interface, sort the size of the statefulSet ordinal in descending order.
-func (dos DescendingOrdinalSts) Less(i, j int) bool {
-	return GetOrdinalSts(dos[i]) > GetOrdinalSts(dos[j])
-}
-
-// GetOrdinalSts gets StatefulSet's ordinal. If StatefulSet has no ordinal, -1 is returned.
-func GetOrdinalSts(sts *appsv1.StatefulSet) int {
-	_, ordinal := getParentNameAndOrdinalSts(sts)
-	return ordinal
-}
-
-// getParentNameAndOrdinalSts gets the name of cluster-component and StatefulSet's ordinal as extracted from its Name. If
+// ParseParentNameAndOrdinal gets the name of cluster-component and StatefulSet's ordinal as extracted from its Name. If
 // the StatefulSet's Name was not match a statefulSetRegex, its parent is considered to be empty string,
 // and its ordinal is considered to be -1.
-func getParentNameAndOrdinalSts(sts *appsv1.StatefulSet) (string, int) {
+func ParseParentNameAndOrdinal(s string) (string, int32) {
 	parent := ""
-	ordinal := -1
-	subMatches := statefulSetRegex.FindStringSubmatch(sts.Name)
+	ordinal := int32(-1)
+	subMatches := statefulSetRegex.FindStringSubmatch(s)
 	if len(subMatches) < 3 {
 		return parent, ordinal
 	}
 	parent = subMatches[1]
 	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
-		ordinal = int(i)
+		ordinal = int32(i)
 	}
 	return parent, ordinal
 }
@@ -179,6 +160,25 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 		}
 	}
 	return pods, nil
+}
+
+// GetPodOwnerReferencesSts gets the owner reference statefulSet of the pod.
+func GetPodOwnerReferencesSts(ctx context.Context, cli client.Client, podObj *corev1.Pod) (*appsv1.StatefulSet, error) {
+	stsList := &appsv1.StatefulSetList{}
+	if err := cli.List(ctx, stsList,
+		&client.ListOptions{Namespace: podObj.Namespace},
+		client.MatchingLabels{
+			constant.KBAppComponentLabelKey: podObj.Labels[constant.KBAppComponentLabelKey],
+			constant.AppInstanceLabelKey:    podObj.Labels[constant.AppInstanceLabelKey],
+		}); err != nil {
+		return nil, err
+	}
+	for _, sts := range stsList.Items {
+		if IsMemberOf(&sts, podObj) {
+			return &sts, nil
+		}
+	}
+	return nil, nil
 }
 
 // MarkPrimaryStsToReconcile marks the primary statefulSet annotation to be reconciled.

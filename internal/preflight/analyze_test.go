@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package preflight
@@ -25,6 +28,7 @@ import (
 	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
+	preflightTesting "github.com/apecloud/kubeblocks/internal/preflight/testing"
 )
 
 var _ = Describe("analyze_test", func() {
@@ -35,37 +39,12 @@ var _ = Describe("analyze_test", func() {
 		kbAnalyzers      []*preflightv1beta2.ExtendAnalyze
 		hostAnalyzers    []*troubleshoot.HostAnalyze
 		kbhHostAnalyzers []*preflightv1beta2.ExtendHostAnalyze
-		clusterVersion   = `
-{
-  "info": {
-    "major": "1",
-    "minor": "23",
-    "gitVersion": "v1.23.15",
-    "gitCommit": "b84cb8ab29366daa1bba65bc67f54de2f6c34848",
-    "gitTreeState": "clean",
-    "buildDate": "2022-12-08T10:42:57Z",
-    "goVersion": "go1.17.13",
-    "compiler": "gc",
-    "platform": "linux/arm64"
-  },
-  "string": "v1.23.15"
-}`
 	)
 
 	BeforeEach(func() {
 		ctx = context.TODO()
-		allCollectedData = map[string][]byte{"cluster-info/cluster_version.json": []byte(clusterVersion)}
-		analyzers = []*troubleshoot.Analyze{
-			{ClusterVersion: &troubleshoot.ClusterVersion{
-				AnalyzeMeta: troubleshoot.AnalyzeMeta{
-					CheckName: "ClusterVersionCheck",
-				},
-				Outcomes: []*troubleshoot.Outcome{
-					{
-						Pass: &troubleshoot.SingleOutcome{
-							Message: "version is ok.",
-						}}}}},
-		}
+		allCollectedData = preflightTesting.FakeCollectedData()
+		analyzers = preflightTesting.FakeAnalyzers()
 		kbAnalyzers = []*preflightv1beta2.ExtendAnalyze{{}}
 		hostAnalyzers = []*troubleshoot.HostAnalyze{{}}
 		kbhHostAnalyzers = []*preflightv1beta2.ExtendHostAnalyze{{}}

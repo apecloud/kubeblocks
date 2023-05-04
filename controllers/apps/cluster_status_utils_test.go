@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
@@ -51,49 +54,46 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-
 		testapps.ClearClusterResources(&testCtx)
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		// testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
 	}
 	BeforeEach(cleanEnv)
 
 	AfterEach(cleanEnv)
 
-	const statefulMySQLCompType = "stateful"
+	const statefulMySQLCompDefName = "stateful"
 	const statefulMySQLCompName = "mysql1"
 
-	const consensusMySQLCompType = "consensus"
+	const consensusMySQLCompDefName = "consensus"
 	const consensusMySQLCompName = "mysql2"
 
-	const nginxCompType = "stateless"
+	const statelessCompDefName = "stateless"
 	const nginxCompName = "nginx"
 
 	createClusterDef := func() {
 		_ = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.StatefulMySQLComponent, statefulMySQLCompType).
-			AddComponent(testapps.ConsensusMySQLComponent, consensusMySQLCompType).
-			AddComponent(testapps.StatelessNginxComponent, nginxCompType).
+			AddComponentDef(testapps.StatefulMySQLComponent, statefulMySQLCompDefName).
+			AddComponentDef(testapps.ConsensusMySQLComponent, consensusMySQLCompDefName).
+			AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
 			Create(&testCtx)
 	}
 
 	createClusterVersion := func() {
 		_ = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(statefulMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-			AddComponent(consensusMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-			AddComponent(nginxCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
+			AddComponentVersion(statefulMySQLCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			AddComponentVersion(consensusMySQLCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			AddComponentVersion(statelessCompDefName).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
 			Create(&testCtx)
 	}
 
 	createCluster := func() *appsv1alpha1.Cluster {
 		return testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-			AddComponent(statefulMySQLCompName, statefulMySQLCompType).SetReplicas(3).
-			AddComponent(consensusMySQLCompName, consensusMySQLCompType).SetReplicas(3).
-			AddComponent(nginxCompName, nginxCompType).SetReplicas(3).
+			AddComponent(statefulMySQLCompName, statefulMySQLCompDefName).SetReplicas(3).
+			AddComponent(consensusMySQLCompName, consensusMySQLCompDefName).SetReplicas(3).
+			AddComponent(nginxCompName, statelessCompDefName).SetReplicas(3).
 			Create(&testCtx).GetObject()
 	}
 
@@ -281,7 +281,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			By("test the cluster phase when cluster only contains a component of Stateful workload, and the component is Failed or Abnormal")
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(statefulMySQLCompName, statefulMySQLCompType).SetReplicas(3).GetObject()
+				AddComponent(statefulMySQLCompName, statefulMySQLCompDefName).SetReplicas(3).GetObject()
 			// mock Stateful component is Failed and expect cluster phase is FailedPhase
 			testHandleClusterPhaseWhenCompsNotReady(clusterObj, appsv1alpha1.FailedClusterCompPhase, appsv1alpha1.FailedClusterPhase)
 
@@ -301,9 +301,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				g.Expect(tmpCluster.Status.Components).Should(HaveLen(len(tmpCluster.Spec.ComponentSpecs)))
 			})).Should(Succeed())
 
-			changeAndCheckComponents := func(changeFunc func(), expectObservedGeneration int64, checkFun func(Gomega, *appsv1alpha1.Cluster)) {
-				Expect(testapps.ChangeObj(&testCtx, cluster, func() {
-					changeFunc()
+			changeAndCheckComponents := func(changeFunc func(*appsv1alpha1.Cluster), expectObservedGeneration int64, checkFun func(Gomega, *appsv1alpha1.Cluster)) {
+				Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
+					changeFunc(lcluster)
 				})).ShouldNot(HaveOccurred())
 				// wait for cluster controller reconciles to complete.
 				Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(cluster))).Should(Equal(expectObservedGeneration))
@@ -313,8 +313,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("delete consensus component")
 			consensusClusterComponent := cluster.Spec.ComponentSpecs[2]
 			changeAndCheckComponents(
-				func() {
-					cluster.Spec.ComponentSpecs = cluster.Spec.ComponentSpecs[:2]
+				func(lcluster *appsv1alpha1.Cluster) {
+					lcluster.Spec.ComponentSpecs = cluster.Spec.ComponentSpecs[:2]
 				}, 2,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					g.Expect(tmpCluster.Status.Components).Should(HaveLen(2))
@@ -324,8 +324,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("add consensus component")
 			consensusClusterComponent.Name = "consensus1"
 			changeAndCheckComponents(
-				func() {
-					cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, consensusClusterComponent)
+				func(lcluster *appsv1alpha1.Cluster) {
+					lcluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, consensusClusterComponent)
 				}, 3,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					_, isExist := tmpCluster.Status.Components[consensusClusterComponent.Name]
@@ -336,8 +336,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("modify consensus component name")
 			modifyConsensusName := "consensus2"
 			changeAndCheckComponents(
-				func() {
-					cluster.Spec.ComponentSpecs[2].Name = modifyConsensusName
+				func(lcluster *appsv1alpha1.Cluster) {
+					lcluster.Spec.ComponentSpecs[2].Name = modifyConsensusName
 				}, 4,
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					_, isExist := tmpCluster.Status.Components[modifyConsensusName]

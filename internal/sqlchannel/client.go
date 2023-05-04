@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package sqlchannel
@@ -46,12 +49,6 @@ type OperationResult struct {
 	respTime time.Time
 }
 
-type Order struct {
-	OrderID  int     `json:"orderid"`
-	Customer string  `json:"customer"`
-	Price    float64 `json:"price"`
-}
-
 func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, error) {
 	if characterType == "" {
 		return nil, fmt.Errorf("pod %v chacterType must be set", pod.Name)
@@ -61,6 +58,7 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 	if ip == "" {
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
+
 	port, err := intctrlutil.GetProbeGRPCPort(pod)
 	if err != nil {
 		return nil, err
@@ -93,6 +91,7 @@ func (cli *OperationClient) GetRole() (string, error) {
 		Data:      []byte(""),
 		Metadata:  map[string]string{},
 	}
+
 	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
 	if err != nil {
 		return "", err
@@ -104,6 +103,37 @@ func (cli *OperationClient) GetRole() (string, error) {
 	}
 
 	return result["role"], nil
+}
+
+// GetSystemAccounts list all system accounts created
+func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
+	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
+	defer cancel()
+
+	// Request sql channel via Dapr SDK
+	req := &dapr.InvokeBindingRequest{
+		Name:      cli.CharacterType,
+		Operation: string(ListSystemAccountsOp),
+	}
+
+	if resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req); err != nil {
+		return nil, err
+	} else {
+		sqlResponse := SQLChannelResponse{}
+		if err = json.Unmarshal(resp.Data, &sqlResponse); err != nil {
+			return nil, err
+		}
+		if sqlResponse.Event == RespEveFail {
+			return nil, fmt.Errorf("get system accounts error: %s", sqlResponse.Message)
+		} else {
+			result := []string{}
+			if err = json.Unmarshal(([]byte)(sqlResponse.Message), &result); err != nil {
+				return nil, err
+			} else {
+				return result, err
+			}
+		}
+	}
 }
 
 func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {
@@ -169,11 +199,11 @@ type OperationHTTPClient struct {
 	httpRequestPrefix string
 	RequestTimeout    time.Duration
 	containerName     string
-	exec              *exec.ExecOptions
+	characterType     string
 }
 
-// NewHTTPClientWithPod create a new OperationHTTPClient with pod
-func NewHTTPClientWithPod(exec *exec.ExecOptions, pod *corev1.Pod, characterType string) (*OperationHTTPClient, error) {
+// NewHTTPClientWithChannelPod create a new OperationHTTPClient with sqlchannel container
+func NewHTTPClientWithChannelPod(pod *corev1.Pod, characterType string) (*OperationHTTPClient, error) {
 	var (
 		err error
 	)
@@ -199,34 +229,59 @@ func NewHTTPClientWithPod(exec *exec.ExecOptions, pod *corev1.Pod, characterType
 		httpRequestPrefix: fmt.Sprintf(HTTPRequestPrefx, port, characterType),
 		RequestTimeout:    10 * time.Second,
 		containerName:     container,
-		exec:              exec,
+		characterType:     characterType,
 	}
 	return client, nil
 }
 
 // SendRequest exec sql operation, this is a blocking operation and it will use pod EXEC subresource to send an http request to the probe pod
-func (cli *OperationHTTPClient) SendRequest(request SQLChannelRequest) (SQLChannelResponse, error) {
+func (cli *OperationHTTPClient) SendRequest(exec *exec.ExecOptions, request SQLChannelRequest) (SQLChannelResponse, error) {
 	var (
-		response  = SQLChannelResponse{}
 		strBuffer bytes.Buffer
 		errBuffer bytes.Buffer
 		err       error
+		response  = SQLChannelResponse{}
 	)
 
 	if jsonData, err := json.Marshal(request); err != nil {
 		return response, err
 	} else {
-		cli.exec.ContainerName = cli.containerName
-		cli.exec.Command = []string{"sh", "-c", cli.httpRequestPrefix + " -d '" + string(jsonData) + "'"}
+		exec.ContainerName = cli.containerName
+		exec.Command = []string{"sh", "-c", cli.httpRequestPrefix + " -d '" + string(jsonData) + "'"}
 	}
 
 	// redirect output to strBuffer to be parsed later
-	if err = cli.exec.RunWithRedirect(&strBuffer, &errBuffer); err != nil {
+	if err = exec.RunWithRedirect(&strBuffer, &errBuffer); err != nil {
 		return response, err
+	}
+	return parseResponse(strBuffer.Bytes(), request.Operation, cli.characterType)
+}
+
+type errorResponse struct {
+	ErrorCode string `json:"errorCode"`
+	Message   string `json:"message"`
+}
+
+// parseResponse parse response to errorResponse or SQLChannelResponse to capture error message if any.
+func parseResponse(data []byte, operation string, charType string) (SQLChannelResponse, error) {
+	errorResponse := errorResponse{}
+	response := SQLChannelResponse{}
+	if err := json.Unmarshal(data, &errorResponse); err != nil {
+		return response, err
+	} else if len(errorResponse.ErrorCode) > 0 {
+		return SQLChannelResponse{
+			Event:   RespEveFail,
+			Message: fmt.Sprintf("Operation `%s` on component of type `%s` is not supported yet.", operation, charType),
+			Metadata: SQLChannelMeta{
+				Operation: operation,
+				StartTime: time.Now(),
+				EndTime:   time.Now(),
+				Extra:     errorResponse.Message,
+			},
+		}, SQLChannelError{Reason: UnsupportedOps}
 	}
 
-	if err = json.Unmarshal(strBuffer.Bytes(), &response); err != nil {
-		return response, err
-	}
-	return response, nil
+	// conver it to SQLChannelResponse
+	err := json.Unmarshal(data, &response)
+	return response, err
 }

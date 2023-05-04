@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: weaviate-standalone-config-template
+  name: weaviate-config-template
   namespace: {{ .Release.Namespace | quote }}
   labels:
   {{- include "weaviate.labels" . | nindent 4 }}

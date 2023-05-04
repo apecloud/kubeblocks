@@ -1,14 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package v1beta2
@@ -32,6 +38,9 @@ type ExtendAnalyze struct {
 	// clusterAccess is to determine the accessibility of target k8s cluster
 	// +optional
 	ClusterAccess *ClusterAccessAnalyze `json:"clusterAccess,omitempty"`
+	// StorageClass is to determine the correctness of target storage class
+	// +optional
+	StorageClass *KBStorageClassAnalyze `json:"storageClass,omitempty"`
 }
 
 type HostUtility struct {
@@ -79,6 +88,21 @@ type ClusterRegionAnalyze struct {
 	// regionNames is a set of expected region names
 	// +kubebuilder:validation:Required
 	RegionNames []string `json:"regionNames"`
+}
+
+// KBStorageClassAnalyze replaces default storageClassAnalyze in preflight
+type KBStorageClassAnalyze struct {
+	// analyzeMeta is defined in troubleshoot.sh
+	troubleshoot.AnalyzeMeta `json:",inline"`
+	// outcomes are expected user defined results.
+	// +kubebuilder:validation:Required
+	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
+	// Parameters is a set of parameters including type and fsType...
+	// +kubebuilder:validation:Required
+	StorageClassType string `json:"storageClassType"`
+	// provisioner is the provisioner of storageClass
+	// +optional
+	Provisioner string `json:"provisioner,omitempty"`
 }
 
 type ExtendHostAnalyze struct {

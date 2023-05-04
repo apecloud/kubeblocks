@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package component
@@ -35,7 +38,9 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	roleObserveURIFormat = "http://localhost:%s/v1.0/bindings/%s"
+	checkRoleURIFormat    = "http://localhost:%s/v1.0/bindings/%s"
+	checkRunningURIFormat = "/v1.0/bindings/%s?operation=checkRunning"
+	checkStatusURIFormat  = "/v1.0/bindings/%s?operation=checkStatus"
 )
 
 var (
@@ -66,21 +71,21 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		return err
 	}
 
-	if componentProbes.RoleChangedProbe != nil {
+	if componentProbes.RoleProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleChangedProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleChangedProbe, int(probeSvcHTTPPort))
+		buildRoleProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
 	if componentProbes.StatusProbe != nil {
 		statusProbeContainer := container.DeepCopy()
-		buildStatusProbeContainer(statusProbeContainer, componentProbes.StatusProbe, int(probeSvcHTTPPort))
+		buildStatusProbeContainer(component.CharacterType, statusProbeContainer, componentProbes.StatusProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *statusProbeContainer)
 	}
 
 	if componentProbes.RunningProbe != nil {
 		runningProbeContainer := container.DeepCopy()
-		buildRunningProbeContainer(runningProbeContainer, componentProbes.RunningProbe, int(probeSvcHTTPPort))
+		buildRunningProbeContainer(component.CharacterType, runningProbeContainer, componentProbes.RunningProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *runningProbeContainer)
 	}
 
@@ -120,21 +125,17 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	container.Command = []string{"probe", "--app-id", "batch-sdk",
 		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
 		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
-		"--app-protocol", "http",
 		"--log-level", logLevel,
 		"--config", "/config/probe/config.yaml",
 		"--components-path", "/config/probe/components"}
 
-	if len(component.Services) > 0 && len(component.Services[0].Spec.Ports) > 0 {
-		service := component.Services[0]
-		port := service.Spec.Ports[0]
-		dbPort := port.TargetPort.IntValue()
-		if dbPort == 0 {
-			dbPort = int(port.Port)
-		}
+	if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
+		mainContainer := component.PodSpec.Containers[0]
+		port := mainContainer.Ports[0]
+		dbPort := port.ContainerPort
 		container.Env = append(container.Env, corev1.EnvVar{
 			Name:      constant.KBPrefix + "_SERVICE_PORT",
-			Value:     strconv.Itoa(dbPort),
+			Value:     strconv.Itoa(int(dbPort)),
 			ValueFrom: nil,
 		})
 	}
@@ -182,13 +183,13 @@ func getComponentRoles(component *SynthesizedComponent) map[string]string {
 	return roles
 }
 
-func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *corev1.Container,
+func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(characterType)
 	svcPort := strconv.Itoa(probeSvcHTTPPort)
-	roleObserveURI := fmt.Sprintf(roleObserveURIFormat, svcPort, bindingType)
+	roleObserveURI := fmt.Sprintf(checkRoleURIFormat, svcPort, bindingType)
 	probe.Exec.Command = []string{
 		"curl", "-X", "POST",
 		"--max-time", strconv.Itoa(int(probeSetting.TimeoutSeconds)),
@@ -203,12 +204,12 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
-func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
+func buildStatusProbeContainer(characterType string, statusProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	statusProbeContainer.Name = constant.StatusProbeContainerName
 	probe := statusProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = "/v1.0/bindings/probe?operation=checkStatus"
+	httpGet.Path = fmt.Sprintf(checkStatusURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet
@@ -218,12 +219,12 @@ func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 	statusProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
-func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
+func buildRunningProbeContainer(characterType string, runningProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	runningProbeContainer.Name = constant.RunningProbeContainerName
 	probe := runningProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = "/v1.0/bindings/probe?operation=checkRunning"
+	httpGet.Path = fmt.Sprintf(checkRunningURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet

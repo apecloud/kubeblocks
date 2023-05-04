@@ -5,7 +5,7 @@ title: kbcli cluster create
 Create a cluster.
 
 ```
-kbcli cluster create [CLUSTER_NAME] [flags]
+kbcli cluster create [NAME] [flags]
 ```
 
 ### Examples
@@ -16,6 +16,12 @@ kbcli cluster create [CLUSTER_NAME] [flags]
   
   # --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
   kbcli cluster create mycluster --cluster-definition apecloud-mysql
+  
+  # Output resource information in YAML format, but do not create resources.
+  kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=client -o yaml
+  
+  # Output resource information in YAML format, the information will be sent to the server, but the resource will not be actually created.
+  kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=server -o yaml
   
   # Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
@@ -35,11 +41,14 @@ kbcli cluster create [CLUSTER_NAME] [flags]
   # Create a cluster and set cpu to 1 core, memory to 1Gi, storage size to 20Gi and replicas to 3
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1,memory=1Gi,storage=20Gi,replicas=3
   
-  # Create a cluster and set class to general-1c4g
-  kbcli cluster create myclsuter --cluster-definition apecloud-mysql --set class=general-1c4g
+  # Create a cluster and set the class to general-1c1g, valid classes can be found by executing the command "kbcli class list --cluster-definition=<cluster-definition-name>"
+  kbcli cluster create mycluster --cluster-definition apecloud-mysql --set class=general-1c1g
+  
+  # Create a cluster with replicationSet workloadType and set switchPolicy to Noop
+  kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
   
   # Create a cluster and use a URL to set cluster resource
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/my.yaml
+  kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/apecloud-mysql.yaml
   
   # Create a cluster and load cluster resource set from stdin
   cat << EOF | kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file -
@@ -55,26 +64,28 @@ kbcli cluster create [CLUSTER_NAME] [flags]
   kbcli cluster create --cluster-definition apecloud-mysql --tolerations '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
   
   # Create a cluster, with each pod runs on their own dedicated node
-  kbcli cluster create --tenancy=DedicatedNode
+  kbcli cluster create --cluster-definition apecloud-mysql --tenancy=DedicatedNode
 ```
 
 ### Options
 
 ```
-      --backup string                Set a source backup to restore data
-      --cluster-definition string    Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
-      --cluster-version string       Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
-      --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level (default true)
-  -h, --help                         help for create
-      --monitor                      Set monitor enabled and inject metrics exporter (default true)
-      --node-labels stringToString   Node label selector (default [])
-      --pod-anti-affinity string     Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
-      --set stringArray              Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi)
-  -f, --set-file string              Use yaml file, URL, or stdin to set the cluster resource
-      --tenancy string               Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
-      --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
-      --tolerations strings          Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
-      --topology-keys stringArray    Topology keys for affinity
+      --backup string                  Set a source backup to restore data
+      --cluster-definition string      Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
+      --cluster-version string         Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
+      --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --enable-all-logs                Enable advanced application all log extraction, and true will ignore enabledLogs of component level, default is false
+  -h, --help                           help for create
+      --monitor                        Set monitor enabled and inject metrics exporter (default true)
+      --node-labels stringToString     Node label selector (default [])
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
+      --set stringArray                Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
+  -f, --set-file string                Use yaml file, URL, or stdin to set the cluster resource
+      --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
+      --termination-policy string      Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
+      --tolerations strings            Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
+      --topology-keys stringArray      Topology keys for affinity
 ```
 
 ### Options inherited from parent commands

@@ -28,6 +28,7 @@ import (
 	"unicode"
 
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
@@ -68,7 +69,7 @@ func ReadPluginFromFile(path string) (Plugin, error) {
 	if err != nil {
 		return plugin, err
 	}
-	return plugin, nil
+	return plugin, errors.Wrap(ValidatePlugin(plugin.Name, plugin), "plugin manifest validation error")
 }
 
 func ReadReceiptFromFile(path string) (Receipt, error) {
@@ -130,4 +131,112 @@ func GetInstalledPluginReceipts(receiptsDir string) ([]Receipt, error) {
 
 	}
 	return out, nil
+}
+
+func isSupportAPIVersion(apiVersion string) bool {
+	for _, v := range SupportAPIVersion {
+		if apiVersion == v {
+			return true
+		}
+	}
+	return false
+}
+
+func ValidatePlugin(name string, p Plugin) error {
+	if !isSupportAPIVersion(p.APIVersion) {
+		return errors.Errorf("plugin manifest has apiVersion=%q, not supported in this version of krew (try updating plugin index or install a newer version of krew)", p.APIVersion)
+	}
+	if p.Kind != PluginKind {
+		return errors.Errorf("plugin manifest has kind=%q, but only %q is supported", p.Kind, PluginKind)
+	}
+	if p.Name != name {
+		return errors.Errorf("plugin manifest has name=%q, but expected %q", p.Name, name)
+	}
+	if p.Spec.ShortDescription == "" {
+		return errors.New("should have a short description")
+	}
+	if len(p.Spec.Platforms) == 0 {
+		return errors.New("should have a platform")
+	}
+	if p.Spec.Version == "" {
+		return errors.New("should have a version")
+	}
+	if _, err := parseVersion(p.Spec.Version); err != nil {
+		return errors.Wrap(err, "failed to parse version")
+	}
+	for _, pl := range p.Spec.Platforms {
+		if err := validatePlatform(pl); err != nil {
+			return errors.Wrapf(err, "platform (%+v) is badly constructed", pl)
+		}
+	}
+	return nil
+}
+
+func validatePlatform(p Platform) error {
+	if p.URI == "" {
+		return errors.New("`uri` has to be set")
+	}
+	if p.Sha256 == "" {
+		return errors.New("`sha256` sum has to be set")
+	}
+	if p.Bin == "" {
+		return errors.New("`bin` has to be set")
+	}
+	if err := validateFiles(p.Files); err != nil {
+		return errors.Wrap(err, "`files` is invalid")
+	}
+	if err := validateSelector(p.Selector); err != nil {
+		return errors.Wrap(err, "invalid platform selector")
+	}
+	return nil
+}
+
+func validateFiles(fops []FileOperation) error {
+	if fops == nil {
+		return nil
+	}
+	if len(fops) == 0 {
+		return errors.New("`files` has to be unspecified or non-empty")
+	}
+	for _, op := range fops {
+		if op.From == "" {
+			return errors.New("`from` field has to be set")
+		} else if op.To == "" {
+			return errors.New("`to` field has to be set")
+		}
+	}
+	return nil
+}
+
+// validateSelector checks if the platform selector uses supported keys and is not empty or nil.
+func validateSelector(sel *metav1.LabelSelector) error {
+	if sel == nil {
+		return errors.New("nil selector is not supported")
+	}
+	if sel.MatchLabels == nil && len(sel.MatchExpressions) == 0 {
+		return errors.New("empty selector is not supported")
+	}
+
+	// check for unsupported keys
+	keys := []string{}
+	for k := range sel.MatchLabels {
+		keys = append(keys, k)
+	}
+	for _, expr := range sel.MatchExpressions {
+		keys = append(keys, expr.Key)
+	}
+	for _, key := range keys {
+		if key != "os" && key != "arch" {
+			return errors.Errorf("key %q not supported", key)
+		}
+	}
+
+	if sel.MatchLabels != nil && len(sel.MatchLabels) == 0 {
+		return errors.New("`matchLabels` specified but empty")
+	}
+	if sel.MatchExpressions != nil && len(sel.MatchExpressions) == 0 {
+		return errors.New("`matchExpressions` specified but empty")
+	}
+
+	return nil
 }

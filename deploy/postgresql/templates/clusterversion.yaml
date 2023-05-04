@@ -16,6 +16,7 @@ spec:
       containers:
       - name: postgresql
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+    clientImage: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -45,4 +46,5 @@ spec:
         containers:
           - name: postgresql
             image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0
+      clientImage: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0
 ---

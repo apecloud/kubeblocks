@@ -426,7 +426,8 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 				// job failed set terminal state phase
 				setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, InstallationFailed,
 					fmt.Sprintf("Installation failed, do inspect error from jobs.batch %s", key.String()))
-				// only allow to do pod logs if max concurrent reconciles > 1
+				// only allow to do pod logs if max concurrent reconciles > 1, also considered that helm
+				// cmd error only has limited contents
 				if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
 					if err := logFailedJobPodToCondError(ctx, &r.stageCtx, addon, key.Name, InstallationFailedLogs); err != nil {
 						r.setRequeueWithErr(err, "")
@@ -594,7 +595,8 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 				r.reconciler.Event(addon, "Warning", UninstallationFailed,
 					fmt.Sprintf("Uninstallation failed, do inspect error from jobs.batch %s",
 						key.String()))
-				// only allow to do pod logs if max concurrent reconciles > 1
+				// only allow to do pod logs if max concurrent reconciles > 1, also considered that helm
+				// cmd error only has limited contents
 				if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
 					if err := logFailedJobPodToCondError(ctx, &r.stageCtx, addon, key.Name, UninstallationFailedLogs); err != nil {
 						r.setRequeueWithErr(err, "")
@@ -956,6 +958,7 @@ func logFailedJobPodToCondError(ctx context.Context, stageCtx *stageCtx, addon *
 		return b.CreationTimestamp.Before(&(a.CreationTimestamp))
 	})
 
+podsloop:
 	for _, pod := range podList.Items {
 		switch pod.Status.Phase {
 		case corev1.PodFailed:
@@ -963,25 +966,16 @@ func logFailedJobPodToCondError(ctx context.Context, stageCtx *stageCtx, addon *
 			if err != nil {
 				return err
 			}
-
 			currOpts := &corev1.PodLogOptions{
 				Container: getJobMainContainerName(addon),
 			}
-
 			req := clientset.Pods(pod.Namespace).GetLogs(pod.Name, currOpts)
-			// readCloser, err := req.Stream(ctx)
-			// if err != nil {
-			// 	r.setRequeueWithErr(err, "")
-			// 	return
-			// }
-			// defer readCloser.Close()
-			// _, err = io.Copy(opts.Out, readCloser)
 			data, err := req.DoRaw(ctx)
 			if err != nil {
 				return err
 			}
 			setAddonErrorConditions(ctx, stageCtx, addon, false, true, reason, string(data))
-			break
+			break podsloop
 		}
 	}
 	return nil

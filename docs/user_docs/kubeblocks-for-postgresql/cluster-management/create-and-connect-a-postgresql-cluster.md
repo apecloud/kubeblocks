@@ -50,7 +50,7 @@ kbcli cluster create pg-cluster --cluster-definition='postgresql'
   kbcli cluster create pg-cluster --cluster-definition postgresql --set replicas=1
   ```
 
-* KubeBlocks supports PostgreSQL v12.14.0 and v14.7.1 and you can sepecify a version when creating a cluster. If you do not specify a verison, v12.14.0 is applied by default.
+* KubeBlocks supports PostgreSQL v12.14.0 and v14.7.1 and you can specify a version when creating a cluster. If you do not specify a version, v12.14.0 is applied by default.
 
   ```bash
   kbcli cluster create pg-cluster --cluster-definition postgresql --cluster-version 14.7.1

@@ -323,7 +323,7 @@ prometheus:
       ## If true, alertmanager will create/use a Persistent Volume Claim
       ## If false, use emptyDir
       ##
-      enabled: true
+      enabled: false
 
       ## alertmanager data Persistent Volume size
       ##
@@ -346,7 +346,7 @@ prometheus:
       ## If true, use a statefulset instead of a deployment for pod management.
       ## This allows to scale replicas to more than 1 pod
       ##
-      enabled: true
+      enabled: false
 
       ## Alertmanager headless service to use for the statefulset
       ##
@@ -530,7 +530,7 @@ prometheus:
       ## If true, Prometheus server will create/use a Persistent Volume Claim
       ## If false, use emptyDir
       ##
-      enabled: true
+      enabled: false
 
       ## Prometheus server data Persistent Volume size
       ##
@@ -553,7 +553,7 @@ prometheus:
       ## If true, use a statefulset instead of a deployment for pod management.
       ## This allows to scale replicas to more than 1 pod
       ##
-      enabled: true
+      enabled: false
 
     ## Prometheus server resource requests and limits
     ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/

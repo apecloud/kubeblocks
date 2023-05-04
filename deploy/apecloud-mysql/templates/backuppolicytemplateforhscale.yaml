@@ -15,5 +15,7 @@ spec:
         containerName: mysql
         preCommands:
         - "touch /data/mysql/data/.restore; sync"
+        postCommands:
+        - "rm -f /data/mysql/data/.restore; sync"
       target:
         role: leader

@@ -28,12 +28,16 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -142,21 +146,30 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 func (r *AddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&extensionsv1alpha1.Addon{}).
-		// TODO: replace with controller-idioms's adopt lib
-		// Watches(&source.Kind{Type: &batchv1.Job{}},
-		// 	&handler.EnqueueRequestForObject{},
-		// 	builder.WithPredicates(&jobCompletionPredicate{reconciler: r, Log: log.FromContext(context.TODO())})).
+		Watches(&source.Kind{Type: &batchv1.Job{}}, handler.EnqueueRequestsFromMapFunc(r.findAddonJobs)).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurrentReconcilesKey),
 		}).
 		Complete(r)
 }
 
-// type jobCompletionPredicate struct {
-// 	predicate.Funcs
-// 	reconciler *AddonReconciler
-// 	Log        logr.Logger
-// }
+func (r *AddonReconciler) findAddonJobs(job client.Object) []reconcile.Request {
+	labels := job.GetLabels()
+	if _, ok := labels[constant.AddonNameLabelKey]; !ok {
+		return []reconcile.Request{}
+	}
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: job.GetNamespace(),
+				Name:      job.GetName(),
+			},
+		},
+	}
+}
 
 func (r *AddonReconciler) cleanupJobPods(reqCtx intctrlutil.RequestCtx) error {
 	if err := r.DeleteAllOf(reqCtx.Ctx, &corev1.Pod{},

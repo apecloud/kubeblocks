@@ -40,7 +40,9 @@ const (
 	DisablingAddon                  = "DisablingAddon"
 	EnablingAddon                   = "EnablingAddon"
 	InstallationFailed              = "InstallationFailed"
+	InstallationFailedLogs          = "InstallationFailedLogs"
 	UninstallationFailed            = "UninstallationFailed"
+	UninstallationFailedLogs        = "UninstallationFailedLogs"
 	AddonRefObjError                = "ReferenceObjectError"
 
 	// config keys used in viper

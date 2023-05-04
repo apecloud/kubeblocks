@@ -28,11 +28,13 @@ import (
 
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -422,9 +424,15 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			// info. from conditions.
 			if helmInstallJob.Status.Failed > 0 {
 				// job failed set terminal state phase
-				setAddonErrorConditions(ctx, &r.stageCtx, addon, InstallationFailed,
+				setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, InstallationFailed,
 					fmt.Sprintf("Installation failed, do inspect error from jobs.batch %s", key.String()))
-				r.setReconciled()
+				// only allow to do pod logs if max concurrent reconciles > 1
+				if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
+					if err := logFailedJobPodToCondError(ctx, &r.stageCtx, addon, key.Name, InstallationFailedLogs); err != nil {
+						r.setRequeueWithErr(err, "")
+						return
+					}
+				}
 				return
 			}
 			r.setRequeueAfter(time.Second, "")
@@ -455,44 +463,31 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			"--wait",
 		}
 
-		// add extra helm install option flags
-		for k, v := range addon.Spec.Helm.InstallOptions {
-			helmContainer.Args = append(helmContainer.Args, fmt.Sprintf("--%s", k))
-			if v != "" {
-				helmContainer.Args = append(helmContainer.Args, v)
-			}
-		}
-
 		installValues := addon.Spec.Helm.BuildMergedValues(addon.Spec.InstallSpec)
-		// set values from URL
-		for _, urlValue := range installValues.URLs {
-			helmContainer.Args = append(helmContainer.Args, "--values", urlValue)
+		if err = addon.Spec.Helm.BuildContainerArgs(helmContainer, installValues); err != nil {
+			r.setRequeueWithErr(err, "")
+			return
 		}
 
 		// set values from file
 		for _, cmRef := range installValues.ConfigMapRefs {
 			cm := &corev1.ConfigMap{}
-			if err := r.reconciler.Get(ctx, client.ObjectKey{
+			key := client.ObjectKey{
 				Name:      cmRef.Name,
-				Namespace: mgrNS}, cm); err != nil {
+				Namespace: mgrNS}
+			if err := r.reconciler.Get(ctx, key, cm); err != nil {
 				if !apierrors.IsNotFound(err) {
 					r.setRequeueWithErr(err, "")
 					return
 				}
 				r.setRequeueAfter(time.Second, fmt.Sprintf("ConfigMap %s not found", cmRef.Name))
+				setAddonErrorConditions(ctx, &r.stageCtx, addon, false, true, AddonRefObjError,
+					fmt.Sprintf("ConfigMap object %v not found", key))
 				return
 			}
-			hasMatch := false
-			for k := range cm.Data {
-				if k != cmRef.Key {
-					continue
-				}
-				hasMatch = true
-				break
-			}
-			if !hasMatch {
-				setAddonErrorConditions(ctx, &r.stageCtx, addon, AddonRefObjError,
-					fmt.Sprintf("Attach ConfigMap volume source failed, key %s not found", cmRef.Key))
+			if !findDataKey(cm.Data, cmRef) {
+				setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, AddonRefObjError,
+					fmt.Sprintf("Attach ConfigMap %v volume source failed, key %s not found", key, cmRef.Key))
 				r.setReconciled()
 				return
 			}
@@ -516,27 +511,22 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 
 		for _, secretRef := range installValues.SecretRefs {
 			secret := &corev1.Secret{}
-			if err := r.reconciler.Get(ctx, client.ObjectKey{
+			key := client.ObjectKey{
 				Name:      secretRef.Name,
-				Namespace: mgrNS}, secret); err != nil {
+				Namespace: mgrNS}
+			if err := r.reconciler.Get(ctx, key, secret); err != nil {
 				if !apierrors.IsNotFound(err) {
 					r.setRequeueWithErr(err, "")
 					return
 				}
 				r.setRequeueAfter(time.Second, fmt.Sprintf("Secret %s not found", secret.Name))
+				setAddonErrorConditions(ctx, &r.stageCtx, addon, false, true, AddonRefObjError,
+					fmt.Sprintf("Secret object %v not found", key))
 				return
 			}
-			hasMatch := false
-			for k := range secret.Data {
-				if k != secretRef.Key {
-					continue
-				}
-				hasMatch = true
-				break
-			}
-			if !hasMatch {
-				setAddonErrorConditions(ctx, &r.stageCtx, addon, AddonRefObjError,
-					fmt.Sprintf("Attach Secret volume source failed, key %s not found", secretRef.Key))
+			if !findDataKey(secret.Data, secretRef) {
+				setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, AddonRefObjError,
+					fmt.Sprintf("Attach Secret %v volume source failed, key %s not found", key, secretRef.Key))
 				r.setReconciled()
 				return
 			}
@@ -554,17 +544,6 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 						},
 					}
 				})
-		}
-
-		// set key1=val1,key2=val2 value
-		if len(installValues.SetValues) > 0 {
-			helmContainer.Args = append(helmContainer.Args, "--set",
-				strings.Join(installValues.SetValues, ","))
-		}
-
-		// set key1=jsonval1,key2=jsonval2 JSON value, applied multiple
-		for _, v := range installValues.SetJSONValues {
-			helmContainer.Args = append(helmContainer.Args, "--set-json", v)
 		}
 
 		if err := r.reconciler.Create(ctx, helmInstallJob); err != nil {
@@ -615,6 +594,13 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 				r.reconciler.Event(addon, "Warning", UninstallationFailed,
 					fmt.Sprintf("Uninstallation failed, do inspect error from jobs.batch %s",
 						key.String()))
+				// only allow to do pod logs if max concurrent reconciles > 1
+				if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
+					if err := logFailedJobPodToCondError(ctx, &r.stageCtx, addon, key.Name, UninstallationFailedLogs); err != nil {
+						r.setRequeueWithErr(err, "")
+						return
+					}
+				}
 
 				if err := r.reconciler.Delete(ctx, helmUninstallJob); client.IgnoreNotFound(err) != nil {
 					r.setRequeueWithErr(err, "")
@@ -782,6 +768,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 		}
 	}
 	ttlSec := int32(ttl.Seconds())
+	backoffLimit := int32(3)
 	helmProtoJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -790,6 +777,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 			},
 		},
 		Spec: batchv1.JobSpec{
+			BackoffLimit:            &backoffLimit,
 			TTLSecondsAfterFinished: &ttlSec,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -799,11 +787,11 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 					},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy:      corev1.RestartPolicyOnFailure,
+					RestartPolicy:      corev1.RestartPolicyNever,
 					ServiceAccountName: viper.GetString("KUBEBLOCKS_ADDON_SA_NAME"),
 					Containers: []corev1.Container{
 						{
-							Name:            strings.ToLower(string(addon.Spec.Type)),
+							Name:            getJobMainContainerName(addon),
 							Image:           viper.GetString(constant.KBToolsImage),
 							ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgAddonJobImgPullPolicy)),
 							// TODO: need have image that is capable of following settings, current settings
@@ -915,10 +903,14 @@ func enabledAddonWithDefaultValues(ctx context.Context, stageCtx *stageCtx,
 func setAddonErrorConditions(ctx context.Context,
 	stageCtx *stageCtx,
 	addon *extensionsv1alpha1.Addon,
-	reason, message string, eventMessage ...string) {
+	setFailedStatus, recordEvent bool,
+	reason, message string,
+	eventMessage ...string) {
 	patch := client.MergeFrom(addon.DeepCopy())
 	addon.Status.ObservedGeneration = addon.Generation
-	addon.Status.Phase = extensionsv1alpha1.AddonFailed
+	if setFailedStatus {
+		addon.Status.Phase = extensionsv1alpha1.AddonFailed
+	}
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 		Type:               extensionsv1alpha1.ConditionTypeChecked,
 		Status:             metav1.ConditionFalse,
@@ -932,9 +924,75 @@ func setAddonErrorConditions(ctx context.Context,
 		stageCtx.setRequeueWithErr(err, "")
 		return
 	}
+	if !recordEvent {
+		return
+	}
 	if len(eventMessage) > 0 && eventMessage[0] != "" {
 		stageCtx.reconciler.Event(addon, "Warning", reason, eventMessage[0])
 	} else {
 		stageCtx.reconciler.Event(addon, "Warning", reason, message)
 	}
+}
+
+func getJobMainContainerName(addon *extensionsv1alpha1.Addon) string {
+	return strings.ToLower(string(addon.Spec.Type))
+}
+
+func logFailedJobPodToCondError(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon,
+	jobName, reason string) error {
+	podList := &corev1.PodList{}
+	if err := stageCtx.reconciler.List(ctx, podList,
+		client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS)),
+		client.MatchingLabels{
+			constant.AddonNameLabelKey:    stageCtx.reqCtx.Req.Name,
+			constant.AppManagedByLabelKey: constant.AppName,
+			"job-name":                    jobName,
+		}); err != nil {
+		return err
+	}
+
+	// sort pod with latest creation place front
+	slices.SortFunc(podList.Items, func(a, b corev1.Pod) bool {
+		return b.CreationTimestamp.Before(&(a.CreationTimestamp))
+	})
+
+	for _, pod := range podList.Items {
+		switch pod.Status.Phase {
+		case corev1.PodFailed:
+			clientset, err := corev1client.NewForConfig(stageCtx.reconciler.RestConfig)
+			if err != nil {
+				return err
+			}
+
+			currOpts := &corev1.PodLogOptions{
+				Container: getJobMainContainerName(addon),
+			}
+
+			req := clientset.Pods(pod.Namespace).GetLogs(pod.Name, currOpts)
+			// readCloser, err := req.Stream(ctx)
+			// if err != nil {
+			// 	r.setRequeueWithErr(err, "")
+			// 	return
+			// }
+			// defer readCloser.Close()
+			// _, err = io.Copy(opts.Out, readCloser)
+			data, err := req.DoRaw(ctx)
+			if err != nil {
+				return err
+			}
+			setAddonErrorConditions(ctx, stageCtx, addon, false, true, reason, string(data))
+			break
+		}
+	}
+	return nil
+}
+
+func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1.DataObjectKeySelector) bool {
+	for k := range data {
+		if k != refObj.Key {
+			continue
+		}
+		return true
+	}
+	return false
 }

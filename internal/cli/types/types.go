@@ -111,13 +111,12 @@ const (
 
 // DataProtection API group
 const (
-	DPAPIGroup                    = "dataprotection.kubeblocks.io"
-	DPAPIVersion                  = "v1alpha1"
-	ResourceBackups               = "backups"
-	ResourceBackupTools           = "backuptools"
-	ResourceRestoreJobs           = "restorejobs"
-	ResourceBackupPolicies        = "backuppolicies"
-	ResourceBackupPolicyTemplates = "backuppolicytemplates"
+	DPAPIGroup             = "dataprotection.kubeblocks.io"
+	DPAPIVersion           = "v1alpha1"
+	ResourceBackups        = "backups"
+	ResourceBackupTools    = "backuptools"
+	ResourceRestoreJobs    = "restorejobs"
+	ResourceBackupPolicies = "backuppolicies"
 )
 
 // Extensions API group

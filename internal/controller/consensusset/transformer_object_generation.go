@@ -42,7 +42,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	oriSet, _ := root.OriObj.(*workloads.ConsensusSet)
 
 	// generate objects by current spec
-	svc := builder.NewServiceBuilder(csSet.Namespace, csSet.Namespace).
+	svc := builder.NewServiceBuilder(csSet.Namespace, csSet.Name).
 		AddLabels(constant.AppInstanceLabelKey, csSet.Name).
 		AddLabels(constant.KBManagedByKey, ConsensusSetKind).
 		// AddAnnotationsInMap(csSet.Annotations).

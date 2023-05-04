@@ -135,7 +135,7 @@ func (e *EnqueueRequestForAncestor) getOwnerReconcileRequest(obj client.Object, 
 	// get the object by the ownerRef
 	object, err := e.getSourceObject(obj)
 	if err != nil {
-		log.Error(err, "could not find source object", "gvk", obj.GetObjectKind().GroupVersionKind(), "name", obj.GetName())
+		log.Info("could not find source object", "gvk", obj.GetObjectKind().GroupVersionKind(), "name", obj.GetName(), "error", err.Error())
 		return
 	}
 
@@ -144,7 +144,15 @@ func (e *EnqueueRequestForAncestor) getOwnerReconcileRequest(obj client.Object, 
 	ctx := context.Background()
 	ref, err := e.getOwnerUpTo(ctx, object, e.UpToLevel, scheme)
 	if err != nil {
-		log.Error(err, "cloud not find top object",
+		log.Info("cloud not find top object",
+			"source object gvk", object.GetObjectKind().GroupVersionKind(),
+			"name", object.GetName(),
+			"up to level", e.UpToLevel,
+			"error", err.Error())
+		return
+	}
+	if ref == nil {
+		log.Info("cloud not find top object",
 			"source object gvk", object.GetObjectKind().GroupVersionKind(),
 			"name", object.GetName(),
 			"up to level", e.UpToLevel)

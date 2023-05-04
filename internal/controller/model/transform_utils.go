@@ -167,7 +167,7 @@ func IsObjectUpdating(object client.Object) bool {
 	if !generation.IsValid() {
 		return false
 	}
-	return observedGeneration.Interface() == generation.Interface()
+	return observedGeneration.Interface() != generation.Interface()
 }
 
 func IsObjectStatusUpdating(object client.Object) bool {

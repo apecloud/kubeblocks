@@ -434,17 +434,16 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 	for j := 0; j < int(params.Component.Replicas); j++ {
 		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
 		hostNameTplValue := params.Cluster.Name + "-" + params.Component.Name + "-" + strconv.Itoa(j)
-
-		if params.Component.WorkloadType != appsv1alpha1.Replication {
-			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
-			continue
-		}
+		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 
 		// build env for replication workload
-		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
-		// if primaryIndex is 0, the pod name have to be no suffix '-0'
-		primaryIndex := params.Component.GetPrimaryIndex()
-		envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s", params.Cluster.Name, params.Component.Name, primaryIndex, svcName)
+		if params.Component.WorkloadType == appsv1alpha1.Replication {
+			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s",
+				params.Cluster.Name,
+				params.Component.Name,
+				params.Component.GetPrimaryIndex(),
+				svcName)
+		}
 	}
 
 	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go

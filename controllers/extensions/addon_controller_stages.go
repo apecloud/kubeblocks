@@ -57,6 +57,12 @@ const (
 
 func init() {
 	viper.SetDefault(addonSANameKey, "kubeblocks-addon-installer")
+	viper.SetDefault(addonHelmInstallOptKey, []string{
+		"--atomic",
+		"--cleanup-on-fail",
+		"--wait",
+	})
+	viper.SetDefault(addonHelmUninstallOptKey, []string{})
 }
 
 func (r *stageCtx) setReconciled() {
@@ -449,20 +455,15 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 		helmInstallJob.ObjectMeta.Namespace = key.Namespace
 		helmJobPodSpec := &helmInstallJob.Spec.Template.Spec
 		helmContainer := &helmInstallJob.Spec.Template.Spec.Containers[0]
-		helmContainer.Args = []string{
+		helmContainer.Args = append([]string{
 			"upgrade",
 			"--install",
 			"$(RELEASE_NAME)",
 			"$(CHART)",
 			"--namespace",
 			"$(RELEASE_NS)",
-			"--timeout",
-			"10m",
 			"--create-namespace",
-			"--atomic",
-			"--cleanup-on-fail",
-			"--wait",
-		}
+		}, viper.GetStringSlice(addonHelmInstallOptKey)...)
 
 		installValues := addon.Spec.Helm.BuildMergedValues(addon.Spec.InstallSpec)
 		if err = addon.Spec.Helm.BuildContainerArgs(helmContainer, installValues); err != nil {
@@ -651,14 +652,12 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 		}
 		helmUninstallJob.ObjectMeta.Name = key.Name
 		helmUninstallJob.ObjectMeta.Namespace = key.Namespace
-		helmUninstallJob.Spec.Template.Spec.Containers[0].Args = []string{
+		helmUninstallJob.Spec.Template.Spec.Containers[0].Args = append([]string{
 			"delete",
 			"$(RELEASE_NAME)",
 			"--namespace",
 			"$(RELEASE_NS)",
-			"--timeout",
-			"10m",
-		}
+		}, viper.GetStringSlice(addonHelmUninstallOptKey)...)
 		r.reqCtx.Log.V(1).Info("create helm uninstall job", "job", key)
 		if err := r.reconciler.Create(ctx, helmUninstallJob); err != nil {
 			r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "job", key, "err", err)

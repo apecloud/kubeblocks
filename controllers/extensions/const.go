@@ -48,4 +48,6 @@ const (
 	// config keys used in viper
 	maxConcurrentReconcilesKey = "MAXCONCURRENTRECONCILES_ADDON"
 	addonSANameKey             = "KUBEBLOCKS_ADDON_SA_NAME"
+	addonHelmInstallOptKey     = "KUBEBLOCKS_ADDON_HELM_INSTALL_OPTIONS"
+	addonHelmUninstallOptKey   = "KUBEBLOCKS_ADDON_HELM_UNINSTALL_OPTIONS"
 )

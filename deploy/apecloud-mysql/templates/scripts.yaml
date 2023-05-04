@@ -43,6 +43,13 @@ data:
           fi
         fi 
         /scripts/upgrade-learner.sh &
+      else 
+        # if self is in topology and role is learner, upgrade it to follower
+        # sometimes pod crash before upgrade learner finished
+        is_learner=`echo $in_topology | grep "Learner"`
+        if [ ! -z "$is_learner" ]; then 
+          /scripts/upgrade-learner.sh &
+        fi
       fi
     fi
     cluster_info="";

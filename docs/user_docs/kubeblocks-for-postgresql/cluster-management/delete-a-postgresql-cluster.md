@@ -1,7 +1,7 @@
 ---
 title: Delete a PostgreSQL Cluster
 description: How to delete a PostgreSQL Cluster
-keywords: []
+keywords: [postgresql, delete a cluster]
 sidebar_position: 6
 sidebar_label: Delete protection
 ---
@@ -38,7 +38,7 @@ NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-PO
 pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:49 UTC+0800
 ```
 
-## Option 1. Use kbcli
+## Step
 
 Configure the cluster name and run the command below to delete the specified cluster.
 
@@ -50,18 +50,4 @@ kbcli cluster delete <name>
 
 ```bash
 kbcli cluster delete pg-cluster
-```
-
-## Option 2. Use kubectl
-
-Configure the cluster name and run the command below to delete the specified cluster.
-
-```bash
-kubectl delete cluster <name>
-```
-
-***Example***
-
-```bash
-kubectl delete cluster pg-cluster
 ```

@@ -38,7 +38,7 @@ NAME            NAMESPACE CLUSTER-DEFINITION VERSION         TERMINATION-POLICY 
 mysql-cluster default   apecloud-mysql     ac-mysql-8.0.30 Delete             Running Feb 06,2023 18:27 UTC+0800
 ```
 
-## Option 1. Use kbcli
+## Step
 
 Configure the cluster name and run the command below to delete the specified cluster.
 
@@ -50,18 +50,4 @@ kbcli cluster delete <name>
 
 ```bash
 kbcli cluster delete mysql-cluster
-```
-
-## Option 2. Use kubectl
-
-Configure the cluster name and run the command below to delete the specified cluster.
-
-```bash
-kubectl delete cluster <name>
-```
-
-***Example***
-
-```bash
-kubectl delete cluster mysql-cluster
 ```

@@ -161,7 +161,7 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
 
 4. Connect to the database to verify whether the parameters are modified.
 
-   The whole searching process has a 30-second delay since it takes some time for kubelete to synchronize modifications to the volume of the pod.
+   The whole searching process has a 30-second delay since it takes some time for kubelet to synchronize modifications to the volume of the pod.
 
    ```bash
    kbcli cluster connect mysql-cluster

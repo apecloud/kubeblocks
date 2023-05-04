@@ -1,11 +1,12 @@
 ---
-title: Delete a MySQL Cluster
+title: Delete a MongoDB Cluster
 description: How to delete a MySQL Cluster
+keywords: [mongodb, delete a cluster]
 sidebar_position: 6
 sidebar_label: Delete protection
 ---
 
-# Delete a MySQL Cluster
+# Delete a MongoDB Cluster
 
 ## Termination policy
 
@@ -19,7 +20,7 @@ The termination policy determines how you delete a cluster.
 |:--                     | :--                                       |
 | `DoNotTerminate`       | `DoNotTerminate` blocks delete operation. |
 | `Halt`                 | `Halt` deletes workload resources such as statefulset, deployment workloads but keep PVCs. |
-| `Delete `              | `Delete` delete workload resources and PVCs but keep backups. |
+| `Delete`               | `Delete` delete workload resources and PVCs but keep backups. |
 | `WipeOut`              | `WipeOut` deletes workload resources, PVCs and all relevant resources included backups. |
 
 To check the termination policy, execute the following command.
@@ -28,9 +29,7 @@ To check the termination policy, execute the following command.
 kbcli cluster list <name>
 ```
 
-
-
-## Option 1. Use kbcli
+## Step
 
 Configure the cluster name and run the command below to delete the specified cluster.
 
@@ -38,17 +37,8 @@ Configure the cluster name and run the command below to delete the specified clu
 kbcli cluster delete <name>
 ```
 
-
-## Option 2. Use kubectl
-
-Configure the cluster name and run the command below to delete the specified cluster.
-
-```bash
-kubectl delete cluster <name>
-```
-
 ***Example***
 
 ```bash
-kubectl delete cluster mongodb-cluster
+kbcli cluster delete mongodb-cluster
 ```

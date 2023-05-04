@@ -26,21 +26,21 @@ This document shows how to create and connect to a MySQL cluster.
 
 ***Steps***
 
- Create a MySQL cluster with default settings.
+Create a MySQL cluster with default settings.
 
-   ```bash
-   kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
-   ```
+```bash
+kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+```
 
-   ***Result***
+***Result***
 
 * A cluster then is created in the default namespace. You can specify a namespace for your cluster by using `--namespace` or the abbreviated `-n` option. For example,
 
-     ```bash
-     kubectl create namespace demo
+   ```bash
+   kubectl create namespace demo
 
-     kbcli cluster create -n demo --cluster-definition='apecloud-mysql'
-     ```
+   kbcli cluster create -n demo --cluster-definition='apecloud-mysql'
+   ```
 
 * This cluster is created with built-in toleration which tolerates the node with the `kb-data=true:NoSchedule` taint.
 * This cluster has built-in node affinity which first deploys the node with the `kb-data:true` label.
@@ -70,10 +70,11 @@ A class is a set of resource configurations of CPU, memory and storage, to offer
 2. Use `--set` option with `kbcli cluster create` command.
 
    ```bash
-   kbcli cluster create myclsuter --cluster-definition apecloud-mysql --set class=general-2c2g
+   kbcli cluster create mysql-clsuter --cluster-definition apecloud-mysql --set class=general-2c2g
    ```
 
 Except for the `--set` options, there are many options you can create cluster with, see Table 1.
+
 📎 Table 1. kbcli cluster create options description
 
 | Option                 | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |

@@ -1,3 +1,11 @@
+---
+title: Customize class types
+description: How to customize class types for a MySQL cluster
+keywords: [mysql, class type, customize class types]
+sidebar_position: 2
+sidebar_label: Customize class types
+---
+
 # Customize class types
 
 You can use KubeBlocks to create your own class types.
@@ -6,28 +14,28 @@ You can use KubeBlocks to create your own class types.
 
 - To create one class.
 
-1. Use ```kbcli class create``` to create customized class types.
+1. Use `kbcli class create` to create customized class types.
 
    *Example:*
 
-   ```
-   kbcli class create custom-1c2g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 1Gi --storage name=data,size=10Gi
+   ```bash
+   kbcli class create custom-1c1g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 1Gi --storage name=data,size=10Gi
    ```
 
-2. Check whether the class is created with ```kbcli class list``` command.
+2. Check whether the class is created with `kbcli class list` command.
 
-    ```
+    ```bash
     kbcli class list --cluster-definition apecloud-mysql  
     ```
 
-    And you can see a class named `custom-1c2g` is listed.
-       
+    And you can see a class named `custom-1c1g` is listed.
+
 -To create many classes at a time
 
 1. If you want to create many classes, you can use yaml file.
 For example, you can create the file named `/tmp/class.yaml`.
 
-```
+```bash
 - resourceConstraintRef: kb-resource-constraint-general
   # class template, you can declare variables and set default values here
   template: |
@@ -55,9 +63,8 @@ For example, you can create the file named `/tmp/class.yaml`.
 
 2. Apply the yaml file to create classes.
 
-```
+```bash
 kbcli class create --cluster-definition apecloud-mysql --type mysql --file /tmp/class.yaml
 ```
 
-3. Check whether these classes are created with ```kbcli class list``` command.
-
+3. Check whether these classes are created with `kbcli class list` command.

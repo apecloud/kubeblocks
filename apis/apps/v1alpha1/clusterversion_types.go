@@ -82,6 +82,11 @@ type ClusterComponentVersion struct {
 	// +listMapKey=name
 	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// clientImage define image for the component to connect database or engines.
+	// This value has a higher proirity over ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.image.
+	// +optional
+	ClientImage string `json:"clientImage,omitempty"`
+
 	// versionContext defines containers images' context for component versions,
 	// this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers | containers]
 	VersionsCtx VersionsContext `json:"versionsContext"`

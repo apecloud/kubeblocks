@@ -214,38 +214,53 @@ func (c *StatefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli 
 		return nil
 	}
 	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
-		var vctProto *corev1.PersistentVolumeClaimSpec
+		var proto *corev1.PersistentVolumeClaimSpec
 		for _, v := range c.Component.VolumeClaimTemplates {
 			if v.Name == vct.Name {
-				vctProto = &v.Spec
+				proto = &v.Spec
 				break
 			}
 		}
-
-		// REVIEW: how could VCT proto is nil?
-		if vctProto == nil {
+		// REVIEW: seems we can remove a volume claim from templates at runtime, without any changes and warning messages?
+		if proto == nil {
 			continue
 		}
 
-		// TODO(fix):
-		//   1. check that can't decrease the storage size.
-		//   2. since we can't update the storage size of stateful set, so we can't use it to determine the expansion.
-		if vct.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Resources.Requests[corev1.ResourceStorage] {
+		if vct.Spec.Resources.Requests[corev1.ResourceStorage] == proto.Resources.Requests[corev1.ResourceStorage] {
 			continue
 		}
 
-		for i := *c.runningWorkload.Spec.Replicas - 1; i >= 0; i-- {
-			pvc := &corev1.PersistentVolumeClaim{}
-			pvcKey := types.NamespacedName{
-				Namespace: c.runningWorkload.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, c.runningWorkload.Name, i),
-			}
-			if err := cli.Get(reqCtx.Ctx, pvcKey, pvc); err != nil {
-				return err
-			}
-			pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Resources.Requests[corev1.ResourceStorage]
-			c.UpdateResource(pvc, c.WorkloadVertex)
+		if err := c.expandVolumes(reqCtx, cli, vct.Name, proto); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+func (c *StatefulComponentBase) expandVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	vctName string, proto *corev1.PersistentVolumeClaimSpec) error {
+	volumes, err := c.getRunningVolumes(reqCtx, cli, vctName, c.runningWorkload)
+	if err != nil {
+		return err
+	}
+	if len(volumes) == 0 {
+		return nil
+	}
+
+	quantity := volumes[0].Spec.Resources.Requests[corev1.ResourceStorage]
+	protoQuantity := proto.Resources.Requests[corev1.ResourceStorage]
+	ret := quantity.Cmp(protoQuantity)
+	if ret == 0 {
+		return nil
+	}
+	if ret > 0 {
+		return fmt.Errorf("can't decrease the volume size from %s to %s, component: %s, volume template: %s",
+			quantity.String(), protoQuantity.String(), c.GetName(), vctName)
+	}
+
+	for _, pvc := range volumes {
+		pvc.Spec.Resources.Requests[corev1.ResourceStorage] = proto.Resources.Requests[corev1.ResourceStorage]
+		c.UpdateResource(pvc, c.WorkloadVertex)
 	}
 	return nil
 }
@@ -437,7 +452,7 @@ func (c *StatefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.Req
 			c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload updated")
 		}
 		// to work around that the scaled PVC will be deleted at object action.
-		if err := c.updatePVC(reqCtx, cli, stsObj); err != nil {
+		if err := c.updateVolumes(reqCtx, cli, stsObj); err != nil {
 			return err
 		}
 	}
@@ -471,7 +486,7 @@ func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) bool 
 	return false
 }
 
-func (c *StatefulComponentBase) updatePVC(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+func (c *StatefulComponentBase) updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	// PVCs which have been added to the dag because of volume expansion.
 	pvcNameSet := sets.New[string]()
 	for _, v := range ictrltypes.FindAll[*corev1.PersistentVolumeClaim](c.Dag) {
@@ -479,27 +494,37 @@ func (c *StatefulComponentBase) updatePVC(reqCtx intctrlutil.RequestCtx, cli cli
 	}
 
 	for _, vct := range c.Component.VolumeClaimTemplates {
-		for i := c.Component.Replicas - 1; i >= 0; i-- {
-			pvcName := fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i)
-			if pvcNameSet.Has(pvcName) {
+		pvcs, err := c.getRunningVolumes(reqCtx, cli, vct.Name, stsObj)
+		if err != nil {
+			return err
+		}
+		for _, pvc := range pvcs {
+			if pvcNameSet.Has(pvc.Name) {
 				continue
-			}
-
-			pvc := &corev1.PersistentVolumeClaim{}
-			pvcKey := types.NamespacedName{
-				Namespace: stsObj.Namespace,
-				Name:      pvcName,
-			}
-			if err := cli.Get(reqCtx.Ctx, pvcKey, pvc); err != nil {
-				if apierrors.IsNotFound(err) {
-					continue
-				}
-				return err
 			}
 			c.NoopResource(pvc, c.WorkloadVertex)
 		}
 	}
 	return nil
+}
+
+func (c *StatefulComponentBase) getRunningVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string,
+	stsObj *appsv1.StatefulSet) ([]*corev1.PersistentVolumeClaim, error) {
+	pvcs, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PersistentVolumeClaimSignature, c.GetNamespace(), c.GetMatchingLabels())
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
+	prefix := fmt.Sprintf("%s-%s", vctName, stsObj.Name)
+	for _, pvc := range pvcs {
+		if strings.HasPrefix(pvc.Name, prefix) {
+			matchedPVCs = append(matchedPVCs, pvc)
+		}
+	}
+	return matchedPVCs, nil
 }
 
 func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {

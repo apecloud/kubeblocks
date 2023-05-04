@@ -681,7 +681,9 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      getPVCName(compName, i),
 					Namespace: clusterKey.Namespace,
 					Labels: map[string]string{
-						constant.AppInstanceLabelKey: clusterKey.Name,
+						constant.AppManagedByLabelKey:   constant.AppName,
+						constant.AppInstanceLabelKey:    clusterKey.Name,
+						constant.KBAppComponentLabelKey: compName,
 					}},
 				Spec: pvcSpec.ToV1PersistentVolumeClaimSpec(),
 			}

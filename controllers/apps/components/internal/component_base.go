@@ -211,12 +211,7 @@ func (c *ComponentBase) ResolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli 
 }
 
 func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	labels := map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppInstanceLabelKey:    c.GetClusterName(),
-		constant.KBAppComponentLabelKey: c.GetName(),
-	}
-	svcObjList, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.ServiceSignature, c.GetNamespace(), labels)
+	svcObjList, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.ServiceSignature, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}

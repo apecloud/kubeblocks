@@ -31,7 +31,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
-	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -66,7 +66,7 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	reqCtx.Log.V(1).Info("reconcile", "ConsensusSet", req.NamespacedName)
 
 	requeueError := func(err error) (ctrl.Result, error) {
-		if re, ok := err.(lifecycle.RequeueError); ok {
+		if re, ok := err.(model.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -94,6 +94,8 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
 	plan, errBuild := planBuilder.
 		AddTransformer(
+			// fix meta
+			&consensusset.FixMetaTransformer{},
 			// handle deletion
 			// handle cluster deletion first
 			&consensusset.CSSetDeletionTransformer{},

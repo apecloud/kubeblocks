@@ -59,6 +59,7 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 		return err
 	}
 	origCluster := transCtx.OrigCluster
+	backupPolicyNames := map[string]struct{}{}
 	for _, tpl := range backupPolicyTPLs.Items {
 		r.isDefaultTemplate = tpl.Annotations[constant.DefaultBackupPolicyTemplateAnnotationKey]
 		r.tplIdentifier = tpl.Spec.Identifier
@@ -72,9 +73,15 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 			if backupPolicy == nil {
 				continue
 			}
+			// if exist multiple backup policy templates and duplicate spec.identifier,
+			// the backupPolicy that may be generated may have duplicate names, and it is necessary to check if it already exists.
+			if _, ok := backupPolicyNames[backupPolicy.Name]; ok {
+				continue
+			}
 			vertex := &lifecycleVertex{obj: backupPolicy}
 			dag.AddVertex(vertex)
 			dag.Connect(rootVertex, vertex)
+			backupPolicyNames[backupPolicy.Name] = struct{}{}
 		}
 	}
 	return nil

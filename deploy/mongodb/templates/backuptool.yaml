@@ -53,4 +53,5 @@ spec:
     - |
      mkdir -p ${BACKUP_DIR} && cd ${DATA_DIR}
      tar -czvf ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz ./
+     echo $?
   incrementalBackupCommands: []

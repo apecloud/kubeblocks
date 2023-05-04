@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "kafka-cluster.fullname" . }}
   labels: {{ include "kafka-cluster.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: kafka # ref clusterdefinition.name

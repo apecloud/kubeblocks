@@ -55,7 +55,7 @@ Create the name of the service account to use
 */}}
 {{- define "postgresqlcluster.serviceAccountName" -}}
 {{- if .Values.serviceAccount.enabled }}
-{{- printf "kb-postgres-%s" .Release.Name | trunc 63 | trimSuffix "-"  }}
+{{- printf "kb-sa-%s" .Release.Name | trunc 63 | trimSuffix "-"  }}
 {{- else }}
 {{- .Values.serviceAccount.name }}
 {{- end }}

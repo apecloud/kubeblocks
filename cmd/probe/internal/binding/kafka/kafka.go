@@ -28,6 +28,7 @@ import (
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/kafka"
+	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
 const (
@@ -67,7 +68,7 @@ func (kafkaOps *KafkaOperations) Init(metadata bindings.Metadata) error {
 	// kafkaOps.DBPort = kafkaOps.GetRunningPort()
 	// kafkaOps.RegisterOperation(GetRoleOperation, kafkaOps.GetRoleOps)
 	// kafkaOps.RegisterOperation(GetLagOperation, kafkaOps.GetLagOps)
-	// kafkaOps.RegisterOperation(CheckStatusOperation, kafkaOps.CheckStatusOps)
+	kafkaOps.RegisterOperation(CheckStatusOperation, kafkaOps.CheckStatusOps)
 	// kafkaOps.RegisterOperation(ExecOperation, kafkaOps.ExecOps)
 	// kafkaOps.RegisterOperation(QueryOperation, kafkaOps.QueryOps)
 	return nil
@@ -170,4 +171,12 @@ func adaptHandler(handler bindings.Handler) kafka.EventHandler {
 		})
 		return err
 	}
+}
+
+// CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
+func (kafkaOps *KafkaOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+
+	result := OpsResult{}
+
+	return result, nil
 }

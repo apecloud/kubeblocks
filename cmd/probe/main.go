@@ -39,6 +39,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/dapr/pkg/runtime"
 	"github.com/dapr/kit/logger"
 
@@ -50,6 +51,7 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/etcd"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/kafka"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mongodb"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
@@ -71,6 +73,12 @@ func init() {
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(postgres.NewPostgres, "postgres")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(func(log logger.Logger) bindings.OutputBinding {
+		return kafka.NewKafka(log)
+	}, "kafka")
+	bindingsLoader.DefaultRegistry.RegisterInputBinding(func(log logger.Logger) bindings.InputBinding {
+		return kafka.NewKafka(log)
+	}, "kafka")
 	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")
 	httpMiddlewareLoader.DefaultRegistry.RegisterComponent(func(log logger.Logger) httpMiddlewareLoader.FactoryMethod {
 		return func(metadata middleware.Metadata) (httpMiddleware.Middleware, error) {

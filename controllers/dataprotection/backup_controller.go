@@ -1009,6 +1009,13 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 				"backup", backup.Name)
 			return nil
 		}
+		// check if pvc exists
+		if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backup.Namespace, Name: pvcName}, &corev1.PersistentVolumeClaim{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
 
 		backupFilePath := ""
 		if backup.Status.Manifests != nil && backup.Status.Manifests.BackupTool != nil {

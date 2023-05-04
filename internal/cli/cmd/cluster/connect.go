@@ -348,6 +348,9 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 		return nil, err
 	}
 
+	info.ClusterName = o.clusterName
+	info.ComponentName = o.componentName
+	info.HeadlessEndpoint = getOneHeadlessEndpoint(objs.ClusterDef, objs.Secrets)
 	// get username and password
 	if info.User, info.Password, err = getUserAndPassword(objs.ClusterDef, objs.Secrets); err != nil {
 		return nil, err
@@ -427,4 +430,16 @@ func getUserAndPassword(clusterDef *appsv1alpha1.ClusterDefinition, secrets *cor
 	passwordKey := getPasswordKey(clusterDef.Spec.ConnectionCredential)
 	password, err = getSecretVal(&secret, passwordKey)
 	return user, password, err
+}
+
+// get cluster headlessEndpoint from secrets
+func getOneHeadlessEndpoint(clusterDef *appsv1alpha1.ClusterDefinition, secrets *corev1.SecretList) string {
+	if len(secrets.Items) == 0 {
+		return ""
+	}
+	val, ok := secrets.Items[0].Data["headlessEndpoint"]
+	if !ok {
+		return ""
+	}
+	return string(val)
 }

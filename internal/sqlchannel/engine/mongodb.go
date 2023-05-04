@@ -36,8 +36,15 @@ func newMongoDB() *mongodb {
 			Container:   "mongodb",
 			UserEnv:     "$MONGODB_ROOT_USER",
 			PasswordEnv: "$MONGODB_ROOT_PASSWORD",
+			Database:    "admin",
 		},
-		examples: map[ClientType]buildConnectExample{},
+		examples: map[ClientType]buildConnectExample{
+			CLI: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# mongodb client connection example
+mongosh mongodb://%s:%s@%s/%s?replicaset=%s-%s
+`, info.User, info.Password, info.HeadlessEndpoint, info.Database, info.ClusterName, info.ComponentName)
+			},
+		},
 	}
 }
 
@@ -60,8 +67,10 @@ func (r mongodb) Container() string {
 }
 
 func (r mongodb) ConnectExample(info *ConnectionInfo, client string) string {
-	// TODO implement me
-	panic("implement me")
+	if len(info.Database) == 0 {
+		info.Database = r.info.Database
+	}
+	return buildExample(info, client, r.examples)
 }
 
 var _ Interface = &mongodb{}

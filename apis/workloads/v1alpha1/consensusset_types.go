@@ -83,7 +83,7 @@ type ConsensusSetStatus struct {
 	apps.StatefulSetStatus `json:"apps.StatefulSetStatus"`
 
 	// leader status.
-	// +kubebuilder:validation:Required
+	// +optional
 	Leader ConsensusMemberStatus `json:"leader"`
 
 	// followers status.

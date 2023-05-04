@@ -17,6 +17,7 @@ limitations under the License.
 package consensusset
 
 import (
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -75,6 +76,14 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	headLessSvc := hdlBuilder.GetObject()
 
 	stsBuilder := builder.NewStatefulSetBuilder(csSet.Namespace, csSet.Name)
+	template := csSet.Spec.Template
+	labels := template.Labels
+	if labels == nil {
+		labels = make(map[string]string, 2)
+	}
+	labels[constant.AppInstanceLabelKey] = csSet.Name
+	labels[constant.KBManagedByKey] = ConsensusSetKind
+	template.Labels = labels
 	stsBuilder.AddLabels(constant.AppInstanceLabelKey, csSet.Name).
 		AddLabels(constant.KBManagedByKey, ConsensusSetKind).
 		AddMatchLabel(constant.AppInstanceLabelKey, csSet.Name).
@@ -84,21 +93,24 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		SetMinReadySeconds(10).
 		SetPodManagementPolicy(apps.ParallelPodManagement).
 		SetVolumeClaimTemplates(csSet.Spec.VolumeClaimTemplates...).
-		SetTemplate(csSet.Spec.Template).
+		SetTemplate(template).
 		SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
 	sts := stsBuilder.GetObject()
 	// TODO: builds env config map
 
 	// put all objects into the dag
+	vertices := make([]*model.ObjectVertex, 0)
 	svcVertex := &model.ObjectVertex{Obj: svc}
 	headlessSvcVertex := &model.ObjectVertex{Obj: headLessSvc}
 	stsVertex := &model.ObjectVertex{Obj: sts}
-	dag.AddVertex(svcVertex)
-	dag.AddVertex(headlessSvcVertex)
-	dag.AddVertex(stsVertex)
-	dag.Connect(root, svcVertex)
-	dag.Connect(root, headlessSvcVertex)
-	dag.Connect(root, stsVertex)
+	vertices = append(vertices, svcVertex, headlessSvcVertex, stsVertex)
+	for _, vertex := range vertices {
+		if err := controllerutil.SetOwnership(csSet, vertex.Obj, model.GetScheme(), CSSetFinalizerName); err != nil {
+			return err
+		}
+		dag.AddVertex(vertex)
+		dag.Connect(root, vertex)
+	}
 	dag.Connect(stsVertex, svcVertex)
 	dag.Connect(stsVertex, headlessSvcVertex)
 
@@ -187,6 +199,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		// vertices to be deleted
 		deleteOrphanVertices()
 	}
+	root.Action = model.ActionPtr(model.STATUS)
 
 	return nil
 }

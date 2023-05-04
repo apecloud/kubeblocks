@@ -9753,7 +9753,6 @@ spec:
                 type: object
             required:
             - apps.StatefulSetStatus
-            - leader
             type: object
         type: object
     served: true

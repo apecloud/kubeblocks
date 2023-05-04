@@ -26,7 +26,6 @@ import (
 func ownedKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&appsv1.StatefulSetList{},
-		&appsv1.DeploymentList{},
 		&corev1.ServiceList{},
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},

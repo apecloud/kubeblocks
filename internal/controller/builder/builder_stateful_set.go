@@ -19,6 +19,7 @@ package builder
 import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type StatefulSetBuilder struct {
@@ -42,6 +43,11 @@ func (builder *StatefulSetBuilder) AddMatchLabels(keyValues ...string) *Stateful
 }
 
 func (builder *StatefulSetBuilder) AddMatchLabelsInMap(labels map[string]string) *StatefulSetBuilder {
+	selector := builder.get().Spec.Selector
+	if selector == nil {
+		selector = &metav1.LabelSelector{}
+		builder.get().Spec.Selector = selector
+	}
 	matchLabels := builder.get().Spec.Selector.MatchLabels
 	if matchLabels == nil {
 		matchLabels = make(map[string]string, len(labels))

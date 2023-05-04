@@ -210,7 +210,7 @@ func (e *EnqueueRequestForAncestor) getSourceObject(object client.Object) (clien
 
 	ctx := context.Background()
 	// get the object by the ownerRef
-	sourceObject, err := e.getObjectByOwnerRef(ctx, ownerRef, scheme)
+	sourceObject, err := e.getObjectByOwnerRef(ctx, objectRef.Namespace, ownerRef, scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -233,14 +233,14 @@ func (e *EnqueueRequestForAncestor) getOwnerUpTo(ctx context.Context, object cli
 	if upToLevel == 1 {
 		return ownerRef, nil
 	}
-	objectNew, err := e.getObjectByOwnerRef(ctx, *ownerRef, scheme)
+	objectNew, err := e.getObjectByOwnerRef(ctx, object.GetNamespace(), *ownerRef, scheme)
 	if err != nil {
 		return nil, err
 	}
 	return e.getOwnerUpTo(ctx, objectNew, upToLevel-1, scheme)
 }
 
-func (e *EnqueueRequestForAncestor) getObjectByOwnerRef(ctx context.Context, ownerRef metav1.OwnerReference, scheme runtime.Scheme) (client.Object, error) {
+func (e *EnqueueRequestForAncestor) getObjectByOwnerRef(ctx context.Context, ownerNameSpace string, ownerRef metav1.OwnerReference, scheme runtime.Scheme) (client.Object, error) {
 	gv, err := schema.ParseGroupVersion(ownerRef.APIVersion)
 	if err != nil {
 		return nil, err
@@ -268,7 +268,7 @@ func (e *EnqueueRequestForAncestor) getObjectByOwnerRef(ctx context.Context, own
 		return nil, err
 	}
 	if mapping.Scope.Name() != meta.RESTScopeNameRoot {
-		request.Namespace = object.GetNamespace()
+		request.Namespace = ownerNameSpace
 	}
 	if err := e.Client.Get(ctx, request.NamespacedName, object); err != nil {
 		return nil, err

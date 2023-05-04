@@ -5,6 +5,8 @@ metadata:
   labels:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
+  annotations:
+    dataprotection.kubeblocks.io/is-default-policy-template: "true"
 spec:
   clusterDefinitionRef: apecloud-mysql
   backupPolicies:

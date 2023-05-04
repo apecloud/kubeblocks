@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "weaviate.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: weaviate-standalone
+  clusterDefinitionRef: weaviate
   componentVersions:
     - componentDefRef: weaviate
       versionsContext:

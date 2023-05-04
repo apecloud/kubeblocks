@@ -4,7 +4,7 @@ metadata:
   name: {{ .Release.Name }}
   labels: {{ include "weaviate.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: weaviate-standalone # ref clusterdefinition.name
+  clusterDefinitionRef: weaviate # ref clusterdefinition.name
   clusterVersionRef: weaviate-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:

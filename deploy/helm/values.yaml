@@ -1099,6 +1099,15 @@ prometheus:
                 summary: 'MongoDB is Down'
                 description: 'MongoDB instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
       
+            - alert: MongodbRestarted
+              expr: 'time() - process_start_time_seconds < 60'
+              for: 0m
+              labels:
+                severity: info
+              annotations:
+                summary: 'Mongodb has just been restarted (< 60s)'
+                description: 'Mongodb has just been restarted {{ $value | printf "%.1f" }} seconds ago\n LABELS = {{ $labels }}'
+      
             - alert: MongodbReplicaMemberUnhealthy
               expr: 'max_over_time(mongodb_rs_members_health[1m]) == 0'
               for: 0m
@@ -1608,7 +1617,7 @@ grafana:
 snapshot-controller:
   ## @param snapshot-controller.enabled -- Enable snapshot-controller chart.
   ##
-  enabled: false
+  enabled: true
   ## @param snapshot-controller.replicaCount -- Number of replicas to deploy.
   ##
   replicaCount: 1
@@ -1752,7 +1761,7 @@ csi-hostpath-driver:
     create: true
     default: true
 
-aws-loadbalancer-controller:
+aws-load-balancer-controller:
   clusterName: ""
   enabled: false
   replicaCount: 1
@@ -1764,3 +1773,13 @@ aws-loadbalancer-controller:
   serviceAccount:
     create: true
     name: kubeblocks-service-account-aws-load-balancer-controller
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: kb-controller
+            operator: In
+            values:
+            - "true"

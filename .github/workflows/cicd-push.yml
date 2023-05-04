@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Get trigger mode
         id: get_trigger_mode
         run: |
@@ -35,6 +35,8 @@ jobs:
       - name: merge releasing to release
         if: ${{ startsWith(github.ref_name, 'releasing-') }}
         run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
           bash .github/utils/merge_releasing_branch.sh
 
   pre-push:

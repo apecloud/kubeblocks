@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package kubeblocks
@@ -40,6 +43,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -50,7 +54,7 @@ var (
 	infoExample = templates.Examples(`
 	# list workloads owned by KubeBlocks
 	kbcli kubeblocks status
-	
+
 	# list all resources owned by KubeBlocks, such as workloads, cluster definitions, backup template.
 	kbcli kubeblocks status --all`)
 )
@@ -74,6 +78,14 @@ var (
 		types.ConfigmapGVR(),
 		types.SecretGVR(),
 		types.ServiceGVR(),
+	}
+
+	kubeBlocksRBAC = []schema.GroupVersionResource{
+		types.ClusterRoleGVR(),
+		types.ClusterRoleBindingGVR(),
+		types.RoleGVR(),
+		types.RoleBindingGVR(),
+		types.ServiceAccountGVR(),
 	}
 
 	kubeBlocksStorages = []schema.GroupVersionResource{
@@ -158,6 +170,7 @@ func (o *statusOptions) run() error {
 	if o.showAll {
 		o.showKubeBlocksResources(ctx, &allErrs)
 		o.showKubeBlocksConfig(ctx, &allErrs)
+		o.showKubeBlocksRBAC(ctx, &allErrs)
 		o.showKubeBlocksStorage(ctx, &allErrs)
 		o.showHelmResources(ctx, &allErrs)
 	}
@@ -218,6 +231,19 @@ func (o *statusOptions) showKubeBlocksConfig(ctx context.Context, allErrs *[]err
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME")
 	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksConfigurations, selectorList, allErrs)
+	for _, resourceList := range unstructuredList {
+		for _, resource := range resourceList.Items {
+			tblPrinter.AddRow(resource.GetNamespace(), resource.GetKind(), resource.GetName())
+		}
+	}
+	tblPrinter.Print()
+}
+
+func (o *statusOptions) showKubeBlocksRBAC(ctx context.Context, allErrs *[]error) {
+	fmt.Fprintln(o.Out, "\nKubeBlocks RBAC:")
+	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME")
+	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksRBAC, selectorList, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			tblPrinter.AddRow(resource.GetNamespace(), resource.GetKind(), resource.GetName())
@@ -371,6 +397,9 @@ func listResourceByGVR(ctx context.Context, client dynamic.Interface, namespace 
 	unstructuredList := make([]*unstructured.UnstructuredList, 0)
 	for _, gvr := range gvrlist {
 		for _, labelSelector := range selector {
+			if klog.V(1).Enabled() {
+				klog.Infof("listResourceByGVR: namespace=%s, gvrlist=%v, selector=%v", namespace, gvr, labelSelector)
+			}
 			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, labelSelector)
 			if err != nil {
 				appendErrIgnoreNotFound(allErrs, err)

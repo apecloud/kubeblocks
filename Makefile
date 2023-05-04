@@ -137,8 +137,6 @@ ifeq ($(SKIP_GO_GEN), false)
 	$(GO) generate -x ./internal/configuration/proto
 endif
 
-
-
 .PHONY: test-go-generate
 test-go-generate: ## Run go generate against test code.
 	$(GO) generate -x ./internal/testutil/k8s/mocks/...
@@ -269,7 +267,7 @@ kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
 clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 
-.PHONY: doc
+.PHONY: kbcli-doc
 kbcli-doc: generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
@@ -752,10 +750,8 @@ endif
 render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
 	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
-	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	$(HELM) template mycluster deploy/redis-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	$(HELM) template mycluster deploy/mongodb > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
-	$(HELM) template mycluster deploy/mongodb-cluster >> test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+	$(HELM) template mycluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
 
 
 .PHONY: test-e2e
@@ -765,4 +761,3 @@ test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
 # NOTE: include must be placed at the end
 include docker/docker.mk
 include cmd/cmd.mk
-

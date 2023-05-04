@@ -77,6 +77,10 @@ spec:
             - name: VOLUMESNAPSHOT
               value: "true"
             {{- end }}
+            {{- if .Capabilities.APIVersions.Has "snapshot.storage.k8s.io/v1beta1" }}
+            - name: VOLUMESNAPSHOT_API_BETA
+              value: "true"
+            {{- end }}
             {{- if .Values.admissionWebhooks.enabled }}
             - name: ENABLE_WEBHOOKS
               value: "true"

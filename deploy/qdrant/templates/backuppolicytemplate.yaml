@@ -1,12 +1,12 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: qdrant-standalone-backup-policy-template
+  name: qdrant-backup-policy-template
   labels:
-    clusterdefinition.kubeblocks.io/name: qdrant-standalone
+    clusterdefinition.kubeblocks.io/name: qdrant
     {{- include "qdrant.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: qdrant-standalone
+  clusterDefinitionRef: qdrant
   backupPolicies:
   - componentDefRef: qdrant
     ttl: 7d

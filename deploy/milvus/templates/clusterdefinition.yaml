@@ -2,7 +2,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: milvus-standalone
+  name: milvus
   labels:
     {{- include "milvus.labels" . | nindent 4 }}
 spec:
@@ -26,8 +26,8 @@ spec:
           scrapePort: 9187
       logConfigs:
       configSpecs:
-        - name: milvus-standalone-config-template
-          templateRef: milvus-standalone-config-template
+        - name: milvus-config-template
+          templateRef: milvus-config-template
           volumeName: milvus-config
           namespace: {{.Release.Namespace}}
       service:

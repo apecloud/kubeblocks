@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package dataprotection
@@ -26,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
@@ -54,15 +58,16 @@ import (
 
 const (
 	backupPathBase                 = "/backupdata"
-	deleteBackupFilesJobNamePrefix = "delete-backup-files-"
+	deleteBackupFilesJobNamePrefix = "delete-"
 )
 
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
-	Scheme   *k8sruntime.Scheme
-	Recorder record.EventRecorder
-	clock    clock.RealClock
+	Scheme      *k8sruntime.Scheme
+	Recorder    record.EventRecorder
+	clock       clock.RealClock
+	snapshotCli *intctrlutil.VolumeSnapshotCompatClient
 }
 
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
@@ -86,6 +91,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Req:      req,
 		Log:      log.FromContext(ctx).WithValues("backup", req.NamespacedName),
 		Recorder: r.Recorder,
+	}
+	// initialize snapshotCompatClient
+	r.snapshotCli = &intctrlutil.VolumeSnapshotCompatClient{
+		Client: r.Client,
+		Ctx:    ctx,
 	}
 	// Get backup obj
 	backup := &dataprotectionv1alpha1.Backup{}
@@ -126,7 +136,11 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{})
 
 	if viper.GetBool("VOLUMESNAPSHOT") {
-		b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		if intctrlutil.InVolumeSnapshotV1Beta1() {
+			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		} else {
+			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		}
 	}
 
 	return b.Complete(r)
@@ -383,7 +397,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 		backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 		snap := &snapshotv1.VolumeSnapshot{}
-		exists, _ := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, snap)
+		exists, _ := r.snapshotCli.CheckResourceExists(key, snap)
 		if exists {
 			backup.Status.TotalSize = snap.Status.RestoreSize.String()
 		}
@@ -584,7 +598,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 	snapshotPolicy *dataprotectionv1alpha1.SnapshotPolicy) error {
 
 	snap := &snapshotv1.VolumeSnapshot{}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, reqCtx.Req.NamespacedName, snap)
+	exists, err := r.snapshotCli.CheckResourceExists(reqCtx.Req.NamespacedName, snap)
 	if err != nil {
 		return err
 	}
@@ -637,7 +651,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		}
 
 		reqCtx.Log.V(1).Info("create a volumeSnapshot from backup", "snapshot", snap.Name)
-		if err = r.Client.Create(reqCtx.Ctx, snap); err != nil && !apierrors.IsAlreadyExists(err) {
+		if err = r.snapshotCli.Create(snap); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
@@ -650,7 +664,8 @@ func (r *BackupReconciler) ensureVolumeSnapshotReady(reqCtx intctrlutil.RequestC
 	key types.NamespacedName) (bool, error) {
 
 	snap := &snapshotv1.VolumeSnapshot{}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, snap)
+	// not found, continue creation
+	exists, err := r.snapshotCli.CheckResourceExists(key, snap)
 	if err != nil {
 		return false, err
 	}
@@ -945,20 +960,20 @@ func (r *BackupReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.Request
 func (r *BackupReconciler) deleteReferenceVolumeSnapshot(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) error {
 	snaps := &snapshotv1.VolumeSnapshotList{}
 
-	if err := r.Client.List(reqCtx.Ctx, snaps,
+	if err := r.snapshotCli.List(snaps,
 		client.InNamespace(reqCtx.Req.Namespace),
 		client.MatchingLabels(buildBackupLabels(backup))); err != nil {
 		return err
 	}
 	for _, i := range snaps.Items {
 		if controllerutil.ContainsFinalizer(&i, dataProtectionFinalizerName) {
-			patch := client.MergeFrom(i.DeepCopy())
+			patch := i.DeepCopy()
 			controllerutil.RemoveFinalizer(&i, dataProtectionFinalizerName)
-			if err := r.Patch(reqCtx.Ctx, &i, patch); err != nil {
+			if err := r.snapshotCli.Patch(&i, patch); err != nil {
 				return err
 			}
 		}
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &i); err != nil {
+		if err := r.snapshotCli.Delete(&i); err != nil {
 			return err
 		}
 	}
@@ -977,6 +992,9 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	}
 
 	jobName := deleteBackupFilesJobNamePrefix + backup.Name
+	if len(jobName) > 60 {
+		jobName = jobName[:60]
+	}
 	jobKey := types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
 	job := batchv1.Job{}
 	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, jobKey, &job)
@@ -990,6 +1008,13 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 			reqCtx.Log.Info("skip deleting backup files because PersistentVolumeClaimName empty",
 				"backup", backup.Name)
 			return nil
+		}
+		// check if pvc exists
+		if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backup.Namespace, Name: pvcName}, &corev1.PersistentVolumeClaim{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
 		}
 
 		backupFilePath := ""

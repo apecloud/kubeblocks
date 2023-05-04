@@ -33,7 +33,10 @@ spec:
           limits: resources.limits.memory
 
   defaultInstallValues:
-    - replicas: 2
+    - replicas: 1
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
 
   installable:
     autoInstall: false

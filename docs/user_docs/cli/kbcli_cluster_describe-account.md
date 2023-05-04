@@ -12,7 +12,11 @@ kbcli cluster describe-account [flags]
 
 ```
   # describe account and show role information
-  kbcli cluster describe-account NAME --component COMPNAME--username NAME
+  kbcli cluster describe-account NAME --component COMPNAME --name USERNAME
+  # describe account with default component
+  kbcli cluster delete-account NAME --name USERNAME
+  # describe account for instance
+  kbcli cluster describe-account --instance INSTANCE --name USERNAME
 ```
 
 ### Options

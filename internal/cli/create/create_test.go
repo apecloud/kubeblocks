@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package create
@@ -132,13 +135,12 @@ var _ = Describe("Create", func() {
 				},
 				BuildFlags: func(cmd *cobra.Command) {
 					cmd.Flags().StringVar(&baseOptions.Namespace, "clusterDefRef", "", "cluster definition")
-					cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+					cmd.Flags().StringVar(&baseOptions.DryRunStrategy, "dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 					cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 					printer.AddOutputFlagForCreate(cmd, &baseOptions.Format)
 				},
 			}
 			cmd := BuildCommand(inputs)
-			inputs.Cmd = cmd
 
 			testCases := []struct {
 				clusterName   string
@@ -197,7 +199,7 @@ var _ = Describe("Create", func() {
 				Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
 				Expect(baseOptions.Validate(inputs)).Should(Succeed())
 
-				dryRunStrateg, _ := GetDryRunStrategy(cmd)
+				dryRunStrateg, _ := baseOptions.GetDryRunStrategy()
 				if t.success {
 					Expect(dryRunStrateg == t.dryRunStrateg).Should(BeTrue())
 					Expect(baseOptions.Run(inputs)).Should(Succeed())

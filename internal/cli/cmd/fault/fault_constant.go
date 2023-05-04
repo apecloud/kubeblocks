@@ -4,7 +4,7 @@ const (
 	Unchanged = "unchanged"
 )
 
-var Options = []string{"PodChaosOptions", "NetworkChaosOptions", "IOChaosOptions"}
+// var Options = []string{"PodChaosOptions", "NetworkChaosOptions", "IOChaosOptions"}
 
 const (
 	Group   = "chaos-mesh.org"
@@ -13,12 +13,16 @@ const (
 	ResourcePodChaos     = "podchaos"
 	ResourceNetworkChaos = "networkchaos"
 	ResourceIOChaos      = "iochaos"
+	ResourceStressChaos  = "stresschaos"
+	ResourceDNSChaos     = "dnschaos"
 )
 
 const (
 	CueTemplatePodChaos     = "podChaos_template.cue"
 	CueTemplateNetworkChaos = "networkChaos_template.cue"
 	CueTemplateIOChaos      = "IOChaos_template.cue"
+	CueTemplateStressChaos  = "StressChaos_template.cue"
+	CueTemplateDNSChaos     = "DNSChaos_template.cue"
 )
 
 const (
@@ -47,10 +51,22 @@ const (
 )
 
 const (
+	Random      = "random"
+	RandomShort = "DNS random IP chaos"
+	Error       = "error"
+	ErrorShort  = "DNS error IP chaos"
+)
+
+const (
 	Latency           = "latency"
 	LatencyShort      = "IO Latency attack."
 	Fault             = "fault"
 	FaultShort        = "IO Fault attack."
 	AttrOverride      = "attr-override"
 	AttrOverrideShort = "IO AttrOverrideShort attack."
+)
+
+const (
+	Stress      = "stress"
+	StressShort = "stress chaos"
 )

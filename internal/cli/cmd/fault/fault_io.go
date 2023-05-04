@@ -13,6 +13,11 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
+// TODO: add more examples
+var faultIOExample = `
+	
+`
+
 type IOChaosOptions struct {
 	Delay string `json:"delay"`
 	Errno int    `json:"errno"`
@@ -33,7 +38,7 @@ type IOChaosOptions struct {
 func NewIOChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "IO",
-		Short: "inject fault to pod.",
+		Short: "IO chaos.",
 	}
 	cmd.AddCommand(
 		NewIOLatencyCmd(f, streams),
@@ -47,7 +52,7 @@ func (o *IOChaosOptions) createInputs(f cmdutil.Factory, use string, short strin
 	return &create.Inputs{
 		Use:             use,
 		Short:           short,
-		Example:         faultPodExample,
+		Example:         faultIOExample,
 		CueTemplateName: CueTemplateIOChaos,
 		Group:           Group,
 		Version:         Version,
@@ -68,7 +73,6 @@ func NewIOLatencyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.IoLatency)},
 	}
 
-	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
 		cmd.Flags().StringVar(&o.Delay, "delay", "", `specific delay time.`)
@@ -95,7 +99,6 @@ func NewIOFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.IoFaults)},
 	}
 
-	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
 		cmd.Flags().IntVar(&o.Errno, "errno", 0, `the returned error number.`)
@@ -116,13 +119,13 @@ func NewIOFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return create.BuildCommand(*inputs)
 }
 
+// NewIOAttrOverrideCmd TODO
 func NewIOAttrOverrideCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &IOChaosOptions{
 		BaseOptions:      create.BaseOptions{IOStreams: streams},
 		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.IoAttrOverride)},
 	}
 
-	// TODO
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
 

@@ -25,7 +25,7 @@ options: {
 	label?:						{}
 
 	direction: 				string
-	// // optional
+	// optional
 	externalTargets?:  [...]
 
 	targetNamespaceSelector: string

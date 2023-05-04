@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"strconv"
 
+	"k8s.io/kubectl/pkg/util/templates"
+
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -14,6 +18,25 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 )
+
+// TODO: add more examples
+var faultNetWorkExample = templates.Examples(`
+	kbcli fault network partition
+
+	kbcli fault network partition --label=statefulset.kubernetes.io/pod-name=mycluster-mysql-1 --external-targets=www.baidu.com
+
+	kbcli fault network partition --label=statefulset.kubernetes.io/pod-name=mycluster-mysql-1 --target-label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2 --target-namespace-selector=default --duration=3m --direction=both
+
+	kbcli fault network partition --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2  --duplicate=10s
+	
+	kbcli fault network loss --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --loss=10
+	
+	kbcli fault network corrupt --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --corrupt=10
+	
+	kbcli fault network duplicate --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --duplicate=10
+	
+	kbcli fault network delay --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --latency=10s
+`)
 
 type NetworkChaosOptions struct {
 	// Specify the network direction
@@ -43,6 +66,16 @@ type NetworkChaosOptions struct {
 	// The correlation of loss or corruption or duplication or delay
 	Correlation string `json:"correlation"`
 
+	Rate string `json:"rate"`
+
+	Limit uint32 `json:"limit"`
+
+	Buffer uint32 `json:"buffer"`
+
+	Peakrate uint64 `json:"peakrate"`
+
+	Minburst uint32 `json:"minburst"`
+
 	FaultBaseOptions
 
 	create.BaseOptions
@@ -52,7 +85,7 @@ func (o *NetworkChaosOptions) createInputs(f cmdutil.Factory, buildFlags func(*c
 	return &create.Inputs{
 		Use:             use,
 		Short:           short,
-		Example:         faultPodExample,
+		Example:         faultNetWorkExample,
 		CueTemplateName: cueTemplateName,
 		Group:           Group,
 		Version:         Version,
@@ -70,7 +103,7 @@ func (o *NetworkChaosOptions) createInputs(f cmdutil.Factory, buildFlags func(*c
 func NewNetworkChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "network",
-		Short: "network attack.",
+		Short: "network chaos.",
 	}
 	cmd.AddCommand(
 		NewPartitionCmd(f, streams),
@@ -90,6 +123,9 @@ func NewPartitionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	}
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
+
+		// register flag completion func
+		registerFlagCompletionFunc(cmd, f)
 	}
 	inputs := o.createInputs(
 		f,
@@ -111,6 +147,11 @@ func NewLossCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		o.AddCommonFlag(cmd)
 		cmd.Flags().StringVar(&o.Loss, "loss", "", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
 		cmd.Flags().StringVar(&o.Correlation, "correlation", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
+
+		util.CheckErr(cmd.MarkFlagRequired("loss"))
+
+		// register flag completion func
+		registerFlagCompletionFunc(cmd, f)
 	}
 	inputs := o.createInputs(
 		f,
@@ -133,6 +174,11 @@ func NewDelayCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		cmd.Flags().StringVar(&o.Latency, "latency", "", `the length of time to delay.`)
 		cmd.Flags().StringVar(&o.Jitter, "jitter", "0ms", `the variation range of the delay time.`)
 		cmd.Flags().StringVar(&o.Correlation, "correlation", "0", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
+
+		util.CheckErr(cmd.MarkFlagRequired("latency"))
+
+		// register flag completion func
+		registerFlagCompletionFunc(cmd, f)
 	}
 	inputs := o.createInputs(
 		f,
@@ -154,6 +200,11 @@ func NewDuplicateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		o.AddCommonFlag(cmd)
 		cmd.Flags().StringVar(&o.Duplicate, "duplicate", "", `the probability of a packet being repeated. Value range: [0, 100].`)
 		cmd.Flags().StringVar(&o.Correlation, "correlation", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
+
+		util.CheckErr(cmd.MarkFlagRequired("duplicate"))
+
+		// register flag completion func
+		registerFlagCompletionFunc(cmd, f)
 	}
 	inputs := o.createInputs(
 		f,
@@ -175,6 +226,11 @@ func NewCorruptCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		o.AddCommonFlag(cmd)
 		cmd.Flags().StringVar(&o.Corrupt, "corrupt", "", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
 		cmd.Flags().StringVar(&o.Correlation, "correlation", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
+
+		util.CheckErr(cmd.MarkFlagRequired("corrupt"))
+
+		// register flag completion func
+		registerFlagCompletionFunc(cmd, f)
 	}
 	inputs := o.createInputs(
 		f,
@@ -187,14 +243,24 @@ func NewCorruptCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return create.BuildCommand(*inputs)
 }
 
+// NewBandwidthCmd TODO
 func NewBandwidthCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &NetworkChaosOptions{
 		BaseOptions:      create.BaseOptions{IOStreams: streams},
 		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.BandwidthAction)},
 	}
-	// TODO
+
 	var BuildFlags = func(cmd *cobra.Command) {
 		o.AddCommonFlag(cmd)
+
+		cmd.Flags().StringVar(&o.Rate, "rate", "", `Indicates the rate at which the bandwidth is limited. For example : 1mbps.`)
+		cmd.Flags().Uint32Var(&o.Limit, "limit", 0, `Indicates the number of bytes waiting in the queue.`)
+		cmd.Flags().Uint32Var(&o.Buffer, "buffer", 0, `The maximum number of bytes that can be sent instantaneously.`)
+		cmd.Flags().Uint64Var(&o.Peakrate, "peakrate", 0, `The maximum consumption rate of the bucket.`)
+		cmd.Flags().Uint32Var(&o.Minburst, "minburst", 0, `The size of the peakrate bucket.`)
+
+		// register flag completion func
+		registerFlagCompletionFunc(cmd, f)
 	}
 	inputs := o.createInputs(
 		f,
@@ -228,6 +294,7 @@ func (o *NetworkChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
 }
 
+// Validate TODO
 func (o *NetworkChaosOptions) Validate() error {
 	if o.TargetValue == "" && (o.TargetMode == "fixed" || o.TargetMode == "fixed-percent" || o.TargetMode == "random-max-percent") {
 		return fmt.Errorf("you must use --value to specify an integer")
@@ -243,6 +310,7 @@ func (o *NetworkChaosOptions) Validate() error {
 	return nil
 }
 
+// Complete TODO
 func (o *NetworkChaosOptions) Complete() error {
 	err := o.BaseComplete()
 	if err != nil {

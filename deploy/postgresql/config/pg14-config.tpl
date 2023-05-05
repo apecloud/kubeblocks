@@ -11,7 +11,7 @@
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
-{{- $buffer_unit = "KB" }}
+{{- $buffer_unit = "kB" }}
 {{- end -}}
 
 {{- if ge $shared_buffers 1024 }}

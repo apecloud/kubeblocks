@@ -14,7 +14,7 @@
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
-{{- $buffer_unit = "KB" }}
+{{- $buffer_unit = "kB" }}
 {{- end -}}
 
 {{- if ge $shared_buffers 1024 }}
@@ -52,7 +52,7 @@ autovacuum_vacuum_cost_limit = '200'
 autovacuum_vacuum_scale_factor = '0.05'
 autovacuum_vacuum_threshold = '50'
 {{- if gt $phy_memory 0 }}
-autovacuum_work_mem = '{{ printf "%dKB" ( max ( div $phy_memory 65536 ) 131072 ) }}'
+autovacuum_work_mem = '{{ printf "%dkB" ( max ( div $phy_memory 65536 ) 131072 ) }}'
 {{- end }}
 backend_flush_after = '0'
 backslash_quote = 'safe_encoding'
@@ -124,7 +124,7 @@ geqo_seed = '0'
 geqo_selection_bias = '2'
 geqo_threshold = '12'
 gin_fuzzy_search_limit = '0'
-gin_pending_list_limit = '4096KB'
+gin_pending_list_limit = '4096kB'
 # patroni on
 hot_standby_feedback = 'False'
 # rds huge_pages=on, patroni try
@@ -166,7 +166,7 @@ log_planner_stats = 'False'
 log_replication_commands = 'False'
 log_statement = 'ddl'
 log_statement_stats = 'False'
-log_temp_files = '128KB'
+log_temp_files = '128kB'
 log_transaction_sample_rate = '0'
 #maintenance_work_mem = '3952MB'
 max_connections = '{{ $max_connections }}'
@@ -190,9 +190,9 @@ max_wal_senders = '64'
 # {LEAST(GREATEST(DBInstanceClassMemory/2097152, 2048), 16384)}
 max_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 2097152 ) 2048 ) 16384 ) }}'
 max_worker_processes = '{{ max $phy_cpu 8 }}'
-// min_parallel_index_scan_size unit is 8KB, 64 = 512KB
-min_parallel_index_scan_size = '512KB'
-// min_parallel_table_scan_size unit is 8KB, 1024 = 8MB
+# min_parallel_index_scan_size unit is 8KB, 64 = 512KB
+min_parallel_index_scan_size = '512kB'
+# min_parallel_table_scan_size unit is 8KB, 1024 = 8MB
 min_parallel_table_scan_size = '8MB'
 {{- if gt $phy_memory 0 }}
 # min_wal_size={LEAST(GREATEST(DBInstanceClassMemory/8388608, 256), 8192)} # patroni 1/20 disk size
@@ -240,7 +240,7 @@ session_replication_role = 'origin'
 sql_firewall.firewall = 'disable'
 
 #auto generated
-# shared_buffers = '{{ printf "%d%s" $shared_buffers $buffer_unit }}'
+shared_buffers = '{{ printf "%d%s" $shared_buffers $buffer_unit }}'
 # shared_preload_libraries = 'pg_stat_statements,auto_explain,bg_mon,pgextwlist,pg_auth_mon,set_user,pg_cron,pg_stat_kcache'
 
 {{- if $.component.tls }}
@@ -272,7 +272,7 @@ temp_buffers = '8MB'
 
 # {DBInstanceClassMemory/1024}
 {{- if gt $phy_memory 0 }}
-temp_file_limit = '{{ printf "%dKB" ( div $phy_memory 1024 ) }}'
+temp_file_limit = '{{ printf "%dkB" ( div $phy_memory 1024 ) }}'
 {{- end }}
 
 #extension: timescaledb
@@ -318,6 +318,6 @@ wal_writer_delay = '200ms'
 # rds unit 8KB, so 1M, patroni 1M
 wal_writer_flush_after = '1MB'
 # {GREATEST(DBInstanceClassMemory/4194304, 4096)}
-work_mem = '{{ printf "%dKB" ( max ( div $phy_memory 4194304 ) 4096 ) }}'
+work_mem = '{{ printf "%dkB" ( max ( div $phy_memory 4194304 ) 4096 ) }}'
 xmlbinary = 'base64'
 xmloption = 'content'

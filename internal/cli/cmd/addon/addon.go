@@ -444,24 +444,6 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 	}()
 
 	if o.addonEnableFlags.useDefault() {
-		if len(o.addon.Spec.DefaultInstallValues) == 0 {
-			installSpec.Enabled = true
-			return nil
-		}
-
-		for _, di := range o.addon.Spec.GetSortedDefaultInstallValues() {
-			if len(di.Selectors) == 0 {
-				installSpec = di.AddonInstallSpec
-				break
-			}
-			for _, s := range di.Selectors {
-				if !s.MatchesFromConfig() {
-					continue
-				}
-				installSpec = di.AddonInstallSpec
-				break
-			}
-		}
 		installSpec.Enabled = true
 		return nil
 	}

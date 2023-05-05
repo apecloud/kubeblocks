@@ -97,5 +97,6 @@ func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1.Deployment{}).
 		Owns(&appsv1.ReplicaSet{}).
 		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate)).
+		Named("deployment-watcher").
 		Complete(r)
 }

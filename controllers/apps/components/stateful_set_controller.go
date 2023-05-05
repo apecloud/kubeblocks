@@ -100,5 +100,6 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1.StatefulSet{}).
 		Owns(&corev1.Pod{}).
 		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate)).
+		Named("statefulset-watcher").
 		Complete(r)
 }

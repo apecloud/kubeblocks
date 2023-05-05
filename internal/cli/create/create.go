@@ -31,7 +31,7 @@ import (
 	cuejson "cuelang.org/go/encoding/json"
 	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -53,6 +53,17 @@ import (
 var (
 	//go:embed template/*
 	cueTemplate embed.FS
+)
+
+type CreateDependency func(dryRun []string) error
+
+type DryRunStrategy int
+
+const (
+	// DryRunNone indicates the client will make all mutating calls
+	DryRunNone DryRunStrategy = iota
+	DryRunClient
+	DryRunServer
 )
 
 type Inputs struct {
@@ -83,9 +94,6 @@ type Inputs struct {
 	// Group of Version, default is v1alpha1
 	Version string
 
-	// Command of input
-	Cmd *cobra.Command
-
 	// Factory
 	Factory cmdutil.Factory
 
@@ -102,6 +110,12 @@ type Inputs struct {
 
 	// CustomOutPut will be executed after creating successfully.
 	CustomOutPut func(options *BaseOptions)
+
+	// CleanUpFn will be executed after creating failed.
+	CleanUpFn func() error
+
+	// CreateDependencies will be executed before creating.
+	CreateDependencies CreateDependency
 
 	// ResourceNameGVRForCompletion resource name for completion.
 	ResourceNameGVRForCompletion schema.GroupVersionResource
@@ -123,6 +137,8 @@ type BaseOptions struct {
 
 	Format printer.Format `json:"-"`
 
+	DryRunStrategy string `json:"-"`
+
 	// Quiet minimize unnecessary output
 	Quiet bool
 
@@ -142,7 +158,6 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 			util.CheckErr(inputs.BaseOptionsObj.Run(inputs))
 		},
 	}
-	inputs.Cmd = cmd
 	if inputs.BuildFlags != nil {
 		inputs.BuildFlags(cmd)
 	}
@@ -245,7 +260,7 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	}
 
 	previewObj := unstructuredObj
-	dryRunStrategy, err := GetDryRunStrategy(inputs.Cmd)
+	dryRunStrategy, err := o.GetDryRunStrategy()
 	if err != nil {
 		return err
 	}
@@ -257,11 +272,28 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 		if dryRunStrategy == DryRunServer {
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
-		// create k8s resource
+
+		// create dependencies
+		if inputs.CreateDependencies != nil {
+			if err = inputs.CreateDependencies(createOptions.DryRun); err != nil {
+				return err
+			}
+		}
+
+		// create kubernetes resource
 		previewObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), previewObj, createOptions)
 		if err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				return err
+			}
+
+			// for other errors, clean up dependencies
+			if cleanErr := o.CleanUp(inputs); cleanErr != nil {
+				fmt.Fprintf(o.ErrOut, "clean up denpendencies failed: %v\n", cleanErr)
+			}
 			return err
 		}
+
 		if dryRunStrategy != DryRunServer {
 			o.Name = previewObj.GetName()
 			if o.Quiet {
@@ -280,6 +312,17 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 		return err
 	}
 	return printer.PrintObj(previewObj, o.Out)
+}
+
+func (o *BaseOptions) CleanUp(inputs Inputs) error {
+	if inputs.CreateDependencies == nil {
+		return nil
+	}
+
+	if inputs.CleanUpFn != nil {
+		return inputs.CleanUpFn()
+	}
+	return nil
 }
 
 // RunAsApply execute command. the options of parameter contain the command flags and args.
@@ -332,7 +375,7 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 		objectByte, metav1.PatchOptions{}); err != nil {
 
 		// create object if not found
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			if _, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(
 				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 				return err
@@ -342,6 +385,24 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 		}
 	}
 	return nil
+}
+
+func (o *BaseOptions) GetDryRunStrategy() (DryRunStrategy, error) {
+	if o.DryRunStrategy == "" {
+		return DryRunNone, nil
+	}
+	switch o.DryRunStrategy {
+	case "client":
+		return DryRunClient, nil
+	case "server":
+		return DryRunServer, nil
+	case "unchanged":
+		return DryRunClient, nil
+	case "none":
+		return DryRunNone, nil
+	default:
+		return DryRunNone, fmt.Errorf(`invalid dry-run value (%v). Must be "none", "server", or "client"`, o.DryRunStrategy)
+	}
 }
 
 // NewCueValue convert cue template  to cue Value which holds any value like Boolean,Struct,String and more cue type.
@@ -382,35 +443,4 @@ func convertContentToUnstructured(cueValue cue.Value) (*unstructured.Unstructure
 		return nil, err
 	}
 	return unstructuredObj, nil
-}
-
-type DryRunStrategy int
-
-const (
-	// DryRunNone indicates the client will make all mutating calls
-	DryRunNone DryRunStrategy = iota
-	DryRunClient
-	DryRunServer
-)
-
-func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
-	if cmd == nil {
-		return DryRunNone, nil
-	}
-	dryRunFlag, err := cmd.Flags().GetString("dry-run")
-	if err != nil {
-		return DryRunNone, nil
-	}
-	switch dryRunFlag {
-	case cmd.Flag("dry-run").NoOptDefVal:
-		return DryRunClient, nil
-	case "client":
-		return DryRunClient, nil
-	case "server":
-		return DryRunServer, nil
-	case "none":
-		return DryRunNone, nil
-	default:
-		return DryRunNone, fmt.Errorf(`invalid dry-run value (%v). Must be "none", "server", or "client"`, dryRunFlag)
-	}
 }

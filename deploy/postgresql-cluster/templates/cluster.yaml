@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "postgresqlcluster.fullname" . }}
   labels: {{ include "postgresqlcluster.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: postgresql # ref clusterdefinition.name
@@ -19,6 +19,7 @@ spec:
       componentDefRef: postgresql # ref clusterdefinition components.name
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 2 }}
+      serviceAccountName: {{ include "postgresqlcluster.serviceAccountName" . }}
       primaryIndex: {{ .Values.primaryIndex | default 0 }}
       switchPolicy:
         type: {{ .Values.switchPolicy.type}}

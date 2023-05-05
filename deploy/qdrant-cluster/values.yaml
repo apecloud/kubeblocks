@@ -6,6 +6,8 @@ replicaCount: 1
 terminationPolicy: Delete
 
 clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
 
 monitor:
   enabled: false

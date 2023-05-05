@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "milvus.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: milvus-standalone
+  clusterDefinitionRef: milvus
   componentVersions:
     - componentDefRef: minio
       versionsContext:

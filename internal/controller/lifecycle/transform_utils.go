@@ -30,6 +30,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -199,4 +200,20 @@ func readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.C
 	}
 
 	return snapshot, nil
+}
+
+// sendWaringEventForCluster sends a warning event when occurs error.
+func sendWaringEventWithError(
+	recorder record.EventRecorder,
+	cluster *appsv1alpha1.Cluster,
+	reason string,
+	err error) {
+	if err == nil {
+		return
+	}
+	controllerErr := intctrlutil.ToControllerError(err)
+	if controllerErr != nil {
+		reason = string(controllerErr.Type)
+	}
+	recorder.Event(cluster, corev1.EventTypeWarning, reason, err.Error())
 }

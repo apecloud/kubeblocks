@@ -105,7 +105,7 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompDefName).
+				AddComponentVersion(statefulCompDefName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()

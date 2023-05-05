@@ -56,7 +56,7 @@ var _ = Describe("affinity utils", func() {
 				GetObject()
 
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 
 			affinity := &appsv1alpha1.Affinity{
@@ -113,7 +113,7 @@ var _ = Describe("affinity utils", func() {
 				GetObject()
 
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 
 			affinity := &appsv1alpha1.Affinity{

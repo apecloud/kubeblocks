@@ -70,7 +70,6 @@ spec:
         - name: data
           type: data
       podSpec:
-        serviceAccountName: operator
         securityContext:
           runAsUser: 0
           fsGroup: 103
@@ -83,13 +82,10 @@ spec:
             volumeMounts:
               - name: data
                 mountPath: /home/postgres/pgdata
-                mode: 0777
               - name: postgresql-config
                 mountPath: /home/postgres/conf
-                mode: 0777
               - name: scripts
                 mountPath: /kb-scripts
-                mode: 0777
         containers:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
@@ -97,15 +93,27 @@ spec:
               runAsUser: 0
             command:
               - /kb-scripts/setup.sh
+            readinessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 25
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - -ee
+                  - |
+                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm
               - name: data
                 mountPath: /home/postgres/pgdata
-                mode: 0777
               - name: postgresql-config
                 mountPath: /home/postgres/conf
-                mode: 0777
               - name: scripts
                 mountPath: /kb-scripts
             ports:

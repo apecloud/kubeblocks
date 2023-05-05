@@ -289,7 +289,7 @@ var _ = Describe("ReplicationSet Switch", func() {
 
 			By("Create a clusterVersion obj with replication workloadType.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(testapps.DefaultRedisCompDefName).AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
+				AddComponentVersion(testapps.DefaultRedisCompDefName).AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 
 		})

@@ -9,9 +9,9 @@ spec:
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
-    endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
+    endpoint: "https://$(SVC_FQDN):$(SVC_PORT_http)"
     host: "$(SVC_FQDN)"
-    port: "$(SVC_PORT_mysql)"
+    port: "$(SVC_PORT_http)"
   componentDefs:
     - name: opensearch
       characterType: opensearch
@@ -147,3 +147,58 @@ spec:
 
               sleep infinity &
               wait $!
+    - name: dashboard
+      characterType: opensearch-dashboard
+      workloadType: Stateless
+      service:
+        ports:
+        - name: http
+          port: 5601
+          targetPort: http
+      podSpec:
+        containers:
+        - name: dashboard
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+          - sh
+          - -c
+          - |
+            #!/usr/bin/bash
+            set -e
+            bash opensearch-dashboards-docker-entrypoint.sh opensearch-dashboards
+          env:
+          - name: OPENSEARCH_HOSTS
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: endpoint
+          - name: SERVER_HOST
+            value: "0.0.0.0"
+          startupProbe:
+            tcpSocket:
+              port: 5601
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 20
+            successThreshold: 1
+            initialDelaySeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5601
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 10
+            successThreshold: 1
+            initialDelaySeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 5601
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 10
+            successThreshold: 1
+            initialDelaySeconds: 10
+          ports:
+          - containerPort: 5601
+            name: http
+            protocol: TCP

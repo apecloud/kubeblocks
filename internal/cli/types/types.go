@@ -37,6 +37,9 @@ const (
 	// CliHomeEnv defines kbcli home system env
 	CliHomeEnv = "KBCLI_HOME"
 
+	// DefaultLogFilePrefix is the default log file prefix
+	DefaultLogFilePrefix = "kbcli"
+
 	// DefaultNamespace is the namespace where kubeblocks is installed if
 	// no other namespace is specified
 	DefaultNamespace = "kb-system"

@@ -240,8 +240,6 @@ func (o *UninstallOptions) uninstallAddons() error {
 					allErrs = append(allErrs, err)
 					continue
 				}
-				klog.V(1).Infof("Addon: %s, enabled: %v, status: %s",
-					addon.Name, addon.Spec.InstallSpec.GetEnabled(), addon.Status.Phase)
 
 				if uninstall {
 					// we only need to uninstall addons that are not disabled
@@ -361,7 +359,7 @@ func checkResources(dynamic dynamic.Interface) error {
 }
 
 func disableAddon(dynamic dynamic.Interface, addon *extensionsv1alpha1.Addon) error {
-	klog.V(1).Infof("Uninstall %s", addon.Name)
+	klog.V(1).Infof("Uninstall %s, status %s", addon.Name, addon.Status.Phase)
 	if _, err := dynamic.Resource(types.AddonGVR()).Patch(context.TODO(), addon.Name, k8sapitypes.JSONPatchType,
 		[]byte("[{\"op\": \"replace\", \"path\": \"/spec/install/enabled\", \"value\": false }]"),
 		metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {

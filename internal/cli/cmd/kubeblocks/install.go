@@ -129,6 +129,12 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
+
+	// default write log to file
+	if err = util.EnableLogToFile(cmd.Flags()); err != nil {
+		fmt.Fprintf(o.Out, "Failed to enable the log file %s", err.Error())
+	}
+
 	if o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
 	}
@@ -261,18 +267,11 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 				continue
 			}
 
-			installable := false
-			if addon.Spec.InstallSpec != nil {
-				installable = addon.Spec.Installable.AutoInstall
-			}
-
-			klog.V(1).Infof("Addon: %s, enabled: %v, status: %s, auto-install: %v",
-				addon.Name, addon.Spec.InstallSpec.GetEnabled(), addon.Status.Phase, installable)
-			// addon is enabled, then check its status
+			// addon should be auto installed, check its status
 			if addon.Spec.InstallSpec.GetEnabled() {
 				addons[addon.Name] = string(addon.Status.Phase)
 				if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
-					klog.V(1).Infof("Addon %s is not enabled yet", addon.Name)
+					klog.V(1).Infof("Addon %s is not enabled yet, status %s", addon.Name, addon.Status.Phase)
 					allEnabled = false
 				}
 			}

@@ -30,6 +30,7 @@ import (
 // Kafka allows reading/writing to a Kafka consumer group.
 type Kafka struct {
 	Producer        sarama.SyncProducer
+	broker          *sarama.Broker
 	consumerGroup   string
 	brokers         []string
 	logger          logger.Logger
@@ -76,6 +77,8 @@ func (k *Kafka) Init(_ context.Context, metadata map[string]string) error {
 	k.consumerGroup = meta.ConsumerGroup
 	k.initialOffset = meta.InitialOffset
 	k.authType = meta.AuthType
+
+	k.broker = sarama.NewBroker(k.brokers[0])
 
 	config := sarama.NewConfig()
 	config.Version = meta.Version
@@ -178,4 +181,53 @@ type KafkaBulkMessageEntry struct {
 	Event       []byte            `json:"event"`
 	ContentType string            `json:"contentType,omitempty"`
 	Metadata    map[string]string `json:"metadata"`
+}
+
+func (k *Kafka) BrokerOpen() error {
+	connected, err := k.broker.Connected()
+	if err != nil {
+		k.logger.Info("broker connected err:%v", err)
+		return err
+	}
+	if !connected {
+		err = k.broker.Open(k.config)
+		if err != nil {
+			k.logger.Info("broker connected err:%v", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (k *Kafka) BrokerClose() {
+	_ = k.broker.Close()
+}
+
+func (k *Kafka) BrokerCreateTopics(topic string) error {
+	req := &sarama.CreateTopicsRequest{
+		Version: 1,
+		TopicDetails: map[string]*sarama.TopicDetail{
+			topic: {
+				NumPartitions:     -1,
+				ReplicationFactor: -1,
+			},
+		},
+		Timeout:      time.Second,
+		ValidateOnly: false,
+	}
+
+	resp, err := k.broker.CreateTopics(req)
+	if err != nil {
+		k.logger.Infof("CheckStatus error: %v", err)
+		return err
+	} else {
+		respErr := resp.TopicErrors[topic]
+		// ErrNo details: https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
+		if respErr.Err != 0 {
+			k.logger.Infof("CheckStatus error, errMsg: %s errNo: %d", respErr.Error(), int16(respErr.Err))
+			return respErr
+		}
+		return nil
+	}
 }

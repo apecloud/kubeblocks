@@ -19,12 +19,11 @@ package kafka
 import (
 	"context"
 	"errors"
+	"github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/kit/logger"
 	"strings"
 	"sync"
 	"sync/atomic"
-
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/kafka"
@@ -110,21 +109,12 @@ func (kafkaOps *KafkaOperations) InitDelay() error {
 	return nil
 }
 
-func (kafkaOps *KafkaOperations) Operations() []bindings.OperationKind {
-	return []bindings.OperationKind{bindings.CreateOperation}
-}
-
 func (kafkaOps *KafkaOperations) Close() (err error) {
 	if kafkaOps.closed.CompareAndSwap(false, true) {
 		close(kafkaOps.closeCh)
 	}
 	defer kafkaOps.wg.Wait()
 	return kafkaOps.kafka.Close()
-}
-
-func (kafkaOps *KafkaOperations) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
-	err := kafkaOps.kafka.Publish(ctx, kafkaOps.publishTopic, req.Data, req.Metadata)
-	return nil, err
 }
 
 func (kafkaOps *KafkaOperations) Read(ctx context.Context, handler bindings.Handler) error {
@@ -175,8 +165,25 @@ func adaptHandler(handler bindings.Handler) kafka.EventHandler {
 
 // CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (kafkaOps *KafkaOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-
 	result := OpsResult{}
+	topic := "kb_health_check"
+
+	err := kafkaOps.kafka.BrokerOpen()
+	if err != nil {
+		result["event"] = OperationFailed
+		result["message"] = err.Error()
+		return result, nil
+	}
+	defer kafkaOps.kafka.BrokerClose()
+
+	err = kafkaOps.kafka.BrokerCreateTopics(topic)
+	if err != nil {
+		result["event"] = OperationFailed
+		result["message"] = err.Error()
+	} else {
+		result["event"] = OperationSuccess
+		result["message"] = "topic validateOnly success"
+	}
 
 	return result, nil
 }

@@ -228,7 +228,7 @@ KubeBlocks %s is installing to namespace %s.
 You can check the KubeBlocks status by running "kbcli kubeblocks status"
 `, o.Version, o.HelmCfg.Namespace())
 		}
-		fmt.Fprintf(o.Out, msg)
+		fmt.Fprint(o.Out, msg)
 		o.printNotes()
 	}
 	return nil

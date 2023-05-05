@@ -20,8 +20,15 @@ spec:
         - name: csi-hostpath-driver-chart-kubeblocks-values
           key: values-kubeblocks-override.yaml
 
+    valuesMapping:
+      jsonMap:
+        tolerations: tolerations
+
   defaultInstallValues:
     - enabled: true
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
 
   installable:
     autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "csi-hostpath-driver" ) "enabled" }}

@@ -55,15 +55,19 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// generate objects by current spec
-	svc := builder.NewServiceBuilder(csSet.Namespace, csSet.Name).
+	svcBuilder := builder.NewServiceBuilder(csSet.Namespace, csSet.Name).
 		AddLabels(constant.AppInstanceLabelKey, csSet.Name).
 		AddLabels(constant.KBManagedByKey, ConsensusSetKind).
 		// AddAnnotationsInMap(csSet.Annotations).
 		AddSelectors(constant.AppInstanceLabelKey, csSet.Name).
 		AddSelectors(constant.KBManagedByKey, ConsensusSetKind).
 		AddPorts(csSet.Spec.Service.Ports...).
-		SetType(csSet.Spec.Service.Type).
-		GetObject()
+		SetType(csSet.Spec.Service.Type)
+	if len(csSet.Spec.Leader.Name) > 0 {
+		svcBuilder.AddSelectors(constant.RoleLabelKey, csSet.Spec.Leader.Name)
+	}
+	svc := svcBuilder.GetObject()
+
 	hdlBuilder := builder.NewHeadlessServiceBuilder(csSet.Namespace, getHeadlessSvcName(*csSet)).
 		AddLabels(constant.AppInstanceLabelKey, csSet.Name).
 		AddLabels(constant.KBManagedByKey, ConsensusSetKind).

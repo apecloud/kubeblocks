@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package consensusset
 
 import (
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	"fmt"
+	"strconv"
+	"strings"
+
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -31,18 +34,25 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type ObjectGenerationTransformer struct{}
 
 func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*CSSetTransformContext)
+	csSet := transCtx.CSSet
+	oriSet := transCtx.OrigCSSet
+
+	if model.IsObjectDeleting(oriSet) {
+		return nil
+	}
+
 	// get root vertex(i.e. consensus set)
 	root, err := model.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
-	csSet, _ := root.Obj.(*workloads.ConsensusSet)
-	oriSet, _ := root.OriObj.(*workloads.ConsensusSet)
 
 	// generate objects by current spec
 	svc := builder.NewServiceBuilder(csSet.Namespace, csSet.Name).
@@ -54,7 +64,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		AddPorts(csSet.Spec.Service.Ports...).
 		SetType(csSet.Spec.Service.Type).
 		GetObject()
-	hdlBuilder := builder.NewHeadlessServiceBuilder(csSet.Namespace, csSet.Name+"-headless").
+	hdlBuilder := builder.NewHeadlessServiceBuilder(csSet.Namespace, getHeadlessSvcName(*csSet)).
 		AddLabels(constant.AppInstanceLabelKey, csSet.Name).
 		AddLabels(constant.KBManagedByKey, ConsensusSetKind).
 		AddSelectors(constant.AppInstanceLabelKey, csSet.Name).
@@ -99,14 +109,20 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		SetTemplate(template).
 		SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
 	sts := stsBuilder.GetObject()
-	// TODO: builds env config map
+
+	envData := buildEnvConfigData(*csSet)
+	envConfig := builder.NewConfigMapBuilder(csSet.Namespace, csSet.Name+"-env").
+		AddLabels(constant.AppInstanceLabelKey, csSet.Name).
+		AddLabels(constant.KBManagedByKey, ConsensusSetKind).
+		SetData(envData).GetObject()
 
 	// put all objects into the dag
 	vertices := make([]*model.ObjectVertex, 0)
 	svcVertex := &model.ObjectVertex{Obj: svc}
 	headlessSvcVertex := &model.ObjectVertex{Obj: headLessSvc}
 	stsVertex := &model.ObjectVertex{Obj: sts}
-	vertices = append(vertices, svcVertex, headlessSvcVertex, stsVertex)
+	envConfigVertex := &model.ObjectVertex{Obj: envConfig}
+	vertices = append(vertices, svcVertex, headlessSvcVertex, stsVertex, envConfigVertex)
 	for _, vertex := range vertices {
 		if err := controllerutil.SetOwnership(csSet, vertex.Obj, model.GetScheme(), CSSetFinalizerName); err != nil {
 			return err
@@ -116,6 +132,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 	dag.Connect(stsVertex, svcVertex)
 	dag.Connect(stsVertex, headlessSvcVertex)
+	dag.Connect(stsVertex, envConfigVertex)
 
 	// read cache snapshot
 	oldSnapshot, err := model.ReadCacheSnapshot(ctx, csSet, ownedKinds()...)
@@ -205,6 +222,49 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	root.Action = model.ActionPtr(model.STATUS)
 
 	return nil
+}
+
+func getHeadlessSvcName(set workloads.ConsensusSet) string {
+	return strings.Join([]string{set.Name, "headless"}, "-")
+}
+
+func buildEnvConfigData(set workloads.ConsensusSet) map[string]string {
+	envData := map[string]string{}
+
+	prefix := constant.KBPrefix + "_" + strings.ToUpper(set.Name) + "_"
+	prefix = strings.ReplaceAll(prefix, "-", "_")
+	svcName := getHeadlessSvcName(set)
+	envData[prefix+"N"] = strconv.Itoa(int(set.Spec.Replicas))
+	for i := 0; i < int(set.Spec.Replicas); i++ {
+		hostNameTplKey := prefix + strconv.Itoa(i) + "_HOSTNAME"
+		hostNameTplValue := set.Name + "-" + strconv.Itoa(i)
+		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+	}
+
+	// build consensus env from set.status
+	podName := set.Status.Leader.PodName
+	if podName != "" && podName != DefaultPodName {
+		envData[prefix+"LEADER"] = podName
+	}
+	followers := ""
+	for _, follower := range set.Status.Followers {
+		podName = follower.PodName
+		if podName == "" || podName == DefaultPodName {
+			continue
+		}
+		if len(followers) > 0 {
+			followers += ","
+		}
+		followers += podName
+	}
+	if followers != "" {
+		envData[prefix+"FOLLOWERS"] = followers
+	}
+
+	// set owner uid to let pod know if the owner is recreated
+	envData[prefix+"OWNER_UID"] = string(set.UID)
+
+	return envData
 }
 
 var _ graph.Transformer = &ObjectGenerationTransformer{}

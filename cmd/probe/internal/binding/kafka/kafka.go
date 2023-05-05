@@ -22,11 +22,12 @@ package kafka
 import (
 	"context"
 	"errors"
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/kit/logger"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/kafka"

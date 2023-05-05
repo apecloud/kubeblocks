@@ -16,8 +16,9 @@
 
 - [KubeBlocks](#kubeblocks)
   - [What is KubeBlocks](#what-is-kubeblocks)
+    - [Why you need KubeBlocks](#why-you-need-kubeblocks)
     - [Goals](#goals)
-    - [Key Features](#key-features)
+    - [Key features](#key-features)
   - [Documents](#documents)
     - [Quick start with KubeBlocks](#quick-start-with-kubeblocks)
     - [Introduction](#introduction)
@@ -50,7 +51,7 @@ To address these challenges, and solve the problem of complexity, KubeBlocks int
 - Provide the most advanced user experience based on the concepts of IaC and GitOps.
 
 ### Key features
-- Compatible with AWS, GCP, Azure, and Alibaba Cloud.
+- Be compatible with AWS, GCP, Azure, and Alibaba Cloud.
 - Supports MySQL, PostgreSQL, Redis, MongoDB, Kafka, and more.
 - Provides production-level performance, resilience, scalability, and observability.
 - Simplifies day-2 operations, such as upgrading, scaling, monitoring, backup, and restore.

@@ -46,7 +46,9 @@ kbcli addon enable ADDON_NAME [flags]
       --set stringArray                set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2), it's only being processed if addon's type is helm.
       --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
       --storage stringArray            Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items)). 
-                                       Additional notes for Helm type Addon, that resizing storage will fail if modified value is a storage request size 
+                                       Additional notes:
+                                       1. Specify '0' value will removed storage values settings and explicitly disabled 'persistentVolumeEnabled' attribute.
+                                       2. For Helm type Addon, that resizing storage will fail if modified value is a storage request size 
                                        that belongs to StatefulSet's volume claim template, to resolve 'Failed' Addon status possible action is disable and 
                                        re-enable the addon (More info on how-to resize a PVC: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources).
                                        

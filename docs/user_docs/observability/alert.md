@@ -1,6 +1,7 @@
 ---
 title: Configure IM alert
 description: How to enable IM alert
+keywords: [mysql, alert, alert message]
 sidebar_position: 2
 ---
 
@@ -8,12 +9,16 @@ sidebar_position: 2
 
 Alerts are mainly used for daily error response to improve system availability. Kubeblocks has a built-in set of common alert rules and integrates multiple notification channels. The alert capability of Kubeblocks can meet the operation and maintenance requirements of production-level online clusters.
 
+:::
+The alert function is the same for all 
+
 ## Alert rules
 
-KubeBlocks has a set of general built-in alter rules to meet the alert needs of different types of data products and provides an out-of-the-box experience without further configurations. These alert rules provide the best practice for cluster operation and maintenance. These alarm rules further improve alert accuracy and reduce the probability of false negatives and false positives through experience-based smoothing windows, alarm thresholds, alarm levels, and alarm indicators.
+The built-in generic alert rules of KubeBlocks meet the needs of various data products and provide an out-of-the-box experience without further configurations. These alert rules provide the best practice for cluster operation and maintenance, which further improve alert accuracy and reduce the probability of false negatives and false positives by experience-based smoothing windows, alert thresholds, alert levels, and alert indicators.
 
-Taking PostgreSQL as an example, the alert rules have built-in common abnormal events, such as instance down, instance restart, slow query, connection amount, deadlock, and cache hit rate. 
-The following example shows PostgreSQL alert rules (refer to [Prometheus](https://prometheus.io/docs/prometheus/latest/querying/basics/) for syntax). When the amount of active connections exceeds 80% of the threshold and lasts for 2 minutes, Prometheus triggers a warning and sends it to AlertManager.
+Taking PostgreSQL as an example, the alert rules have built-in common abnormal events, such as instance down, instance restart, slow query, connection amount, deadlock, and cache hit rate.
+
+The following example shows PostgreSQL alert rules (refer to [Prometheus](https://prometheus.io/docs/prometheus/latest/querying/basics/) for syntax). When the amount of active connections exceeds 80% of the threshold and lasts for 2 minutes, Prometheus triggers a warning alert and sends it to AlertManager.
 
 ```bash
 alert: PostgreSQLTooManyConnections
@@ -41,7 +46,8 @@ kbcli dashboard open kubeblocks-prometheus-server # Here is an example and fill 
 
 ## Configure IM alert
 
-The alert message notification of Kubeblocks mainly adopts the AlertManager native capability. After receiving the Prometheus alarm, KubeBlocks performs multiple steps, including deduplication, grouping, silence, suppression, and routing, and finally sends it to the corresponding notification channel.
+The alert message notification of Kubeblocks mainly adopts the AlertManager native capability. After receiving the Prometheus alert, KubeBlocks performs steps including deduplication, grouping, silence, suppression, and routing, and finally sends it to the corresponding notification channel.
+
 AlertManager integrates a set of notification channels, such as Email and Slack. Kubeblocks extends new IM class notification channels with AlertManger Webhook.
 
 This tutorial takes configuring Feishu as the notification channel as an example.
@@ -50,12 +56,13 @@ This tutorial takes configuring Feishu as the notification channel as an example
 
 To receive alerts, you need to deploy monitoring components and enable cluster monitoring first. Refer to [Monitor database](monitor-database.md) for details.
 
-### Step 1. Configure alert channels
+### Configure alert channels
 
-Configure the notification channels in advance based on your needs and obtain the necessary information for the following steps. 
-Taking Feishu as an example, you can obtain the webhook address after creating a custom robot. If the signature verification in the security configuration is enabled, you can obtain the signature key in advance.
+The alert message notification of Kubeblocks mainly adopts the AlertManager native capability. After receiving the Prometheus alert, KubeBlocks performs steps including deduplication, grouping, silence, suppression, and routing, and finally sends it to the corresponding notification channel.
 
-Currently, Feishu custom bot, DingTalk custom bot, WeChat Enterprise custom bot, and Slack are supported. You can refer to the following guides to configure notification channels.
+AlertManager integrates a set of notification channels, such as Email and Slack. Kubeblocks extends new IM class notification channels with AlertManger Webhook.
+
+This tutorial takes configuring Feishu as the notification channel as an example.
 
 * [Feishu custom bot](https://open.feishu.cn/document/ukTMukTMukTM/ucTM5YjL3ETO24yNxkjN)
 * [DingTalk custom bot](https://open.dingtalk.com/document/orgapp/custom-robot-access)
@@ -69,9 +76,9 @@ Currently, Feishu custom bot, DingTalk custom bot, WeChat Enterprise custom bot,
 
 :::
 
-### Step 2. Configure the receiver
+### Configure the receiver
 
-To improve ease of use, `kbcli` develops the `alert` subcommand to simplify the receiver configuration. You can set the notification channels and receivers by the `alert` subcommand. This subcommand also supports condition filters, such as cluster names and severity levels. After the configuration succeeds, it takes effect dynamically without restarting the service.
+To improve ease of use, `kbcli` develops the `alert` subcommand to simplify the receiver configuration. You can set the notification channels and receivers by the `alert` subcommand. This subcommand also supports condition filters, such as cluster names and severity levels. After the configuration succeeds, it takes effect dynamically without the service restarting.
 
 Add an alert receiver.
    
@@ -93,13 +100,13 @@ Add an alert receiver.
    kbcli alert add-receiver \
    --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=sign'
 
-   # Only receive the alerts from a cluster named mysql
+   # Only receive the alerts from a cluster named mysql-cluster
    kbcli alert add-receiver \
-   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=mysql
+   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=mysql-cluster
 
-   # Only receive the critical alerts from a cluster named mysql
+   # Only receive the critical alerts from a cluster named mysql-cluster
    kbcli alert add-receiver \
-   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=mysql --severity=critical
+   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=mysql-cluster --severity=critical
    ```
 
 :::note
@@ -108,13 +115,13 @@ For the detailed command description, run `kbcli alert add-receiver -h`.
 
 :::
 
-Run the command below to view the notification configurations.
+View the notification configurations.
 
   ```bash
   kbcli alert list-receivers
   ```
 
-Run the command below to delete the notification channel and receiver if you want to disable the alert function.
+Delete the notification channel and receiver if you want to disable the alert function.
 
   ```bash
   kbcli alert delete-receiver <receiver-name>

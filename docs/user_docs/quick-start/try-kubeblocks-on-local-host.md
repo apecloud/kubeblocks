@@ -8,7 +8,7 @@ sidebar_label: Try out KubeBlocks on local host
 
 # Try out KubeBlocks in 5 minutes on Local Host
 
-This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command.
+This guide walks you through the quickest way to get started with KubeBlocks on your local host, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command.
 
 With Playground, you can try out KubeBlocks on your local host (macOS) and on a cloud environment.
 

@@ -6,6 +6,7 @@ sidebar_label: Restart
 ---
 
 # Restart MongoDB cluster
+
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
 
 :::note

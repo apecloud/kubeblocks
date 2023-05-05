@@ -349,7 +349,7 @@ func checkResources(dynamic dynamic.Interface) error {
 	}
 
 	if len(crs) > 0 {
-		errMsg := bytes.NewBufferString("failed to uninstall, the following resources need to be removed first:\n")
+		errMsg := bytes.NewBufferString("failed to uninstall, the following resources need to be removed first\n")
 		for k, v := range crs {
 			errMsg.WriteString(fmt.Sprintf("  %s: %s\n", k, strings.Join(v, " ")))
 		}

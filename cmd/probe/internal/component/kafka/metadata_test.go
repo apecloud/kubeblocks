@@ -47,7 +47,7 @@ func getKafka() *Kafka {
 }
 
 func getBaseMetadata() map[string]string {
-	return map[string]string{"consumerGroup": "a", "clientID": "a", "brokers": "a", "disableTls": "true", "authType": mtlsAuthType, "maxMessageBytes": "2048"}
+	return map[string]string{"consumerGroup": "a", "clientID": "a", "brokers": "a", "disableTls": "true", "authType": mtlsAuthType, "maxMessageBytes": "2048", "initialOffset": "newest"}
 }
 
 func getCompleteMetadata() map[string]string {
@@ -102,7 +102,7 @@ func assertMetadata(t *testing.T, meta *kafkaMetadata) {
 }
 
 func TestMissingBrokers(t *testing.T) {
-	m := map[string]string{}
+	m := map[string]string{"initialOffset": "newest"}
 	k := getKafka()
 	meta, err := k.getKafkaMetadata(m)
 	require.Error(t, err)
@@ -112,7 +112,7 @@ func TestMissingBrokers(t *testing.T) {
 }
 
 func TestMissingAuthType(t *testing.T) {
-	m := map[string]string{"brokers": "akfak.com:9092"}
+	m := map[string]string{"brokers": "kafka.com:9092", "initialOffset": "newest"}
 	k := getKafka()
 	meta, err := k.getKafkaMetadata(m)
 	require.Error(t, err)
@@ -122,7 +122,7 @@ func TestMissingAuthType(t *testing.T) {
 }
 
 func TestMetadataUpgradeNoAuth(t *testing.T) {
-	m := map[string]string{"brokers": "akfak.com:9092", "authRequired": "false"}
+	m := map[string]string{"brokers": "akfak.com:9092", "initialOffset": "newest", "authRequired": "false"}
 	k := getKafka()
 	upgraded, err := k.upgradeMetadata(m)
 	require.Nil(t, err)
@@ -131,7 +131,7 @@ func TestMetadataUpgradeNoAuth(t *testing.T) {
 
 func TestMetadataUpgradePasswordAuth(t *testing.T) {
 	k := getKafka()
-	m := map[string]string{"brokers": "akfak.com:9092", "authRequired": "true", "saslPassword": "sassapass"}
+	m := map[string]string{"brokers": "akfak.com:9092", "initialOffset": "newest", "authRequired": "true", "saslPassword": "sassapass"}
 	upgraded, err := k.upgradeMetadata(m)
 	require.Nil(t, err)
 	require.Equal(t, passwordAuthType, upgraded["authType"])
@@ -139,7 +139,7 @@ func TestMetadataUpgradePasswordAuth(t *testing.T) {
 
 func TestMetadataUpgradePasswordMTLSAuth(t *testing.T) {
 	k := getKafka()
-	m := map[string]string{"brokers": "akfak.com:9092", "authRequired": "true"}
+	m := map[string]string{"brokers": "akfak.com:9092", "initialOffset": "newest", "authRequired": "true"}
 	upgraded, err := k.upgradeMetadata(m)
 	require.Nil(t, err)
 	require.Equal(t, mtlsAuthType, upgraded["authType"])
@@ -147,7 +147,7 @@ func TestMetadataUpgradePasswordMTLSAuth(t *testing.T) {
 
 func TestMissingSaslValues(t *testing.T) {
 	k := getKafka()
-	m := map[string]string{"brokers": "akfak.com:9092", "authType": "password"}
+	m := map[string]string{"brokers": "akfak.com:9092", "initialOffset": "newest", "authType": "password"}
 	meta, err := k.getKafkaMetadata(m)
 	require.Error(t, err)
 	require.Nil(t, meta)
@@ -165,7 +165,7 @@ func TestMissingSaslValues(t *testing.T) {
 
 func TestMissingSaslValuesOnUpgrade(t *testing.T) {
 	k := getKafka()
-	m := map[string]string{"brokers": "akfak.com:9092", "authRequired": "true", "saslPassword": "sassapass"}
+	m := map[string]string{"brokers": "akfak.com:9092", "initialOffset": "newest", "authRequired": "true", "saslPassword": "sassapass"}
 	upgraded, err := k.upgradeMetadata(m)
 	require.Nil(t, err)
 	meta, err := k.getKafkaMetadata(upgraded)
@@ -177,7 +177,7 @@ func TestMissingSaslValuesOnUpgrade(t *testing.T) {
 
 func TestMissingOidcValues(t *testing.T) {
 	k := getKafka()
-	m := map[string]string{"brokers": "akfak.com:9092", "authType": oidcAuthType}
+	m := map[string]string{"brokers": "akfak.com:9092", "initialOffset": "newest", "authType": oidcAuthType}
 	meta, err := k.getKafkaMetadata(m)
 	require.Error(t, err)
 	require.Nil(t, meta)
@@ -205,10 +205,11 @@ func TestMissingOidcValues(t *testing.T) {
 func TestPresentSaslValues(t *testing.T) {
 	k := getKafka()
 	m := map[string]string{
-		"brokers":      "akfak.com:9092",
-		"authType":     passwordAuthType,
-		"saslUsername": "sassafras",
-		"saslPassword": "sassapass",
+		"brokers":       "akfak.com:9092",
+		"authType":      passwordAuthType,
+		"saslUsername":  "sassafras",
+		"saslPassword":  "sassapass",
+		"initialOffset": "newest",
 	}
 	meta, err := k.getKafkaMetadata(m)
 	require.NoError(t, err)
@@ -227,6 +228,7 @@ func TestPresentOidcValues(t *testing.T) {
 		"oidcClientID":      "sassafras",
 		"oidcClientSecret":  "sassapass",
 		"oidcScopes":        "akfak",
+		"initialOffset":     "newest",
 	}
 	meta, err := k.getKafkaMetadata(m)
 	require.NoError(t, err)

@@ -1,32 +1,14 @@
-# Default values for opensearch.
+# Default values for opensearch-cluster.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
 replicaCount: 1
 
-image:
-  registry: registry.cn-hangzhou.aliyuncs.com
-  repository: opensearchproject/opensearch
-  pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
-  dashboard:
-    repository: opensearchproject/opensearch-dashboards
-    tag: ""
+terminationPolicy: Delete
 
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
-clusterVersionOverride: ""
-
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Annotations to add to the service account
-  annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name: ""
 
 podAnnotations: {}
 
@@ -53,8 +35,30 @@ resources: {}
   #   cpu: 100m
   #   memory: 128Mi
 
+ingress:
+  enabled: false
+
+service:
+  type: ClusterIP
+
 nodeSelector: {}
 
 tolerations: []
 
 affinity: {}
+
+topologyKeys:
+- kubernetes.io/hostname
+
+monitor:
+  enabled: false
+
+persistence:
+  enabled: true
+  data:
+    storageClassName:
+    size: 1Gi
+
+dashboard:
+  resources: {}
+  replicaCount: 1

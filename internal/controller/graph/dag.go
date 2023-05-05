@@ -165,14 +165,14 @@ func (d *DAG) WalkBFS(walkFunc WalkFunc) error {
 	root := d.Root()
 	queue = append(queue, root)
 	for len(queue) > 0 {
-		shouldStop := false
+		var walkErr error
 		for _, vertex := range queue {
-			if walkFunc(vertex) != nil {
-				shouldStop = true
+			if err := walkFunc(vertex); err != nil {
+				walkErr = err
 			}
 		}
-		if shouldStop {
-			break
+		if walkErr != nil {
+			return walkErr
 		}
 
 		nextStep := make([]Vertex, 0)

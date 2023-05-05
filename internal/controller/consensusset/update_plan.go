@@ -65,8 +65,8 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 	}
 
 	// if DeletionTimestamp is not nil, it is terminating.
-	if pod.DeletionTimestamp != nil {
-		return ErrContinue
+	if !pod.DeletionTimestamp.IsZero() {
+		return ErrWait
 	}
 
 	// if pod is the latest version, we do nothing
@@ -111,10 +111,10 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	// append unknown, empty and learner
 	index := 0
 	podList := p.pods
-	for _, pod := range podList {
+	for i, pod := range podList {
 		role := pod.Labels[constant.RoleLabelKey]
 		if rolePriorityMap[role] <= learnerPriority {
-			vertex := &model.ObjectVertex{Obj: &pod}
+			vertex := &model.ObjectVertex{Obj: &podList[i]}
 			p.dag.AddVertex(vertex)
 			p.dag.Connect(preVertex, vertex)
 			currentVertex = vertex
@@ -182,7 +182,7 @@ func (p *realUpdatePlan) buildSerialUpdatePlan() {
 }
 
 func (p *realUpdatePlan) execute() ([]*corev1.Pod, error) {
-	if err := p.dag.WalkBFS(p.planWalkFunc); err != nil {
+	if err := p.dag.WalkBFS(p.planWalkFunc); err != nil && err != ErrWait && err != ErrStop {
 		return nil, err
 	}
 

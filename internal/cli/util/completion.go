@@ -54,14 +54,18 @@ func ResourceNameCompletionFunc(f cmdutil.Factory, gvr schema.GroupVersionResour
 }
 
 // CompGetResourceWithLabels gets the list of the resource specified which begin with `toComplete` and have the specified labels.
+// example: CompGetResourceWithLabels(f, cmd, "pods", []string{"app=nginx"}, toComplete)
+// gets the name of the pods which have the label `app=nginx` and begin with `toComplete`
 func CompGetResourceWithLabels(f cmdutil.Factory, cmd *cobra.Command, resourceName string, labels []string, toComplete string) []string {
 	template := "{{ range .items  }}{{ .metadata.name }} {{ end }}"
-	return CompGetFromTemplate(&template, f, "", cmd, []string{resourceName}, labels, toComplete)
+	return CompGetFromTemplateWithLabels(&template, f, "", cmd, []string{resourceName}, labels, toComplete)
 }
 
-// CompGetFromTemplate executes a Get operation using the specified template and args and returns the results
+// CompGetFromTemplateWithLabels executes a Get operation using the specified template and args and returns the results
 // which begin with `toComplete` and have the specified labels.
-func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, cmd *cobra.Command, args []string, labels []string, toComplete string) []string {
+// example: CompGetFromTemplateWithLabels(&template, f, "", cmd, []string{"pods"}, []string{"app=nginx"}, toComplete)
+// will get the output of `kubectl get pods --template=template -l app=nginx`, and split the output by space and return
+func CompGetFromTemplateWithLabels(template *string, f cmdutil.Factory, namespace string, cmd *cobra.Command, args []string, labels []string, toComplete string) []string {
 	buf := new(bytes.Buffer)
 	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
 	o := get.NewGetOptions("kubectl", streams)

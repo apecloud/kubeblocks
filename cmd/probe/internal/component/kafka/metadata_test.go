@@ -54,7 +54,7 @@ func getCompleteMetadata() map[string]string {
 	return map[string]string{
 		"consumerGroup": "a", "clientID": "a", "brokers": "a", "authType": mtlsAuthType, "maxMessageBytes": "2048",
 		skipVerify: "true", clientCert: clientCertPemMock, clientKey: clientKeyMock, caCert: caCertMock,
-		"consumeRetryInterval": "200",
+		"consumeRetryInterval": "200", "initialOffset": "newest",
 	}
 }
 

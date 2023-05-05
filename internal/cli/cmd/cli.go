@@ -20,14 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cmd
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
 	kccmd "k8s.io/kubectl/pkg/cmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
@@ -124,6 +127,9 @@ A Command Line Interface for KubeBlocks`,
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
 
+	// add klog flags
+	addKlogFlags(flags)
+
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 	ioStreams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
 
@@ -214,4 +220,20 @@ func registerUsageAndHelpFuncForSubCommand(cmd *cobra.Command, helpFunc func(*co
 		subCmd.SetHelpFunc(helpFunc)
 		subCmd.SetUsageFunc(usageFunc)
 	}
+}
+
+// addKlogFlags adds flags from k8s.io/klog
+// marks the flags as hidden to avoid showing them in help
+func addKlogFlags(fs *pflag.FlagSet) {
+	local := flag.NewFlagSet("klog", flag.ExitOnError)
+	klog.InitFlags(local)
+	local.VisitAll(func(f *flag.Flag) {
+		f.Name = strings.ReplaceAll(f.Name, "_", "-")
+		if fs.Lookup(f.Name) != nil {
+			return
+		}
+		newFlag := pflag.PFlagFromGoFlag(f)
+		newFlag.Hidden = true
+		fs.AddFlag(newFlag)
+	})
 }

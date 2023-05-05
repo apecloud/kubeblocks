@@ -21,6 +21,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
 	"os"
 	"strings"
 
@@ -142,6 +143,7 @@ A Command Line Interface for KubeBlocks`,
 		addon.NewAddonCmd(f, ioStreams),
 		migration.NewMigrationCmd(f, ioStreams),
 		plugin.NewPluginCmd(ioStreams),
+		fault.NewFaultCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

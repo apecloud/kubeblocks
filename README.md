@@ -9,7 +9,7 @@
 [![TODOs](https://img.shields.io/endpoint?url=https://api.tickgit.com/badge?repo=github.com/apecloud/kubeblocks)](https://www.tickgit.com/browse?repo=github.com/apecloud/kubeblocks)
 [![Artifact HUB](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/apecloud)](https://artifacthub.io/packages/search?repo=apecloud)
 
-![image](./docs/img/banner-in-readme.png)
+![image](./docs/img/banner-readme.png)
 
 - [KubeBlocks](#kubeblocks)
   - [What is KubeBlocks](#what-is-kubeblocks)

@@ -9592,91 +9592,58 @@ spec:
           status:
             description: ConsensusSetStatus defines the observed state of ConsensusSet
             properties:
-              apps.StatefulSetStatus:
-                description: StatefulSetStatus represents the current state of a StatefulSet.
-                properties:
-                  availableReplicas:
-                    description: Total number of available pods (ready for at least
-                      minReadySeconds) targeted by this statefulset.
-                    format: int32
-                    type: integer
-                  collisionCount:
-                    description: collisionCount is the count of hash collisions for
-                      the StatefulSet. The StatefulSet controller uses this field
-                      as a collision avoidance mechanism when it needs to create the
-                      name for the newest ControllerRevision.
-                    format: int32
-                    type: integer
-                  conditions:
-                    description: Represents the latest available observations of a
-                      statefulset's current state.
-                    items:
-                      description: StatefulSetCondition describes the state of a statefulset
-                        at a certain point.
-                      properties:
-                        lastTransitionTime:
-                          description: Last time the condition transitioned from one
-                            status to another.
-                          format: date-time
-                          type: string
-                        message:
-                          description: A human readable message indicating details
-                            about the transition.
-                          type: string
-                        reason:
-                          description: The reason for the condition's last transition.
-                          type: string
-                        status:
-                          description: Status of the condition, one of True, False,
-                            Unknown.
-                          type: string
-                        type:
-                          description: Type of statefulset condition.
-                          type: string
-                      required:
-                      - status
-                      - type
-                      type: object
-                    type: array
-                  currentReplicas:
-                    description: currentReplicas is the number of Pods created by
-                      the StatefulSet controller from the StatefulSet version indicated
-                      by currentRevision.
-                    format: int32
-                    type: integer
-                  currentRevision:
-                    description: currentRevision, if not empty, indicates the version
-                      of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).
-                    type: string
-                  observedGeneration:
-                    description: observedGeneration is the most recent generation
-                      observed for this StatefulSet. It corresponds to the StatefulSet's
-                      generation, which is updated on mutation by the API Server.
-                    format: int64
-                    type: integer
-                  readyReplicas:
-                    description: readyReplicas is the number of pods created for this
-                      StatefulSet with a Ready Condition.
-                    format: int32
-                    type: integer
-                  replicas:
-                    description: replicas is the number of Pods created by the StatefulSet
-                      controller.
-                    format: int32
-                    type: integer
-                  updateRevision:
-                    description: updateRevision, if not empty, indicates the version
-                      of the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)
-                    type: string
-                  updatedReplicas:
-                    description: updatedReplicas is the number of Pods created by
-                      the StatefulSet controller from the StatefulSet version indicated
-                      by updateRevision.
-                    format: int32
-                    type: integer
-                required:
-                - replicas
-                type: object
+              availableReplicas:
+                description: Total number of available pods (ready for at least minReadySeconds)
+                  targeted by this statefulset.
+                format: int32
+                type: integer
+              collisionCount:
+                description: collisionCount is the count of hash collisions for the
+                  StatefulSet. The StatefulSet controller uses this field as a collision
+                  avoidance mechanism when it needs to create the name for the newest
+                  ControllerRevision.
+                format: int32
+                type: integer
+              conditions:
+                description: Represents the latest available observations of a statefulset's
+                  current state.
+                items:
+                  description: StatefulSetCondition describes the state of a statefulset
+                    at a certain point.
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of statefulset condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              currentReplicas:
+                description: currentReplicas is the number of Pods created by the
+                  StatefulSet controller from the StatefulSet version indicated by
+                  currentRevision.
+                format: int32
+                type: integer
+              currentRevision:
+                description: currentRevision, if not empty, indicates the version
+                  of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).
+                type: string
               followers:
                 description: followers status.
                 items:
@@ -9751,8 +9718,34 @@ spec:
                 - podName
                 - roleName
                 type: object
+              observedGeneration:
+                description: observedGeneration is the most recent generation observed
+                  for this StatefulSet. It corresponds to the StatefulSet's generation,
+                  which is updated on mutation by the API Server.
+                format: int64
+                type: integer
+              readyReplicas:
+                description: readyReplicas is the number of pods created for this
+                  StatefulSet with a Ready Condition.
+                format: int32
+                type: integer
+              replicas:
+                description: replicas is the number of Pods created by the StatefulSet
+                  controller.
+                format: int32
+                type: integer
+              updateRevision:
+                description: updateRevision, if not empty, indicates the version of
+                  the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)
+                type: string
+              updatedReplicas:
+                description: updatedReplicas is the number of Pods created by the
+                  StatefulSet controller from the StatefulSet version indicated by
+                  updateRevision.
+                format: int32
+                type: integer
             required:
-            - apps.StatefulSetStatus
+            - replicas
             type: object
         type: object
     served: true

@@ -83,8 +83,9 @@ For detailed feature information, see [Feature list](https://github.com/apecloud
 ## Contributing to KubeBlocks
 Your contributions and suggestions are welcomed and appreciated.
 - See the [Contributing Guide](docs/CONTRIBUTING.md) for details on typical contribution workflows.
-- See the [Development Guide](docs/DEVELOPING.md) to get started with building and developing.
-- See the [Docs Contributing Guide](docs/CONTRIBUTING_DOCS.md) to get started with contributing to the KubeBlocks docs.
+- See the [Developer Guide](docs/DEVELOPING.md) to get started with building and developing.
+- See the [Technical Writer Guide](docs/CONTRIBUTING_DOCS.md) to get started with contributing to the KubeBlocks docs.
 
 ## License
-KubeBlocks is under the Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.
+KubeBlocks is under the GNU Affero General Public License v3.0. 
+See the [LICENSE](./LICENSE) file for details.

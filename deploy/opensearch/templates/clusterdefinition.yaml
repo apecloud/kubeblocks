@@ -93,9 +93,9 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: cluster.initial_master_nodes
-              value: "$(KB_POD_NAME).$(KB_CLUSTER_NAME)-opensearch-headless"
+              value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-0"
             - name: discovery.seed_hosts
-              value: "$(KB_POD_NAME).$(KB_CLUSTER_NAME)-opensearch-headless"
+              value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-headless"
             - name: cluster.name
               value: "$(KB_CLUSTER_NAME)"
             - name: network.host
@@ -126,13 +126,13 @@ spec:
                   else
                     BASIC_AUTH=''
                   fi
-                  curl -XGET -s -k --fail ${BASIC_AUTH} https://$(KB_POD_NAME).$(KB_CLUSTER_NAME)-opensearch-headless:9200:${path}
+                  curl -XGET -s -k --fail ${BASIC_AUTH} https://$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-headless:9200:${path}
               }
 
               cleanup () {
                 while true ; do
                   local master="$(http "/_cat/master?h=node" || echo "")"
-                  if [[ $master == "$(KB_POD_NAME).$(KB_CLUSTER_NAME)-opensearch-headless"* && $master != "${NODE_NAME}" ]]; then
+                  if [[ $master == "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)"* && $master != "${NODE_NAME}" ]]; then
                     echo "This node is not master."
                     break
                   fi

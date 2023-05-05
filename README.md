@@ -42,21 +42,20 @@ To address these challenges, and solve the problem of complexity, KubeBlocks int
 - Maintains the status of data replication and automatically repairs replication errors or delays.
 
 ### Goals
-- Enhance stateful applications control plane manageability on Kubernetes clusters, being open sourced and cloud neutral 
-- Manage data platforms without a high cognitive load of cloud computing, Kubernetes, and database knowledge 
-- Be community-driven, embracing extensibility, and providing domain functions without vendor lock-in
-- Reduce costs by only paying for the infrastructure and increasing the utilization of resources with flexible scheduling
-- Support the most popular databases, analytical software, and their bundled tools
-- Provide the most advanced user experience based on the concepts of IaC and GitOps
+- Enhance stateful workloads on Kubernetes, being open-source and cloud-neutral.
+- Manage data infrastructure without a high cognitive load of cloud computing, Kubernetes, and database knowledge.
+- Be community-driven, embracing extensibility, and providing domain functions without vendor lock-in.
+- Reduce costs by only paying for the infrastructure and increasing the utilization of resources with flexible scheduling.
+- Support the most popular RDBMS, NoSQL, streaming and analytical systems, and their bundled tools.
+- Provide the most advanced user experience based on the concepts of IaC and GitOps.
 
 ### Key features
-- Kubernetes-native and multi-cloud supported.
-- Supports multiple database engines, including MySQL, PostgreSQL, Redis, MongoDB, and more.
+- Compatible with AWS, GCP, Azure, and Alibaba Cloud.
+- Supports MySQL, PostgreSQL, Redis, MongoDB, Kafka, and more.
 - Provides production-level performance, resilience, scalability, and observability.
 - Simplifies day-2 operations, such as upgrading, scaling, monitoring, backup, and restore.
-- Declarative configuration is made simple, and imperative commands are made powerful.
-- The learning curve is flat, and you are welcome to submit new issues on GitHub.
-
+- Contains a powerful and intuitive command line tool.
+- Sets up a full-stack, production-ready data infrastructure in minutes.
 
 For detailed feature information, see [Feature list](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/user_docs/Introduction/feature_list.md)
 

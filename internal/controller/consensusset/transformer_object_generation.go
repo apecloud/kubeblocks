@@ -219,7 +219,6 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		// vertices to be deleted
 		deleteOrphanVertices()
 	}
-	root.Action = model.ActionPtr(model.STATUS)
 
 	return nil
 }

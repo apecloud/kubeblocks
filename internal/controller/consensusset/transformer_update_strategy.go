@@ -33,7 +33,7 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 	transCtx, _ := ctx.(*CSSetTransformContext)
 	csSet := transCtx.CSSet
 	origCSSet := transCtx.OrigCSSet
-	if model.IsObjectDeleting(origCSSet) {
+	if !model.IsObjectStatusUpdating(origCSSet) {
 		return nil
 	}
 

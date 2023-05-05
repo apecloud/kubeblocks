@@ -56,6 +56,7 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 	case model.IsObjectUpdating(origCSSet):
 		// use consensus set's generation instead of sts's
 		csSet.Status.ObservedGeneration = csSet.Generation
+		csSet.Status.Replicas = csSet.Spec.Replicas
 	case model.IsObjectStatusUpdating(origCSSet):
 		generation := csSet.Status.ObservedGeneration
 		csSet.Status.StatefulSetStatus = sts.Status
@@ -69,7 +70,12 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 		setConsensusSetStatusRoles(csSet, pods)
 	}
 
-	// TODO: handle Update(i.e. pods deletion)
+	// get root vertex(i.e. consensus set)
+	root, err := model.FindRootVertex(dag)
+	if err != nil {
+		return err
+	}
+	root.Action = model.ActionPtr(model.STATUS)
 
 	return nil
 }

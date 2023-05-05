@@ -2,14 +2,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: minio-chart-kubeblocks-values
-  labels:
-    {{- include "kubeblocks.labels" . | nindent 4 }}
-  {{- if .Values.keepAddons }}
-  annotations:
-    helm.sh/resource-policy: keep
-  {{- end }}
 data:
-  bucketName: miniobucket1
+  bucketName: {{ .Values.minio.bucketName }}
   values-kubeblocks-override.yaml: |-
     resources:
       requests:
@@ -18,9 +12,9 @@ data:
     persistence:
       enabled: false
     mode: standalone
-    rootUser: rootuser
-    rootPassword: rootpass123
+    rootUser: {{ .Values.minio.rootUser }}
+    rootPassword: {{ randAlphaNum 10 }}
     buckets:
-      - name: miniobucket1
+      - name: {{ .Values.minio.bucketName }}
         policy: none
         purge: false

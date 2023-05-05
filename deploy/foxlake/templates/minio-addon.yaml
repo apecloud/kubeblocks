@@ -16,6 +16,16 @@ spec:
 
   defaultInstallValues:
     - enabled: true
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - k3s
 
   installable:
     autoInstall: true
+    selectors:
+      - key: KubeGitVersion
+        operator: Contains
+        values:
+          - k3s

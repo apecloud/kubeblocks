@@ -21,3 +21,7 @@ mysql:
     repository: mysql
     pullPolicy: IfNotPresent
     tag: "latest"
+
+minio:
+  bucketName: "foxlake"
+  rootUser: "foxlake"

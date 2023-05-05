@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
@@ -140,8 +139,7 @@ func (b *csSetPlanBuilder) csSetWalkFunc(v graph.Vertex) error {
 				return err
 			}
 		}
-		// delete secondary objects
-		if _, ok := vertex.Obj.(*appsv1alpha1.Cluster); !ok {
+		if !model.IsObjectDeleting(vertex.Obj) {
 			err := b.cli.Delete(b.transCtx.Context, vertex.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err

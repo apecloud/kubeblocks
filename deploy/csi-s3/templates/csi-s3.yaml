@@ -53,7 +53,7 @@ spec:
         app: csi-s3
     spec:
       serviceAccount: csi-s3
-      {{- with .Values.daemonSetTolerations }}
+      {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}

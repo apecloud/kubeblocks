@@ -119,9 +119,6 @@ func (b *csSetPlanBuilder) csSetWalkFunc(v graph.Vertex) error {
 			return err
 		}
 	case model.UPDATE:
-		if vertex.Immutable {
-			return nil
-		}
 		o, err := b.buildUpdateObj(vertex)
 		if err != nil {
 			return err

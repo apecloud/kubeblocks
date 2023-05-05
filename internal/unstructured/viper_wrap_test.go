@@ -62,8 +62,8 @@ func TestPropertiesFormat(t *testing.T) {
 	const propertiesContext = `
 listen_addresses = '*'
 port = '5432'
+archive_command = '[[ $(date +%H%M) == 1200 ]] && rm -rf /home/postgres/pgdata/pgroot/arcwal/$(date -d"yesterday" +%Y%m%d); mkdir -p /home/postgres/pgdata/pgroot/arcwal/$(date +%Y%m%d) && gzip -kqc %p > /home/postgres/pgdata/pgroot/arcwal/$(date +%Y%m%d)/%f.gz'
 
-#archive_command = 'wal_dir=/pg/arcwal; [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); /bin/mkdir -p ${wal_dir}/$(date +%Y%m%d) && /usr/bin/lz4 -q -z %p > ${wal_dir}/$(date +%Y%m%d)/%f.lz4'
 #archive_mode = 'True'
 auto_explain.log_analyze = 'True'
 auto_explain.log_min_duration = '1s'
@@ -81,6 +81,7 @@ autovacuum_naptime = '1min'
 	assert.EqualValues(t, propConfigObj.Get("auto_explain.log_nested_statements"), "'True'")
 	assert.EqualValues(t, propConfigObj.Get("auto_explain.log_min_duration"), "'1s'")
 	assert.EqualValues(t, propConfigObj.Get("autovacuum_naptime"), "'1min'")
+	assert.EqualValues(t, propConfigObj.Get("archive_command"), `'[[ $(date +%H%M) == 1200 ]] && rm -rf /home/postgres/pgdata/pgroot/arcwal/$(date -d"yesterday" +%Y%m%d); mkdir -p /home/postgres/pgdata/pgroot/arcwal/$(date +%Y%m%d) && gzip -kqc %p > /home/postgres/pgdata/pgroot/arcwal/$(date +%Y%m%d)/%f.gz'`)
 
 	dumpContext, err := propConfigObj.Marshal()
 	assert.Nil(t, err)

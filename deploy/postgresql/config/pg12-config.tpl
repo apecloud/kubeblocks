@@ -26,7 +26,8 @@
 
 listen_addresses = '*'
 port = '5432'
-archive_command = 'wal_dir=/home/postgres/pgdata/pgroot/arcwal; wal_dir_today=${wal_dir}/$(date +%Y%m%d); [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); mkdir -p ${wal_dir_today} && gzip -kqc %p > ${wal_dir_today}/%f.gz'
+# archive_command = 'wal_dir=/home/postgres/pgdata/pgroot/arcwal; wal_dir_today=${wal_dir}/$(date +%Y%m%d); [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); mkdir -p ${wal_dir_today} && gzip -kqc %p > ${wal_dir_today}/%f.gz'
+archive_command = '[[ $(date +%H%M) == 1200 ]] && rm -rf /home/postgres/pgdata/pgroot/arcwal/$(date -d"yesterday" +%Y%m%d); mkdir -p /home/postgres/pgdata/pgroot/arcwal/$(date +%Y%m%d) && gzip -kqc %p > /home/postgres/pgdata/pgroot/arcwal/$(date +%Y%m%d)/%f.gz'
 archive_mode = 'on'
 auto_explain.log_analyze = 'True'
 auto_explain.log_min_duration = '1s'

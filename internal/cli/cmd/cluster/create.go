@@ -431,7 +431,7 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 			if clusterDefinition == "" || err != nil {
 				clusterVersion = utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete)
 			} else {
-				label := fmt.Sprintf("clusterdefinition.kubeblocks.io/name=%s", clusterDefinition)
+				label := fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDefinition)
 				clusterVersion = util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.ClusterVersionGVR()), []string{label}, toComplete)
 			}
 			return clusterVersion, cobra.ShellCompDirectiveNoFileComp

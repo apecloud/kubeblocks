@@ -531,6 +531,19 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 	}
 	installValues := r.InstallValues
 	processor := func(installSpecItem AddonInstallSpecItem, valueMapping HelmValuesMappingItem) {
+		var pvEnabled *bool
+		defer func() {
+			if v := valueMapping.HelmValueMap.PVEnabled; v != "" && pvEnabled != nil {
+				installValues.SetValues = append(installValues.SetValues,
+					fmt.Sprintf("%s=%v", v, *pvEnabled))
+			}
+		}()
+
+		if installSpecItem.PVEnabled != nil {
+			b := *installSpecItem.PVEnabled
+			pvEnabled = &b
+		}
+
 		if installSpecItem.Replicas != nil && *installSpecItem.Replicas >= 0 {
 			if v := valueMapping.HelmValueMap.ReplicaCount; v != "" {
 				installValues.SetValues = append(installValues.SetValues,
@@ -547,13 +560,6 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 					installValues.SetValues = append(installValues.SetValues,
 						fmt.Sprintf("%s=%v", v, installSpecItem.StorageClass))
 				}
-			}
-		}
-
-		if installSpecItem.PVEnabled != nil {
-			if v := valueMapping.HelmValueMap.PVEnabled; v != "" {
-				installValues.SetValues = append(installValues.SetValues,
-					fmt.Sprintf("%s=%v", v, *installSpecItem.PVEnabled))
 			}
 		}
 
@@ -602,6 +608,7 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 				}
 			}
 		}
+
 	}
 	processor(installSpec.AddonInstallSpecItem, r.ValuesMapping.HelmValuesMappingItem)
 	for _, ei := range installSpec.ExtraItems {

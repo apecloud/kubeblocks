@@ -203,7 +203,9 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		"Sets addon CPU resource values (--cpu [extraName:]<request>/<limit>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.StorageSets, "storage", []string{},
 		`Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items)). 
-Additional notes for Helm type Addon, that resizing storage will fail if modified value is a storage request size 
+Additional notes:
+1. Specify '0' value will removed storage values settings and explicitly disabled 'persistentVolumeEnabled' attribute.
+2. For Helm type Addon, that resizing storage will fail if modified value is a storage request size 
 that belongs to StatefulSet's volume claim template, to resolve 'Failed' Addon status possible action is disable and 
 re-enable the addon (More info on how-to resize a PVC: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources).
 `)
@@ -599,7 +601,15 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			}
 			return q, nil
 		}, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
-			item.Resources.Requests[corev1.ResourceStorage] = i.(resource.Quantity)
+			q := i.(resource.Quantity)
+			// for 0 storage size, remove storage request value and explicitly disabled `persistentVolumeEnabled`
+			if v, _ := q.AsInt64(); v == 0 {
+				delete(item.Resources.Requests, corev1.ResourceStorage)
+				b := false
+				item.PVEnabled = &b
+				return
+			}
+			item.Resources.Requests[corev1.ResourceStorage] = q
 			// explicitly enabled `persistentVolumeEnabled` if provided storage size settings
 			b := true
 			item.PVEnabled = &b

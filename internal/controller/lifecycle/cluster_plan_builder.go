@@ -422,7 +422,10 @@ func (c *clusterPlanBuilder) checkDependencyResourcesDeleted(node *lifecycleVert
 		// check if the dependency resource is deleted
 		err := c.cli.Get(c.transCtx.Context, types.NamespacedName{Name: outNode.obj.GetName(), Namespace: outNode.obj.GetNamespace()}, outNode.obj)
 		if err != nil {
-			return client.IgnoreNotFound(err)
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
 		}
 		if outNode.obj != nil {
 			return fmt.Errorf("%s/%s dependency resource %s/%s is not deleted", node.obj.GetNamespace(), node.obj.GetName(), outNode.obj.GetNamespace(), outNode.obj.GetName())

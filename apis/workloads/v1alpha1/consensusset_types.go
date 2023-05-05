@@ -139,8 +139,13 @@ type ConsensusSetStatus struct {
 	Learner *ConsensusMemberStatus `json:"learner,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks,all},shortName=csset
+// +kubebuilder:printcolumn:name="LEADER",type="string",JSONPath=".status.leader.podName",description="leader pod name."
+// +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.readyReplicas",description="ready replicas."
+// +kubebuilder:printcolumn:name="REPLICAS",type="string",JSONPath=".status.replicas",description="total replicas."
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ConsensusSet is the Schema for the consensussets API
 type ConsensusSet struct {
@@ -151,7 +156,7 @@ type ConsensusSet struct {
 	Status ConsensusSetStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ConsensusSetList contains a list of ConsensusSet
 type ConsensusSetList struct {

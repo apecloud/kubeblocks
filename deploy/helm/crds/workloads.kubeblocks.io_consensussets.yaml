@@ -9,13 +9,34 @@ metadata:
 spec:
   group: workloads.kubeblocks.io
   names:
+    categories:
+    - kubeblocks
+    - all
     kind: ConsensusSet
     listKind: ConsensusSetList
     plural: consensussets
+    shortNames:
+    - csset
     singular: consensusset
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: leader pod name.
+      jsonPath: .status.leader.podName
+      name: LEADER
+      type: string
+    - description: ready replicas.
+      jsonPath: .status.readyReplicas
+      name: READY
+      type: string
+    - description: total replicas.
+      jsonPath: .status.replicas
+      name: REPLICAS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ConsensusSet is the Schema for the consensussets API

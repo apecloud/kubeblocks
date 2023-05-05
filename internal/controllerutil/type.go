@@ -41,3 +41,9 @@ func (r *RequestCtx) UpdateCtxValue(key, val any) context.Context {
 	r.Ctx = context.WithValue(r.Ctx, key, val)
 	return p
 }
+
+// WithValue returns a copy of parent in which the value associated with key is
+// val.
+func (r *RequestCtx) WithValue(key, val any) context.Context {
+	return context.WithValue(r.Ctx, key, val)
+}

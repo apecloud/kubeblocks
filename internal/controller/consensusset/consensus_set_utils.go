@@ -106,7 +106,7 @@ func generateConsensusUpdatePlan(stsObj *appsv1.StatefulSet, pods []corev1.Pod, 
 		if err != nil {
 			return false, err
 		}
-		vertex := model.ObjectVertex{Obj: &pod, Action: model.ActionPtr(model.DELETE)}
+		vertex := &model.ObjectVertex{Obj: &pod, Action: model.ActionPtr(model.DELETE)}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 

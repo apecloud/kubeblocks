@@ -29,21 +29,25 @@ const (
 	NoDeleteJobs         = "extensions.kubeblocks.io/no-delete-jobs"
 
 	// condition reasons
-	AddonDisabled                    = "AddonDisabled"
-	AddonEnabled                     = "AddonEnabled"
-	AddonSpecInstallFailed           = "AddonSpecInstallFailed"
-	AddonSpecInstallableReqUnmatched = "AddonSpecInstallableRequirementUnmatched"
+	AddonDisabled = "AddonDisabled"
+	AddonEnabled  = "AddonEnabled"
 
 	// event reasons
 	InstallableCheckSkipped         = "InstallableCheckSkipped"
 	InstallableRequirementUnmatched = "InstallableRequirementUnmatched"
 	AddonAutoInstall                = "AddonAutoInstall"
+	AddonSetDefaultValues           = "AddonSetDefaultValues"
 	DisablingAddon                  = "DisablingAddon"
 	EnablingAddon                   = "EnablingAddon"
 	InstallationFailed              = "InstallationFailed"
+	InstallationFailedLogs          = "InstallationFailedLogs"
 	UninstallationFailed            = "UninstallationFailed"
+	UninstallationFailedLogs        = "UninstallationFailedLogs"
+	AddonRefObjError                = "ReferenceObjectError"
 
 	// config keys used in viper
 	maxConcurrentReconcilesKey = "MAXCONCURRENTRECONCILES_ADDON"
 	addonSANameKey             = "KUBEBLOCKS_ADDON_SA_NAME"
+	addonHelmInstallOptKey     = "KUBEBLOCKS_ADDON_HELM_INSTALL_OPTIONS"
+	addonHelmUninstallOptKey   = "KUBEBLOCKS_ADDON_HELM_UNINSTALL_OPTIONS"
 )

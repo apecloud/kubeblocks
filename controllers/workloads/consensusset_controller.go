@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -137,17 +136,6 @@ func (r *ConsensusSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&workloads.ConsensusSet{}).
 		Owns(&appsv1.StatefulSet{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}},
-			&handler.EnqueueRequestForOwner{
-				OwnerType:    &workloads.ConsensusSet{},
-				IsController: false,
-			}).
-		Watches(&source.Kind{Type: &corev1.Pod{}},
-			&consensusset.EnqueueRequestForAncestor{
-				Client:    r.Client,
-				OwnerType: &workloads.ConsensusSet{},
-				UpToLevel: 2,
-			}).
-		Watches(&source.Kind{Type: &corev1.Event{}},
 			&consensusset.EnqueueRequestForAncestor{
 				Client:    r.Client,
 				OwnerType: &workloads.ConsensusSet{},

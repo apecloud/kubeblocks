@@ -346,7 +346,7 @@ prometheus:
       ## If true, use a statefulset instead of a deployment for pod management.
       ## This allows to scale replicas to more than 1 pod
       ##
-      enabled: false
+      enabled: true
 
       ## Alertmanager headless service to use for the statefulset
       ##
@@ -553,7 +553,7 @@ prometheus:
       ## If true, use a statefulset instead of a deployment for pod management.
       ## This allows to scale replicas to more than 1 pod
       ##
-      enabled: false
+      enabled: true
 
     ## Prometheus server resource requests and limits
     ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/

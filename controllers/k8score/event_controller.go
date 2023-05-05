@@ -76,7 +76,7 @@ var _ EventHandler = &RoleChangeEventHandler{}
 
 func init() {
 	EventHandlerMap["role-change-handler"] = &RoleChangeEventHandler{}
-	EventHandlerMap["consensus-set-event-handler"] = &consensusset.EventHandler{}
+	EventHandlerMap["consensus-set-event-handler"] = &consensusset.PodRoleEventHandler{}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

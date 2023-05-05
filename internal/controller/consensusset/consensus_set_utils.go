@@ -26,6 +26,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -383,4 +384,14 @@ func setConsensusSetStatusRole(set *workloads.ConsensusSet, role, podName string
 		needUpdate = setConsensusSetStatusLearner(set, memberExt)
 	}
 	return needUpdate
+}
+
+func ownedKinds() []client.ObjectList {
+	return []client.ObjectList{
+		&appsv1.StatefulSetList{},
+		&corev1.ServiceList{},
+		&corev1.SecretList{},
+		&corev1.ConfigMapList{},
+		&policyv1.PodDisruptionBudgetList{},
+	}
 }

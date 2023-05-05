@@ -37,7 +37,7 @@ import (
 // TODO(free6om): dedup copied funcs from event_controllers.go
 // TODO(free6om): refactor event_controller.go as it should NOT import controllers/apps/component/*
 
-type EventHandler struct{}
+type PodRoleEventHandler struct{}
 
 // probeEventType defines the type of probe event.
 type probeEventType string
@@ -63,7 +63,7 @@ const (
 	probeEventRoleInvalid      probeEventType = "roleInvalid"
 )
 
-func (h *EventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
 		return nil
 	}

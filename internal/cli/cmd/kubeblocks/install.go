@@ -301,7 +301,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 			}
 			time.Sleep(5 * time.Second)
 		}
-		//Timeout
+		// Timeout
 		for k, v := range addons {
 			if !v && OS == types.GoosWindows {
 				out := fmt.Sprintf("%-50s %s\n", "Addon "+k, printer.BoldRed("FAIL"))

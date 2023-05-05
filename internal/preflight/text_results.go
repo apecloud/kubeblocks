@@ -29,7 +29,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const FailMessage = "Fail items were found. Please resolve the fail items and try again."
+const (
+	FailMessage = "Fail items were found. Please resolve the fail items and try again."
+	PassMessage = "The kubernetes cluster preflight check pass, and you can enjoy KubeBlocks now."
+)
 
 type TextResultOutput struct {
 	Title   string `json:"title" yaml:"title"`
@@ -78,7 +81,11 @@ func showTextResultsJSON(preflightName string, analyzeResults []*analyzerunner.A
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal results as json")
 	}
-	fmt.Printf("%s\n", b)
+	if len(b) <= 5 {
+		fmt.Println(PassMessage)
+	} else {
+		fmt.Printf("%s\n", b)
+	}
 	if len(output.Fail) > 0 {
 		return errors.New(FailMessage)
 	}
@@ -93,7 +100,7 @@ func showStdoutResultsYAML(preflightName string, analyzeResults []*analyzerunner
 		failInfo = color.New(color.FgRed)
 	)
 	if len(data.Warn) == 0 && len(data.Fail) == 0 {
-		fmt.Println("The kubernetes cluster preflight check pass, and you can enjoy KubeBlocks now.")
+		fmt.Println(PassMessage)
 	}
 	if len(data.Pass) > 0 {
 		passInfo.Println("Pass items")

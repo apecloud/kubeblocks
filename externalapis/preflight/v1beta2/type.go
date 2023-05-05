@@ -19,7 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package v1beta2
 
-import troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+import (
+	v1 "k8s.io/api/core/v1"
+
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+)
 
 // ExtendCollect defines extended data collector for k8s cluster
 type ExtendCollect struct {
@@ -41,6 +45,9 @@ type ExtendAnalyze struct {
 	// StorageClass is to determine the correctness of target storage class
 	// +optional
 	StorageClass *KBStorageClassAnalyze `json:"storageClass,omitempty"`
+	// StorageClass is to determine the correctness of target storage class
+	// +optional
+	Taint *KBTaintAnalyze `json:"taint,omitempty"`
 }
 
 type HostUtility struct {
@@ -103,6 +110,18 @@ type KBStorageClassAnalyze struct {
 	// provisioner is the provisioner of storageClass
 	// +optional
 	Provisioner string `json:"provisioner,omitempty"`
+}
+
+// KBTaintAnalyze matches the analysis of taints with TolerationsMap
+type KBTaintAnalyze struct {
+	// analyzeMeta is defined in troubleshoot.sh
+	troubleshoot.AnalyzeMeta `json:",inline"`
+	// outcomes are expected user defined results.
+	// +kubebuilder:validation:Required
+	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
+	// tolerations are tolerance configuration passed by kbcli
+	// +optional
+	TolerationsMap map[string][]v1.Toleration `json:"tolerations"`
 }
 
 type ExtendHostAnalyze struct {

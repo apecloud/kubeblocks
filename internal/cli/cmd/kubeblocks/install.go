@@ -105,6 +105,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		PreflightFlags: preflight.NewPreflightFlags(),
 		IOStreams:      streams,
 	}
+	*p.Interactive = false
 
 	cmd := &cobra.Command{
 		Use:     "install",
@@ -114,7 +115,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
 			util.CheckErr(o.PrecheckBeforeInstall())
-			util.CheckErr(p.Preflight(f, args))
+			util.CheckErr(p.Preflight(f, args, o.ValueOpts))
 			util.CheckErr(o.Install())
 		},
 	}
@@ -124,6 +125,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before install")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks")
+	cmd.Flags().BoolVar(&p.force, flagForce, p.force, "If present, just print fail item and continue with the following steps")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd

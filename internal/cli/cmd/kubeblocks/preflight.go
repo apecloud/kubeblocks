@@ -27,13 +27,13 @@ import (
 	"os/signal"
 	"strings"
 
-	"github.com/ahmetalpbalkan/go-cursor"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
+	"helm.sh/helm/v3/pkg/cli/values"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -41,13 +41,11 @@ import (
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	kbpreflight "github.com/apecloud/kubeblocks/internal/preflight"
-	kbinteractive "github.com/apecloud/kubeblocks/internal/preflight/interactive"
 )
 
 const (
-	flagInteractive               = "interactive"
-	flagFormat                    = "format"
 	flagCollectorImage            = "collector-image"
 	flagCollectorPullPolicy       = "collector-pullpolicy"
 	flagCollectWithoutPermissions = "collect-without-permissions"
@@ -58,6 +56,7 @@ const (
 	flagDebug                     = "debug"
 	flagNamespace                 = "namespace"
 	flagVerbose                   = "verbose"
+	flagForce                     = "force"
 
 	PreflightPattern     = "data/%s_preflight.yaml"
 	HostPreflightPattern = "data/%s_hostpreflight.yaml"
@@ -90,6 +89,8 @@ type PreflightOptions struct {
 	checkYamlData [][]byte
 	namespace     string
 	verbose       bool
+	force         bool
+	ValueOpts     values.Options
 }
 
 func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -109,8 +110,6 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		},
 	}
 	// add flags
-	cmd.Flags().BoolVar(p.Interactive, flagInteractive, false, "interactive preflights, default value is false")
-	cmd.Flags().StringVar(p.Format, flagFormat, "yaml", "output format, one of human, json, yaml. only used when interactive is set to false, default format is yaml")
 	cmd.Flags().StringVar(p.CollectorImage, flagCollectorImage, *p.CollectorImage, "the full name of the collector image to use")
 	cmd.Flags().StringVar(p.CollectorPullPolicy, flagCollectorPullPolicy, *p.CollectorPullPolicy, "the pull policy of the collector image")
 	cmd.Flags().BoolVar(p.CollectWithoutPermissions, flagCollectWithoutPermissions, *p.CollectWithoutPermissions, "always run preflight checks even if some require permissions that preflight does not have")
@@ -121,6 +120,7 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().BoolVar(p.Debug, flagDebug, *p.Debug, "enable debug logging")
 	cmd.Flags().StringVarP(&p.namespace, flagNamespace, "n", "", "If present, the namespace scope for this CLI request")
 	cmd.Flags().BoolVar(&p.verbose, flagVerbose, p.verbose, "print more verbose logs, default value is false")
+	helm.AddValueOptionsFlags(cmd.Flags(), &p.ValueOpts)
 	return cmd
 }
 
@@ -138,7 +138,12 @@ func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 	return yamlDataList, nil
 }
 
-func (p *PreflightOptions) Preflight(f cmdutil.Factory, args []string) error {
+func (p *PreflightOptions) Preflight(f cmdutil.Factory, args []string, opts values.Options) error {
+	if p.force {
+		return nil
+	}
+	p.ValueOpts = opts
+	*p.Format = "yaml"
 	var err error
 	if err = p.complete(f, args); err != nil {
 		return err
@@ -204,10 +209,6 @@ func (p *PreflightOptions) run() error {
 		preflightName   string
 		err             error
 	)
-	if *p.Interactive {
-		fmt.Print(cursor.Hide())
-		defer fmt.Print(cursor.Show())
-	}
 	// set progress chan
 	progressCh := make(chan interface{})
 	defer close(progressCh)
@@ -221,7 +222,7 @@ func (p *PreflightOptions) run() error {
 		return err
 	}
 	// 2. collect data
-	collectResults, err = kbpreflight.CollectPreflight(p.factory, ctx, kbPreflight, kbHostPreflight, progressCh)
+	collectResults, err = kbpreflight.CollectPreflight(p.factory, &p.ValueOpts, ctx, kbPreflight, kbHostPreflight, progressCh)
 	if err != nil {
 		return err
 	}
@@ -237,11 +238,7 @@ func (p *PreflightOptions) run() error {
 	if len(analyzeResults) == 0 {
 		return errors.New("no data has been collected")
 	}
-	if *p.Interactive {
-		return kbinteractive.ShowInteractiveResults(preflightName, analyzeResults, *p.Output)
-	} else {
-		return kbpreflight.ShowTextResults(preflightName, analyzeResults, *p.Format, p.verbose)
-	}
+	return kbpreflight.ShowTextResults(preflightName, analyzeResults, *p.Format, p.verbose)
 }
 
 func CollectProgress(ctx context.Context, progressCh <-chan interface{}, verbose bool) func() error {

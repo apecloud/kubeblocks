@@ -424,7 +424,9 @@ func (c *clusterPlanBuilder) checkDependencyResourcesDeleted(node *lifecycleVert
 		if err != nil {
 			return client.IgnoreNotFound(err)
 		}
-		return fmt.Errorf("%s/%s dependency resource %s/%s is not deleted", node.obj.GetNamespace(), node.obj.GetName(), outNode.obj.GetNamespace(), outNode.obj.GetName())
+		if outNode.obj != nil {
+			return fmt.Errorf("%s/%s dependency resource %s/%s is not deleted", node.obj.GetNamespace(), node.obj.GetName(), outNode.obj.GetNamespace(), outNode.obj.GetName())
+		}
 	}
 	return nil
 }

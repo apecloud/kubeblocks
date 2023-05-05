@@ -154,6 +154,43 @@ func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 	return nil
 }
 
+// WalkBFS walks the DAG 'd' in breadth-first order
+func (d *DAG) WalkBFS(walkFunc WalkFunc) error {
+	if err := d.validate(); err != nil {
+		return err
+	}
+	queue := make([]Vertex, 0)
+	walked := make(map[Vertex]bool, len(d.Vertices()))
+
+	root := d.Root()
+	queue = append(queue, root)
+	for len(queue) > 0 {
+		shouldStop := false
+		for _, vertex := range queue {
+			if walkFunc(vertex) != nil {
+				shouldStop = true
+			}
+		}
+		if shouldStop {
+			break
+		}
+
+		nextStep := make([]Vertex, 0)
+		for _, vertex := range queue {
+			adjs := d.outAdj(vertex)
+			for _, adj := range adjs {
+				if !walked[adj] {
+					nextStep = append(nextStep, adj)
+					walked[adj] = true
+				}
+			}
+		}
+		queue = nextStep
+	}
+
+	return nil
+}
+
 // Root return root vertex that has no in adjacent.
 // our DAG should have one and only one root vertex
 func (d *DAG) Root() Vertex {

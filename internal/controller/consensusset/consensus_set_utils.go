@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package consensusset
 
 import (
-	"errors"
 	"sort"
 	"strings"
 
@@ -31,7 +30,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -78,132 +76,6 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
 
 		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
 	})
-}
-
-// generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
-func generateConsensusUpdatePlan(stsObj *appsv1.StatefulSet, pods []corev1.Pod, set workloads.ConsensusSet, dag *graph.DAG) *Plan {
-	plan := &Plan{}
-	plan.Start = &Step{}
-	plan.WalkFunc = func(obj interface{}) (bool, error) {
-		pod, ok := obj.(corev1.Pod)
-		if !ok {
-			return false, errors.New("wrong type: obj not Pod")
-		}
-
-		// if DeletionTimestamp is not nil, it is terminating.
-		if pod.DeletionTimestamp != nil {
-			return true, nil
-		}
-
-		// if pod is the latest version, we do nothing
-		if intctrlutil.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
-			// wait until ready
-			return !intctrlutil.PodIsReadyWithLabel(pod), nil
-		}
-
-		// delete the pod to trigger associate StatefulSet to re-create it
-		root, err := model.FindRootVertex(dag)
-		if err != nil {
-			return false, err
-		}
-		vertex := &model.ObjectVertex{Obj: &pod, Action: model.ActionPtr(model.DELETE)}
-		dag.AddVertex(vertex)
-		dag.Connect(root, vertex)
-
-		return true, nil
-	}
-
-	rolePriorityMap := ComposeRolePriorityMap(set)
-	SortPods(pods, rolePriorityMap)
-
-	// generate plan by UpdateStrategy
-	switch set.Spec.UpdateStrategy {
-	case workloads.SerialUpdateStrategy:
-		generateConsensusSerialPlan(plan, pods)
-	case workloads.ParallelUpdateStrategy:
-		generateConsensusParallelPlan(plan, pods)
-	case workloads.BestEffortParallelUpdateStrategy:
-		generateConsensusBestEffortParallelPlan(plan, pods, rolePriorityMap)
-	}
-
-	return plan
-}
-
-// unknown & empty & learner & 1/2 followers -> 1/2 followers -> leader
-func generateConsensusBestEffortParallelPlan(plan *Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
-	start := plan.Start
-	// append unknown, empty and learner
-	index := 0
-	for _, pod := range pods {
-		role := pod.Labels[constant.RoleLabelKey]
-		if rolePriorityMap[role] <= learnerPriority {
-			nextStep := &Step{}
-			nextStep.Obj = pod
-			start.NextSteps = append(start.NextSteps, nextStep)
-			index++
-		}
-	}
-	if len(start.NextSteps) > 0 {
-		start = start.NextSteps[0]
-	}
-	// append 1/2 followers
-	podList := pods[index:]
-	followerCount := 0
-	for _, pod := range podList {
-		if rolePriorityMap[pod.Labels[constant.RoleLabelKey]] < leaderPriority {
-			followerCount++
-		}
-	}
-	end := followerCount / 2
-	for i := 0; i < end; i++ {
-		nextStep := &Step{}
-		nextStep.Obj = podList[i]
-		start.NextSteps = append(start.NextSteps, nextStep)
-	}
-
-	if len(start.NextSteps) > 0 {
-		start = start.NextSteps[0]
-	}
-	// append the other 1/2 followers
-	podList = podList[end:]
-	end = followerCount - end
-	for i := 0; i < end; i++ {
-		nextStep := &Step{}
-		nextStep.Obj = podList[i]
-		start.NextSteps = append(start.NextSteps, nextStep)
-	}
-
-	if len(start.NextSteps) > 0 {
-		start = start.NextSteps[0]
-	}
-	// append leader
-	podList = podList[end:]
-	for _, pod := range podList {
-		nextStep := &Step{}
-		nextStep.Obj = pod
-		start.NextSteps = append(start.NextSteps, nextStep)
-	}
-}
-
-// unknown & empty & leader & followers & learner
-func generateConsensusParallelPlan(plan *Plan, pods []corev1.Pod) {
-	start := plan.Start
-	for _, pod := range pods {
-		nextStep := &Step{}
-		nextStep.Obj = pod
-		start.NextSteps = append(start.NextSteps, nextStep)
-	}
-}
-
-// unknown -> empty -> learner -> followers(none->readonly->readwrite) -> leader
-func generateConsensusSerialPlan(plan *Plan, pods []corev1.Pod) {
-	start := plan.Start
-	for _, pod := range pods {
-		nextStep := &Step{}
-		nextStep.Obj = pod
-		start.NextSteps = append(start.NextSteps, nextStep)
-		start = nextStep
-	}
 }
 
 // ComposeRolePriorityMap generates a priority map based on roles.

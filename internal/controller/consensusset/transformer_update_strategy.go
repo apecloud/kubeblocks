@@ -65,11 +65,22 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
 
 	// generate the pods Deletion plan
-	plan := generateConsensusUpdatePlan(stsObj, pods, *csSet, dag)
-	// execute plan
-	if _, err := plan.WalkOneStep(); err != nil {
+	plan := newUpdatePlan(*csSet, pods)
+	podsToBeUpdated, err := plan.execute()
+	if err != nil {
 		return err
 	}
+	// get root vertex(i.e. consensus set)
+	root, err := model.FindRootVertex(dag)
+	if err != nil {
+		return err
+	}
+	for _, pod := range podsToBeUpdated {
+		vertex := &model.ObjectVertex{Obj: pod, Action: model.ActionPtr(model.DELETE)}
+		dag.AddVertex(vertex)
+		dag.Connect(root, vertex)
+	}
+
 	return nil
 }
 

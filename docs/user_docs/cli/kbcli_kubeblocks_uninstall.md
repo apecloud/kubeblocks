@@ -23,7 +23,7 @@ kbcli kubeblocks uninstall [flags]
       --remove-namespace   Remove default created "kb-system" namespace or not
       --remove-pvcs        Remove PersistentVolumeClaim or not
       --remove-pvs         Remove PersistentVolume or not
-      --timeout duration   Time to wait for uninstalling KubeBlocks, such as --timeout=5m (default 5m0s)
+      --timeout duration   Time to wait for uninstalling KubeBlocks, such as --timeout=5m (default 30m0s)
       --wait               Wait for KubeBlocks to be uninstalled, including all the add-ons. It will wait for as long as --timeout (default true)
 ```
 

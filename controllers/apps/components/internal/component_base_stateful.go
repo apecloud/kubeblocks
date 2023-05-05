@@ -135,18 +135,20 @@ func (c *StatefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
-	if err := c.Restart(reqCtx, cli); err != nil {
-		return err
-	}
+	if c.runningWorkload != nil {
+		if err := c.Restart(reqCtx, cli); err != nil {
+			return err
+		}
 
-	// cluster.spec.componentSpecs[*].volumeClaimTemplates[*].spec.resources.requests[corev1.ResourceStorage]
-	if err := c.ExpandVolume(reqCtx, cli); err != nil {
-		return err
-	}
+		// cluster.spec.componentSpecs[*].volumeClaimTemplates[*].spec.resources.requests[corev1.ResourceStorage]
+		if err := c.ExpandVolume(reqCtx, cli); err != nil {
+			return err
+		}
 
-	// cluster.spec.componentSpecs[*].replicas
-	if err := c.HorizontalScale(reqCtx, cli); err != nil {
-		return err
+		// cluster.spec.componentSpecs[*].replicas
+		if err := c.HorizontalScale(reqCtx, cli); err != nil {
+			return err
+		}
 	}
 
 	if err := c.updateUnderlyingResources(reqCtx, cli, c.runningWorkload); err != nil {
@@ -203,16 +205,10 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 }
 
 func (c *StatefulComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if c.runningWorkload == nil {
-		return nil
-	}
 	return util.RestartPod(&c.runningWorkload.Spec.Template)
 }
 
 func (c *StatefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if c.runningWorkload == nil {
-		return nil
-	}
 	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
 		var proto *corev1.PersistentVolumeClaimSpec
 		for _, v := range c.Component.VolumeClaimTemplates {
@@ -266,9 +262,6 @@ func (c *StatefulComponentBase) expandVolumes(reqCtx intctrlutil.RequestCtx, cli
 }
 
 func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if c.runningWorkload == nil {
-		return nil
-	}
 	ret := c.horizontalScaling(c.runningWorkload)
 	if ret == 0 {
 		return nil
@@ -591,6 +584,7 @@ func (c *StatefulComponentBase) handleGarbageOfRestoreBeforeRunning() error {
 			return err
 		}
 	}
+	// TODO: remove from the cluster annotation RestoreFromBackUpAnnotationKey?
 	return nil
 }
 

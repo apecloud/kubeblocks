@@ -308,10 +308,9 @@ func (c *ComponentBase) updateStatus(updatefn func(status *appsv1alpha1.ClusterC
 }
 
 func (c *ComponentBase) BuildLatestStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) error {
-	// TODO(refactor): should review it again
-	if reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil() {
-		return nil
-	}
+	// if reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil() {
+	//	return nil
+	// }
 
 	pods, err := util.ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {

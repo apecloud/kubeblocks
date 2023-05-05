@@ -179,18 +179,20 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
-	if err := c.Restart(reqCtx, cli); err != nil {
-		return err
-	}
+	if c.runningWorkload != nil {
+		if err := c.Restart(reqCtx, cli); err != nil {
+			return err
+		}
 
-	// cluster.spec.componentSpecs[*].volumeClaimTemplates[*].spec.resources.requests[corev1.ResourceStorage]
-	if err := c.ExpandVolume(reqCtx, cli); err != nil {
-		return err
-	}
+		// cluster.spec.componentSpecs[*].volumeClaimTemplates[*].spec.resources.requests[corev1.ResourceStorage]
+		if err := c.ExpandVolume(reqCtx, cli); err != nil {
+			return err
+		}
 
-	// cluster.spec.componentSpecs[*].replicas
-	if err := c.HorizontalScale(reqCtx, cli); err != nil {
-		return err
+		// cluster.spec.componentSpecs[*].replicas
+		if err := c.HorizontalScale(reqCtx, cli); err != nil {
+			return err
+		}
 	}
 
 	if err := c.updateUnderlyingResources(reqCtx, cli, c.runningWorkload); err != nil {
@@ -204,6 +206,9 @@ func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if err := c.init(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()), true); err != nil {
 		return err
 	}
+	if c.runningWorkload == nil {
+		return nil
+	}
 	return c.ComponentBase.BuildLatestStatus(reqCtx, cli, c.runningWorkload)
 }
 
@@ -212,9 +217,6 @@ func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli cli
 }
 
 func (c *statelessComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if c.runningWorkload == nil {
-		return nil
-	}
 	if c.runningWorkload.Spec.Replicas == nil && c.Component.Replicas > 0 {
 		reqCtx.Recorder.Eventf(c.Cluster,
 			corev1.EventTypeNormal,
@@ -232,9 +234,6 @@ func (c *statelessComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli 
 }
 
 func (c *statelessComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	if c.runningWorkload == nil {
-		return nil
-	}
 	return util.RestartPod(&c.runningWorkload.Spec.Template)
 }
 

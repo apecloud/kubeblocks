@@ -53,7 +53,7 @@ func TestWalkTopoOrder(t *testing.T) {
 	expected := []int{4, 5, 1, 10, 12, 11, 9, 6, 0, 3, 2, 7, 8}
 	walkOrder := make([]int, 0, len(expected))
 
-	walkFunc := func(v Vertex) error {
+	walkFunc := func(v Vertex, dag DAG) error {
 		walkOrder = append(walkOrder, v.(int))
 		fmt.Printf("%v ", v)
 		return nil

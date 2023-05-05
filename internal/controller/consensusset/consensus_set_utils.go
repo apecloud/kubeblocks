@@ -17,22 +17,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 package consensusset
 
 import (
 	"errors"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"sort"
 	"strings"
 
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -228,8 +227,8 @@ func ComposeRolePriorityMap(set workloads.ConsensusSet) map[string]int {
 	return rolePriorityMap
 }
 
-// updateConsensusSetRoleLabel updates pod role label when internal container role changed
-func updateConsensusSetRoleLabel(cli client.Client,
+// updatePodRoleLabel updates pod role label when internal container role changed
+func updatePodRoleLabel(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	set workloads.ConsensusSet,
 	pod *corev1.Pod, role string) error {

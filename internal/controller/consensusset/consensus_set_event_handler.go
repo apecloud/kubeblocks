@@ -128,25 +128,6 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	return role, updatePodRoleLabel(cli, reqCtx, *csSet, pod, role)
 }
 
-// updatePodRoleLabel updates pod role label when internal container role changed
-func updatePodRoleLabel(cli client.Client,
-	reqCtx intctrlutil.RequestCtx,
-	csSet workloads.ConsensusSet,
-	pod *corev1.Pod, role string) error {
-	ctx := reqCtx.Ctx
-	roleMap := composeConsensusRoleMap(csSet)
-	// role not defined in CR, ignore it
-	if _, ok := roleMap[role]; !ok {
-		return nil
-	}
-
-	// update pod role label
-	patch := client.MergeFrom(pod.DeepCopy())
-	pod.Labels[constant.RoleLabelKey] = role
-	pod.Labels[constant.ConsensusSetAccessModeLabelKey] = string(roleMap[role].accessMode)
-	return cli.Patch(ctx, pod, patch)
-}
-
 // parseProbeEventMessage parses probe event message.
 func parseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) *probeMessage {
 	message := &probeMessage{}

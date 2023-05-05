@@ -57,8 +57,6 @@ To address these challenges, and solve the problem of complexity, KubeBlocks int
 - Contains a powerful and intuitive command line tool.
 - Sets up a full-stack, production-ready data infrastructure in minutes.
 
-For detailed feature information, see [Feature list](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/user_docs/Introduction/feature_list.md)
-
 ## Documents
 ### Quick start with KubeBlocks
 [Quick Start](docs/user_docs/quick_start_guide.md) shows you the quickest way to get started with KubeBlocks.

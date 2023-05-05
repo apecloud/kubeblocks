@@ -9,15 +9,14 @@
 [![TODOs](https://img.shields.io/endpoint?url=https://api.tickgit.com/badge?repo=github.com/apecloud/kubeblocks)](https://www.tickgit.com/browse?repo=github.com/apecloud/kubeblocks)
 [![Artifact HUB](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/apecloud)](https://artifacthub.io/packages/search?repo=apecloud)
 
-![image](./docs/img/readme-banner2.png)
+![image](./docs/img/banner-in-readme.png)
 
 - [KubeBlocks](#kubeblocks)
   - [What is KubeBlocks](#what-is-kubeblocks)
     - [Why you need KubeBlocks](#why-you-need-kubeblocks)
     - [Goals](#goals)
     - [Key features](#key-features)
-  - [Documents](#documents)
-    - [Quick start with KubeBlocks](#quick-start-with-kubeblocks)
+  - [Get started with KubeBlocks](#get-started-with-kubeblocks)
   - [Community](#community)
   - [Contributing to KubeBlocks](#contributing-to-kubeblocks)
   - [License](#license)
@@ -55,9 +54,7 @@ To address these challenges, and solve the problem of complexity, KubeBlocks int
 - Contains a powerful and intuitive command line tool.
 - Sets up a full-stack, production-ready data infrastructure in minutes.
 
-## Documents
-
-### Quick start with KubeBlocks
+## Get started with KubeBlocks
 
 [Quick Start](./docs/user_docs/quick-start/) shows you the quickest way to get started with KubeBlocks.
 

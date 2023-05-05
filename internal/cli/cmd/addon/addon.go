@@ -427,6 +427,7 @@ func addonEnableDisableHandler(o *addonCmdOpts, cmd *cobra.Command, args []strin
 func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[string]interface{}) (err error) {
 	extraNames := o.addon.GetExtraNames()
 	installSpec := extensionsv1alpha1.AddonInstallSpec{
+		Enabled:              true,
 		AddonInstallSpecItem: extensionsv1alpha1.NewAddonInstallSpecItem(),
 	}
 	// only using named return value in defer function
@@ -445,7 +446,6 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 	}()
 
 	if o.addonEnableFlags.useDefault() {
-		installSpec.Enabled = true
 		return nil
 	}
 
@@ -600,6 +600,9 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			return q, nil
 		}, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
 			item.Resources.Requests[corev1.ResourceStorage] = i.(resource.Quantity)
+			// explicitly enabled `persistentVolumeEnabled` if provided storage size settings
+			b := true
+			item.PVEnabled = &b
 		}); err != nil {
 			return err
 		}

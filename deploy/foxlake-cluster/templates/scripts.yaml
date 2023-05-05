@@ -9,8 +9,8 @@ data:
     #!/bin/bash
     echo -e "create local storage for foxlake cluster"
     mysql -u${MYSQL_ROOT_USER} -p${MYSQL_ROOT_PASSWORD} \
-      -h${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_HOST} \
-      -P${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_PORT} \
+      -h${FOXLAKE_HOST} \
+      -P${FOXLAKE_PORT} \
       -e \
       "CREATE OR REPLACE STORAGE default AT URI \
         'minio://${KB_ADDON_MINIO_SERVICE_HOST}:${KB_ADDON_MINIO_SERVICE_PORT}/${MINIO_BUCKET_NAME}' \
@@ -19,8 +19,8 @@ data:
     #!/bin/bash
     echo -e "create cloud storage for foxlake cluster"
     mysql -u${MYSQL_ROOT_USER} -p${MYSQL_ROOT_PASSWORD} \
-      -h${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_HOST} \
-      -P${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_PORT} \
+      -h${FOXLAKE_HOST} \
+      -P${FOXLAKE_PORT} \
       -e \
       "CREATE OR REPLACE STORAGE default AT URI \
         's3://${S3_BUCKET_NAME}.s3.cn-northwest-1.amazonaws.com.cn/default' \

@@ -103,3 +103,16 @@ local
       key: rootPassword
 {{- end }}
 {{- end }}
+
+{{- define "foxlake-endpoint.env" -}}
+- name: FOXLAKE_HOST
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Release.Name }}-conn-credential
+      key: host
+- name: FOXLAKE_PORT
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Release.Name }}-conn-credential
+      key: port
+{{- end }}

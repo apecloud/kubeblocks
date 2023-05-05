@@ -6,7 +6,7 @@ metadata:
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "2"
-    "helm.sh/hook-delete-policy": before-hook-creation, hook-succeeded
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   template:
     metadata:
@@ -20,7 +20,9 @@ spec:
           command:
             - "sh"
             - "-c"
-            - "while ! nc -z ${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_HOST} ${FOXLAKE_CLUSTER_FOXLAKE_SERVICE_PORT}; do sleep 1; printf '-'; done; echo -e '  >> FoxLake Server has started';"
+            - "while ! nc -z ${FOXLAKE_HOST} ${FOXLAKE_PORT}; do sleep 1; printf '-'; done; echo -e '  >> FoxLake Server has started';"
+          env:
+            {{- include "foxlake-endpoint.env" . | nindent 12}} 
       containers:
         - name: config-storage
           image: "mysql:latest"
@@ -37,14 +39,21 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-conn-credential
                   key: password
+            {{- include "foxlake-endpoint.env" . | nindent 12}}
             {{- include "post-job.env" . | nindent 12}}
           volumeMounts:
             - name: scripts
               mountPath: /scripts
               readOnly: true
+            - name: foxlake-conn-credential
+              mountPath: /foxlake-conn-credential
+              readOnly: true 
       volumes:
         - name: scripts
           configMap:
             name: foxlake-cluster-setup-scripts 
             defaultMode: 0777
+        - name: foxlake-conn-credential
+          secret:
+            secretName: {{ .Release.Name }}-conn-credential
   backoffLimit: 4

@@ -61,7 +61,7 @@ jobs:
           bash .github/utils/utils.sh --type 8      
 
   remove-runner:
-    needs: make-test
+    needs: release-test
     runs-on: ubuntu-latest
     if: ${{ always() }}
     steps:

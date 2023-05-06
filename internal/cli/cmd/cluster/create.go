@@ -52,7 +52,6 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -952,6 +951,7 @@ func (o *CreateOptions) validateClusterVersion() error {
 			for k := range existedClusterVersions {
 				o.ClusterVersionRef = k
 			}
+			fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
 		} else {
 			return fmt.Errorf("failed to find the default cluster version, use '--cluster-version ClusterVersion' to set it")
 		}
@@ -961,10 +961,9 @@ func (o *CreateOptions) validateClusterVersion() error {
 
 // getClusterVersions return all cluster versions in K8S and return true if the cluster have a default cluster version
 func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[string]struct{}, bool, error) {
-	gvr := types.ClusterVersionGVR()
 	allClusterVersions := make(map[string]struct{})
 	existedDefault := false
-	list, err := dynamic.Resource(gvr).List(context.Background(), metav1.ListOptions{
+	list, err := dynamic.Resource(types.ClusterVersionGVR()).List(context.Background(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
 	})
 	if err != nil {
@@ -973,7 +972,7 @@ func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[strin
 	for _, item := range list.Items {
 		allClusterVersions[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
-		if !existedDefault && annotations != nil && (annotations[clusterversion.IsDefaultClusterVersionAnnotation] == annotationTrueValue || annotations[clusterversion.BetaIsDefaultClusterVersionAnnotation] == annotationTrueValue) {
+		if !existedDefault && annotations != nil && (annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue) {
 			existedDefault = true
 		}
 	}

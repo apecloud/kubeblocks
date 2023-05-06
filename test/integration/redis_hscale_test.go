@@ -21,7 +21,6 @@ package appstest
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"strconv"
 	"strings"
 
@@ -34,6 +33,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"

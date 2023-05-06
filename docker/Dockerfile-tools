@@ -15,7 +15,8 @@ FROM --platform=${BUILDPLATFORM} golang:1.20 as builder
 ARG TARGETOS
 ARG TARGETARCH
 
-ARG GOPROXY=https://goproxy.cn
+ARG GOPROXY
+#ARG GOPROXY=https://goproxy.cn
 ARG LD_FLAGS="-s -w"
 
 ENV GONOPROXY=github.com/apecloud

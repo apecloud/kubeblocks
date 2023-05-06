@@ -30,6 +30,13 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
+// IsDefaultClusterVersionAnnotation represents a ClusterVersion annotation that
+// marks a ClusterVersion as the default ClusterVersion.
+const IsDefaultClusterVersionAnnotation = "clusterversions.kubernetes.io/is-default-class"
+
+// BetaIsDefaultClusterVersionAnnotation is the beta version of IsDefaultClusterVersionAnnotation.
+const BetaIsDefaultClusterVersionAnnotation = "clusterversions.beta.kubernetes.io/is-default-class"
+
 var listExample = templates.Examples(`
 		# list all ClusterVersion
 		kbcli clusterversion list`)

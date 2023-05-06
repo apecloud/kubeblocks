@@ -52,6 +52,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -241,13 +242,8 @@ func (o *CreateOptions) Validate() error {
 		return fmt.Errorf("a valid termination policy is needed, use --termination-policy to specify one of: DoNotTerminate, Halt, Delete, WipeOut")
 	}
 
-	if o.ClusterVersionRef == "" {
-		version, err := cluster.GetLatestVersion(o.Dynamic, o.ClusterDefRef)
-		if err != nil {
-			return err
-		}
-		o.ClusterVersionRef = version
-		fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
+	if err := o.validateClusterVersion(); err != nil {
+		return err
 	}
 
 	if len(o.Values) > 0 && len(o.SetFile) > 0 {
@@ -932,11 +928,56 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 	for _, item := range list.Items {
 		allStorageClasses[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
-		if !existedDefault && annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == "true" || annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true") {
+		if !existedDefault && annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == annotationTrueValue || annotations[storage.BetaIsDefaultStorageClassAnnotation] == annotationTrueValue) {
 			existedDefault = true
 		}
 	}
 	return allStorageClasses, existedDefault, nil
+}
+
+// validateClusterVersion check whether the cluster version we need is exist in K8S or
+// the default cluster version is exist
+func (o *CreateOptions) validateClusterVersion() error {
+	existedClusterVersions, existedDefault, err := getClusterVersions(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return err
+	}
+	if o.ClusterVersionRef != "" {
+		if _, ok := existedClusterVersions[o.ClusterVersionRef]; !ok {
+			return fmt.Errorf("failed to find the specified cluster version \"%s\"", o.ClusterVersionRef)
+		}
+	} else if !existedDefault {
+		// if default version is not set and there is only one version, use it
+		if len(existedClusterVersions) == 1 {
+			for k := range existedClusterVersions {
+				o.ClusterVersionRef = k
+			}
+		} else {
+			return fmt.Errorf("failed to find the default cluster version, use '--cluster-version ClusterVersion' to set it")
+		}
+	}
+	return nil
+}
+
+// getClusterVersions return all cluster versions in K8S and return true if the cluster have a default cluster version
+func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[string]struct{}, bool, error) {
+	gvr := types.ClusterVersionGVR()
+	allClusterVersions := make(map[string]struct{})
+	existedDefault := false
+	list, err := dynamic.Resource(gvr).List(context.Background(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	for _, item := range list.Items {
+		allClusterVersions[item.GetName()] = struct{}{}
+		annotations := item.GetAnnotations()
+		if !existedDefault && annotations != nil && (annotations[clusterversion.IsDefaultClusterVersionAnnotation] == annotationTrueValue || annotations[clusterversion.BetaIsDefaultClusterVersionAnnotation] == annotationTrueValue) {
+			existedDefault = true
+		}
+	}
+	return allClusterVersions, existedDefault, nil
 }
 
 func shouldCreateDependencies(cd *appsv1alpha1.ClusterDefinition, compSpec *appsv1alpha1.ClusterComponentSpec) (bool, error) {

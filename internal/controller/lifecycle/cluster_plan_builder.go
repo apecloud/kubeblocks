@@ -271,7 +271,6 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 				return err
 			}
 		}
-
 	case STATUS:
 		patch := client.MergeFrom(node.oriObj)
 		if err := c.cli.Status().Patch(c.transCtx.Context, node.obj, patch); err != nil {

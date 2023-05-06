@@ -67,6 +67,6 @@ func mockKafkaOps(t *testing.T) *KafkaOperations {
 func getMetadata() map[string]string {
 	return map[string]string{
 		"consumerGroup": "a", "clientID": "a", "brokers": "a", "maxMessageBytes": "2048",
-		"consumeRetryInterval": "200", "initialOffset": "newest",
+		"consumeRetryInterval": "200", "initialOffset": "newest", "authType": "mtls",
 	}
 }

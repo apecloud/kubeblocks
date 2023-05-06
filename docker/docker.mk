@@ -29,6 +29,7 @@ DOCKERFILE_DIR?=./docker
 
 # Image URL to use all building/pushing image targets
 IMG ?= docker.io/apecloud/$(APP_NAME)
+TOOL_IMG ?= docker.io/apecloud/$(APP_NAME)-tool
 CLI_IMG ?= docker.io/apecloud/kbcli
 CLI_TAG ?= v$(CLI_VERSION)
 
@@ -94,12 +95,12 @@ endif
 .PHONY: build-tools-image
 build-tools-image: generate ## Build tools container image.
 ifneq ($(BUILDX_ENABLED), true)
-	docker build . -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile-tools -t ${IMG}:latest
+	docker build . -t ${TOOL_IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile-tools -t ${TOOL_IMG}:latest
 else
 ifeq ($(TAG_LATEST), true)
-	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest $(BUILDX_ARGS)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:latest $(BUILDX_ARGS)
 else
-	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} $(BUILDX_ARGS)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:${VERSION} $(BUILDX_ARGS)
 endif
 endif
 
@@ -107,14 +108,14 @@ endif
 push-tools-image: generate ## Push tools container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
-	docker push ${IMG}:latest
+	docker push ${TOOL_IMG}:latest
 else
-	docker push ${IMG}:${VERSION}
+	docker push ${TOOL_IMG}:${VERSION}
 endif
 else
 ifeq ($(TAG_LATEST), true)
-	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest --push $(BUILDX_ARGS)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:latest --push $(BUILDX_ARGS)
 else
-	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push $(BUILDX_ARGS)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:${VERSION} --push $(BUILDX_ARGS)
 endif
 endif

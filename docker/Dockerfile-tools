@@ -1,20 +1,33 @@
 # Build the kubeblocks tools binaries
 # includes kbcli, kubectl, and manager tools.
-FROM --platform=${BUILDPLATFORM} golang:1.20 as builder
 
 ## docker buildx build injected build-args:
 #BUILDPLATFORM — matches the current machine. (e.g. linux/amd64)
 #BUILDOS — os component of BUILDPLATFORM, e.g. linux
 #BUILDARCH — e.g. amd64, arm64, riscv64
-#BUILDVARIANT — used to set ARM variant, e.g. v7
+#BUILDVARIANT — used to set build ARM variant, e.g. v7
 #TARGETPLATFORM — The value set with --platform flag on build
 #TARGETOS - OS component from --platform, e.g. linux
 #TARGETARCH - Architecture from --platform, e.g. arm64
-#TARGETVARIANT
+#TARGETVARIANT - used to set target ARM variant, e.g. v7
 
+ARG GO_VERSION=1.20
+
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as bin-downloader
 ARG TARGETOS
 ARG TARGETARCH
 
+ARG KUBECTL_VERSION=1.26.3
+WORKDIR /workspace
+
+# Download binaries
+RUN curl -v -fsSL https://dl.k8s.io/v${KUBECTL_VERSION}/kubernetes-client-${TARGETOS}-${TARGETARCH}.tar.gz | tar -zxv
+
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as kbcli-builder
+ARG TARGETOS
+ARG TARGETARCH
 ARG GOPROXY
 #ARG GOPROXY=https://goproxy.cn
 ARG LD_FLAGS="-s -w"
@@ -44,34 +57,137 @@ COPY cmd/cli/ cmd/cli/
 COPY apis/ apis/
 COPY test/testdata/testdata.go test/testdata/testdata.go
 
-# Download binaries
-RUN curl -fsSL https://dl.k8s.io/v1.26.3/kubernetes-client-${TARGETOS}-${TARGETARCH}.tar.gz | tar -zxv
+# Build
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o kbcli cmd/cli/main.go
+
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as probe-builder
+ARG TARGETOS
+ARG TARGETARCH
+ARG GOPROXY
+#ARG GOPROXY=https://goproxy.cn
+ARG LD_FLAGS="-s -w"
+
+ENV GONOPROXY=github.com/apecloud
+ENV GONOSUMDB=github.com/apecloud
+ENV GOPRIVATE=github.com/apecloud
+ENV GOPROXY=${GOPROXY}
+
+WORKDIR /workspace
+
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+# RUN go mod download
+
+# Copy the go source
+COPY internal/ internal/
+COPY controllers/ controllers/
+COPY cmd/reloader/ cmd/reloader/
+COPY cmd/probe/ cmd/probe/
+COPY externalapis/ externalapis/
+COPY version/ version/
+COPY cmd/cli/ cmd/cli/
+COPY apis/ apis/
+COPY test/testdata/testdata.go test/testdata/testdata.go
+
+# Build
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o probe cmd/probe/main.go
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as killer-builder
+ARG TARGETOS
+ARG TARGETARCH
+ARG GOPROXY
+#ARG GOPROXY=https://goproxy.cn
+ARG LD_FLAGS="-s -w"
+
+ENV GONOPROXY=github.com/apecloud
+ENV GONOSUMDB=github.com/apecloud
+ENV GOPRIVATE=github.com/apecloud
+ENV GOPROXY=${GOPROXY}
+
+WORKDIR /workspace
+
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+# RUN go mod download
+
+# Copy the go source
+COPY internal/ internal/
+COPY controllers/ controllers/
+COPY cmd/reloader/ cmd/reloader/
+COPY cmd/probe/ cmd/probe/
+COPY externalapis/ externalapis/
+COPY version/ version/
+COPY cmd/cli/ cmd/cli/
+COPY apis/ apis/
+COPY test/testdata/testdata.go test/testdata/testdata.go
 
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o reloader cmd/reloader/main.go
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o killer cmd/reloader/container_killer/killer.go
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o probe cmd/probe/main.go
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o kbcli cmd/cli/main.go
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as reloader-builder
+ARG TARGETOS
+ARG TARGETARCH
+ARG GOPROXY
+#ARG GOPROXY=https://goproxy.cn
+ARG LD_FLAGS="-s -w"
+
+ENV GONOPROXY=github.com/apecloud
+ENV GONOSUMDB=github.com/apecloud
+ENV GOPRIVATE=github.com/apecloud
+ENV GOPROXY=${GOPROXY}
+
+WORKDIR /workspace
+
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+# RUN go mod download
+
+# Copy the go source
+COPY internal/ internal/
+COPY controllers/ controllers/
+COPY cmd/reloader/ cmd/reloader/
+COPY cmd/probe/ cmd/probe/
+COPY externalapis/ externalapis/
+COPY version/ version/
+COPY cmd/cli/ cmd/cli/
+COPY apis/ apis/
+COPY test/testdata/testdata.go test/testdata/testdata.go
+
+# Build
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o reloader cmd/reloader/main.go
 
 # Use alpine
-FROM docker.io/alpine:3.17
+FROM docker.io/alpine:3.17 as dist
+ARG APK_MIRROR
+#ARG APK_MIRROR="mirrors.aliyun.com"
 
 # install tools via apk
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+ENV APK_MIRROR=${APK_MIRROR}
+RUN if [ -n "${APK_MIRROR}" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi
 RUN apk add --no-cache curl helm \
     && rm -rf /var/cache/apk/*
 
 # use apk to install kubectl in the next alpine version.
-COPY --from=builder /workspace/kubernetes/client/bin/kubectl /bin
+COPY --from=bin-downloader /workspace/kubernetes/client/bin/kubectl /bin
 
 # copy kubeblocks tools
-COPY --from=builder /workspace/killer /bin
-COPY --from=builder /workspace/reloader /bin
 COPY config/probe config/probe
-COPY --from=builder /workspace/probe /bin
-COPY --from=builder /workspace/kbcli /bin
+COPY --from=killer-builder /workspace/killer /bin
+COPY --from=reloader-builder /workspace/reloader /bin
+COPY --from=probe-builder /workspace/probe /bin
+COPY --from=kbcli-builder /workspace/kbcli /bin
 
-WORKDIR /
 # mkdir kbcli config dir and helm cache dir.
 RUN mkdir /.kbcli && chown -R 65532:65532 /.kbcli \
     && mkdir /.cache && chown -R 65532:65532 /.cache

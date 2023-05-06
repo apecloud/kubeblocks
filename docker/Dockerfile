@@ -1,5 +1,10 @@
 # Build the manager binary
-FROM --platform=${BUILDPLATFORM} golang:1.20 as builder
+ARG GO_VERSION=1.20
+ARG DIST_IMG=gcr.io/distroless/static:nonroot
+# use following dist image arg if you have problem access gcr.io registry, i.e., China region.
+#ARG DIST_IMG=katanomi/distroless-static:nonroot
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as builder
 
 ## docker buildx build injected build-args:
 #BUILDPLATFORM — matches the current machine. (e.g. linux/amd64)
@@ -44,7 +49,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM katanomi/distroless-static:nonroot
+FROM ${DIST_IMG} as dist
 
 WORKDIR /
 COPY --from=builder /workspace/manager .

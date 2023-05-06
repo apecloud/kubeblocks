@@ -115,8 +115,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 		role := pod.Labels[constant.RoleLabelKey]
 		if rolePriorityMap[role] <= learnerPriority {
 			vertex := &model.ObjectVertex{Obj: &podList[i]}
-			p.dag.AddVertex(vertex)
-			p.dag.Connect(preVertex, vertex)
+			p.dag.AddConnect(preVertex, vertex)
 			currentVertex = vertex
 			index++
 		}
@@ -134,8 +133,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	end := followerCount / 2
 	for i := 0; i < end; i++ {
 		vertex := &model.ObjectVertex{Obj: &podList[i]}
-		p.dag.AddVertex(vertex)
-		p.dag.Connect(preVertex, vertex)
+		p.dag.AddConnect(preVertex, vertex)
 		currentVertex = vertex
 	}
 	preVertex = currentVertex
@@ -145,8 +143,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	end = followerCount - end
 	for i := 0; i < end; i++ {
 		vertex := &model.ObjectVertex{Obj: &podList[i]}
-		p.dag.AddVertex(vertex)
-		p.dag.Connect(preVertex, vertex)
+		p.dag.AddConnect(preVertex, vertex)
 		currentVertex = vertex
 	}
 	preVertex = currentVertex
@@ -155,8 +152,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	podList = podList[end:]
 	for _, pod := range podList {
 		vertex := &model.ObjectVertex{Obj: &pod}
-		p.dag.AddVertex(vertex)
-		p.dag.Connect(preVertex, vertex)
+		p.dag.AddConnect(preVertex, vertex)
 	}
 }
 
@@ -165,8 +161,7 @@ func (p *realUpdatePlan) buildParallelUpdatePlan() {
 	root, _ := model.FindRootVertex(p.dag)
 	for _, pod := range p.pods {
 		vertex := &model.ObjectVertex{Obj: &pod}
-		p.dag.AddVertex(vertex)
-		p.dag.Connect(root, vertex)
+		p.dag.AddConnect(root, vertex)
 	}
 }
 
@@ -175,8 +170,7 @@ func (p *realUpdatePlan) buildSerialUpdatePlan() {
 	preVertex, _ := model.FindRootVertex(p.dag)
 	for _, pod := range p.pods {
 		vertex := &model.ObjectVertex{Obj: &pod}
-		p.dag.AddVertex(vertex)
-		p.dag.Connect(preVertex, vertex)
+		p.dag.AddConnect(preVertex, vertex)
 		preVertex = vertex
 	}
 }

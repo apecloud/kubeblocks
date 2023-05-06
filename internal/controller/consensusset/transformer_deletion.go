@@ -48,8 +48,7 @@ func (t *CSSetDeletionTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 	for _, object := range snapshot {
 		vertex := &model.ObjectVertex{Obj: object, Action: model.ActionPtr(model.DELETE)}
-		dag.AddVertex(vertex)
-		dag.Connect(root, vertex)
+		dag.AddConnect(root, vertex)
 	}
 	root.Action = model.ActionPtr(model.DELETE)
 

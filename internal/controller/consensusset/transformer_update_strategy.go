@@ -77,8 +77,7 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 	}
 	for _, pod := range podsToBeUpdated {
 		vertex := &model.ObjectVertex{Obj: pod, Action: model.ActionPtr(model.DELETE)}
-		dag.AddVertex(vertex)
-		dag.Connect(root, vertex)
+		dag.AddConnect(root, vertex)
 	}
 
 	return nil

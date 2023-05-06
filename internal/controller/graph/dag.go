@@ -126,6 +126,14 @@ func (d *DAG) Connect(from, to Vertex) bool {
 	return true
 }
 
+// AddConnect add 'to' to the DAG 'd' and connect 'from' to 'to'
+func (d *DAG) AddConnect(from, to Vertex) bool {
+	if !d.AddVertex(to) {
+		return false
+	}
+	return d.Connect(from, to)
+}
+
 // WalkTopoOrder walk the DAG 'd' in topology order
 func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 	if err := d.validate(); err != nil {

@@ -131,8 +131,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		if err := controllerutil.SetOwnership(csSet, vertex.Obj, model.GetScheme(), CSSetFinalizerName); err != nil {
 			return err
 		}
-		dag.AddVertex(vertex)
-		dag.Connect(root, vertex)
+		dag.AddConnect(root, vertex)
 	}
 	dag.Connect(stsVertex, svcVertex)
 	dag.Connect(stsVertex, headlessSvcVertex)
@@ -190,8 +189,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 				IsOrphan: true,
 				Action:   model.ActionPtr(model.DELETE),
 			}
-			dag.AddVertex(v)
-			dag.Connect(root, v)
+			dag.AddConnect(root, v)
 		}
 	}
 

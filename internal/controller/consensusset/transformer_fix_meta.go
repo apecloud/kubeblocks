@@ -49,8 +49,7 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	csSetCopy := csSet.DeepCopy()
 	controllerutil.AddFinalizer(csSetCopy, CSSetFinalizerName)
 	vertex := &model.ObjectVertex{Obj: csSetCopy, OriObj: transCtx.OrigCSSet, Action: model.ActionPtr(model.UPDATE)}
-	dag.AddVertex(vertex)
-	dag.Connect(root, vertex)
+	dag.AddConnect(root, vertex)
 
 	return nil
 }

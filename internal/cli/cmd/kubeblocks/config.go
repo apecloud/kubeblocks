@@ -26,14 +26,11 @@ import (
 	"strings"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
@@ -228,17 +225,12 @@ func markKubeBlocksPodsToLoadConfigMap(client kubernetes.Interface) error {
 		if !belongToKubeBlocks {
 			continue
 		}
-		oldPod := pod.DeepCopy()
 		// mark the pod to load configmap
 		if pod.Annotations == nil {
 			pod.Annotations = map[string]string{}
 		}
 		pod.Annotations[types.LoadConfigMapAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-		oldData, _ := json.Marshal(oldPod)
-		newData, _ := json.Marshal(pod)
-		patchBytes, _ := jsonpatch.CreateMergePatch(oldData, newData)
-		_, _ = client.CoreV1().Pods(deploy.Namespace).Patch(context.TODO(), pod.Name, apitypes.MergePatchType,
-			patchBytes, metav1.PatchOptions{})
+		_, _ = client.CoreV1().Pods(deploy.Namespace).Update(context.TODO(), &pod, metav1.UpdateOptions{})
 	}
 	return nil
 }

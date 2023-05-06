@@ -466,25 +466,12 @@ func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 	for j := 0; j < int(component.Replicas); j++ {
 		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
 		hostNameTplValue := cluster.Name + "-" + component.Name + "-" + strconv.Itoa(j)
-
-		if component.WorkloadType != appsv1alpha1.Replication {
-			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
-			continue
-		}
+		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 
 		// build env for replication workload
-		// the 1st replica's hostname should not have suffix like '-0'
-		if j == 0 {
-			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
-		} else {
-			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue+"-0", svcName)
-		}
-		// if primaryIndex is 0, the pod name have to be no suffix '-0'
-		primaryIndex := component.GetPrimaryIndex()
-		if primaryIndex == 0 {
-			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s", cluster.Name, component.Name, primaryIndex, svcName)
-		} else {
-			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d-%d.%s", cluster.Name, component.Name, primaryIndex, 0, svcName)
+		if component.WorkloadType == appsv1alpha1.Replication {
+			envData[constant.KBReplicationSetPrimaryPodName] =
+				fmt.Sprintf("%s-%s-%d.%s", cluster.Name, component.Name, component.GetPrimaryIndex(), svcName)
 		}
 	}
 

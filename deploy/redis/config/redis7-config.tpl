@@ -18,7 +18,7 @@ rdbcompression yes
 rdbchecksum yes
 dbfilename dump.rdb
 rdb-del-sync-files no
-dir ./
+dir /data
 replica-serve-stale-data yes
 replica-read-only yes
 repl-diskless-sync yes

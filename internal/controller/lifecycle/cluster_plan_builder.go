@@ -26,16 +26,19 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -63,6 +66,7 @@ type clusterPlanBuilder struct {
 	cli          client.Client
 	transCtx     *ClusterTransformContext
 	transformers graph.TransformerChain
+	dag          *graph.DAG
 }
 
 // clusterPlan a graph.Plan implementation for Cluster reconciliation
@@ -150,6 +154,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	err = c.transformers.ApplyTo(c.transCtx, dag)
 	// log for debug
 	c.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
+	// add dag to clusterPlanBuilder
+	c.dag = dag
 
 	// we got the execution plan
 	plan := &clusterPlan{
@@ -256,7 +262,12 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 		}
 		// delete secondary objects
 		if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
-			err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.Obj)
+			// check dependency resources has been deleted before deleting the resource
+			err := c.checkDependencyResourcesDeleted(node)
+			if err != nil {
+				return err
+			}
+			err = intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.Obj)
 			// err := c.cli.Delete(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -347,4 +358,47 @@ func (c *clusterPlanBuilder) emitPhaseUpdatingEvent(oldPhase, newPhase appsv1alp
 		c.transCtx.EventRecorder.Event(cluster, eType, string(newPhase), message)
 		_ = opsutil.MarkRunningOpsRequestAnnotation(c.transCtx.Context, c.cli, cluster)
 	}
+}
+
+// checkDependencyResourcesDeleted checks if the dependency resources are deleted when cluster is deleted.
+func (c *clusterPlanBuilder) checkDependencyResourcesDeleted(node *ictrltypes.LifecycleVertex) error {
+	if c.dag == nil {
+		return nil
+	}
+	// get the dependency resources
+	outAdj := c.dag.OutAdj(node)
+	if len(outAdj) == 0 {
+		return nil
+	}
+	for _, out := range outAdj {
+		outNode, ok := out.(*ictrltypes.LifecycleVertex)
+		if !ok {
+			return fmt.Errorf("wrong vertex type %v", outNode)
+		}
+		// if the node.obj is StatefulSet, check if the pods are deleted
+		sts, ok := outNode.Obj.(*appsv1.StatefulSet)
+		if ok {
+			pods, err := componentutil.GetPodListByStatefulSet(c.transCtx.Context, c.cli, sts)
+			if err != nil {
+				return err
+			}
+			if len(pods) > 0 {
+				return &realRequeueError{reason: fmt.Sprintf("waiting dependency resource delete, %s/%s dependency resource statefulSet %s/%s still have pods",
+					node.Obj.GetNamespace(), node.Obj.GetName(), outNode.Obj.GetNamespace(), outNode.Obj.GetName()), requeueAfter: requeueDuration}
+			}
+		}
+		// check if the dependency resource is deleted
+		err := c.cli.Get(c.transCtx.Context, types.NamespacedName{Name: outNode.Obj.GetName(), Namespace: outNode.Obj.GetNamespace()}, outNode.Obj)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		if outNode.Obj != nil {
+			return &realRequeueError{reason: fmt.Sprintf("waiting dependency resource delete, %s/%s dependency resource %s/%s is not deleted",
+				node.Obj.GetNamespace(), node.Obj.GetName(), outNode.Obj.GetNamespace(), outNode.Obj.GetName()), requeueAfter: requeueDuration}
+		}
+	}
+	return nil
 }

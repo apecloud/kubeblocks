@@ -15,6 +15,7 @@ on:
 
 env:
   RELEASE_VERSION: ${{ github.ref_name }}
+  RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
 
 
 jobs:
@@ -57,3 +58,21 @@ jobs:
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.20"
     secrets: inherit
+
+  send-message:
+    runs-on: ubuntu-latest
+    needs: [ release-image, release-tools-image ]
+    if: ${{ always() && github.event.action == 'published' }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: send message
+        run: |
+          CONTENT="release\u00a0image\u00a0error"
+          if [[ "${{ needs.release-image.result }}" == "success" && "${{ needs.release-tools-image.result }}" == "success" ]]; then
+              CONTENT="release\u00a0image\u00a0success"
+          fi
+          
+          bash .github/utils/utils.sh --type 12 \
+            --content "${CONTENT}"\
+            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

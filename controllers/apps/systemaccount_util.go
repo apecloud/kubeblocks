@@ -390,3 +390,14 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 	tolerations = componetutil.PatchBuiltInToleration(tolerations)
 	job.Spec.Template.Spec.Tolerations = tolerations
 }
+
+// completeExecConfig override the image of execConfig if version is not nil.
+func completeExecConfig(execConfig *appsv1alpha1.CmdExecutorConfig, version *appsv1alpha1.ClusterComponentVersion) {
+	if version == nil {
+		return
+	}
+	if len(version.ClientImage) == 0 {
+		return
+	}
+	execConfig.Image = version.ClientImage
+}

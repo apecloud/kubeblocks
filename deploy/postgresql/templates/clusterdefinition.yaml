@@ -51,7 +51,7 @@ spec:
           volumeName: postgresql-config
           defaultMode: 0777
         - name: postgresql-custom-metrics
-          templateRef: postgresql-custom-metrics
+          templateRef: postgresql14-custom-metrics
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-custom-metrics
           defaultMode: 0777

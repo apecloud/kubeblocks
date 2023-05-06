@@ -28,12 +28,16 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -59,7 +63,8 @@ func init() {
 // +kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=delete;deletecollection
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;delete;deletecollection
+// +kubebuilder:rbac:groups=core,resources=pods/log,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -103,6 +108,10 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrlerihandler.NewTypeHandler(&autoInstallCheckStage{stageCtx: buildStageCtx(next...)})
 	}
 
+	enabledAutoValuesStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
+		return ctrlerihandler.NewTypeHandler(&enabledWithDefaultValuesStage{stageCtx: buildStageCtx(next...)})
+	}
+
 	progressingStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
 		return ctrlerihandler.NewTypeHandler(&progressingHandler{stageCtx: buildStageCtx(next...)})
 	}
@@ -116,6 +125,7 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		genIDProceedStageBuilder,
 		installableCheckStageBuilder,
 		autoInstallCheckStageBuilder,
+		enabledAutoValuesStageBuilder,
 		progressingStageBuilder,
 		terminalStateStageBuilder,
 	).Handler("")
@@ -137,21 +147,30 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 func (r *AddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&extensionsv1alpha1.Addon{}).
-		// TODO: replace with controller-idioms's adopt lib
-		// Watches(&source.Kind{Type: &batchv1.Job{}},
-		// 	&handler.EnqueueRequestForObject{},
-		// 	builder.WithPredicates(&jobCompletionPredicate{reconciler: r, Log: log.FromContext(context.TODO())})).
+		Watches(&source.Kind{Type: &batchv1.Job{}}, handler.EnqueueRequestsFromMapFunc(r.findAddonJobs)).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurrentReconcilesKey),
 		}).
 		Complete(r)
 }
 
-// type jobCompletionPredicate struct {
-// 	predicate.Funcs
-// 	reconciler *AddonReconciler
-// 	Log        logr.Logger
-// }
+func (r *AddonReconciler) findAddonJobs(job client.Object) []reconcile.Request {
+	labels := job.GetLabels()
+	if _, ok := labels[constant.AddonNameLabelKey]; !ok {
+		return []reconcile.Request{}
+	}
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: job.GetNamespace(),
+				Name:      job.GetName(),
+			},
+		},
+	}
+}
 
 func (r *AddonReconciler) cleanupJobPods(reqCtx intctrlutil.RequestCtx) error {
 	if err := r.DeleteAllOf(reqCtx.Ctx, &corev1.Pod{},

@@ -43,7 +43,7 @@ func NewDeploymentReconciler(mgr ctrl.Manager) error {
 }
 
 func NewStatefulSetReconciler(mgr ctrl.Manager) error {
-	return newComponentWorkloadReconciler(mgr, "stateful-set-controller", generics.StatefulSetSignature, generics.PodSignature)
+	return newComponentWorkloadReconciler(mgr, "statefulset-controller", generics.StatefulSetSignature, generics.PodSignature)
 }
 
 func newComponentWorkloadReconciler[T generics.Object, PT generics.PObject[T], LT generics.ObjList[T], S generics.Object, PS generics.PObject[S], LS generics.ObjList[S]](
@@ -52,7 +52,7 @@ func newComponentWorkloadReconciler[T generics.Object, PT generics.PObject[T], L
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor(name),
-	}).SetupWithManager(mgr)
+	}).SetupWithManager(mgr, name)
 }
 
 // componentWorkloadReconciler reconciles a component workload object
@@ -106,7 +106,7 @@ func (r *componentWorkloadReconciler[T, PT, S, PS]) Reconcile(ctx context.Contex
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *componentWorkloadReconciler[T, PT, S, PS]) SetupWithManager(mgr ctrl.Manager) error {
+func (r *componentWorkloadReconciler[T, PT, S, PS]) SetupWithManager(mgr ctrl.Manager, name string) error {
 	var (
 		obj1 T
 		obj2 S
@@ -115,6 +115,7 @@ func (r *componentWorkloadReconciler[T, PT, S, PS]) SetupWithManager(mgr ctrl.Ma
 		For(PT(&obj1)).
 		Owns(PS(&obj2)).
 		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate)).
+		Named(name).
 		Complete(r)
 }
 

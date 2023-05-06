@@ -1,8 +1,0 @@
-apiVersion: v1
-appVersion: 1.1.7
-description: Container Storage Interface (CSI) driver for oss volumes
-home: https://github.com/kubernetes-sigs/alibaba-cloud-csi-driver
-keywords:
-- oss
-name: csi-oss
-version: 1.1.7

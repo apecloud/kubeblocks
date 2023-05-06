@@ -111,7 +111,6 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	r.Recorder.Eventf(pod, corev1.EventTypeNormal, "AddAnnotation", "add annotation %s=%s", constant.LeaderAnnotationKey, componentStatus.ConsensusSetStatus.Leader.Pod)
-
 	return intctrlutil.Reconciled()
 }
 
@@ -120,5 +119,6 @@ func (r *PodReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Pod{}).
 		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate)).
+		Named("pod-watcher").
 		Complete(r)
 }

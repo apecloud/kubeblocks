@@ -163,7 +163,7 @@ const (
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJobKind               = "CronJob"
 	JobKind                   = "Job"
-	ReplicaSetKind            = "ReplicaSetKind"
+	ReplicaSetKind            = "ReplicaSet"
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
 	ConfigMapKind             = "ConfigMap"

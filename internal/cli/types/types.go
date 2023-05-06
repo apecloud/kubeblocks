@@ -104,6 +104,7 @@ const (
 
 	ClassProviderLabelKey              = "class.kubeblocks.io/provider"
 	ResourceConstraintProviderLabelKey = "resourceconstraint.kubeblocks.io/provider"
+	ReloadConfigMapAnnotationKey       = "kubeblocks.io/reload-configmap" // mark an annotation to load configmap
 )
 
 // DataProtection API group

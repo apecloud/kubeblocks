@@ -1,0 +1,25 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: redis-new-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "redis.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: redis-new
+  componentVersions:
+  - componentDefRef: redis
+    versionsContext:
+      containers:
+      - name: redis
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+  - componentDefRef: redis-sentinel
+    versionsContext:
+      initContainers:
+        - name: init-redis-sentinel
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+      containers:
+        - name: redis-sentinel
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-scripts-new
+data:
+  setup.sh: |
+    #!/bin/sh
+    set -ex
+    KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
+    if [ "$KB_PRIMARY_POD_NAME_PREFIX" = "$KB_POD_NAME" ]; then
+      echo "primary instance skip create a replication relationship."
+      exit 0
+    else
+      until redis-cli -h $KB_PRIMARY_POD_NAME -p 6379 ping; do sleep 1; done
+      redis-cli -h 127.0.0.1 -p 6379 replicaof $KB_PRIMARY_POD_NAME 6379 || exit 1
+    fi
+  redis-start.sh: |
+    #!/bin/sh
+    set -ex
+    # echo "include /etc/conf/redis.conf" >> /etc/redis/redis.conf
+    # echo "replica-announce-ip $KB_POD_FQDN" >> /etc/redis/redis.conf
+    /kb/tools/config_render --config-volume /etc/conf/ --config /opt/kb-tools/config/redis-replication-config/kb-cm-config.yaml --output-dir /etc/redis
+    exec redis-server /etc/redis/redis.conf \
+    --loadmodule /opt/redis-stack/lib/redisearch.so ${REDISEARCH_ARGS} \
+    --loadmodule /opt/redis-stack/lib/redisgraph.so ${REDISGRAPH_ARGS} \
+    --loadmodule /opt/redis-stack/lib/redistimeseries.so ${REDISTIMESERIES_ARGS} \
+    --loadmodule /opt/redis-stack/lib/rejson.so ${REDISJSON_ARGS} \
+    --loadmodule /opt/redis-stack/lib/redisbloom.so ${REDISBLOOM_ARGS}
+  redis-sentinel-setup.sh: |-
+    {{- .Files.Get "scripts/redis-sentinel-setup.sh.tpl" | nindent 4 }}
+  redis-sentinel-start.sh: |-
+    {{- .Files.Get "scripts/redis-sentinel-start.sh.tpl" | nindent 4 }}
+  redis-sentinel-ping.sh: |-
+    #!/bin/sh
+    set -ex
+    response=$(
+          timeout -s 3 $1 \
+          redis-cli \
+            -h localhost \
+            -p 26379 \
+            ping
+        )
+    if [ "$?" -eq "124" ]; then
+      echo "Timed out"
+      exit 1
+    fi
+    if [ "$response" != "PONG" ]; then
+      echo "$response"
+      exit 1
+    fi

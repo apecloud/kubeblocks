@@ -1,0 +1,80 @@
+{{- $cc := .Files.Get "config/redis7-config-effect-scope.yaml" | fromYaml }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: redis7-config-constraints-new
+  labels:
+    {{- include "redis.labels" . | nindent 4 }}
+spec:
+
+  cfgSchemaTopLevelName: RedisParameter
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    cue: |-
+      {{- .Files.Get "config/redis7-config-constraint.cue" | nindent 6 }}
+
+  ## require db instance restart
+  {{- if hasKey $cc "staticParameters" }}
+  staticParameters:
+    {{- $params := get $cc "staticParameters" }}
+    {{- range $params }}
+    - {{ . }}
+    {{- end }}
+  {{- end}}
+
+  ## reload parameters
+  ## dynamicParameters
+  {{- if hasKey $cc "dynamicParameters" }}
+  dynamicParameters:
+   {{- $params := get $cc "dynamicParameters" }}
+   {{- range $params }}
+    - {{ . }}
+   {{- end }}
+ {{- end}}
+
+
+  # redis configuration file format
+  formatterConfig:
+    format: redis
+
+  #  shared_volume:
+  #    name: redis-config
+  #    mountPath: /etc/redis
+
+  ## for tools
+  reloadOptions:
+    shellTrigger:
+      command:
+      - "redis-update.sh"
+
+  scriptConfigs:
+    - scriptConfigMapRef: redis-reload-script-new
+      namespace: {{ .Release.Namespace }}
+
+  toolConfigs:
+    - name: init-redis-tools
+      command:
+        - cp
+        - /usr/local/bin/redis-cli
+        - /kb/tools/redis-cli
+      image: docker.io/library/redis:7.0.11-alpine
+      mountPoint: /kb/tools
+      volumeName: redis-tools
+    - name: init-secondary-render-tools
+      command:
+        - cp
+        - /bin/config_render
+        - /kb/tools/config_render
+      image: "$(KUBEBLOCKS_TOOLS_IMAGE)"
+      mountPoint: /kb/tools
+      volumeName: redis-tools
+
+  downwardAPIOptions:
+    - name: "pod-info"
+      mountPoint: "/etc/pod_info"
+      command:
+      - "redis-process-pod.sh"
+      items:
+        - path: "labels/role"
+          fieldRef:
+            fieldPath: metadata.labels['kubeblocks.io/role']

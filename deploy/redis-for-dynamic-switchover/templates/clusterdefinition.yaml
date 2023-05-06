@@ -1,14 +1,14 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: redis
+  name: redis-new
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 spec:
   type: redis
   connectionCredential:
-    username: default
-    password: "$(RANDOM_PASSWD)"
+    username: ""
+    password: ""
     endpoint: "$(SVC_FQDN):$(SVC_PORT_redis)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_redis)"
@@ -67,13 +67,17 @@ spec:
             targetPort: redis
       configSpecs:
         - name: redis-replication-config
-          templateRef: redis7-config-template
-          constraintRef: redis7-config-constraints
+          templateRef: redis7-config-template-new
+          constraintRef: redis7-config-constraints-new
           namespace: {{ .Release.Namespace }}
           volumeName: redis-config
+          secondaryRenderedConfigSpec:
+            templateRef: redis7-config-template-second
+            namespace: {{ .Release.Namespace }}
+            policy: none
       scriptSpecs:
         - name: redis-scripts
-          templateRef: redis-scripts
+          templateRef: redis-scripts-new
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
@@ -105,36 +109,11 @@ spec:
                 mountPath: /scripts
               - name: redis-conf
                 mountPath: /etc/redis
-            env:
-              - name: REDIS_REPL_USER
-                value: "kbreplicator"
-              - name: REDIS_REPL_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
-              - name: REDIS_DEFAULT_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
-              - name: REDIS_SENTINEL_USER
-                value: "$(REDIS_REPL_USER)-sentinel"
-              - name: REDIS_SENTINEL_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
-              - name: REDIS_ARGS
-                value: "--requirepass $(REDIS_PASSWORD)"
             command: ["/scripts/redis-start.sh"]
             lifecycle:
               postStart:
                 exec:
-                  command: ["/scripts/redis-post-start.sh"]
+                  command: ["/scripts/setup.sh"]
           - name: redis-exporter
             image: oliver006/redis_exporter:latest
             imagePullPolicy: IfNotPresent
@@ -158,19 +137,12 @@ spec:
 # to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.
 # Instead, using a shell script to wrap redis-cli and pass $(KB_ACCOUNT_STATEMENT) to it will do.
         cmdExecutorConfig:
-          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
-          env:
-            - name: REDIS_DEFAULT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: $(CONN_CREDENTIAL_SECRET_NAME)
-                  key: password
-                  optional: false
+          image: docker.io/redis:7.0.5
           command:
           - sh
           - -c
           args:
-          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) -a $REDIS_DEFAULT_PASSWORD $(KB_ACCOUNT_STATEMENT) | redis-cli -h $(KB_ACCOUNT_ENDPOINT) -a $REDIS_DEFAULT_PASSWORD acl save "
+          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)"
         passwordConfig:
           length: 10
           numDigits: 5
@@ -178,23 +150,40 @@ spec:
           letterCase: MixedCases
         accounts:
           - name: kbadmin
-            provisionPolicy: &kbadminAcctRef
+            provisionPolicy:
               type: CreateByStmt
               scope: AllPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
                 update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbdataprotection
-            provisionPolicy: *kbadminAcctRef
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AllPods
+              statements:
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbmonitoring
-            provisionPolicy: &kbReadOnlyAcctRef
+            provisionPolicy:
               type: CreateByStmt
               scope: AllPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
                 update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbprobe
-            provisionPolicy: *kbReadOnlyAcctRef
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AllPods
+              statements:
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
+          - name: kbreplicator
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AllPods
+              statements:
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) +psync +replconf +ping
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
     - name: redis-sentinel
       workloadType: Stateful
       characterType: redis
@@ -205,13 +194,13 @@ spec:
             port: 26379
       configSpecs:
         - name: redis-replication-config
-          templateRef: redis7-config-template
-          constraintRef: redis7-config-constraints
+          templateRef: redis7-config-template-new
+          constraintRef: redis7-config-constraints-new
           namespace: {{ .Release.Namespace }}
           volumeName: redis-config
       scriptSpecs:
         - name: redis-scripts
-          templateRef: redis-scripts
+          templateRef: redis-scripts-new
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
@@ -232,37 +221,6 @@ spec:
             - name: scripts
               mountPath: /scripts
           command: [ "/scripts/redis-sentinel-setup.sh" ]
-          env:
-            - name: REDIS_REPL_USER
-              value: "kbreplicator"
-            - name: REDIS_REPL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: $(CONN_CREDENTIAL_SECRET_NAME)
-                  key: password
-                  optional: false
-            - name: REDIS_DEFAULT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: $(CONN_CREDENTIAL_SECRET_NAME)
-                  key: password
-                  optional: false
-            - name: REDIS_SENTINEL_USER
-              value: "$(REDIS_REPL_USER)-sentinel"
-            - name: REDIS_SENTINEL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: $(CONN_CREDENTIAL_SECRET_NAME)
-                  key: password
-                  optional: false
-            - name: SENTINEL_USER
-              value: "default"
-            - name: SENTINEL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: $(CONN_CREDENTIAL_SECRET_NAME)
-                  key: password
-                  optional: false
         containers:
         - name: redis-sentinel
           imagePullPolicy: IfNotPresent
@@ -278,37 +236,6 @@ spec:
               mountPath: /etc/sentinel
             - name: scripts
               mountPath: /scripts
-          env:
-            - name: REDIS_REPL_USER
-              value: "kbreplicator"
-            - name: REDIS_REPL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: $(CONN_CREDENTIAL_SECRET_NAME)
-                  key: password
-                  optional: false
-            - name: REDIS_DEFAULT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: $(CONN_CREDENTIAL_SECRET_NAME)
-                  key: password
-                  optional: false
-            - name: REDIS_SENTINEL_USER
-              value: "$(REDIS_REPL_USER)-sentinel"
-            - name: REDIS_SENTINEL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: $(CONN_CREDENTIAL_SECRET_NAME)
-                  key: password
-                  optional: false
-            - name: SENTINEL_USER
-              value: "default"
-            - name: SENTINEL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: $(CONN_CREDENTIAL_SECRET_NAME)
-                  key: password
-                  optional: false
           command:
             - /bin/bash
           args:
@@ -316,10 +243,6 @@ spec:
             - |
               set -ex
               /scripts/redis-sentinel-start.sh
-          lifecycle:
-            postStart:
-              exec:
-                command: [ "/scripts/redis-sentinel-post-start.sh" ]
           livenessProbe:
             initialDelaySeconds: 10
             periodSeconds: 5

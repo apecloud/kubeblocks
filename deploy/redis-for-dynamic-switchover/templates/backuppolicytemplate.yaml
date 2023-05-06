@@ -1,0 +1,22 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: redis-backup-policy-template
+  labels:
+    clusterdefinition.kubeblocks.io/name: redis
+    {{- include "redis.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: redis
+  backupPolicies:
+  - componentDefRef: redis
+    ttl: 7d
+    schedule:
+      baseBackup:
+        type: snapshot
+        enable: false
+        cronExpression: "0 18 * * 0"
+    snapshot:
+      target:
+        connectionCredentialKey:
+          passwordKey: password
+          usernameKey: username

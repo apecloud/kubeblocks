@@ -43,7 +43,9 @@ func (c *SecretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 			v, _ := vertex.(*ictrltypes.LifecycleVertex)
 			// connect all none secret vertices to all secret vertices
 			if _, ok := v.Obj.(*corev1.Secret); !ok {
-				dag.Connect(vertex, secretVertex)
+				if *v.Action != *ictrltypes.ActionDeletePtr() {
+					dag.Connect(vertex, secretVertex)
+				}
 			}
 		}
 	}

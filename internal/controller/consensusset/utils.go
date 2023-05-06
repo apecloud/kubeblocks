@@ -34,7 +34,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// TODO: dedup, copy from controllers/apps/component/consensusset/consensus_set_utils.go
+// TODO: dedup, copy from controllers/apps/component/consensus/consensus_utils.go
 type consensusRole string
 
 type consensusMemberExt struct {

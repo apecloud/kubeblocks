@@ -36,8 +36,8 @@ WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
 # Go setup
 export GO111MODULE = auto
-# export GOPROXY = https://proxy.golang.org
-export GOPROXY = https://goproxy.cn
+#export GOPROXY = https://proxy.golang.org
+#export GOPROXY = https://goproxy.cn
 export GOSUMDB = sum.golang.org
 export GONOPROXY = github.com/apecloud
 export GONOSUMDB = github.com/apecloud

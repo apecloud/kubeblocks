@@ -21,6 +21,7 @@ package consensusset
 
 import (
 	"errors"
+
 	corev1 "k8s.io/api/core/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"

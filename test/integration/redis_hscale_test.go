@@ -21,6 +21,7 @@ package appstest
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"strconv"
 	"strings"
 
@@ -34,7 +35,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -121,7 +121,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 		By("Checking pods number and role label in StatefulSet")
 		for _, sts := range stsList.Items {
-			podList, err := controllerutil.GetPodListByStatefulSet(ctx, k8sClient, &sts)
+			podList, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
 			Expect(err).To(Succeed())
 			Expect(len(podList)).Should(BeEquivalentTo(1))
 			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {

@@ -21,6 +21,7 @@ package appstest
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,7 +34,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -124,7 +124,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 		By("Checking pods' role label")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 		sts := &stsList.Items[0]
-		pods, err := controllerutil.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 		// should have 3 pods
 		Expect(len(pods)).Should(Equal(3))

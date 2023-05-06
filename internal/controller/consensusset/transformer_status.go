@@ -21,7 +21,7 @@ package consensusset
 
 import (
 	"context"
-
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,7 +30,6 @@ import (
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // CSSetStatusTransformer computes the current status:
@@ -103,7 +102,7 @@ func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsO
 	}
 	var pods []corev1.Pod
 	for _, pod := range podList.Items {
-		if controllerutil.IsMemberOf(stsObj, &pod) {
+		if util.IsMemberOf(stsObj, &pod) {
 			pods = append(pods, pod)
 		}
 	}

@@ -123,7 +123,7 @@ func RemoveReplicationSetClusterStatus(cli client.Client,
 	}
 	var allPodList []corev1.Pod
 	for _, stsObj := range stsList {
-		podList, err := intctrlutil.GetPodListByStatefulSet(ctx, cli, stsObj)
+		podList, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
 		if err != nil {
 			return err
 		}

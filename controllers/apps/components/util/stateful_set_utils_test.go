@@ -17,9 +17,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package controllerutil
+package util
 
 import (
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -37,13 +38,13 @@ import (
 func TestGetParentNameAndOrdinal(t *testing.T) {
 	set := testk8s.NewFakeStatefulSet("foo", 3)
 	pod := testk8s.NewFakeStatefulSetPod(set, 1)
-	if parent, ordinal := GetParentNameAndOrdinal(pod); parent != set.Name {
+	if parent, ordinal := controllerutil.GetParentNameAndOrdinal(pod); parent != set.Name {
 		t.Errorf("Extracted the wrong parent name expected %s found %s", set.Name, parent)
 	} else if ordinal != 1 {
 		t.Errorf("Extracted the wrong ordinal expected %d found %d", 1, ordinal)
 	}
 	pod.Name = "1-bar"
-	if parent, ordinal := GetParentNameAndOrdinal(pod); parent != "" {
+	if parent, ordinal := controllerutil.GetParentNameAndOrdinal(pod); parent != "" {
 		t.Error("Expected empty string for non-member Pod parent")
 	} else if ordinal != -1 {
 		t.Error("Expected -1 for non member Pod ordinal")
@@ -106,13 +107,13 @@ var _ = Describe("StatefulSet utils test", func() {
 	cleanAll := func() {
 		By("Cleaning resources")
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResources(&controllerutil.testCtx)
 		// clear rest resources
-		inNS := client.InNamespace(testCtx.DefaultNamespace)
-		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		inNS := client.InNamespace(controllerutil.testCtx.DefaultNamespace)
+		ml := client.HasLabels{controllerutil.testCtx.TestObjLabelKey}
 		// namespaced resources
 		// testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		testapps.ClearResources(&controllerutil.testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -121,40 +122,40 @@ var _ = Describe("StatefulSet utils test", func() {
 	When("Updating a StatefulSet with `OnDelete` UpdateStrategy", func() {
 		It("will not update pods of the StatefulSet util the pods have been manually deleted", func() {
 			By("Creating a StatefulSet")
-			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, testapps.DefaultRedisCompName).
+			sts := testapps.NewStatefulSetFactory(controllerutil.testCtx.DefaultNamespace, stsName, clusterName, testapps.DefaultRedisCompName).
 				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(testapps.DefaultRedisCompName).
 				AddAppManangedByLabel().
 				AddRoleLabel(role).
 				SetReplicas(1).
-				Create(&testCtx).GetObject()
+				Create(&controllerutil.testCtx).GetObject()
 
 			By("Creating pods by the StatefulSet")
-			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompName, nil)
-			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
+			testapps.MockReplicationComponentPods(nil, controllerutil.testCtx, sts, clusterName, testapps.DefaultRedisCompName, nil)
+			Expect(IsStsAndPodsRevisionConsistent(controllerutil.testCtx.Ctx, controllerutil.k8sClient, sts)).Should(BeTrue())
 
 			By("Updating the StatefulSet's UpdateRevision")
 			sts.Status.UpdateRevision = "new-mock-revision"
-			testk8s.PatchStatefulSetStatus(&testCtx, sts.Name, sts.Status)
-			podList, err := GetPodListByStatefulSet(ctx, k8sClient, sts)
+			testk8s.PatchStatefulSetStatus(&controllerutil.testCtx, sts.Name, sts.Status)
+			podList, err := GetPodListByStatefulSet(controllerutil.ctx, controllerutil.k8sClient, sts)
 			Expect(err).To(Succeed())
 			Expect(len(podList)).To(Equal(1))
 
 			By("Testing get the StatefulSet of the pod")
-			ownerSts, err := GetPodOwnerReferencesSts(ctx, k8sClient, &podList[0])
+			ownerSts, err := GetPodOwnerReferencesSts(controllerutil.ctx, controllerutil.k8sClient, &podList[0])
 			Expect(err).To(Succeed())
 			Expect(ownerSts).ShouldNot(BeNil())
 
 			By("Deleting the pods of StatefulSet")
-			Expect(DeleteStsPods(testCtx.Ctx, k8sClient, sts)).Should(Succeed())
-			podList, err = GetPodListByStatefulSet(ctx, k8sClient, sts)
+			Expect(DeleteStsPods(controllerutil.testCtx.Ctx, controllerutil.k8sClient, sts)).Should(Succeed())
+			podList, err = GetPodListByStatefulSet(controllerutil.ctx, controllerutil.k8sClient, sts)
 			Expect(err).To(Succeed())
 			Expect(len(podList)).To(Equal(0))
 
 			By("Creating new pods by StatefulSet with new UpdateRevision")
-			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompName, nil)
-			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
+			testapps.MockReplicationComponentPods(nil, controllerutil.testCtx, sts, clusterName, testapps.DefaultRedisCompName, nil)
+			Expect(IsStsAndPodsRevisionConsistent(controllerutil.testCtx.Ctx, controllerutil.k8sClient, sts)).Should(BeTrue())
 		})
 	})
 })

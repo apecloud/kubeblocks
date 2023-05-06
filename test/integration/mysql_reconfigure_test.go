@@ -21,7 +21,7 @@ package appstest
 
 import (
 	"fmt"
-
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -156,7 +155,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 		By("Checking pods' role label")
 		sts := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey).Items[0]
-		pods, err := controllerutil.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
+		pods, err := util.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
 		Expect(err).To(Succeed())
 		Expect(len(pods)).Should(Equal(3))
 

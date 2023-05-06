@@ -31,7 +31,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	utils "github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // Switch is the main high-availability switching implementation.
@@ -351,7 +350,7 @@ func (s *Switch) updateRoleLabel() error {
 	}
 
 	for _, sts := range stsList.Items {
-		if controllerutil.IsMemberOf(&sts, s.SwitchInstance.OldPrimaryRole.Pod) {
+		if utils.IsMemberOf(&sts, s.SwitchInstance.OldPrimaryRole.Pod) {
 			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Secondary)); err != nil {
 				return err
 			}
@@ -359,7 +358,7 @@ func (s *Switch) updateRoleLabel() error {
 				return err
 			}
 		}
-		if controllerutil.IsMemberOf(&sts, s.SwitchInstance.CandidatePrimaryRole.Pod) {
+		if utils.IsMemberOf(&sts, s.SwitchInstance.CandidatePrimaryRole.Pod) {
 			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Primary)); err != nil {
 				return err
 			}
@@ -394,7 +393,7 @@ func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) erro
 			RoleDetectInfo:   nil,
 			LagDetectInfo:    nil,
 		}
-		_, o := controllerutil.ParseParentNameAndOrdinal(pod.Name)
+		_, o := utils.ParseParentNameAndOrdinal(pod.Name)
 		switch o {
 		case oldPrimaryIndex:
 			s.SwitchInstance.OldPrimaryRole = sri

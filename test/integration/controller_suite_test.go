@@ -21,6 +21,7 @@ package appstest
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -106,7 +107,7 @@ func GetConsensusRoleCountMap(testCtx testutil.TestContext, k8sClient client.Cli
 	}
 
 	sts := stsList.Items[0]
-	pods, err := intctrlutil.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
+	pods, err := util.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
 
 	if err != nil {
 		return roleCountMap

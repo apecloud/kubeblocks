@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package replication
 
 import (
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -194,7 +194,7 @@ var _ = Describe("Replication Component", func() {
 			By("Checking if the pod is not updated when statefulset is not updated")
 			Expect(replicationComponent.HandleUpdate(ctx, replicationSetSts)).To(Succeed())
 			Expect(err).To(Succeed())
-			Expect(controllerutil.IsStsAndPodsRevisionConsistent(ctx, k8sClient, replicationSetSts)).Should(BeTrue())
+			Expect(util.IsStsAndPodsRevisionConsistent(ctx, k8sClient, replicationSetSts)).Should(BeTrue())
 		})
 	})
 })

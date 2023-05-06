@@ -21,7 +21,6 @@ package consensus
 
 import (
 	"context"
-
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -47,12 +46,12 @@ func (r *ConsensusComponent) IsRunning(ctx context.Context, obj client.Object) (
 	if obj == nil {
 		return false, nil
 	}
-	sts := intctrlutil.ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := intctrlutil.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
+	sts := util.ConvertToStatefulSet(obj)
+	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
-	pods, err := intctrlutil.GetPodListByStatefulSet(ctx, r.Cli, sts)
+	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
@@ -62,7 +61,7 @@ func (r *ConsensusComponent) IsRunning(ctx context.Context, obj client.Object) (
 		}
 	}
 
-	return intctrlutil.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
+	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
 }
 
 func (r *ConsensusComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
@@ -180,7 +179,7 @@ func (r *ConsensusComponent) HandleUpdate(ctx context.Context, obj client.Object
 		return nil
 	}
 
-	stsObj := intctrlutil.ConvertToStatefulSet(obj)
+	stsObj := util.ConvertToStatefulSet(obj)
 	// get compDefName from stsObj.name
 	compDefName := r.Cluster.Spec.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
 
@@ -193,7 +192,7 @@ func (r *ConsensusComponent) HandleUpdate(ctx context.Context, obj client.Object
 	if component == nil || component.WorkloadType != appsv1alpha1.Consensus {
 		return nil
 	}
-	pods, err := intctrlutil.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
+	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
 	if err != nil {
 		return err
 	}

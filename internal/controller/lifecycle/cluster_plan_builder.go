@@ -66,6 +66,7 @@ type clusterPlanBuilder struct {
 	cli          client.Client
 	transCtx     *ClusterTransformContext
 	transformers graph.TransformerChain
+	dag          *graph.DAG
 }
 
 // clusterPlan a graph.Plan implementation for Cluster reconciliation
@@ -153,6 +154,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	err = c.transformers.ApplyTo(c.transCtx, dag)
 	// log for debug
 	c.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
+	// add dag to clusterPlanBuilder
+	c.dag = dag
 
 	// we got the execution plan
 	plan := &clusterPlan{
@@ -200,7 +203,7 @@ func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ct
 }
 
 // TODO: retry strategy on error
-func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex, dag graph.DAG) error {
+func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	node, ok := vertex.(*lifecycleVertex)
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", vertex)
@@ -268,7 +271,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex, dag graph.DAG)
 		// delete secondary objects
 		if _, ok := node.obj.(*appsv1alpha1.Cluster); !ok {
 			// check dependency resources has been deleted before deleting the resource
-			err := c.checkDependencyResourcesDeleted(node, dag)
+			err := c.checkDependencyResourcesDeleted(node)
 			if err != nil {
 				return err
 			}
@@ -397,9 +400,12 @@ func (c *clusterPlanBuilder) emitPhaseUpdatingEvent(oldPhase, newPhase appsv1alp
 }
 
 // checkDependencyResourcesDeleted checks if the dependency resources are deleted when cluster is deleted.
-func (c *clusterPlanBuilder) checkDependencyResourcesDeleted(node *lifecycleVertex, dag graph.DAG) error {
+func (c *clusterPlanBuilder) checkDependencyResourcesDeleted(node *lifecycleVertex) error {
+	if c.dag == nil {
+		return nil
+	}
 	// get the dependency resources
-	outAdj := dag.OutAdj(node)
+	outAdj := c.dag.OutAdj(node)
 	if len(outAdj) == 0 {
 		return nil
 	}

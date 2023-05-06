@@ -42,7 +42,7 @@ type realEdge struct {
 
 // WalkFunc defines the action should be taken when we walk through the DAG.
 // the func is vertex basis
-type WalkFunc func(v Vertex, dag DAG) error
+type WalkFunc func(v Vertex) error
 
 var _ Edge = &realEdge{}
 
@@ -133,7 +133,7 @@ func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 	}
 	orders := d.topologicalOrder(false)
 	for _, v := range orders {
-		if err := walkFunc(v, *d); err != nil {
+		if err := walkFunc(v); err != nil {
 			return err
 		}
 	}
@@ -147,7 +147,7 @@ func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 	}
 	orders := d.topologicalOrder(true)
 	for _, v := range orders {
-		if err := walkFunc(v, *d); err != nil {
+		if err := walkFunc(v); err != nil {
 			return err
 		}
 	}
@@ -172,7 +172,7 @@ func (d *DAG) Root() Vertex {
 // String return a string representation of the DAG in topology order
 func (d *DAG) String() string {
 	str := "|"
-	walkFunc := func(v Vertex, dag DAG) error {
+	walkFunc := func(v Vertex) error {
 		str += fmt.Sprintf("->%v", v)
 		return nil
 	}

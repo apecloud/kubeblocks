@@ -53,6 +53,7 @@ const (
 	resultValueKey  = "result"
 	errorValueKey   = "err"
 	operandValueKey = "operand"
+	trueVal         = "true"
 )
 
 func init() {
@@ -267,7 +268,7 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 		if addon.Spec.InstallSpec != nil {
 			return
 		}
-		if addon.Annotations != nil && addon.Annotations[SkipInstallableCheck] == "true" {
+		if addon.Annotations != nil && addon.Annotations[SkipInstallableCheck] == trueVal {
 			r.reconciler.Event(addon, "Warning", InstallableCheckSkipped,
 				"Installable check skipped.")
 			return
@@ -328,7 +329,7 @@ func (r *enabledWithDefaultValuesStage) Handle(ctx context.Context) {
 			r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
 			return
 		}
-		if v, ok := addon.Annotations[AddonDefaultIsEmpty]; ok && v == "true" {
+		if v, ok := addon.Annotations[AddonDefaultIsEmpty]; ok && v == trueVal {
 			return
 		}
 		enabledAddonWithDefaultValues(ctx, &r.stageCtx, addon, AddonSetDefaultValues, "Addon enabled with default values")
@@ -890,7 +891,7 @@ func enabledAddonWithDefaultValues(ctx context.Context, stageCtx *stageCtx,
 			addon.Annotations = map[string]string{}
 		}
 		if di.AddonInstallSpec.IsEmpty() {
-			addon.Annotations[AddonDefaultIsEmpty] = "true"
+			addon.Annotations[AddonDefaultIsEmpty] = trueVal
 		}
 		if err := stageCtx.reconciler.Client.Update(ctx, addon); err != nil {
 			stageCtx.setRequeueWithErr(err, "")

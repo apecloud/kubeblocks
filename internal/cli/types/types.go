@@ -37,6 +37,9 @@ const (
 	// CliHomeEnv defines kbcli home system env
 	CliHomeEnv = "KBCLI_HOME"
 
+	// DefaultLogFilePrefix is the default log file prefix
+	DefaultLogFilePrefix = "kbcli"
+
 	// DefaultNamespace is the namespace where kubeblocks is installed if
 	// no other namespace is specified
 	DefaultNamespace = "kb-system"
@@ -111,13 +114,12 @@ const (
 
 // DataProtection API group
 const (
-	DPAPIGroup                    = "dataprotection.kubeblocks.io"
-	DPAPIVersion                  = "v1alpha1"
-	ResourceBackups               = "backups"
-	ResourceBackupTools           = "backuptools"
-	ResourceRestoreJobs           = "restorejobs"
-	ResourceBackupPolicies        = "backuppolicies"
-	ResourceBackupPolicyTemplates = "backuppolicytemplates"
+	DPAPIGroup             = "dataprotection.kubeblocks.io"
+	DPAPIVersion           = "v1alpha1"
+	ResourceBackups        = "backups"
+	ResourceBackupTools    = "backuptools"
+	ResourceRestoreJobs    = "restorejobs"
+	ResourceBackupPolicies = "backuppolicies"
 )
 
 // Extensions API group

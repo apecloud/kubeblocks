@@ -51,7 +51,7 @@ jobs:
       - name: send message
         run: |
           CONTENT="release\u00a0chart\u00a0error"
-          if [[ "${{ needs.make-test.result }}" == "success" ]]; then
+          if [[ "${{ needs.release-chart.result }}" == "success" ]]; then
               CONTENT="release\u00a0chart\u00a0success"
           fi
           

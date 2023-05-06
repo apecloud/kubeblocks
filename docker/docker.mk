@@ -27,6 +27,9 @@ DEBIAN_MIRROR=mirrors.aliyun.com
 DOCKER:=DOCKER_BUILDKIT=1 docker
 DOCKERFILE_DIR?=./docker
 
+# BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
+BUILDX_PLATFORMS ?= linux/amd64,linux/arm64
+
 # Image URL to use all building/pushing image targets
 IMG ?= docker.io/apecloud/$(APP_NAME)
 TOOL_IMG ?= docker.io/apecloud/$(APP_NAME)-tool
@@ -39,7 +42,7 @@ DEV_CONTAINER_IMAGE_NAME = docker.io/apecloud/$(APP_NAME)-dev
 
 DEV_CONTAINER_DOCKERFILE = Dockerfile-dev
 DOCKERFILE_DIR = ./docker
-BUILDX_ARGS ?= --cache-to type=gha --cache-from type=gha
+BUILDX_ARGS ?=
 
 ##@ Docker containers
 
@@ -64,19 +67,21 @@ endif
 
 
 .PHONY: build-manager-image
+build-manager-image: DOCKER_BUILD_ARGS += --cache-to type=gha --cache-from type=gha
 build-manager-image: generate ## Build Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
-	$(DOCKER) build . -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile -t ${IMG}:latest
+	$(DOCKER) build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile -t ${IMG}:${VERSION} -t ${IMG}:latest
 else
 ifeq ($(TAG_LATEST), true)
-	$(DOCKER) buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest $(BUILDX_ARGS)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest $(BUILDX_ARGS)
 else
-	$(DOCKER) buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} $(BUILDX_ARGS)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} $(BUILDX_ARGS)
 endif
 endif
 
 
 .PHONY: push-manager-image
+push-manager-image: DOCKER_BUILD_ARGS += --cache-to type=gha --cache-from type=gha
 push-manager-image: generate ## Push Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
@@ -86,25 +91,27 @@ else
 endif
 else
 ifeq ($(TAG_LATEST), true)
-	$(DOCKER) buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest --push $(BUILDX_ARGS)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest --push $(BUILDX_ARGS)
 else
-	$(DOCKER) buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push $(BUILDX_ARGS)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push $(BUILDX_ARGS)
 endif
 endif
 
 .PHONY: build-tools-image
+build-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha --cache-from type=gha
 build-tools-image: generate ## Build tools container image.
 ifneq ($(BUILDX_ENABLED), true)
-	$(DOCKER) build . -t ${TOOL_IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile-tools -t ${TOOL_IMG}:latest
+	$(DOCKER) build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile-tools -t ${TOOL_IMG}:${VERSION} -t ${TOOL_IMG}:latest
 else
 ifeq ($(TAG_LATEST), true)
-	$(DOCKER) buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:latest $(BUILDX_ARGS)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:latest $(BUILDX_ARGS)
 else
-	$(DOCKER) buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:${VERSION} $(BUILDX_ARGS)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:${VERSION} $(BUILDX_ARGS)
 endif
 endif
 
 .PHONY: push-tools-image
+push-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha --cache-from type=gha
 push-tools-image: generate ## Push tools container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
@@ -114,8 +121,8 @@ else
 endif
 else
 ifeq ($(TAG_LATEST), true)
-	$(DOCKER) buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:latest --push $(BUILDX_ARGS)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile-tools --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:latest --push $(BUILDX_ARGS)
 else
-	$(DOCKER) buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-tools $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:${VERSION} --push $(BUILDX_ARGS)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile-tools --platform $(BUILDX_PLATFORMS) -t ${TOOL_IMG}:${VERSION} --push $(BUILDX_ARGS)
 endif
 endif

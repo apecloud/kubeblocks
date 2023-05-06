@@ -13,7 +13,6 @@
 
 ARG GO_VERSION=1.20
 
-
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as bin-downloader
 ARG TARGETOS
 ARG TARGETARCH
@@ -37,28 +36,32 @@ ENV GONOSUMDB=github.com/apecloud
 ENV GOPRIVATE=github.com/apecloud
 ENV GOPROXY=${GOPROXY}
 
-WORKDIR /workspace
+WORKDIR /src
 
 # Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
+#COPY go.mod go.mod
+#COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 # RUN go mod download
 
 # Copy the go source
-COPY internal/ internal/
-COPY controllers/ controllers/
-COPY cmd/reloader/ cmd/reloader/
-COPY cmd/probe/ cmd/probe/
-COPY externalapis/ externalapis/
-COPY version/ version/
-COPY cmd/cli/ cmd/cli/
-COPY apis/ apis/
-COPY test/testdata/testdata.go test/testdata/testdata.go
+#COPY internal/ internal/
+#COPY controllers/ controllers/
+#COPY cmd/reloader/ cmd/reloader/
+#COPY cmd/probe/ cmd/probe/
+#COPY externalapis/ externalapis/
+#COPY version/ version/
+#COPY cmd/cli/ cmd/cli/
+#COPY apis/ apis/
+#COPY test/testdata/testdata.go test/testdata/testdata.go
 
 # Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o kbcli cmd/cli/main.go
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    go env && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/kbcli cmd/cli/main.go
 
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as probe-builder
@@ -73,28 +76,32 @@ ENV GONOSUMDB=github.com/apecloud
 ENV GOPRIVATE=github.com/apecloud
 ENV GOPROXY=${GOPROXY}
 
-WORKDIR /workspace
+WORKDIR /src
 
 # Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
+#COPY go.mod go.mod
+#COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 # RUN go mod download
 
 # Copy the go source
-COPY internal/ internal/
-COPY controllers/ controllers/
-COPY cmd/reloader/ cmd/reloader/
-COPY cmd/probe/ cmd/probe/
-COPY externalapis/ externalapis/
-COPY version/ version/
-COPY cmd/cli/ cmd/cli/
-COPY apis/ apis/
-COPY test/testdata/testdata.go test/testdata/testdata.go
+#COPY internal/ internal/
+#COPY controllers/ controllers/
+#COPY cmd/reloader/ cmd/reloader/
+#COPY cmd/probe/ cmd/probe/
+#COPY externalapis/ externalapis/
+#COPY version/ version/
+#COPY cmd/cli/ cmd/cli/
+#COPY apis/ apis/
+#COPY test/testdata/testdata.go test/testdata/testdata.go
 
 # Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o probe cmd/probe/main.go
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    go env && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/probe cmd/probe/main.go
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as killer-builder
 ARG TARGETOS
@@ -108,29 +115,32 @@ ENV GONOSUMDB=github.com/apecloud
 ENV GOPRIVATE=github.com/apecloud
 ENV GOPROXY=${GOPROXY}
 
-WORKDIR /workspace
+WORKDIR /src
 
 # Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
+#COPY go.mod go.mod
+#COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 # RUN go mod download
 
 # Copy the go source
-COPY internal/ internal/
-COPY controllers/ controllers/
-COPY cmd/reloader/ cmd/reloader/
-COPY cmd/probe/ cmd/probe/
-COPY externalapis/ externalapis/
-COPY version/ version/
-COPY cmd/cli/ cmd/cli/
-COPY apis/ apis/
-COPY test/testdata/testdata.go test/testdata/testdata.go
+#COPY internal/ internal/
+#COPY controllers/ controllers/
+#COPY cmd/reloader/ cmd/reloader/
+#COPY cmd/probe/ cmd/probe/
+#COPY externalapis/ externalapis/
+#COPY version/ version/
+#COPY cmd/cli/ cmd/cli/
+#COPY apis/ apis/
+#COPY test/testdata/testdata.go test/testdata/testdata.go
 
 # Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o reloader cmd/reloader/main.go
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o killer cmd/reloader/container_killer/killer.go
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    go env && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/killer cmd/reloader/container_killer/killer.go
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as reloader-builder
 ARG TARGETOS
@@ -144,28 +154,32 @@ ENV GONOSUMDB=github.com/apecloud
 ENV GOPRIVATE=github.com/apecloud
 ENV GOPROXY=${GOPROXY}
 
-WORKDIR /workspace
+WORKDIR /src
 
 # Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
+#COPY go.mod go.mod
+#COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 # RUN go mod download
 
 # Copy the go source
-COPY internal/ internal/
-COPY controllers/ controllers/
-COPY cmd/reloader/ cmd/reloader/
-COPY cmd/probe/ cmd/probe/
-COPY externalapis/ externalapis/
-COPY version/ version/
-COPY cmd/cli/ cmd/cli/
-COPY apis/ apis/
-COPY test/testdata/testdata.go test/testdata/testdata.go
+#COPY internal/ internal/
+#COPY controllers/ controllers/
+#COPY cmd/reloader/ cmd/reloader/
+#COPY cmd/probe/ cmd/probe/
+#COPY externalapis/ externalapis/
+#COPY version/ version/
+#COPY cmd/cli/ cmd/cli/
+#COPY apis/ apis/
+#COPY test/testdata/testdata.go test/testdata/testdata.go
 
 # Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o reloader cmd/reloader/main.go
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    go env && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/reloader cmd/reloader/main.go
 
 # Use alpine
 FROM docker.io/alpine:3.17 as dist
@@ -183,10 +197,10 @@ COPY --from=bin-downloader /workspace/kubernetes/client/bin/kubectl /bin
 
 # copy kubeblocks tools
 COPY config/probe config/probe
-COPY --from=killer-builder /workspace/killer /bin
-COPY --from=reloader-builder /workspace/reloader /bin
-COPY --from=probe-builder /workspace/probe /bin
-COPY --from=kbcli-builder /workspace/kbcli /bin
+COPY --from=killer-builder /out/killer /bin
+COPY --from=reloader-builder /out/reloader /bin
+COPY --from=probe-builder /out/probe /bin
+COPY --from=kbcli-builder /out/kbcli /bin
 
 # mkdir kbcli config dir and helm cache dir.
 RUN mkdir /.kbcli && chown -R 65532:65532 /.kbcli \

@@ -397,9 +397,7 @@ func listResourceByGVR(ctx context.Context, client dynamic.Interface, namespace 
 	unstructuredList := make([]*unstructured.UnstructuredList, 0)
 	for _, gvr := range gvrlist {
 		for _, labelSelector := range selector {
-			if klog.V(1).Enabled() {
-				klog.Infof("listResourceByGVR: namespace=%s, gvrlist=%v, selector=%v", namespace, gvr, labelSelector)
-			}
+			klog.V(1).Infof("listResourceByGVR: namespace=%s, gvrlist=%v, selector=%v", namespace, gvr, labelSelector)
 			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, labelSelector)
 			if err != nil {
 				appendErrIgnoreNotFound(allErrs, err)

@@ -26,7 +26,6 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 11323,
   "graphTooltip": 1,
-  "id": 13,
   "links": [
     {
       "asDropdown": false,
@@ -141,7 +140,7 @@
           "datasourceErrors": {},
           "editorMode": "code",
           "errors": {},
-          "expr": "count(sum by(namespace)(pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}))",
+          "expr": "count(sum by(namespace)(pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})) or vector(0)",
           "format": "time_series",
           "interval": "1m",
           "intervalFactor": 1,
@@ -217,7 +216,7 @@
           "datasourceErrors": {},
           "editorMode": "code",
           "errors": {},
-          "expr": "count(sum by(namespace, app_kubernetes_io_instance)(pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}))",
+          "expr": "count(sum by(namespace, app_kubernetes_io_instance)(pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})) or vector(0)",
           "format": "time_series",
           "interval": "1m",
           "intervalFactor": 1,
@@ -293,7 +292,7 @@
           "datasourceErrors": {},
           "editorMode": "code",
           "errors": {},
-          "expr": "sum(rate(pg_stat_database_xact_commit{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) + rate(pg_stat_database_xact_rollback{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]))",
+          "expr": "sum(rate(pg_stat_database_xact_commit{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) + rate(pg_stat_database_xact_rollback{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) or vector(0)",
           "format": "time_series",
           "interval": "1m",
           "intervalFactor": 1,
@@ -704,7 +703,7 @@
           "datasourceErrors": {},
           "editorMode": "code",
           "errors": {},
-          "expr": "count(pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"} > 0)",
+          "expr": "count(pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"} > 0) or vector(0)",
           "format": "time_series",
           "interval": "1m",
           "intervalFactor": 1,
@@ -785,14 +784,14 @@
           "editorMode": "code",
           "errors": {},
           "exemplar": false,
-          "expr": "count(pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"} <= 0)",
+          "expr": "count(pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"} <= 0) or vector(0)",
           "format": "time_series",
-          "instant": true,
+          "instant": false,
           "interval": "1m",
           "intervalFactor": 1,
           "legendFormat": "__auto",
           "metric": "",
-          "range": false,
+          "range": true,
           "refId": "A",
           "step": 20
         }
@@ -863,7 +862,7 @@
           "datasourceErrors": {},
           "editorMode": "code",
           "errors": {},
-          "expr": "sum(rate(pg_stat_statements_calls{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]))",
+          "expr": "sum(rate(pg_stat_statements_calls{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) or vector(0)",
           "format": "time_series",
           "interval": "1m",
           "intervalFactor": 1,
@@ -1495,7 +1494,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "dark-green"
+                "color": "dark-green",
+                "value": null
               }
             ]
           },
@@ -2483,7 +2483,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2499,7 +2500,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 4
+            "y": 33
           },
           "id": 432,
           "links": [],
@@ -2594,7 +2595,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2610,7 +2612,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 4
+            "y": 33
           },
           "id": 434,
           "links": [],
@@ -2705,7 +2707,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2721,7 +2724,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 12
+            "y": 41
           },
           "id": 433,
           "links": [],
@@ -2816,7 +2819,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2832,7 +2836,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 12
+            "y": 41
           },
           "id": 435,
           "links": [],
@@ -2927,7 +2931,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2943,7 +2948,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 20
+            "y": 49
           },
           "id": 436,
           "links": [],
@@ -3038,7 +3043,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3054,7 +3060,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 20
+            "y": 49
           },
           "id": 437,
           "links": [],
@@ -5415,8 +5421,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5520,8 +5525,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",

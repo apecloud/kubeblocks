@@ -54,6 +54,12 @@ const (
 	cliName = "kbcli"
 )
 
+func init() {
+	if _, err := util.GetCliHomeDir(); err != nil {
+		fmt.Println("Failed to create kbcli home dir:", err)
+	}
+}
+
 func NewDefaultCliCmd() *cobra.Command {
 	cmd := NewCliCmd()
 
@@ -123,6 +129,9 @@ A Command Line Interface for KubeBlocks`,
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
+
+	// add klog flags
+	util.AddKlogFlags(flags)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 	ioStreams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}

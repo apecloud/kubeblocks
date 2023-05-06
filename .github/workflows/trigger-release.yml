@@ -1,0 +1,41 @@
+name: TRIGGER-RELEASE
+
+on:
+  workflow_dispatch:
+    inputs:
+      trigger-content:
+        description: 'the trigger request content'
+        required: false
+        default: ''
+      trigger-type:
+        description: 'the trigger type (e.g. release/package)'
+        required: false
+        default: 'release'
+
+run-name: ${{ inputs.trigger-type }}:${{ inputs.trigger-content }}
+
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  PACKAGE_BOT_WEBHOOK: ${{ secrets.PACKAGE_BOT_WEBHOOK }}
+  RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
+
+
+jobs:
+  trigger-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: trigger release
+        id: get_release_version
+        run: |
+          BOT_WEBHOOK=${{ env.RELEASE_BOT_WEBHOOK }}
+          if [[ "${{ inputs.trigger-type }}" == "package" ]]; then
+              BOT_WEBHOOK=${{ env.PACKAGE_BOT_WEBHOOK }}
+          fi
+          RELEASE_VERSION=`bash .github/utils/utils.sh --type 10 \
+            --tag-name "${{ vars.CURRENT_RELEASE_VERSION }}" \
+            --branch-name "${{ vars.CURRENT_RELEASE_BRANCH }}" \
+            --content '${{ inputs.trigger-content }}' \
+            --trigger-type "${{ inputs.trigger-type }}" \
+            --bot-webhook ${BOT_WEBHOOK} \
+            --github-token ${{ env.GITHUB_TOKEN }}`

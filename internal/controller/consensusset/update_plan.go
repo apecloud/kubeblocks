@@ -21,11 +21,9 @@ package consensusset
 
 import (
 	"errors"
-
 	corev1 "k8s.io/api/core/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -112,8 +110,8 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	index := 0
 	podList := p.pods
 	for i, pod := range podList {
-		role := pod.Labels[constant.RoleLabelKey]
-		if rolePriorityMap[role] <= learnerPriority {
+		roleName := getRoleName(pod)
+		if rolePriorityMap[roleName] <= learnerPriority {
 			vertex := &model.ObjectVertex{Obj: &podList[i]}
 			p.dag.AddConnect(preVertex, vertex)
 			currentVertex = vertex
@@ -126,7 +124,8 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	podList = podList[index:]
 	followerCount := 0
 	for _, pod := range podList {
-		if rolePriorityMap[pod.Labels[constant.RoleLabelKey]] < leaderPriority {
+		roleName := getRoleName(pod)
+		if rolePriorityMap[roleName] < leaderPriority {
 			followerCount++
 		}
 	}

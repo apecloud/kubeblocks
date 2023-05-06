@@ -21,6 +21,7 @@ package consensusset
 
 import (
 	"sort"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -48,8 +49,8 @@ const (
 // reverse it if reverse==true
 func sortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 	sort.SliceStable(pods, func(i, j int) bool {
-		roleI := pods[i].Labels[constant.RoleLabelKey]
-		roleJ := pods[j].Labels[constant.RoleLabelKey]
+		roleI := getRoleName(pods[i])
+		roleJ := getRoleName(pods[j])
 		if reverse {
 			roleI, roleJ = roleJ, roleI
 		}
@@ -69,20 +70,21 @@ func composeRolePriorityMap(set workloads.ConsensusSet) map[string]int {
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[""] = emptyPriority
 	for _, role := range set.Spec.Roles {
+		roleName := strings.ToLower(role.Name)
 		switch {
 		case role.IsLeader:
-			rolePriorityMap[role.Name] = leaderPriority
+			rolePriorityMap[roleName] = leaderPriority
 		case role.CanVote:
 			switch role.AccessMode {
 			case workloads.NoneMode:
-				rolePriorityMap[role.Name] = followerNonePriority
+				rolePriorityMap[roleName] = followerNonePriority
 			case workloads.ReadonlyMode:
-				rolePriorityMap[role.Name] = followerReadonlyPriority
+				rolePriorityMap[roleName] = followerReadonlyPriority
 			case workloads.ReadWriteMode:
-				rolePriorityMap[role.Name] = followerReadWritePriority
+				rolePriorityMap[roleName] = followerReadWritePriority
 			}
 		default:
-			rolePriorityMap[role.Name] = learnerPriority
+			rolePriorityMap[roleName] = learnerPriority
 		}
 	}
 
@@ -93,25 +95,27 @@ func composeRolePriorityMap(set workloads.ConsensusSet) map[string]int {
 func updatePodRoleLabel(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	set workloads.ConsensusSet,
-	pod *corev1.Pod, role string) error {
+	pod *corev1.Pod, roleName string) error {
 	ctx := reqCtx.Ctx
 	roleMap := composeRoleMap(set)
 	// role not defined in CR, ignore it
-	if _, ok := roleMap[role]; !ok {
+	roleName = strings.ToLower(roleName)
+	role, ok := roleMap[roleName]
+	if !ok {
 		return nil
 	}
 
 	// update pod role label
 	patch := client.MergeFrom(pod.DeepCopy())
-	pod.Labels[model.RoleLabelKey] = role
-	pod.Labels[model.ConsensusSetAccessModeLabelKey] = string(roleMap[role].AccessMode)
+	pod.Labels[model.RoleLabelKey] = role.Name
+	pod.Labels[model.ConsensusSetAccessModeLabelKey] = string(role.AccessMode)
 	return cli.Patch(ctx, pod, patch)
 }
 
 func composeRoleMap(set workloads.ConsensusSet) map[string]workloads.ConsensusRole {
 	roleMap := make(map[string]workloads.ConsensusRole, 0)
 	for _, role := range set.Spec.Roles {
-		roleMap[role.Name] = role
+		roleMap[strings.ToLower(role.Name)] = role
 	}
 	return roleMap
 }
@@ -126,7 +130,7 @@ func setMembersStatus(set *workloads.ConsensusSet, pods []corev1.Pod) {
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
-		roleName := pod.Labels[constant.RoleLabelKey]
+		roleName := getRoleName(pod)
 		role, ok := roleMap[roleName]
 		if !ok {
 			continue
@@ -138,6 +142,10 @@ func setMembersStatus(set *workloads.ConsensusSet, pods []corev1.Pod) {
 		newMembersStatus = append(newMembersStatus, memberStatus)
 	}
 	set.Status.MembersStatus = newMembersStatus
+}
+
+func getRoleName(pod corev1.Pod) string {
+	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }
 
 func ownedKinds() []client.ObjectList {

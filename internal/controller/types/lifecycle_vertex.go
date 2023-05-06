@@ -33,7 +33,6 @@ const (
 	CREATE = LifecycleAction("CREATE")
 	DELETE = LifecycleAction("DELETE")
 	UPDATE = LifecycleAction("UPDATE")
-	PATCH  = LifecycleAction("PATCH")
 	STATUS = LifecycleAction("STATUS")
 	NOOP   = LifecycleAction("NOOP")
 )
@@ -71,20 +70,16 @@ func ActionCreatePtr() *LifecycleAction {
 	return ActionPtr(CREATE)
 }
 
-func ActionUpdatePtr() *LifecycleAction {
-	return ActionPtr(UPDATE)
-}
-
 func ActionDeletePtr() *LifecycleAction {
 	return ActionPtr(DELETE)
 }
 
-func ActionStatusPtr() *LifecycleAction {
-	return ActionPtr(STATUS)
+func ActionUpdatePtr() *LifecycleAction {
+	return ActionPtr(UPDATE)
 }
 
-func ActionPatchPtr() *LifecycleAction {
-	return ActionPtr(PATCH)
+func ActionStatusPtr() *LifecycleAction {
+	return ActionPtr(STATUS)
 }
 
 func ActionNoopPtr() *LifecycleAction {
@@ -105,12 +100,6 @@ func LifecycleObjectUpdate(dag *graph.DAG, obj client.Object, parent *LifecycleV
 	return addObject(dag, obj, ActionUpdatePtr(), parent)
 }
 
-func LifecycleObjectPatch(dag *graph.DAG, obj, objCopy client.Object, parent *LifecycleVertex) *LifecycleVertex {
-	vertex := addObject(dag, obj, ActionPatchPtr(), parent)
-	vertex.ObjCopy = objCopy
-	return vertex
-}
-
 func LifecycleObjectNoop(dag *graph.DAG, obj client.Object, parent *LifecycleVertex) *LifecycleVertex {
 	return addObject(dag, obj, ActionNoopPtr(), parent)
 }
@@ -129,18 +118,6 @@ func addObject(dag *graph.DAG, obj client.Object, action *LifecycleAction, paren
 		dag.Connect(parent, vertex)
 	}
 	return vertex
-}
-
-func FindMatchedVertex[T interface{}](dag *graph.DAG, objectKey client.ObjectKey) graph.Vertex {
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*LifecycleVertex)
-		if _, ok := v.Obj.(T); ok {
-			if client.ObjectKeyFromObject(v.Obj) == objectKey {
-				return vertex
-			}
-		}
-	}
-	return nil
 }
 
 func FindAll[T interface{}](dag *graph.DAG) []graph.Vertex {

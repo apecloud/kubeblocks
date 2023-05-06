@@ -206,12 +206,10 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 			if o == r.getPrimaryIndex() {
 				role = string(Primary)
 			}
-			podCopy := pod.DeepCopy()
 			pod.GetLabels()[constant.RoleLabelKey] = role
 			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-				Obj:     pod,
-				ObjCopy: podCopy,
-				Action:  ictrltypes.ActionPatchPtr(),
+				Obj:    pod,
+				Action: ictrltypes.ActionUpdatePtr(),
 			})
 		}
 		// else {

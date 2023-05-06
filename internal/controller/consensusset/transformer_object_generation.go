@@ -193,34 +193,12 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 	}
 
-	// update dag by root vertex's status
-	switch {
-	case model.IsObjectDeleting(oriSet):
-		for _, vertex := range dag.Vertices() {
-			v, _ := vertex.(*model.ObjectVertex)
-			v.Action = model.ActionPtr(model.DELETE)
-		}
-		deleteOrphanVertices()
-	case model.IsObjectStatusUpdating(oriSet):
-		defer func() {
-			vertices := model.FindAllNot[*workloads.ConsensusSet](dag)
-			for _, vertex := range vertices {
-				v, _ := vertex.(*model.ObjectVertex)
-				// TODO: fix me, workaround for h-scaling to update stateful set
-				if _, ok := v.Obj.(*apps.StatefulSet); !ok {
-					v.Immutable = true
-				}
-			}
-		}()
-		fallthrough
-	case model.IsObjectUpdating(oriSet):
-		// vertices to be created
-		createNewVertices()
-		// vertices to be updated
-		updateVertices()
-		// vertices to be deleted
-		deleteOrphanVertices()
-	}
+	// vertices to be created
+	createNewVertices()
+	// vertices to be updated
+	updateVertices()
+	// vertices to be deleted
+	deleteOrphanVertices()
 
 	return nil
 }

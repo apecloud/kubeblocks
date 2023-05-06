@@ -107,7 +107,7 @@ func (b *csSetPlanBuilder) csSetWalkFunc(v graph.Vertex) error {
 		return fmt.Errorf("wrong vertex type %v", v)
 	}
 	if vertex.Action == nil {
-		return errors.New("node action can't be nil")
+		return errors.New("vertex action can't be nil")
 	}
 	if vertex.Immutable {
 		return nil

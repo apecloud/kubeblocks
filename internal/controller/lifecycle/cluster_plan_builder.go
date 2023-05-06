@@ -415,21 +415,19 @@ func (c *clusterPlanBuilder) checkDependencyResourcesDeleted(node *lifecycleVert
 			return fmt.Errorf("wrong vertex type %v", outNode)
 		}
 		// if the node.obj is StatefulSet, check if the pods are deleted
-		gvk, err := getGVKName(outNode.obj, scheme)
-		if err != nil {
-			return err
-		}
-		if gvk.gvk.Kind == constant.StatefulSetKind {
-			pods, err := componentutil.GetPodListByStatefulSet(c.transCtx.Context, c.cli, outNode.obj.(*appsv1.StatefulSet))
+		sts, ok := outNode.obj.(*appsv1.StatefulSet)
+		if ok {
+			pods, err := componentutil.GetPodListByStatefulSet(c.transCtx.Context, c.cli, sts)
 			if err != nil {
 				return err
 			}
 			if len(pods) > 0 {
-				return fmt.Errorf("%s/%s dependency resource statefulSet %s/%s still have pods", node.obj.GetNamespace(), node.obj.GetName(), gvk.ns, gvk.name)
+				return &realRequeueError{reason: fmt.Sprintf("waiting dependency resource delete, %s/%s dependency resource statefulSet %s/%s still have pods",
+					node.obj.GetNamespace(), node.obj.GetName(), outNode.obj.GetNamespace(), outNode.obj.GetName()), requeueAfter: requeueDuration}
 			}
 		}
 		// check if the dependency resource is deleted
-		err = c.cli.Get(c.transCtx.Context, types.NamespacedName{Name: outNode.obj.GetName(), Namespace: outNode.obj.GetNamespace()}, outNode.obj)
+		err := c.cli.Get(c.transCtx.Context, types.NamespacedName{Name: outNode.obj.GetName(), Namespace: outNode.obj.GetNamespace()}, outNode.obj)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				continue
@@ -437,7 +435,8 @@ func (c *clusterPlanBuilder) checkDependencyResourcesDeleted(node *lifecycleVert
 			return err
 		}
 		if outNode.obj != nil {
-			return fmt.Errorf("%s/%s dependency resource %s/%s is not deleted", node.obj.GetNamespace(), node.obj.GetName(), outNode.obj.GetNamespace(), outNode.obj.GetName())
+			return &realRequeueError{reason: fmt.Sprintf("waiting dependency resource delete, %s/%s dependency resource %s/%s is not deleted",
+				node.obj.GetNamespace(), node.obj.GetName(), outNode.obj.GetNamespace(), outNode.obj.GetName()), requeueAfter: requeueDuration}
 		}
 	}
 	return nil

@@ -89,8 +89,8 @@ func (p *realUpdatePlan) build() {
 	root := &model.ObjectVertex{}
 	p.dag.AddVertex(root)
 
-	rolePriorityMap := ComposeRolePriorityMap(p.csSet)
-	SortPods(p.pods, rolePriorityMap)
+	rolePriorityMap := composeRolePriorityMap(p.csSet)
+	sortPods(p.pods, rolePriorityMap, false)
 
 	// generate plan by UpdateStrategy
 	switch p.csSet.Spec.UpdateStrategy {

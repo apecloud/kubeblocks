@@ -66,7 +66,7 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 			return err
 		}
 		// update role fields
-		setConsensusSetStatusRoles(csSet, pods)
+		setMembersStatus(csSet, pods)
 	}
 
 	// get root vertex(i.e. consensus set)

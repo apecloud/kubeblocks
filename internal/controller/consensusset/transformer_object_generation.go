@@ -56,23 +56,25 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	// generate objects by current spec
 	svcBuilder := builder.NewServiceBuilder(csSet.Namespace, csSet.Name).
-		AddLabels(constant.AppInstanceLabelKey, csSet.Name).
-		AddLabels(constant.KBManagedByKey, ConsensusSetKind).
+		AddLabels(model.AppInstanceLabelKey, csSet.Name).
+		AddLabels(model.KBManagedByKey, ConsensusSetKind).
 		// AddAnnotationsInMap(csSet.Annotations).
-		AddSelectors(constant.AppInstanceLabelKey, csSet.Name).
-		AddSelectors(constant.KBManagedByKey, ConsensusSetKind).
+		AddSelectors(model.AppInstanceLabelKey, csSet.Name).
+		AddSelectors(model.KBManagedByKey, ConsensusSetKind).
 		AddPorts(csSet.Spec.Service.Ports...).
 		SetType(csSet.Spec.Service.Type)
-	if len(csSet.Spec.Leader.Name) > 0 {
-		svcBuilder.AddSelectors(constant.RoleLabelKey, csSet.Spec.Leader.Name)
+	for _, role := range csSet.Spec.Roles {
+		if role.IsLeader && len(role.Name) > 0 {
+			svcBuilder.AddSelectors(model.ConsensusSetAccessModeLabelKey, string(role.AccessMode))
+		}
 	}
 	svc := svcBuilder.GetObject()
 
 	hdlBuilder := builder.NewHeadlessServiceBuilder(csSet.Namespace, getHeadlessSvcName(*csSet)).
-		AddLabels(constant.AppInstanceLabelKey, csSet.Name).
-		AddLabels(constant.KBManagedByKey, ConsensusSetKind).
-		AddSelectors(constant.AppInstanceLabelKey, csSet.Name).
-		AddSelectors(constant.KBManagedByKey, ConsensusSetKind)
+		AddLabels(model.AppInstanceLabelKey, csSet.Name).
+		AddLabels(model.KBManagedByKey, ConsensusSetKind).
+		AddSelectors(model.AppInstanceLabelKey, csSet.Name).
+		AddSelectors(model.KBManagedByKey, ConsensusSetKind)
 	//	.AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
 	// if component.Monitor.Enable {
 	//	hdBuilder.AddAnnotations("prometheus.io/path", component.Monitor.ScrapePath).
@@ -98,13 +100,13 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	if labels == nil {
 		labels = make(map[string]string, 2)
 	}
-	labels[constant.AppInstanceLabelKey] = csSet.Name
-	labels[constant.KBManagedByKey] = ConsensusSetKind
+	labels[model.AppInstanceLabelKey] = csSet.Name
+	labels[model.KBManagedByKey] = ConsensusSetKind
 	template.Labels = labels
-	stsBuilder.AddLabels(constant.AppInstanceLabelKey, csSet.Name).
-		AddLabels(constant.KBManagedByKey, ConsensusSetKind).
-		AddMatchLabel(constant.AppInstanceLabelKey, csSet.Name).
-		AddMatchLabel(constant.KBManagedByKey, ConsensusSetKind).
+	stsBuilder.AddLabels(model.AppInstanceLabelKey, csSet.Name).
+		AddLabels(model.KBManagedByKey, ConsensusSetKind).
+		AddMatchLabel(model.AppInstanceLabelKey, csSet.Name).
+		AddMatchLabel(model.KBManagedByKey, ConsensusSetKind).
 		SetServiceName(headLessSvc.Name).
 		SetReplicas(csSet.Spec.Replicas).
 		SetMinReadySeconds(10).
@@ -116,8 +118,8 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	envData := buildEnvConfigData(*csSet)
 	envConfig := builder.NewConfigMapBuilder(csSet.Namespace, csSet.Name+"-env").
-		AddLabels(constant.AppInstanceLabelKey, csSet.Name).
-		AddLabels(constant.KBManagedByKey, ConsensusSetKind).
+		AddLabels(model.AppInstanceLabelKey, csSet.Name).
+		AddLabels(model.KBManagedByKey, ConsensusSetKind).
 		SetData(envData).GetObject()
 
 	// put all objects into the dag
@@ -220,21 +222,21 @@ func buildEnvConfigData(set workloads.ConsensusSet) map[string]string {
 		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 	}
 
-	// build consensus env from set.status
-	podName := set.Status.Leader.PodName
-	if podName != "" && podName != DefaultPodName {
-		envData[prefix+"LEADER"] = podName
-	}
+	// build consensus env from set.Status.MembersStatus
 	followers := ""
-	for _, follower := range set.Status.Followers {
-		podName = follower.PodName
-		if podName == "" || podName == DefaultPodName {
+	for _, memberStatus := range set.Status.MembersStatus {
+		if memberStatus.PodName == "" || memberStatus.PodName == DefaultPodName {
 			continue
 		}
-		if len(followers) > 0 {
-			followers += ","
+		switch {
+		case memberStatus.IsLeader:
+			envData[prefix+"LEADER"] = memberStatus.PodName
+		case memberStatus.CanVote:
+			if len(followers) > 0 {
+				followers += ","
+			}
+			followers += memberStatus.PodName
 		}
-		followers += podName
 	}
 	if followers != "" {
 		envData[prefix+"FOLLOWERS"] = followers

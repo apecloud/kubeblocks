@@ -22,7 +22,7 @@ spec:
   versions:
   - additionalPrinterColumns:
     - description: leader pod name.
-      jsonPath: .status.leader.podName
+      jsonPath: .status.membersStatus[0].podName
       name: LEADER
       type: string
     - description: ready replicas.
@@ -56,89 +56,6 @@ spec:
           spec:
             description: ConsensusSetSpec defines the desired state of ConsensusSet
             properties:
-              followers:
-                description: Followers, has voting right but not Leader.
-                items:
-                  properties:
-                    accessMode:
-                      default: ReadWrite
-                      description: AccessMode, what service this member capable.
-                      enum:
-                      - None
-                      - Readonly
-                      - ReadWrite
-                      type: string
-                    name:
-                      default: leader
-                      description: Name, role name.
-                      type: string
-                    replicas:
-                      default: 0
-                      description: Replicas, number of Pods of this role. default
-                        1 for Leader default 0 for Learner default Components[*].Replicas
-                        - Leader.Replicas - Learner.Replicas for Followers
-                      format: int32
-                      minimum: 0
-                      type: integer
-                  required:
-                  - accessMode
-                  - name
-                  type: object
-                type: array
-              leader:
-                description: Leader, one single leader.
-                properties:
-                  accessMode:
-                    default: ReadWrite
-                    description: AccessMode, what service this member capable.
-                    enum:
-                    - None
-                    - Readonly
-                    - ReadWrite
-                    type: string
-                  name:
-                    default: leader
-                    description: Name, role name.
-                    type: string
-                  replicas:
-                    default: 0
-                    description: Replicas, number of Pods of this role. default 1
-                      for Leader default 0 for Learner default Components[*].Replicas
-                      - Leader.Replicas - Learner.Replicas for Followers
-                    format: int32
-                    minimum: 0
-                    type: integer
-                required:
-                - accessMode
-                - name
-                type: object
-              learner:
-                description: Learner, no voting right.
-                properties:
-                  accessMode:
-                    default: ReadWrite
-                    description: AccessMode, what service this member capable.
-                    enum:
-                    - None
-                    - Readonly
-                    - ReadWrite
-                    type: string
-                  name:
-                    default: leader
-                    description: Name, role name.
-                    type: string
-                  replicas:
-                    default: 0
-                    description: Replicas, number of Pods of this role. default 1
-                      for Leader default 0 for Learner default Components[*].Replicas
-                      - Leader.Replicas - Learner.Replicas for Followers
-                    format: int32
-                    minimum: 0
-                    type: integer
-                required:
-                - accessMode
-                - name
-                type: object
               replicas:
                 default: 1
                 description: Replicas defines number of Pods
@@ -1560,6 +1477,35 @@ spec:
                 required:
                 - kind
                 type: object
+              roles:
+                description: Roles, a list of roles defined in this consensus system.
+                items:
+                  properties:
+                    accessMode:
+                      default: ReadWrite
+                      description: AccessMode, what service this member capable.
+                      enum:
+                      - None
+                      - Readonly
+                      - ReadWrite
+                      type: string
+                    canVote:
+                      default: true
+                      description: CanVote, whether this member has voting rights
+                      type: boolean
+                    isLeader:
+                      default: false
+                      description: IsLeader, whether this member is the leader
+                      type: boolean
+                    name:
+                      default: leader
+                      description: Name, role name.
+                      type: string
+                  required:
+                  - accessMode
+                  - name
+                  type: object
+                type: array
               service:
                 description: service defines the behavior of a service spec. provides
                   read-write service https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -9606,8 +9552,8 @@ spec:
                   type: object
                 type: array
             required:
-            - leader
             - roleObservation
+            - roles
             - template
             type: object
           status:
@@ -9665,80 +9611,45 @@ spec:
                 description: currentRevision, if not empty, indicates the version
                   of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).
                 type: string
-              followers:
-                description: followers status.
+              membersStatus:
+                description: members' status.
                 items:
                   properties:
-                    accessMode:
-                      default: None
-                      description: accessMode, what service this pod provides.
-                      enum:
-                      - None
-                      - Readonly
-                      - ReadWrite
-                      type: string
                     podName:
                       default: Unknown
                       description: PodName pod name.
                       type: string
-                    roleName:
-                      default: Unknown
-                      description: RoleName role name.
-                      type: string
+                    role:
+                      properties:
+                        accessMode:
+                          default: ReadWrite
+                          description: AccessMode, what service this member capable.
+                          enum:
+                          - None
+                          - Readonly
+                          - ReadWrite
+                          type: string
+                        canVote:
+                          default: true
+                          description: CanVote, whether this member has voting rights
+                          type: boolean
+                        isLeader:
+                          default: false
+                          description: IsLeader, whether this member is the leader
+                          type: boolean
+                        name:
+                          default: leader
+                          description: Name, role name.
+                          type: string
+                      required:
+                      - accessMode
+                      - name
+                      type: object
                   required:
-                  - accessMode
                   - podName
-                  - roleName
+                  - role
                   type: object
                 type: array
-              leader:
-                description: leader status.
-                properties:
-                  accessMode:
-                    default: None
-                    description: accessMode, what service this pod provides.
-                    enum:
-                    - None
-                    - Readonly
-                    - ReadWrite
-                    type: string
-                  podName:
-                    default: Unknown
-                    description: PodName pod name.
-                    type: string
-                  roleName:
-                    default: Unknown
-                    description: RoleName role name.
-                    type: string
-                required:
-                - accessMode
-                - podName
-                - roleName
-                type: object
-              learner:
-                description: learner status.
-                properties:
-                  accessMode:
-                    default: None
-                    description: accessMode, what service this pod provides.
-                    enum:
-                    - None
-                    - Readonly
-                    - ReadWrite
-                    type: string
-                  podName:
-                    default: Unknown
-                    description: PodName pod name.
-                    type: string
-                  roleName:
-                    default: Unknown
-                    description: RoleName role name.
-                    type: string
-                required:
-                - accessMode
-                - podName
-                - roleName
-                type: object
               observedGeneration:
                 description: observedGeneration is the most recent generation observed
                   for this StatefulSet. It corresponds to the StatefulSet's generation,

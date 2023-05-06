@@ -80,62 +80,47 @@ func (r *ConsensusSet) ValidateDelete() error {
 func (r *ConsensusSet) validate() error {
 	var allErrs field.ErrorList
 
-	// roleObserveQuery and Leader are required
-	if r.Spec.Leader.Name == "" {
-		allErrs = append(allErrs,
-			field.Required(field.NewPath("spec.leader.name"),
-				"leader name can't be blank"))
-	}
-
-	// Leader.Replicas should not be present or should set to 1
-	if *r.Spec.Leader.Replicas != 0 && *r.Spec.Leader.Replicas != 1 {
-		allErrs = append(allErrs,
-			field.Invalid(field.NewPath("spec.leader.replicas"),
-				r.Spec.Leader.Replicas,
-				"leader replicas can only be 1"))
-	}
-
-	// Leader.replicas + Follower.replicas should be odd
-	candidates := int32(1)
-	for _, member := range r.Spec.Followers {
-		if member.Replicas != nil {
-			candidates += *member.Replicas
+	// Leader is required
+	hasHeader := false
+	for _, role := range r.Spec.Roles {
+		if role.IsLeader && len(role.Name) > 0 {
+			hasHeader = true
 		}
 	}
-	if candidates%2 == 0 {
+	if !hasHeader {
 		allErrs = append(allErrs,
-			field.Invalid(field.NewPath("spec.candidates(leader.replicas+followers[*].replicas)"),
-				candidates,
-				"candidates(leader+followers) should be odd"))
+			field.Required(field.NewPath("spec.roles"),
+				"leader is required"))
 	}
-	// if spec.replicas is 1, then only Leader should be present. just omit if present
 
-	// if Followers.Replicas present, Leader.Replicas(that is 1) + Followers.Replicas + Learner.Replicas should equal to spec.Replicas
-	isFollowerPresent := false
-	memberCount := int32(1)
-	for _, member := range r.Spec.Followers {
-		if member.Replicas != nil && *member.Replicas > 0 {
-			isFollowerPresent = true
-			memberCount += *member.Replicas
-		}
-	}
-	if isFollowerPresent {
-		if r.Spec.Learner != nil && r.Spec.Learner.Replicas != nil {
-			memberCount += *r.Spec.Learner.Replicas
-		}
-		if memberCount != r.Spec.Replicas {
+	for _, role := range r.Spec.Roles {
+		if len(role.Name) == 0 {
 			allErrs = append(allErrs,
-				field.Invalid(field.NewPath("spec.Replicas"),
-					r.Spec.Replicas,
-					"#(members) should be equal to Replicas"))
+				field.Required(field.NewPath("spec.roles[*].name"),
+					"role name can't be empty"))
 		}
+		if role.AccessMode != NoneMode &&
+			role.AccessMode != ReadonlyMode &&
+			role.AccessMode != ReadWriteMode {
+			allErrs = append(allErrs,
+				field.Required(field.NewPath("spec.roles[*].accessMode"),
+					"invalid accessMode, should be one of [None, Readonly, ReadWrite]"))
+		}
+	}
+
+	if r.Spec.UpdateStrategy != SerialUpdateStrategy &&
+		r.Spec.UpdateStrategy != ParallelUpdateStrategy &&
+		r.Spec.UpdateStrategy != BestEffortParallelUpdateStrategy {
+		allErrs = append(allErrs,
+			field.Required(field.NewPath("spec.updateStrategy"),
+				"invalid updateStrategy, should be one of [Serial, BestEffortParallel, Parallel]"))
 	}
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{
-				Group: "core.kubeblocks.io/v1alpha1",
-				Kind:  "ConsensusBlock",
+				Group: "workloads.kubeblocks.io/v1alpha1",
+				Kind:  "ConsensusSet",
 			},
 			r.Name, allErrs)
 	}

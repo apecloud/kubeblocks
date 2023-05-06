@@ -54,17 +54,9 @@ type ConsensusSetSpec struct {
 	// +optional
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 
-	// Leader, one single leader.
+	// Roles, a list of roles defined in this consensus system.
 	// +kubebuilder:validation:Required
-	Leader ConsensusMember `json:"leader"`
-
-	// Followers, has voting right but not Leader.
-	// +optional
-	Followers []ConsensusMember `json:"followers,omitempty"`
-
-	// Learner, no voting right.
-	// +optional
-	Learner *ConsensusMember `json:"learner,omitempty"`
+	Roles []ConsensusRole `json:"roles"`
 
 	// RoleObservation provides method to observe role.
 	RoleObservation RoleObservation `json:"roleObservation"`
@@ -126,23 +118,15 @@ type ConsensusSetStatus struct {
 	// +optional
 	AvailableReplicas int32 `json:"availableReplicas" protobuf:"varint,11,opt,name=availableReplicas"`
 
-	// leader status.
+	// members' status.
 	// +optional
-	Leader ConsensusMemberStatus `json:"leader,omitempty"`
-
-	// followers status.
-	// +optional
-	Followers []ConsensusMemberStatus `json:"followers,omitempty"`
-
-	// learner status.
-	// +optional
-	Learner *ConsensusMemberStatus `json:"learner,omitempty"`
+	MembersStatus []ConsensusMemberStatus `json:"membersStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=csset
-// +kubebuilder:printcolumn:name="LEADER",type="string",JSONPath=".status.leader.podName",description="leader pod name."
+// +kubebuilder:printcolumn:name="LEADER",type="string",JSONPath=".status.membersStatus[0].podName",description="leader pod name."
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.readyReplicas",description="ready replicas."
 // +kubebuilder:printcolumn:name="REPLICAS",type="string",JSONPath=".status.replicas",description="total replicas."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
@@ -165,7 +149,7 @@ type ConsensusSetList struct {
 	Items           []ConsensusSet `json:"items"`
 }
 
-type ConsensusMember struct {
+type ConsensusRole struct {
 	// Name, role name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=leader
@@ -177,14 +161,15 @@ type ConsensusMember struct {
 	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
 	AccessMode AccessMode `json:"accessMode"`
 
-	// Replicas, number of Pods of this role.
-	// default 1 for Leader
-	// default 0 for Learner
-	// default Components[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
+	// CanVote, whether this member has voting rights
+	// +kubebuilder:default=true
 	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
+	CanVote bool `json:"canVote"`
+
+	// IsLeader, whether this member is the leader
+	// +kubebuilder:default=false
+	// +optional
+	IsLeader bool `json:"isLeader"`
 }
 
 // AccessMode define SVC access mode enums.
@@ -226,21 +211,12 @@ type RoleObservation struct {
 }
 
 type ConsensusMemberStatus struct {
-	// RoleName role name.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Unknown
-	RoleName string `json:"roleName"`
-
-	// accessMode, what service this pod provides.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
-	// +kubebuilder:default=None
-	AccessMode AccessMode `json:"accessMode"`
-
 	// PodName pod name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
 	PodName string `json:"podName"`
+
+	ConsensusRole `json:"role"`
 }
 
 func init() {

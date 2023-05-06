@@ -33,8 +33,13 @@ func NewConsensusSetBuilder(namespace, name string) *ConsensusSetBuilder {
 		&workloads.ConsensusSet{
 			Spec: workloads.ConsensusSetSpec{
 				Replicas: 1,
-				Leader: workloads.ConsensusMember{
-					Name: "leader",
+				Roles: []workloads.ConsensusRole{
+					{
+						Name:       "leader",
+						AccessMode: workloads.ReadWriteMode,
+						IsLeader:   true,
+						CanVote:    true,
+					},
 				},
 				UpdateStrategy: workloads.SerialUpdateStrategy,
 			},

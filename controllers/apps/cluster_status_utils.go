@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -193,26 +194,32 @@ func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDef
 
 // getComponentRelatedInfo gets componentMap, clusterAvailabilityMap and component definition information
 func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition,
-	componentName string) (map[string]string, map[string]bool, *appsv1alpha1.ClusterComponentDefinition) {
+	componentName string) (map[string]string, map[string]bool, *appsv1alpha1.ClusterComponentDefinition, error) {
 	var (
 		compDefName  string
 		componentMap = map[string]string{}
 		componentDef *appsv1alpha1.ClusterComponentDefinition
 	)
 	for _, v := range cluster.Spec.ComponentSpecs {
-		if v.Name == componentName {
+		componentMap[v.Name] = v.ComponentDefRef
+		if compDefName == "" && v.Name == componentName {
 			compDefName = v.ComponentDefRef
 		}
-		componentMap[v.Name] = v.ComponentDefRef
+	}
+	if compDefName == "" {
+		return nil, nil, nil, errors.New(fmt.Sprintf("expected %s component not found", componentName))
 	}
 	clusterAvailabilityEffectMap := map[string]bool{}
 	for i, v := range clusterDef.Spec.ComponentDefs {
 		clusterAvailabilityEffectMap[v.Name] = getClusterAvailabilityEffect(&v)
-		if v.Name == compDefName {
+		if componentDef == nil && v.Name == compDefName {
 			componentDef = &clusterDef.Spec.ComponentDefs[i]
 		}
 	}
-	return componentMap, clusterAvailabilityEffectMap, componentDef
+	if componentDef == nil {
+		return nil, nil, nil, errors.New(fmt.Sprintf("expected %s componentDef not found", compDefName))
+	}
+	return componentMap, clusterAvailabilityEffectMap, componentDef, nil
 }
 
 // handleClusterStatusByEvent handles the cluster status when warning event happened
@@ -240,10 +247,13 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	componentName := labels[constant.KBAppComponentLabelKey]
 	// get the component phase by component name and sync to Cluster.status.components
 	patch := client.MergeFrom(cluster.DeepCopy())
-	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
 	clusterComponent := cluster.Spec.GetComponentByName(componentName)
 	if clusterComponent == nil {
 		return nil
+	}
+	componentMap, clusterAvailabilityEffectMap, componentDef, err := getComponentRelatedInfo(cluster, clusterDef, componentName)
+	if err != nil {
+		return err
 	}
 	// get the component status by event and check whether the component status needs to be synchronized to the cluster
 	component, err := components.NewComponentByType(cli, cluster, clusterComponent, *componentDef)
@@ -269,14 +279,11 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 // TODO: Unified cluster event processing
 // handleEventForClusterStatus handles event for cluster Warning and Failed phase
 func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorder record.EventRecorder, event *corev1.Event) error {
-
 	type predicateProcessor struct {
 		pred      func() bool
 		processor func() error
 	}
-
 	nilReturnHandler := func() error { return nil }
-
 	pps := []predicateProcessor{
 		{
 			// handle cronjob complete or fail event
@@ -313,7 +320,6 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 			},
 		},
 	}
-
 	for _, pp := range pps {
 		if pp.pred() {
 			return pp.processor()

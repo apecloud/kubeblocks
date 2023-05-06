@@ -21,7 +21,6 @@ package apps
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -207,7 +206,7 @@ func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1al
 		}
 	}
 	if compDefName == "" {
-		return nil, nil, nil, errors.New(fmt.Sprintf("expected %s component not found", componentName))
+		return nil, nil, nil, fmt.Errorf("expected %s component not found", componentName)
 	}
 	clusterAvailabilityEffectMap := map[string]bool{}
 	for i, v := range clusterDef.Spec.ComponentDefs {
@@ -217,7 +216,7 @@ func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1al
 		}
 	}
 	if componentDef == nil {
-		return nil, nil, nil, errors.New(fmt.Sprintf("expected %s componentDef not found", compDefName))
+		return nil, nil, nil, fmt.Errorf("expected %s componentDef not found", compDefName)
 	}
 	return componentMap, clusterAvailabilityEffectMap, componentDef, nil
 }

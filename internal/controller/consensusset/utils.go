@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package consensusset
 
 import (
+	"sort"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sort"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -32,7 +33,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// TODO: dedup, copy from controllers/apps/component/consensus/consensus_utils.go
 const (
 	leaderPriority            = 1 << 5
 	followerReadWritePriority = 1 << 4
@@ -132,7 +132,7 @@ func setMembersStatus(set *workloads.ConsensusSet, pods []corev1.Pod) {
 			continue
 		}
 		memberStatus := workloads.ConsensusMemberStatus{
-			PodName: pod.Name,
+			PodName:       pod.Name,
 			ConsensusRole: role,
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)

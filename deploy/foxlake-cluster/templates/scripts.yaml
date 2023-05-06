@@ -25,5 +25,15 @@ data:
       "CREATE OR REPLACE STORAGE default AT URI \
         's3://${S3_BUCKET_NAME}.s3.cn-northwest-1.amazonaws.com.cn/default' \
         credentials (ACCESS_KEY_ID='${AWS_ACCESS_KEY_ID}' SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}');"
+  create_s3_bucket.sh: |
+    #!/bin/bash
+    echo -e "create s3 bucket for foxlake cluster";
+    # check if bucket exists
+    if aws s3api head-bucket --bucket ${S3_BUCKET_NAME} 2>/dev/null; then
+      echo -e "s3 bucket ${S3_BUCKET_NAME} already exists";
+    else
+      echo -e "s3 bucket ${S3_BUCKET_NAME} does not exist, creating...";
+      aws s3 mb s3://${S3_BUCKET_NAME} --region ${AWS_DEFAULT_REGION};
+    fi
 
 

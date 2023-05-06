@@ -19,14 +19,17 @@ spec:
         - name: create-s3-bucket
           image: "amazon/aws-cli"
           command:
-          - aws
-          args:
-          - s3
-          - mb
-          - s3://$(S3_BUCKET_NAME)
-          - --region
-          - $(AWS_DEFAULT_REGION)
+            - "/scripts/create_s3_bucket.sh"
           env:
             {{- include "post-job.env" . | nindent 12}}
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: foxlake-cluster-setup-scripts 
+            defaultMode: 0777
   backoffLimit: 0
 {{- end}}

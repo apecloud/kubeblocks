@@ -43,6 +43,7 @@ import (
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -61,7 +62,8 @@ type destroyOptions struct {
 
 	// purge resources, before destroy kubernetes cluster we should delete cluster and
 	// uninstall KubeBlocks
-	purge bool
+	purge   bool
+	timeout time.Duration
 }
 
 func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
@@ -79,6 +81,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&o.purge, "purge", true, "Purge all resources before destroy kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks.")
+	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
 
 	return cmd
 }
@@ -108,15 +111,15 @@ func (o *destroyOptions) destroy() error {
 // destroyLocal destroy local k3d cluster that will destroy all resources
 func (o *destroyOptions) destroyLocal() error {
 	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
-	spinner := printer.Spinner(o.Out, "%-50s", "Delete playground k3d cluster "+o.prevCluster.ClusterName)
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Delete playground k3d cluster "+o.prevCluster.ClusterName))
+	defer s.Fail()
 	if err := provider.DeleteK8sCluster(o.prevCluster); err != nil {
 		if !strings.Contains(err.Error(), "no cluster found") &&
 			!strings.Contains(err.Error(), "does not exist") {
 			return err
 		}
 	}
-	spinner(true)
+	s.Success()
 
 	if err := o.removeKubeConfig(); err != nil {
 		return err
@@ -267,13 +270,13 @@ func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 		return nil
 	}
 
-	spinner := printer.Spinner(o.Out, fmt.Sprintf("%-50s", "Delete clusters created by KubeBlocks"))
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Delete clusters created by KubeBlocks"))
+	defer s.Fail()
 
 	// get all clusters
 	clusters, err := getClusters()
 	if clusters == nil || len(clusters.Items) == 0 {
-		spinner(true)
+		s.Success()
 		return nil
 	}
 
@@ -331,7 +334,7 @@ func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 		return err
 	}
 
-	spinner(true)
+	s.Success()
 	return nil
 }
 
@@ -342,6 +345,7 @@ func (o *destroyOptions) uninstallKubeBlocks(client kubernetes.Interface, dynami
 			IOStreams: o.IOStreams,
 			Client:    client,
 			Dynamic:   dynamic,
+			Wait:      true,
 		},
 		AutoApprove:     true,
 		RemoveNamespace: true,
@@ -359,17 +363,17 @@ func (o *destroyOptions) uninstallKubeBlocks(client kubernetes.Interface, dynami
 }
 
 func (o *destroyOptions) removeKubeConfig() error {
-	spinner := printer.Spinner(o.Out, "%-50s", "Remove kubeconfig from "+defaultKubeConfigPath)
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Remove kubeconfig from "+defaultKubeConfigPath))
+	defer s.Fail()
 	if err := kubeConfigRemove(o.prevCluster.KubeConfig, defaultKubeConfigPath); err != nil {
 		if os.IsNotExist(err) {
-			spinner(true)
+			s.Success()
 			return nil
 		} else {
 			return err
 		}
 	}
-	spinner(true)
+	s.Success()
 
 	clusterContext, err := kubeConfigCurrentContext(o.prevCluster.KubeConfig)
 	if err != nil {
@@ -391,11 +395,11 @@ func (o *destroyOptions) removeKubeConfig() error {
 
 // remove state file
 func (o *destroyOptions) removeStateFile() error {
-	spinner := printer.Spinner(o.Out, "Remove state file %s", o.stateFilePath)
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Remove state file %s", o.stateFilePath))
+	defer s.Fail()
 	if err := removeStateFile(o.stateFilePath); err != nil {
 		return err
 	}
-	spinner(true)
+	s.Success()
 	return nil
 }

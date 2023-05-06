@@ -89,6 +89,7 @@ func NewConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := &InstallOptions{
 		Options: Options{
 			IOStreams: streams,
+			Wait:      true,
 		},
 	}
 

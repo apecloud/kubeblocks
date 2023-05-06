@@ -229,7 +229,7 @@ func markKubeBlocksPodsToLoadConfigMap(client kubernetes.Interface) error {
 		if pod.Annotations == nil {
 			pod.Annotations = map[string]string{}
 		}
-		pod.Annotations[types.LoadConfigMapAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+		pod.Annotations[types.ReloadConfigMapAnnotationKey] = time.Now().Format(time.RFC3339Nano)
 		_, _ = client.CoreV1().Pods(deploy.Namespace).Update(context.TODO(), &pod, metav1.UpdateOptions{})
 	}
 	return nil

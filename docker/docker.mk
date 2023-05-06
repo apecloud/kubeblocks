@@ -39,7 +39,7 @@ DEV_CONTAINER_IMAGE_NAME = docker.io/apecloud/$(APP_NAME)-dev
 
 DEV_CONTAINER_DOCKERFILE = Dockerfile-dev
 DOCKERFILE_DIR = ./docker
-BUILDX_ARGS ?=
+BUILDX_ARGS ?= --cache-to type=gha --cache-from type=gha
 
 ##@ Docker containers
 

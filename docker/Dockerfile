@@ -1,8 +1,9 @@
 # Build the manager binary
-ARG GO_VERSION=1.20
 ARG DIST_IMG=gcr.io/distroless/static:nonroot
 # use following dist image arg if you have problem access gcr.io registry, i.e., China region.
 #ARG DIST_IMG=katanomi/distroless-static:nonroot
+
+ARG GO_VERSION=1.20
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as builder
 

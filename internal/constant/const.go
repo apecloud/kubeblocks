@@ -37,6 +37,10 @@ const (
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
 	CfgAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
+
+	// data plane config key
+	CfgKeyDataPlaneTolerations = "DATA_PLANE_TOLERATIONS"
+	CfgKeyDataPlaneAffinity    = "DATA_PLANE_AFFINITY"
 )
 
 const (
@@ -192,15 +196,6 @@ const (
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
 	ProbeCheckRunningPath = "spec.containers{" + RunningProbeContainerName + "}"
-
-	// KubeBlocksDataNodeLabelKey is the node label key of the built-in data node label
-	KubeBlocksDataNodeLabelKey = "kb-data"
-	// KubeBlocksDataNodeLabelValue is the node label value of the built-in data node label
-	KubeBlocksDataNodeLabelValue = "true"
-	// KubeBlocksDataNodeTolerationKey is the taint label key of the built-in data node taint
-	KubeBlocksDataNodeTolerationKey = "kb-data"
-	// KubeBlocksDataNodeTolerationValue is the taint label value of the built-in data node taint
-	KubeBlocksDataNodeTolerationValue = "true"
 )
 
 const (

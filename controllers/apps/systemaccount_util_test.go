@@ -239,7 +239,7 @@ func TestRenderJob(t *testing.T) {
 			for _, t := range jobToleration {
 				tolerationKeys = append(tolerationKeys, t.Key)
 			}
-			assert.Contains(t, tolerationKeys, constant.KubeBlocksDataNodeTolerationKey)
+			assert.Contains(t, tolerationKeys, testDataPlaneTolerationKey)
 			assert.Contains(t, tolerationKeys, toleration[0].Key)
 		case appsv1alpha1.ReferToExisting:
 			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.ConnCredentialPlaceHolder))

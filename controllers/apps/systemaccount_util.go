@@ -363,7 +363,7 @@ func getDebugMode(annotatedDebug string) bool {
 	return viper.GetBool(systemAccountsDebugMode) || debugOn
 }
 
-func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, compKey componentUniqueKey, account appsv1alpha1.AccountName) {
+func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, compKey componentUniqueKey, account appsv1alpha1.AccountName) error {
 	debugModeOn := getDebugMode(cluster.Annotations[debugClusterAnnotationKey])
 	// add label
 	ml := getLabelsForSecretsAndJobs(compKey)
@@ -379,16 +379,13 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 	}
 
 	// add toleration
-	tolerations := cluster.Spec.Tolerations
 	clusterComp := cluster.Spec.GetComponentByName(compKey.componentName)
-	if clusterComp != nil {
-		if len(clusterComp.Tolerations) != 0 {
-			tolerations = clusterComp.Tolerations
-		}
+	tolerations, err := componetutil.BuildTolerations(cluster, clusterComp)
+	if err != nil {
+		return err
 	}
-	// add built-in toleration
-	tolerations = componetutil.PatchBuiltInToleration(tolerations)
 	job.Spec.Template.Spec.Tolerations = tolerations
+	return nil
 }
 
 // completeExecConfig override the image of execConfig if version is not nil.

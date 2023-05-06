@@ -25,11 +25,23 @@ import (
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/components-contrib/metadata"
 	"github.com/dapr/kit/logger"
+	"github.com/stretchr/testify/assert"
+
+	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
 // Test case for Init() function
 func TestInit(t *testing.T) {
-	// TODO: find mock way
+	kafkaOps := mockKafkaOps(t)
+
+	err := kafkaOps.Init(kafkaOps.Metadata)
+	if err != nil {
+		t.Errorf("Error during Init(): %s", err)
+	}
+
+	assert.Equal(t, "kafka", kafkaOps.DBType)
+	assert.NotNil(t, kafkaOps.InitIfNeed)
+	assert.NotNil(t, kafkaOps.OperationMap[CheckStatusOperation])
 }
 
 func TestCheckStatusOps(t *testing.T) {
@@ -37,21 +49,14 @@ func TestCheckStatusOps(t *testing.T) {
 }
 
 func mockKafkaOps(t *testing.T) *KafkaOperations {
-	metadata := bindings.Metadata{
+	m := bindings.Metadata{
 		Base: metadata.Base{
 			Properties: map[string]string{},
 		},
 	}
 
 	kafkaOps := NewKafka(logger.NewLogger("test")).(*KafkaOperations)
-	_ = kafkaOps.Init(metadata)
+	_ = kafkaOps.Init(m)
 
 	return kafkaOps
-}
-
-func getMetadata() map[string]string {
-	return map[string]string{
-		"consumerGroup": "a", "clientID": "a", "brokers": "a", "maxMessageBytes": "2048",
-		"consumeRetryInterval": "200", "initialOffset": "newest", "authType": "none",
-	}
 }

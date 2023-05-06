@@ -71,9 +71,14 @@ func (r *stageCtx) setReconciled() {
 }
 
 func (r *stageCtx) setRequeueAfter(duration time.Duration, msg string) {
-	res, err := intctrlutil.RequeueAfter(time.Second, r.reqCtx.Log, msg)
+	res, err := intctrlutil.RequeueAfter(duration, r.reqCtx.Log, msg)
 	r.updateResultNErr(&res, err)
 }
+
+// func (r *stageCtx) setRequeue(msg string) {
+// 	res, err := intctrlutil.Requeue(r.reqCtx.Log, msg)
+// 	r.updateResultNErr(&res, err)
+// }
 
 func (r *stageCtx) setRequeueWithErr(err error, msg string) {
 	res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, msg)
@@ -307,7 +312,7 @@ func (r *autoInstallCheckStage) Handle(ctx context.Context) {
 			return
 		}
 		// proceed if has specified addon.spec.installSpec
-		if addon.Spec.InstallSpec.HasSetValues() {
+		if addon.Spec.InstallSpec != nil {
 			r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
 			return
 		}
@@ -319,8 +324,11 @@ func (r *autoInstallCheckStage) Handle(ctx context.Context) {
 func (r *enabledWithDefaultValuesStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
 		r.reqCtx.Log.V(1).Info("enabledWithDefaultValuesStage", "phase", addon.Status.Phase)
-		if addon.Spec.InstallSpec.HasSetValues() ||
-			addon.Spec.InstallSpec.IsDisabled() {
+		if addon.Spec.InstallSpec.HasSetValues() || addon.Spec.InstallSpec.IsDisabled() {
+			r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
+			return
+		}
+		if v, ok := addon.Annotations[AddonDefaultIsEmpty]; ok && v == "true" {
 			return
 		}
 		enabledAddonWithDefaultValues(ctx, &r.stageCtx, addon, AddonSetDefaultValues, "Addon enabled with default values")
@@ -878,6 +886,12 @@ func enabledAddonWithDefaultValues(ctx context.Context, stageCtx *stageCtx,
 	setInstallSpec := func(di *extensionsv1alpha1.AddonDefaultInstallSpecItem) {
 		addon.Spec.InstallSpec = di.AddonInstallSpec.DeepCopy()
 		addon.Spec.InstallSpec.Enabled = true
+		if addon.Annotations == nil {
+			addon.Annotations = map[string]string{}
+		}
+		if di.AddonInstallSpec.IsEmpty() {
+			addon.Annotations[AddonDefaultIsEmpty] = "true"
+		}
 		if err := stageCtx.reconciler.Client.Update(ctx, addon); err != nil {
 			stageCtx.setRequeueWithErr(err, "")
 			return

@@ -49,7 +49,7 @@ type AnalyzeTaintClassByKb struct {
 }
 
 func (a *AnalyzeTaintClassByKb) Title() string {
-	return util.TitleOrDefault(a.analyzer.AnalyzeMeta, "Kubeblocks Storage Class")
+	return util.TitleOrDefault(a.analyzer.AnalyzeMeta, "Kubeblocks Taints")
 }
 
 func (a *AnalyzeTaintClassByKb) GetAnalyzer() *preflightv1beta2.KBTaintAnalyze {

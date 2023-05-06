@@ -120,7 +120,7 @@ func (c *StatefulComponentBase) Create(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
-	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Create a new component")
+	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
 
 	return nil
 }
@@ -166,13 +166,13 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return nil
 	}
 
-	// TODO(impl): check the operation result of @Restart, @ExpandVolume, @HorizontalScale, and update component status if needed.
-	//   @Restart - whether pods are available, covered by @BuildLatestStatus
-	//   @ExpandVolume - whether PVCs have been expand finished
-	//   @HorizontalScale - whether replicas to added or deleted have been done, and the cron job to delete PVCs have finished
-	//  With these changes, we can remove the manipulation to cluster and component status phase in ops controller.
+	statusTxn := &statusReconciliationTxn{}
 
-	if err := c.statusHorizontalScale(reqCtx, cli); err != nil {
+	if err := c.statusExpandVolume(reqCtx, cli, statusTxn); err != nil {
+		return err
+	}
+
+	if err := c.statusHorizontalScale(reqCtx, cli, statusTxn); err != nil {
 		return err
 	}
 
@@ -193,7 +193,11 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		}
 	}
 
-	if err := c.BuildLatestStatus(reqCtx, cli, c.runningWorkload); err != nil {
+	if err := c.StatusWorkload(reqCtx, cli, c.runningWorkload, statusTxn); err != nil {
+		return err
+	}
+
+	if err := statusTxn.commit(); err != nil {
 		return err
 	}
 
@@ -261,6 +265,47 @@ func (c *StatefulComponentBase) expandVolumes(reqCtx intctrlutil.RequestCtx, cli
 	return nil
 }
 
+func (c *StatefulComponentBase) statusExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
+		running, failed, err := c.hasVolumeExpansionRunning(reqCtx, cli, vct.Name)
+		if err != nil {
+			return err
+		}
+		if failed {
+			txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
+				c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "Volume Expansion failed")
+			})
+			return nil
+		}
+		if running {
+			txn.propose(appsv1alpha1.SpecReconcilingClusterCompPhase, func() {
+				c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Volume Expansion failed")
+			})
+			return nil
+		}
+	}
+	return nil
+}
+
+func (c *StatefulComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string) (bool, bool, error) {
+	var (
+		running bool
+		failed  bool
+	)
+	volumes, err := c.getRunningVolumes(reqCtx, cli, vctName, c.runningWorkload)
+	if err != nil {
+		return false, false, err
+	}
+	for _, v := range volumes {
+		if v.Status.Capacity == nil || v.Status.Capacity.Storage().Cmp(v.Spec.Resources.Requests[corev1.ResourceStorage]) >= 0 {
+			continue
+		}
+		running = true
+		// TODO: how to check the expansion failed?
+	}
+	return running, failed, nil
+}
+
 func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	ret := c.horizontalScaling(c.runningWorkload)
 	if ret == 0 {
@@ -291,11 +336,6 @@ func (c *StatefulComponentBase) horizontalScaling(stsObj *appsv1.StatefulSet) in
 }
 
 func (c *StatefulComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
-	// if scale in to 0, do not delete pvc
-	if c.Component.Replicas == 0 || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
-		return nil // TODO: should reject to scale-in to zero explicitly
-	}
-
 	for i := c.Component.Replicas; i < *stsObj.Spec.Replicas; i++ {
 		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
@@ -436,13 +476,58 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	return nil
 }
 
+func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+	ret := c.horizontalScaling(c.runningWorkload)
+	if ret == 0 {
+		return c.statusPVCDeletionJobFailed(reqCtx, cli, txn)
+	}
+	if ret > 0 {
+		// forward the h-scaling progress.
+		if err := c.scaleOut(reqCtx, cli, c.runningWorkload); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *StatefulComponentBase) statusPVCDeletionJobFailed(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+	hasJobFailed := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (*batchv1.Job, string, error) {
+		jobs, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.JobSignature, c.GetNamespace(), c.GetMatchingLabels())
+		if err != nil {
+			return nil, "", err
+		}
+		for _, job := range jobs {
+			// TODO: use a better way to check the delete PVC job.
+			if !strings.HasPrefix(job.Name, "delete-pvc-") {
+				continue
+			}
+			for _, cond := range job.Status.Conditions {
+				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+					return job, fmt.Sprintf("%s-%s", cond.Reason, cond.Message), nil
+				}
+			}
+		}
+		return nil, "", nil
+	}
+	if job, msg, err := hasJobFailed(reqCtx, cli); err != nil {
+		return err
+	} else if job != nil {
+		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
+		statusMessage := appsv1alpha1.ComponentMessageMap{msgKey: msg}
+		txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
+			c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, statusMessage, "PVC deletion job failed")
+		})
+	}
+	return nil
+}
+
 func (c *StatefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	if stsObj == nil {
 		c.createWorkload()
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload created")
+		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload created")
 	} else {
 		if c.updateWorkload(stsObj) {
-			c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload updated")
+			c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload updated")
 		}
 		// to work around that the scaled PVC will be deleted at object action.
 		if err := c.updateVolumes(reqCtx, cli, stsObj); err != nil {
@@ -518,47 +603,6 @@ func (c *StatefulComponentBase) getRunningVolumes(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	return matchedPVCs, nil
-}
-
-func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	ret := c.horizontalScaling(c.runningWorkload)
-	if ret == 0 {
-		return c.statusPVCDeletionJobFailed(reqCtx, cli)
-	}
-	if ret > 0 {
-		// forward the h-scaling progress.
-		if err := c.scaleOut(reqCtx, cli, c.runningWorkload); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *StatefulComponentBase) statusPVCDeletionJobFailed(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	hasJobFailed := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (*batchv1.Job, string, error) {
-		jobs, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.JobSignature, c.GetNamespace(), c.GetMatchingLabels())
-		if err != nil {
-			return nil, "", err
-		}
-		for _, job := range jobs {
-			if !strings.HasPrefix(job.Name, "delete-pvc-") {
-				continue
-			}
-			for _, cond := range job.Status.Conditions {
-				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
-					return job, fmt.Sprintf("%s-%s", cond.Reason, cond.Message), nil
-				}
-			}
-		}
-		return nil, "", nil
-	}
-	if job, msg, err := hasJobFailed(reqCtx, cli); err != nil {
-		return err
-	} else if job != nil {
-		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
-		c.setStatusPhaseWithMsg(appsv1alpha1.AbnormalClusterCompPhase, msgKey, msg, "PVC deletion job failed")
-	}
-	return nil
 }
 
 // handleGarbageOfRestoreBeforeRunning handles the garbage for restore before cluster phase changes to Running.

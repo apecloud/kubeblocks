@@ -246,14 +246,10 @@ func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.
 	return nil
 }
 
-// SetStatusPhase set the cluster component phase to @phase conditionally.
-func (c *ComponentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase, message string) {
-	c.setStatusPhaseWithMsg(phase, "", "", message)
-}
-
-// setStatusPhaseWithMsg set the cluster component phase and messages to specified conditionally.
-func (c *ComponentBase) setStatusPhaseWithMsg(phase appsv1alpha1.ClusterComponentPhase, statusMsgKey, statusMsg, phaseTransitionMsg string) {
-	if err := c.updateStatus(func(status *appsv1alpha1.ClusterComponentStatus) error {
+// SetStatusPhase set the cluster component phase and messages to specified conditionally.
+func (c *ComponentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase,
+	statusMessage appsv1alpha1.ComponentMessageMap, phaseTransitionMsg string) {
+	updatefn := func(status *appsv1alpha1.ClusterComponentStatus) error {
 		if status.Phase == phase {
 			return nil
 		}
@@ -264,20 +260,140 @@ func (c *ComponentBase) setStatusPhaseWithMsg(phase appsv1alpha1.ClusterComponen
 		}
 
 		status.Phase = phase
-		if statusMsgKey != "" {
-			if status.Message == nil {
-				status.Message = map[string]string{}
+		if status.Message == nil {
+			status.Message = statusMessage
+		} else {
+			for k, v := range statusMessage {
+				status.Message[k] = v
 			}
-			status.Message[statusMsgKey] = statusMsg
 		}
 		return nil
-	}, phaseTransitionMsg); err != nil {
-		panic(fmt.Sprintf("unexpected error occurred: %s", err.Error()))
+	}
+	if err := c.updateStatus(phaseTransitionMsg, updatefn); err != nil {
+		panic(fmt.Sprintf("unexpected error occurred while updating component status: %s", err.Error()))
 	}
 }
 
+func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object, txn *statusReconciliationTxn) error {
+	// if reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil() {
+	//	return nil
+	// }
+
+	pods, err := util.ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	if err != nil {
+		return err
+	}
+
+	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, obj)
+	if err != nil {
+		return err
+
+	}
+
+	var podsReady *bool
+	if c.Component.Replicas > 0 {
+		podsReadyForComponent, err := c.ComponentSet.PodsReady(reqCtx.Ctx, obj)
+		if err != nil {
+			return err
+		}
+		podsReady = &podsReadyForComponent
+	}
+
+	hasFailedPodTimedOut := false
+	timedOutPodStatusMessage := appsv1alpha1.ComponentMessageMap{}
+	if !isRunning && (podsReady == nil || !*podsReady) {
+		hasFailedPodTimedOut, timedOutPodStatusMessage = hasFailedAndTimedOutPod(pods)
+	}
+
+	phase, statusMessage, err := c.buildStatus(reqCtx.Ctx, pods, isRunning, podsReady, hasFailedPodTimedOut, timedOutPodStatusMessage)
+	if err != nil {
+		return err
+	}
+
+	phaseTransitionCondMsg := ""
+	if podsReady == nil {
+		phaseTransitionCondMsg = fmt.Sprintf("Running: %v, PodsReady: nil, PodsTimedout: %v", isRunning, hasFailedPodTimedOut)
+	} else {
+		phaseTransitionCondMsg = fmt.Sprintf("Running: %v, PodsReady: %v, PodsTimedout: %v", isRunning, *podsReady, hasFailedPodTimedOut)
+	}
+
+	updatefn := func(status *appsv1alpha1.ClusterComponentStatus) error {
+		if phase != "" {
+			status.Phase = phase
+		}
+		status.SetMessage(statusMessage)
+		status.PodsReady = podsReady
+		if podsReady != nil && *podsReady {
+			status.PodsReadyTime = &metav1.Time{Time: time.Now()}
+		} else {
+			status.PodsReadyTime = nil
+		}
+		return nil
+	}
+
+	if txn != nil {
+		txn.propose(phase, func() {
+			if err = c.updateStatus(phaseTransitionCondMsg, updatefn); err != nil {
+				panic(fmt.Sprintf("unexpected error occurred while updating component status: %s", err.Error()))
+			}
+		})
+		return nil
+	}
+	// TODO(refactor): wait = true to requeue.
+	return c.updateStatus(phaseTransitionCondMsg, updatefn)
+}
+
+func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isRunning bool, podsReady *bool,
+	hasFailedPodTimedOut bool, timedOutPodStatusMessage appsv1alpha1.ComponentMessageMap) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
+	var (
+		err           error
+		phase         appsv1alpha1.ClusterComponentPhase
+		statusMessage appsv1alpha1.ComponentMessageMap
+	)
+	if isRunning {
+		if c.Component.Replicas == 0 {
+			// if replicas number of component is zero, the component has stopped.
+			// 'Stopped' is a special 'Running' for workload(StatefulSet/Deployment).
+			phase = appsv1alpha1.StoppedClusterCompPhase
+		} else {
+			// change component phase to Running when workloads of component are running.
+			phase = appsv1alpha1.RunningClusterCompPhase
+		}
+		return phase, statusMessage, nil
+	}
+
+	if podsReady != nil && *podsReady {
+		// check if the role probe timed out when component phase is not Running but all pods of component are ready.
+		phase, statusMessage = c.ComponentSet.GetPhaseWhenPodsReadyAndProbeTimeout(pods)
+		return phase, statusMessage, nil
+	}
+
+	// if there is no running operation in cluster or failed pod timed-out, that means the component is Failed or Abnormal.
+	// TODO(refactor): should review and check this condition carefully.
+	//// clusterUpRunning checks if the cluster is up running, includes the partially running.
+	// clusterUpRunning := func(cluster *appsv1alpha1.Cluster) bool {
+	//	return cluster.Status.ObservedGeneration != cluster.Generation &&
+	//		slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), cluster.Status.Phase)
+	// }
+	// if clusterUpRunning(c.Cluster) || hasFailedPodTimedOut {
+	if hasFailedPodTimedOut {
+		phase, statusMessage, err = c.ComponentSet.GetPhaseWhenPodsNotReady(ctx, c.GetName())
+		if err != nil {
+			return "", nil, err
+		}
+	}
+	if statusMessage == nil {
+		statusMessage = timedOutPodStatusMessage
+	} else {
+		for k, v := range timedOutPodStatusMessage {
+			statusMessage[k] = v
+		}
+	}
+	return phase, statusMessage, nil
+}
+
 // updateStatus updates the cluster component status by @updatefn, with additional message to explain the transition occurred.
-func (c *ComponentBase) updateStatus(updatefn func(status *appsv1alpha1.ClusterComponentStatus) error, message string) error {
+func (c *ComponentBase) updateStatus(phaseTransitionMsg string, updatefn func(status *appsv1alpha1.ClusterComponentStatus) error) error {
 	if updatefn == nil {
 		return nil
 	}
@@ -300,105 +416,109 @@ func (c *ComponentBase) updateStatus(updatefn func(status *appsv1alpha1.ClusterC
 	if phase != status.Phase {
 		// TODO: logging the event
 		if c.Recorder != nil {
-			c.Recorder.Eventf(c.Cluster, corev1.EventTypeNormal, types.ComponentPhaseTransition, message)
+			c.Recorder.Eventf(c.Cluster, corev1.EventTypeNormal, types.ComponentPhaseTransition, phaseTransitionMsg)
 		}
 	}
 
 	return nil
 }
 
-func (c *ComponentBase) BuildLatestStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) error {
-	// if reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil() {
-	//	return nil
-	// }
-
-	pods, err := util.ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
-	if err != nil {
-		return err
-	}
-
-	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, obj)
-	if err != nil {
-		return err
-	}
-
-	var podsReady *bool
-	if c.Component.Replicas > 0 {
-		podsReadyForComponent, err := c.ComponentSet.PodsReady(reqCtx.Ctx, obj)
-		if err != nil {
-			return err
-		}
-		podsReady = &podsReadyForComponent
-	}
-
-	hasFailedPodTimedOut := false
-	timedOutPodStatusMessage := appsv1alpha1.ComponentMessageMap{}
-	if !isRunning && (podsReady == nil || !*podsReady) {
-		hasFailedPodTimedOut, timedOutPodStatusMessage = hasFailedAndTimedOutPod(pods)
-	}
-
-	phaseTransitionCondMsg := ""
-	if podsReady == nil {
-		phaseTransitionCondMsg = fmt.Sprintf("Running: %v, PodsReady: nil, PodsTimedout: %v", isRunning, hasFailedPodTimedOut)
-	} else {
-		phaseTransitionCondMsg = fmt.Sprintf("Running: %v, PodsReady: %v, PodsTimedout: %v", isRunning, *podsReady, hasFailedPodTimedOut)
-	}
-
-	updatefn := func(status *appsv1alpha1.ClusterComponentStatus) error {
-		return c.buildStatus(reqCtx.Ctx, pods, isRunning, podsReady, hasFailedPodTimedOut, timedOutPodStatusMessage, status)
-	}
-	// TODO(refactor): wait = true to requeue.
-	return c.updateStatus(updatefn, phaseTransitionCondMsg)
-}
-
-func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isRunning bool, podsReady *bool,
-	hasFailedPodTimedOut bool, timedOutPodStatusMessage appsv1alpha1.ComponentMessageMap, status *appsv1alpha1.ClusterComponentStatus) error {
-	if isRunning {
-		if c.Component.Replicas == 0 {
-			// if replicas number of component is zero, the component has stopped.
-			// 'Stopped' is a special 'Running' for workload(StatefulSet/Deployment).
-			status.Phase = appsv1alpha1.StoppedClusterCompPhase
-		} else {
-			// change component phase to Running when workloads of component are running.
-			status.Phase = appsv1alpha1.RunningClusterCompPhase
-		}
-		status.SetMessage(nil)
-	} else {
-		if podsReady != nil && *podsReady {
-			// check if the role probe timed out when component phase is not Running but all pods of component are ready.
-			c.ComponentSet.HandleProbeTimeoutWhenPodsReady(status, pods)
-		} else {
-			// if there is no running operation in cluster or failed pod timed-out, that means the component is Failed or Abnormal.
-			status.Message = timedOutPodStatusMessage
-			// TODO(refactor): should review and check this condition carefully.
-			//// clusterUpRunning checks if the cluster is up running, includes the partially running.
-			// clusterUpRunning := func(cluster *appsv1alpha1.Cluster) bool {
-			//	return cluster.Status.ObservedGeneration != cluster.Generation &&
-			//		slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), cluster.Status.Phase)
-			// }
-			// if clusterUpRunning(c.Cluster) || hasFailedPodTimedOut {
-			if hasFailedPodTimedOut {
-				phase, statusMessage, err := c.ComponentSet.GetPhaseWhenPodsNotReady(ctx, c.GetName())
-				if err != nil {
-					return err
-				}
-				if phase != "" {
-					status.Phase = phase
-				}
-				for k, v := range statusMessage {
-					status.Message[k] = v
-				}
-			}
-		}
-	}
-	status.PodsReady = podsReady
-	if podsReady != nil && *podsReady {
-		status.PodsReadyTime = &metav1.Time{Time: time.Now()}
-	} else {
-		status.PodsReadyTime = nil
-	}
-	return nil
-}
+// func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) error {
+//	// if reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil() {
+//	//	return nil
+//	// }
+//
+//	pods, err := util.ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+//	if err != nil {
+//		return err
+//	}
+//
+//	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, obj)
+//	if err != nil {
+//		return err
+//	}
+//
+//	var podsReady *bool
+//	if c.Component.Replicas > 0 {
+//		podsReadyForComponent, err := c.ComponentSet.PodsReady(reqCtx.Ctx, obj)
+//		if err != nil {
+//			return err
+//		}
+//		podsReady = &podsReadyForComponent
+//	}
+//
+//	hasFailedPodTimedOut := false
+//	timedOutPodStatusMessage := appsv1alpha1.ComponentMessageMap{}
+//	if !isRunning && (podsReady == nil || !*podsReady) {
+//		hasFailedPodTimedOut, timedOutPodStatusMessage = hasFailedAndTimedOutPod(pods)
+//	}
+//
+//	phaseTransitionCondMsg := ""
+//	if podsReady == nil {
+//		phaseTransitionCondMsg = fmt.Sprintf("Running: %v, PodsReady: nil, PodsTimedout: %v", isRunning, hasFailedPodTimedOut)
+//	} else {
+//		phaseTransitionCondMsg = fmt.Sprintf("Running: %v, PodsReady: %v, PodsTimedout: %v", isRunning, *podsReady, hasFailedPodTimedOut)
+//	}
+//
+//	// TODO(refactor): wait = true to requeue.
+//	return c.updateStatus(phaseTransitionCondMsg, func(status *appsv1alpha1.ClusterComponentStatus) error {
+//		return c.buildStatus(reqCtx.Ctx, pods, isRunning, podsReady, hasFailedPodTimedOut, timedOutPodStatusMessage, status)
+//	})
+// }
+//
+// func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isRunning bool, podsReady *bool,
+//	hasFailedPodTimedOut bool, timedOutPodStatusMessage appsv1alpha1.ComponentMessageMap, status *appsv1alpha1.ClusterComponentStatus) error {
+//	if isRunning {
+//		if c.Component.Replicas == 0 {
+//			// if replicas number of component is zero, the component has stopped.
+//			// 'Stopped' is a special 'Running' for workload(StatefulSet/Deployment).
+//			status.Phase = appsv1alpha1.StoppedClusterCompPhase
+//		} else {
+//			// change component phase to Running when workloads of component are running.
+//			status.Phase = appsv1alpha1.RunningClusterCompPhase
+//		}
+//		status.SetMessage(nil)
+//	} else {
+//		var (
+//			err           error
+//			phase         appsv1alpha1.ClusterComponentPhase
+//			statusMessage appsv1alpha1.ComponentMessageMap
+//		)
+//		if podsReady != nil && *podsReady {
+//			// check if the role probe timed out when component phase is not Running but all pods of component are ready.
+//			phase, statusMessage = c.ComponentSet.GetPhaseWhenPodsReadyAndProbeTimeout(pods)
+//		} else {
+//			// if there is no running operation in cluster or failed pod timed-out, that means the component is Failed or Abnormal.
+//			status.Message = timedOutPodStatusMessage
+//			// TODO(refactor): should review and check this condition carefully.
+//			//// clusterUpRunning checks if the cluster is up running, includes the partially running.
+//			// clusterUpRunning := func(cluster *appsv1alpha1.Cluster) bool {
+//			//	return cluster.Status.ObservedGeneration != cluster.Generation &&
+//			//		slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), cluster.Status.Phase)
+//			// }
+//			// if clusterUpRunning(c.Cluster) || hasFailedPodTimedOut {
+//			if hasFailedPodTimedOut {
+//				phase, statusMessage, err = c.ComponentSet.GetPhaseWhenPodsNotReady(ctx, c.GetName())
+//				if err != nil {
+//					return err
+//				}
+//			}
+//		}
+//		if phase != "" {
+//			status.Phase = phase
+//		}
+//		for k, v := range statusMessage {
+//			status.Message[k] = v
+//		}
+//	}
+//	status.PodsReady = podsReady
+//	if podsReady != nil && *podsReady {
+//		status.PodsReadyTime = &metav1.Time{Time: time.Now()}
+//	} else {
+//		status.PodsReadyTime = nil
+//	}
+//	return nil
+// }
 
 // hasFailedAndTimedOutPod returns whether the pod of components is still failed after a PodFailedTimeout period.
 // if return true, component phase will be set to Failed/Abnormal.

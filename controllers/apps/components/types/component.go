@@ -104,11 +104,9 @@ type ComponentSet interface {
 	// if the component is ConsensusSet,it will be available when the pod is ready and labeled with its role.
 	PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool
 
-	// HandleProbeTimeoutWhenPodsReady if the component has no role probe, return false directly. otherwise,
-	// we should handle the component phase when the role probe timeout and return a bool.
-	// if return true, means probe is not timing out and need to requeue after an interval time to handle probe timeout again.
-	// else return false, means probe has timed out and needs to update the component phase to Failed or Abnormal.
-	HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod)
+	// GetPhaseWhenPodsReadyAndProbeTimeout when the pods of component are ready but the probe timed-out,
+	//  calculate the component phase is Failed or Abnormal.
+	GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap)
 
 	// GetPhaseWhenPodsNotReady when the pods of component are not ready, calculate the component phase is Failed or Abnormal.
 	// if return an empty phase, means the pods of component are ready and skips it.

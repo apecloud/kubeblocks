@@ -81,8 +81,8 @@ func (r *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
-// HandleProbeTimeoutWhenPodsReady the Stateful component has no role detection, empty implementation here.
-func (r *Stateful) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
+func (r *Stateful) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
+	return "", nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.

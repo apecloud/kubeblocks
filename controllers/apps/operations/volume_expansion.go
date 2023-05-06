@@ -54,7 +54,6 @@ func init() {
 	volumeExpansionBehaviour := OpsBehaviour{
 		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
 		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
-		MaintainClusterPhaseBySelf:         true,
 		OpsHandler:                         volumeExpansionOpsHandler{},
 		ProcessingReasonInClusterCondition: ProcessingReasonVolumeExpanding,
 	}
@@ -104,13 +103,11 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		err                  error
 		opsRequestPhase      = appsv1alpha1.OpsRunningPhase
 		oldOpsRequestStatus  = opsRequest.Status.DeepCopy()
-		oldClusterStatus     = opsRes.Cluster.Status.DeepCopy()
 		expectProgressCount  int
 		succeedProgressCount int
 	)
 
 	patch := client.MergeFrom(opsRequest.DeepCopy())
-	clusterPatch := client.MergeFrom(opsRes.Cluster.DeepCopy())
 	if opsRequest.Status.Components == nil {
 		ve.initComponentStatus(opsRequest)
 	}
@@ -135,7 +132,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 			}
 		}
 		// when component expand volume completed, do it.
-		ve.setComponentPhaseForClusterAndOpsRequest(&compStatus, opsRes.Cluster, v.ComponentName, completedOnComponent)
+		ve.setOpsRequestComponentPhase(&compStatus, opsRes.Cluster, v.ComponentName, completedOnComponent)
 		opsRequest.Status.Components[v.ComponentName] = compStatus
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", succeedProgressCount, expectProgressCount)
@@ -161,11 +158,6 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		// if volume expansion timed out, do it
 		opsRequestPhase = appsv1alpha1.OpsFailedPhase
 		err = errors.New(fmt.Sprintf("Timed out waiting for volume expansion completed, the timeout is %g minutes", VolumeExpansionTimeOut.Minutes()))
-	}
-
-	// when opsRequest completed or cluster status is changed, do it
-	if patchErr := ve.patchClusterStatus(reqCtx, cli, opsRes, opsRequestPhase, oldClusterStatus, clusterPatch); patchErr != nil {
-		return "", requeueAfter, patchErr
 	}
 
 	return opsRequestPhase, requeueAfter, err
@@ -211,7 +203,7 @@ func (ve volumeExpansionOpsHandler) checkIsTimeOut(opsRequest *appsv1alpha1.OpsR
 }
 
 // setClusterComponentPhaseToRunning when component expand volume completed, check whether change the component status.
-func (ve volumeExpansionOpsHandler) setComponentPhaseForClusterAndOpsRequest(component *appsv1alpha1.OpsRequestComponentStatus,
+func (ve volumeExpansionOpsHandler) setOpsRequestComponentPhase(component *appsv1alpha1.OpsRequestComponentStatus,
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
 	completedOnComponent bool) {
@@ -226,8 +218,6 @@ func (ve volumeExpansionOpsHandler) setComponentPhaseForClusterAndOpsRequest(com
 	if p == appsv1alpha1.SpecReconcilingClusterCompPhase {
 		p = appsv1alpha1.RunningClusterCompPhase
 	}
-	c.Phase = p
-	cluster.Status.SetComponentStatus(componentName, c)
 	component.Phase = p
 }
 
@@ -235,24 +225,6 @@ func (ve volumeExpansionOpsHandler) setComponentPhaseForClusterAndOpsRequest(com
 func (ve volumeExpansionOpsHandler) isExpansionCompleted(phase appsv1alpha1.ProgressStatus) bool {
 	return slices.Contains([]appsv1alpha1.ProgressStatus{appsv1alpha1.FailedProgressStatus,
 		appsv1alpha1.SucceedProgressStatus}, phase)
-}
-
-// patchClusterStatus patch cluster status
-func (ve volumeExpansionOpsHandler) patchClusterStatus(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	opsRequestPhase appsv1alpha1.OpsPhase,
-	oldClusterStatus *appsv1alpha1.ClusterStatus,
-	clusterPatch client.Patch) error {
-	// when the OpsRequest.status.phase is Succeed or Failed, do it
-	if opsRequestIsCompleted(opsRequestPhase) && opsRes.Cluster.Status.Phase == appsv1alpha1.SpecReconcilingClusterPhase {
-		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
-	}
-	// if cluster status changed, patch it
-	if !reflect.DeepEqual(oldClusterStatus, opsRes.Cluster.Status) {
-		return cli.Status().Patch(reqCtx.Ctx, opsRes.Cluster, clusterPatch)
-	}
-	return nil
 }
 
 // pvcIsResizing when pvc start resizing, it will set conditions type to Resizing/FileSystemResizePending

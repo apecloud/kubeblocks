@@ -164,7 +164,7 @@ func (c *statelessComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
-	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Create a new component")
+	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
 
 	return nil
 }
@@ -209,7 +209,7 @@ func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if c.runningWorkload == nil {
 		return nil
 	}
-	return c.ComponentBase.BuildLatestStatus(reqCtx, cli, c.runningWorkload)
+	return c.ComponentBase.StatusWorkload(reqCtx, cli, c.runningWorkload, nil)
 }
 
 func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -259,7 +259,7 @@ func (c *statelessComponent) createWorkload() {
 	deployProto := c.WorkloadVertex.Obj.(*appsv1.Deployment)
 	c.WorkloadVertex.Obj = deployProto
 	c.WorkloadVertex.Action = ictrltypes.ActionCreatePtr()
-	c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload created")
+	c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload created")
 }
 
 func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
@@ -271,6 +271,6 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
 		c.WorkloadVertex.Obj = deployObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionUpdatePtr()
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Component workload updated")
+		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload updated")
 	}
 }

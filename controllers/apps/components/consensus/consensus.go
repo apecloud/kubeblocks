@@ -116,10 +116,11 @@ func (r *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bo
 	return intctrlutil.PodIsReadyWithLabel(*pod)
 }
 
-func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.ClusterComponentStatus, pods []*corev1.Pod) {
+func (r *ConsensusSet) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
 	var (
-		isAbnormal bool
-		isFailed   = true
+		isAbnormal     bool
+		isFailed       = true
+		statusMessages appsv1alpha1.ComponentMessageMap
 	)
 	for _, pod := range pods {
 		role := pod.Labels[constant.RoleLabelKey]
@@ -128,15 +129,17 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(status *appsv1alpha1.Clus
 		}
 		if role == "" {
 			isAbnormal = true
-			status.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
+			statusMessages.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
 		}
 		// TODO clear up the message of ready pod in component.message.
 	}
 	if isFailed {
-		status.Phase = appsv1alpha1.FailedClusterCompPhase
-	} else if isAbnormal {
-		status.Phase = appsv1alpha1.AbnormalClusterCompPhase
+		return appsv1alpha1.FailedClusterCompPhase, statusMessages
 	}
+	if isAbnormal {
+		return appsv1alpha1.AbnormalClusterCompPhase, statusMessages
+	}
+	return "", statusMessages
 }
 
 func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,

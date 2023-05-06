@@ -637,8 +637,14 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	testStorageExpansion := func(compName, compDefName string) {
-		const storageClassName = "sc-mock"
-		const replicas = 3
+		var (
+			storageClassName  = "sc-mock"
+			replicas          = 3
+			volumeSize        = "1Gi"
+			newVolumeSize     = "2Gi"
+			volumeQuantity    = resource.MustParse(volumeSize)
+			newVolumeQuantity = resource.MustParse(newVolumeSize)
+		)
 
 		By("Mock a StorageClass which allows resize")
 		allowVolumeExpansion := true
@@ -652,7 +658,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(testCtx.CreateObj(testCtx.Ctx, storageClass)).Should(Succeed())
 
 		By("Creating a cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVCSpec("1Gi")
+		pvcSpec := testapps.NewPVCSpec(volumeSize)
 		pvcSpec.StorageClassName = &storageClass.Name
 
 		By("Create cluster and waiting for the cluster initialized")
@@ -660,7 +666,7 @@ var _ = Describe("Cluster Controller", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(compName, compDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			SetReplicas(replicas).
+			SetReplicas(int32(replicas)).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -689,6 +695,10 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).Should(Succeed())
 			pvc.Status.Phase = corev1.ClaimBound // only bound pvc allows resize
+			if pvc.Status.Capacity == nil {
+				pvc.Status.Capacity = corev1.ResourceList{}
+			}
+			pvc.Status.Capacity[corev1.ResourceStorage] = volumeQuantity
 			Expect(k8sClient.Status().Update(testCtx.Ctx, pvc)).Should(Succeed())
 		}
 
@@ -709,11 +719,36 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Updating the PVC storage size")
-		newStorageValue := resource.MustParse("2Gi")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			comp := &cluster.Spec.ComponentSpecs[0]
-			comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
+			comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newVolumeQuantity
 		})()).ShouldNot(HaveOccurred())
+
+		By("Checking the resize operation in progress")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+		for i := 0; i < replicas; i++ {
+			pvc := &corev1.PersistentVolumeClaim{}
+			pvcKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      getPVCName(compName, i),
+			}
+			Expect(k8sClient.Get(testCtx.Ctx, pvcKey, pvc)).Should(Succeed())
+			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newVolumeQuantity))
+			Expect(pvc.Status.Capacity[corev1.ResourceStorage]).To(Equal(volumeQuantity))
+		}
+
+		By("Mock resizing of PVCs finished")
+		for i := 0; i < replicas; i++ {
+			pvcKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      getPVCName(compName, i),
+			}
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+				pvc.Status.Capacity[corev1.ResourceStorage] = newVolumeQuantity
+			})()).ShouldNot(HaveOccurred())
+		}
 
 		By("Checking the resize operation finished")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
@@ -721,16 +756,14 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking PVCs are resized")
-		stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		sts = &stsList.Items[0]
-		for i := *sts.Spec.Replicas - 1; i >= 0; i-- {
-			pvc := &corev1.PersistentVolumeClaim{}
+		for i := 0; i < replicas; i++ {
 			pvcKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
-				Name:      getPVCName(compName, int(i)),
+				Name:      getPVCName(compName, i),
 			}
-			Expect(k8sClient.Get(testCtx.Ctx, pvcKey, pvc)).Should(Succeed())
-			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newStorageValue))
+			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+				g.Expect(pvc.Status.Capacity[corev1.ResourceStorage]).To(Equal(newVolumeQuantity))
+			})).Should(Succeed())
 		}
 	}
 

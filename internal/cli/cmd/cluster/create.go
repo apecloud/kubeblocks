@@ -937,15 +937,16 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 // validateClusterVersion check whether the cluster version we need is exist in K8S or
 // the default cluster version is exist
 func (o *CreateOptions) validateClusterVersion() error {
-	existedClusterVersions, existedDefault, err := getClusterVersions(o.Dynamic, o.ClusterDefRef)
+	existedClusterVersions, defaultVersion, existedDefault, err := getClusterVersions(o.Dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
-	if o.ClusterVersionRef != "" {
+	switch {
+	case o.ClusterVersionRef != "":
 		if _, ok := existedClusterVersions[o.ClusterVersionRef]; !ok {
 			return fmt.Errorf("failed to find the specified cluster version \"%s\"", o.ClusterVersionRef)
 		}
-	} else if !existedDefault {
+	case !existedDefault:
 		// if default version is not set and there is only one version, use it
 		if len(existedClusterVersions) == 1 {
 			for k := range existedClusterVersions {
@@ -955,28 +956,37 @@ func (o *CreateOptions) validateClusterVersion() error {
 		} else {
 			return fmt.Errorf("failed to find the default cluster version, use '--cluster-version ClusterVersion' to set it")
 		}
+	case existedDefault:
+		// TODO: achieve this in operator
+		if existedDefault {
+			o.ClusterVersionRef = defaultVersion
+			fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
+		}
 	}
+
 	return nil
 }
 
 // getClusterVersions return all cluster versions in K8S and return true if the cluster have a default cluster version
-func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[string]struct{}, bool, error) {
+func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[string]struct{}, string, bool, error) {
 	allClusterVersions := make(map[string]struct{})
 	existedDefault := false
+	defaultVersion := ""
 	list, err := dynamic.Resource(types.ClusterVersionGVR()).List(context.Background(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
 	})
 	if err != nil {
-		return nil, false, err
+		return nil, defaultVersion, false, err
 	}
 	for _, item := range list.Items {
 		allClusterVersions[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
 		if !existedDefault && annotations != nil && (annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue) {
 			existedDefault = true
+			defaultVersion = item.GetName()
 		}
 	}
-	return allClusterVersions, existedDefault, nil
+	return allClusterVersions, defaultVersion, existedDefault, nil
 }
 
 func shouldCreateDependencies(cd *appsv1alpha1.ClusterDefinition, compSpec *appsv1alpha1.ClusterComponentSpec) (bool, error) {

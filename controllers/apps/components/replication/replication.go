@@ -163,9 +163,11 @@ func (r *ReplicationComponent) HandleUpdate(ctx context.Context, obj client.Obje
 				return err
 			}
 		}
-		if err := util.DeleteStsPods(ctx, r.Cli, sts); err != nil {
-			return err
-		}
+	}
+	// REVIEW/TODO: (Y-Rookie)
+	//  1. should employ rolling deletion as default strategy instead of delete them all.
+	if err := util.DeleteStsPods(ctx, r.Cli, sts); err != nil {
+		return err
 	}
 	// sync cluster.spec.componentSpecs.[x].primaryIndex when failover occurs and switchPolicy is Noop.
 	if err := syncPrimaryIndex(ctx, r.Cli, r.Cluster, sts.Labels[constant.KBAppComponentLabelKey]); err != nil {

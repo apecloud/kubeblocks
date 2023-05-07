@@ -146,7 +146,13 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	case appsv1alpha1.Consensus:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return buildConsensusSet(reqCtx, task, envConfig.Name)
+				return buildStsWithCustomParameters(reqCtx, task, envConfig.Name,
+					func(sts *appsv1.StatefulSet) {
+						// REVIEW: why having 10s for consensus?
+						sts.Spec.MinReadySeconds = 10
+						sts.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+						sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+					})
 			}); err != nil {
 			return err
 		}
@@ -175,7 +181,13 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return buildReplicationSet(reqCtx, task, envConfig.Name)
+				return buildStsWithCustomParameters(reqCtx, task, envConfig.Name,
+					func(sts *appsv1.StatefulSet) {
+						// REVIEW: why having 10s for workloadType=replication?
+						sts.Spec.MinReadySeconds = 10
+						sts.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+						sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+					})
 			}); err != nil {
 			return err
 		}
@@ -221,28 +233,18 @@ func addLeaderSelectorLabels(service *corev1.Service, component *component.Synth
 	}
 }
 
-// buildConsensusSet build on a stateful set
-func buildConsensusSet(reqCtx intctrlutil.RequestCtx,
-	task *intctrltypes.ReconcileTask,
-	envConfigName string) (*appsv1.StatefulSet, error) {
-	sts, err := builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfigName)
-	if err != nil {
-		return sts, err
-	}
-
-	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
-	return sts, err
-}
-
-// buildReplicationSet builds a replication component on statefulSet.
-func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
-	task *intctrltypes.ReconcileTask,
-	envConfigName string) (*appsv1.StatefulSet, error) {
+// buildStsWithCustomParameters build a statefulset
+func buildStsWithCustomParameters(reqCtx intctrlutil.RequestCtx,
+	task *intctrltypes.ReconcileTask, envConfigName string,
+	customParamsSetter func(*appsv1.StatefulSet)) (*appsv1.StatefulSet, error) {
 	sts, err := builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfigName)
 	if err != nil {
 		return nil, err
 	}
-	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+	if customParamsSetter == nil {
+		return sts, nil
+	}
+	customParamsSetter(sts)
 	return sts, nil
 }
 

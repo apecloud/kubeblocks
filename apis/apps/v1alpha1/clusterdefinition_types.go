@@ -243,6 +243,8 @@ type VolumeTypeSpec struct {
 // ClusterComponentDefinition provides a workload component specification template,
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
+// +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ?  has(self.consensusSpec) : !has(self.consensusSpec)",message="componentDefs.consensusSpec is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
+// +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Replication' ?  has(self.replicationSpec) : !has(self.replicationSpec)",message="componentDefs.replicationSpec is required when componentDefs.workloadType is Replication, and forbidden otherwise"
 type ClusterComponentDefinition struct {
 	// name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
@@ -538,6 +540,13 @@ type ConsensusSetSpec struct {
 	// +kubebuilder:default=Serial
 	// +optional
 	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
+}
+
+func NewConsensusSetSpec() *ConsensusSetSpec {
+	return &ConsensusSetSpec{
+		Leader:         DefaultLeader,
+		UpdateStrategy: SerialStrategy,
+	}
 }
 
 type ConsensusMember struct {

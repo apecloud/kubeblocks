@@ -8718,6 +8718,15 @@ spec:
                   - name
                   - workloadType
                   type: object
+                  x-kubernetes-validations:
+                  - message: componentDefs.consensusSpec is required when componentDefs.workloadType
+                      is Consensus, and forbidden otherwise
+                    rule: 'has(self.workloadType) && self.workloadType == ''Consensus''
+                      ?  has(self.consensusSpec) : !has(self.consensusSpec)'
+                  - message: componentDefs.replicationSpec is required when componentDefs.workloadType
+                      is Replication, and forbidden otherwise
+                    rule: 'has(self.workloadType) && self.workloadType == ''Replication''
+                      ?  has(self.replicationSpec) : !has(self.replicationSpec)'
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:

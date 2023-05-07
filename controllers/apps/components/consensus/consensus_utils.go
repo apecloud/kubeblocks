@@ -70,13 +70,11 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
 	sort.SliceStable(pods, func(i, j int) bool {
 		roleI := pods[i].Labels[constant.RoleLabelKey]
 		roleJ := pods[j].Labels[constant.RoleLabelKey]
-
 		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
 			_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
 			_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
 			return ordinal1 < ordinal2
 		}
-
 		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
 	})
 }
@@ -116,12 +114,14 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 
 	// generate plan by UpdateStrategy
 	switch component.ConsensusSpec.UpdateStrategy {
-	case appsv1alpha1.SerialStrategy:
-		generateConsensusSerialPlan(plan, pods)
 	case appsv1alpha1.ParallelStrategy:
 		generateConsensusParallelPlan(plan, pods)
 	case appsv1alpha1.BestEffortParallelStrategy:
 		generateConsensusBestEffortParallelPlan(plan, pods, rolePriorityMap)
+	case appsv1alpha1.SerialStrategy:
+		fallthrough
+	default:
+		generateConsensusSerialPlan(plan, pods)
 	}
 
 	return plan
@@ -207,9 +207,8 @@ func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
 // ComposeRolePriorityMap generates a priority map based on roles.
 func ComposeRolePriorityMap(component appsv1alpha1.ClusterComponentDefinition) map[string]int {
 	if component.ConsensusSpec == nil {
-		component.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{Leader: appsv1alpha1.DefaultLeader}
+		component.ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
 	}
-
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[""] = emptyPriority
 	rolePriorityMap[component.ConsensusSpec.Leader.Name] = leaderPriority
@@ -226,7 +225,6 @@ func ComposeRolePriorityMap(component appsv1alpha1.ClusterComponentDefinition) m
 			rolePriorityMap[follower.Name] = followerReadWritePriority
 		}
 	}
-
 	return rolePriorityMap
 }
 

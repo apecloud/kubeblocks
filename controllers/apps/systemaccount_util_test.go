@@ -209,7 +209,7 @@ func TestRenderJob(t *testing.T) {
 			endpoint := "10.0.0.1"
 			job := renderJob(engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
-			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
+			_ = calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			assert.NotNil(t, job.Spec.TTLSecondsAfterFinished)
 			assert.Equal(t, (int32)(0), *job.Spec.TTLSecondsAfterFinished)
 			envList := job.Spec.Template.Spec.Containers[0].Env
@@ -220,7 +220,7 @@ func TestRenderJob(t *testing.T) {
 			assert.NotNil(t, job)
 			// set debug mode on
 			cluster.Annotations[debugClusterAnnotationKey] = "True"
-			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
+			_ = calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			assert.Nil(t, job.Spec.TTLSecondsAfterFinished)
 			assert.NotNil(t, secrets)
 			// set debug mode off
@@ -231,7 +231,7 @@ func TestRenderJob(t *testing.T) {
 			cluster.Spec.Tolerations = toleration
 			job = renderJob(engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
-			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
+			_ = calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			jobToleration := job.Spec.Template.Spec.Tolerations
 			assert.Equal(t, 2, len(jobToleration))
 			// make sure the toleration is added to job and contains our built-in toleration

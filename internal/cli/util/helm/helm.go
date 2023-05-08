@@ -51,6 +51,7 @@ import (
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -553,8 +554,8 @@ func GetQuiteLog() action.DebugLog {
 	return func(format string, v ...interface{}) {}
 }
 
-func GetVerboseLog(out io.Writer) action.DebugLog {
+func GetVerboseLog() action.DebugLog {
 	return func(format string, v ...interface{}) {
-		fmt.Fprintf(out, format+"\n", v...)
+		klog.Infof(format+"\n", v...)
 	}
 }

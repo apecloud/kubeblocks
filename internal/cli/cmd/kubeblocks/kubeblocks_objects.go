@@ -109,10 +109,7 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 			ns = metav1.NamespaceAll
 		}
 
-		if klog.V(1).Enabled() {
-			klog.Infof("search objects by labels, namespace: %s, name: %s, gvr: %s", labelSelector, gvr, scope)
-		}
-
+		klog.V(1).Infof("search objects by labels, namespace: %s, name: %s, gvr: %s", labelSelector, gvr, scope)
 		objs, err := dynamic.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
@@ -136,9 +133,7 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 
 	// get object by name
 	getObjectByName := func(name string, gvr schema.GroupVersionResource) {
-		if klog.V(1).Enabled() {
-			klog.Infof("search object by name, namespace: %s, name: %s, gvr: %s ", namespace, name, gvr)
-		}
+		klog.V(1).Infof("search object by name, namespace: %s, name: %s, gvr: %s ", namespace, name, gvr)
 		obj, err := dynamic.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			appendErr(err)
@@ -149,9 +144,7 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 		}
 		target := kbObjs[gvr]
 		target.Items = append(target.Items, *obj)
-		if klog.V(1).Enabled() {
-			klog.Infof("\tget object: %s, %s, %s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
-		}
+		klog.V(1).Infof("\tget object: %s, %s, %s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 	}
 	// get RBAC resources, such as ClusterRole, ClusterRoleBinding, Role, RoleBinding, ServiceAccount
 	getObjectsByLabels(buildKubeBlocksSelectorLabels(), types.ClusterRoleGVR(), ResourceScopeGlobal)

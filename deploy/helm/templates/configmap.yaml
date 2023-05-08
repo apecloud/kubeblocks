@@ -34,8 +34,8 @@ data:
 
     {{- if .Values.dataPlane }}
     # data plane tolerations
-    DATA_PLANE_TOLERATIONS: "{{ .Values.dataPlane.tolerations }}"
+    DATA_PLANE_TOLERATIONS: '{{ toJson .Values.dataPlane.tolerations }}'
 
     # data plane affinity
-    DATA_PLANE_AFFINITY: "{{ .Values.dataPlane.affinity }}"
+    DATA_PLANE_AFFINITY: '{{ toJson .Values.dataPlane.affinity }}'
     {{- end }}

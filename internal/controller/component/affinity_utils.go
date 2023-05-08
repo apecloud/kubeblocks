@@ -166,10 +166,11 @@ func mergeAffinity(dest, src *corev1.Affinity) (*corev1.Affinity, error) {
 		return dest, nil
 	}
 
-	rst := dest.DeepCopy()
-	if rst == nil {
-		rst = new(corev1.Affinity)
+	if dest == nil {
+		return src.DeepCopy(), nil
 	}
+
+	rst := dest.DeepCopy()
 	skipPodAffinity := src.PodAffinity == nil
 	skipPodAntiAffinity := src.PodAntiAffinity == nil
 	skipNodeAffinity := src.NodeAffinity == nil

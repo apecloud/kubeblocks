@@ -24,6 +24,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"github.com/briandowns/spinner"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 type Spinner struct {
@@ -39,19 +41,29 @@ type Spinner struct {
 	cancel chan struct{}
 }
 
-type Option func(*Spinner)
+type Interface interface {
+	Start()
+	Done(status string)
+	Success()
+	Fail()
+	UpdateSpinnerMessage(msg string)
+	SetMessage(msg string)
+	SetFinalMsg(msg string)
+}
+
+type Option func(Interface)
 
 func WithMessage(msg string) Option {
-	return func(s *Spinner) {
+	return func(s Interface) {
 		s.UpdateSpinnerMessage(msg)
 	}
 }
 
-func WithDelay(delay time.Duration) Option {
-	return func(s *Spinner) {
-		s.delay = delay
-	}
-}
+// func WithDelay(delay time.Duration) Option {
+// 	return func(s Spinner) {
+// 		// s.delay = delay
+// 	}
+// }
 
 func (s *Spinner) UpdateSpinnerMessage(msg string) {
 	s.s.Suffix = fmt.Sprintf(" %s", msg)
@@ -121,7 +133,17 @@ func (s *Spinner) Fail() {
 	s.Done(printer.BoldRed("FAIL"))
 }
 
-func New(w io.Writer, opts ...Option) *Spinner {
+func New(w io.Writer, opts ...Option) Interface {
+	if runtime.GOOS == types.GoosWindows {
+		res := &WindowsSpinner{
+			out: w,
+		}
+		for _, opt := range opts {
+			opt(res)
+		}
+		return res
+	}
+
 	res := &Spinner{}
 	res.s = spinner.New(spinner.CharSets[11],
 		100*time.Millisecond,

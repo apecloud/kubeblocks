@@ -297,8 +297,8 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 			for k, v := range addons {
 				_, ok := newReadyInWin[k]
 				if v == string(extensionsv1alpha1.AddonEnabled) && !ok {
-					out := fmt.Sprintf("%-50s %s\n", "Addon "+k, printer.BoldGreen("OK"))
-					fmt.Print(out)
+					s := spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Addon "+k)))
+					s.Success()
 					newReadyInWin[k] = true
 				}
 			}
@@ -318,8 +318,8 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 			if err == wait.ErrWaitTimeout {
 				for k, v := range addons {
 					if v != string(extensionsv1alpha1.AddonEnabled) && OS == types.GoosWindows {
-						out := fmt.Sprintf("%-50s %s\n", "Addon "+k, printer.BoldRed("FAIL"))
-						fmt.Print(out)
+						s := spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Addon "+k)))
+						s.Fail()
 					}
 				}
 				return errors.New("timeout waiting for auto-install addons to be enabled, run \"kbcli addon list\" to check addon status")
@@ -365,7 +365,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		s.SetMessage(suffixMsg(allMsg))
 	}
 
-	spinnerDone := func(s *spinner.Spinner) {
+	spinnerDone := func(s spinner.Interface) {
 		s.SetFinalMsg(allMsg)
 		s.Done("")
 		fmt.Fprintln(o.Out)

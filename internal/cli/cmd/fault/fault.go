@@ -33,7 +33,7 @@ func NewFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Short: "inject faults to pod.",
 	}
 	cmd.AddCommand(
-		NewIOChaosCmd(f, streams),
+		NewTimeChaosCmd(f, streams),
 	)
 	return cmd
 }

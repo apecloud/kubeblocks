@@ -242,6 +242,10 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	}
 
 	// addons record the addons and its status
+	var (
+		allEnabled bool
+		err        error
+	)
 	addons := make(map[string]string)
 	OS := OS.GOOS
 
@@ -292,7 +296,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 			}
 			for k, v := range addons {
 				_, ok := newReadyInWin[k]
-				if v && !ok {
+				if v == string(extensionsv1alpha1.AddonEnabled) && !ok {
 					out := fmt.Sprintf("%-50s %s\n", "Addon "+k, printer.BoldGreen("OK"))
 					fmt.Print(out)
 					newReadyInWin[k] = true
@@ -300,26 +304,30 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 			}
 		}
 
-		for i := 0; i < viper.GetInt("KB_WAIT_ADDON_TIMES"); i++ {
+		if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
 			allEnabled, err = checkAddons()
 			if err != nil {
-				out := fmt.Sprintf("%-50s %s\n", "Wait for addons to be ready", printer.BoldRed("FAIL"))
-				fmt.Println(out)
-				return err
+				return false, err
 			}
 			checkProgressInWindows()
 			if allEnabled {
-				return nil
+				return true, nil
 			}
-			time.Sleep(5 * time.Second)
+			return false, nil
+		}); err != nil {
+			if err == wait.ErrWaitTimeout {
+				for k, v := range addons {
+					if v != string(extensionsv1alpha1.AddonEnabled) && OS == types.GoosWindows {
+						out := fmt.Sprintf("%-50s %s\n", "Addon "+k, printer.BoldRed("FAIL"))
+						fmt.Print(out)
+					}
+				}
+				return errors.New("timeout waiting for auto-install addons to be enabled, run \"kbcli addon list\" to check addon status")
+			}
+			return err
 		}
 		// Timeout
-		for k, v := range addons {
-			if !v && OS == types.GoosWindows {
-				out := fmt.Sprintf("%-50s %s\n", "Addon "+k, printer.BoldRed("FAIL"))
-				fmt.Print(out)
-			}
-		}
+
 		return nil
 	}
 
@@ -357,15 +365,11 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		s.SetMessage(suffixMsg(allMsg))
 	}
 
-	var (
-		allEnabled  bool
-		err         error
-		spinnerDone = func(s *spinner.Spinner) {
-			s.SetFinalMsg(allMsg)
-			s.Done("")
-			fmt.Fprintln(o.Out)
-		}
-	)
+	spinnerDone := func(s *spinner.Spinner) {
+		s.SetFinalMsg(allMsg)
+		s.Done("")
+		fmt.Fprintln(o.Out)
+	}
 
 	// wait all addons to be enabled, or timeout
 	if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {

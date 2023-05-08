@@ -19,7 +19,7 @@ data:
     set -ex
     # echo "include /etc/conf/redis.conf" >> /etc/redis/redis.conf
     # echo "replica-announce-ip $KB_POD_FQDN" >> /etc/redis/redis.conf
-    /kb/tools/config_render --config-volume /etc/conf/ --config /opt/kb-tools/config/redis-replication-config/kb-cm-config.yaml --output-dir /etc/redis
+    /kb/tools/config_render --config-volume /etc/conf/ --config /opt/kb-tools/config/redis-replication-config --output-dir /etc/redis
     exec redis-server /etc/redis/redis.conf \
     --loadmodule /opt/redis-stack/lib/redisearch.so ${REDISEARCH_ARGS} \
     --loadmodule /opt/redis-stack/lib/redisgraph.so ${REDISGRAPH_ARGS} \

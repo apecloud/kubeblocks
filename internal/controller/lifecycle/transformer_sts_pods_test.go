@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
@@ -21,10 +22,10 @@ var _ = Describe("statefulset pod label update test", func() {
 		It("update annotation according to replicas", func() {
 			var (
 				namespace        = "default"
-				clusterDefName   = "sts-h-scale-cluster-def"
+				clusterDefName   = "sts-cluster-def"
 				componentDefName = "foo"
-				clusterVerName   = "sts-h-scale-cluster-ver"
-				clusterName      = "sts-h-scale-cluster"
+				clusterVerName   = "sts-cluster-ver"
+				clusterName      = "sts-cluster"
 				componentName    = "bar"
 				volumeName       = "data"
 				stsName          = clusterName + "-" + componentName
@@ -48,6 +49,7 @@ var _ = Describe("statefulset pod label update test", func() {
 				AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{ObjectMeta: template.ObjectMeta, Spec: template.Spec}).
 				GetObject()
 			origSts := sts.DeepCopy()
+
 			pvc1 := apps.NewPersistentVolumeClaimFactory(namespace, pvcNameBase+"1", cluster.Name, componentName, volumeName).
 				AddAppInstanceLabel(clusterName).
 				GetObject()
@@ -63,7 +65,7 @@ var _ = Describe("statefulset pod label update test", func() {
 			transCtx := &ClusterTransformContext{
 				Context:     ctx,
 				Client:      k8sMock,
-				Logger:      log.FromContext(ctx).WithValues("transformer", "h-scale"),
+				Logger:      log.FromContext(ctx).WithValues("transformer", "sts-pods"),
 				ClusterDef:  cd,
 				ClusterVer:  cv,
 				Cluster:     cluster,
@@ -77,30 +79,24 @@ var _ = Describe("statefulset pod label update test", func() {
 			stsVertex := &lifecycleVertex{obj: sts, oriObj: origSts, action: actionPtr(UPDATE)}
 			dag.AddVertex(stsVertex)
 			dag.Connect(rootVertex, stsVertex)
-			By("mock client.List pvcs")
+			By("mock client.List pods")
 			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.PersistentVolumeClaimList{}, gomock.Any()).
+				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
 				DoAndReturn(
-					func(_ context.Context, list *corev1.PersistentVolumeClaimList, _ ...client.ListOption) error {
-						list.Items = []corev1.PersistentVolumeClaim{
-							*pvc1,
-							*pvc2,
+					func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
+						list.Items = []corev1.Pod{}
+						for i := 0; i < int(*sts.Spec.Replicas); i++ {
+							pod := apps.NewPodFactory(namespace, "test-pod-"+strconv.Itoa(i)).AddLabelsInMap(sts.Labels).GetObject()
+							list.Items = append(list.Items, *pod)
 						}
 						return nil
 					}).AnyTimes()
 
-			transformer := &StsHorizontalScalingTransformer{}
+			transformer := &StsPodsTransformer{}
 
 			By("do transform")
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			Expect(len(findAll[*corev1.PersistentVolumeClaim](dag))).Should(Equal(0))
-
-			By("prepare initial DAG with sts.action=DELETE")
-			stsVertex.action = actionPtr(DELETE)
-
-			By("do transform")
-			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			Expect(len(findAll[*corev1.PersistentVolumeClaim](dag))).Should(Equal(2))
+			Expect(len(findAll[*corev1.Pod](dag))).Should(Equal(int(*sts.Spec.Replicas)))
 		})
 	})
 })

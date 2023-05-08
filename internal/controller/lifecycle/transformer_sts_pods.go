@@ -55,6 +55,9 @@ func (t *StsPodsTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 			}
 			for _, pod := range podList.Items {
 				obj := pod.DeepCopy()
+				if obj.Annotations == nil {
+					obj.Annotations = make(map[string]string)
+				}
 				obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(*stsProto.Spec.Replicas))
 				v := &lifecycleVertex{
 					obj:    obj,

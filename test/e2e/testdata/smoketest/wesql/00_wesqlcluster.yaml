@@ -3,9 +3,9 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster
+  name: mycluster-apecloud-mysql-cluster
   labels: 
-    helm.sh/chart: apecloud-mysql-cluster-0.5.0-beta.17
+    helm.sh/chart: apecloud-mysql-cluster-0.5.0-beta.19
     app.kubernetes.io/name: apecloud-mysql-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "8.0.30"

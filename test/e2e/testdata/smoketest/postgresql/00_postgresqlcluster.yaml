@@ -6,7 +6,7 @@ metadata:
   name: kb-sa-mycluster
   labels:
     
-    helm.sh/chart: pgcluster-0.5.0-beta.17
+    helm.sh/chart: pgcluster-0.5.0-beta.19
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "14.7.1"
@@ -20,7 +20,7 @@ metadata:
   namespace: default
   labels:
     
-    helm.sh/chart: pgcluster-0.5.0-beta.17
+    helm.sh/chart: pgcluster-0.5.0-beta.19
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "14.7.1"
@@ -70,7 +70,7 @@ metadata:
   name: kb-rolebinding-default-mycluster
   labels:
     
-    helm.sh/chart: pgcluster-0.5.0-beta.17
+    helm.sh/chart: pgcluster-0.5.0-beta.19
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "14.7.1"
@@ -88,9 +88,9 @@ subjects:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster
+  name: mycluster-pgcluster
   labels: 
-    helm.sh/chart: pgcluster-0.5.0-beta.17
+    helm.sh/chart: pgcluster-0.5.0-beta.19
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "14.7.1"

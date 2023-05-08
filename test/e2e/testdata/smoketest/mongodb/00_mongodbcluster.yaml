@@ -5,7 +5,7 @@ kind: Cluster
 metadata:
   name: mycluster
   labels:
-    helm.sh/chart: mongodb-cluster-0.5.0-beta.17
+    helm.sh/chart: mongodb-cluster-0.5.0-beta.19
     app.kubernetes.io/name: mongodb-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"

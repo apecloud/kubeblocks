@@ -172,7 +172,7 @@ type ConsensusRole struct {
 	IsLeader bool `json:"isLeader"`
 }
 
-// AccessMode define SVC access mode enums.
+// AccessMode defines SVC access mode enums.
 // +enum
 type AccessMode string
 
@@ -182,7 +182,7 @@ const (
 	NoneMode      AccessMode = "None"
 )
 
-// UpdateStrategy define Cluster Component update strategy.
+// UpdateStrategy defines Cluster Component update strategy.
 // +enum
 type UpdateStrategy string
 
@@ -192,6 +192,7 @@ const (
 	ParallelUpdateStrategy           UpdateStrategy = "Parallel"
 )
 
+// BindingType defines built-in role observation type
 type BindingType string
 
 const (

@@ -1,7 +1,6 @@
 package fault
 
 import (
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -9,6 +8,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"

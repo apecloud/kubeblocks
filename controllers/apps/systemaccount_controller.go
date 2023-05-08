@@ -147,17 +147,24 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.Reconciled()
 	}
 
+	// wait till the cluster is running
+	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+		reqCtx.Log.V(1).Info("Cluster is not ready yet", "cluster", req.NamespacedName)
+		return intctrlutil.Reconciled()
+	}
+
 	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
 	clusterDefNS := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
 	if err := r.Client.Get(reqCtx.Ctx, clusterDefNS, clusterdefinition); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
 	}
 
-	// wait till the cluster is running
-	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
-		reqCtx.Log.V(1).Info("Cluster is not ready yet", "cluster", req.NamespacedName)
-		return intctrlutil.Reconciled()
+	clusterVersion := &appsv1alpha1.ClusterVersion{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, clusterVersion); err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
 	}
+
+	componentVersions := clusterVersion.Spec.GetDefNameMappingComponents()
 
 	// process accounts per component
 	processAccountsForComponent := func(compDef *appsv1alpha1.ClusterComponentDefinition, compDecl *appsv1alpha1.ClusterComponentSpec,
@@ -201,6 +208,8 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			case appsv1alpha1.CreateByStmt:
 				if engine == nil {
 					execConfig := compDef.SystemAccounts.CmdExecutorConfig
+					// complete execConfig with settings from component version
+					completeExecConfig(execConfig, componentVersions[compDef.Name])
 					engine = newCustomizedEngine(execConfig, cluster, compDecl.Name)
 				}
 				if err := r.createByStmt(reqCtx, cluster, compDef, compKey, engine, account, svcEP, headlessEP); err != nil {

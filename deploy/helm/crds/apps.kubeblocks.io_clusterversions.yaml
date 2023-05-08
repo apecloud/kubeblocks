@@ -62,6 +62,11 @@ spec:
                   description: ClusterComponentVersion is an application version component
                     spec.
                   properties:
+                    clientImage:
+                      description: clientImage define image for the component to connect
+                        database or engines. This value has a higher proirity over
+                        ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.image.
+                      type: string
                     componentDefRef:
                       description: componentDefRef reference one of the cluster component
                         definition names in ClusterDefinition API (spec.componentDefs.name).

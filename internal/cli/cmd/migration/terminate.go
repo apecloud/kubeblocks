@@ -40,7 +40,7 @@ func NewMigrationTerminateCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.MigrationTaskGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			_, validErr := IsMigrationCrdValidWithFactory(o.Factory)
-			util.CheckErr(validErr)
+			PrintCrdInvalidError(validErr)
 			util.CheckErr(deleteMigrationTask(o, args))
 		},
 	}

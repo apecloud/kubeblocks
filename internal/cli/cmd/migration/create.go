@@ -86,7 +86,7 @@ func NewMigrationCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		Example:           CreateTemplate,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.MigrationTaskGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())

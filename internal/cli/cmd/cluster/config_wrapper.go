@@ -38,7 +38,7 @@ type configWrapper struct {
 	clusterName   string
 	updatedParams map[string]string
 
-	// auto fill field
+	// autofill field
 	componentName  string
 	configSpecName string
 	configKey      string

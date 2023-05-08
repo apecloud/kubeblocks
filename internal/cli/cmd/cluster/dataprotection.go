@@ -206,7 +206,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Example:           createBackupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
@@ -544,7 +544,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Example:           createRestoreExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			util.CheckErr(o.Complete())
 			util.CheckErr(o.Validate())
 			util.CheckErr(o.Run())

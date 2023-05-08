@@ -213,7 +213,7 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Example:           createReconfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.CreateOptions.Complete())
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())

@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -79,14 +78,7 @@ var _ = Describe("Create", func() {
 		})
 
 		It("test create with dry-run", func() {
-			cmd := &cobra.Command{
-				Use: "test-create",
-			}
-			cmd.Flags().String("dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
-			options.Cmd = cmd
 			options.Format = printer.YAML
-
 			testCases := []struct {
 				clusterName    string
 				isUseDryRun    bool
@@ -136,7 +128,7 @@ var _ = Describe("Create", func() {
 					t.isUseDryRun, t.dryRunStrategy, t.mode))
 				options.Name = t.clusterName
 				if t.isUseDryRun {
-					Expect(cmd.Flags().Set("dry-run", t.mode)).Should(Succeed())
+					options.DryRun = t.mode
 				}
 				Expect(options.Complete()).Should(Succeed())
 

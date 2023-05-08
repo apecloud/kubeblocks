@@ -122,7 +122,7 @@ func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
-	cmd.Flags().StringVar(&o.DryRunStrategy, "dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	if o.HasComponentNamesFlag {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "components", nil, " Component names to this operations")
@@ -260,7 +260,7 @@ func (o *OperationsOptions) Validate() error {
 			return err
 		}
 	}
-	if o.RequireConfirm && o.DryRunStrategy == "none" {
+	if o.RequireConfirm && o.DryRun == "none" {
 		return delete.Confirm([]string{o.Name}, o.In)
 	}
 	return nil
@@ -369,7 +369,7 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example:           restartExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteRestartOps())
 			cmdutil.CheckErr(o.Validate())
@@ -394,7 +394,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example:           upgradeExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
@@ -422,7 +422,7 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		Example:           verticalScalingExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteComponentsFlag())
 			cmdutil.CheckErr(o.Validate())
@@ -450,7 +450,7 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 		Example:           horizontalScalingExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteComponentsFlag())
 			cmdutil.CheckErr(o.Validate())
@@ -478,7 +478,7 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		Example:           volumeExpansionExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteComponentsFlag())
 			cmdutil.CheckErr(o.Validate())
@@ -513,7 +513,7 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Example:           exposeExamples,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.fillExpose())
 			cmdutil.CheckErr(o.Validate())
@@ -549,7 +549,7 @@ func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Example:           stopExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
@@ -574,7 +574,7 @@ func NewStartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Example:           startExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())

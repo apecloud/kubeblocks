@@ -173,7 +173,7 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Example:           editConfigExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Cmd, o.Args = cmd, args
+			o.Args = args
 			cmdutil.CheckErr(o.CreateOptions.Complete())
 			util.CheckErr(o.Complete())
 			util.CheckErr(o.Validate())

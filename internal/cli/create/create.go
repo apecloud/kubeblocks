@@ -30,7 +30,6 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	cuejson "cuelang.org/go/encoding/json"
 	"github.com/leaanthony/debme"
-	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,14 +67,13 @@ type CreateOptions struct {
 	Namespace string
 
 	// Name Resource name of the command line operation
-	Name           string
-	Args           []string
-	Cmd            *cobra.Command
-	Dynamic        dynamic.Interface
-	Client         kubernetes.Interface
-	Format         printer.Format
-	ToPrinter      func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
-	DryRunStrategy string
+	Name      string
+	Args      []string
+	Dynamic   dynamic.Interface
+	Client    kubernetes.Interface
+	Format    printer.Format
+	ToPrinter func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
+	DryRun    string
 
 	// CueTemplateName cue template file name to render the resource
 	CueTemplateName string
@@ -186,7 +184,7 @@ func (o *CreateOptions) Run() error {
 
 			// for other errors, clean up dependencies
 			if cleanErr := o.CleanUp(); cleanErr != nil {
-				fmt.Fprintf(o.ErrOut, "clean up denpendencies failed: %v\n", cleanErr)
+				fmt.Fprintf(o.ErrOut, "Failed to clean up denpendencies: %v\n", cleanErr)
 			}
 			return err
 		}
@@ -255,10 +253,10 @@ func (o *CreateOptions) buildResourceObj() (*unstructured.Unstructured, error) {
 }
 
 func (o *CreateOptions) GetDryRunStrategy() (DryRunStrategy, error) {
-	if o.DryRunStrategy == "" {
+	if o.DryRun == "" {
 		return DryRunNone, nil
 	}
-	switch o.DryRunStrategy {
+	switch o.DryRun {
 	case "client":
 		return DryRunClient, nil
 	case "server":
@@ -268,7 +266,7 @@ func (o *CreateOptions) GetDryRunStrategy() (DryRunStrategy, error) {
 	case "none":
 		return DryRunNone, nil
 	default:
-		return DryRunNone, fmt.Errorf(`invalid dry-run value (%v). Must be "none", "server", or "client"`, o.DryRunStrategy)
+		return DryRunNone, fmt.Errorf(`invalid dry-run value (%v). Must be "none", "server", or "client"`, o.DryRun)
 	}
 }
 

@@ -58,6 +58,34 @@ spec:
           spec:
             description: ClusterSpec defines the desired state of Cluster
             properties:
+              ResourceAllocationPolicies:
+                additionalProperties:
+                  properties:
+                    dedicateRatio:
+                      default: 100
+                      exclusiveMinimum: true
+                      maximum: 100
+                      minimum: 0
+                      type: integer
+                    dedicateSize:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    overAllocationRatio:
+                      default: 0
+                      maximum: 100
+                      minimum: 0
+                      type: integer
+                    overAllocationSize:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                  type: object
+                type: object
               affinity:
                 description: affinity is a group of affinity scheduling rules.
                 properties:
@@ -113,6 +141,34 @@ spec:
                   and ClusterVersion's component if type is matching.
                 items:
                   properties:
+                    ResourceAllocationPolicies:
+                      additionalProperties:
+                        properties:
+                          dedicateRatio:
+                            default: 100
+                            exclusiveMinimum: true
+                            maximum: 100
+                            minimum: 0
+                            type: integer
+                          dedicateSize:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          overAllocationRatio:
+                            default: 0
+                            maximum: 100
+                            minimum: 0
+                            type: integer
+                          overAllocationSize:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                        type: object
+                      type: object
                     affinity:
                       description: affinity describes affinities which specific by
                         users.

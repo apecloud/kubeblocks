@@ -33,31 +33,33 @@ type MonitorConfig struct {
 }
 
 type SynthesizedComponent struct {
-	ClusterDefName        string                                 `json:"clusterDefName,omitempty"`
-	Name                  string                                 `json:"name,omitempty"`
-	Type                  string                                 `json:"type,omitempty"`
-	CharacterType         string                                 `json:"characterType,omitempty"`
-	MaxUnavailable        *intstr.IntOrString                    `json:"maxUnavailable,omitempty"`
-	Replicas              int32                                  `json:"replicas"`
-	WorkloadType          v1alpha1.WorkloadType                  `json:"workloadType,omitempty"`
-	ConsensusSpec         *v1alpha1.ConsensusSetSpec             `json:"consensusSpec,omitempty"`
-	PrimaryIndex          *int32                                 `json:"primaryIndex,omitempty"`
-	PodSpec               *corev1.PodSpec                        `json:"podSpec,omitempty"`
-	Services              []corev1.Service                       `json:"services,omitempty"`
-	Probes                *v1alpha1.ClusterDefinitionProbes      `json:"probes,omitempty"`
-	VolumeClaimTemplates  []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	Monitor               *MonitorConfig                         `json:"monitor,omitempty"`
-	EnabledLogs           []string                               `json:"enabledLogs,omitempty"`
-	LogConfigs            []v1alpha1.LogConfig                   `json:"logConfigs,omitempty"`
-	ConfigTemplates       []v1alpha1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
-	ScriptTemplates       []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
-	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy        `json:"horizontalScalePolicy,omitempty"`
-	TLS                   bool                                   `json:"tls"`
-	Issuer                *v1alpha1.Issuer                       `json:"issuer,omitempty"`
-	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"VolumeTypes,omitempty"`
-	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
-	ComponentDef          string                                 `json:"componentDef,omitempty"`
-	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
+	ClusterDefName             string                                 `json:"clusterDefName,omitempty"`
+	Name                       string                                 `json:"name,omitempty"`
+	Type                       string                                 `json:"type,omitempty"`
+	CharacterType              string                                 `json:"characterType,omitempty"`
+	MaxUnavailable             *intstr.IntOrString                    `json:"maxUnavailable,omitempty"`
+	Replicas                   int32                                  `json:"replicas"`
+	WorkloadType               v1alpha1.WorkloadType                  `json:"workloadType,omitempty"`
+	ConsensusSpec              *v1alpha1.ConsensusSetSpec             `json:"consensusSpec,omitempty"`
+	PrimaryIndex               *int32                                 `json:"primaryIndex,omitempty"`
+	ClassDefRef                *v1alpha1.ClassDefRef                  `json:"classDefRef,omitempty"`
+	ResourceAllocationPolicies v1alpha1.ResourceAllocationPolicies    `json:"resourceAllocationPolicies,omitempty"`
+	PodSpec                    *corev1.PodSpec                        `json:"podSpec,omitempty"`
+	Services                   []corev1.Service                       `json:"services,omitempty"`
+	Probes                     *v1alpha1.ClusterDefinitionProbes      `json:"probes,omitempty"`
+	VolumeClaimTemplates       []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	Monitor                    *MonitorConfig                         `json:"monitor,omitempty"`
+	EnabledLogs                []string                               `json:"enabledLogs,omitempty"`
+	LogConfigs                 []v1alpha1.LogConfig                   `json:"logConfigs,omitempty"`
+	ConfigTemplates            []v1alpha1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
+	ScriptTemplates            []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
+	HorizontalScalePolicy      *v1alpha1.HorizontalScalePolicy        `json:"horizontalScalePolicy,omitempty"`
+	TLS                        bool                                   `json:"tls"`
+	Issuer                     *v1alpha1.Issuer                       `json:"issuer,omitempty"`
+	VolumeTypes                []v1alpha1.VolumeTypeSpec              `json:"VolumeTypes,omitempty"`
+	CustomLabelSpecs           []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
+	ComponentDef               string                                 `json:"componentDef,omitempty"`
+	ServiceAccountName         string                                 `json:"serviceAccountName,omitempty"`
 }
 
 // GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is

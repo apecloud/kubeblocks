@@ -121,22 +121,6 @@ func buildPodAffinity(
 			PreferredDuringSchedulingIgnoredDuringExecution: weightedPodAffinityTerms,
 		}
 	}
-	// Add pod PodAffinityTerm for dedicated node
-	if clusterOrCompAffinity.Tenancy == appsv1alpha1.DedicatedNode {
-		var labelSelectorReqs []metav1.LabelSelectorRequirement
-		labelSelectorReqs = append(labelSelectorReqs, metav1.LabelSelectorRequirement{
-			Key:      intctrlutil.WorkloadTypeLabelKey,
-			Operator: metav1.LabelSelectorOpIn,
-			Values:   appsv1alpha1.WorkloadTypes,
-		})
-		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, corev1.PodAffinityTerm{
-				TopologyKey: corev1.LabelHostname,
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: labelSelectorReqs,
-				},
-			})
-	}
 	affinity.PodAntiAffinity = podAntiAffinity
 	return affinity
 }

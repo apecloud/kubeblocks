@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -60,6 +61,9 @@ type ClusterSpec struct {
 	// affinity is a group of affinity scheduling rules.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
+
+	// +optional
+	ResourceAllocationPolicies ResourceAllocationPolicies `json:"ResourceAllocationPolicies,omitempty"`
 
 	// tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -143,6 +147,9 @@ type ClusterComponentSpec struct {
 	// affinity describes affinities which specific by users.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
+
+	// +optional
+	ResourceAllocationPolicies ResourceAllocationPolicies `json:"ResourceAllocationPolicies,omitempty"`
 
 	// Component tolerations will override ClusterSpec.Tolerations if specified.
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -370,6 +377,29 @@ type Affinity struct {
 	// +kubebuilder:default=SharedNode
 	// +optional
 	Tenancy TenancyType `json:"tenancy,omitempty"`
+}
+
+type ResourceAllocationPolicies map[corev1.ResourceName]ResourceAllocationPolicy
+
+type ResourceAllocationPolicy struct {
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:default=0
+	// +optional
+	OverAllocationRatio *int `json:"overAllocationRatio,omitempty"`
+
+	// +optional
+	OverAllocationSize *resource.Quantity `json:"overAllocationSize,omitempty"`
+
+	// +kubebuilder:validation:ExclusiveMinimum=true
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:default=100
+	// +optional
+	DedicateRatio *int `json:"dedicateRatio,omitempty"`
+
+	// +optional
+	DedicateSize *resource.Quantity `json:"dedicateSize,omitempty"`
 }
 
 // Issuer defines Tls certs issuer

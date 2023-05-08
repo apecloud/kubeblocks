@@ -84,6 +84,8 @@ const (
 	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
 	BackupToolTypeLabelKey          = "kubeblocks.io/backup-tool-type"
 	BackupTypeLabelKeyKey           = "dataprotection.kubeblocks.io/backup-type"
+	ResourceCPULabelKey             = "apps.kubeblocks.io/cpu"
+	ResourceMemoryLabelKey          = "apps.kubeblocks.io/memory"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey                  = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster

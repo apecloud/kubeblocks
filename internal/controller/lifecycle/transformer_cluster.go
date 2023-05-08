@@ -23,9 +23,12 @@ import (
 	"encoding/json"
 	"reflect"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -69,6 +72,21 @@ func (c *ClusterTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	clusterCompVerMap := transCtx.ClusterVer.Spec.GetDefNameMappingComponents()
 	process1stComp := true
 
+	var (
+		classDefinitionList appsv1alpha1.ComponentClassDefinitionList
+	)
+
+	ml := []client.ListOption{
+		client.MatchingLabels{constant.ClusterDefLabelKey: transCtx.ClusterDef.Name},
+	}
+	if err := transCtx.Client.List(transCtx.Context, &classDefinitionList, ml...); err != nil {
+		return err
+	}
+	clsMgr, err := class.NewManager(classDefinitionList)
+	if err != nil {
+		return err
+	}
+
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,
@@ -76,9 +94,14 @@ func (c *ClusterTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	}
 	// TODO: should move credential secrets creation from system_account_controller & here into credential_transformer,
 	// TODO: as those secrets are owned by the cluster
-	prepareComp := func(synthesizedComp *component.SynthesizedComponent) error {
+	prepareComp := func(compSpec *appsv1alpha1.ClusterComponentSpec, synthesizedComp *component.SynthesizedComponent) error {
 		iParams := task
 		iParams.Component = synthesizedComp
+
+		if err := fillComponentClass(cluster, compSpec, synthesizedComp, clsMgr); err != nil {
+			return err
+		}
+
 		if process1stComp && len(synthesizedComp.Services) > 0 {
 			if err := prepareConnCredential(&iParams); err != nil {
 				return err
@@ -109,7 +132,7 @@ func (c *ClusterTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		compVer := clusterCompVerMap[compDefName]
 		compSpecs := clusterCompSpecMap[compDefName]
 		for _, compSpec := range compSpecs {
-			if err := prepareComp(component.BuildComponent(reqCtx, *cluster, *transCtx.ClusterDef, compDef, compSpec, compVer)); err != nil {
+			if err := prepareComp(&compSpec, component.BuildComponent(reqCtx, *cluster, *transCtx.ClusterDef, compDef, compSpec, compVer)); err != nil {
 				return err
 			}
 		}
@@ -172,6 +195,127 @@ func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string
 		}
 	}
 	return compBackupMap, err
+}
+
+func fillComponentClass(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec, synthesizedComp *component.SynthesizedComponent, clsMgr *class.Manager) error {
+	cls, err := clsMgr.ChooseClass(compSpec)
+	if err != nil {
+		return err
+	}
+	if cls == nil {
+		// TODO reconsider handling policy for this case
+		return nil
+	}
+	compSpec.ClassDefRef = &cls.ClassDefRef
+
+	// update pod resource requests and limits
+	requests := corev1.ResourceList{
+		corev1.ResourceCPU:    cls.CPU,
+		corev1.ResourceMemory: cls.Memory,
+	}
+	synthesizedComp.PodSpec.Containers[0].Resources = corev1.ResourceRequirements{
+		Requests: requests,
+		Limits:   requests,
+	}
+	var volumes []corev1.PersistentVolumeClaimTemplate
+	if len(synthesizedComp.VolumeClaimTemplates) > 0 {
+		volumes = synthesizedComp.VolumeClaimTemplates
+	} else {
+		for _, volume := range cls.Volumes {
+			volumes = append(volumes, corev1.PersistentVolumeClaimTemplate{
+				Spec: corev1.PersistentVolumeClaimSpec{
+					// TODO define access mode in class
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: volume.Size,
+						},
+					},
+				},
+			})
+		}
+	}
+	synthesizedComp.VolumeClaimTemplates = volumes
+
+	// update tenancy affinity
+	affinity := cluster.Spec.Affinity
+	if compSpec.Affinity != nil {
+		affinity = compSpec.Affinity
+	}
+
+	podAntiAffinity := synthesizedComp.PodSpec.Affinity.PodAntiAffinity
+	// add pod anti-affinity to ensure isolated with other pods
+	if affinity.Tenancy == appsv1alpha1.DedicatedNode {
+		var labelSelectorReqs []metav1.LabelSelectorRequirement
+		labelSelectorReqs = append(labelSelectorReqs, metav1.LabelSelectorRequirement{
+			Key:      constant.WorkloadTypeLabelKey,
+			Operator: metav1.LabelSelectorOpIn,
+			Values:   appsv1alpha1.WorkloadTypes,
+		})
+		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, corev1.PodAffinityTerm{
+				TopologyKey: corev1.LabelHostname,
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: labelSelectorReqs,
+				},
+			},
+		)
+	}
+
+	// if class is specified, add node affinity to ensure node resource match with the class
+	nodeAffinity := synthesizedComp.PodSpec.Affinity.NodeAffinity
+	if affinity.Tenancy == appsv1alpha1.DedicatedNode && cls != nil {
+		var nodeSelectorTerms []corev1.NodeSelectorTerm
+		nodeSelectorTerms = append(nodeSelectorTerms, []corev1.NodeSelectorTerm{
+			{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      constant.ResourceCPULabelKey,
+						Operator: "In",
+						Values:   []string{cls.CPU.AsDec().String()},
+					},
+					{
+						Key:      constant.ResourceMemoryLabelKey,
+						Operator: "In",
+						Values:   []string{cls.Memory.AsDec().String()},
+					},
+				},
+			},
+			{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      constant.ResourceCPULabelKey,
+						Operator: "Gt",
+						Values:   []string{cls.CPU.AsDec().String()},
+					},
+					{
+						Key:      constant.ResourceMemoryLabelKey,
+						Operator: "Gt",
+						Values:   []string{cls.Memory.AsDec().String()},
+					},
+				},
+			},
+		}...)
+		nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
+			nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, nodeSelectorTerms...)
+	}
+	return nil
+}
+
+func fillDedicatedComponentResources(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent, cls *class.ComponentClassWithRef) {
+	requests := corev1.ResourceList{
+		corev1.ResourceCPU:    cls.CPU,
+		corev1.ResourceMemory: cls.Memory,
+	}
+
+	policy, ok := synthesizedComp.ResourceAllocationPolicies[corev1.ResourceCPU]
+	if ok && policy.OverAllocationRatio != nil {
+		requests.Cpu()
+	}
+}
+
+func fillSharedComponentResources(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent, cls *class.ComponentClassWithRef) {
+
 }
 
 var _ graph.Transformer = &ClusterTransformer{}

@@ -51,7 +51,10 @@ func BuildComponent(
 		CharacterType:         clusterCompDefObj.CharacterType,
 		MaxUnavailable:        clusterCompDefObj.MaxUnavailable,
 		WorkloadType:          clusterCompDefObj.WorkloadType,
+		StatelessSpec:         clusterCompDefObj.StatelessSpec,
+		StatefulSpec:          clusterCompDefObj.StatefulSpec,
 		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
+		ReplicationSpec:       clusterCompDefObj.ReplicationSpec,
 		PodSpec:               clusterCompDefObj.PodSpec,
 		Probes:                clusterCompDefObj.Probes,
 		LogConfigs:            clusterCompDefObj.LogConfigs,
@@ -64,6 +67,7 @@ func BuildComponent(
 		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
 		ComponentDef:          clusterCompSpec.ComponentDefRef,
 		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
+		StatefulSetWorkload:   clusterCompDefObj.GetStatefulSetWorkload(),
 	}
 
 	// resolve component.ConfigTemplates

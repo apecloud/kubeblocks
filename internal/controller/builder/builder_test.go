@@ -204,7 +204,7 @@ var _ = Describe("builder", func() {
 
 		It("builds Service correctly", func() {
 			params := newParams()
-			svcList, err := BuildSvcList(*params)
+			svcList, err := BuildSvcListWithCustomAttributes(*params, nil)
 			Expect(err).Should(BeNil())
 			Expect(svcList).ShouldNot(BeEmpty())
 		})

@@ -40,7 +40,10 @@ type SynthesizedComponent struct {
 	MaxUnavailable        *intstr.IntOrString                    `json:"maxUnavailable,omitempty"`
 	Replicas              int32                                  `json:"replicas"`
 	WorkloadType          v1alpha1.WorkloadType                  `json:"workloadType,omitempty"`
+	StatelessSpec         *v1alpha1.StatelessSetSpec             `json:"statelessSpec,omitempty"`
+	StatefulSpec          *v1alpha1.StatefulSetSpec              `json:"statefulSpec,omitempty"`
 	ConsensusSpec         *v1alpha1.ConsensusSetSpec             `json:"consensusSpec,omitempty"`
+	ReplicationSpec       *v1alpha1.ReplicationSpec              `json:"replicationSpec,omitempty"`
 	PrimaryIndex          *int32                                 `json:"primaryIndex,omitempty"`
 	PodSpec               *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Services              []corev1.Service                       `json:"services,omitempty"`
@@ -58,6 +61,7 @@ type SynthesizedComponent struct {
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
 	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
+	StatefulSetWorkload   v1alpha1.StatefulSetWorkload
 }
 
 // GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is

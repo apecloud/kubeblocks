@@ -109,7 +109,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		}()
 
 		// render config template
-		configs, err := buildCfg(task, workload, podSpec, reqCtx.Ctx, cli)
+		configs, err := renderConfigNScriptFiles(task, workload, podSpec, reqCtx.Ctx, cli)
 		if err != nil {
 			return err
 		}
@@ -125,38 +125,8 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		return nil
 	}
 
-	// REVIEW/TODO:
-	// - need higher level abstraction handling
-	// - or move this module to part operator controller handling
-	switch task.Component.WorkloadType {
-	case appsv1alpha1.Stateless:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildDeploy(reqCtx, task.GetBuilderParams())
-			}); err != nil {
-			return err
-		}
-	case appsv1alpha1.Stateful:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfig.Name)
-			}); err != nil {
-			return err
-		}
-	case appsv1alpha1.Consensus:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return buildStsWithCustomParameters(reqCtx, task, envConfig.Name,
-					func(sts *appsv1.StatefulSet) {
-						// REVIEW: why having 10s for consensus?
-						sts.Spec.MinReadySeconds = 10
-						sts.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
-						sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
-					})
-			}); err != nil {
-			return err
-		}
-	case appsv1alpha1.Replication:
+	// pre-condition check
+	if task.Component.WorkloadType == appsv1alpha1.Replication {
 		// get the number of existing pods under the current component
 		var existPodList = &corev1.PodList{}
 		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, *task.Cluster, existPodList, task.Component.Name); err != nil {
@@ -164,7 +134,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		}
 
 		// If the Pods already exists, check whether there is an HA switching and the HA process is prioritized to handle.
-		// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
+		// TODO: (xingran) After refactoring, HA switching will be handled in the replicationSet controller.
 		if len(existPodList.Items) > 0 {
 			primaryIndexChanged, _, err := replication.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster,
 				task.Component.Name, task.Component.GetPrimaryIndex())
@@ -179,21 +149,31 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			}
 		}
 
+	}
+
+	// REVIEW/TODO:
+	// - need higher level abstraction handling
+	// - or move this module to part operator controller handling
+	switch task.Component.WorkloadType {
+	case appsv1alpha1.Stateless:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return buildStsWithCustomParameters(reqCtx, task, envConfig.Name,
-					func(sts *appsv1.StatefulSet) {
-						// REVIEW: why having 10s for workloadType=replication?
-						sts.Spec.MinReadySeconds = 10
-						sts.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
-						sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
-					})
+				return builder.BuildDeploy(reqCtx, task.GetBuilderParams())
 			}); err != nil {
 			return err
 		}
+	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
+		if err := workloadProcessor(
+			func(envConfig *corev1.ConfigMap) (client.Object, error) {
+				return buildStsWithCustomAttributes(reqCtx, task, envConfig.Name, nil)
+			}); err != nil {
+			return err
+		}
+
 	}
 
-	if needBuildPDB(task) {
+	// conditional build PodDisruptionBudget
+	if comp := task.Component; comp.WorkloadType == appsv1alpha1.Consensus && comp.MaxUnavailable != nil {
 		pdb, err := builder.BuildPDB(task.GetBuilderParams())
 		if err != nil {
 			return err
@@ -201,28 +181,21 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		task.AppendResource(pdb)
 	}
 
-	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
-	if err != nil {
-		return err
-	}
-	for _, svc := range svcList {
-		// REVIEW/TODO: need higher level abstraction handling
+	svcList, err := builder.BuildSvcListWithCustomAttributes(task.GetBuilderParams(), func(svc *corev1.Service) {
 		switch task.Component.WorkloadType {
 		case appsv1alpha1.Consensus:
 			addLeaderSelectorLabels(svc, task.Component)
 		case appsv1alpha1.Replication:
 			svc.Spec.Selector[constant.RoleLabelKey] = string(replication.Primary)
 		}
+	})
+	if err != nil {
+		return err
+	}
+	for _, svc := range svcList {
 		task.AppendResource(svc)
 	}
 	return nil
-}
-
-// needBuildPDB check whether the PodDisruptionBudget needs to be built
-func needBuildPDB(task *intctrltypes.ReconcileTask) bool {
-	// TODO: add ut
-	comp := task.Component
-	return comp.WorkloadType == appsv1alpha1.Consensus && comp.MaxUnavailable != nil
 }
 
 // TODO multi roles with same accessMode support
@@ -233,25 +206,25 @@ func addLeaderSelectorLabels(service *corev1.Service, component *component.Synth
 	}
 }
 
-// buildStsWithCustomParameters build a statefulset
-func buildStsWithCustomParameters(reqCtx intctrlutil.RequestCtx,
+// buildStsWithCustomAttributes build a statefulset
+func buildStsWithCustomAttributes(reqCtx intctrlutil.RequestCtx,
 	task *intctrltypes.ReconcileTask, envConfigName string,
-	customParamsSetter func(*appsv1.StatefulSet)) (*appsv1.StatefulSet, error) {
+	customAttrSetter func(*appsv1.StatefulSet)) (*appsv1.StatefulSet, error) {
 	sts, err := builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfigName)
 	if err != nil {
 		return nil, err
 	}
-	if customParamsSetter == nil {
+	if customAttrSetter == nil {
 		return sts, nil
 	}
-	customParamsSetter(sts)
+	customAttrSetter(sts)
 	return sts, nil
 }
 
-// buildCfg generate volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
+// renderConfigNScriptFiles generate volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
 // and generate configManager sidecar for the reconfigure operation.
 // TODO rename this function, this function name is not very reasonable, but there is no suitable name.
-func buildCfg(task *intctrltypes.ReconcileTask,
+func renderConfigNScriptFiles(task *intctrltypes.ReconcileTask,
 	obj client.Object,
 	podSpec *corev1.PodSpec,
 	ctx context.Context,

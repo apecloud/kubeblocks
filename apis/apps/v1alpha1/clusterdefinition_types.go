@@ -22,6 +22,7 @@ package v1alpha1
 import (
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -244,7 +245,6 @@ type VolumeTypeSpec struct {
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
 // +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ?  has(self.consensusSpec) : !has(self.consensusSpec)",message="componentDefs.consensusSpec is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
-// +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Replication' ?  has(self.replicationSpec) : !has(self.replicationSpec)",message="componentDefs.replicationSpec is required when componentDefs.workloadType is Replication, and forbidden otherwise"
 type ClusterComponentDefinition struct {
 	// name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
@@ -322,11 +322,19 @@ type ClusterComponentDefinition struct {
 	// +optional
 	Service *ServiceSpec `json:"service,omitempty"`
 
+	// statefulSpec defines stateless related spec if workloadType is Stateless.
+	// +optional
+	StatelessSpec *StatelessSetSpec `json:"statelessSpec,omitempty"`
+
+	// statefulSpec defines stateful related spec if workloadType is Stateful.
+	// +optional
+	StatefulSpec *StatefulSetSpec `json:"statefulSpec,omitempty"`
+
 	// consensusSpec defines consensus related spec if workloadType is Consensus, required if workloadType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 
-	// replicationSpec defines replication related spec if workloadType is Replication, required if workloadType is Replication.
+	// replicationSpec defines replication related spec if workloadType is Replication.
 	// +optional
 	ReplicationSpec *ReplicationSpec `json:"replicationSpec,omitempty"`
 
@@ -361,6 +369,46 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=key
 	// +optional
 	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
+}
+
+func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
+	if r.IsStatelessWorkload() {
+		return nil
+	}
+	switch r.WorkloadType {
+	case Stateful:
+		return r.StatefulSpec
+	case Consensus:
+		return r.ConsensusSpec
+	case Replication:
+		return r.ReplicationSpec
+	}
+	return nil
+}
+
+func (r *ClusterComponentDefinition) IsStatelessWorkload() bool {
+	return r.WorkloadType == Stateless
+}
+
+func (r *ClusterComponentDefinition) GetCommonStatefulSpec() (*StatefulSetSpec, error) {
+	if r.IsStatelessWorkload() {
+		return nil, ErrWorkloadTypeIsStateless
+	}
+	switch r.WorkloadType {
+	case Stateful:
+		return r.StatefulSpec, nil
+	case Consensus:
+		if r.ConsensusSpec != nil {
+			return &r.ConsensusSpec.StatefulSetSpec, nil
+		}
+	case Replication:
+		if r.ReplicationSpec != nil {
+			return &r.ReplicationSpec.StatefulSetSpec, nil
+		}
+	default:
+		return nil, ErrWorkloadTypeIsUnknown
+	}
+	return nil, nil
 }
 
 type ServiceSpec struct {
@@ -518,7 +566,90 @@ type ClusterDefinitionProbes struct {
 	RoleProbeTimeoutAfterPodsReady int32 `json:"roleProbeTimeoutAfterPodsReady,omitempty"`
 }
 
+type StatelessSetSpec struct {
+	// llStrategy defines the underlying deployment strategy to use to replace existing pods with new ones.
+	// +optional
+	// +patchStrategy=retainKeys
+	UpdateStrategy appsv1.DeploymentStrategy `json:"updateStrategy,omitempty"`
+}
+
+type StatefulSetSpec struct {
+	// updateStrategy, Pods update strategy.
+	// In case of workloadType=Consensus the update strategy will be following:
+	//
+	// serial: update Pods one by one that guarantee minimum component unavailable time.
+	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
+	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time.
+	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
+	// parallel: force parallel
+	// +kubebuilder:default=Serial
+	// +optional
+	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// llPodManagementPolicy is the low-level controls how pods are created during initial scale up,
+	// when replacing pods on nodes, or when scaling down.
+	// `OrderedReady` policy specify where pods are created in increasing order (pod-0, then
+	// pod-1, etc) and the controller will wait until each pod is ready before
+	// continuing. When scaling down, the pods are removed in the opposite order.
+	// `Parallel` policy specify create pods in parallel
+	// to match the desired scale without waiting, and on scale down will delete
+	// all pods at once.
+	// +optional
+	LLPodManagementPolicy appsv1.PodManagementPolicyType `json:"llPodManagementPolicy,omitempty" protobuf:"bytes,6,opt,name=podManagementPolicy,casttype=PodManagementPolicyType"`
+
+	// llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy that will be
+	// employed to update Pods in the StatefulSet when a revision is made to
+	// Template. Will ignore `updateStrategy` attribute if provided.
+	LLUpdateStrategy *appsv1.StatefulSetUpdateStrategy `json:"llUpdateStrategy,omitempty" protobuf:"bytes,7,opt,name=updateStrategy"`
+}
+
+var _ StatefulSetWorkload = &StatefulSetSpec{}
+
+func (r *StatefulSetSpec) GetUpdateStrategy() UpdateStrategy {
+	if r == nil {
+		return SerialStrategy
+	}
+	return r.UpdateStrategy
+}
+
+func (r *StatefulSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
+	if r == nil {
+		r = &StatefulSetSpec{
+			UpdateStrategy: SerialStrategy,
+		}
+	}
+	return r.finalStsUpdateStrategy()
+}
+
+func (r *StatefulSetSpec) finalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
+	if r.LLUpdateStrategy != nil {
+		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
+	}
+
+	switch r.UpdateStrategy {
+	case BestEffortParallelStrategy:
+		m := intstr.FromString("49%")
+		return appsv1.ParallelPodManagement, appsv1.StatefulSetUpdateStrategy{
+			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+				MaxUnavailable: &m,
+			},
+		}
+	case ParallelStrategy:
+		return appsv1.ParallelPodManagement, appsv1.StatefulSetUpdateStrategy{}
+	case SerialStrategy:
+		m := intstr.FromInt(1)
+		return appsv1.OrderedReadyPodManagement, appsv1.StatefulSetUpdateStrategy{
+			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+				MaxUnavailable: &m,
+			},
+		}
+	}
+	return "", appsv1.StatefulSetUpdateStrategy{}
+}
+
 type ConsensusSetSpec struct {
+	StatefulSetSpec `json:",inline"`
+
 	// leader, one single leader.
 	// +kubebuilder:validation:Required
 	Leader ConsensusMember `json:"leader"`
@@ -530,22 +661,38 @@ type ConsensusSetSpec struct {
 	// learner, no voting right.
 	// +optional
 	Learner *ConsensusMember `json:"learner,omitempty"`
+}
 
-	// updateStrategy, Pods update strategy.
-	// serial: update Pods one by one that guarantee minimum component unavailable time.
-	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
-	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time.
-	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
-	// parallel: force parallel
-	// +kubebuilder:default=Serial
-	// +optional
-	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
+var _ StatefulSetWorkload = &ConsensusSetSpec{}
+
+func (r *ConsensusSetSpec) GetUpdateStrategy() UpdateStrategy {
+	if r == nil {
+		return SerialStrategy
+	}
+	return r.UpdateStrategy
+}
+
+func (r *ConsensusSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
+	if r == nil {
+		r = NewConsensusSetSpec()
+	}
+	if r.LLUpdateStrategy != nil {
+		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
+	}
+	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
+	switch r.UpdateStrategy {
+	case SerialStrategy, BestEffortParallelStrategy:
+		s.Type = appsv1.OnDeleteStatefulSetStrategyType
+	}
+	return appsv1.ParallelPodManagement, s
 }
 
 func NewConsensusSetSpec() *ConsensusSetSpec {
 	return &ConsensusSetSpec{
-		Leader:         DefaultLeader,
-		UpdateStrategy: SerialStrategy,
+		Leader: DefaultLeader,
+		StatefulSetSpec: StatefulSetSpec{
+			UpdateStrategy: SerialStrategy,
+		},
 	}
 }
 
@@ -571,6 +718,8 @@ type ConsensusMember struct {
 }
 
 type ReplicationSpec struct {
+	StatefulSetSpec `json:",inline"`
+
 	// switchPolicies defines a collection of different types of switchPolicy, and each type of switchPolicy is limited to one.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
@@ -579,6 +728,22 @@ type ReplicationSpec struct {
 	// switchCmdExecutorConfig configs how to get client SDK and perform switch statements.
 	// +kubebuilder:validation:Required
 	SwitchCmdExecutorConfig *SwitchCmdExecutorConfig `json:"switchCmdExecutorConfig"`
+}
+
+var _ StatefulSetWorkload = &ReplicationSpec{}
+
+func (r *ReplicationSpec) GetUpdateStrategy() UpdateStrategy {
+	if r == nil {
+		return SerialStrategy
+	}
+	return r.UpdateStrategy
+}
+
+func (r *ReplicationSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
+	if r == nil {
+		r = &ReplicationSpec{}
+	}
+	return r.StatefulSetSpec.finalStsUpdateStrategy()
 }
 
 type SwitchPolicy struct {

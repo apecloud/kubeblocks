@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"strings"
 
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -265,7 +264,6 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 		return cluster
 	}
 
-	maps.Keys()
 	primaryComponent := FindClusterComp(o.Cluster, o.ClusterDef.Spec.ComponentDefs[0].Name)
 	internalEndpoints, externalEndpoints := GetComponentEndpoints(o.Services, primaryComponent)
 	if len(internalEndpoints) > 0 {

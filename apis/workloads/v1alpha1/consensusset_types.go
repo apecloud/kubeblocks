@@ -192,22 +192,94 @@ const (
 	ParallelUpdateStrategy           UpdateStrategy = "Parallel"
 )
 
-// RoleObservation defines method to observe role
-type RoleObservation struct {
-	Kind string `json:"kind"`
+type BindingType string
 
-	// Container will be run as a sidecar container
+const (
+	ApeCloudMySQLBinding BindingType = "apecloud-mysql"
+	ETCDBinding          BindingType = "etcd"
+	ZooKeeperBinding     BindingType = "zookeeper"
+	MongoDBBinding       BindingType = "mongodb"
+)
+
+// RoleObservation defines how to observe role
+type RoleObservation struct {
+	// the action should be taken to determine the role of the pod
+	ObservationHandler `json:",inline"`
+
+	// Number of seconds after the container has started before role observation has started.
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
+
+	// Number of seconds after which the observation times out.
+	// Defaults to 1 second. Minimum value is 1.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
+
+	// How often (in seconds) to perform the observation.
+	// Default to 2 seconds. Minimum value is 1.
+	// +kubebuilder:default=2
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
+
+	// Minimum consecutive successes for the observation to be considered successful after having failed.
+	// Defaults to 1. Minimum value is 1.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	SuccessThreshold int32 `json:"successThreshold,omitempty"`
+
+	// Minimum consecutive failures for the observation to be considered failed after having succeeded.
+	// Defaults to 3. Minimum value is 1.
+	// +kubebuilder:default=3
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+}
+
+type ObservationHandler struct {
+	// BuiltIn specifies the built-in observation action
+	// if both BuiltIn and Custom are not configured, BuiltIn will be chosen
+	// +optional
+	BuiltIn *BuiltInAction `json:"builtIn,omitempty"`
+
+	// Custom specifies customized observation action
+	// +optional
+	Custom *CustomAction `json:"custom,omitempty"`
+}
+
+type BuiltInAction struct {
+	// binding type
+	// +kubebuilder:validation:Enum={apecloud-mysql, etcd, zookeeper, mongodb}
+	// +kubebuilder:default=apecloud-mysql
+	// +kubebuilder:validation:Required
+	BindingType BindingType `json:"bindingType"`
+}
+
+type CustomAction struct {
+	// Actions to be taken in serial
+	// after all actions done, the final output should be a single string of the role name defined in spec.Roles
+	// +kubebuilder:validation:Required
+	Actions []Action `json:"actions"`
+}
+
+type Action struct {
+	// utility container contains command that can be used to retrieve of process role info
 	// +optional
 	Container *corev1.Container `json:"container,omitempty"`
 
-	// RoleProbe will be executed against Container to retrieve role info
-	RoleProbe corev1.Probe `json:"roleProbe,omitempty"`
-
-	// PostProcessCommand, processes role info returned from RoleProbe,
-	// to get a single string of the role name.
-	// all commands are from Container, or [BusyBox](https://busybox.net/) if Container not configured
-	// +optional
-	PostProcessCommand []string `json:"postProcessCommand,omitempty"`
+	// Command will be executed in Container to retrieve or process role info
+	// Command should be in the Container, or latest [BusyBox](https://busybox.net/) if Container not configured
+	// Environment variables can be used in Command:
+	// - LAST_STDOUT stdout from last action
+	// - USERNAME credential
+	// - PASSWORD credential
+	// +kubebuilder:validation:Required
+	Command []string `json:"command"`
 }
 
 type ConsensusMemberStatus struct {

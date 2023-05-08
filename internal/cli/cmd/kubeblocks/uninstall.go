@@ -110,7 +110,9 @@ func (o *UninstallOptions) PreCheck() error {
 	// check if there is any resource should be removed first, if so, return error
 	// and ask user to remove them manually
 	if err := checkResources(o.Dynamic); err != nil {
-		return err
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
 	}
 
 	// verify where kubeblocks is installed
@@ -206,7 +208,7 @@ func (o *UninstallOptions) Uninstall() error {
 	if o.Wait {
 		fmt.Fprintln(o.Out, "Uninstall KubeBlocks done.")
 	} else {
-		fmt.Fprintf(o.Out, "KubeBlocks is uninstalling, run \"kbcli kubeblocks status\" to check status.\n")
+		fmt.Fprintf(o.Out, "KubeBlocks is uninstalling, run \"kbcli kubeblocks status -A\" to check kubeblocks resources.\n")
 	}
 	return nil
 }

@@ -129,7 +129,7 @@ func (b *csSetPlanBuilder) csSetWalkFunc(v graph.Vertex) error {
 			return err
 		}
 	case model.DELETE:
-		if controllerutil.RemoveFinalizer(vertex.Obj, CSSetFinalizerName) {
+		if controllerutil.RemoveFinalizer(vertex.Obj, csSetFinalizerName) {
 			err := b.cli.Update(b.transCtx.Context, vertex.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				b.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))

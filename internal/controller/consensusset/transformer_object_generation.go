@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/spf13/viper"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -55,72 +56,10 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// generate objects by current spec
-	svcBuilder := builder.NewServiceBuilder(csSet.Namespace, csSet.Name).
-		AddLabels(model.AppInstanceLabelKey, csSet.Name).
-		AddLabels(model.KBManagedByKey, ConsensusSetKind).
-		// AddAnnotationsInMap(csSet.Annotations).
-		AddSelectors(model.AppInstanceLabelKey, csSet.Name).
-		AddSelectors(model.KBManagedByKey, ConsensusSetKind).
-		AddPorts(csSet.Spec.Service.Ports...).
-		SetType(csSet.Spec.Service.Type)
-	for _, role := range csSet.Spec.Roles {
-		if role.IsLeader && len(role.Name) > 0 {
-			svcBuilder.AddSelectors(model.ConsensusSetAccessModeLabelKey, string(role.AccessMode))
-		}
-	}
-	svc := svcBuilder.GetObject()
-
-	hdlBuilder := builder.NewHeadlessServiceBuilder(csSet.Namespace, getHeadlessSvcName(*csSet)).
-		AddLabels(model.AppInstanceLabelKey, csSet.Name).
-		AddLabels(model.KBManagedByKey, ConsensusSetKind).
-		AddSelectors(model.AppInstanceLabelKey, csSet.Name).
-		AddSelectors(model.KBManagedByKey, ConsensusSetKind)
-	//	.AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
-	// if component.Monitor.Enable {
-	//	hdBuilder.AddAnnotations("prometheus.io/path", component.Monitor.ScrapePath).
-	//		AddAnnotations("prometheus.io/port", strconv.Itoa(int(component.Monitor.ScrapePort))).
-	//		AddAnnotations("prometheus.io/scheme", "http")
-	// }
-	for _, container := range csSet.Spec.Template.Spec.Containers {
-		for _, port := range container.Ports {
-			servicePort := corev1.ServicePort{
-				Name:       port.Name,
-				Protocol:   port.Protocol,
-				Port:       port.ContainerPort,
-				TargetPort: intstr.FromString(port.Name),
-			}
-			hdlBuilder.AddPorts(servicePort)
-		}
-	}
-	headLessSvc := hdlBuilder.GetObject()
-
-	stsBuilder := builder.NewStatefulSetBuilder(csSet.Namespace, csSet.Name)
-	template := csSet.Spec.Template
-	labels := template.Labels
-	if labels == nil {
-		labels = make(map[string]string, 2)
-	}
-	labels[model.AppInstanceLabelKey] = csSet.Name
-	labels[model.KBManagedByKey] = ConsensusSetKind
-	template.Labels = labels
-	stsBuilder.AddLabels(model.AppInstanceLabelKey, csSet.Name).
-		AddLabels(model.KBManagedByKey, ConsensusSetKind).
-		AddMatchLabel(model.AppInstanceLabelKey, csSet.Name).
-		AddMatchLabel(model.KBManagedByKey, ConsensusSetKind).
-		SetServiceName(headLessSvc.Name).
-		SetReplicas(csSet.Spec.Replicas).
-		SetMinReadySeconds(10).
-		SetPodManagementPolicy(apps.ParallelPodManagement).
-		SetVolumeClaimTemplates(csSet.Spec.VolumeClaimTemplates...).
-		SetTemplate(template).
-		SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
-	sts := stsBuilder.GetObject()
-
-	envData := buildEnvConfigData(*csSet)
-	envConfig := builder.NewConfigMapBuilder(csSet.Namespace, csSet.Name+"-env").
-		AddLabels(model.AppInstanceLabelKey, csSet.Name).
-		AddLabels(model.KBManagedByKey, ConsensusSetKind).
-		SetData(envData).GetObject()
+	svc := buildSvc(*csSet)
+	headLessSvc := buildHeadlessSvc(*csSet)
+	sts := buildSts(*csSet, headLessSvc.Name)
+	envConfig := buildEnvConfigMap(*csSet)
 
 	// put all objects into the dag
 	vertices := make([]*model.ObjectVertex, 0)
@@ -130,7 +69,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	envConfigVertex := &model.ObjectVertex{Obj: envConfig}
 	vertices = append(vertices, svcVertex, headlessSvcVertex, stsVertex, envConfigVertex)
 	for _, vertex := range vertices {
-		if err := controllerutil.SetOwnership(csSet, vertex.Obj, model.GetScheme(), CSSetFinalizerName); err != nil {
+		if err := controllerutil.SetOwnership(csSet, vertex.Obj, model.GetScheme(), csSetFinalizerName); err != nil {
 			return err
 		}
 		dag.AddConnect(root, vertex)
@@ -205,6 +144,215 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	return nil
 }
 
+func buildSvc(csSet workloads.ConsensusSet) *corev1.Service {
+	svcBuilder := builder.NewServiceBuilder(csSet.Namespace, csSet.Name).
+		AddLabels(model.AppInstanceLabelKey, csSet.Name).
+		AddLabels(model.KBManagedByKey, kindConsensusSet).
+		// AddAnnotationsInMap(csSet.Annotations).
+		AddSelectors(model.AppInstanceLabelKey, csSet.Name).
+		AddSelectors(model.KBManagedByKey, kindConsensusSet).
+		AddPorts(csSet.Spec.Service.Ports...).
+		SetType(csSet.Spec.Service.Type)
+	for _, role := range csSet.Spec.Roles {
+		if role.IsLeader && len(role.Name) > 0 {
+			svcBuilder.AddSelectors(model.ConsensusSetAccessModeLabelKey, string(role.AccessMode))
+		}
+	}
+	return svcBuilder.GetObject()
+}
+
+func buildHeadlessSvc(csSet workloads.ConsensusSet) *corev1.Service {
+	hdlBuilder := builder.NewHeadlessServiceBuilder(csSet.Namespace, getHeadlessSvcName(csSet)).
+		AddLabels(model.AppInstanceLabelKey, csSet.Name).
+		AddLabels(model.KBManagedByKey, kindConsensusSet).
+		AddSelectors(model.AppInstanceLabelKey, csSet.Name).
+		AddSelectors(model.KBManagedByKey, kindConsensusSet)
+	//	.AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
+	// if component.Monitor.Enable {
+	//	hdBuilder.AddAnnotations("prometheus.io/path", component.Monitor.ScrapePath).
+	//		AddAnnotations("prometheus.io/port", strconv.Itoa(int(component.Monitor.ScrapePort))).
+	//		AddAnnotations("prometheus.io/scheme", "http")
+	// }
+	for _, container := range csSet.Spec.Template.Spec.Containers {
+		for _, port := range container.Ports {
+			servicePort := corev1.ServicePort{
+				Name:       port.Name,
+				Protocol:   port.Protocol,
+				Port:       port.ContainerPort,
+				TargetPort: intstr.FromString(port.Name),
+			}
+			hdlBuilder.AddPorts(servicePort)
+		}
+	}
+	return hdlBuilder.GetObject()
+}
+
+func buildSts(csSet workloads.ConsensusSet, headlessSvcName string) *apps.StatefulSet {
+	stsBuilder := builder.NewStatefulSetBuilder(csSet.Namespace, csSet.Name)
+	template := buildPodTemplate(csSet)
+	stsBuilder.AddLabels(model.AppInstanceLabelKey, csSet.Name).
+		AddLabels(model.KBManagedByKey, kindConsensusSet).
+		AddMatchLabel(model.AppInstanceLabelKey, csSet.Name).
+		AddMatchLabel(model.KBManagedByKey, kindConsensusSet).
+		SetServiceName(headlessSvcName).
+		SetReplicas(csSet.Spec.Replicas).
+		SetMinReadySeconds(10).
+		SetPodManagementPolicy(apps.ParallelPodManagement).
+		SetVolumeClaimTemplates(csSet.Spec.VolumeClaimTemplates...).
+		SetTemplate(*template).
+		SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
+	return stsBuilder.GetObject()
+}
+
+func buildEnvConfigMap(csSet workloads.ConsensusSet) *corev1.ConfigMap {
+	envData := buildEnvConfigData(csSet)
+	return builder.NewConfigMapBuilder(csSet.Namespace, csSet.Name+"-env").
+		AddLabels(model.AppInstanceLabelKey, csSet.Name).
+		AddLabels(model.KBManagedByKey, kindConsensusSet).
+		SetData(envData).GetObject()
+}
+
+func buildPodTemplate(csSet workloads.ConsensusSet) *corev1.PodTemplateSpec {
+	template := csSet.Spec.Template
+	labels := template.Labels
+	if labels == nil {
+		labels = make(map[string]string, 2)
+	}
+	labels[model.AppInstanceLabelKey] = csSet.Name
+	labels[model.KBManagedByKey] = kindConsensusSet
+	template.Labels = labels
+
+	injectRoleObservationContainer(csSet, &template)
+
+	return &template
+}
+
+func injectRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec) {
+	roleObservation := csSet.Spec.RoleObservation
+	switch {
+	case roleObservation.Custom == nil:
+		injectBuiltInRoleObservationContainer(csSet, template)
+	case roleObservation.BuiltIn == nil:
+		injectCustomRoleObservationContainer(csSet, template)
+	default:
+		injectBuiltInRoleObservationContainer(csSet, template)
+		injectCustomRoleObservationContainer(csSet, template)
+	}
+}
+
+func injectBuiltInRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec) {
+	// compute parameters for role observation container
+	roleObservation := csSet.Spec.RoleObservation
+	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
+	if len(image) == 0 {
+		image = defaultBuiltInRoleObservationImage
+	}
+	observationDaemonPort := viper.GetInt("ROLE_OBSERVATION_SERVICE_PORT")
+	if observationDaemonPort == 0 {
+		observationDaemonPort = defaultBuiltInRoleObservationDaemonPort
+	}
+	bindingType := strings.ToLower(string(roleObservation.BuiltIn.BindingType))
+	if strings.EqualFold(bindingType, "apecloud-mysql") {
+		bindingType = "mysql"
+	}
+	roleObserveURI := fmt.Sprintf(roleObservationURIFormat, strconv.Itoa(observationDaemonPort), bindingType)
+	env := make([]corev1.EnvVar, 0)
+	if roleObservation.Credential != nil {
+		env = append(env,
+			corev1.EnvVar{
+				Name:      usernameCredentialVarName,
+				Value:     roleObservation.Credential.Username.Value,
+				ValueFrom: roleObservation.Credential.Username.ValueFrom,
+			},
+			corev1.EnvVar{
+				Name:      passwordCredentialVarName,
+				Value:     roleObservation.Credential.Password.Value,
+				ValueFrom: roleObservation.Credential.Password.ValueFrom,
+			},
+			// for compatibility with old probe env var names
+			corev1.EnvVar{
+				Name:      "KB_SERVICE_USER",
+				Value:     roleObservation.Credential.Username.Value,
+				ValueFrom: roleObservation.Credential.Username.ValueFrom,
+			},
+			corev1.EnvVar{
+				Name:      "KB_SERVICE_PASSWORD",
+				Value:     roleObservation.Credential.Password.Value,
+				ValueFrom: roleObservation.Credential.Password.ValueFrom,
+			})
+	}
+	// find service port of th db engine
+	servicePort := 0
+	port := csSet.Spec.Service.Ports[0]
+	for _, c := range csSet.Spec.Template.Spec.Containers {
+		for _, p := range c.Ports {
+			if port.TargetPort.Type == intstr.String && p.Name == port.TargetPort.StrVal ||
+				port.TargetPort.Type == intstr.Int && p.ContainerPort == port.TargetPort.IntVal {
+				servicePort = int(p.ContainerPort)
+				break
+			}
+		}
+	}
+	if servicePort > 0 {
+		env = append(env,
+			corev1.EnvVar{
+				Name:  servicePortVarName,
+				Value: strconv.Itoa(servicePort),
+			},
+			// for compatibility with old probe env var names
+			corev1.EnvVar{
+				Name:  "KB_SERVICE_PORT",
+				Value: strconv.Itoa(servicePort),
+			})
+	}
+
+	// build container
+	container := corev1.Container{
+		Name:            roleObservationName,
+		Image:           image,
+		ImagePullPolicy: "IfNotPresent",
+		Command: []string{"probe", "--app-id", "batch-sdk",
+			"--dapr-http-port", strconv.Itoa(observationDaemonPort),
+			"--app-protocol", "http",
+			"--log-level", "info",
+			"--config", "/config/probe/config.yaml",
+			"--components-path", "/config/probe/components",
+		},
+		Ports: []corev1.ContainerPort{{
+			ContainerPort: int32(observationDaemonPort),
+			Name:          roleObservationName,
+			Protocol:      "TCP",
+		}},
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"curl", "-X", "POST",
+						"--max-time", "1",
+						"--fail-with-body", "--silent",
+						"-H", "Content-ComponentDefRef: application/json",
+						roleObserveURI,
+						"-d", "{\"operation\": \"checkRole\", \"metadata\":{\"sql\":\"\"}}",
+					},
+				},
+			},
+			InitialDelaySeconds: roleObservation.InitialDelaySeconds,
+			TimeoutSeconds:      roleObservation.TimeoutSeconds,
+			PeriodSeconds:       roleObservation.PeriodSeconds,
+			SuccessThreshold:    roleObservation.SuccessThreshold,
+			FailureThreshold:    roleObservation.FailureThreshold,
+		},
+		Env: env,
+	}
+
+	// inject role observation container
+	template.Spec.Containers = append(template.Spec.Containers, container)
+}
+
+func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec) {
+	// TODO(free6om): implementation
+}
+
 func getHeadlessSvcName(set workloads.ConsensusSet) string {
 	return strings.Join([]string{set.Name, "headless"}, "-")
 }
@@ -225,7 +373,7 @@ func buildEnvConfigData(set workloads.ConsensusSet) map[string]string {
 	// build consensus env from set.Status.MembersStatus
 	followers := ""
 	for _, memberStatus := range set.Status.MembersStatus {
-		if memberStatus.PodName == "" || memberStatus.PodName == DefaultPodName {
+		if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName {
 			continue
 		}
 		switch {

@@ -64,7 +64,7 @@ const (
 )
 
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
+	if event.InvolvedObject.FieldPath != roleObservationEventFieldPath {
 		return nil
 	}
 	var (

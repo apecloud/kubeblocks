@@ -31,11 +31,20 @@ import (
 )
 
 const (
-	ConsensusSetKind = "ConsensusSet"
+	kindConsensusSet = "ConsensusSet"
 
-	DefaultPodName = "Unknown"
+	defaultPodName = "Unknown"
 
-	CSSetFinalizerName = "cs.workloads.kubeblocks.io/finalizer"
+	csSetFinalizerName = "cs.workloads.kubeblocks.io/finalizer"
+
+	roleObservationName                     = "role-observe"
+	defaultBuiltInRoleObservationImage      = "registry.cn-hangzhou.aliyuncs.com/apecloud/kubeblocks-tools:latest"
+	defaultBuiltInRoleObservationDaemonPort = 3501
+	roleObservationURIFormat                = "http://localhost:%s/v1.0/bindings/%s" // http://localhost:<port>/v1.0/bindings/<binding_type>
+	usernameCredentialVarName               = "KB_CONSENSUS_SET_USERNAME"
+	passwordCredentialVarName               = "KB_CONSENSUS_SET_PASSWORD"
+	servicePortVarName                      = "KB_CONSENSUS_SET_SERVICE_PORT"
+	roleObservationEventFieldPath           = "spec.containers{" + roleObservationName + "}"
 )
 
 type CSSetTransformContext struct {

@@ -43,11 +43,11 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	// The object is not being deleted, so if it does not have our finalizer,
 	// then lets add the finalizer and update the object. This is equivalent
 	// registering our finalizer.
-	if controllerutil.ContainsFinalizer(csSet, CSSetFinalizerName) {
+	if controllerutil.ContainsFinalizer(csSet, csSetFinalizerName) {
 		return nil
 	}
 	csSetCopy := csSet.DeepCopy()
-	controllerutil.AddFinalizer(csSetCopy, CSSetFinalizerName)
+	controllerutil.AddFinalizer(csSetCopy, csSetFinalizerName)
 	vertex := &model.ObjectVertex{Obj: csSetCopy, OriObj: transCtx.OrigCSSet, Action: model.ActionPtr(model.UPDATE)}
 	dag.AddConnect(root, vertex)
 

@@ -40,8 +40,8 @@ type ConsensusSetSpec struct {
 	// provides read-write service
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	Service *corev1.ServiceSpec `json:"service,omitempty"`
+	// +kubebuilder:validation:Required
+	Service corev1.ServiceSpec `json:"service"`
 
 	Template corev1.PodTemplateSpec `json:"template"`
 
@@ -240,6 +240,10 @@ type RoleObservation struct {
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+
+	// Credential used to connect to DB engine
+	// +optional
+	Credential *Credential `json:"credential,omitempty"`
 }
 
 type ObservationHandler struct {
@@ -276,11 +280,43 @@ type Action struct {
 	// Command will be executed in Container to retrieve or process role info
 	// Command should be in the Container, or latest [BusyBox](https://busybox.net/) if Container not configured
 	// Environment variables can be used in Command:
-	// - LAST_STDOUT stdout from last action
-	// - USERNAME credential
-	// - PASSWORD credential
+	// - KB_CONSENSUS_SET_LAST_STDOUT stdout from last action
+	// - KB_CONSENSUS_SET_USERNAME username part of credential
+	// - KB_CONSENSUS_SET_PASSWORD password part of credential
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
+}
+
+type Credential struct {
+	// Username
+	// variable name will be KB_CONSENSUS_SET_USERNAME
+	// +kubebuilder:validation:Required
+	Username CredentialVar `json:"username"`
+
+	// Password
+	// variable name will be KB_CONSENSUS_SET_PASSWORD
+	// +kubebuilder:validation:Required
+	Password CredentialVar `json:"password"`
+}
+
+type CredentialVar struct {
+	// Optional: no more than one of the following may be specified.
+
+	// Variable references $(VAR_NAME) are expanded
+	// using the previously defined environment variables in the container and
+	// any service environment variables. If a variable cannot be resolved,
+	// the reference in the input string will be unchanged. Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+	// "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+	// Escaped references will never be expanded, regardless of whether the variable
+	// exists or not.
+	// Defaults to "".
+	// +optional
+	Value string `json:"value,omitempty"`
+
+	// Source for the environment variable's value. Cannot be used if value is not empty.
+	// +optional
+	ValueFrom *corev1.EnvVarSource `json:"valueFrom,omitempty"`
 }
 
 type ConsensusMemberStatus struct {

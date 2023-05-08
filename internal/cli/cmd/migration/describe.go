@@ -32,7 +32,6 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -107,11 +106,8 @@ func (o *describeOptions) complete(args []string) error {
 		return err
 	}
 
-	_, err = IsMigrationCrdValidWithDynamic(&o.dynamic)
-	if errors.IsNotFound(err) {
-		return fmt.Errorf("datamigration crd is not install")
-	} else if err != nil {
-		return err
+	if _, err = IsMigrationCrdValidWithDynamic(&o.dynamic); err != nil {
+		PrintCrdInvalidError(err)
 	}
 
 	if len(args) == 0 {

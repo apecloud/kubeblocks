@@ -41,7 +41,7 @@ fullnameOverride: ""
 updateStrategy:
   rollingUpdate:
     maxSurge: 1
-    maxUnavailable: 1
+    maxUnavailable: 0
   type: RollingUpdate
 
 ## Change `hostNetwork` to `true` when you want the KubeBlocks's pod to share its host's network namespace.

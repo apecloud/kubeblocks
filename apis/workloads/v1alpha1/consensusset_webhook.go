@@ -108,6 +108,18 @@ func (r *ConsensusSet) validate() error {
 		}
 	}
 
+	if r.Spec.RoleObservation.BuiltIn != nil {
+		binding := r.Spec.RoleObservation.BuiltIn.BindingType
+		if binding != ApeCloudMySQLBinding &&
+			binding != ETCDBinding &&
+			binding != ZooKeeperBinding &&
+			binding != MongoDBBinding {
+			allErrs = append(allErrs,
+				field.Required(field.NewPath("spec.roleObservation.builtIn.bindingType"),
+					"invalid bindingType, should be one of [apecloud-mysql, etcd, zookeeper, mongodb]"))
+		}
+	}
+
 	if r.Spec.UpdateStrategy != SerialUpdateStrategy &&
 		r.Spec.UpdateStrategy != ParallelUpdateStrategy &&
 		r.Spec.UpdateStrategy != BestEffortParallelUpdateStrategy {

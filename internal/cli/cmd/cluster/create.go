@@ -32,6 +32,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -949,9 +950,7 @@ func (o *CreateOptions) validateClusterVersion() error {
 	case !existedDefault:
 		// if default version is not set and there is only one version, use it
 		if len(existedClusterVersions) == 1 {
-			for k := range existedClusterVersions {
-				o.ClusterVersionRef = k
-			}
+			o.ClusterVersionRef = maps.Keys(existedClusterVersions)[0]
 			fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
 		} else {
 			return fmt.Errorf("failed to find the default cluster version, use '--cluster-version ClusterVersion' to set it")
@@ -981,7 +980,10 @@ func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[strin
 	for _, item := range list.Items {
 		allClusterVersions[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
-		if !existedDefault && annotations != nil && (annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue) {
+		if annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue {
+			if existedDefault {
+				return nil, defaultVersion, existedDefault, fmt.Errorf("clusterDef %s has more than one default cluster version", clusterDef)
+			}
 			existedDefault = true
 			defaultVersion = item.GetName()
 		}

@@ -16,7 +16,7 @@ import (
 
 var faultPodExample = templates.Examples(`
 	# kill all pods in default namespace
-	kbcli kbcli fault pod kill
+	kbcli fault pod kill
 	
 	# kill any pod in default namespace
 	kbcli fault pod kill --mode=one

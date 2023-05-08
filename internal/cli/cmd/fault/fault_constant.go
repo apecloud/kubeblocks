@@ -4,8 +4,6 @@ const (
 	Unchanged = "unchanged"
 )
 
-// var Options = []string{"PodChaosOptions", "NetworkChaosOptions", "IOChaosOptions"}
-
 const (
 	Group   = "chaos-mesh.org"
 	Version = "v1alpha1"
@@ -15,58 +13,67 @@ const (
 	ResourceIOChaos      = "iochaos"
 	ResourceStressChaos  = "stresschaos"
 	ResourceDNSChaos     = "dnschaos"
+	ResourceTimeChaos    = "timechaos"
 )
 
 const (
 	CueTemplatePodChaos     = "podChaos_template.cue"
 	CueTemplateNetworkChaos = "networkChaos_template.cue"
 	CueTemplateIOChaos      = "IOChaos_template.cue"
-	CueTemplateStressChaos  = "StressChaos_template.cue"
+	CueTemplateStressChaos  = "stressChaos_template.cue"
 	CueTemplateDNSChaos     = "DNSChaos_template.cue"
+	CueTemplateTimeChaos    = "timeChaos_template.cue"
 )
 
 const (
 	Kill               = "kill"
-	KillShort          = "kill a pod"
+	KillShort          = "kill pod"
 	Failure            = "failure"
-	FailureShort       = "failure a pod"
+	FailureShort       = "failure pod"
 	KillContainer      = "kill-container"
-	KillContainerShort = "kill a container"
+	KillContainerShort = "kill containers"
 )
 
 // NetWorkChaos Command
 const (
 	Partition      = "partition"
-	PartitionShort = "partition attack."
+	PartitionShort = "Make a pod network partitioned from other objects."
 	Loss           = "loss"
-	LossShort      = "loss attack"
+	LossShort      = "Cause pods to communicate with other objects to drop packets."
 	Delay          = "delay"
-	DelayShort     = "delay attack"
+	DelayShort     = "Make pods communicate with other objects lazily."
 	Duplicate      = "duplicate"
-	DuplicateShort = "duplicate attack"
+	DuplicateShort = "Make pods communicate with other objects to pick up duplicate packets."
 	Corrupt        = "corrupt"
-	CorruptShort   = "corrupt attack"
+	CorruptShort   = "Distorts the messages a pod communicates with other objects."
 	Bandwidth      = "bandwidth"
-	BandwidthShort = "bandwidth attack"
+	BandwidthShort = "Limit the bandwidth that pods use to communicate with other objects."
 )
 
 const (
 	Random      = "random"
-	RandomShort = "DNS random IP chaos"
+	RandomShort = "Make DNS return any IP when resolving external domain names."
 	Error       = "error"
-	ErrorShort  = "DNS error IP chaos"
+	ErrorShort  = "Make DNS return an error when resolving external domain names."
 )
 
 const (
-	Latency           = "latency"
-	LatencyShort      = "IO Latency attack."
-	Fault             = "fault"
-	FaultShort        = "IO Fault attack."
-	AttrOverride      = "attr-override"
-	AttrOverrideShort = "IO AttrOverrideShort attack."
+	Latency        = "latency"
+	LatencyShort   = "delayed IO operations."
+	Fault          = "fault"
+	FaultShort     = "Causes IO operations to return specific errors."
+	Attribute      = "attribute"
+	AttributeShort = "Override the attributes of the file."
+	Mistake        = "mistake"
+	MistakeShort   = "Alters the contents of the file, distorting the contents of the file."
 )
 
 const (
 	Stress      = "stress"
-	StressShort = "stress chaos"
+	StressShort = "Add memory pressure or CPU load to the system."
+)
+
+const (
+	Time      = "time"
+	TimeShort = "Clock skew failure."
 )

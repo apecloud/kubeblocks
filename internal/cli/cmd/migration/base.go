@@ -22,8 +22,10 @@ package migration
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,12 +34,17 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	migrationv1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
 	MigrationTaskLabel          = "datamigration.apecloud.io/migrationtask"
 	MigrationTaskStepAnnotation = "datamigration.apecloud.io/step"
 	SerialJobOrderAnnotation    = "common.apecloud.io/serial_job_order"
+)
+
+const (
+	invalidMigrationCrdAdvice = "to use migration-related functions, please ensure that the addon of migration is enabled. you can use: 'kbcli addon enable migration' to enable the addon"
 )
 
 // Endpoint
@@ -200,6 +207,17 @@ func IsMigrationCrdValidWithDynamic(dynamic *dynamic.Interface) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func PrintCrdInvalidError(err error) {
+	if err == nil {
+		return
+	}
+	if !errors.IsNotFound(err) {
+		util.CheckErr(err)
+	}
+	fmt.Fprintf(os.Stderr, "hint: %s\n", invalidMigrationCrdAdvice)
+	os.Exit(cmdutil.DefaultErrorExitCode)
 }
 
 func IsMigrationCrdValidWithFactory(factory cmdutil.Factory) (bool, error) {

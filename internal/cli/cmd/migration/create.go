@@ -26,7 +26,6 @@ import (
 
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -107,11 +106,8 @@ func NewMigrationCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 func (o *CreateMigrationOptions) Validate() error {
 	var err error
 
-	_, err = IsMigrationCrdValidWithDynamic(&o.Dynamic)
-	if errors.IsNotFound(err) {
-		return fmt.Errorf("datamigration crd is not install")
-	} else if err != nil {
-		return err
+	if _, err = IsMigrationCrdValidWithDynamic(&o.Dynamic); err != nil {
+		PrintCrdInvalidError(err)
 	}
 
 	if o.Template == "" {

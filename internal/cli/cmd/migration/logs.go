@@ -28,7 +28,6 @@ import (
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -109,11 +108,8 @@ func (o *LogsOptions) complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 
-	_, err = IsMigrationCrdValidWithDynamic(&o.Dynamic)
-	if errors.IsNotFound(err) {
-		return fmt.Errorf("datamigration crd is not install")
-	} else if err != nil {
-		return err
+	if _, err = IsMigrationCrdValidWithDynamic(&o.Dynamic); err != nil {
+		PrintCrdInvalidError(err)
 	}
 
 	taskObj, err := o.getMigrationObjects(o.taskName)

@@ -252,7 +252,7 @@ func injectBuiltInRoleObservationContainer(csSet workloads.ConsensusSet, templat
 		observationDaemonPort = defaultBuiltInRoleObservationDaemonPort
 	}
 	bindingType := strings.ToLower(string(roleObservation.BuiltIn.BindingType))
-	if strings.EqualFold(bindingType, "apecloud-mysql") {
+	if roleObservation.BuiltIn.BindingType == workloads.ApeCloudMySQLBinding {
 		bindingType = "mysql"
 	}
 	roleObserveURI := fmt.Sprintf(roleObservationURIFormat, strconv.Itoa(observationDaemonPort), bindingType)

@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -120,8 +120,8 @@ func readClusterInfoFromFile(path string) (*cp.K8sClusterInfo, error) {
 }
 
 func writeAndUseKubeConfig(kubeConfig string, kubeConfigPath string, out io.Writer) error {
-	spinner := printer.Spinner(out, fmt.Sprintf("%-50s", "Write kubeconfig to "+kubeConfigPath))
-	defer spinner(false)
+	s := spinner.New(out, spinnerMsg("Write kubeconfig to "+kubeConfigPath))
+	defer s.Fail()
 	if err := kubeConfigWrite(kubeConfig, kubeConfigPath, writeKubeConfigOptions{
 		UpdateExisting:       true,
 		UpdateCurrentContext: true,
@@ -134,7 +134,7 @@ func writeAndUseKubeConfig(kubeConfig string, kubeConfigPath string, out io.Writ
 		return err
 	}
 
-	spinner(true)
+	s.Success()
 	return nil
 }
 

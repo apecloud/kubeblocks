@@ -61,9 +61,6 @@ statefulset: {
 		podManagementPolicy: "Parallel"
 		template: {
 			metadata: {
-				annotations: {
-					"apps.kubeblocks.io/component-replicas": "\(component.replicas)"
-				}
 				labels: {
 					"app.kubernetes.io/name":       "\(component.clusterDefName)"
 					"app.kubernetes.io/instance":   "\(cluster.metadata.name)"

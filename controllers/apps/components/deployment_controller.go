@@ -81,6 +81,11 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				reqCtx.Recorder.Event(cluster, corev1.EventTypeWarning, "Deployment Controller PatchWorkloadCustomLabelFailed", err.Error())
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			}
+			// update component info to pods' annotations
+			if err := updateComponentInfoToPods(reqCtx.Ctx, r.Client, cluster, componentSpec); err != nil {
+				reqCtx.Recorder.Event(cluster, corev1.EventTypeWarning, "StatefulSet Deploy updateComponentInfoToPods Failed", err.Error())
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			}
 			if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			} else if requeueAfter != 0 {

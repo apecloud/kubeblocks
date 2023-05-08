@@ -81,6 +81,11 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				reqCtx.Recorder.Event(cluster, corev1.EventTypeWarning, "StatefulSet Controller PatchWorkloadCustomLabelFailed", err.Error())
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			}
+			// update component info to pods' annotations
+			if err := updateComponentInfoToPods(reqCtx.Ctx, r.Client, cluster, componentSpec); err != nil {
+				reqCtx.Recorder.Event(cluster, corev1.EventTypeWarning, "StatefulSet Controller updateComponentInfoToPods Failed", err.Error())
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			}
 			reqCtx.Log.V(1).Info("before updateComponentStatusInClusterStatus",
 				"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,
 				"replicas", sts.Status.Replicas)

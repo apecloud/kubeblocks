@@ -68,6 +68,11 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	// skip if sts is being deleted
+	if !sts.DeletionTimestamp.IsZero() {
+		return intctrlutil.Reconciled()
+	}
+
 	return workloadCompClusterReconcile(reqCtx, r.Client, sts,
 		func(cluster *appsv1alpha1.Cluster, componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
 			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
@@ -95,5 +100,6 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1.StatefulSet{}).
 		Owns(&corev1.Pod{}).
 		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate)).
+		Named("statefulset-watcher").
 		Complete(r)
 }

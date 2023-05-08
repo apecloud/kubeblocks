@@ -68,11 +68,14 @@ func New(typeName string) (Interface, error) {
 }
 
 type ConnectionInfo struct {
-	Host     string
-	User     string
-	Password string
-	Database string
-	Port     string
+	Host             string
+	User             string
+	Password         string
+	Database         string
+	Port             string
+	ClusterName      string
+	ComponentName    string
+	HeadlessEndpoint string
 }
 
 type buildConnectExample func(info *ConnectionInfo) string

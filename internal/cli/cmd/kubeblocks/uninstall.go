@@ -29,7 +29,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,18 +36,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/utils/strings/slices"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
-	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -93,54 +93,26 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().BoolVar(&o.removePVs, "remove-pvs", false, "Remove PersistentVolume or not")
 	cmd.Flags().BoolVar(&o.removePVCs, "remove-pvcs", false, "Remove PersistentVolumeClaim or not")
 	cmd.Flags().BoolVar(&o.RemoveNamespace, "remove-namespace", false, "Remove default created \"kb-system\" namespace or not")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for uninstalling KubeBlocks, such as --timeout=5m")
+	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be uninstalled, including all the add-ons. It will wait for as long as --timeout")
 	return cmd
 }
 
 func (o *UninstallOptions) PreCheck() error {
 	// wait user to confirm
 	if !o.AutoApprove {
-		printer.Warning(o.Out, "uninstall will remove all KubeBlocks resources.\n")
+		printer.Warning(o.Out, "this action will remove all KubeBlocks resources.\n")
 		if err := confirmUninstall(o.In); err != nil {
 			return err
 		}
 	}
 
-	preCheckList := []string{
-		"clusters.apps.kubeblocks.io",
-	}
-	ctx := context.Background()
-
-	// delete crds
-	crs := map[string][]string{}
-	crdList, err := o.Dynamic.Resource(types.CRDGVR()).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, crd := range crdList.Items {
-		// find kubeblocks crds
-		if strings.Contains(crd.GetName(), constant.APIGroup) &&
-			slices.Contains(preCheckList, crd.GetName()) {
-			gvr, err := getGVRByCRD(&crd)
-			if err != nil {
-				return err
-			}
-			// find custom resource
-			objList, err := o.Dynamic.Resource(*gvr).List(ctx, metav1.ListOptions{})
-			if err != nil {
-				return err
-			}
-			for _, item := range objList.Items {
-				crs[crd.GetName()] = append(crs[crd.GetName()], item.GetName())
-			}
+	// check if there is any resource should be removed first, if so, return error
+	// and ask user to remove them manually
+	if err := checkResources(o.Dynamic); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
 		}
-	}
-
-	if len(crs) > 0 {
-		errMsg := bytes.NewBufferString("failed to uninstall, the following custom resources need to be removed first:\n")
-		for k, v := range crs {
-			errMsg.WriteString(fmt.Sprintf("  %s: %s\n", k, strings.Join(v, " ")))
-		}
-		return errors.Errorf(errMsg.String())
 	}
 
 	// verify where kubeblocks is installed
@@ -159,21 +131,23 @@ func (o *UninstallOptions) PreCheck() error {
 }
 
 func (o *UninstallOptions) Uninstall() error {
-	printSpinner := func(spinner func(result bool), err error) {
+	printSpinner := func(s *spinner.Spinner, err error) {
 		if err == nil || apierrors.IsNotFound(err) ||
 			strings.Contains(err.Error(), "release: not found") {
-			spinner(true)
+			s.Success()
 			return
 		}
-		spinner(false)
+		s.Fail()
 		fmt.Fprintf(o.Out, "  %s\n", err.Error())
 	}
-	newSpinner := func(msg string) func(result bool) {
-		return printer.Spinner(o.Out, fmt.Sprintf("%-50s", msg))
+	newSpinner := func(msg string) *spinner.Spinner {
+		return spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", msg)))
 	}
 
 	// uninstall all KubeBlocks addons
-	printSpinner(newSpinner("Uninstall KubeBlocks addons"), o.uninstallAddons())
+	if err := o.uninstallAddons(); err != nil {
+		return err
+	}
 
 	// uninstall helm release that will delete custom resources, but since finalizers is not empty,
 	// custom resources will not be deleted, so we will remove finalizers later.
@@ -231,95 +205,167 @@ func (o *UninstallOptions) Uninstall() error {
 			deleteNamespace(o.Client, types.DefaultNamespace))
 	}
 
-	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done.")
+	if o.Wait {
+		fmt.Fprintln(o.Out, "Uninstall KubeBlocks done.")
+	} else {
+		fmt.Fprintf(o.Out, "KubeBlocks is uninstalling, run \"kbcli kubeblocks status -A\" to check kubeblocks resources.\n")
+	}
 	return nil
 }
 
 // uninstallAddons uninstall all KubeBlocks addons
 func (o *UninstallOptions) uninstallAddons() error {
+	addonStatus := make(map[string]string)
+
 	var (
 		allErrs []error
-		stop    bool
 		err     error
+		msg     = "Wait for addons to be disabled"
+
+		processAddons = func(uninstall bool) error {
+			objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: buildKubeBlocksSelectorLabels(),
+			})
+			if err != nil && !apierrors.IsNotFound(err) {
+				klog.V(1).Infof("Failed to get KubeBlocks addons %s", err.Error())
+				allErrs = append(allErrs, err)
+				return utilerrors.NewAggregate(allErrs)
+			}
+			if objects == nil {
+				return nil
+			}
+
+			for _, obj := range objects.Items {
+				addon := extensionsv1alpha1.Addon{}
+				if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
+					klog.V(1).Infof("Failed to convert KubeBlocks addon %s", err.Error())
+					allErrs = append(allErrs, err)
+					continue
+				}
+
+				if uninstall {
+					// we only need to uninstall addons that are not disabled
+					if addon.Status.Phase == extensionsv1alpha1.AddonDisabled {
+						continue
+					}
+					addonStatus[addon.Name] = string(addon.Status.Phase)
+					o.addons = append(o.addons, &addon)
+
+					// uninstall addons
+					if err = disableAddon(o.Dynamic, &addon); err != nil {
+						klog.V(1).Infof("Failed to uninstall KubeBlocks addon %s %s", addon.Name, err.Error())
+						allErrs = append(allErrs, err)
+					}
+				} else {
+					// update addons if exists
+					if _, ok := addonStatus[addon.Name]; ok {
+						addonStatus[addon.Name] = string(addon.Status.Phase)
+					}
+				}
+			}
+			return utilerrors.NewAggregate(allErrs)
+		}
+
+		buildMsg = func() (string, bool) {
+			var addonMsg []string
+			allDisabled := true
+			for k, v := range addonStatus {
+				if v == string(extensionsv1alpha1.AddonDisabled) {
+					v = printer.BoldGreen("OK")
+				} else {
+					allDisabled = false
+				}
+				addonMsg = append(addonMsg, fmt.Sprintf("%-48s %s", "Addon "+k, v))
+			}
+			sort.Strings(addonMsg)
+			return fmt.Sprintf("%-50s\n  %s", msg, strings.Join(addonMsg, "\n  ")), allDisabled
+		}
 	)
-	uninstallAddon := func(addon *extensionsv1alpha1.Addon) error {
-		klog.V(1).Infof("Uninstall %s", addon.Name)
-		if _, err := o.Dynamic.Resource(types.AddonGVR()).Patch(context.TODO(), addon.Name, k8sapitypes.JSONPatchType,
-			[]byte("[{\"op\": \"replace\", \"path\": \"/spec/install/enabled\", \"value\": false }]"),
-			metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}
 
-	processAddons := func(processFn func(addon *extensionsv1alpha1.Addon) error) ([]*extensionsv1alpha1.Addon, error) {
-		var addons []*extensionsv1alpha1.Addon
-		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: buildAddonLabelSelector(),
-		})
-		if err != nil && !apierrors.IsNotFound(err) {
-			klog.V(1).Infof("Failed to get KubeBlocks addons %s", err.Error())
-			allErrs = append(allErrs, err)
-			return nil, utilerrors.NewAggregate(allErrs)
-		}
-		if objects == nil {
-			return nil, nil
-		}
-
-		// if all addons are disabled, then we will stop uninstalling addons
-		stop = true
-		for _, obj := range objects.Items {
-			addon := extensionsv1alpha1.Addon{}
-			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
-				klog.V(1).Infof("Failed to convert KubeBlocks addon %s", err.Error())
-				allErrs = append(allErrs, err)
-				continue
-			}
-			klog.V(1).Infof("Addon: %s, enabled: %v, status: %s",
-				addon.Name, addon.Spec.InstallSpec.GetEnabled(), addon.Status.Phase)
-			addons = append(addons, &addon)
-			if addon.Status.Phase == extensionsv1alpha1.AddonDisabled {
-				continue
-			}
-			// if there is an enabled addon, then we will continue uninstalling addons
-			// and wait for a while to make sure all addons are disabled
-			stop = false
-			if processFn == nil {
-				continue
-			}
-			if err = processFn(&addon); err != nil && !apierrors.IsNotFound(err) {
-				klog.V(1).Infof("Failed to uninstall KubeBlocks addon %s", err.Error())
-				allErrs = append(allErrs, err)
-			}
-		}
-		return addons, utilerrors.NewAggregate(allErrs)
+	var s *spinner.Spinner
+	if !o.Wait {
+		s = spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Uninstall KubeBlocks addons")))
+	} else {
+		s = spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", msg)))
 	}
 
 	// get all addons and uninstall them
-	if o.addons, err = processAddons(uninstallAddon); err != nil {
+	if err = processAddons(true); err != nil {
+		s.Fail()
 		return err
 	}
 
-	if len(o.addons) == 0 || stop {
+	if len(addonStatus) == 0 || !o.Wait {
+		s.Success()
 		return nil
+	}
+
+	spinnerDone := func(s *spinner.Spinner, msg string) {
+		s.SetFinalMsg(msg)
+		s.Done("")
+		fmt.Fprintln(o.Out)
 	}
 
 	// check if all addons are disabled, if so, then we will stop checking addons
 	// status otherwise, we will wait for a while and check again
-	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_TIMES"); i++ {
-		klog.V(1).Infof("Wait for %d seconds and check addons disabled again", 5)
-		time.Sleep(5 * time.Second)
-		// pass a nil processFn, we will only check addons status, do not try to
-		// uninstall addons again
-		if o.addons, err = processAddons(nil); err != nil {
-			return err
+	if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
+		// we will only check addons status, do not try to uninstall addons again
+		if err = processAddons(false); err != nil {
+			return false, err
 		}
-		if stop {
-			return nil
+		m, allDisabled := buildMsg()
+		s.SetMessage(m)
+		if allDisabled {
+			spinnerDone(s, m)
+			return true, nil
 		}
-	}
-	if !stop {
-		allErrs = append(allErrs, fmt.Errorf("failed to uninstall KubeBlocks addons"))
+		return false, nil
+	}); err != nil {
+		m, _ := buildMsg()
+		spinnerDone(s, m)
+		if err == wait.ErrWaitTimeout {
+			allErrs = append(allErrs, errors.New("timeout waiting for addons to be disabled, run \"kbcli addon list\" to check addon status"))
+		} else {
+			allErrs = append(allErrs, err)
+		}
 	}
 	return utilerrors.NewAggregate(allErrs)
+}
+
+func checkResources(dynamic dynamic.Interface) error {
+	ctx := context.Background()
+	gvrList := []schema.GroupVersionResource{
+		types.ClusterGVR(),
+		types.BackupGVR(),
+	}
+
+	crs := map[string][]string{}
+	for _, gvr := range gvrList {
+		objList, err := dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		for _, item := range objList.Items {
+			crs[gvr.Resource] = append(crs[gvr.Resource], item.GetName())
+		}
+	}
+
+	if len(crs) > 0 {
+		errMsg := bytes.NewBufferString("failed to uninstall, the following resources need to be removed first\n")
+		for k, v := range crs {
+			errMsg.WriteString(fmt.Sprintf("  %s: %s\n", k, strings.Join(v, " ")))
+		}
+		return errors.Errorf(errMsg.String())
+	}
+	return nil
+}
+
+func disableAddon(dynamic dynamic.Interface, addon *extensionsv1alpha1.Addon) error {
+	klog.V(1).Infof("Uninstall %s, status %s", addon.Name, addon.Status.Phase)
+	if _, err := dynamic.Resource(types.AddonGVR()).Patch(context.TODO(), addon.Name, k8sapitypes.JSONPatchType,
+		[]byte("[{\"op\": \"replace\", \"path\": \"/spec/install/enabled\", \"value\": false }]"),
+		metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }

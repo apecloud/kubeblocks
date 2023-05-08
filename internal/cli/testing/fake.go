@@ -27,8 +27,11 @@ import (
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -55,6 +58,9 @@ const (
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupToolName      = "fake-backup-tool"
+
+	IsDefautl    = true
+	IsNotDefault = false
 )
 
 var (
@@ -529,4 +535,114 @@ func FakeConfigConstraint(ccName string) *appsv1alpha1.ConfigConstraint {
 		},
 	}
 	return cm
+}
+
+func FakeStorageClass(name string, isDefault bool) *storagev1.StorageClass {
+	storageClassObj := &storagev1.StorageClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StorageClass",
+			APIVersion: "storage.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	if isDefault {
+		storageClassObj.ObjectMeta.Annotations = make(map[string]string)
+		storageClassObj.ObjectMeta.Annotations[storage.IsDefaultStorageClassAnnotation] = "true"
+	}
+	return storageClassObj
+}
+
+func FakeServiceAccount(name string) *corev1.ServiceAccount {
+	return &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+				constant.AppNameLabelKey:     KubeBlocksChartName},
+		},
+	}
+}
+
+func FakeClusterRole(name string) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+				constant.AppNameLabelKey:     KubeBlocksChartName},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"*"},
+				Resources: []string{"*"},
+				Verbs:     []string{"*"},
+			},
+		},
+	}
+}
+
+func FakeClusterRoleBinding(name string, sa *corev1.ServiceAccount, clusterRole *rbacv1.ClusterRole) *rbacv1.ClusterRoleBinding {
+	return &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+				constant.AppNameLabelKey:     KubeBlocksChartName},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind: clusterRole.Kind,
+			Name: clusterRole.Name,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      sa.Name,
+				Namespace: sa.Namespace,
+			},
+		},
+	}
+}
+
+func FakeRole(name string) *rbacv1.Role {
+	return &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+				constant.AppNameLabelKey:     KubeBlocksChartName},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"*"},
+				Resources: []string{"*"},
+				Verbs:     []string{"*"},
+			},
+		},
+	}
+}
+
+func FakeRoleBinding(name string, sa *corev1.ServiceAccount, role *rbacv1.Role) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+				constant.AppNameLabelKey:     KubeBlocksChartName},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind: role.Kind,
+			Name: role.Name,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      sa.Name,
+				Namespace: sa.Namespace,
+			},
+		},
+	}
 }

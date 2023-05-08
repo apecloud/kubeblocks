@@ -1,12 +1,12 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: weaviate-standalone-backup-policy-template
+  name: weaviate-backup-policy-template
   labels:
-    clusterdefinition.kubeblocks.io/name: weaviate-standalone
+    clusterdefinition.kubeblocks.io/name: weaviate
     {{- include "weaviate.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: weaviate-standalone
+  clusterDefinitionRef: weaviate
   backupPolicies:
   - componentDefRef: weaviate
     ttl: 7d

@@ -80,6 +80,14 @@ func (factory *MockClusterFactory) SetReplicas(replicas int32) *MockClusterFacto
 	return factory
 }
 
+func (factory *MockClusterFactory) SetServiceAccountName(serviceAccountName string) *MockClusterFactory {
+	comps := factory.get().Spec.ComponentSpecs
+	if len(comps) > 0 {
+		comps[len(comps)-1].ServiceAccountName = serviceAccountName
+	}
+	return factory
+}
+
 func (factory *MockClusterFactory) SetResources(resources corev1.ResourceRequirements) *MockClusterFactory {
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {

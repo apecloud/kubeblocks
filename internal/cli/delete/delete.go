@@ -38,7 +38,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
-type DeleteHook func(object runtime.Object) error
+type DeleteHook func(options *DeleteOptions, object runtime.Object) error
+
 type DeleteOptions struct {
 	Factory       cmdutil.Factory
 	Namespace     string
@@ -221,12 +222,12 @@ func (o *DeleteOptions) preDeleteResource(info *resource.Info) error {
 			return err
 		}
 	}
-	return o.PreDeleteHook(info.Object)
+	return o.PreDeleteHook(o, info.Object)
 }
 
 func (o *DeleteOptions) postDeleteResource(object runtime.Object) error {
 	if o.PostDeleteHook != nil {
-		return o.PostDeleteHook(object)
+		return o.PostDeleteHook(o, object)
 	}
 	return nil
 }

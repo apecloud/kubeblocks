@@ -58,7 +58,7 @@ import (
 
 const (
 	backupPathBase                 = "/backupdata"
-	deleteBackupFilesJobNamePrefix = "delete-backup-files-"
+	deleteBackupFilesJobNamePrefix = "delete-"
 )
 
 // BackupReconciler reconciles a Backup object
@@ -746,11 +746,44 @@ func (r *BackupReconciler) createDeleteBackupFileJob(
 	backupPVCName string,
 	backupFilePath string) error {
 
+	// make sure the path has a leading slash
+	if !strings.HasPrefix(backupFilePath, "/") {
+		backupFilePath = "/" + backupFilePath
+	}
+
+	// this script first deletes the directory where the backup is located (including files
+	// in the directory), and then traverses up the path level by level to clean up empty directories.
+	deleteScript := fmt.Sprintf(`
+		backupPathBase=%s;
+		targetPath="${backupPathBase}%s";
+
+		echo "removing backup files in ${targetPath}";
+		rm -rf "${targetPath}";
+
+		absBackupPathBase=$(realpath "${backupPathBase}");
+		curr=$(realpath "${targetPath}");
+		while true; do
+			parent=$(dirname "${curr}");
+			if [ "${parent}" == "${absBackupPathBase}" ]; then
+				echo "reach backupPathBase ${backupPathBase}, done";
+				break;
+			fi;
+			if [ ! "$(ls -A "${parent}")" ]; then
+				echo "${parent} is empty, removing it...";
+				rmdir "${parent}";
+			else
+				echo "${parent} is not empty, done";
+				break;
+			fi;
+			curr="${parent}";
+		done
+	`, backupPathBase, backupFilePath)
+
 	// build container
 	container := corev1.Container{}
 	container.Name = backup.Name
 	container.Command = []string{"sh", "-c"}
-	container.Args = []string{fmt.Sprintf("rm -rf %s%s", backupPathBase, backupFilePath)}
+	container.Args = []string{deleteScript}
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 
@@ -992,6 +1025,9 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	}
 
 	jobName := deleteBackupFilesJobNamePrefix + backup.Name
+	if len(jobName) > 60 {
+		jobName = jobName[:60]
+	}
 	jobKey := types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
 	job := batchv1.Job{}
 	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, jobKey, &job)
@@ -1005,6 +1041,13 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 			reqCtx.Log.Info("skip deleting backup files because PersistentVolumeClaimName empty",
 				"backup", backup.Name)
 			return nil
+		}
+		// check if pvc exists
+		if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backup.Namespace, Name: pvcName}, &corev1.PersistentVolumeClaim{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
 		}
 
 		backupFilePath := ""

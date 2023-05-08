@@ -71,12 +71,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-func init() {
-	if _, err := GetCliHomeDir(); err != nil {
-		fmt.Println("Failed to create kbcli home dir:", err)
-	}
-}
-
 // CloseQuietly closes `io.Closer` quietly. Very handy and helpful for code
 // quality too.
 func CloseQuietly(d io.Closer) {
@@ -263,7 +257,7 @@ func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
 			return node
 		}
 	}
-	return &corev1.Node{}
+	return nil
 }
 
 // ResourceIsEmpty check if resource is empty or not

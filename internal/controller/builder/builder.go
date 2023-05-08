@@ -36,7 +36,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -346,13 +345,14 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 	uuidStrB64 := base64.RawStdEncoding.EncodeToString([]byte(strings.ReplaceAll(uuidStr, "-", "")))
 	uuidHex := hex.EncodeToString(uuidBytes)
 	m := map[string]string{
-		"$(RANDOM_PASSWD)":     randomString(8),
-		"$(UUID)":              uuidStr,
-		"$(UUID_B64)":          uuidB64,
-		"$(UUID_STR_B64)":      uuidStrB64,
-		"$(UUID_HEX)":          uuidHex,
-		"$(SVC_FQDN)":          fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
-		"$(HEADLESS_SVC_FQDN)": fmt.Sprintf("%s-%s-headless.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+		"$(RANDOM_PASSWD)":        randomString(8),
+		"$(UUID)":                 uuidStr,
+		"$(UUID_B64)":             uuidB64,
+		"$(UUID_STR_B64)":         uuidStrB64,
+		"$(UUID_HEX)":             uuidHex,
+		"$(SVC_FQDN)":             fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+		"$(KB_CLUSTER_COMP_NAME)": params.Cluster.Name + "-" + params.Component.Name,
+		"$(HEADLESS_SVC_FQDN)":    fmt.Sprintf("%s-%s-headless.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
 	}
 	if len(params.Component.Services) > 0 {
 		for _, p := range params.Component.Services[0].Spec.Ports {
@@ -425,45 +425,6 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 // envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
 func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli client.Client) (*corev1.ConfigMap, error) {
 
-	isRecreateFromExistingPVC := func() (bool, error) {
-		ml := client.MatchingLabels{
-			constant.AppInstanceLabelKey:    params.Cluster.Name,
-			constant.KBAppComponentLabelKey: params.Component.Name,
-		}
-		pvcList := corev1.PersistentVolumeClaimList{}
-		if err := cli.List(reqCtx.Ctx, &pvcList, ml); err != nil {
-			return false, err
-		}
-		// no pvc means it's not recreation
-		if len(pvcList.Items) == 0 {
-			return false, nil
-		}
-		// check sts existence
-		stsList := appsv1.StatefulSetList{}
-		if err := cli.List(reqCtx.Ctx, &stsList, ml); err != nil {
-			return false, err
-		}
-		// recreation will not have existing sts
-		if len(stsList.Items) > 0 {
-			return false, nil
-		}
-		// check pod existence
-		for _, pvc := range pvcList.Items {
-			vctName := pvc.Annotations[constant.VolumeClaimTemplateNameLabelKey]
-			podName := strings.TrimPrefix(pvc.Name, vctName+"-")
-			if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: podName, Namespace: params.Cluster.Namespace}, &corev1.Pod{}); err != nil {
-				if apierrors.IsNotFound(err) {
-					continue
-				}
-				return false, err
-			}
-			// any pod exists means it's not a recreation
-			return false, nil
-		}
-		// passed all the above checks, so it's a recreation
-		return true, nil
-	}
-
 	const tplFile = "env_config_template.cue"
 
 	prefix := constant.KBPrefix + "_" + strings.ToUpper(params.Component.Type) + "_"
@@ -473,25 +434,15 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 	for j := 0; j < int(params.Component.Replicas); j++ {
 		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
 		hostNameTplValue := params.Cluster.Name + "-" + params.Component.Name + "-" + strconv.Itoa(j)
-
-		if params.Component.WorkloadType != appsv1alpha1.Replication {
-			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
-			continue
-		}
+		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 
 		// build env for replication workload
-		// the 1st replica's hostname should not have suffix like '-0'
-		if j == 0 {
-			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
-		} else {
-			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue+"-0", svcName)
-		}
-		// if primaryIndex is 0, the pod name have to be no suffix '-0'
-		primaryIndex := params.Component.GetPrimaryIndex()
-		if primaryIndex == 0 {
-			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s", params.Cluster.Name, params.Component.Name, primaryIndex, svcName)
-		} else {
-			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d-%d.%s", params.Cluster.Name, params.Component.Name, primaryIndex, 0, svcName)
+		if params.Component.WorkloadType == appsv1alpha1.Replication {
+			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s",
+				params.Cluster.Name,
+				params.Component.Name,
+				params.Component.GetPrimaryIndex(),
+				svcName)
 		}
 	}
 
@@ -520,12 +471,8 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 		}
 	}
 
-	// if created from existing pvc, set env
-	isRecreate, err := isRecreateFromExistingPVC()
-	if err != nil {
-		return nil, err
-	}
-	envData[prefix+"RECREATE"] = strconv.FormatBool(isRecreate)
+	// set cluster uid to let pod know if the cluster is recreated
+	envData[prefix+"CLUSTER_UID"] = string(params.Cluster.UID)
 
 	config := corev1.ConfigMap{}
 	if err := buildFromCUE(tplFile, map[string]any{

@@ -81,9 +81,9 @@ var _ = Describe("builder", func() {
 	allFieldsClusterVersionObj := func(needCreate bool) *appsv1alpha1.ClusterVersion {
 		By("By assure an clusterVersion obj")
 		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(mysqlCompDefName).
+			AddComponentVersion(mysqlCompDefName).
 			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponent(proxyCompDefName).
+			AddComponentVersion(proxyCompDefName).
 			AddInitContainerShort("nginx-init", testapps.NginxImage).
 			AddContainerShort("nginx", testapps.NginxImage).
 			GetObject()
@@ -324,15 +324,14 @@ var _ = Describe("builder", func() {
 			reqCtx := newReqCtx()
 			params := newParams()
 
-			By("creating pvc to make it looks like recreation")
-			pvcName := "test-pvc"
-			testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
-				params.Component.Name, testapps.DataVolumeName).SetStorage("1Gi").CheckedCreate(&testCtx)
+			uuid := "12345"
+			By("mock a cluster uuid")
+			params.Cluster.UID = types.UID(uuid)
 
 			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_RECREATE"]).Should(Equal("true"))
+			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_CLUSTER_UID"]).Should(Equal(uuid))
 		})
 
 		It("builds Env Config with ConsensusSet status correctly", func() {
@@ -375,13 +374,8 @@ var _ = Describe("builder", func() {
 				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)
 				svcName := fmt.Sprintf("%s-headless", stsName)
 				By("Checking KB_PRIMARY_POD_NAME value be right")
-				if int(params.Component.GetPrimaryIndex()) == 0 {
-					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
-						Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
-				} else {
-					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
-						Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "-0." + svcName))
-				}
+				Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
+					Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
 				for i := 0; i < int(params.Component.Replicas); i++ {
 					if i == 0 {
 						By("Checking the 1st replica's hostname should not have suffix '-0'")
@@ -389,7 +383,7 @@ var _ = Describe("builder", func() {
 							Should(Equal(stsName + "-" + strconv.Itoa(0) + "." + svcName))
 					} else {
 						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
-							Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "-0." + svcName))
+							Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
 					}
 				}
 			}

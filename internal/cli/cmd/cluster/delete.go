@@ -20,17 +20,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -44,6 +50,7 @@ var deleteExample = templates.Examples(`
 func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := delete.NewDeleteOptions(f, streams, types.ClusterGVR())
 	o.PreDeleteHook = clusterPreDeleteHook
+	o.PostDeleteHook = clusterPostDeleteHook
 
 	cmd := &cobra.Command{
 		Use:               "delete NAME",
@@ -66,18 +73,104 @@ func deleteCluster(o *delete.DeleteOptions, args []string) error {
 	return o.Run()
 }
 
-func clusterPreDeleteHook(object runtime.Object) error {
-	if object.GetObjectKind().GroupVersionKind().Kind != appsv1alpha1.ClusterKind {
-		klog.V(1).Infof("object %s is not of kind %s, skip PreDeleteHook.", object.GetObjectKind().GroupVersionKind().Kind, appsv1alpha1.ClusterKind)
-		return nil
-	}
-	unstructured := object.(*unstructured.Unstructured)
-	cluster := &appsv1alpha1.Cluster{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.Object, cluster); err != nil {
+func clusterPreDeleteHook(o *delete.DeleteOptions, object runtime.Object) error {
+	cluster, err := getClusterFromObject(object)
+	if err != nil {
 		return err
 	}
 	if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {
 		return fmt.Errorf("cluster %s is protected by termination policy %s, skip deleting", cluster.Name, appsv1alpha1.DoNotTerminate)
 	}
 	return nil
+}
+
+func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error {
+	c, err := getClusterFromObject(object)
+	if err != nil {
+		return err
+	}
+
+	dynamic, err := o.Factory.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	client, err := o.Factory.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+
+	// HACK: for a postgresql cluster, we need to delete the sa, role and rolebinding
+	cd, err := cluster.GetClusterDefByName(dynamic, c.Spec.ClusterDefRef)
+	if err != nil {
+		return err
+	}
+	for _, compSpec := range c.Spec.ComponentSpecs {
+		if err = deleteCompDependencies(client, c.Namespace, c.Name, cd, &compSpec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteCompDependencies(client kubernetes.Interface, ns string, name string, cd *appsv1alpha1.ClusterDefinition,
+	compSpec *appsv1alpha1.ClusterComponentSpec) error {
+	if d, err := shouldCreateDependencies(cd, compSpec); err != nil {
+		return err
+	} else if !d {
+		return nil
+	}
+	return deleteDependencies(client, ns, name)
+}
+
+func deleteDependencies(client kubernetes.Interface, ns string, name string) error {
+	klog.V(1).Infof("delete dependencies for cluster %s", name)
+	var (
+		saName          = saNamePrefix + name
+		roleName        = roleNamePrefix + name
+		roleBindingName = roleBindingNamePrefix + name
+		allErr          []error
+	)
+
+	// now, delete the dependencies, for postgresql, we delete sa, role and rolebinding
+	ctx := context.TODO()
+	gracePeriod := int64(0)
+	deleteOptions := metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}
+	checkErr := func(err error) bool {
+		if err != nil && !apierrors.IsNotFound(err) {
+			return true
+		}
+		return false
+	}
+
+	// delete rolebinding
+	klog.V(1).Infof("delete rolebinding %s", roleBindingName)
+	if err := client.RbacV1().RoleBindings(ns).Delete(ctx, roleBindingName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+
+	// delete service account
+	klog.V(1).Infof("delete service account %s", saName)
+	if err := client.CoreV1().ServiceAccounts(ns).Delete(ctx, saName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+
+	// delete role
+	klog.V(1).Infof("delete role %s", roleName)
+	if err := client.RbacV1().Roles(ns).Delete(ctx, roleName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+	return errors.NewAggregate(allErr)
+}
+
+func getClusterFromObject(object runtime.Object) (*appsv1alpha1.Cluster, error) {
+	if object.GetObjectKind().GroupVersionKind().Kind != appsv1alpha1.ClusterKind {
+		return nil, fmt.Errorf("object %s is not of kind %s", object.GetObjectKind().GroupVersionKind().Kind, appsv1alpha1.ClusterKind)
+	}
+	unstructured := object.(*unstructured.Unstructured)
+	cluster := &appsv1alpha1.Cluster{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.Object, cluster); err != nil {
+		return nil, err
+	}
+	return cluster, nil
 }

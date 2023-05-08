@@ -31,12 +31,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
@@ -64,6 +66,7 @@ type clusterPlanBuilder struct {
 	cli          client.Client
 	transCtx     *ClusterTransformContext
 	transformers graph.TransformerChain
+	dag          *graph.DAG
 }
 
 // clusterPlan a graph.Plan implementation for Cluster reconciliation
@@ -139,9 +142,11 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		}
 		// if pre-check failed, this is a fast return, no need to set apply resource condition
 		if preCheckCondition.Status != metav1.ConditionTrue {
+			sendWaringEventWithError(c.transCtx.GetRecorder(), c.transCtx.Cluster, ReasonPreCheckFailed, err)
 			return
 		}
 		setApplyResourceCondition(&c.transCtx.Cluster.Status.Conditions, c.transCtx.Cluster.Generation, err)
+		sendWaringEventWithError(c.transCtx.GetRecorder(), c.transCtx.Cluster, ReasonApplyResourcesFailed, err)
 	}()
 
 	// new a DAG and apply chain on it, after that we should get the final Plan
@@ -149,6 +154,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	err = c.transformers.ApplyTo(c.transCtx, dag)
 	// log for debug
 	c.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
+	// add dag to clusterPlanBuilder
+	c.dag = dag
 
 	// we got the execution plan
 	plan := &clusterPlan{
@@ -173,9 +180,9 @@ func (p *clusterPlan) Execute() error {
 }
 
 func (p *clusterPlan) handlePlanExecutionError(err error) error {
-	condition := newFailedApplyResourcesCondition(err.Error())
+	condition := newFailedApplyResourcesCondition(err)
 	meta.SetStatusCondition(&p.transCtx.Cluster.Status.Conditions, condition)
-	p.transCtx.EventRecorder.Event(p.transCtx.Cluster, corev1.EventTypeWarning, condition.Reason, condition.Message)
+	sendWaringEventWithError(p.transCtx.GetRecorder(), p.transCtx.Cluster, ReasonApplyResourcesFailed, err)
 	return p.cli.Status().Patch(p.transCtx.Context, p.transCtx.Cluster, client.MergeFrom(p.transCtx.OrigCluster.DeepCopy()))
 }
 
@@ -263,7 +270,13 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		}
 		// delete secondary objects
 		if _, ok := node.obj.(*appsv1alpha1.Cluster); !ok {
-			err := c.cli.Delete(c.transCtx.Context, node.obj)
+			// check dependency resources has been deleted before deleting the resource
+			err := c.checkDependencyResourcesDeleted(node)
+			if err != nil {
+				return err
+			}
+			err = intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.obj)
+			// err := c.cli.Delete(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -384,4 +397,47 @@ func (c *clusterPlanBuilder) emitPhaseUpdatingEvent(oldPhase, newPhase appsv1alp
 		c.transCtx.EventRecorder.Event(cluster, eType, string(newPhase), message)
 		_ = opsutil.MarkRunningOpsRequestAnnotation(c.transCtx.Context, c.cli, cluster)
 	}
+}
+
+// checkDependencyResourcesDeleted checks if the dependency resources are deleted when cluster is deleted.
+func (c *clusterPlanBuilder) checkDependencyResourcesDeleted(node *lifecycleVertex) error {
+	if c.dag == nil {
+		return nil
+	}
+	// get the dependency resources
+	outAdj := c.dag.OutAdj(node)
+	if len(outAdj) == 0 {
+		return nil
+	}
+	for _, out := range outAdj {
+		outNode, ok := out.(*lifecycleVertex)
+		if !ok {
+			return fmt.Errorf("wrong vertex type %v", outNode)
+		}
+		// if the node.obj is StatefulSet, check if the pods are deleted
+		sts, ok := outNode.obj.(*appsv1.StatefulSet)
+		if ok {
+			pods, err := componentutil.GetPodListByStatefulSet(c.transCtx.Context, c.cli, sts)
+			if err != nil {
+				return err
+			}
+			if len(pods) > 0 {
+				return &realRequeueError{reason: fmt.Sprintf("waiting dependency resource delete, %s/%s dependency resource statefulSet %s/%s still have pods",
+					node.obj.GetNamespace(), node.obj.GetName(), outNode.obj.GetNamespace(), outNode.obj.GetName()), requeueAfter: requeueDuration}
+			}
+		}
+		// check if the dependency resource is deleted
+		err := c.cli.Get(c.transCtx.Context, types.NamespacedName{Name: outNode.obj.GetName(), Namespace: outNode.obj.GetNamespace()}, outNode.obj)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		if outNode.obj != nil {
+			return &realRequeueError{reason: fmt.Sprintf("waiting dependency resource delete, %s/%s dependency resource %s/%s is not deleted",
+				node.obj.GetNamespace(), node.obj.GetName(), outNode.obj.GetNamespace(), outNode.obj.GetName()), requeueAfter: requeueDuration}
+		}
+	}
+	return nil
 }

@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +40,9 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
+
+// ConditionsError cluster will display this status on list cmd when the status of ApplyResources or ProvisioningStarted condition is not "True".
+const ConditionsError = "ConditionsError"
 
 type GetOptions struct {
 	WithClusterDef     bool
@@ -88,6 +92,7 @@ func listResources[T any](dynamic dynamic.Interface, gvr schema.GroupVersionReso
 // Get all kubernetes objects belonging to the database cluster
 func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	var err error
+
 	objs := NewClusterObjects()
 	ctx := context.TODO()
 	corev1 := o.Client.CoreV1()
@@ -112,12 +117,22 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		return nil, err
 	}
 
-	// wrap the cluster phase if the latest ops request is processing
-	latestOpsProcessedCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
-	if latestOpsProcessedCondition != nil && latestOpsProcessedCondition.Status == metav1.ConditionFalse {
-		objs.Cluster.Status.Phase = appsv1alpha1.ClusterPhase(latestOpsProcessedCondition.Reason)
+	if objs.Cluster.Status.Phase == appsv1alpha1.SpecReconcilingClusterPhase {
+		// wrap the cluster phase if the latest ops request is processing
+		latestOpsProcessedCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
+		if latestOpsProcessedCondition != nil && latestOpsProcessedCondition.Status == metav1.ConditionFalse {
+			objs.Cluster.Status.Phase = appsv1alpha1.ClusterPhase(latestOpsProcessedCondition.Reason)
+		}
+	}
+	provisionCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
+	if provisionCondition != nil && provisionCondition.Status == metav1.ConditionFalse {
+		objs.Cluster.Status.Phase = ConditionsError
 	}
 
+	applyResourcesCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeApplyResources)
+	if applyResourcesCondition != nil && applyResourcesCondition.Status == metav1.ConditionFalse {
+		objs.Cluster.Status.Phase = ConditionsError
+	}
 	// get cluster definition
 	if o.WithClusterDef {
 		cd := &appsv1alpha1.ClusterDefinition{}
@@ -184,10 +199,13 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 			}
 
 			node, err := corev1.Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-			if err != nil {
+			if err != nil && !apierrors.IsNotFound(err) {
 				return nil, err
 			}
-			objs.Nodes = append(objs.Nodes, node)
+
+			if node != nil {
+				objs.Nodes = append(objs.Nodes, node)
+			}
 		}
 	}
 
@@ -211,15 +229,16 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 			}
 		}
 	}
+
 	if o.WithDataProtection {
-		dplistOpts := metav1.ListOptions{
+		dpListOpts := metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s",
 				constant.AppInstanceLabelKey, o.Name),
 		}
-		if err := listResources(o.Dynamic, types.BackupPolicyGVR(), o.Namespace, dplistOpts, &objs.BackupPolicies); err != nil {
+		if err = listResources(o.Dynamic, types.BackupPolicyGVR(), o.Namespace, dpListOpts, &objs.BackupPolicies); err != nil {
 			return nil, err
 		}
-		if err := listResources(o.Dynamic, types.BackupGVR(), o.Namespace, dplistOpts, &objs.Backups); err != nil {
+		if err = listResources(o.Dynamic, types.BackupGVR(), o.Namespace, dpListOpts, &objs.Backups); err != nil {
 			return nil, err
 		}
 	}

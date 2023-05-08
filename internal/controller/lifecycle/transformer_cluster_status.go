@@ -24,7 +24,6 @@ import (
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -71,36 +70,38 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		cluster.Status.ClusterDefGeneration = transCtx.ClusterDef.Generation
 	}
 
-	updateClusterPhase := func() {
-		clusterPhase := cluster.Status.Phase
-		if clusterPhase == "" {
-			cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
-		} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
-			cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
-		}
-	}
-
-	isStorageUpdated := func(oldSts, newSts *appsv1.StatefulSet) bool {
-		if oldSts == nil || newSts == nil {
-			return false
-		}
-		for _, oldVct := range oldSts.Spec.VolumeClaimTemplates {
-			var newVct *corev1.PersistentVolumeClaim
-			for _, v := range newSts.Spec.VolumeClaimTemplates {
-				if v.Name == oldVct.Name {
-					newVct = &v
-					break
-				}
-			}
-			if newVct == nil {
-				continue
-			}
-			if oldVct.Spec.Resources.Requests[corev1.ResourceStorage] != newVct.Spec.Resources.Requests[corev1.ResourceStorage] {
+	compareContainersAttribute := func(oldContainer, newContainer reflect.Value, attributeNames ...string) bool {
+		for _, name := range attributeNames {
+			oldValue := oldContainer.FieldByName(name).Interface()
+			newValue := newContainer.FieldByName(name).Interface()
+			if !reflect.DeepEqual(oldValue, newValue) {
 				return true
 			}
 		}
 		return false
 	}
+
+	// isStorageUpdated := func(oldSts, newSts *appsv1.StatefulSet) bool {
+	//	if oldSts == nil || newSts == nil {
+	//		return false
+	//	}
+	//	for _, oldVct := range oldSts.Spec.VolumeClaimTemplates {
+	//		var newVct *corev1.PersistentVolumeClaim
+	//		for _, v := range newSts.Spec.VolumeClaimTemplates {
+	//			if v.Name == oldVct.Name {
+	//				newVct = &v
+	//				break
+	//			}
+	//		}
+	//		if newVct == nil {
+	//			continue
+	//		}
+	//		if oldVct.Spec.Resources.Requests[corev1.ResourceStorage] != newVct.Spec.Resources.Requests[corev1.ResourceStorage] {
+	//			return true
+	//		}
+	//	}
+	//	return false
+	// }
 
 	updateComponentsPhase := func() {
 		vertices := findAll[*appsv1.StatefulSet](dag)
@@ -122,36 +123,38 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 			newSpec := reflect.ValueOf(v.obj).Elem().FieldByName("Spec")
 
 			// compare replicas
-			// oldReplicas := oldSpec.FieldByName("Replicas").Interface()
-			// newReplicas := newSpec.FieldByName("Replicas").Interface()
-			// if !reflect.DeepEqual(oldReplicas, newReplicas) {
-			//	updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
-			//	continue
-			// }
-			// compare cpu & memory
-			oldResources := oldSpec.FieldByName("Template").
-				FieldByName("Spec").
-				FieldByName("Containers").
-				Index(0).
-				FieldByName("Resources").Interface()
-			newResources := newSpec.FieldByName("Template").
-				FieldByName("Spec").
-				FieldByName("Containers").
-				Index(0).
-				FieldByName("Resources").Interface()
-			if !reflect.DeepEqual(oldResources, newResources) {
+			oldReplicas := oldSpec.FieldByName("Replicas").Interface()
+			newReplicas := newSpec.FieldByName("Replicas").Interface()
+			if !reflect.DeepEqual(oldReplicas, newReplicas) && !v.immutable {
 				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
 				continue
 			}
-			// compare sts storage
-			if _, ok := v.obj.(*appsv1.StatefulSet); ok {
-				oldSts, _ := v.oriObj.(*appsv1.StatefulSet)
-				newSts, _ := v.obj.(*appsv1.StatefulSet)
-				if !isStorageUpdated(oldSts, newSts) {
-					continue
-				}
+			// compare containers attributes
+			oldContainers := oldSpec.FieldByName("Template").
+				FieldByName("Spec").
+				FieldByName("Containers").
+				Index(0)
+			newContainers := newSpec.FieldByName("Template").
+				FieldByName("Spec").
+				FieldByName("Containers").
+				Index(0)
+			isChanged := compareContainersAttribute(oldContainers, newContainers, "Resources", "Image")
+			if isChanged {
+				updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
 			}
-			updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
+			// TODO(free6om): pvc expansion is not allowed by sts, but ops supports it by update the under pvc directly,
+			// which causes different behavior between volume expansion ops and cluster spec Update.
+			// should make them act same.
+			//
+			// compare sts storage
+			// if _, ok := v.obj.(*appsv1.StatefulSet); ok {
+			//	oldSts, _ := v.oriObj.(*appsv1.StatefulSet)
+			//	newSts, _ := v.obj.(*appsv1.StatefulSet)
+			//	if !isStorageUpdated(oldSts, newSts) {
+			//		continue
+			//	}
+			// }
+			// updateComponentPhaseWithOperation(cluster, v.obj.GetLabels()[constant.KBAppComponentLabelKey])
 		}
 	}
 
@@ -168,13 +171,13 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	case isClusterUpdating(*origCluster):
 		transCtx.Logger.Info("update cluster status after applying resources ")
 		updateObservedGeneration()
-		updateClusterPhase()
 		updateComponentsPhase()
 		// update components' phase in cluster.status
 		rootVertex.action = actionPtr(STATUS)
 	case isClusterStatusUpdating(*origCluster):
 		initClusterStatusParams()
 		defer func() { rootVertex.action = actionPtr(STATUS) }()
+		updateComponentsPhase()
 		// checks if the controller is handling the garbage of restore.
 		if err := t.handleGarbageOfRestoreBeforeRunning(transCtx, cluster, dag); err != nil {
 			return err
@@ -427,20 +430,22 @@ func (t *ClusterStatusTransformer) removeStsInitContainerForRestore(
 	var doRemoveInitContainers bool
 	for _, vertex := range vertexList {
 		v, _ := vertex.(*lifecycleVertex)
-		sts, _ := v.obj.(*appsv1.StatefulSet)
-		initContainers := sts.Spec.Template.Spec.InitContainers
+		if v.oriObj == nil {
+			continue
+		}
+		originSts, _ := v.oriObj.(*appsv1.StatefulSet)
+		initContainers := originSts.Spec.Template.Spec.InitContainers
 		restoreInitContainerName := component.GetRestoredInitContainerName(backupName)
 		restoreInitContainerIndex, _ := intctrlutil.GetContainerByName(initContainers, restoreInitContainerName)
 		if restoreInitContainerIndex == -1 {
 			continue
 		}
+		sts, _ := v.obj.(*appsv1.StatefulSet)
 		doRemoveInitContainers = true
 		initContainers = append(initContainers[:restoreInitContainerIndex], initContainers[restoreInitContainerIndex+1:]...)
 		sts.Spec.Template.Spec.InitContainers = initContainers
-		if v.oriObj != nil {
-			v.immutable = false
-			v.action = actionPtr(UPDATE)
-		}
+		v.immutable = false
+		v.action = actionPtr(UPDATE)
 	}
 	if doRemoveInitContainers {
 		// if need to remove init container, reset component to Creating.

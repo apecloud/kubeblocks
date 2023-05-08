@@ -17,14 +17,14 @@ spec:
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
   componentSpecs:
-    - name: replicaset
-      componentDefRef: replicaset
+    - name: mongodb
+      componentDefRef: mongodb
       monitor: {{ $.Values.monitor.enabled }}
-      replicas: {{ $.Values.replicaset.replicas }}
-      {{- with $.Values.replicaset.tolerations }}
+      replicas: {{ $.Values.mongodb.replicas }}
+      {{- with $.Values.mongodb.tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
       {{- end }}
-      {{- with $.Values.replicaset.resources }}
+      {{- with $.Values.mongodb.resources }}
       resources:
         limits:
           cpu: {{ .limits.cpu | quote }}
@@ -33,15 +33,15 @@ spec:
           cpu: {{ .requests.cpu | quote }}
           memory: {{ .requests.memory | quote }}
       {{- end }}
-      {{- if $.Values.replicaset.persistence.enabled }}
+      {{- if $.Values.mongodb.persistence.enabled }}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: {{ $.Values.replicaset.persistence.data.storageClassName }}
+            storageClassName: {{ $.Values.mongodb.persistence.data.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ $.Values.replicaset.persistence.data.size }}
+                storage: {{ $.Values.mongodb.persistence.data.size }}
       {{- end }}
 {{- end }}

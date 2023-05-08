@@ -20,21 +20,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubeblocks
 
 import (
+	"context"
+
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("kubeblocks objects", func() {
+
 	It("delete objects", func() {
 		dynamic := testing.FakeDynamicClient()
 		Expect(deleteObjects(dynamic, types.DeployGVR(), nil)).Should(Succeed())
@@ -95,20 +101,65 @@ var _ = Describe("kubeblocks objects", func() {
 		}
 
 		for _, c := range testCases {
-			client := mockDynamicClientWithCRD(c.clusterDef, c.clusterVersion, c.backupTool)
+			objects := mockCRD()
+			objects = append(objects, testing.FakeVolumeSnapshotClass())
+			objects = append(objects, c.clusterDef, c.clusterVersion, c.backupTool)
+			client := testing.FakeDynamicClient(objects...)
 			objs, _ := getKBObjects(client, "", nil)
 			Expect(removeCustomResources(client, objs)).Should(Succeed())
 		}
 	})
 
 	It("delete crd", func() {
-		dynamic := mockDynamicClientWithCRD()
+		objects := mockCRD()
+		objects = append(objects, testing.FakeVolumeSnapshotClass())
+		dynamic := testing.FakeDynamicClient(objects...)
 		objs, _ := getKBObjects(dynamic, "", nil)
 		Expect(deleteObjects(dynamic, types.CRDGVR(), objs[types.CRDGVR()])).Should(Succeed())
 	})
+
+	It("test getKBObjects", func() {
+		objects := mockCRD()
+		objects = append(objects, mockCRs()...)
+		objects = append(objects, testing.FakeVolumeSnapshotClass())
+		objects = append(objects, mockRBACResources()...)
+		objects = append(objects, mockConfigMaps()...)
+		dynamic := testing.FakeDynamicClient(objects...)
+		objs, _ := getKBObjects(dynamic, "", nil)
+
+		tmp, err := dynamic.Resource(types.ClusterRoleGVR()).Namespace(metav1.NamespaceAll).
+			List(context.TODO(), metav1.ListOptions{LabelSelector: buildKubeBlocksSelectorLabels()})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(tmp.Items).Should(HaveLen(1))
+		// verify crds
+		Expect(objs[types.CRDGVR()].Items).Should(HaveLen(4))
+		// verify crs
+		for _, gvr := range []schema.GroupVersionResource{types.ClusterDefGVR(), types.ClusterVersionGVR()} {
+			objlist, ok := objs[gvr]
+			Expect(ok).Should(BeTrue())
+			Expect(objlist.Items).Should(HaveLen(1))
+		}
+
+		// verify rbac info
+		for _, gvr := range []schema.GroupVersionResource{types.RoleGVR(), types.ClusterRoleBindingGVR(), types.ServiceAccountGVR()} {
+			objlist, ok := objs[gvr]
+			Expect(ok).Should(BeTrue())
+			Expect(objlist.Items).Should(HaveLen(1), gvr.String())
+		}
+		// verify cofnig tpl
+		for _, gvr := range []schema.GroupVersionResource{types.ConfigmapGVR()} {
+			objlist, ok := objs[gvr]
+			Expect(ok).Should(BeTrue())
+			Expect(objlist.Items).Should(HaveLen(1), gvr.String())
+		}
+	})
 })
 
-func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
+func mockName() string {
+	return uuid.NewString()
+}
+
+func mockCRD() []runtime.Object {
 	clusterCRD := v1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CustomResourceDefinition",
@@ -162,9 +213,34 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 		},
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
+	return []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD}
+}
 
-	allObjs := []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD,
-		testing.FakeVolumeSnapshotClass()}
-	allObjs = append(allObjs, objects...)
-	return testing.FakeDynamicClient(allObjs...)
+func mockCRs() []runtime.Object {
+	allObjects := make([]runtime.Object, 0)
+	allObjects = append(allObjects, testing.FakeClusterDef())
+	allObjects = append(allObjects, testing.FakeClusterVersion())
+	return allObjects
+}
+
+func mockRBACResources() []runtime.Object {
+	sa := testing.FakeServiceAccount(mockName())
+
+	cluserRole := testing.FakeClusterRole(mockName())
+	cluserRoleBinding := testing.FakeClusterRoleBinding(mockName(), sa, cluserRole)
+
+	role := testing.FakeRole(mockName())
+	roleBinding := testing.FakeRoleBinding(mockName(), sa, role)
+
+	return []runtime.Object{sa, cluserRole, cluserRoleBinding, role, roleBinding}
+}
+
+func mockConfigMaps() []runtime.Object {
+	obj := testing.FakeConfigMap(mockName())
+	// add a config tpl label
+	if obj.ObjectMeta.Labels == nil {
+		obj.ObjectMeta.Labels = make(map[string]string)
+	}
+	obj.ObjectMeta.Labels[constant.CMConfigurationTypeLabelKey] = constant.ConfigTemplateType
+	return []runtime.Object{obj}
 }

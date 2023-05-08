@@ -39,9 +39,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
+	"k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -63,9 +67,10 @@ var clusterCreateExample = templates.Examples(`
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql
 
 	# Output resource information in YAML format, but do not create resources.
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=client -o yaml
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run -o yaml
 
-	# Output resource information in YAML format, the information will be sent to the server, but the resource will not be actually created.
+	# Output resource information in YAML format, the information will be sent to the server
+	# but the resource will not be actually created.
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=server -o yaml
 	
 	# Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
@@ -86,27 +91,31 @@ var clusterCreateExample = templates.Examples(`
 	# Create a cluster and set cpu to 1 core, memory to 1Gi, storage size to 20Gi and replicas to 3
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1,memory=1Gi,storage=20Gi,replicas=3
 
-	# Create a cluster and set the class to general-1c1g, valid classes can be found by executing the command "kbcli class list --cluster-definition=<cluster-definition-name>"
+	# Create a cluster and set the class to general-1c1g
+	# run "kbcli class list --cluster-definition=cluster-definition-name" to get the class list
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set class=general-1c1g
 
 	# Create a cluster with replicationSet workloadType and set switchPolicy to Noop
 	kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
 
 	# Create a cluster and use a URL to set cluster resource
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/apecloud-mysql.yaml
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql \
+		--set-file https://kubeblocks.io/yamls/apecloud-mysql.yaml
 
 	# Create a cluster and load cluster resource set from stdin
 	cat << EOF | kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file -
 	- name: my-test ...
 
 	# Create a cluster forced to scatter by node
-	kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname --pod-anti-affinity Required
+	kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname \
+		--pod-anti-affinity Required
 
 	# Create a cluster in specific labels nodes
-	kbcli cluster create --cluster-definition apecloud-mysql --node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
+	kbcli cluster create --cluster-definition apecloud-mysql \
+		--node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
 
 	# Create a Cluster with two tolerations 
-	kbcli cluster create --cluster-definition apecloud-mysql --tolerations '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+	kbcli cluster create --cluster-definition apecloud-mysql --tolerations \ '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
 
     # Create a cluster, with each pod runs on their own dedicated node
     kbcli cluster create --cluster-definition apecloud-mysql --tenancy=DedicatedNode
@@ -126,6 +135,7 @@ const (
 	keyMemory       setKey = "memory"
 	keyReplicas     setKey = "replicas"
 	keyStorage      setKey = "storage"
+	keyStorageClass setKey = "storageClass"
 	keySwitchPolicy setKey = "switchPolicy"
 	keyUnknown      setKey = "unknown"
 )
@@ -170,6 +180,8 @@ type CreateOptions struct {
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
 
+	shouldCreateDependencies bool `json:"-"`
+
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
 	UpdatableFlags
@@ -196,7 +208,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
 	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
-	cmd.Flags().String("dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().StringVar(&o.DryRunStrategy, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	// add updatable flags
 	o.UpdatableFlags.addFlags(cmd)
@@ -305,10 +317,15 @@ func (o *CreateOptions) Validate() error {
 	if len(o.Name) > 16 {
 		return fmt.Errorf("cluster name should be less than 16 characters")
 	}
+
 	return nil
 }
 
 func (o *CreateOptions) Complete() error {
+	if err := o.Validate(); err != nil {
+		return err
+	}
+
 	components, err := o.buildComponents()
 	if err != nil {
 		return err
@@ -325,73 +342,182 @@ func (o *CreateOptions) Complete() error {
 	if len(tolerations) > 0 {
 		o.Tolerations = tolerations
 	}
-	return nil
+
+	// validate default storageClassName
+	return validateStorageClass(o.Dynamic, o.ComponentSpecs)
+}
+
+func (o *CreateOptions) CleanUp() error {
+	if o.Client == nil {
+		return nil
+	}
+
+	return deleteDependencies(o.Client, o.Namespace, o.Name)
 }
 
 // buildComponents build components from file or set values
 func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 	var (
-		componentByte []byte
-		err           error
+		err       error
+		cd        *appsv1alpha1.ClusterDefinition
+		compSpecs []*appsv1alpha1.ClusterComponentSpec
 	)
 
-	componentClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, o.ClusterDefRef)
+	compClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return nil, err
+	}
+
+	cd, err = cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
 	if err != nil {
 		return nil, err
 	}
 
 	// build components from file
-	components := o.ComponentSpecs
 	if len(o.SetFile) > 0 {
-		if componentByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
+		var (
+			compByte []byte
+			comps    []map[string]interface{}
+		)
+		if compByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
 			return nil, err
 		}
-		if componentByte, err = yaml.YAMLToJSON(componentByte); err != nil {
+		if compByte, err = yaml.YAMLToJSON(compByte); err != nil {
 			return nil, err
 		}
-		if err = json.Unmarshal(componentByte, &components); err != nil {
+		if err = json.Unmarshal(compByte, &comps); err != nil {
 			return nil, err
 		}
-		for _, item := range components {
-			var comp appsv1alpha1.ClusterComponentSpec
-			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item, &comp); err != nil {
+		for _, comp := range comps {
+			var compSpec appsv1alpha1.ClusterComponentSpec
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(comp, &compSpec); err != nil {
 				return nil, err
 			}
-			if _, err = class.ValidateComponentClass(&comp, componentClasses); err != nil {
-				return nil, err
-			}
+			compSpecs = append(compSpecs, &compSpec)
 		}
-		return components, nil
-	}
-
-	// build components from set values or environment variables
-	if len(components) == 0 {
-		cd, err := cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
-		if err != nil {
-			return nil, err
-		}
-
+	} else {
+		// build components from set values or environment variables
 		compSets, err := buildCompSetsMap(o.Values, cd)
 		if err != nil {
 			return nil, err
 		}
 
-		componentObjs, err := buildClusterComp(cd, compSets, componentClasses)
+		compSpecs, err = buildClusterComp(cd, compSets, compClasses)
 		if err != nil {
 			return nil, err
 		}
-		for _, compObj := range componentObjs {
-			if _, err = class.ValidateComponentClass(compObj, componentClasses); err != nil {
-				return nil, err
-			}
-			comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compObj)
-			if err != nil {
-				return nil, err
-			}
-			components = append(components, comp)
-		}
 	}
-	return components, nil
+
+	var comps []map[string]interface{}
+	for _, compSpec := range compSpecs {
+		// validate component classes
+		if _, err = class.ValidateComponentClass(compSpec, compClasses); err != nil {
+			return nil, err
+		}
+
+		// create component dependencies
+		if err = o.buildDependenciesFn(cd, compSpec); err != nil {
+			return nil, err
+		}
+
+		comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compSpec)
+		if err != nil {
+			return nil, err
+		}
+		comps = append(comps, comp)
+	}
+	return comps, nil
+}
+
+const (
+	saNamePrefix          = "kb-sa-"
+	roleNamePrefix        = "kb-role-"
+	roleBindingNamePrefix = "kb-rolebinding-"
+)
+
+// buildDependenciesFn create dependencies function for components, e.g. postgresql depends on
+// a service account, a role and a rolebinding
+func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
+	compSpec *appsv1alpha1.ClusterComponentSpec) error {
+
+	// HACK: now we only support postgresql cluster definition
+	if c, err := shouldCreateDependencies(cd, compSpec); err != nil {
+		return err
+	} else if !c {
+		return nil
+	}
+
+	// set component service account name
+	compSpec.ServiceAccountName = saNamePrefix + o.Name
+	o.shouldCreateDependencies = true
+	return nil
+}
+
+func (o *CreateOptions) CreateDependencies(dryRun []string) error {
+	var (
+		saName          = saNamePrefix + o.Name
+		roleName        = roleNamePrefix + o.Name
+		roleBindingName = roleBindingNamePrefix + o.Name
+	)
+
+	if !o.shouldCreateDependencies {
+		return nil
+	}
+
+	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
+	// create service account
+	labels := buildResourceLabels(o.Name)
+	applyOptions := metav1.ApplyOptions{FieldManager: "kbcli", DryRun: dryRun}
+	sa := corev1ac.ServiceAccount(saName, o.Namespace).WithLabels(labels)
+
+	klog.V(1).Infof("create service account %s", saName)
+	if _, err := o.Client.CoreV1().ServiceAccounts(o.Namespace).Apply(context.TODO(), sa, applyOptions); err != nil {
+		return err
+	}
+
+	// create role
+	klog.V(1).Infof("create role %s", roleName)
+	role := rbacv1ac.Role(roleName, o.Namespace).WithRules([]*rbacv1ac.PolicyRuleApplyConfiguration{
+		{
+			APIGroups: []string{""},
+			Resources: []string{"configmaps"},
+			Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"endpoints"},
+			Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+			Verbs:     []string{"get", "list", "patch", "update", "watch"},
+		},
+	}...).WithLabels(labels)
+	if _, err := o.Client.RbacV1().Roles(o.Namespace).Apply(context.TODO(), role, applyOptions); err != nil {
+		return err
+	}
+
+	// create role binding
+	rbacAPIGroup := "rbac.authorization.k8s.io"
+	rbacKind := "Role"
+	saKind := "ServiceAccount"
+	roleBinding := rbacv1ac.RoleBinding(roleBindingName, o.Namespace).WithLabels(labels).
+		WithSubjects([]*rbacv1ac.SubjectApplyConfiguration{
+			{
+				Kind:      &saKind,
+				Name:      &saName,
+				Namespace: &o.Namespace,
+			},
+		}...).
+		WithRoleRef(&rbacv1ac.RoleRefApplyConfiguration{
+			APIGroup: &rbacAPIGroup,
+			Kind:     &rbacKind,
+			Name:     &roleName,
+		})
+	klog.V(1).Infof("create role binding %s", roleBindingName)
+	_, err := o.Client.RbacV1().RoleBindings(o.Namespace).Apply(context.TODO(), roleBinding, applyOptions)
+	return err
 }
 
 // MultipleSourceComponents get component data from multiple source, such as stdin, URI and local file
@@ -507,6 +633,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				return "2"
 			}
 		}
+
 		// the default replicas is 3 if not set by command flag, for Consensus workload
 		if c.WorkloadType == appsv1alpha1.Consensus {
 			if key == keyReplicas {
@@ -556,7 +683,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 	}
 
 	var comps []*appsv1alpha1.ClusterComponentSpec
-	for _, c := range cd.Spec.ComponentDefs {
+	for i, c := range cd.Spec.ComponentDefs {
 		sets := map[setKey]string{}
 		if setsMap != nil {
 			sets = setsMap[c.Name]
@@ -614,6 +741,10 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				},
 			},
 		}}
+		storageClass := getVal(&c, keyStorageClass, sets)
+		if len(storageClass) != 0 {
+			compObj.VolumeClaimTemplates[i].Spec.StorageClassName = &storageClass
+		}
 		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err
 		}
@@ -626,7 +757,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 // specified in the set, use the cluster definition default component name.
 func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
-	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keySwitchPolicy)}
+	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keyStorageClass), string(keySwitchPolicy)}
 	parseKey := func(key string) setKey {
 		for _, k := range keys {
 			if strings.EqualFold(k, key) {
@@ -767,4 +898,83 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 				"DedicatedNode\teach pod of the cluster will run on their own dedicated node",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}))
+}
+
+// validateStorageClass check whether the StorageClasses we need are exist in K8S or
+// the default StorageClasses are exist
+func validateStorageClass(dynamic dynamic.Interface, components []map[string]interface{}) error {
+	existedStorageClasses, existedDefault, err := getStorageClasses(dynamic)
+	if err != nil {
+		return err
+	}
+	for _, comp := range components {
+		compObj := appsv1alpha1.ClusterComponentSpec{}
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(comp, &compObj)
+		if err != nil {
+			return err
+		}
+		for _, vct := range compObj.VolumeClaimTemplates {
+			name := vct.Spec.StorageClassName
+			if name != nil {
+				// validate the specified StorageClass whether exist
+				if _, ok := existedStorageClasses[*name]; !ok {
+					return fmt.Errorf("failed to find the specified storageClass \"%s\"", *name)
+				}
+			} else if !existedDefault {
+				// validate the default StorageClass
+				return fmt.Errorf("failed to find the default storageClass, use '--set storageClass=NAME' to set it")
+			}
+		}
+	}
+	return nil
+}
+
+// getStorageClasses return all StorageClasses in K8S and return true if the cluster have a default StorageClasses
+func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, error) {
+	gvr := types.StorageClassGVR()
+	allStorageClasses := make(map[string]struct{})
+	existedDefault := false
+	list, err := dynamic.Resource(gvr).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+	for _, item := range list.Items {
+		allStorageClasses[item.GetName()] = struct{}{}
+		annotations := item.GetAnnotations()
+		if !existedDefault && annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == "true" || annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true") {
+			existedDefault = true
+		}
+	}
+	return allStorageClasses, existedDefault, nil
+}
+
+func shouldCreateDependencies(cd *appsv1alpha1.ClusterDefinition, compSpec *appsv1alpha1.ClusterComponentSpec) (bool, error) {
+	var compDef *appsv1alpha1.ClusterComponentDefinition
+	if cd.Spec.Type != "postgresql" {
+		return false, nil
+	}
+
+	// get cluster component definition
+	for i, def := range cd.Spec.ComponentDefs {
+		if def.Name == compSpec.ComponentDefRef {
+			compDef = &cd.Spec.ComponentDefs[i]
+		}
+	}
+
+	if compDef == nil {
+		return false, fmt.Errorf("failed to find component definition for componnet %s", compSpec.Name)
+	}
+
+	// for postgresql, we need to create a service account, a role and a rolebinding
+	if compDef.CharacterType != "postgresql" {
+		return false, nil
+	}
+	return true, nil
+}
+
+func buildResourceLabels(clusterName string) map[string]string {
+	return map[string]string{
+		constant.AppInstanceLabelKey:  clusterName,
+		constant.AppManagedByLabelKey: "kbcli",
+	}
 }

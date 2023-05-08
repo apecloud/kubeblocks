@@ -140,7 +140,7 @@ var _ = Describe("Create", func() {
 				}
 				Expect(options.Complete()).Should(Succeed())
 
-				s, _ := GetDryRunStrategy(cmd)
+				s, _ := options.GetDryRunStrategy()
 				if t.success {
 					Expect(s == t.dryRunStrategy).Should(BeTrue())
 					Expect(options.Run()).Should(Succeed())

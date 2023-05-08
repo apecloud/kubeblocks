@@ -77,7 +77,7 @@ func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName
 
 // CreateConsensusMysqlClusterVersion creates a mysql clusterVersion with a component of ConsensusSet type.
 func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName, workloadType string) *appsv1alpha1.ClusterVersion {
-	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponent(workloadType).AddContainerShort("mysql", ApeCloudMySQLImage).
+	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponentVersion(workloadType).AddContainerShort("mysql", ApeCloudMySQLImage).
 		Create(&testCtx).GetObject()
 }
 
@@ -112,7 +112,7 @@ func MockConsensusComponentStsPod(
 		AddConsensusSetAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).
-		Create(&testCtx).GetObject()
+		CheckedCreate(&testCtx).GetObject()
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{
 		{

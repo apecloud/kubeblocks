@@ -21,7 +21,6 @@ package kubeblocks
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -41,9 +40,17 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
+type resourceScope string
+
+const (
+	ResourceScopeGlobal resourceScope = "global"
+	ResourceScopeLocal  resourceScope = "namespaced"
+)
+
 type kbObjects map[schema.GroupVersionResource]*unstructured.UnstructuredList
 
 var (
+	// addon resources
 	resourceGVRs = []schema.GroupVersionResource{
 		types.DeployGVR(),
 		types.StatefulSetGVR(),
@@ -96,33 +103,17 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 		}
 	}
 
-	getWebhooks := func(gvr schema.GroupVersionResource) {
-		objs, err := dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			appendErr(err)
-			return
-		}
-		result := &unstructured.UnstructuredList{}
-		for _, obj := range objs.Items {
-			if !strings.Contains(obj.GetName(), strings.ToLower(types.KubeBlocksName)) {
-				continue
-			}
-			result.Items = append(result.Items, obj)
-		}
-		kbObjs[gvr] = result
-	}
-	getWebhooks(types.ValidatingWebhookConfigurationGVR())
-	getWebhooks(types.MutatingWebhookConfigurationGVR())
-
-	// get cluster roles and cluster role bindings by label
-	getRBACResources := func(labelSelector string, gvr schema.GroupVersionResource, global bool) {
+	getObjectsByLabels := func(labelSelector string, gvr schema.GroupVersionResource, scope resourceScope) {
 		ns := namespace
-		if global {
+		if scope == ResourceScopeGlobal {
 			ns = metav1.NamespaceAll
 		}
+
+		klog.V(1).Infof("search objects by labels, namespace: %s, name: %s, gvr: %s", labelSelector, gvr, scope)
 		objs, err := dynamic.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
+
 		if err != nil {
 			appendErr(err)
 			return
@@ -133,29 +124,16 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 		}
 		target := kbObjs[gvr]
 		target.Items = append(target.Items, objs.Items...)
-	}
-	getRBACResources(buildAddonLabelSelector(), types.ClusterRoleGVR(), true)
-	getRBACResources(buildAddonLabelSelector(), types.ClusterRoleBindingGVR(), true)
-
-	// get objects by label selector
-	getObjects := func(labelSelector string, gvr schema.GroupVersionResource) {
-		objs, err := dynamic.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		if err != nil {
-			appendErr(err)
-			return
+		if klog.V(1).Enabled() {
+			for _, item := range objs.Items {
+				klog.Infof("\tget object: %s, %s, %s", item.GetNamespace(), item.GetKind(), item.GetName())
+			}
 		}
-
-		if _, ok := kbObjs[gvr]; !ok {
-			kbObjs[gvr] = &unstructured.UnstructuredList{}
-		}
-		target := kbObjs[gvr]
-		target.Items = append(target.Items, objs.Items...)
 	}
 
 	// get object by name
-	getObject := func(name string, gvr schema.GroupVersionResource) {
+	getObjectByName := func(name string, gvr schema.GroupVersionResource) {
+		klog.V(1).Infof("search object by name, namespace: %s, name: %s, gvr: %s ", namespace, name, gvr)
 		obj, err := dynamic.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			appendErr(err)
@@ -166,22 +144,28 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 		}
 		target := kbObjs[gvr]
 		target.Items = append(target.Items, *obj)
+		klog.V(1).Infof("\tget object: %s, %s, %s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 	}
+	// get RBAC resources, such as ClusterRole, ClusterRoleBinding, Role, RoleBinding, ServiceAccount
+	getObjectsByLabels(buildKubeBlocksSelectorLabels(), types.ClusterRoleGVR(), ResourceScopeGlobal)
+	getObjectsByLabels(buildKubeBlocksSelectorLabels(), types.ClusterRoleBindingGVR(), ResourceScopeGlobal)
+	getObjectsByLabels(buildKubeBlocksSelectorLabels(), types.RoleGVR(), ResourceScopeLocal)
+	getObjectsByLabels(buildKubeBlocksSelectorLabels(), types.RoleBindingGVR(), ResourceScopeLocal)
+	getObjectsByLabels(buildKubeBlocksSelectorLabels(), types.ServiceAccountGVR(), ResourceScopeLocal)
+	// get webhooks
+	getObjectsByLabels(buildKubeBlocksSelectorLabels(), types.ValidatingWebhookConfigurationGVR(), ResourceScopeGlobal)
+	getObjectsByLabels(buildKubeBlocksSelectorLabels(), types.MutatingWebhookConfigurationGVR(), ResourceScopeGlobal)
+	// get configmap for config template
+	getObjectsByLabels(buildConfigTypeSelectorLabels(), types.ConfigmapGVR(), ResourceScopeLocal)
+	getObjectsByLabels(buildKubeBlocksSelectorLabels(), types.ConfigmapGVR(), ResourceScopeLocal)
 
 	// get resources which label matches app.kubernetes.io/instance=kubeblocks or
 	// label matches release=kubeblocks, like prometheus-server
 	for _, selector := range buildResourceLabelSelectors(addons) {
 		for _, gvr := range resourceGVRs {
-			getObjects(selector, gvr)
+			getObjectsByLabels(selector, gvr, ResourceScopeLocal)
 		}
 	}
-
-	// build label selector
-	configMapLabelSelector := fmt.Sprintf("%s=%s", constant.CMConfigurationTypeLabelKey, constant.ConfigTemplateType)
-
-	// get configmap
-	getObjects(configMapLabelSelector, types.ConfigmapGVR())
-	getObjects(buildAddonLabelSelector(), types.ConfigmapGVR())
 
 	// get PVs by PVC
 	if pvcs, ok := kbObjs[types.PVCGVR()]; ok {
@@ -191,10 +175,9 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 				appendErr(err)
 				continue
 			}
-			getObject(pvc.Spec.VolumeName, types.PVGVR())
+			getObjectByName(pvc.Spec.VolumeName, types.PVGVR())
 		}
 	}
-
 	return kbObjs, utilerrors.NewAggregate(allErrs)
 }
 

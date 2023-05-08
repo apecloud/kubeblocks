@@ -39,7 +39,7 @@ func NewMigrationListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
 			_, validErr := IsMigrationCrdValidWithFactory(o.Factory)
-			util.CheckErr(validErr)
+			PrintCrdInvalidError(validErr)
 			o.Names = args
 			_, err := o.Run()
 			util.CheckErr(err)

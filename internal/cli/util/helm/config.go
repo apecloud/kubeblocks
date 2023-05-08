@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package helm
 
 import (
-	"os"
-
 	"helm.sh/helm/v3/pkg/action"
 )
 
@@ -43,7 +41,7 @@ func NewConfig(namespace string, kubeConfig string, ctx string, debug bool) *Con
 	}
 
 	if debug {
-		cfg.logFn = GetVerboseLog(os.Stdout)
+		cfg.logFn = GetVerboseLog()
 	} else {
 		cfg.logFn = GetQuiteLog()
 	}

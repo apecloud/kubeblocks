@@ -68,6 +68,11 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	// skip if deploy is being deleted
+	if !deploy.DeletionTimestamp.IsZero() {
+		return intctrlutil.Reconciled()
+	}
+
 	return workloadCompClusterReconcile(reqCtx, r.Client, deploy,
 		func(cluster *appsv1alpha1.Cluster, componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
 			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, deploy, componentSpec)
@@ -92,5 +97,6 @@ func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1.Deployment{}).
 		Owns(&appsv1.ReplicaSet{}).
 		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate)).
+		Named("deployment-watcher").
 		Complete(r)
 }

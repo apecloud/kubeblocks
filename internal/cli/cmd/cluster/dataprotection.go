@@ -292,7 +292,7 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	cmd := &cobra.Command{
 		Use:               "list-backups",
 		Short:             "List backups.",
-		Aliases:           []string{"ls-backup"},
+		Aliases:           []string{"ls-backups"},
 		Example:           listBackupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {

@@ -57,7 +57,7 @@ var _ = Describe("test clusterVersion controller", func() {
 		It("test clusterVersion controller", func() {
 			By("create a clusterVersion obj")
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponentVersion(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 
 			By("wait for clusterVersion phase is unavailable when clusterDef is not found")

@@ -58,21 +58,21 @@ func TestRedisConfig(t *testing.T) {
 		valueArgs: "256mb 64mb 60",
 		wantErr:   false,
 		testKey: map[string]string{
-			"client-output-buffer-limit.pubsub": "256mb 64mb 60",
+			"client-output-buffer-limit pubsub": "256mb 64mb 60",
 		},
 	}, {
 		keyArgs:   []string{"client-output-buffer-limit", "normal"},
 		valueArgs: "128mb 32mb 0",
 		wantErr:   false,
 		testKey: map[string]string{
-			"client-output-buffer-limit.normal": "128mb 32mb 0",
-			"client-output-buffer-limit.pubsub": "256mb 64mb 60",
+			"client-output-buffer-limit normal": "128mb 32mb 0",
+			"client-output-buffer-limit pubsub": "256mb 64mb 60",
 			"port":                              "6379",
 		},
 	}}
 	for _, tt := range tests {
 		t.Run("config_test", func(t *testing.T) {
-			if err := c.Update(strings.Join(tt.keyArgs, "."), tt.valueArgs); (err != nil) != tt.wantErr {
+			if err := c.Update(strings.Join(tt.keyArgs, " "), tt.valueArgs); (err != nil) != tt.wantErr {
 				t.Errorf("Update() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
@@ -94,14 +94,14 @@ func TestRedisConfigGetAllParameters(t *testing.T) {
 		fn   mockfn
 		want map[string]interface{}
 	}{{
-		name: "xxx",
+		name: "multi field update test",
 		fn: func() ConfigObject {
 			c, _ := LoadConfig("test", "", appsv1alpha1.RedisCfg)
 			_ = c.Update("port", "123")
-			_ = c.Update("a.b", "123 234")
-			_ = c.Update("a.c", "345")
-			_ = c.Update("a.d", "1 2")
-			_ = c.Update("a.d.e", "1 2")
+			_ = c.Update("a b", "123 234")
+			_ = c.Update("a c", "345")
+			_ = c.Update("a d", "1 2")
+			_ = c.Update("a d e", "1 2")
 			return c
 		},
 		want: map[string]interface{}{

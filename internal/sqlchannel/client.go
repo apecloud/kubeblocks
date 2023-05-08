@@ -262,9 +262,8 @@ type errorResponse struct {
 	Message   string `json:"message"`
 }
 
+// parseResponse parse response to errorResponse or SQLChannelResponse to capture error message if any.
 func parseResponse(data []byte, operation string, charType string) (SQLChannelResponse, error) {
-	// conver to errorResponse first, and check error code
-	// if error code is not empty, it means the request failed
 	errorResponse := errorResponse{}
 	response := SQLChannelResponse{}
 	if err := json.Unmarshal(data, &errorResponse); err != nil {
@@ -279,7 +278,7 @@ func parseResponse(data []byte, operation string, charType string) (SQLChannelRe
 				EndTime:   time.Now(),
 				Extra:     errorResponse.Message,
 			},
-		}, nil
+		}, SQLChannelError{Reason: UnsupportedOps}
 	}
 
 	// conver it to SQLChannelResponse

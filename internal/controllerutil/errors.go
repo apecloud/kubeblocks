@@ -51,6 +51,10 @@ const (
 	ErrorTypeBackupNotCompleted       ErrorType = "BackupNotCompleted"       // report backup not completed.
 	ErrorTypeBackupPVCNameIsEmpty     ErrorType = "BackupPVCNameIsEmpty"     // pvc name for backup is empty
 	ErrorTypeBackupJobFailed          ErrorType = "BackupJobFailed"          // backup job failed
+	ErrorTypeStorageNotMatch          ErrorType = "ErrorTypeStorageNotMatch"
+
+	// ErrorType for cluster controller
+	ErrorTypeBackupFailed ErrorType = "BackupFailed"
 )
 
 var ErrFailedToAddFinalizer = errors.New("failed to add finalizer")

@@ -91,7 +91,7 @@ var _ = Describe("reconfigure test", func() {
 			GetObject()
 		By("Create a clusterVersion obj")
 		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(statefulCompDefName).
+			AddComponentVersion(statefulCompDefName).
 			GetObject()
 		By("creating a cluster")
 		clusterObj := testapps.NewClusterFactory(ns, clusterName,

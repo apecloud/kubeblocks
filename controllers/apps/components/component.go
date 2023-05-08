@@ -200,16 +200,17 @@ func updateComponentInfoToPods(
 	if err := cli.List(ctx, &podList, ml); err != nil {
 		return err
 	}
+	replicasStr := strconv.Itoa(int(componentSpec.Replicas))
 	for _, pod := range podList.Items {
 		if pod.Annotations != nil &&
-			pod.Annotations[constant.ComponentReplicasAnnotationKey] == strconv.Itoa(int(componentSpec.Replicas)) {
+			pod.Annotations[constant.ComponentReplicasAnnotationKey] == replicasStr {
 			continue
 		}
 		patch := client.MergeFrom(pod.DeepCopy())
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
-		pod.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(componentSpec.Replicas))
+		pod.Annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
 		if err := cli.Patch(ctx, &pod, patch); err != nil {
 			return err
 		}

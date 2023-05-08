@@ -87,7 +87,7 @@ var _ = Describe("affinity utils", func() {
 				Ctx: ctx,
 				Log: tlog,
 			}
-			component = BuildComponent(
+			component, _ = BuildComponent(
 				reqCtx,
 				*clusterObj,
 				*clusterDefObj,

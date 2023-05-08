@@ -32,10 +32,10 @@ data:
     # the configmap namespace of the pv template.
     BACKUP_PV_CONFIGMAP_NAMESPACE: "{{ .Values.dataProtection.backupPVConfigMapNamespace }}"
 
-    {{- if .Values.dataPlane }}
+    {{- with .Values.dataPlane }}
     # data plane tolerations
-    DATA_PLANE_TOLERATIONS: '{{ toJson .Values.dataPlane.tolerations }}'
+    DATA_PLANE_TOLERATIONS: {{ toJson .tolerations | squote }}
 
     # data plane affinity
-    DATA_PLANE_AFFINITY: '{{ toJson .Values.dataPlane.affinity }}'
+    DATA_PLANE_AFFINITY: {{ toJson .affinity | squote }}
     {{- end }}

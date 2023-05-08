@@ -104,13 +104,14 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component := component.BuildComponent(
+			component, err := component.BuildComponent(
 				reqCtx,
 				*cluster,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
 			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
@@ -145,7 +146,7 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component := component.BuildComponent(
+			component, err := component.BuildComponent(
 				reqCtx,
 				*cluster,
 				*clusterDef,
@@ -153,6 +154,7 @@ var _ = Describe("Cluster Controller", func() {
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0],
 			)
+			Expect(err).Should(Succeed())
 			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
@@ -197,13 +199,14 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component := component.BuildComponent(
+			component, err := component.BuildComponent(
 				reqCtx,
 				*cluster,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
 			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
@@ -246,13 +249,14 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component := component.BuildComponent(
+			component, err := component.BuildComponent(
 				reqCtx,
 				*cluster,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
 			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
@@ -304,13 +308,14 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component := component.BuildComponent(
+			component, err := component.BuildComponent(
 				reqCtx,
 				*cluster,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
 			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
@@ -355,13 +360,14 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component := component.BuildComponent(
+			component, err := component.BuildComponent(
 				reqCtx,
 				*cluster,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
 			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 

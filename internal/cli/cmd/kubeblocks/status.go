@@ -210,12 +210,14 @@ func (o *statusOptions) showAddons() {
 	fmt.Fprintln(o.Out, "\nKubeBlocks Addons:")
 	tbl := printer.NewTablePrinter(o.Out)
 	tbl.SetHeader("NAME", "STATUS", "TYPE", "PROVIDER")
+
 	var provider string
+	var ok bool
 	for _, addon := range o.addons {
-		if addon.Labels == nil || len(addon.Labels[constant.AddonProviderLableKey]) == 0 {
+		if addon.Labels == nil {
 			provider = notAvailable
-		} else {
-			provider = addon.Labels[constant.AddonProviderLableKey]
+		} else if provider, ok = addon.Labels[constant.AddonProviderLableKey]; !ok {
+			provider = notAvailable
 		}
 		tbl.AddRow(addon.Name, addon.Status.Phase, addon.Spec.Type, provider)
 	}
@@ -319,10 +321,8 @@ func (o *statusOptions) showHelmResources(ctx context.Context, allErrs *[]error)
 	for _, addon := range o.addons {
 		helmReleaseList = append(helmReleaseList, util.BuildAddonReleaseName(addon.Name))
 	}
-	// selectors :=
-	selectors := []metav1.ListOptions{
-		{LabelSelector: helmLabel(helmReleaseList)}, //label selector 'owner=helm,name in (kubeblocks,kb-addon-mongodb,kb-addon-redis...)'
-	}
+	// label selector 'owner=helm,name in (kubeblocks,kb-addon-mongodb,kb-addon-redis...)'
+	selectors := []metav1.ListOptions{{LabelSelector: helmLabel(helmReleaseList)}}
 	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, helmConfigurations, selectors, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {

@@ -63,7 +63,8 @@ func init() {
 // +kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=delete;deletecollection
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;delete;deletecollection
+// +kubebuilder:rbac:groups=core,resources=pods/log,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -185,7 +186,7 @@ func (r *AddonReconciler) cleanupJobPods(reqCtx intctrlutil.RequestCtx) error {
 }
 
 func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, addon *extensionsv1alpha1.Addon) (*ctrl.Result, error) {
-	if addon.Annotations != nil && addon.Annotations[NoDeleteJobs] == "true" {
+	if addon.Annotations != nil && addon.Annotations[NoDeleteJobs] == trueVal {
 		return nil, nil
 	}
 	deleteJobIfExist := func(jobName string) error {

@@ -402,7 +402,7 @@ var _ = Describe("Cluster Controller", func() {
 			compName, "data").SetStorage("1Gi").CheckedCreate(&testCtx)
 	}
 
-	mockPodsForConsensusTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
+	mockPodsForTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
 		componentName := cluster.Spec.ComponentSpecs[0].Name
 		clusterName := cluster.Name
 		stsName := cluster.Name + "-" + componentName
@@ -450,7 +450,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
 
 		By("Creating mock pods in StatefulSet")
-		pods := mockPodsForConsensusTest(clusterObj, int(comp.Replicas))
+		pods := mockPodsForTest(clusterObj, int(comp.Replicas))
 		for i, pod := range pods {
 			if comp.ComponentDefRef == replicationCompDefName && i == 0 {
 				By("mocking primary for replication to pass check")
@@ -950,7 +950,7 @@ var _ = Describe("Cluster Controller", func() {
 		}).Should(Succeed())
 
 		By("Creating mock pods in StatefulSet, and set controller reference")
-		pods := mockPodsForConsensusTest(clusterObj, replicas)
+		pods := mockPodsForTest(clusterObj, replicas)
 		for _, pod := range pods {
 			Expect(controllerutil.SetControllerReference(sts, &pod, scheme.Scheme)).Should(Succeed())
 			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())

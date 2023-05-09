@@ -259,7 +259,6 @@ involvedObject:
   kind: Pod
   name: {{ .PodName }}
   namespace: {{ .Namespace }}
-message: {{ .Message }}
 reason: RoleChanged
 type: Normal
 `
@@ -272,7 +271,6 @@ type: Normal
 	roleValue := map[string]string{
 		"PodName":   podName,
 		"Namespace": namespace,
-		"Message":   string(msg),
 		"EventSeq":  seq,
 	}
 	tmpl, err := template.New("event-tmpl").Parse(eventTmpl)
@@ -290,6 +288,7 @@ type: Normal
 	if err != nil {
 		return nil, err
 	}
+	event.Message = string(msg)
 	event.FirstTimestamp = metav1.Now()
 	event.LastTimestamp = metav1.Now()
 

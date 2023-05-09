@@ -18,8 +18,9 @@ kbcli playground destroy [flags]
 ### Options
 
 ```
-  -h, --help    help for destroy
-      --purge   Purge all resources before destroy kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks. (default true)
+  -h, --help               help for destroy
+      --purge              Purge all resources before destroy kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks. (default true)
+      --timeout duration   Time to wait for installing KubeBlocks, such as --timeout=10m (default 30m0s)
 ```
 
 ### Options inherited from parent commands

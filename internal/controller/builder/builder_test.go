@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package builder
@@ -78,9 +81,9 @@ var _ = Describe("builder", func() {
 	allFieldsClusterVersionObj := func(needCreate bool) *appsv1alpha1.ClusterVersion {
 		By("By assure an clusterVersion obj")
 		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(mysqlCompDefName).
+			AddComponentVersion(mysqlCompDefName).
 			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponent(proxyCompDefName).
+			AddComponentVersion(proxyCompDefName).
 			AddInitContainerShort("nginx-init", testapps.NginxImage).
 			AddContainerShort("nginx", testapps.NginxImage).
 			GetObject()
@@ -321,15 +324,14 @@ var _ = Describe("builder", func() {
 			reqCtx := newReqCtx()
 			params := newParams()
 
-			By("creating pvc to make it looks like recreation")
-			pvcName := "test-pvc"
-			testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
-				params.Component.Name, testapps.DataVolumeName).SetStorage("1Gi").CheckedCreate(&testCtx)
+			uuid := "12345"
+			By("mock a cluster uuid")
+			params.Cluster.UID = types.UID(uuid)
 
 			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_RECREATE"]).Should(Equal("true"))
+			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_CLUSTER_UID"]).Should(Equal(uuid))
 		})
 
 		It("builds Env Config with ConsensusSet status correctly", func() {
@@ -372,13 +374,8 @@ var _ = Describe("builder", func() {
 				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)
 				svcName := fmt.Sprintf("%s-headless", stsName)
 				By("Checking KB_PRIMARY_POD_NAME value be right")
-				if int(params.Component.GetPrimaryIndex()) == 0 {
-					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
-						Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
-				} else {
-					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
-						Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "-0." + svcName))
-				}
+				Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
+					Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
 				for i := 0; i < int(params.Component.Replicas); i++ {
 					if i == 0 {
 						By("Checking the 1st replica's hostname should not have suffix '-0'")
@@ -386,7 +383,7 @@ var _ = Describe("builder", func() {
 							Should(Equal(stsName + "-" + strconv.Itoa(0) + "." + svcName))
 					} else {
 						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
-							Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "-0." + svcName))
+							Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
 					}
 				}
 			}

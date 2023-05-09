@@ -11,11 +11,12 @@ kbcli cluster list-accounts [flags]
 ### Examples
 
 ```
-  # list all users from specified component of a cluster
-  kbcli cluster list-accounts NAME --component COMPNAME --show-connected-users
-  
-  # list all users from cluster's one particular instance
-  kbcli cluster list-accounts NAME -i INSTANCE
+  # list all users for component
+  kbcli cluster list-accounts NAME --component COMPNAME
+  # list all users with default component
+  kbcli cluster list-accounts NAME
+  # list all users from instance
+  kbcli cluster list-accounts --instance INSTANCE
 ```
 
 ### Options

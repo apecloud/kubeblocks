@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "etcd-cluster.fullname" . }}
   labels:
     {{- include "etcd-cluster.labels" . | nindent 4 }}
 spec:

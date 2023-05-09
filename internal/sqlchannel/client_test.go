@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package sqlchannel
@@ -19,6 +22,7 @@ package sqlchannel
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -233,7 +237,8 @@ func TestParseSqlChannelResult(t *testing.T) {
 	{"errorCode":"ERR_INVOKE_OUTPUT_BINDING","message":"error when invoke output binding mongodb: binding mongodb does not support operation listUsers. supported operations:checkRunning checkRole getRole"}
 	`
 		sqlResposne, err := parseResponse(([]byte)(result), "listUsers", "mongodb")
-		assert.Nil(t, err)
+		assert.NotNil(t, err)
+		assert.True(t, IsUnSupportedError(err))
 		assert.Equal(t, sqlResposne.Event, RespEveFail)
 		assert.Contains(t, sqlResposne.Message, "not supported")
 	})
@@ -265,6 +270,16 @@ func TestParseSqlChannelResult(t *testing.T) {
 		_, err := parseResponse(([]byte)(result), "listUsers", "mongodb")
 		assert.NotNil(t, err)
 	})
+}
+
+func TestErrMsg(t *testing.T) {
+	err := SQLChannelError{
+		Reason: UnsupportedOps,
+	}
+	assert.True(t, strings.Contains(err.Error(), "unsupported"))
+	assert.False(t, IsUnSupportedError(nil))
+	assert.True(t, IsUnSupportedError(err))
+	assert.False(t, IsUnSupportedError(errors.New("test")))
 }
 
 func newTCPServer(t *testing.T, daprServer pb.DaprServer, port int) (int, func()) {

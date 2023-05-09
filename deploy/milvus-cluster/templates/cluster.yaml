@@ -1,10 +1,10 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "milvus.fullname" . }}
   labels: {{ include "milvus.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: milvus-standalone # ref clusterdefinition.name
+  clusterDefinitionRef: milvus # ref clusterdefinition.name
   clusterVersionRef: milvus-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:

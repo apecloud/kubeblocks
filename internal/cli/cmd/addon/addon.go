@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package addon
@@ -173,11 +176,12 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
     
         # Enabled "prometheus" addon and its extra alertmanager component with custom resources settings 
     	kbcli addon enable prometheus --memory 512Mi/4Gi --storage 8Gi --replicas 2 \
-  			--memory alertmanager:16Mi/256Mi --storage: alertmanager:1Gi --replicas alertmanager:2 
+  			--memory alertmanager:16Mi/256Mi --storage alertmanager:1Gi --replicas alertmanager:2 
 
         # Enabled "prometheus" addon with tolerations 
-    	kbcli addon enable prometheus --tolerations '[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]' \
-			--tolerations 'alertmanager:[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]'
+    	kbcli addon enable prometheus \
+			--tolerations '[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
+			--tolerations 'alertmanager:[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]'
 
 		# Enabled "prometheus" addon with helm like custom settings
 		kbcli addon enable prometheus --set prometheus.alertmanager.image.tag=v0.24.0
@@ -199,7 +203,9 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		"Sets addon CPU resource values (--cpu [extraName:]<request>/<limit>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.StorageSets, "storage", []string{},
 		`Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items)). 
-Additional notes for Helm type Addon, that resizing storage will fail if modified value is a storage request size 
+Additional notes:
+1. Specify '0' value will removed storage values settings and explicitly disabled 'persistentVolumeEnabled' attribute.
+2. For Helm type Addon, that resizing storage will fail if modified value is a storage request size 
 that belongs to StatefulSet's volume claim template, to resolve 'Failed' Addon status possible action is disable and 
 re-enable the addon (More info on how-to resize a PVC: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources).
 `)
@@ -423,6 +429,7 @@ func addonEnableDisableHandler(o *addonCmdOpts, cmd *cobra.Command, args []strin
 func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[string]interface{}) (err error) {
 	extraNames := o.addon.GetExtraNames()
 	installSpec := extensionsv1alpha1.AddonInstallSpec{
+		Enabled:              true,
 		AddonInstallSpecItem: extensionsv1alpha1.NewAddonInstallSpecItem(),
 	}
 	// only using named return value in defer function
@@ -441,25 +448,6 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 	}()
 
 	if o.addonEnableFlags.useDefault() {
-		if len(o.addon.Spec.DefaultInstallValues) == 0 {
-			installSpec.Enabled = true
-			return nil
-		}
-
-		for _, di := range o.addon.Spec.GetSortedDefaultInstallValues() {
-			if len(di.Selectors) == 0 {
-				installSpec = di.AddonInstallSpec
-				break
-			}
-			for _, s := range di.Selectors {
-				if !s.MatchesFromConfig() {
-					continue
-				}
-				installSpec = di.AddonInstallSpec
-				break
-			}
-		}
-		installSpec.Enabled = true
 		return nil
 	}
 
@@ -487,15 +475,13 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 		return pItem, nil
 	}
 
-	twoTuplesProcessor := func(s, flag string,
+	_tuplesProcessor := func(t []string, s, flag string,
 		valueTransformer func(s, flag string) (interface{}, error),
 		valueAssigner func(*extensionsv1alpha1.AddonInstallSpecItem, interface{}),
 	) error {
-		t := strings.SplitN(s, ":", 2)
 		l := len(t)
 		var name string
 		var result interface{}
-		var err error
 		switch l {
 		case 2:
 			name = t[0]
@@ -523,6 +509,31 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			valueAssigner(&pItem.AddonInstallSpecItem, result)
 		}
 		return nil
+	}
+
+	twoTuplesProcessor := func(s, flag string,
+		valueTransformer func(s, flag string) (interface{}, error),
+		valueAssigner func(*extensionsv1alpha1.AddonInstallSpecItem, interface{}),
+	) error {
+		t := strings.SplitN(s, ":", 2)
+		return _tuplesProcessor(t, s, flag, valueTransformer, valueAssigner)
+	}
+
+	twoTuplesJSONProcessor := func(s, flag string,
+		valueTransformer func(s, flag string) (interface{}, error),
+		valueAssigner func(*extensionsv1alpha1.AddonInstallSpecItem, interface{}),
+	) error {
+		var jsonArrary []map[string]interface{}
+		var t []string
+
+		err := json.Unmarshal([]byte(s), &jsonArrary)
+		if err != nil {
+			// not a valid JSON array treat it a 2 tuples
+			t = strings.SplitN(s, ":", 2)
+		} else {
+			t = []string{s}
+		}
+		return _tuplesProcessor(t, s, flag, valueTransformer, valueAssigner)
 	}
 
 	reqLimitResTransformer := func(s, flag string) (interface{}, error) {
@@ -575,7 +586,7 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 	}
 
 	for _, v := range f.TolerationsSet {
-		if err := twoTuplesProcessor(v, "tolerations", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
+		if err := twoTuplesJSONProcessor(v, "tolerations", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
 			item.Tolerations = i.(string)
 		}); err != nil {
 			return err
@@ -590,7 +601,18 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			}
 			return q, nil
 		}, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
-			item.Resources.Requests[corev1.ResourceStorage] = i.(resource.Quantity)
+			q := i.(resource.Quantity)
+			// for 0 storage size, remove storage request value and explicitly disabled `persistentVolumeEnabled`
+			if v, _ := q.AsInt64(); v == 0 {
+				delete(item.Resources.Requests, corev1.ResourceStorage)
+				b := false
+				item.PVEnabled = &b
+				return
+			}
+			item.Resources.Requests[corev1.ResourceStorage] = q
+			// explicitly enabled `persistentVolumeEnabled` if provided storage size settings
+			b := true
+			item.PVEnabled = &b
 		}); err != nil {
 			return err
 		}

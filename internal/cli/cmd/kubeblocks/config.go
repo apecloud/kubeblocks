@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package kubeblocks
@@ -20,20 +23,26 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/maps"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const configKey = "config.yaml"
@@ -80,6 +89,7 @@ func NewConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := &InstallOptions{
 		Options: Options{
 			IOStreams: streams,
+			Wait:      true,
 		},
 	}
 
@@ -91,7 +101,7 @@ func NewConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
 			util.CheckErr(o.Upgrade())
-			// TODO: post handle after the config updates
+			util.CheckErr(markKubeBlocksPodsToLoadConfigMap(o.Client))
 		},
 	}
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
@@ -177,4 +187,51 @@ func getKubeBlocksConfigMap(o *InstallOptions) (*corev1.ConfigMap, error) {
 		}
 	}
 	return configMap, nil
+}
+
+// markKubeBlocksPodsToLoadConfigMap marks an annotation of the KubeBlocks pods to load the projected volumes of configmap.
+// kubelet periodically requeues the Pod after 60-90 seconds, exactly how long it takes Secret/ConfigMaps updates to be reflected to the volumes.
+// so can modify the annotation of the pod to directly enter the coordination queue and make changes of the configmap to effective in a timely.
+func markKubeBlocksPodsToLoadConfigMap(client kubernetes.Interface) error {
+	deploy, err := util.GetKubeBlocksDeploy(client)
+	if err != nil {
+		return err
+	}
+	if deploy == nil {
+		return nil
+	}
+	pods, err := client.CoreV1().Pods(deploy.Namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName,
+	})
+	if err != nil {
+		return err
+	}
+	if len(pods.Items) == 0 {
+		return nil
+	}
+	condition := deploymentutil.GetDeploymentCondition(deploy.Status, appsv1.DeploymentProgressing)
+	if condition == nil {
+		return nil
+	}
+	podBelongToKubeBlocks := func(pod corev1.Pod) bool {
+		for _, v := range pod.OwnerReferences {
+			if v.Kind == constant.ReplicaSetKind && strings.Contains(condition.Message, v.Name) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, pod := range pods.Items {
+		belongToKubeBlocks := podBelongToKubeBlocks(pod)
+		if !belongToKubeBlocks {
+			continue
+		}
+		// mark the pod to load configmap
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		pod.Annotations[types.ReloadConfigMapAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+		_, _ = client.CoreV1().Pods(deploy.Namespace).Update(context.TODO(), &pod, metav1.UpdateOptions{})
+	}
+	return nil
 }

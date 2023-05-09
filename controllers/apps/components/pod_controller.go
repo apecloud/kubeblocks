@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package components
@@ -40,9 +43,9 @@ type PodReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=apps,resources=pods,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=pods/status,verbs=get
-// +kubebuilder:rbac:groups=apps,resources=pods/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get
+// +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -67,6 +70,11 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	if err = r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, pod); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	// skip if pod is being deleted
+	if !pod.DeletionTimestamp.IsZero() {
+		return intctrlutil.Reconciled()
 	}
 
 	if cluster, err = util.GetClusterByObject(reqCtx.Ctx, r.Client, pod); err != nil {
@@ -103,7 +111,6 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	r.Recorder.Eventf(pod, corev1.EventTypeNormal, "AddAnnotation", "add annotation %s=%s", constant.LeaderAnnotationKey, componentStatus.ConsensusSetStatus.Leader.Pod)
-
 	return intctrlutil.Reconciled()
 }
 
@@ -112,5 +119,6 @@ func (r *PodReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Pod{}).
 		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate)).
+		Named("pod-watcher").
 		Complete(r)
 }

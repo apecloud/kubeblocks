@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package playground
@@ -39,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -64,6 +68,10 @@ var (
 		kbcli playground init --cloud-provider gcp --region us-central1`)
 
 	supportedCloudProviders = []string{cp.Local, cp.AWS, cp.GCP, cp.AliCloud, cp.TencentCloud}
+
+	spinnerMsg = func(format string, a ...any) spinner.Option {
+		return spinner.WithMessage(fmt.Sprintf("%-50s", fmt.Sprintf(format, a...)))
+	}
 )
 
 type initOptions struct {
@@ -157,12 +165,12 @@ func (o *initOptions) local() error {
 	}
 
 	// create a local kubernetes cluster (k3d cluster) to deploy KubeBlocks
-	spinner := printer.Spinner(o.Out, "%-50s", "Create k3d cluster: "+clusterInfo.ClusterName)
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Create k3d cluster: "+clusterInfo.ClusterName))
+	defer s.Fail()
 	if err = provider.CreateK8sCluster(clusterInfo); err != nil {
 		return errors.Wrap(err, "failed to set up k3d cluster")
 	}
-	spinner(true)
+	s.Success()
 
 	clusterInfo, err = o.writeStateFile(provider)
 	if err != nil {
@@ -308,8 +316,8 @@ func (o *initOptions) writeStateFile(provider cp.Interface) (*cp.K8sClusterInfo,
 
 // merge created kubernetes cluster kubeconfig to ~/.kube/config and set it as default
 func (o *initOptions) setKubeConfig(info *cp.K8sClusterInfo) error {
-	spinner := printer.Spinner(o.Out, "%-50s", "Merge kubeconfig to "+defaultKubeConfigPath)
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Merge kubeconfig to "+defaultKubeConfigPath))
+	defer s.Fail()
 
 	// check if the default kubeconfig file exists, if not, create it
 	if _, err := os.Stat(defaultKubeConfigPath); os.IsNotExist(err) {
@@ -325,15 +333,15 @@ func (o *initOptions) setKubeConfig(info *cp.K8sClusterInfo) error {
 		writeKubeConfigOptions{UpdateExisting: true, UpdateCurrentContext: true}); err != nil {
 		return errors.Wrapf(err, "failed to write cluster %s kubeconfig", info.ClusterName)
 	}
-	spinner(true)
+	s.Success()
 
 	currentContext, err := kubeConfigCurrentContext(info.KubeConfig)
-	spinner = printer.Spinner(o.Out, "%-50s", "Switch current context to "+currentContext)
-	defer spinner(false)
+	s = spinner.New(o.Out, spinnerMsg("Switch current context to "+currentContext))
+	defer s.Fail()
 	if err != nil {
 		return err
 	}
-	spinner(true)
+	s.Success()
 
 	return nil
 }
@@ -367,12 +375,12 @@ func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	if o.clusterVersion != "" {
 		clusterInfo += ", ClusterVersion: " + o.clusterVersion
 	}
-	spinner := printer.Spinner(o.Out, "Create cluster %s (%s)", kbClusterName, clusterInfo)
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Create cluster %s (%s)", kbClusterName, clusterInfo))
+	defer s.Fail()
 	if err = o.createCluster(); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "failed to create cluster %s", kbClusterName)
 	}
-	spinner(true)
+	s.Success()
 
 	fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n\n")
 	fmt.Fprintf(os.Stdout, "Kubernetes cluster \"%s\" has been created.\n", info.ClusterName)
@@ -404,6 +412,7 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			IOStreams: o.IOStreams,
 			Client:    client,
 			Dynamic:   dynamic,
+			Wait:      true,
 		},
 		Version: o.kbVersion,
 		Monitor: true,
@@ -427,9 +436,9 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			"prometheus.alertmanager.statefulSet.enabled=false")
 	} else if o.cloudProvider == cp.AWS {
 		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
-			// enable aws loadbalancer controller addon automatically on playground
-			"aws-loadbalancer-controller.enabled=true",
-			fmt.Sprintf("aws-loadbalancer-controller.clusterName=%s", k8sClusterName),
+			// enable aws-load-balancer-controller addon automatically on playground
+			"aws-load-balancer-controller.enabled=true",
+			fmt.Sprintf("aws-load-balancer-controller.clusterName=%s", k8sClusterName),
 		)
 	}
 
@@ -438,20 +447,42 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 
 // createCluster construct a cluster create options and run
 func (o *initOptions) createCluster() error {
-	// construct a cluster create options and run
-	options, err := o.newCreateOptions()
-	if err != nil {
+	options := &cmdcluster.CreateOptions{
+		CreateOptions: create.CreateOptions{
+			Factory:         util.NewFactory(),
+			IOStreams:       genericclioptions.NewTestIOStreamsDiscard(),
+			Namespace:       defaultNamespace,
+			Name:            kbClusterName,
+			CueTemplateName: cmdcluster.CueTemplateName,
+			GVR:             types.ClusterGVR(),
+		},
+		UpdatableFlags: cmdcluster.UpdatableFlags{
+			TerminationPolicy: "WipeOut",
+			Monitor:           true,
+			PodAntiAffinity:   "Preferred",
+			Tenancy:           "SharedNode",
+		},
+		ClusterDefRef:     o.clusterDef,
+		ClusterVersionRef: o.clusterVersion,
+	}
+	options.CreateOptions.Options = options
+	options.CreateOptions.PreCreate = options.PreCreate
+
+	// if we are running on cloud, create cluster with three replicas
+	if o.cloudProvider != cp.Local {
+		options.Values = append(options.Values, "replicas=3")
+	}
+
+	if err := options.CreateOptions.Complete(); err != nil {
 		return err
 	}
-
-	inputs := create.Inputs{
-		BaseOptionsObj:  &options.BaseOptions,
-		Options:         options,
-		CueTemplateName: cmdcluster.CueTemplateName,
-		ResourceName:    types.ResourceClusters,
+	if err := options.Validate(); err != nil {
+		return err
 	}
-
-	return options.Run(inputs)
+	if err := options.Complete(); err != nil {
+		return err
+	}
+	return options.Run()
 }
 
 // checkExistedCluster check playground kubernetes cluster exists or not, playground
@@ -481,40 +512,4 @@ func (o *initOptions) checkExistedCluster() error {
 		return cmdutil.ErrExit
 	}
 	return nil
-}
-
-func (o *initOptions) newCreateOptions() (*cmdcluster.CreateOptions, error) {
-	dynamicClient, err := util.NewFactory().DynamicClient()
-	if err != nil {
-		return nil, err
-	}
-	options := &cmdcluster.CreateOptions{
-		BaseOptions: create.BaseOptions{
-			IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
-			Namespace: defaultNamespace,
-			Name:      kbClusterName,
-			Dynamic:   dynamicClient,
-		},
-		UpdatableFlags: cmdcluster.UpdatableFlags{
-			TerminationPolicy: "WipeOut",
-			Monitor:           true,
-			PodAntiAffinity:   "Preferred",
-			Tenancy:           "SharedNode",
-		},
-		ClusterDefRef:     o.clusterDef,
-		ClusterVersionRef: o.clusterVersion,
-	}
-
-	// if we are running on cloud, create cluster with three replicas
-	if o.cloudProvider != cp.Local {
-		options.Values = append(options.Values, "replicas=3")
-	}
-
-	if err = options.Validate(); err != nil {
-		return nil, err
-	}
-	if err = options.Complete(); err != nil {
-		return nil, err
-	}
-	return options, nil
 }

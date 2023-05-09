@@ -323,7 +323,7 @@ prometheus:
       ## If true, alertmanager will create/use a Persistent Volume Claim
       ## If false, use emptyDir
       ##
-      enabled: true
+      enabled: false
 
       ## alertmanager data Persistent Volume size
       ##
@@ -530,7 +530,7 @@ prometheus:
       ## If true, Prometheus server will create/use a Persistent Volume Claim
       ## If false, use emptyDir
       ##
-      enabled: true
+      enabled: false
 
       ## Prometheus server data Persistent Volume size
       ##
@@ -1099,6 +1099,15 @@ prometheus:
                 summary: 'MongoDB is Down'
                 description: 'MongoDB instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
       
+            - alert: MongodbRestarted
+              expr: 'time() - process_start_time_seconds < 60'
+              for: 0m
+              labels:
+                severity: info
+              annotations:
+                summary: 'Mongodb has just been restarted (< 60s)'
+                description: 'Mongodb has just been restarted {{ $value | printf "%.1f" }} seconds ago\n LABELS = {{ $labels }}'
+      
             - alert: MongodbReplicaMemberUnhealthy
               expr: 'max_over_time(mongodb_rs_members_health[1m]) == 0'
               for: 0m
@@ -1608,7 +1617,7 @@ grafana:
 snapshot-controller:
   ## @param snapshot-controller.enabled -- Enable snapshot-controller chart.
   ##
-  enabled: false
+  enabled: true
   ## @param snapshot-controller.replicaCount -- Number of replicas to deploy.
   ##
   replicaCount: 1
@@ -1624,6 +1633,13 @@ snapshot-controller:
       operator: Equal
       value: "true"
       effect: NoSchedule
+
+  volumeSnapshotClasses:
+    - name: default-vsc
+      annotations:
+        snapshot.storage.kubernetes.io/is-default-class: "true"
+      driver: hostpath.csi.k8s.io
+      deletionPolicy: Delete
 
   affinity:
     nodeAffinity:
@@ -1663,23 +1679,6 @@ csi-s3:
     create: true
     singleBucket: ""
     mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666"
-
-csi-oss:
-  enabled: false
-  ## @param csi-oss.secret.akId -- oss Access Key.
-  ## @param csi-oss.secret.akSecret -- oss Secret Key.
-  secret:
-    akId: ""
-    akSecret: ""
-  ## @param csi-oss.storageConfig.bucket -- oss bucket name.
-  ## @param csi-oss.storageConfig.endpoint -- endpoint of the oss service, e.g. oss-cn-hangzhou.aliyuncs.com.
-  ## @param csi-oss.storageConfig.path -- mount path of the oss bucket.
-  ## @param csi-oss.storageConfig.otherOpts -- mount options.
-  storageConfig:
-    bucket: ""
-    endpoint: "oss-cn-hangzhou.aliyuncs.com"
-    path: "/"
-    otherOpts: "-o max_stat_cache_size=0 -o allow_other"
 
 alertmanager-webhook-adaptor:
   ## Linkage with prometheus.enabled
@@ -1745,7 +1744,7 @@ csi-hostpath-driver:
     create: true
     default: true
 
-aws-loadbalancer-controller:
+aws-load-balancer-controller:
   clusterName: ""
   enabled: false
   replicaCount: 1
@@ -1757,3 +1756,13 @@ aws-loadbalancer-controller:
   serviceAccount:
     create: true
     name: kubeblocks-service-account-aws-load-balancer-controller
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: kb-controller
+            operator: In
+            values:
+            - "true"

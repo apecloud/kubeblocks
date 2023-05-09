@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package lifecycle
@@ -29,64 +32,75 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// backupPolicyTPLTransformer transforms the backup policy template to the backup policy.
-type backupPolicyTPLTransformer struct {
-	cr  clusterRefResources
-	cli types2.ReadonlyClient
-	ctx intctrlutil.RequestCtx
+// BackupPolicyTPLTransformer transforms the backup policy template to the backup policy.
+type BackupPolicyTPLTransformer struct {
+	tplCount          int
+	tplIdentifier     string
+	isDefaultTemplate string
 }
 
-func (r *backupPolicyTPLTransformer) Transform(dag *graph.DAG) error {
-	clusterDefName := r.cr.cd.Name
+func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	clusterDefName := transCtx.ClusterDef.Name
 	backupPolicyTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
-	if err := r.cli.List(r.ctx.Ctx, backupPolicyTPLs, client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefName}); err != nil {
+	if err := transCtx.Client.List(transCtx.Context, backupPolicyTPLs, client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefName}); err != nil {
 		return err
 	}
-	if len(backupPolicyTPLs.Items) == 0 {
+	r.tplCount = len(backupPolicyTPLs.Items)
+	if r.tplCount == 0 {
 		return nil
 	}
 	rootVertex, err := findRootVertex(dag)
 	if err != nil {
 		return err
 	}
-	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+	origCluster := transCtx.OrigCluster
+	backupPolicyNames := map[string]struct{}{}
 	for _, tpl := range backupPolicyTPLs.Items {
+		r.isDefaultTemplate = tpl.Annotations[constant.DefaultBackupPolicyTemplateAnnotationKey]
+		r.tplIdentifier = tpl.Spec.Identifier
 		for _, v := range tpl.Spec.BackupPolicies {
-			compDef := r.cr.cd.GetComponentDefByName(v.ComponentDefRef)
+			compDef := transCtx.ClusterDef.GetComponentDefByName(v.ComponentDefRef)
 			if compDef == nil {
 				return intctrlutil.NewNotFound("componentDef %s not found in ClusterDefinition: %s ", v.ComponentDefRef, clusterDefName)
 			}
 			// build the backup policy from the template.
-			backupPolicy := r.transformBackupPolicy(v, origCluster, compDef.WorkloadType, tpl.Name)
+			backupPolicy := r.transformBackupPolicy(transCtx, v, origCluster, compDef.WorkloadType, tpl.Name)
 			if backupPolicy == nil {
+				continue
+			}
+			// if exist multiple backup policy templates and duplicate spec.identifier,
+			// the backupPolicy that may be generated may have duplicate names, and it is necessary to check if it already exists.
+			if _, ok := backupPolicyNames[backupPolicy.Name]; ok {
 				continue
 			}
 			vertex := &lifecycleVertex{obj: backupPolicy}
 			dag.AddVertex(vertex)
 			dag.Connect(rootVertex, vertex)
+			backupPolicyNames[backupPolicy.Name] = struct{}{}
 		}
 	}
 	return nil
 }
 
 // transformBackupPolicy transform backup policy template to backup policy.
-func (r *backupPolicyTPLTransformer) transformBackupPolicy(policyTPL appsv1alpha1.BackupPolicy,
+func (r *BackupPolicyTPLTransformer) transformBackupPolicy(transCtx *ClusterTransformContext,
+	policyTPL appsv1alpha1.BackupPolicy,
 	cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
 	tplName string) *dataprotectionv1alpha1.BackupPolicy {
-	backupPolicyName := DeriveBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef)
+	backupPolicyName := DeriveBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef, r.tplIdentifier)
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
-	if err := r.cli.Get(r.ctx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: backupPolicyName}, backupPolicy); err != nil && !apierrors.IsNotFound(err) {
+	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKey{Namespace: cluster.Namespace, Name: backupPolicyName}, backupPolicy); err != nil && !apierrors.IsNotFound(err) {
 		return nil
 	}
 	if len(backupPolicy.Name) == 0 {
 		// build a new backup policy from the backup policy template.
-		return r.buildBackupPolicy(policyTPL, cluster, workloadType, tplName)
+		return r.buildBackupPolicy(policyTPL, cluster, workloadType, tplName, backupPolicyName)
 	}
 	// sync the existing backup policy with the cluster changes
 	r.syncBackupPolicy(backupPolicy, cluster, policyTPL, workloadType, tplName)
@@ -94,7 +108,7 @@ func (r *backupPolicyTPLTransformer) transformBackupPolicy(policyTPL appsv1alpha
 }
 
 // syncBackupPolicy syncs labels and annotations of the backup policy with the cluster changes.
-func (r *backupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotectionv1alpha1.BackupPolicy,
+func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	cluster *appsv1alpha1.Cluster,
 	policyTPL appsv1alpha1.BackupPolicy,
 	workloadType appsv1alpha1.WorkloadType,
@@ -103,13 +117,14 @@ func (r *backupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 	if backupPolicy.Annotations == nil {
 		backupPolicy.Annotations = map[string]string{}
 	}
-	backupPolicy.Annotations[constant.DefaultBackupPolicyAnnotationKey] = "true"
+	backupPolicy.Annotations[constant.DefaultBackupPolicyAnnotationKey] = r.defaultPolicyAnnotationValue()
 	backupPolicy.Annotations[constant.BackupPolicyTemplateAnnotationKey] = tplName
 	if backupPolicy.Labels == nil {
 		backupPolicy.Labels = map[string]string{}
 	}
 	backupPolicy.Labels[constant.AppInstanceLabelKey] = cluster.Name
 	backupPolicy.Labels[constant.KBAppComponentDefRefLabelKey] = policyTPL.ComponentDefRef
+	backupPolicy.Labels[constant.AppManagedByLabelKey] = constant.AppName
 
 	// only update the role labelSelector of the backup target instance when component workload is Replication/Consensus.
 	// because the replicas of component will change, such as 2->1. then if the target role is 'follower' and replicas is 1,
@@ -154,24 +169,27 @@ func (r *backupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 }
 
 // buildBackupPolicy builds a new backup policy from the backup policy template.
-func (r *backupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.BackupPolicy,
+func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.BackupPolicy,
 	cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
-	tplName string) *dataprotectionv1alpha1.BackupPolicy {
+	tplName,
+	backupPolicyName string) *dataprotectionv1alpha1.BackupPolicy {
 	component := r.getFirstComponent(cluster, policyTPL.ComponentDefRef)
 	if component == nil {
 		return nil
 	}
+
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      DeriveBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef),
+			Name:      backupPolicyName,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
 				constant.AppInstanceLabelKey:          cluster.Name,
 				constant.KBAppComponentDefRefLabelKey: policyTPL.ComponentDefRef,
+				constant.AppManagedByLabelKey:         constant.AppName,
 			},
 			Annotations: map[string]string{
-				constant.DefaultBackupPolicyAnnotationKey:  "true",
+				constant.DefaultBackupPolicyAnnotationKey:  r.defaultPolicyAnnotationValue(),
 				constant.BackupPolicyTemplateAnnotationKey: tplName,
 				constant.BackupDataPathPrefixAnnotationKey: fmt.Sprintf("/%s-%s/%s", cluster.Name, cluster.UID, component.Name),
 			},
@@ -189,7 +207,7 @@ func (r *backupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 }
 
 // getFirstComponent returns the first component name of the componentDefRef.
-func (r *backupPolicyTPLTransformer) getFirstComponent(cluster *appsv1alpha1.Cluster,
+func (r *BackupPolicyTPLTransformer) getFirstComponent(cluster *appsv1alpha1.Cluster,
 	componentDefRef string) *appsv1alpha1.ClusterComponentSpec {
 	for _, v := range cluster.Spec.ComponentSpecs {
 		if v.ComponentDefRef == componentDefRef {
@@ -200,7 +218,7 @@ func (r *backupPolicyTPLTransformer) getFirstComponent(cluster *appsv1alpha1.Clu
 }
 
 // convertSchedulePolicy converts the schedulePolicy from backupPolicyTemplate.
-func (r *backupPolicyTPLTransformer) convertSchedulePolicy(sp *appsv1alpha1.SchedulePolicy) *dataprotectionv1alpha1.SchedulePolicy {
+func (r *BackupPolicyTPLTransformer) convertSchedulePolicy(sp *appsv1alpha1.SchedulePolicy) *dataprotectionv1alpha1.SchedulePolicy {
 	if sp == nil {
 		return nil
 	}
@@ -211,7 +229,7 @@ func (r *backupPolicyTPLTransformer) convertSchedulePolicy(sp *appsv1alpha1.Sche
 }
 
 // convertBaseBackupSchedulePolicy converts the baseBackupSchedulePolicy from backupPolicyTemplate.
-func (r *backupPolicyTPLTransformer) convertBaseBackupSchedulePolicy(sp *appsv1alpha1.BaseBackupSchedulePolicy) *dataprotectionv1alpha1.BaseBackupSchedulePolicy {
+func (r *BackupPolicyTPLTransformer) convertBaseBackupSchedulePolicy(sp *appsv1alpha1.BaseBackupSchedulePolicy) *dataprotectionv1alpha1.BaseBackupSchedulePolicy {
 	if sp == nil {
 		return nil
 	}
@@ -223,7 +241,7 @@ func (r *backupPolicyTPLTransformer) convertBaseBackupSchedulePolicy(sp *appsv1a
 }
 
 // convertBasePolicy converts the basePolicy from backupPolicyTemplate.
-func (r *backupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolicy,
+func (r *BackupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolicy,
 	clusterName string,
 	component appsv1alpha1.ClusterComponentSpec,
 	workloadType appsv1alpha1.WorkloadType) dataprotectionv1alpha1.BasePolicy {
@@ -233,6 +251,7 @@ func (r *backupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolic
 				MatchLabels: map[string]string{
 					constant.AppInstanceLabelKey:    clusterName,
 					constant.KBAppComponentLabelKey: component.Name,
+					constant.AppManagedByLabelKey:   constant.AppName,
 				},
 			},
 		},
@@ -281,7 +300,7 @@ func (r *backupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolic
 }
 
 // convertBaseBackupSchedulePolicy converts the snapshotPolicy from backupPolicyTemplate.
-func (r *backupPolicyTPLTransformer) convertSnapshotPolicy(sp *appsv1alpha1.SnapshotPolicy,
+func (r *BackupPolicyTPLTransformer) convertSnapshotPolicy(sp *appsv1alpha1.SnapshotPolicy,
 	clusterName string,
 	component appsv1alpha1.ClusterComponentSpec,
 	workloadType appsv1alpha1.WorkloadType) *dataprotectionv1alpha1.SnapshotPolicy {
@@ -303,7 +322,7 @@ func (r *backupPolicyTPLTransformer) convertSnapshotPolicy(sp *appsv1alpha1.Snap
 }
 
 // convertBaseBackupSchedulePolicy converts the commonPolicy from backupPolicyTemplate.
-func (r *backupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.CommonBackupPolicy,
+func (r *BackupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.CommonBackupPolicy,
 	clusterName string,
 	component appsv1alpha1.ClusterComponentSpec,
 	workloadType appsv1alpha1.WorkloadType) *dataprotectionv1alpha1.CommonBackupPolicy {
@@ -330,18 +349,36 @@ func (r *backupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.Common
 			Namespace: globalPVConfigMapNamespace,
 		}
 	}
+	globalStorageClass := viper.GetString(constant.CfgKeyBackupPVCStorageClass)
+	var storageClassName *string
+	if globalStorageClass != "" {
+		storageClassName = &globalStorageClass
+	}
 	return &dataprotectionv1alpha1.CommonBackupPolicy{
 		BackupToolName: bp.BackupToolName,
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
 			InitCapacity:              resource.MustParse(defaultInitCapacity),
 			CreatePolicy:              defaultCreatePolicy,
 			PersistentVolumeConfigMap: persistentVolumeConfigMap,
+			StorageClassName:          storageClassName,
 		},
 		BasePolicy: r.convertBasePolicy(bp.BasePolicy, clusterName, component, workloadType),
 	}
 }
 
-// DeriveBackupPolicyName generates the backup policy name which is created from backup policy template.
-func DeriveBackupPolicyName(clusterName, componentDef string) string {
-	return fmt.Sprintf("%s-%s-backup-policy", clusterName, componentDef)
+func (r *BackupPolicyTPLTransformer) defaultPolicyAnnotationValue() string {
+	if r.tplCount > 1 && r.isDefaultTemplate != "true" {
+		return "false"
+	}
+	return "true"
 }
+
+// DeriveBackupPolicyName generates the backup policy name which is created from backup policy template.
+func DeriveBackupPolicyName(clusterName, componentDef, identifier string) string {
+	if len(identifier) == 0 {
+		return fmt.Sprintf("%s-%s-backup-policy", clusterName, componentDef)
+	}
+	return fmt.Sprintf("%s-%s-backup-policy-%s", clusterName, componentDef, identifier)
+}
+
+var _ graph.Transformer = &BackupPolicyTPLTransformer{}

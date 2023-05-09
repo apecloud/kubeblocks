@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package app
@@ -19,6 +22,8 @@ package app
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -70,8 +75,9 @@ func (m *mockClient) Get(ctx context.Context, key client.ObjectKey, obj client.O
 	objKey.Namespace = ""
 	if object, ok := m.objects[objKey]; ok {
 		testutil.SetGetReturnedObject(obj, object)
+		return nil
 	}
-	return nil
+	return apierrors.NewNotFound(corev1.SchemeGroupVersion.WithResource("mock_resource").GroupResource(), key.String())
 }
 
 func (m *mockClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
@@ -83,19 +89,19 @@ func (m *mockClient) List(ctx context.Context, list client.ObjectList, opts ...c
 }
 
 func (m mockClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
-	return cfgcore.MakeError("not support")
+	return nil
 }
 
 func (m mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
-	return cfgcore.MakeError("not support")
+	return nil
 }
 
 func (m mockClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	return cfgcore.MakeError("not support")
+	return nil
 }
 
 func (m mockClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	return cfgcore.MakeError("not support")
+	return nil
 }
 
 func (m mockClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {

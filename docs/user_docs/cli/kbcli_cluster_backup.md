@@ -2,17 +2,26 @@
 title: kbcli cluster backup
 ---
 
-Create a backup.
+Create a backup for the cluster.
 
 ```
-kbcli cluster backup [flags]
+kbcli cluster backup NAME [flags]
 ```
 
 ### Examples
 
 ```
   # create a backup
-  kbcli cluster backup cluster-name
+  kbcli cluster backup mycluster
+  
+  # create a snapshot backup
+  kbcli cluster backup mycluster --backup-type snapshot
+  
+  # create a full backup
+  kbcli cluster backup mycluster --backup-type full
+  
+  # create a backup with specified backup policy
+  kbcli cluster backup mycluster --backup-policy <backup-policy-name>
 ```
 
 ### Options

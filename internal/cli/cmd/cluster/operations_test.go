@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -30,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("operations", func() {
@@ -52,8 +56,11 @@ var _ = Describe("operations", func() {
 		clusterWithOneComp.Spec.ComponentSpecs = []appsv1alpha1.ClusterComponentSpec{
 			clusterWithOneComp.Spec.ComponentSpecs[0],
 		}
+		classDef := testapps.NewComponentClassDefinitionFactory("custom", clusterWithOneComp.Spec.ClusterDefRef, testing.ComponentDefName).
+			AddClasses(testapps.DefaultResourceConstraintName, []string{testapps.Class1c1gName}).
+			GetObject()
 		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(),
-			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp)
+			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp, classDef)
 		tf.Client = &clientfake.RESTClient{}
 	})
 
@@ -62,7 +69,7 @@ var _ = Describe("operations", func() {
 	})
 
 	initCommonOperationOps := func(opsType appsv1alpha1.OpsType, clusterName string, hasComponentNamesFlag bool) *OperationsOptions {
-		o := newBaseOperationsOptions(streams, opsType, hasComponentNamesFlag)
+		o := newBaseOperationsOptions(tf, streams, opsType, hasComponentNamesFlag)
 		o.Dynamic = tf.FakeDynamicClient
 		o.Name = clusterName
 		o.Namespace = testing.Namespace
@@ -70,7 +77,7 @@ var _ = Describe("operations", func() {
 	}
 
 	It("Upgrade Ops", func() {
-		o := newBaseOperationsOptions(streams, appsv1alpha1.UpgradeType, false)
+		o := newBaseOperationsOptions(tf, streams, appsv1alpha1.UpgradeType, false)
 		o.Dynamic = tf.FakeDynamicClient
 
 		By("validate o.name is null")
@@ -105,6 +112,39 @@ var _ = Describe("operations", func() {
 		Expect(o.Validate()).Should(Succeed())
 	})
 
+	It("Vscale Ops", func() {
+		o := initCommonOperationOps(appsv1alpha1.VerticalScalingType, clusterName1, true)
+		By("test CompleteComponentsFlag function")
+		o.ComponentNames = nil
+		By("expect to auto complete components when cluster has only one component")
+		Expect(o.CompleteComponentsFlag()).Should(Succeed())
+		Expect(o.ComponentNames[0]).Should(Equal(testing.ComponentName))
+
+		By("validate invalid class")
+		o.Class = "class-not-exists"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).Should(HaveOccurred())
+
+		By("expect to validate success with class")
+		o.Class = testapps.Class1c1gName
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).ShouldNot(HaveOccurred())
+
+		By("validate invalid resource")
+		o.Class = ""
+		o.CPU = "100"
+		o.Memory = "100Gi"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).Should(HaveOccurred())
+
+		By("expect to validate success with resource")
+		o.Class = ""
+		o.CPU = "1"
+		o.Memory = "1Gi"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).ShouldNot(HaveOccurred())
+	})
+
 	It("Hscale Ops", func() {
 		o := initCommonOperationOps(appsv1alpha1.HorizontalScalingType, clusterName1, true)
 		By("test CompleteComponentsFlag function")
@@ -128,8 +168,8 @@ var _ = Describe("operations", func() {
 	It("Restart ops", func() {
 		o := initCommonOperationOps(appsv1alpha1.RestartType, clusterName, true)
 		By("expect for not found error")
-		inputs := buildOperationsInputs(tf, o)
-		Expect(o.Complete(inputs, []string{clusterName + "2"}))
+		o.Args = []string{clusterName + "2"}
+		Expect(o.Complete())
 		Expect(o.CompleteRestartOps().Error()).Should(ContainSubstring("not found"))
 
 		By("expect for complete success")

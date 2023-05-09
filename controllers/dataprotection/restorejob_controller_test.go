@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package dataprotection
@@ -126,28 +129,24 @@ var _ = Describe("RestoreJob Controller", func() {
 	}
 
 	patchBackupStatus := func(phase dataprotectionv1alpha1.BackupPhase, key types.NamespacedName) {
-		backup := dataprotectionv1alpha1.Backup{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, key, &backup)
-		}).Should(Succeed())
-		Expect(k8sClient.Get(ctx, key, &backup)).Should(Succeed())
-
-		patch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.Phase = phase
-		Expect(k8sClient.Status().Patch(ctx, &backup, patch)).Should(Succeed())
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(backup *dataprotectionv1alpha1.Backup) {
+			backup.Status.Phase = phase
+		})).Should(Succeed())
 	}
 
 	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
-		k8sJob := batchv1.Job{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, key, &k8sJob)
-		}).Should(Succeed())
-		Expect(k8sClient.Get(ctx, key, &k8sJob)).Should(Succeed())
-
-		patch := client.MergeFrom(k8sJob.DeepCopy())
-		jobCondition := batchv1.JobCondition{Type: jobStatus}
-		k8sJob.Status.Conditions = append(k8sJob.Status.Conditions, jobCondition)
-		Expect(k8sClient.Status().Patch(ctx, &k8sJob, patch)).Should(Succeed())
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(job *batchv1.Job) {
+			found := false
+			for _, cond := range job.Status.Conditions {
+				if cond.Type == jobStatus {
+					found = true
+				}
+			}
+			if !found {
+				jobCondition := batchv1.JobCondition{Type: jobStatus}
+				job.Status.Conditions = append(job.Status.Conditions, jobCondition)
+			}
+		})).Should(Succeed())
 	}
 
 	testRestoreJob := func(withResources ...bool) {

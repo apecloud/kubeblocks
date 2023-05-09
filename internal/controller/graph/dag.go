@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package graph
@@ -156,7 +159,7 @@ func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 func (d *DAG) Root() Vertex {
 	roots := make([]Vertex, 0)
 	for n := range d.vertices {
-		if len(d.inAdj(n)) == 0 {
+		if len(d.InAdj(n)) == 0 {
 			roots = append(roots, n)
 		}
 	}
@@ -208,7 +211,7 @@ func (d *DAG) validate() error {
 		}
 
 		marked[v] = true
-		adjacent := d.outAdj(v)
+		adjacent := d.OutAdj(v)
 		for _, vertex := range adjacent {
 			if err := walk(vertex); err != nil {
 				return err
@@ -243,9 +246,9 @@ func (d *DAG) topologicalOrder(reverse bool) []Vertex {
 		}
 		var adjacent []Vertex
 		if reverse {
-			adjacent = d.outAdj(v)
+			adjacent = d.OutAdj(v)
 		} else {
-			adjacent = d.inAdj(v)
+			adjacent = d.InAdj(v)
 		}
 		for _, vertex := range adjacent {
 			walk(vertex)
@@ -256,12 +259,11 @@ func (d *DAG) topologicalOrder(reverse bool) []Vertex {
 	for v := range d.vertices {
 		walk(v)
 	}
-
 	return orders
 }
 
-// outAdj returns all adjacent vertices that v points to
-func (d *DAG) outAdj(v Vertex) []Vertex {
+// OutAdj returns all adjacent vertices that v points to
+func (d *DAG) OutAdj(v Vertex) []Vertex {
 	vertices := make([]Vertex, 0)
 	for e := range d.edges {
 		if e.From() == v {
@@ -271,8 +273,8 @@ func (d *DAG) outAdj(v Vertex) []Vertex {
 	return vertices
 }
 
-// inAdj returns all adjacent vertices that point to v
-func (d *DAG) inAdj(v Vertex) []Vertex {
+// InAdj returns all adjacent vertices that point to v
+func (d *DAG) InAdj(v Vertex) []Vertex {
 	vertices := make([]Vertex, 0)
 	for e := range d.edges {
 		if e.To() == v {

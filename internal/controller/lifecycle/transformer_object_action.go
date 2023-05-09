@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package lifecycle
@@ -19,46 +22,28 @@ package lifecycle
 import (
 	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// objectActionTransformer reads all Vertex.Obj in cache and compute the diff DAG.
-type objectActionTransformer struct {
-	cli client2.ReadonlyClient
-	ctx intctrlutil.RequestCtx
-}
+// ObjectActionTransformer reads all Vertex.Obj in cache and compute the diff DAG.
+type ObjectActionTransformer struct{}
 
-func ownKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&appsv1.StatefulSetList{},
-		&appsv1.DeploymentList{},
-		&corev1.ServiceList{},
-		&corev1.SecretList{},
-		&corev1.ConfigMapList{},
-		&policyv1.PodDisruptionBudgetList{},
-		&dataprotectionv1alpha1.BackupPolicyList{},
-	}
-}
+func (t *ObjectActionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	origCluster := transCtx.OrigCluster
 
-func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
+	// get the old objects snapshot
+	ml := getAppInstanceAndManagedByML(*origCluster)
+	oldSnapshot, err := readCacheSnapshot(transCtx, *origCluster, ml, ownKinds()...)
 	if err != nil {
 		return err
 	}
-	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 
-	// get the old objects snapshot
-	oldSnapshot, err := readCacheSnapshot(c.ctx.Ctx, c.cli, *origCluster, ownKinds()...)
+	rootVertex, err := findRootVertex(dag)
 	if err != nil {
 		return err
 	}
@@ -164,3 +149,5 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 
 	return nil
 }
+
+var _ graph.Transformer = &ObjectActionTransformer{}

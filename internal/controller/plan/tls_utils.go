@@ -1,23 +1,27 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package plan
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"text/template"
 
@@ -26,63 +30,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-func CreateOrCheckTLSCerts(reqCtx controllerutil.RequestCtx,
-	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster,
-) (*v1.Secret, error) {
-	if cluster == nil {
-		return nil, componentutil.ErrReqClusterObj
-	}
-
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if !comp.TLS {
-			continue
-		}
-		// REVIEW/TODO: should do spec validation during validation stage
-		if comp.Issuer == nil {
-			return nil, errors.New("issuer shouldn't be nil when tls enabled")
-		}
-		switch comp.Issuer.Name {
-		case dbaasv1alpha1.IssuerUserProvided:
-			if err := CheckTLSSecretRef(reqCtx, cli, cluster.Namespace, comp.Issuer.SecretRef); err != nil {
-				return nil, err
-			}
-		case dbaasv1alpha1.IssuerKubeBlocks:
-			return createTLSSecret(reqCtx, cli, cluster, comp.Name)
-		}
-	}
-	return nil, nil
-}
-
-// func deleteTLSSecrets(reqCtx controllerutil.RequestCtx, cli client.Client, secretList []v1.Secret) {
-// 	for _, secret := range secretList {
-// 		err := cli.Delete(reqCtx.Ctx, &secret)
-// 		if err != nil {
-// 			reqCtx.Log.Info("delete tls secret error", "err", err)
-// 		}
-// 	}
-// }
-
-func createTLSSecret(reqCtx controllerutil.RequestCtx,
-	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster,
-	componentName string) (*v1.Secret, error) {
-	secret, err := ComposeTLSSecret(cluster.Namespace, cluster.Name, componentName)
-	if err != nil {
-		return nil, err
-	}
-	return secret, nil
-}
 
 // ComposeTLSSecret compose a TSL secret object.
 // REVIEW/TODO:
@@ -131,14 +84,14 @@ func buildFromTemplate(tpl string, vars interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func CheckTLSSecretRef(reqCtx controllerutil.RequestCtx, cli client2.ReadonlyClient, namespace string,
+func CheckTLSSecretRef(ctx context.Context, cli client2.ReadonlyClient, namespace string,
 	secretRef *dbaasv1alpha1.TLSSecretRef) error {
 	if secretRef == nil {
 		return errors.New("issuer.secretRef shouldn't be nil when issuer is UserProvided")
 	}
 
 	secret := &v1.Secret{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: namespace, Name: secretRef.Name}, secret); err != nil {
+	if err := cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: secretRef.Name}, secret); err != nil {
 		return err
 	}
 	if secret.Data == nil {

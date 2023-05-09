@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
@@ -20,6 +23,7 @@ import (
 	"context"
 	"time"
 
+	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
@@ -84,6 +88,7 @@ import (
 // read + update access
 // +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
 
 // read only + watch access
@@ -134,16 +139,82 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
-	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req, r.Recorder)
+	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
+	// Init stage
+	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	} else if err := planBuilder.Validate(); err != nil {
-		return requeueError(err)
-	} else if plan, err := planBuilder.Build(); err != nil {
-		return requeueError(err)
-	} else if err = plan.Execute(); err != nil {
-		return requeueError(err)
 	}
+
+	// Build stage
+	// what you should do in most cases is writing your transformer.
+	//
+	// here are the how-to tips:
+	// 1. one transformer for one scenario
+	// 2. try not to modify the current transformers, make a new one
+	// 3. transformers are independent with each-other, with some exceptions.
+	//    Which means transformers' order is not important in most cases.
+	//    If you don't know where to put your transformer, append it to the end and that would be ok.
+	// 4. don't use client.Client for object write, use client.ReadonlyClient for object read.
+	//    If you do need to create/update/delete object, make your intent operation a lifecycleVertex and put it into the DAG.
+	//
+	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
+	plan, errBuild := planBuilder.
+		AddTransformer(
+			// handle deletion
+			// handle cluster deletion first
+			&lifecycle.ClusterDeletionTransformer{},
+			// fix meta
+			// fix finalizer and cd&cv labels
+			&lifecycle.FixMetaTransformer{},
+			// validate
+			// validate cd & cv's existence and availability
+			&lifecycle.ValidateAndLoadRefResourcesTransformer{},
+			// validate config
+			&lifecycle.ValidateEnableLogsTransformer{},
+			// fix spec
+			// fill class related info
+			&lifecycle.FillClassTransformer{},
+			// generate objects
+			// cluster to K8s objects and put them into dag
+			&lifecycle.ClusterTransformer{Client: r.Client},
+			// tls certs secret
+			&lifecycle.TLSCertsTransformer{},
+			// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
+			&lifecycle.BackupPolicyTPLTransformer{},
+			// add our finalizer to all objects
+			&lifecycle.OwnershipTransformer{},
+			// make all workload objects depending on credential secret
+			&lifecycle.CredentialTransformer{},
+			// make all workload objects depending on all none workload objects
+			&lifecycle.WorkloadsLastTransformer{},
+			// make config configmap immutable
+			&lifecycle.ConfigTransformer{},
+			// read old snapshot from cache, and generate diff plan
+			&lifecycle.ObjectActionTransformer{},
+			// day-2 ops
+			// horizontal scaling
+			&lifecycle.StsHorizontalScalingTransformer{},
+			// stateful set pvc Update
+			&lifecycle.StsPVCTransformer{},
+			// update cluster status
+			&lifecycle.ClusterStatusTransformer{},
+			// handle PITR
+			&lifecycle.PITRTransformer{Client: r.Client},
+			// always safe to put your transformer below
+		).
+		Build()
+
+	// Execute stage
+	// errBuild not nil means build stage partial success or validation error
+	// execute the plan first, delay error handling
+	if errExec := plan.Execute(); errExec != nil {
+		return requeueError(errExec)
+	}
+	if errBuild != nil {
+		return requeueError(errBuild)
+	}
+
 	return intctrlutil.Reconciled()
 }
 
@@ -163,7 +234,11 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&dataprotectionv1alpha1.BackupPolicy{}).
 		Owns(&dataprotectionv1alpha1.Backup{})
 	if viper.GetBool("VOLUMESNAPSHOT") {
-		b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		if intctrlutil.InVolumeSnapshotV1Beta1() {
+			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		} else {
+			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		}
 	}
 	return b.Complete(r)
 }

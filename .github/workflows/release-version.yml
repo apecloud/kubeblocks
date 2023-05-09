@@ -12,11 +12,32 @@ run-name: ref_name:${{ github.ref_name }} release_version:${{ inputs.release_ver
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
 
 
 jobs:
+  merge-releasing-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Auto merge releasing PR
+        run: ./.github/utils/merge_releasing_pr.sh
+
+  release-message:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: release message
+        run: |
+          bash .github/utils/utils.sh --type 11 \
+            --tag-name "${{ inputs.release_version }}" \
+            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }}
+
   release-test:
+    needs: release-message
     runs-on: [ self-hosted, eks-fargate-runner ]
+    outputs:
+      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     steps:
       - uses: apecloud/checkout@main
       - name: vendor lint test
@@ -26,16 +47,47 @@ jobs:
           cp -r /go/bin/setup-envtest ./bin/setup-envtest
           make mod-vendor lint test
 
+      - name: kill kube-apiserver and etcd
+        id: get_runner_name
+        if: ${{ always() }}
+        run: |
+          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
+          bash .github/utils/utils.sh --type 8      
+
+  remove-runner:
+    needs: release-test
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: remove runner
+        run: |
+          bash .github/utils/utils.sh --type 9 \
+            --github-token ${{ env.GITHUB_TOKEN }} \
+            --runner-name ${{ needs.make-test.outputs.runner-name }}    
+
   release-version:
     needs: release-test
     runs-on: ubuntu-latest
     steps:
       - name: checkout branch ${{ github.ref_name }}
         uses: actions/checkout@v3
-
       - name: push tag
         uses: mathieudutour/github-tag-action@v6.1
         with:
           custom_tag: ${{ inputs.release_version }}
           github_token: ${{ env.GITHUB_TOKEN }}
           tag_prefix: ""
+
+  send-message:
+    runs-on: ubuntu-latest
+    needs: release-version
+    if: ${{ failure() || cancelled() }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: send message
+        run: |
+          bash .github/utils/utils.sh --type 12 \
+            --content "release\u00a0error"\
+            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

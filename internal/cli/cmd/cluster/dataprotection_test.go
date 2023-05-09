@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -99,12 +102,12 @@ var _ = Describe("DataProtection", func() {
 		It("validate create backup", func() {
 			By("without cluster name")
 			o := &CreateBackupOptions{
-				BaseOptions: create.BaseOptions{
+				CreateOptions: create.CreateOptions{
 					Dynamic:   testing.FakeDynamicClient(),
 					IOStreams: streams,
+					Factory:   tf,
 				},
 			}
-			o.IOStreams = streams
 			Expect(o.Validate()).To(MatchError("missing cluster name"))
 
 			By("test without default backupPolicy")
@@ -181,36 +184,6 @@ var _ = Describe("DataProtection", func() {
 		Expect(printBackupList(o)).Should(Succeed())
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("test1"))
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql (deleted)"))
-	})
-
-	It("delete-restore", func() {
-		By("test delete-restore cmd")
-		cmd := NewDeleteRestoreCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-
-		args := []string{"test1"}
-		clusterLabel := util.BuildLabelSelectorByNames("", args)
-
-		By("test delete-restore with cluster")
-		o := delete.NewDeleteOptions(tf, streams, types.BackupGVR())
-		Expect(completeForDeleteRestore(o, args)).Should(HaveOccurred())
-
-		By("test delete-restore with cluster and force")
-		o.Force = true
-		Expect(completeForDeleteRestore(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
-
-		By("test delete-restore with cluster and force and labels")
-		o.Force = true
-		customLabel := "test=test"
-		o.LabelSelector = customLabel
-		Expect(completeForDeleteRestore(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == customLabel+","+clusterLabel).Should(BeTrue())
-	})
-
-	It("list-restore", func() {
-		cmd := NewListRestoreCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("restore", func() {

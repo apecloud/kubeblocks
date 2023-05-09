@@ -7,26 +7,27 @@
 {{- if gt $phy_memory 0 }}
 {{- $shared_buffers = div $phy_memory 4 }}
 {{- $max_connections = min ( div $phy_memory 9531392 ) 5000 }}
-{{- end -}}
+{{- end }}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
-{{- $buffer_unit = "KB" }}
-{{- end -}}
+{{- $buffer_unit = "kB" }}
+{{- end }}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
 {{- $buffer_unit = "MB" }}
-{{- end -}}
+{{- end }}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
 {{ $buffer_unit = "GB" }}
-{{- end -}}
+{{- end }}
 
 listen_addresses = '*'
 port = '5432'
-archive_command = 'wal_dir=/home/postgres/pgdata/pgroot/arcwal; wal_dir_today=${wal_dir}/$(date +%Y%m%d); [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); mkdir -p ${wal_dir_today} && gzip -kqc %p > ${wal_dir_today}/%f.gz'
+# archive_command = 'wal_dir=/home/postgres/pgdata/pgroot/arcwal; wal_dir_today=${wal_dir}/$(date +%Y%m%d); [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); mkdir -p ${wal_dir_today} && gzip -kqc %p > ${wal_dir_today}/%f.gz'
+archive_command = 'if [ $(date +%H%M) -eq 1200 ]; then rm -rf /home/postgres/pgdata/pgroot/arcwal/$(date -d"yesterday" +%Y%m%d); fi; mkdir -p /home/postgres/pgdata/pgroot/arcwal/$(date +%Y%m%d) && gzip -kqc %p > /home/postgres/pgdata/pgroot/arcwal/$(date +%Y%m%d)/%f.gz && sync /home/postgres/pgdata/pgroot/arcwal/$(date +%Y%m%d)/%f.gz'
 archive_mode = 'on'
 auto_explain.log_analyze = 'True'
 auto_explain.log_min_duration = '1s'
@@ -67,7 +68,7 @@ log_directory = 'log'
 log_filename = 'postgresql-%Y-%m-%d.log'
 {{ end -}}
 {{ end -}}
-{{ end -}}
+{{ end }}
 
 log_lock_waits = 'True'
 log_min_duration_statement = '100'
@@ -124,7 +125,7 @@ work_mem = '32MB'
 {{- $cert_file := getCertFile }}
 {{- $key_file := getKeyFile }}
 # tls
-ssl=ON
+ssl= 'True'
 ssl_ca_file={{ $ca_file }}
 ssl_cert_file={{ $cert_file }}
 ssl_key_file={{ $key_file }}

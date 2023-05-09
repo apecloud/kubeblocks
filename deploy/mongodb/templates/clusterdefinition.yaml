@@ -9,14 +9,14 @@ spec:
   connectionCredential:
     username: root
     password: {{ (include "mongodb.password" .) | quote  }}
-    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mongodb)"
     host: "$(SVC_FQDN)"
-    port: "$(SVC_PORT_tcp-monogdb)"
-    headlessEndpoint: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
-    headlessHost: "$(POD_NAME_PREFIX)-0.$(HEADLESS_SVC_FQDN)"
-    headlessPort: "$(SVC_PORT_tcp-monogdb)"
+    port: "$(SVC_PORT_mongodb)"
+    headlessEndpoint: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN):$(SVC_PORT_mongodb)"
+    headlessHost: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN)"
+    headlessPort: "$(SVC_PORT_mongodb)"
   componentDefs:
-    - name: replicaset
+    - name: mongodb
       characterType: mongodb
       scriptSpecs:
         - name: mongodb-scripts
@@ -58,12 +58,15 @@ spec:
             accessMode: Readonly
         updateStrategy: Serial
       probes:
+        roleProbeTimeoutAfterPodsReady: 300
         roleProbe:
-          periodSeconds: 2
-          failureThreshold: 3
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       service:
         ports:
-          - protocol: TCP
+          - name: mongodb
+            protocol: TCP
             port: 27017
       volumeTypes:
         - name: data
@@ -93,7 +96,7 @@ spec:
                 exec:
                   command:
                     - /scripts/replicaset-post-start.sh
-                    - REPLICASET
+                    - MONGODB
             volumeMounts:
               - mountPath: /data/mongodb
                 name: data

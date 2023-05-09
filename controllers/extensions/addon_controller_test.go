@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package extensions
@@ -226,7 +229,7 @@ var _ = Describe("Addon controller", func() {
 			Expect(addon.Spec.DefaultInstallValues).ShouldNot(BeEmpty())
 		}
 
-		progressingPhaseCheck := func(genID int, expectPhase extensionsv1alpha1.AddonPhase, handler func()) {
+		addonStatusPhaseCheck := func(genID int, expectPhase extensionsv1alpha1.AddonPhase, handler func()) {
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				Expect(err).To(Not(HaveOccurred()))
@@ -255,7 +258,7 @@ var _ = Describe("Addon controller", func() {
 		}
 
 		enablingPhaseCheck := func(genID int) {
-			progressingPhaseCheck(genID, extensionsv1alpha1.AddonEnabling, func() {
+			addonStatusPhaseCheck(genID, extensionsv1alpha1.AddonEnabling, func() {
 				By("By fake active install job")
 				jobKey := client.ObjectKey{
 					Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
@@ -268,7 +271,7 @@ var _ = Describe("Addon controller", func() {
 		}
 
 		disablingPhaseCheck := func(genID int) {
-			progressingPhaseCheck(genID, extensionsv1alpha1.AddonDisabling, nil)
+			addonStatusPhaseCheck(genID, extensionsv1alpha1.AddonDisabling, nil)
 		}
 
 		checkAddonDeleted := func(g Gomega) {
@@ -302,9 +305,16 @@ var _ = Describe("Addon controller", func() {
 			Expect(testCtx.CreateObj(ctx, helmRelease)).Should(Succeed())
 		}
 
-		It("should successfully reconcile a custom resource for Addon", func() {
+		It("should successfully reconcile a custom resource for Addon with spec.type=Helm", func() {
 			By("By create an addon")
-			createAddonSpecWithRequiredAttributes(nil)
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Type = extensionsv1alpha1.HelmType
+				newOjb.Spec.Helm = &extensionsv1alpha1.HelmTypeInstallSpec{
+					InstallOptions: extensionsv1alpha1.HelmInstallOptions{
+						"--debug": "true",
+					},
+				}
+			})
 
 			By("By checking status.observedGeneration and status.phase=disabled")
 			Eventually(func(g Gomega) {
@@ -539,7 +549,7 @@ var _ = Describe("Addon controller", func() {
 			// "extensions.kubeblocks.io/skip-installable-check"
 		})
 
-		It("should successfully reconcile a custom resource for Addon with CM and secret values", func() {
+		It("should successfully reconcile a custom resource for Addon with CM and secret ref values", func() {
 			By("By create an addon with spec.helm.installValues.configMapRefs set")
 			cm := testapps.CreateCustomizedObj(&testCtx, "addon/cm-values.yaml",
 				&corev1.ConfigMap{}, func(newCM *corev1.ConfigMap) {
@@ -549,6 +559,8 @@ var _ = Describe("Addon controller", func() {
 				&corev1.Secret{}, func(newSecret *corev1.Secret) {
 					newSecret.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
 				})
+
+			By("By addon enabled via auto-install")
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
 				for k := range cm.Data {
@@ -566,12 +578,47 @@ var _ = Describe("Addon controller", func() {
 						})
 				}
 			})
-
-			By("By addon autoInstall auto added")
 			enablingPhaseCheck(2)
 
 			By("By enabled addon with fake completed install job status")
 			fakeInstallationCompletedJob(2)
+		})
+
+		It("should failed reconcile a custom resource for Addon with missing CM ref values", func() {
+			By("By create an addon with spec.helm.installValues.configMapRefs set")
+			cm := testapps.CreateCustomizedObj(&testCtx, "addon/cm-values.yaml",
+				&corev1.ConfigMap{}, func(newCM *corev1.ConfigMap) {
+					newCM.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
+				})
+
+			By("By addon enabled via auto-install")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+				newOjb.Spec.Helm.InstallValues.ConfigMapRefs = append(newOjb.Spec.Helm.InstallValues.ConfigMapRefs,
+					extensionsv1alpha1.DataObjectKeySelector{
+						Name: cm.Name,
+						Key:  "unknown",
+					})
+			})
+			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
+		})
+
+		It("should failed reconcile a custom resource for Addon with missing secret ref values", func() {
+			By("By create an addon with spec.helm.installValues.configMapRefs set")
+			secret := testapps.CreateCustomizedObj(&testCtx, "addon/secret-values.yaml",
+				&corev1.Secret{}, func(newSecret *corev1.Secret) {
+					newSecret.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
+				})
+			By("By addon enabled via auto-install")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+				newOjb.Spec.Helm.InstallValues.SecretRefs = append(newOjb.Spec.Helm.InstallValues.SecretRefs,
+					extensionsv1alpha1.DataObjectKeySelector{
+						Name: secret.Name,
+						Key:  "unknown",
+					})
+			})
+			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
 		})
 	})
 })

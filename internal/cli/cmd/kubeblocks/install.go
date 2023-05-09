@@ -244,10 +244,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	}
 
 	// addons record the addons and its status
-
 	addons := make(map[string]string)
-	// OS := OS.GOOS
-
 	checkAddons := func() (bool, error) {
 		allEnabled := true
 		objs, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
@@ -317,15 +314,14 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	}
 
 	var (
-		allEnabled bool
-		err        error
+		allEnabled  bool
+		err         error
 		spinnerDone = func(s spinner.Interface) {
 			s.SetFinalMsg(allMsg)
 			s.Done("")
 			fmt.Fprintln(o.Out)
 		}
 	)
-	
 	// wait all addons to be enabled, or timeout
 	if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
 		allEnabled, err = checkAddons()

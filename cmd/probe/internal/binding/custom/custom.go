@@ -26,6 +26,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/dapr/components-contrib/bindings"
@@ -93,8 +94,8 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *bindings.InvokeRequest, r
 	)
 
 	for _, port := range *h.actionSvcPorts {
-		url := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, lastOutput)
-		lastOutput, err = h.callAction(ctx, url)
+		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, url.QueryEscape(lastOutput))
+		lastOutput, err = h.callAction(ctx, u)
 		if err != nil {
 			return "", err
 		}

@@ -133,7 +133,7 @@ func (p *PointInTimeRecoveryManager) doRecoveryJob() (shouldRequeue bool, err er
 
 	// mount the data+log pvc, and run scripts job to prepare data
 	if err = p.runRecoveryJob(); err != nil {
-		if err.Error() == "waiting PVC Bound" {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
 			return true, nil
 		}
 		return false, err
@@ -393,6 +393,48 @@ func (p *PointInTimeRecoveryManager) getIncrementalPVC(componentName string) (*c
 	return &pvc, nil
 }
 
+func (p *PointInTimeRecoveryManager) getDataPVCs(componentName string) ([]corev1.PersistentVolumeClaim, error) {
+	podList := corev1.PodList{}
+	podLabels := map[string]string{
+		constant.AppInstanceLabelKey:    p.Cluster.Name,
+		constant.KBAppComponentLabelKey: componentName,
+	}
+	if err := p.Client.List(p.Ctx, &podList,
+		client.InNamespace(p.namespace),
+		client.MatchingLabels(podLabels)); err != nil {
+		return nil, err
+	}
+	dataPVCs := []corev1.PersistentVolumeClaim{}
+	for _, targetPod := range podList.Items {
+		if targetPod.Spec.NodeName == "" {
+			return nil, intctrlutil.NewError(intctrlutil.ErrorTypeNeedWaiting, "waiting Pod scheduled")
+		}
+		for _, volume := range targetPod.Spec.Volumes {
+			if volume.PersistentVolumeClaim == nil {
+				continue
+			}
+			dataPVC := corev1.PersistentVolumeClaim{}
+			pvcKey := types.NamespacedName{Namespace: targetPod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}
+			if err := p.Client.Get(p.Ctx, pvcKey, &dataPVC); err != nil {
+				return nil, err
+			}
+			if dataPVC.Labels[constant.VolumeTypeLabelKey] != string(appsv1alpha1.VolumeTypeData) {
+				continue
+			}
+			if dataPVC.Status.Phase != corev1.ClaimBound {
+				return nil, intctrlutil.NewError(intctrlutil.ErrorTypeNeedWaiting, "waiting PVC Bound")
+			}
+			if dataPVC.Annotations == nil {
+				dataPVC.Annotations = map[string]string{}
+			}
+			dataPVC.Annotations["pod-name"] = targetPod.Name
+			dataPVC.Annotations["node-name"] = targetPod.Spec.NodeName
+			dataPVCs = append(dataPVCs, dataPVC)
+		}
+	}
+	return dataPVCs, nil
+}
+
 func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, err error) {
 	objs = make([]client.Object, 0)
 
@@ -407,18 +449,11 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 			constant.KBAppComponentLabelKey: componentSpec.Name,
 		}
 		// get data dir pvc name
-		dataPVCList := corev1.PersistentVolumeClaimList{}
-		dataPVCLabels := map[string]string{
-			constant.AppInstanceLabelKey:    p.Cluster.Name,
-			constant.KBAppComponentLabelKey: componentSpec.Name,
-			constant.VolumeTypeLabelKey:     string(appsv1alpha1.VolumeTypeData),
-		}
-		if err = p.Client.List(p.Ctx, &dataPVCList,
-			client.InNamespace(p.namespace),
-			client.MatchingLabels(dataPVCLabels)); err != nil {
+		dataPVCs, err := p.getDataPVCs(componentSpec.Name)
+		if err != nil {
 			return objs, err
 		}
-		if len(dataPVCList.Items) == 0 {
+		if len(dataPVCs) == 0 {
 			return objs, errors.New("not found data pvc")
 		}
 		recoveryInfo, err := p.getRecoveryInfo(componentSpec.Name)
@@ -430,10 +465,7 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 			return objs, err
 		}
 		dataVolumeMount := getVolumeMount(recoveryInfo)
-		for i, dataPVC := range dataPVCList.Items {
-			if dataPVC.Status.Phase != corev1.ClaimBound {
-				return objs, errors.New("waiting PVC Bound")
-			}
+		for _, dataPVC := range dataPVCs {
 			volumes := []corev1.Volume{
 				{Name: "data", VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.Name}}},
@@ -450,18 +482,20 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 			if image == "" {
 				image = viper.GetString(constant.KBToolsImage)
 			}
-			jobName := fmt.Sprintf("pitr-phy-%s-%s-%d", p.Cluster.Name, componentSpec.Name, i)
+			jobName := fmt.Sprintf("pitr-phy-%s", dataPVC.Annotations["pod-name"])
 			job, err := builder.BuildPITRJob(jobName, p.Cluster, image, []string{"sh", "-c"},
 				recoveryInfo.Physical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env)
 			job.SetLabels(commonLabels)
+			job.Spec.Template.Spec.NodeName = dataPVC.Annotations["node-name"]
 			if err != nil {
 				return objs, err
 			}
 			// create logic restore job
 			if p.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase && len(recoveryInfo.Logical.RestoreCommands) > 0 {
-				logicJobName := fmt.Sprintf("pitr-logic-%s-%s-%d", p.Cluster.Name, componentSpec.Name, i)
+				logicJobName := fmt.Sprintf("pitr-logic-%s", dataPVC.Annotations["pod-name"])
 				logicJob, err := builder.BuildPITRJob(logicJobName, p.Cluster, image, []string{"sh", "-c"},
 					recoveryInfo.Logical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env)
+				logicJob.Spec.Template.Spec.NodeName = dataPVC.Annotations["node-name"]
 				if err != nil {
 					return objs, err
 				}

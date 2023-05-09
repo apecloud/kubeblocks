@@ -40,7 +40,8 @@ spec:
         mkdir -p ${PITR_DIR};
         cd ${PITR_DIR}
         for i in $(find ${BACKUP_DIR} -name "*.gz"); do
-          cp ${i} $(basename $i)
+          echo "copying ${i}";
+          cp ${i} $(basename $i);
           gzip -df $(basename $i);
         done
         chmod 777 -R ${PITR_DIR};
@@ -54,6 +55,7 @@ spec:
         chmod +x ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
         echo "restore_command='mv ${PITR_DIR}/%f %p'\nrecovery_target_time='${RECOVERY_TIME}'\nrecovery_target_action='promote'" > ${CONF_DIR}/recovery.conf;
         mv ${DATA_DIR} ${DATA_DIR}.old;
+        echo "done.";
         sync;
   backupCommands:
     - |
@@ -63,12 +65,16 @@ spec:
       TODAY_INCR_LOG=${BACKUP_DIR}/$(date +%Y%m%d);
       mkdir -p ${TODAY_INCR_LOG};
       for i in $(find ${ARCHIVE_LOG_DIR} -name "*.gz"); do
+        echo "uploading ${i}";
         mv -f ${i} ${TODAY_INCR_LOG}/;
       done
       if [ -d ${LOG_DIR} ]; then
         cd ${LOG_DIR};
         LATEST_LOG=$(ls -t . | grep '[[:digit:]]$\|.partial$'|head -n 1);
+        echo "uploading ${TODAY_INCR_LOG}/${LATEST_LOG}.gz";
         gzip -kqc ${LATEST_LOG} > ${TODAY_INCR_LOG}/${LATEST_LOG}.gz;
       fi
+      echo "done."
+      sync;
 
   type: pitr

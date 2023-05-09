@@ -170,9 +170,6 @@ spec:
                 - path: "leader"
                   fieldRef:
                     fieldPath: metadata.annotations['cs.apps.kubeblocks.io/leader']
-                - path: "component-replicas"
-                  fieldRef:
-                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}

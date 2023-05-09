@@ -451,7 +451,11 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Creating mock pods in StatefulSet")
 		pods := mockPodsForConsensusTest(clusterObj, int(comp.Replicas))
-		for _, pod := range pods {
+		for i, pod := range pods {
+			if i == 0 {
+				By("mocking primary for replication")
+				pods[0].ObjectMeta.Labels[constant.RoleLabelKey] = "primary"
+			}
 			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			// mock the status to pass the isReady(pod) check in consensus_set
 			pod.Status.Conditions = []corev1.PodCondition{{
@@ -460,6 +464,13 @@ var _ = Describe("Cluster Controller", func() {
 			}}
 			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 		}
+
+		//By("ensuring pods created")
+		//Eventually(testapps.GetListLen(&testCtx, generics.PodSignature,
+		//	client.MatchingLabels{
+		//		constant.AppInstanceLabelKey:    clusterKey.Name,
+		//		constant.KBAppComponentLabelKey: comp.Name,
+		//	}, client.InNamespace(clusterKey.Namespace))).Should(Equal(len(pods)))
 
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
 		changeCompReplicas(clusterKey, int32(updatedReplicas), comp)
@@ -995,7 +1006,7 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(pod.Annotations).ShouldNot(BeNil())
 				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*sts.Spec.Replicas))))
 			}
-		}, time.Second*100).Should(Succeed())
+		}).Should(Succeed())
 
 		By("Updating StatefulSet's status")
 		sts.Status.UpdateRevision = "mock-version"

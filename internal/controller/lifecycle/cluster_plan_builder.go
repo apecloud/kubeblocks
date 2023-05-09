@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -270,6 +271,10 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		}
 		// delete secondary objects
 		if _, ok := node.obj.(*appsv1alpha1.Cluster); !ok {
+			// retain backup for data protection even if the cluster is wiped out.
+			if strings.EqualFold(node.obj.GetLabels()[constant.BackupProtectionLabelKey], constant.BackupRetain) {
+				return nil
+			}
 			// check dependency resources has been deleted before deleting the resource
 			err := c.checkDependencyResourcesDeleted(node)
 			if err != nil {

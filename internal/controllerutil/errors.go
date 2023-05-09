@@ -55,6 +55,7 @@ const (
 
 	// ErrorType for cluster controller
 	ErrorTypeBackupFailed ErrorType = "BackupFailed"
+	ErrorTypeNeedWaiting  ErrorType = "NeedWaiting" // waiting for next reconcile
 )
 
 var ErrFailedToAddFinalizer = errors.New("failed to add finalizer")

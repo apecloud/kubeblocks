@@ -104,8 +104,8 @@ data:
     set -o errexit
     set -o nounset
     SHOW_START_TIME=$1
-    LOG_START_TIME=$(pg_waldump $(ls -tr $PGDATA/pg_wal/ | grep '[[:digit:]]$\|.partial$'|head -n 1) --rmgr=Transaction 2>/dev/null |head -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
-    LOG_STOP_TIME=$(pg_waldump $(ls -t $PGDATA/pg_wal/ | grep '[[:digit:]]$\|.partial$'|head -n 1) --rmgr=Transaction 2>/dev/null |tail -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
+    LOG_START_TIME=$(pg_waldump $(ls -Ftr $PGDATA/pg_wal/ | grep '[[:xdigit:]]$\|.partial$'|head -n 1) --rmgr=Transaction 2>/dev/null |head -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
+    LOG_STOP_TIME=$(pg_waldump $(ls -Ft $PGDATA/pg_wal/ | grep '[[:xdigit:]]$\|.partial$'|head -n 1) --rmgr=Transaction 2>/dev/null |tail -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
     LOG_START_TIME=$(date -d "$LOG_START_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
     LOG_STOP_TIME=$(date -d "$LOG_STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
     [[ $SHOW_START_TIME == "false" ]] && printf "{\"stopTime\": \"$LOG_STOP_TIME\"}" || printf "{\"startTime\": \"$LOG_START_TIME\" ,\"stopTime\": \"$LOG_STOP_TIME\"}"

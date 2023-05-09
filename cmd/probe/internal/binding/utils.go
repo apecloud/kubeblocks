@@ -286,7 +286,7 @@ type: Normal
 	}
 
 	event := &corev1.Event{}
-	event, _, err = scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, event)
+	_, _, err = scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, event)
 	if err != nil {
 		return nil, err
 	}

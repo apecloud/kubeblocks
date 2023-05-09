@@ -36,7 +36,7 @@ import (
 func TestInit(t *testing.T) {
 	s := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			w.Write([]byte("leader"))
+			_, _ = w.Write([]byte("leader"))
 		}),
 	)
 	defer s.Close()

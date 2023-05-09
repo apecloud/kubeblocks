@@ -130,7 +130,7 @@ func (h *HTTPCustom) callAction(ctx context.Context, url string) (string, error)
 
 	// parse http response
 	if resp.StatusCode/100 != 2 {
-		err = fmt.Errorf("received status code %d", resp.StatusCode)
+		return "", fmt.Errorf("received status code %d", resp.StatusCode)
 	}
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {

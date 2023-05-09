@@ -185,7 +185,7 @@ func (d *DAG) WalkBFS(walkFunc WalkFunc) error {
 
 		nextStep := make([]Vertex, 0)
 		for _, vertex := range queue {
-			adjs := d.outAdj(vertex)
+			adjs := d.OutAdj(vertex)
 			for _, adj := range adjs {
 				if !walked[adj] {
 					nextStep = append(nextStep, adj)

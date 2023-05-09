@@ -22,7 +22,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/custom"
 	"os"
 	"os/signal"
 	"syscall"
@@ -43,6 +42,7 @@ import (
 	"github.com/dapr/dapr/pkg/runtime"
 	"github.com/dapr/kit/logger"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/custom"
 	dhttp "github.com/dapr/components-contrib/bindings/http"
 	"github.com/dapr/components-contrib/bindings/localstorage"
 	"github.com/dapr/components-contrib/middleware"

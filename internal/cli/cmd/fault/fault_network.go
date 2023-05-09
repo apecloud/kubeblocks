@@ -1,11 +1,26 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package fault
 
 import (
 	"fmt"
-
-	"k8s.io/kubectl/pkg/util/templates"
-
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"github.com/spf13/cobra"
@@ -13,12 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-// TODO: add more examples
 var faultNetWorkExample = templates.Examples(`
 	# Isolate all pods network under the default namespace from the outside world, including the k8s internal network.
 	kbcli fault network partition
@@ -80,38 +96,31 @@ type NetworkChaosOptions struct {
 	// The correlation of loss or corruption or duplication or delay
 	Correlation string `json:"correlation"`
 
-	Rate string `json:"rate,omitempty"`
-
-	Limit uint32 `json:"limit"`
-
-	Buffer uint32 `json:"buffer"`
-
+	// Bandwidth command
+	Rate     string `json:"rate,omitempty"`
+	Limit    uint32 `json:"limit"`
+	Buffer   uint32 `json:"buffer"`
 	Peakrate uint64 `json:"peakrate"`
-
 	Minburst uint32 `json:"minburst"`
 
 	FaultBaseOptions
 
-	create.BaseOptions
+	create.CreateOptions `json:"-"`
 }
 
-func (o *NetworkChaosOptions) createInputs(f cmdutil.Factory, buildFlags func(*cobra.Command), use string, short string, cueTemplateName string) *create.Inputs {
-	return &create.Inputs{
-		Use:             use,
-		Short:           short,
-		Example:         faultNetWorkExample,
-		CueTemplateName: cueTemplateName,
-		Group:           Group,
-		Version:         Version,
-		ResourceName:    ResourceNetworkChaos,
-		BaseOptionsObj:  &o.BaseOptions,
-		Options:         o,
-		Factory:         f,
-		Validate:        o.Validate,
-		Complete:        o.Complete,
-		PreCreate:       o.PreCreate,
-		BuildFlags:      buildFlags,
+func NewNetworkChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, action string) *NetworkChaosOptions {
+	o := &NetworkChaosOptions{
+		CreateOptions: create.CreateOptions{
+			Factory:         f,
+			IOStreams:       streams,
+			CueTemplateName: CueTemplateNetworkChaos,
+			GVR:             GetGVR(Group, Version, ResourceNetworkChaos),
+		},
+		FaultBaseOptions: FaultBaseOptions{Action: action},
 	}
+	o.CreateOptions.PreCreate = o.PreCreate
+	o.CreateOptions.Options = o
+	return o
 }
 
 func NewNetworkChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -131,162 +140,121 @@ func NewNetworkChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 }
 
 func NewPartitionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &NetworkChaosOptions{
-		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.PartitionAction)},
-	}
-	var BuildFlags = func(cmd *cobra.Command) {
-		o.AddCommonFlag(cmd)
+	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.PartitionAction))
 
-		// register flag completion func
-		registerFlagCompletionFunc(cmd, f)
-	}
-	inputs := o.createInputs(
-		f,
-		BuildFlags,
-		Partition,
-		PartitionShort,
-		CueTemplateNetworkChaos,
-	)
+	cmd := o.NewCobraCommand(Partition, PartitionShort)
 
-	return create.BuildCommand(*inputs)
+	o.AddCommonFlag(cmd)
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
+
+	return cmd
 }
 
 func NewLossCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &NetworkChaosOptions{
-		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.LossAction)},
-	}
-	var BuildFlags = func(cmd *cobra.Command) {
-		o.AddCommonFlag(cmd)
-		cmd.Flags().StringVar(&o.Loss, "loss", "", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
-		cmd.Flags().StringVar(&o.Correlation, "correlation", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
+	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.LossAction))
 
-		util.CheckErr(cmd.MarkFlagRequired("loss"))
+	cmd := o.NewCobraCommand(Loss, LossShort)
 
-		// register flag completion func
-		registerFlagCompletionFunc(cmd, f)
-	}
-	inputs := o.createInputs(
-		f,
-		BuildFlags,
-		Loss,
-		LossShort,
-		CueTemplateNetworkChaos,
-	)
+	o.AddCommonFlag(cmd)
+	cmd.Flags().StringVar(&o.Loss, "loss", "", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
+	cmd.Flags().StringVarP(&o.Correlation, "correlation", "c", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
 
-	return create.BuildCommand(*inputs)
+	util.CheckErr(cmd.MarkFlagRequired("loss"))
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
+
+	return cmd
 }
 
 func NewDelayCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &NetworkChaosOptions{
-		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.DelayAction)},
-	}
-	var BuildFlags = func(cmd *cobra.Command) {
-		o.AddCommonFlag(cmd)
-		cmd.Flags().StringVar(&o.Latency, "latency", "", `the length of time to delay.`)
-		cmd.Flags().StringVar(&o.Jitter, "jitter", "0ms", `the variation range of the delay time.`)
-		cmd.Flags().StringVar(&o.Correlation, "correlation", "0", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
+	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.DelayAction))
 
-		util.CheckErr(cmd.MarkFlagRequired("latency"))
+	cmd := o.NewCobraCommand(Delay, DelayShort)
 
-		// register flag completion func
-		registerFlagCompletionFunc(cmd, f)
-	}
-	inputs := o.createInputs(
-		f,
-		BuildFlags,
-		Delay,
-		DelayShort,
-		CueTemplateNetworkChaos,
-	)
+	o.AddCommonFlag(cmd)
+	cmd.Flags().StringVar(&o.Latency, "latency", "", `the length of time to delay.`)
+	cmd.Flags().StringVar(&o.Jitter, "jitter", "0ms", `the variation range of the delay time.`)
+	cmd.Flags().StringVarP(&o.Correlation, "correlation", "c", "0", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
 
-	return create.BuildCommand(*inputs)
+	util.CheckErr(cmd.MarkFlagRequired("latency"))
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
+
+	return cmd
 }
 
 func NewDuplicateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &NetworkChaosOptions{
-		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.DuplicateAction)},
-	}
-	var BuildFlags = func(cmd *cobra.Command) {
-		o.AddCommonFlag(cmd)
-		cmd.Flags().StringVar(&o.Duplicate, "duplicate", "", `the probability of a packet being repeated. Value range: [0, 100].`)
-		cmd.Flags().StringVar(&o.Correlation, "correlation", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
+	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.DuplicateAction))
 
-		util.CheckErr(cmd.MarkFlagRequired("duplicate"))
+	cmd := o.NewCobraCommand(Duplicate, DuplicateShort)
 
-		// register flag completion func
-		registerFlagCompletionFunc(cmd, f)
-	}
-	inputs := o.createInputs(
-		f,
-		BuildFlags,
-		Duplicate,
-		DuplicateShort,
-		CueTemplateNetworkChaos,
-	)
+	o.AddCommonFlag(cmd)
+	cmd.Flags().StringVar(&o.Duplicate, "duplicate", "", `the probability of a packet being repeated. Value range: [0, 100].`)
+	cmd.Flags().StringVarP(&o.Correlation, "correlation", "c", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
 
-	return create.BuildCommand(*inputs)
+	util.CheckErr(cmd.MarkFlagRequired("duplicate"))
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
+
+	return cmd
 }
 
 func NewCorruptCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &NetworkChaosOptions{
-		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.CorruptAction)},
-	}
-	var BuildFlags = func(cmd *cobra.Command) {
-		o.AddCommonFlag(cmd)
-		cmd.Flags().StringVar(&o.Corrupt, "corrupt", "", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
-		cmd.Flags().StringVar(&o.Correlation, "correlation", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
+	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.CorruptAction))
 
-		util.CheckErr(cmd.MarkFlagRequired("corrupt"))
+	cmd := o.NewCobraCommand(Corrupt, CorruptShort)
 
-		// register flag completion func
-		registerFlagCompletionFunc(cmd, f)
-	}
-	inputs := o.createInputs(
-		f,
-		BuildFlags,
-		Corrupt,
-		CorruptShort,
-		CueTemplateNetworkChaos,
-	)
+	o.AddCommonFlag(cmd)
+	cmd.Flags().StringVar(&o.Corrupt, "corrupt", "", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
+	cmd.Flags().StringVarP(&o.Correlation, "correlation", "c", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
 
-	return create.BuildCommand(*inputs)
+	util.CheckErr(cmd.MarkFlagRequired("corrupt"))
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
+
+	return cmd
 }
 
-// NewBandwidthCmd TODO
 func NewBandwidthCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &NetworkChaosOptions{
-		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.BandwidthAction)},
+	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.BandwidthAction))
+
+	cmd := o.NewCobraCommand(Bandwidth, BandwidthShort)
+
+	o.AddCommonFlag(cmd)
+
+	cmd.Flags().StringVar(&o.Rate, "rate", "", `the rate at which the bandwidth is limited. For example : 10 bps/kbps/mbps/gbps.`)
+	cmd.Flags().Uint32Var(&o.Limit, "limit", 1, `the number of bytes waiting in the queue.`)
+	cmd.Flags().Uint32Var(&o.Buffer, "buffer", 1, `the maximum number of bytes that can be sent instantaneously.`)
+	cmd.Flags().Uint64Var(&o.Peakrate, "peakrate", 0, `the maximum consumption rate of the bucket.`)
+	cmd.Flags().Uint32Var(&o.Minburst, "minburst", 0, `the size of the peakrate bucket.`)
+
+	util.CheckErr(cmd.MarkFlagRequired("rate"))
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
+
+	return cmd
+}
+
+func (o *NetworkChaosOptions) NewCobraCommand(use, short string) *cobra.Command {
+	return &cobra.Command{
+		Use:     use,
+		Short:   short,
+		Example: faultNetWorkExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Args = args
+			cmdutil.CheckErr(o.CreateOptions.Complete())
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Run())
+		},
 	}
-
-	var BuildFlags = func(cmd *cobra.Command) {
-		o.AddCommonFlag(cmd)
-
-		cmd.Flags().StringVar(&o.Rate, "rate", "", `the rate at which the bandwidth is limited. For example : 10 bps/kbps/mbps/gbps.`)
-		cmd.Flags().Uint32Var(&o.Limit, "limit", 1, `the number of bytes waiting in the queue.`)
-		cmd.Flags().Uint32Var(&o.Buffer, "buffer", 1, `the maximum number of bytes that can be sent instantaneously.`)
-		cmd.Flags().Uint64Var(&o.Peakrate, "peakrate", 0, `the maximum consumption rate of the bucket.`)
-		cmd.Flags().Uint32Var(&o.Minburst, "minburst", 0, `the size of the peakrate bucket.`)
-
-		util.CheckErr(cmd.MarkFlagRequired("rate"))
-
-		// register flag completion func
-		registerFlagCompletionFunc(cmd, f)
-	}
-	inputs := o.createInputs(
-		f,
-		BuildFlags,
-		Bandwidth,
-		BandwidthShort,
-		CueTemplateNetworkChaos,
-	)
-
-	return create.BuildCommand(*inputs)
 }
 
 func (o *NetworkChaosOptions) AddCommonFlag(cmd *cobra.Command) {
@@ -298,13 +266,13 @@ func (o *NetworkChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringArrayVar(&o.NamespaceSelector, "namespace-selector", []string{"default"}, `Specifies the namespace into which you want to inject faults.`)
 
 	cmd.Flags().StringVar(&o.Direction, "direction", "to", `You can select "to"" or "from"" or "both"".`)
-	cmd.Flags().StringArrayVar(&o.ExternalTargets, "external-targets", nil, "a network target outside of Kubernetes, which can be an IPv4 address or a domain name,\n\t such as \"www.baidu.com\". Only works with direction: to.")
+	cmd.Flags().StringArrayVarP(&o.ExternalTargets, "external-targets", "e", nil, "a network target outside of Kubernetes, which can be an IPv4 address or a domain name,\n\t such as \"www.baidu.com\". Only works with direction: to.")
 	cmd.Flags().StringVar(&o.TargetMode, "target-mode", "all", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
 	cmd.Flags().StringVar(&o.TargetValue, "target-value", "", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
 	cmd.Flags().StringToStringVar(&o.TargetLabel, "target-label", nil, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
 	cmd.Flags().StringVar(&o.TargetNamespaceSelector, "target-namespace-selector", "default", `Specifies the namespace into which you want to inject faults.`)
 
-	cmd.Flags().StringVar(&o.DryRunStrategy, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
 
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
@@ -315,7 +283,7 @@ func (o *NetworkChaosOptions) Validate() error {
 		return fmt.Errorf("you must use --value to specify an integer")
 	}
 
-	if ok, err := IsInteger(o.TargetValue); o.TargetValue != "" && !ok {
+	if ok, err := IsInteger(o.TargetValue); !ok {
 		return err
 	}
 

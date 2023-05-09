@@ -1,9 +1,30 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package fault
 
+// Unchanged DryRun flag
 const (
 	Unchanged = "unchanged"
 )
 
+// GVR
 const (
 	Group   = "chaos-mesh.org"
 	Version = "v1alpha1"
@@ -16,15 +37,17 @@ const (
 	ResourceTimeChaos    = "timechaos"
 )
 
+// Cue Template Name
 const (
-	CueTemplatePodChaos     = "podChaos_template.cue"
-	CueTemplateNetworkChaos = "networkChaos_template.cue"
-	CueTemplateIOChaos      = "IOChaos_template.cue"
-	CueTemplateStressChaos  = "stressChaos_template.cue"
-	CueTemplateDNSChaos     = "DNSChaos_template.cue"
-	CueTemplateTimeChaos    = "timeChaos_template.cue"
+	CueTemplatePodChaos     = "pod_chaos_template.cue"
+	CueTemplateNetworkChaos = "network_chaos_template.cue"
+	CueTemplateIOChaos      = "io_chaos_template.cue"
+	CueTemplateStressChaos  = "stress_chaos_template.cue"
+	CueTemplateDNSChaos     = "dns_chaos_template.cue"
+	CueTemplateTimeChaos    = "time_chaos_template.cue"
 )
 
+// Pod Chaos Command
 const (
 	Kill               = "kill"
 	KillShort          = "kill pod"
@@ -34,7 +57,7 @@ const (
 	KillContainerShort = "kill containers"
 )
 
-// NetWorkChaos Command
+// NetWork Chaos Command
 const (
 	Partition      = "partition"
 	PartitionShort = "Make a pod network partitioned from other objects."
@@ -50,6 +73,7 @@ const (
 	BandwidthShort = "Limit the bandwidth that pods use to communicate with other objects."
 )
 
+// DNS Chaos Command
 const (
 	Random      = "random"
 	RandomShort = "Make DNS return any IP when resolving external domain names."
@@ -57,6 +81,7 @@ const (
 	ErrorShort  = "Make DNS return an error when resolving external domain names."
 )
 
+// Network Chaos Command
 const (
 	Latency        = "latency"
 	LatencyShort   = "delayed IO operations."
@@ -68,11 +93,13 @@ const (
 	MistakeShort   = "Alters the contents of the file, distorting the contents of the file."
 )
 
+// Stress Chaos Command
 const (
 	Stress      = "stress"
 	StressShort = "Add memory pressure or CPU load to the system."
 )
 
+// Time Chaos Command
 const (
 	Time      = "time"
 	TimeShort = "Clock skew failure."

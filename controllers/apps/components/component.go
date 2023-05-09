@@ -21,11 +21,9 @@ package components
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"golang.org/x/exp/slices"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -182,37 +180,6 @@ func patchWorkloadCustomLabel(
 			if err := util.PatchGVRCustomLabels(ctx, cli, cluster, resource, componentSpec.Name, customLabelSpec.Key, customLabelSpec.Value); err != nil {
 				return err
 			}
-		}
-	}
-	return nil
-}
-
-func updateComponentInfoToPods(
-	ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	componentSpec *appsv1alpha1.ClusterComponentSpec) error {
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey:    cluster.GetName(),
-		constant.KBAppComponentLabelKey: componentSpec.Name,
-	}
-	podList := corev1.PodList{}
-	if err := cli.List(ctx, &podList, ml); err != nil {
-		return err
-	}
-	replicasStr := strconv.Itoa(int(componentSpec.Replicas))
-	for _, pod := range podList.Items {
-		if pod.Annotations != nil &&
-			pod.Annotations[constant.ComponentReplicasAnnotationKey] == replicasStr {
-			continue
-		}
-		patch := client.MergeFrom(pod.DeepCopy())
-		if pod.Annotations == nil {
-			pod.Annotations = make(map[string]string)
-		}
-		pod.Annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
-		if err := cli.Patch(ctx, &pod, patch); err != nil {
-			return err
 		}
 	}
 	return nil

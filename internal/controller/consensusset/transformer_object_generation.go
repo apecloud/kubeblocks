@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package consensusset
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -229,27 +230,55 @@ func buildPodTemplate(csSet workloads.ConsensusSet) *corev1.PodTemplateSpec {
 
 func injectRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec) {
 	roleObservation := csSet.Spec.RoleObservation
-	switch {
-	case roleObservation.Custom == nil:
-		injectBuiltInRoleObservationContainer(csSet, template)
-	case roleObservation.BuiltIn == nil:
-		injectCustomRoleObservationContainer(csSet, template)
-	default:
-		injectBuiltInRoleObservationContainer(csSet, template)
-		injectCustomRoleObservationContainer(csSet, template)
+	bindingType := customBinding
+	if roleObservation.BuiltIn != nil {
+		bindingType = roleObservation.BuiltIn.BindingType
+		if roleObservation.BuiltIn.BindingType == workloads.ApeCloudMySQLBinding {
+			bindingType = mySQLBinding
+		}
 	}
+	actionSvcPorts := make([]int32, 0)
+	if bindingType == customBinding && roleObservation.Custom != nil {
+		allUsedPorts := findAllUsedPorts(template)
+		svcPort := actionSvcPortBase
+		for _, _ = range roleObservation.Custom.Actions {
+			svcPort = findNextAvailablePort(svcPort, allUsedPorts)
+			actionSvcPorts = append(actionSvcPorts, svcPort)
+		}
+		injectCustomRoleObservationContainer(csSet, template, actionSvcPorts)
+	}
+	actionSvcList, _ := json.Marshal(actionSvcPorts)
+	injectProbeContainer(csSet, template, bindingType, string(actionSvcList))
 }
 
-func injectBuiltInRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec) {
-	roleObservation := csSet.Spec.RoleObservation
-	bindingType := strings.ToLower(string(roleObservation.BuiltIn.BindingType))
-	if roleObservation.BuiltIn.BindingType == workloads.ApeCloudMySQLBinding {
-		bindingType = "mysql"
+func findNextAvailablePort(base int32, allUsedPorts []int32) int32 {
+	for port := base + 1; port < 65535; port++ {
+		available := true
+		for _, usedPort := range allUsedPorts {
+			if port == usedPort {
+				available = false
+				break
+			}
+		}
+		if available {
+			return port
+		}
 	}
-	injectProbeContainer(csSet, template, bindingType)
+	return 0
 }
 
-func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, bindingType string) {
+func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
+	allUsedPorts := make([]int32, 0)
+	for _, container := range template.Spec.Containers {
+		for _, port := range container.Ports {
+			allUsedPorts = append(allUsedPorts, port.ContainerPort)
+			allUsedPorts = append(allUsedPorts, port.HostPort)
+		}
+	}
+	return allUsedPorts
+}
+
+func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, bindingType workloads.BindingType, actionSvcList string) {
 	// compute parameters for role observation container
 	roleObservation := csSet.Spec.RoleObservation
 	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
@@ -273,6 +302,10 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 				Name:      passwordCredentialVarName,
 				Value:     roleObservation.Credential.Password.Value,
 				ValueFrom: roleObservation.Credential.Password.ValueFrom,
+			},
+			corev1.EnvVar{
+				Name:  actionSvcListVarName,
+				Value: actionSvcList,
 			},
 			// for compatibility with old probe env var names
 			corev1.EnvVar{
@@ -354,19 +387,15 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 	template.Spec.Containers = append(template.Spec.Containers, container)
 }
 
-func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec) {
+func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32) {
 	// TODO(free6om): implementation
 	// 1. shell2http image
 	// 2. probe http binding
 	// 3. init container & action container; shared volume; copy shell2http binary & injection
 
-	// inject probe container
-	bindingType := "custom"
-	injectProbeContainer(csSet, template, bindingType)
-
 	// inject shared volume
 	agentVolume := corev1.Volume{
-		Name: "role-agent",
+		Name: roleAgentVolumeName,
 		VolumeSource: corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
@@ -375,17 +404,19 @@ func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template
 
 	// inject init container
 	agentVolumeMount := corev1.VolumeMount{
-		Name:      "role-agent",
-		MountPath: "/role-observation",
+		Name:      roleAgentVolumeName,
+		MountPath: roleAgentVolumeMountPath,
 	}
+	agentPath := strings.Join([]string{roleAgentVolumeMountPath, roleAgentName}, "/")
 	initContainer := corev1.Container{
-		Name:            "role-agent-installer",
-		Image:           "msoap/shell2http:1.16.0",
+		Name:            roleAgentInstallerName,
+		Image:           shell2httpImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		VolumeMounts:    []corev1.VolumeMount{agentVolumeMount},
 		Command: []string{
 			"cp",
-			"/app/shell2http", "/role-observation/agent",
+			shell2httpBinaryPath,
+			agentPath,
 		},
 	}
 	template.Spec.InitContainers = append(template.Spec.InitContainers, initContainer)
@@ -397,9 +428,10 @@ func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template
 		action.Container.VolumeMounts = append(action.Container.VolumeMounts, agentVolumeMount)
 
 		// inject agent start cmd to container command
-		command := []string {
-			"/role-observation/agent",
-			"/mysql", "\"mysql\"",
+		command := []string{
+			agentPath,
+			shell2httpServePath,
+			strings.Join(action.Command, " "),
 		}
 		action.Container.Command = command
 

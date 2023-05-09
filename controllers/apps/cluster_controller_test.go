@@ -28,6 +28,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -411,6 +413,7 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      stsName + "-" + strconv.Itoa(i),
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
+						constant.AppManagedByLabelKey:         constant.AppName,
 						constant.AppInstanceLabelKey:          clusterName,
 						constant.KBAppComponentLabelKey:       componentName,
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
@@ -946,9 +949,10 @@ var _ = Describe("Cluster Controller", func() {
 			sts = &stsList.Items[0]
 		}).Should(Succeed())
 
-		By("Creating mock pods in StatefulSet")
+		By("Creating mock pods in StatefulSet, and set controller reference")
 		pods := mockPodsForConsensusTest(clusterObj, replicas)
 		for _, pod := range pods {
+			Expect(controllerutil.SetControllerReference(sts, &pod, scheme.Scheme)).Should(Succeed())
 			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			// mock the status to pass the isReady(pod) check in consensus_set
 			pod.Status.Conditions = []corev1.PodCondition{{

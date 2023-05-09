@@ -237,6 +237,20 @@ func injectRoleObservationContainer(csSet workloads.ConsensusSet, template *core
 			bindingType = mySQLBinding
 		}
 	}
+	credentialEnv := make([]corev1.EnvVar, 0)
+	if roleObservation.Credential != nil {
+		credentialEnv = append(credentialEnv,
+			corev1.EnvVar{
+				Name:      usernameCredentialVarName,
+				Value:     roleObservation.Credential.Username.Value,
+				ValueFrom: roleObservation.Credential.Username.ValueFrom,
+			},
+			corev1.EnvVar{
+				Name:      passwordCredentialVarName,
+				Value:     roleObservation.Credential.Password.Value,
+				ValueFrom: roleObservation.Credential.Password.ValueFrom,
+			})
+	}
 	actionSvcPorts := make([]int32, 0)
 	if bindingType == customBinding && roleObservation.Custom != nil {
 		allUsedPorts := findAllUsedPorts(template)
@@ -245,10 +259,10 @@ func injectRoleObservationContainer(csSet workloads.ConsensusSet, template *core
 			svcPort = findNextAvailablePort(svcPort, allUsedPorts)
 			actionSvcPorts = append(actionSvcPorts, svcPort)
 		}
-		injectCustomRoleObservationContainer(csSet, template, actionSvcPorts)
+		injectCustomRoleObservationContainer(csSet, template, actionSvcPorts, credentialEnv)
 	}
 	actionSvcList, _ := json.Marshal(actionSvcPorts)
-	injectProbeContainer(csSet, template, bindingType, string(actionSvcList))
+	injectProbeContainer(csSet, template, bindingType, string(actionSvcList), credentialEnv)
 }
 
 func findNextAvailablePort(base int32, allUsedPorts []int32) int32 {
@@ -278,7 +292,7 @@ func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
 	return allUsedPorts
 }
 
-func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, bindingType workloads.BindingType, actionSvcList string) {
+func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, bindingType workloads.BindingType, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role observation container
 	roleObservation := csSet.Spec.RoleObservation
 	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
@@ -290,24 +304,15 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 		observationDaemonPort = defaultRoleObservationDaemonPort
 	}
 	roleObserveURI := fmt.Sprintf(roleObservationURIFormat, strconv.Itoa(observationDaemonPort), bindingType)
-	env := make([]corev1.EnvVar, 0)
+	env := credentialEnv
+	env = append(env,
+		corev1.EnvVar{
+			Name:  actionSvcListVarName,
+			Value: actionSvcList,
+		})
 	if roleObservation.Credential != nil {
+		// for compatibility with old probe env var names
 		env = append(env,
-			corev1.EnvVar{
-				Name:      usernameCredentialVarName,
-				Value:     roleObservation.Credential.Username.Value,
-				ValueFrom: roleObservation.Credential.Username.ValueFrom,
-			},
-			corev1.EnvVar{
-				Name:      passwordCredentialVarName,
-				Value:     roleObservation.Credential.Password.Value,
-				ValueFrom: roleObservation.Credential.Password.ValueFrom,
-			},
-			corev1.EnvVar{
-				Name:  actionSvcListVarName,
-				Value: actionSvcList,
-			},
-			// for compatibility with old probe env var names
 			corev1.EnvVar{
 				Name:      "KB_SERVICE_USER",
 				Value:     roleObservation.Credential.Username.Value,
@@ -387,7 +392,7 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 	template.Spec.Containers = append(template.Spec.Containers, container)
 }
 
-func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32) {
+func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
 	// TODO(free6om): implementation
 	// 1. shell2http image
 	// 2. probe http binding
@@ -438,6 +443,7 @@ func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template
 			Image:           image,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			VolumeMounts:    []corev1.VolumeMount{agentVolumeMount},
+			Env:             credentialEnv,
 			Command:         command,
 		}
 		template.Spec.Containers = append(template.Spec.Containers, container)

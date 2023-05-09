@@ -241,6 +241,15 @@ func injectRoleObservationContainer(csSet workloads.ConsensusSet, template *core
 }
 
 func injectBuiltInRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec) {
+	roleObservation := csSet.Spec.RoleObservation
+	bindingType := strings.ToLower(string(roleObservation.BuiltIn.BindingType))
+	if roleObservation.BuiltIn.BindingType == workloads.ApeCloudMySQLBinding {
+		bindingType = "mysql"
+	}
+	injectProbeContainer(csSet, template, bindingType)
+}
+
+func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, bindingType string) {
 	// compute parameters for role observation container
 	roleObservation := csSet.Spec.RoleObservation
 	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
@@ -250,10 +259,6 @@ func injectBuiltInRoleObservationContainer(csSet workloads.ConsensusSet, templat
 	observationDaemonPort := viper.GetInt("ROLE_OBSERVATION_SERVICE_PORT")
 	if observationDaemonPort == 0 {
 		observationDaemonPort = defaultBuiltInRoleObservationDaemonPort
-	}
-	bindingType := strings.ToLower(string(roleObservation.BuiltIn.BindingType))
-	if roleObservation.BuiltIn.BindingType == workloads.ApeCloudMySQLBinding {
-		bindingType = "mysql"
 	}
 	roleObserveURI := fmt.Sprintf(roleObservationURIFormat, strconv.Itoa(observationDaemonPort), bindingType)
 	env := make([]corev1.EnvVar, 0)
@@ -351,6 +356,56 @@ func injectBuiltInRoleObservationContainer(csSet workloads.ConsensusSet, templat
 
 func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec) {
 	// TODO(free6om): implementation
+	// 1. shell2http image
+	// 2. probe http binding
+	// 3. init container & action container; shared volume; copy shell2http binary & injection
+
+	// inject probe container
+	bindingType := "custom"
+	injectProbeContainer(csSet, template, bindingType)
+
+	// inject shared volume
+	agentVolume := corev1.Volume{
+		Name: "role-agent",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+	template.Spec.Volumes = append(template.Spec.Volumes, agentVolume)
+
+	// inject init container
+	agentVolumeMount := corev1.VolumeMount{
+		Name:      "role-agent",
+		MountPath: "/role-observation",
+	}
+	initContainer := corev1.Container{
+		Name:            "role-agent-installer",
+		Image:           "msoap/shell2http:1.16.0",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		VolumeMounts:    []corev1.VolumeMount{agentVolumeMount},
+		Command: []string{
+			"cp",
+			"/app/shell2http", "/role-observation/agent",
+		},
+	}
+	template.Spec.InitContainers = append(template.Spec.InitContainers, initContainer)
+
+	// mount agent volume to all utility containers
+	for _, action := range csSet.Spec.RoleObservation.Custom.Actions {
+		// inject volumeMount
+		// TODO(free6om): handle nil container
+		action.Container.VolumeMounts = append(action.Container.VolumeMounts, agentVolumeMount)
+
+		// inject agent start cmd to container command
+		command := []string {
+			"/role-observation/agent",
+			"/mysql", "\"mysql\"",
+		}
+		action.Container.Command = command
+
+		// inject action containers into template
+		template.Spec.Containers = append(template.Spec.Containers, *action.Container)
+	}
 }
 
 func getHeadlessSvcName(set workloads.ConsensusSet) string {

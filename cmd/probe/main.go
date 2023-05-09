@@ -22,6 +22,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/custom"
 	"os"
 	"os/signal"
 	"syscall"
@@ -69,6 +70,7 @@ func init() {
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mongodb.NewMongoDB, "mongodb")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(redis.NewRedis, "redis")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(postgres.NewPostgres, "postgres")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(custom.NewHTTP, "custom")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
 	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")

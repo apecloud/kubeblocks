@@ -2,9 +2,8 @@ package clusterdefinition
 
 import (
 	"bytes"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"net/http"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/cobra"
@@ -15,7 +14,10 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
-	"net/http"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("clusterdefinition list components", func() {
@@ -23,33 +25,13 @@ var _ = Describe("clusterdefinition list components", func() {
 		cmd     *cobra.Command
 		streams genericclioptions.IOStreams
 		out     *bytes.Buffer
-		//errout  *bytes.Buffer
-		tf *cmdtesting.TestFactory
+		tf      *cmdtesting.TestFactory
 	)
 
 	const (
 		namespace             = testing.Namespace
 		clusterdefinitionName = testing.ClusterDefName
 	)
-
-	//buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	//	o := list.NewListOptions(f, streams, types.ClusterDefGVR())
-	//	cmd := &cobra.Command{
-	//		Use:               "list-components-test",
-	//		Short:             "List cluster definition components test.",
-	//		Example:           listComponentsExample,
-	//		Aliases:           []string{"ls-components"},
-	//		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
-	//		Run: func(cmd *cobra.Command, args []string) {
-	//			util.CheckErr(validate(args))
-	//			o.Names = args
-	//			util.CheckErr(run(o))
-	//		},
-	//	}
-	//	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	//	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
-	//	return cmd
-	//}
 
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
 		tf := testing.NewTestFactory(namespace)
@@ -61,7 +43,6 @@ var _ = Describe("clusterdefinition list components", func() {
 		}
 		tf.Client = tf.UnstructuredClient
 		tf.FakeDynamicClient = testing.FakeDynamicClient(data)
-
 		return tf
 	}
 

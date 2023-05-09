@@ -68,13 +68,16 @@ func run(o *list.ListOptions) error {
 		return err
 	}
 	if len(infos) == 0 {
-		return fmt.Errorf("No clusterdefinition %s found", o.Names[0])
+		return fmt.Errorf("no clusterdefinition %s found", o.Names[0])
 	}
 	p := printer.NewTablePrinter(o.Out)
 	p.SetHeader(componentsTableHeader...)
 	for _, info := range infos {
 		var cd v1alpha1.ClusterDefinition
-		runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd)
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd)
+		if err != nil {
+			return err
+		}
 		for _, comp := range cd.Spec.ComponentDefs {
 			row := make([]interface{}, len(componentsTableHeader))
 			row[0] = comp.Name

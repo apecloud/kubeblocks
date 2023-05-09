@@ -220,34 +220,3 @@ func updateComponentInfoToPods(
 	}
 	return nil
 }
-
-func updateComponentInfoToPods(
-	ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	componentSpec *appsv1alpha1.ClusterComponentSpec) error {
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey:    cluster.GetName(),
-		constant.KBAppComponentLabelKey: componentSpec.Name,
-	}
-	podList := corev1.PodList{}
-	if err := cli.List(ctx, &podList, ml); err != nil {
-		return err
-	}
-	replicasStr := strconv.Itoa(int(componentSpec.Replicas))
-	for _, pod := range podList.Items {
-		if pod.Annotations != nil &&
-			pod.Annotations[constant.ComponentReplicasAnnotationKey] == replicasStr {
-			continue
-		}
-		patch := client.MergeFrom(pod.DeepCopy())
-		if pod.Annotations == nil {
-			pod.Annotations = make(map[string]string)
-		}
-		pod.Annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
-		if err := cli.Patch(ctx, &pod, patch); err != nil {
-			return err
-		}
-	}
-	return nil
-}

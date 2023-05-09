@@ -26,7 +26,6 @@ import (
 
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -68,50 +67,52 @@ type CreateMigrationOptions struct {
 	Resources            []string                 `json:"resources,omitempty"`
 	ResourceModel        map[string]interface{}   `json:"resourceModel,omitempty"`
 	ServerID             uint32                   `json:"serverId,omitempty"`
-	create.BaseOptions
+	create.CreateOptions `json:"-"`
 }
 
 func NewMigrationCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &CreateMigrationOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
-	inputs := create.Inputs{
-		Use:                          "create name",
-		Short:                        "Create a migration task.",
-		Example:                      CreateTemplate,
-		CueTemplateName:              "migration_template.cue",
-		ResourceName:                 types.ResourceMigrationTasks,
-		Group:                        types.MigrationAPIGroup,
-		Version:                      types.MigrationAPIVersion,
-		BaseOptionsObj:               &o.BaseOptions,
-		Options:                      o,
-		Factory:                      f,
-		Validate:                     o.Validate,
-		ResourceNameGVRForCompletion: types.MigrationTaskGVR(),
-		BuildFlags: func(cmd *cobra.Command) {
-			cmd.Flags().StringVar(&o.Template, "template", "", "Specify migration template, run \"kbcli migration templates\" to show all available migration templates")
-			cmd.Flags().StringVar(&o.Source, "source", "", "Set the source database information for migration.such as '{username}:{password}@{connection_address}:{connection_port}/[{database}]'")
-			cmd.Flags().StringVar(&o.Sink, "sink", "", "Set the sink database information for migration.such as '{username}:{password}@{connection_address}:{connection_port}/[{database}]")
-			cmd.Flags().StringSliceVar(&o.MigrationObject, "migration-object", []string{}, "Set the data objects that need to be migrated,such as '\"db1.table1\",\"db2\"'")
-			cmd.Flags().StringSliceVar(&o.Steps, "steps", []string{}, "Set up migration steps,such as: precheck=true,init-struct=true,init-data=true,cdc=true")
-			cmd.Flags().StringSliceVar(&o.Tolerations, "tolerations", []string{}, "Tolerations for migration, such as '\"key=engineType,value=pg,operator=Equal,effect=NoSchedule\"'")
-			cmd.Flags().StringSliceVar(&o.Resources, "resources", []string{}, "Resources limit for migration, such as '\"cpu=3000m,memory=3Gi\"'")
+	o := &CreateMigrationOptions{
+		CreateOptions: create.CreateOptions{
+			Factory:         f,
+			IOStreams:       streams,
+			CueTemplateName: "migration_template.cue",
+			GVR:             types.MigrationTaskGVR(),
+		}}
+	o.CreateOptions.Options = o
 
-			util.CheckErr(cmd.MarkFlagRequired("template"))
-			util.CheckErr(cmd.MarkFlagRequired("source"))
-			util.CheckErr(cmd.MarkFlagRequired("sink"))
-			util.CheckErr(cmd.MarkFlagRequired("migration-object"))
+	cmd := &cobra.Command{
+		Use:               "create NAME",
+		Short:             "Create a migration task.",
+		Example:           CreateTemplate,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.MigrationTaskGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Args = args
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
-	return create.BuildCommand(inputs)
+
+	cmd.Flags().StringVar(&o.Template, "template", "", "Specify migration template, run \"kbcli migration templates\" to show all available migration templates")
+	cmd.Flags().StringVar(&o.Source, "source", "", "Set the source database information for migration.such as '{username}:{password}@{connection_address}:{connection_port}/[{database}]'")
+	cmd.Flags().StringVar(&o.Sink, "sink", "", "Set the sink database information for migration.such as '{username}:{password}@{connection_address}:{connection_port}/[{database}]")
+	cmd.Flags().StringSliceVar(&o.MigrationObject, "migration-object", []string{}, "Set the data objects that need to be migrated,such as '\"db1.table1\",\"db2\"'")
+	cmd.Flags().StringSliceVar(&o.Steps, "steps", []string{}, "Set up migration steps,such as: precheck=true,init-struct=true,init-data=true,cdc=true")
+	cmd.Flags().StringSliceVar(&o.Tolerations, "tolerations", []string{}, "Tolerations for migration, such as '\"key=engineType,value=pg,operator=Equal,effect=NoSchedule\"'")
+	cmd.Flags().StringSliceVar(&o.Resources, "resources", []string{}, "Resources limit for migration, such as '\"cpu=3000m,memory=3Gi\"'")
+
+	util.CheckErr(cmd.MarkFlagRequired("template"))
+	util.CheckErr(cmd.MarkFlagRequired("source"))
+	util.CheckErr(cmd.MarkFlagRequired("sink"))
+	util.CheckErr(cmd.MarkFlagRequired("migration-object"))
+	return cmd
 }
 
 func (o *CreateMigrationOptions) Validate() error {
 	var err error
 
-	_, err = IsMigrationCrdValidWithDynamic(&o.Dynamic)
-	if errors.IsNotFound(err) {
-		return fmt.Errorf("datamigration crd is not install")
-	} else if err != nil {
-		return err
+	if _, err = IsMigrationCrdValidWithDynamic(&o.Dynamic); err != nil {
+		PrintCrdInvalidError(err)
 	}
 
 	if o.Template == "" {
@@ -248,7 +249,7 @@ func (o *CreateMigrationOptions) BuildWithResources() error {
 func (o *CreateMigrationOptions) BuildWithRuntimeParams() error {
 	template := migrationv1.MigrationTemplate{}
 	templateGvr := types.MigrationTemplateGVR()
-	if err := APIResource(&o.BaseOptions.Dynamic, &templateGvr, o.Template, "", &template); err != nil {
+	if err := APIResource(&o.CreateOptions.Dynamic, &templateGvr, o.Template, "", &template); err != nil {
 		return err
 	}
 

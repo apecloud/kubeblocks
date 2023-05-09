@@ -80,9 +80,12 @@ var (
 		types.ServiceGVR(),
 	}
 
-	kubeBlocksRBAC = []schema.GroupVersionResource{
+	kubeBlocksClusterRBAC = []schema.GroupVersionResource{
 		types.ClusterRoleGVR(),
 		types.ClusterRoleBindingGVR(),
+	}
+
+	kubeBlocksNamespacedRBAC = []schema.GroupVersionResource{
 		types.RoleGVR(),
 		types.RoleBindingGVR(),
 		types.ServiceAccountGVR(),
@@ -96,6 +99,7 @@ var (
 		types.ConfigmapGVR(),
 		types.SecretGVR(),
 	}
+	notAvailable = "N/A"
 )
 
 type statusOptions struct {
@@ -205,9 +209,17 @@ func (o *statusOptions) buildSelectorList(ctx context.Context, allErrs *[]error)
 func (o *statusOptions) showAddons() {
 	fmt.Fprintln(o.Out, "\nKubeBlocks Addons:")
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAME", "STATUS", "TYPE")
+	tbl.SetHeader("NAME", "STATUS", "TYPE", "PROVIDER")
+
+	var provider string
+	var ok bool
 	for _, addon := range o.addons {
-		tbl.AddRow(addon.Name, addon.Status.Phase, addon.Spec.Type)
+		if addon.Labels == nil {
+			provider = notAvailable
+		} else if provider, ok = addon.Labels[constant.AddonProviderLableKey]; !ok {
+			provider = notAvailable
+		}
+		tbl.AddRow(addon.Name, addon.Status.Phase, addon.Spec.Type, provider)
 	}
 	tbl.Print()
 }
@@ -240,15 +252,28 @@ func (o *statusOptions) showKubeBlocksConfig(ctx context.Context, allErrs *[]err
 }
 
 func (o *statusOptions) showKubeBlocksRBAC(ctx context.Context, allErrs *[]error) {
-	fmt.Fprintln(o.Out, "\nKubeBlocks RBAC:")
+	fmt.Fprintln(o.Out, "\nKubeBlocks Global RBAC:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("KIND", "NAME")
+	unstructuredList := listResourceByGVR(ctx, o.dynamic, metav1.NamespaceAll, kubeBlocksClusterRBAC, selectorList, allErrs)
+	for _, resourceList := range unstructuredList {
+		for _, resource := range resourceList.Items {
+			tblPrinter.AddRow(resource.GetKind(), resource.GetName())
+		}
+	}
+
+	tblPrinter.Print()
+
+	fmt.Fprintln(o.Out, "\nKubeBlocks Namespaced RBAC:")
+	tblPrinter = printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME")
-	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksRBAC, selectorList, allErrs)
+	unstructuredList = listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksNamespacedRBAC, selectorList, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			tblPrinter.AddRow(resource.GetNamespace(), resource.GetKind(), resource.GetName())
 		}
 	}
+
 	tblPrinter.Print()
 }
 
@@ -287,13 +312,17 @@ func (o *statusOptions) showHelmResources(ctx context.Context, allErrs *[]error)
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "STATUS")
 
-	helmLabel := func(name string) string {
-		return fmt.Sprintf("%s=%s,%s=%s", "name", name, "owner", "helm")
+	helmLabel := func(name []string) string {
+		return fmt.Sprintf("%s in (%s),%s=%s", "name", strings.Join(name, ","), "owner", "helm")
 	}
-	selectors := []metav1.ListOptions{{LabelSelector: types.KubeBlocksHelmLabel}}
+	// init helm release list with 'kubeblocks'
+	helmReleaseList := []string{types.KubeBlocksChartName}
+	// add add one names name = $kubeblocks-addons$
 	for _, addon := range o.addons {
-		selectors = append(selectors, metav1.ListOptions{LabelSelector: helmLabel(util.BuildAddonReleaseName(addon.Name))})
+		helmReleaseList = append(helmReleaseList, util.BuildAddonReleaseName(addon.Name))
 	}
+	// label selector 'owner=helm,name in (kubeblocks,kb-addon-mongodb,kb-addon-redis...)'
+	selectors := []metav1.ListOptions{{LabelSelector: helmLabel(helmReleaseList)}}
 	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, helmConfigurations, selectors, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
@@ -383,8 +412,8 @@ func computeMetricByWorkloads(ctx context.Context, ns string, workloads []*unstr
 		for _, resource := range workload.Items {
 			name := resource.GetName()
 			if podsMetrics == nil {
-				cpuMetricMap[name] = "N/A"
-				memMetricMap[name] = "N/A"
+				cpuMetricMap[name] = notAvailable
+				memMetricMap[name] = notAvailable
 				continue
 			}
 			computeResources(name, podsMetrics)
@@ -397,9 +426,7 @@ func listResourceByGVR(ctx context.Context, client dynamic.Interface, namespace 
 	unstructuredList := make([]*unstructured.UnstructuredList, 0)
 	for _, gvr := range gvrlist {
 		for _, labelSelector := range selector {
-			if klog.V(1).Enabled() {
-				klog.Infof("listResourceByGVR: namespace=%s, gvrlist=%v, selector=%v", namespace, gvr, labelSelector)
-			}
+			klog.V(1).Infof("listResourceByGVR: namespace=%s, gvrlist=%v, selector=%v", namespace, gvr, labelSelector)
 			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, labelSelector)
 			if err != nil {
 				appendErrIgnoreNotFound(allErrs, err)

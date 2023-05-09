@@ -67,9 +67,10 @@ var clusterCreateExample = templates.Examples(`
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql
 
 	# Output resource information in YAML format, but do not create resources.
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=client -o yaml
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run -o yaml
 
-	# Output resource information in YAML format, the information will be sent to the server, but the resource will not be actually created.
+	# Output resource information in YAML format, the information will be sent to the server
+	# but the resource will not be actually created.
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=server -o yaml
 	
 	# Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
@@ -90,27 +91,31 @@ var clusterCreateExample = templates.Examples(`
 	# Create a cluster and set cpu to 1 core, memory to 1Gi, storage size to 20Gi and replicas to 3
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1,memory=1Gi,storage=20Gi,replicas=3
 
-	# Create a cluster and set the class to general-1c1g, valid classes can be found by executing the command "kbcli class list --cluster-definition=<cluster-definition-name>"
+	# Create a cluster and set the class to general-1c1g
+	# run "kbcli class list --cluster-definition=cluster-definition-name" to get the class list
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set class=general-1c1g
 
 	# Create a cluster with replicationSet workloadType and set switchPolicy to Noop
 	kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
 
 	# Create a cluster and use a URL to set cluster resource
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/apecloud-mysql.yaml
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql \
+		--set-file https://kubeblocks.io/yamls/apecloud-mysql.yaml
 
 	# Create a cluster and load cluster resource set from stdin
 	cat << EOF | kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file -
 	- name: my-test ...
 
 	# Create a cluster forced to scatter by node
-	kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname --pod-anti-affinity Required
+	kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname \
+		--pod-anti-affinity Required
 
 	# Create a cluster in specific labels nodes
-	kbcli cluster create --cluster-definition apecloud-mysql --node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
+	kbcli cluster create --cluster-definition apecloud-mysql \
+		--node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
 
 	# Create a Cluster with two tolerations 
-	kbcli cluster create --cluster-definition apecloud-mysql --tolerations '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+	kbcli cluster create --cluster-definition apecloud-mysql --tolerations \ '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
 
     # Create a cluster, with each pod runs on their own dedicated node
     kbcli cluster create --cluster-definition apecloud-mysql --tenancy=DedicatedNode
@@ -180,7 +185,56 @@ type CreateOptions struct {
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
 	UpdatableFlags
-	create.BaseOptions
+	create.CreateOptions `json:"-"`
+}
+
+func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewCreateOptions(f, streams)
+	cmd := &cobra.Command{
+		Use:     "create [NAME]",
+		Short:   "Create a cluster.",
+		Example: clusterCreateExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Args = args
+			cmdutil.CheckErr(o.CreateOptions.Complete())
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Run())
+		},
+	}
+
+	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cd list\" to show all available cluster definitions")
+	cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
+	cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
+	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
+	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
+	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+	// add updatable flags
+	o.UpdatableFlags.addFlags(cmd)
+
+	// add print flags
+	printer.AddOutputFlagForCreate(cmd, &o.Format)
+
+	// set required flag
+	util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
+
+	return cmd
+}
+
+func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *CreateOptions {
+	o := &CreateOptions{CreateOptions: create.CreateOptions{
+		Factory:         f,
+		IOStreams:       streams,
+		CueTemplateName: CueTemplateName,
+		GVR:             types.ClusterGVR(),
+	}}
+	o.CreateOptions.PreCreate = o.PreCreate
+	o.CreateOptions.Options = o
+	return o
 }
 
 func setMonitor(monitor bool, components []map[string]interface{}) {
@@ -278,7 +332,7 @@ func (o *CreateOptions) Complete() error {
 	}
 
 	setMonitor(o.Monitor, components)
-	if err := setBackup(o, components); err != nil {
+	if err = setBackup(o, components); err != nil {
 		return err
 	}
 	o.ComponentSpecs = components
@@ -488,46 +542,6 @@ func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 		data = f
 	}
 	return io.ReadAll(data)
-}
-
-func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
-	inputs := create.Inputs{
-		Use:                "create [NAME]",
-		Short:              "Create a cluster.",
-		Example:            clusterCreateExample,
-		CueTemplateName:    CueTemplateName,
-		ResourceName:       types.ResourceClusters,
-		BaseOptionsObj:     &o.BaseOptions,
-		Options:            o,
-		Factory:            f,
-		Complete:           o.Complete,
-		PreCreate:          o.PreCreate,
-		CleanUpFn:          o.CleanUp,
-		CreateDependencies: o.CreateDependencies,
-		BuildFlags: func(cmd *cobra.Command) {
-			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cd list\" to show all available cluster definitions")
-			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
-			cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
-			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
-			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
-			cmd.Flags().StringVar(&o.DryRunStrategy, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
-			// add updatable flags
-			o.UpdatableFlags.addFlags(cmd)
-
-			// add print flags
-			printer.AddOutputFlagForCreate(cmd, &o.Format)
-
-			// set required flag
-			util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
-
-			// register flag completion func
-			registerFlagCompletionFunc(cmd, f)
-		},
-	}
-
-	return create.BuildCommand(inputs)
 }
 
 func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {

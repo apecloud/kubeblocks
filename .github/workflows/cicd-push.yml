@@ -10,9 +10,6 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  GITLAB_GO_CACHE_PROJECT_ID: 98800
-  GO_CACHE: "go-cache"
-  GO_CACHE_DIR: "/root/.cache"
   GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
 
 
@@ -114,6 +111,8 @@ jobs:
     needs: trigger-mode
     runs-on: [self-hosted, eks-fargate-runner ]
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
+    outputs:
+      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     steps:
       - uses: apecloud/checkout@main
       - name: make manifests check
@@ -146,6 +145,25 @@ jobs:
           flags: unittests
           name: codecov-report
           verbose: true
+
+      - name: kill kube-apiserver and etcd
+        id: get_runner_name
+        if: ${{ always() }}
+        run: |
+          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
+          bash .github/utils/utils.sh --type 8
+
+  remove-runner:
+    needs: make-test
+    runs-on: ubuntu-latest
+    if: ${{ needs.make-test.result != 'skipped' }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: remove runner
+        run: |
+          bash .github/utils/utils.sh --type 9 \
+            --github-token ${{ env.GITHUB_TOKEN }} \
+            --runner-name ${{ needs.make-test.outputs.runner-name }}
 
   check-image:
     needs: trigger-mode

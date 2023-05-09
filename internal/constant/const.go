@@ -84,6 +84,7 @@ const (
 	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
 	BackupToolTypeLabelKey          = "kubeblocks.io/backup-tool-type"
 	BackupTypeLabelKeyKey           = "dataprotection.kubeblocks.io/backup-type"
+	AddonProviderLableKey           = "kubeblocks.io/provider" // AddonProviderLableKey marks the addon provider
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey                  = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -93,6 +94,7 @@ const (
 	RestoreFromBackUpAnnotationKey           = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
 	ClusterSnapshotAnnotationKey             = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	LeaderAnnotationKey                      = "cs.apps.kubeblocks.io/leader"
+	ComponentReplicasAnnotationKey           = "apps.kubeblocks.io/component-replicas"                   // ComponentReplicasAnnotationKey specifies the number of pods in replicas
 	DefaultBackupPolicyAnnotationKey         = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
 	DefaultBackupPolicyTemplateAnnotationKey = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
 	BackupDataPathPrefixAnnotationKey        = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
@@ -163,7 +165,7 @@ const (
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJobKind               = "CronJob"
 	JobKind                   = "Job"
-	ReplicaSetKind            = "ReplicaSetKind"
+	ReplicaSetKind            = "ReplicaSet"
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
 	ConfigMapKind             = "ConfigMap"

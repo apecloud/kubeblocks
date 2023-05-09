@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "weaviate.fullname" . }}
   labels: {{ include "weaviate.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: weaviate # ref clusterdefinition.name

@@ -102,12 +102,12 @@ var _ = Describe("DataProtection", func() {
 		It("validate create backup", func() {
 			By("without cluster name")
 			o := &CreateBackupOptions{
-				BaseOptions: create.BaseOptions{
+				CreateOptions: create.CreateOptions{
 					Dynamic:   testing.FakeDynamicClient(),
 					IOStreams: streams,
+					Factory:   tf,
 				},
 			}
-			o.IOStreams = streams
 			Expect(o.Validate()).To(MatchError("missing cluster name"))
 
 			By("test without default backupPolicy")

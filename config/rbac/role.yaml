@@ -437,6 +437,13 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - pods/log
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
   - resourcequotas
   verbs:
   - create

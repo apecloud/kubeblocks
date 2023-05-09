@@ -223,6 +223,11 @@ func String2RoleType(roleName string) RoleType {
 }
 
 func SentProbeEvent(opsResult OpsResult) error {
+	event, err := createProbeEvent(opsResult)
+	if err != nil {
+		return err
+	}
+
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return err
@@ -232,8 +237,6 @@ func SentProbeEvent(opsResult OpsResult) error {
 	if err != nil {
 		return err
 	}
-	event, _ := createProbeEvent(opsResult)
-
 	namespace := os.Getenv("KB_NAMESPACE")
 	_, err = clientset.CoreV1().Events(namespace).Create(context.TODO(), event, metav1.CreateOptions{})
 	if err != nil {
@@ -252,11 +255,11 @@ metadata:
   namespace: {{ .Namespace }}
 involvedObject:
   apiVersion: v1
-  fieldPath: spec.containers{kbprobe-rolecheck}
+  fieldPath: spec.containers{kb-checkrole}
   kind: Pod
   name: {{ .PodName }}
-  namespace: default
-message: "{\"data\":{\"role\":\"{{ .Role }}\"}}"
+  namespace: {{ .Namespace }}
+message: {{ .Message }}
 reason: RoleChanged
 type: Normal
 `
@@ -282,12 +285,15 @@ type: Normal
 		return nil, err
 	}
 
-	event, _, err := scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, nil)
+	event := &corev1.Event{}
+	event, _, err = scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, event)
 	if err != nil {
 		return nil, err
 	}
+	event.FirstTimestamp = metav1.Now()
+	event.LastTimestamp = metav1.Now()
 
-	return event.(*corev1.Event), nil
+	return event, nil
 }
 
 type roleEventValue struct {

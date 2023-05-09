@@ -435,6 +435,7 @@ func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template
 		command := []string{
 			agentPath,
 			"-port", fmt.Sprintf("%d", actionSvcPorts[i]),
+			"-export-all-vars",
 			shell2httpServePath,
 			strings.Join(action.Command, " "),
 		}

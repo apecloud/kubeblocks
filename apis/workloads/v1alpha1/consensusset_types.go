@@ -280,7 +280,7 @@ type Action struct {
 
 	// Command will be executed in Container to retrieve or process role info
 	// Environment variables can be used in Command:
-	// - KB_CONSENSUS_SET_LAST_STDOUT stdout from last action
+	// - v_KB_CONSENSUS_SET_LAST_STDOUT stdout from last action, watch 'v_' prefixed
 	// - KB_CONSENSUS_SET_USERNAME username part of credential
 	// - KB_CONSENSUS_SET_PASSWORD password part of credential
 	// +kubebuilder:validation:Required

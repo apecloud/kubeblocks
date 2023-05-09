@@ -93,7 +93,7 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *bindings.InvokeRequest, r
 	)
 
 	for _, port := range *h.actionSvcPorts {
-		url := fmt.Sprintf("http://127.0.0.1:%d/role?last_output=%s", port, lastOutput)
+		url := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, lastOutput)
 		lastOutput, err = h.callAction(ctx, url)
 		if err != nil {
 			return "", err

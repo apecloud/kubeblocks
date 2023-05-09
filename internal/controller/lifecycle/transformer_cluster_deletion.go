@@ -49,7 +49,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	switch cluster.Spec.TerminationPolicy {
 	case v1alpha1.DoNotTerminate:
 		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate", "spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
-		return graph.ErrFastReturn
+		return graph.ErrNoops
 	case v1alpha1.Halt:
 		kinds = kindsForHalt()
 	case v1alpha1.Delete:
@@ -86,7 +86,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	root.action = actionPtr(DELETE)
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
-	return graph.ErrFastReturn
+	return graph.ErrNoops
 }
 
 func kindsForDoNotTerminate() []client.ObjectList {

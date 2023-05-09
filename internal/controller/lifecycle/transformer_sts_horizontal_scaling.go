@@ -647,7 +647,7 @@ func doSnapshot(cli roclient.ReadonlyClient,
 		if err != nil {
 			return err
 		}
-		if err := controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
+		if err = controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
 			return err
 		}
 		vertex := &lifecycleVertex{obj: snapshot, action: actionPtr(CREATE)}

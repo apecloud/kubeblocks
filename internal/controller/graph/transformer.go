@@ -45,22 +45,22 @@ type Transformer interface {
 // TransformerChain chains a group Transformer together
 type TransformerChain []Transformer
 
-// ErrFastReturn is used to stop the Transformer chain for some purpose.
+// ErrNoops is used to stop the Transformer chain for some purpose.
 // Use it in Transformer.Transform when all jobs have done and no need to run following transformers
-var ErrFastReturn = errors.New("fast return")
+var ErrNoops = errors.New("No-Ops")
 
 // ApplyTo applies TransformerChain t to dag
 func (r TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
 	for _, transformer := range r {
 		if err := transformer.Transform(ctx, dag); err != nil {
-			return fastReturnErrorToNil(err)
+			return ignoredIfNoops(err)
 		}
 	}
 	return nil
 }
 
-func fastReturnErrorToNil(err error) error {
-	if err == ErrFastReturn {
+func ignoredIfNoops(err error) error {
+	if err == ErrNoops {
 		return nil
 	}
 	return err

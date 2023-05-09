@@ -508,8 +508,8 @@ func checkedCreateDeletePVCCronJob(cli roclient.ReadonlyClient,
 			"CronJobCreate",
 			"create cronjob to delete pvc/%s",
 			pvcKey.Name)
+		return nil
 	}
-
 	return nil
 }
 

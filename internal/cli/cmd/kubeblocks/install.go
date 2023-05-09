@@ -23,7 +23,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	OS "runtime"
 	"sort"
 	"strings"
 	"time"
@@ -175,6 +174,9 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
+	// Todo: KubeBlocks maybe already install but it's status could be Failed.
+	// For example: 'kbcli playground init' in windows will fail and try 'kbcli playground init' again immediately,
+	// kbcli will output SUCCESSFULLY, however the addon csi is failed and KubeBlocks do not install SUCCESSFULLY
 	if v.KubeBlocks != "" {
 		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v.KubeBlocks)
 		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
@@ -242,12 +244,9 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	}
 
 	// addons record the addons and its status
-	var (
-		allEnabled bool
-		err        error
-	)
+
 	addons := make(map[string]string)
-	OS := OS.GOOS
+	// OS := OS.GOOS
 
 	checkAddons := func() (bool, error) {
 		allEnabled := true
@@ -286,51 +285,6 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		return allEnabled, nil
 	}
 
-	progressInWindows := func() error {
-		fmt.Println("Wait for addons to be ready...")
-		newReadyInWin := make(map[string]bool)
-
-		checkProgressInWindows := func() {
-			if len(addons) == 0 {
-				return
-			}
-			for k, v := range addons {
-				_, ok := newReadyInWin[k]
-				if v == string(extensionsv1alpha1.AddonEnabled) && !ok {
-					s := spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Addon "+k)))
-					s.Success()
-					newReadyInWin[k] = true
-				}
-			}
-		}
-
-		if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
-			allEnabled, err = checkAddons()
-			if err != nil {
-				return false, err
-			}
-			checkProgressInWindows()
-			if allEnabled {
-				return true, nil
-			}
-			return false, nil
-		}); err != nil {
-			if err == wait.ErrWaitTimeout {
-				for k, v := range addons {
-					if v != string(extensionsv1alpha1.AddonEnabled) && OS == types.GoosWindows {
-						s := spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Addon "+k)))
-						s.Fail()
-					}
-				}
-				return errors.New("timeout waiting for auto-install addons to be enabled, run \"kbcli addon list\" to check addon status")
-			}
-			return err
-		}
-		// Timeout
-
-		return nil
-	}
-
 	suffixMsg := func(msg string) string {
 		return fmt.Sprintf("%-50s", msg)
 	}
@@ -339,9 +293,6 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		return fmt.Sprintf("%-48s %s", msg, status)
 	}
 
-	if OS == types.GoosWindows {
-		return progressInWindows()
-	}
 	// create spinner
 	allMsg := ""
 	msg := "Wait for addons to be enabled"
@@ -365,12 +316,16 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		s.SetMessage(suffixMsg(allMsg))
 	}
 
-	spinnerDone := func(s spinner.Interface) {
-		s.SetFinalMsg(allMsg)
-		s.Done("")
-		fmt.Fprintln(o.Out)
-	}
-
+	var (
+		allEnabled bool
+		err        error
+		spinnerDone = func(s spinner.Interface) {
+			s.SetFinalMsg(allMsg)
+			s.Done("")
+			fmt.Fprintln(o.Out)
+		}
+	)
+	
 	// wait all addons to be enabled, or timeout
 	if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
 		allEnabled, err = checkAddons()

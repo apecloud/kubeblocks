@@ -135,13 +135,7 @@ func (s *Spinner) Fail() {
 
 func New(w io.Writer, opts ...Option) Interface {
 	if runtime.GOOS == types.GoosWindows {
-		res := &WindowsSpinner{
-			out: w,
-		}
-		for _, opt := range opts {
-			opt(res)
-		}
-		return res
+		return WindowsSpinnerConstructor(w, opts...)
 	}
 
 	res := &Spinner{}

@@ -295,7 +295,6 @@ func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
 func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, bindingType workloads.BindingType, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role observation container
 	roleObservation := csSet.Spec.RoleObservation
-	viper.Set("ROLE_OBSERVATION_IMAGE", "free6om/kubeblocks:latest")
 	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
 	if len(image) == 0 {
 		image = defaultRoleObservationImage

@@ -309,8 +309,8 @@ spec:
                             command:
                               description: 'Command will be executed in Container
                                 to retrieve or process role info Environment variables
-                                can be used in Command: - KB_CONSENSUS_SET_LAST_STDOUT
-                                stdout from last action - KB_CONSENSUS_SET_USERNAME
+                                can be used in Command: - v_KB_CONSENSUS_SET_LAST_STDOUT
+                                stdout from last action, watch ''v_'' prefixed - KB_CONSENSUS_SET_USERNAME
                                 username part of credential - KB_CONSENSUS_SET_PASSWORD
                                 password part of credential'
                               items:

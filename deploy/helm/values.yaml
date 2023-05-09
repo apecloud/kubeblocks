@@ -1678,7 +1678,7 @@ csi-s3:
   storageClass:
     create: true
     singleBucket: ""
-    mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666"
+    mountOptions: ""
 
 alertmanager-webhook-adaptor:
   ## Linkage with prometheus.enabled

@@ -93,7 +93,7 @@ func (r *StatefulComponent) GetPhaseWhenPodsNotReady(ctx context.Context, compon
 }
 
 // HandleUpdateWithProcessors extended HandleUpdate() with custom processors
-// REVIEW/TODO: (nashtsia)
+// REVIEW/TODO: (nashtsai)
 //  1. too many args
 func (r *StatefulComponent) HandleUpdateWithProcessors(ctx context.Context, obj client.Object,
 	compStatusProcessor func(compDef *appsv1alpha1.ClusterComponentDefinition, pods []corev1.Pod, componentName string) error,

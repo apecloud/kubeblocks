@@ -221,7 +221,7 @@ func (factory *MockClusterDefFactory) AddContainerVolumeMounts(containerName str
 	return factory
 }
 
-func (factory *MockClusterDefFactory) AddReplicationSpec(replicationSpec *appsv1alpha1.ReplicationSpec) *MockClusterDefFactory {
+func (factory *MockClusterDefFactory) AddReplicationSpec(replicationSpec *appsv1alpha1.ReplicationSetSpec) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
 		return factory

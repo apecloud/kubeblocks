@@ -322,7 +322,7 @@ type ClusterComponentDefinition struct {
 	// +optional
 	Service *ServiceSpec `json:"service,omitempty"`
 
-	// statefulSpec defines stateless related spec if workloadType is Stateless.
+	// statelessSpec defines stateless related spec if workloadType is Stateless.
 	// +optional
 	StatelessSpec *StatelessSetSpec `json:"statelessSpec,omitempty"`
 
@@ -336,7 +336,7 @@ type ClusterComponentDefinition struct {
 
 	// replicationSpec defines replication related spec if workloadType is Replication.
 	// +optional
-	ReplicationSpec *ReplicationSpec `json:"replicationSpec,omitempty"`
+	ReplicationSpec *ReplicationSetSpec `json:"replicationSpec,omitempty"`
 
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional
@@ -718,7 +718,7 @@ type ConsensusMember struct {
 	Replicas *int32 `json:"replicas,omitempty"`
 }
 
-type ReplicationSpec struct {
+type ReplicationSetSpec struct {
 	StatefulSetSpec `json:",inline"`
 
 	// switchPolicies defines a collection of different types of switchPolicy, and each type of switchPolicy is limited to one.
@@ -731,18 +731,18 @@ type ReplicationSpec struct {
 	SwitchCmdExecutorConfig *SwitchCmdExecutorConfig `json:"switchCmdExecutorConfig"`
 }
 
-var _ StatefulSetWorkload = &ReplicationSpec{}
+var _ StatefulSetWorkload = &ReplicationSetSpec{}
 
-func (r *ReplicationSpec) GetUpdateStrategy() UpdateStrategy {
+func (r *ReplicationSetSpec) GetUpdateStrategy() UpdateStrategy {
 	if r == nil {
 		return SerialStrategy
 	}
 	return r.UpdateStrategy
 }
 
-func (r *ReplicationSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
+func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
 	if r == nil {
-		r = &ReplicationSpec{}
+		r = &ReplicationSetSpec{}
 	}
 	return r.StatefulSetSpec.finalStsUpdateStrategy()
 }

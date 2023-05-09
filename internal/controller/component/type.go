@@ -43,7 +43,7 @@ type SynthesizedComponent struct {
 	StatelessSpec         *v1alpha1.StatelessSetSpec             `json:"statelessSpec,omitempty"`
 	StatefulSpec          *v1alpha1.StatefulSetSpec              `json:"statefulSpec,omitempty"`
 	ConsensusSpec         *v1alpha1.ConsensusSetSpec             `json:"consensusSpec,omitempty"`
-	ReplicationSpec       *v1alpha1.ReplicationSpec              `json:"replicationSpec,omitempty"`
+	ReplicationSpec       *v1alpha1.ReplicationSetSpec           `json:"replicationSpec,omitempty"`
 	PrimaryIndex          *int32                                 `json:"primaryIndex,omitempty"`
 	PodSpec               *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Services              []corev1.Service                       `json:"services,omitempty"`

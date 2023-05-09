@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/inf.v0"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -143,4 +144,13 @@ func TestResourceConstraints(t *testing.T) {
 		}
 		assert.Equal(t, item.expect, cf.MatchClass(class))
 	}
+}
+
+// helper function to test use cases of resource.Quantity and inf.Dec
+func TestQuantity(t *testing.T) {
+	cpu := resource.MustParse("500m")
+
+	println(cpu.MilliValue())
+
+	println(inf.NewDec(1, 0).Mul(cpu.AsDec(), inf.NewDec(int64(50), 2)).String())
 }

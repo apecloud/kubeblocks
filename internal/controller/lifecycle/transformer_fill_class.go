@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"sort"
 
+	"gopkg.in/inf.v0"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -103,14 +105,25 @@ func (r *FillClassTransformer) fillClass(transCtx *ClusterTransformContext) erro
 			// TODO reconsider handling policy for this case
 			continue
 		}
-
 		comp.ClassDefRef = &cls.ClassDefRef
-		requests := corev1.ResourceList{
-			corev1.ResourceCPU:    cls.CPU,
-			corev1.ResourceMemory: cls.Memory,
+
+		// update tenancy affinity
+		affinity := cluster.Spec.Affinity
+		if comp.Affinity != nil {
+			affinity = comp.Affinity
 		}
-		requests.DeepCopyInto(&comp.Resources.Requests)
-		requests.DeepCopyInto(&comp.Resources.Limits)
+		policies := cluster.Spec.ResourceAllocationPolicies
+		if comp.ResourceAllocationPolicies != nil {
+			policies = comp.ResourceAllocationPolicies
+		}
+		if affinity.Tenancy == appsv1alpha1.DedicatedNode {
+			comp.Resources, err = getDedicatedComponentResources(policies, cls)
+		} else {
+			comp.Resources, err = getSharedComponentResources(policies, cls)
+		}
+		if err != nil {
+			return err
+		}
 
 		var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
 		if len(comp.VolumeClaimTemplates) > 0 {
@@ -141,6 +154,113 @@ func buildVolumeClaimByClass(cls *class.ComponentClassWithRef) []appsv1alpha1.Cl
 		})
 	}
 	return volumes
+}
+
+type ResourceSummary struct {
+	CPUTotal resource.Quantity
+	CPULimit resource.Quantity
+	MemTotal resource.Quantity
+	MemLimit resource.Quantity
+}
+
+func getDedicatedComponentResources(policies appsv1alpha1.ResourceAllocationPolicies, cls *class.ComponentClassWithRef) (corev1.ResourceRequirements, error) {
+	resources := getDedicatedResourceTotalAndLimit(policies, cls)
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    cls.CPU,
+			corev1.ResourceMemory: cls.Memory,
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resources.CPULimit,
+			corev1.ResourceMemory: resources.MemLimit,
+		},
+	}, nil
+}
+
+func getDedicatedResourceTotalAndLimit(policies appsv1alpha1.ResourceAllocationPolicies, cls *class.ComponentClassWithRef) ResourceSummary {
+	var (
+		// total is used to choose vm, limit is used to set the resource limits
+		cpuTotal = cls.CPU
+		memTotal = cls.Memory
+		cpuLimit = cls.CPU
+		memLimit = cls.Memory
+	)
+
+	if policy, ok := policies[corev1.ResourceCPU]; ok {
+		if policy.OverCommitRatio != 0 {
+			overSize := inf.NewDec(1, 0).Mul(cls.CPU.AsDec(), inf.NewDec(int64(policy.OverCommitRatio), 2))
+			cpuTotal = resource.MustParse(inf.NewDec(1, 0).Add(cls.CPU.AsDec(), overSize).String())
+		} else if !policy.OverCommitSize.IsZero() {
+			cpuTotal = resource.MustParse(cls.CPU.String())
+			cpuTotal.Add(policy.OverCommitSize)
+		}
+
+		if policy.DedicatedReservedRatio != nil {
+			cpuLimit = resource.MustParse(inf.NewDec(1, 0).Mul(cpuTotal.AsDec(), inf.NewDec(int64(*policy.DedicatedReservedRatio), 2)).String())
+		} else if !policy.DedicatedReservedSize.IsZero() {
+			cpuLimit = policy.DedicatedReservedSize
+		} else {
+			cpuLimit = cpuTotal
+		}
+	}
+
+	if policy, ok := policies[corev1.ResourceMemory]; ok {
+		if policy.OverCommitRatio != 0 {
+			overSize := inf.NewDec(1, 0).Mul(cls.Memory.AsDec(), inf.NewDec(int64(policy.OverCommitRatio), 2))
+			memTotal = resource.MustParse(inf.NewDec(1, 0).Add(cls.Memory.AsDec(), overSize).String())
+		} else if !policy.OverCommitSize.IsZero() {
+			memTotal = resource.MustParse(cls.Memory.String())
+			memTotal.Add(policy.OverCommitSize)
+		}
+
+		if policy.DedicatedReservedRatio != nil {
+			memLimit = resource.MustParse(inf.NewDec(1, 0).Mul(memTotal.AsDec(), inf.NewDec(int64(*policy.DedicatedReservedRatio), 2)).String())
+		} else if !policy.DedicatedReservedSize.IsZero() {
+			memLimit = policy.DedicatedReservedSize
+		} else {
+			memLimit = memTotal
+		}
+	}
+	return ResourceSummary{CPUTotal: cpuTotal, CPULimit: cpuLimit, MemTotal: memTotal, MemLimit: memLimit}
+}
+
+func getSharedComponentResources(policies appsv1alpha1.ResourceAllocationPolicies, cls *class.ComponentClassWithRef) (corev1.ResourceRequirements, error) {
+	var (
+		cpuLimit = cls.CPU
+		memLimit = cls.Memory
+	)
+
+	if policy, ok := policies[corev1.ResourceCPU]; ok {
+		if policy.OverCommitRatio != 0 {
+			overSize := inf.NewDec(1, 0).Mul(cls.CPU.AsDec(), inf.NewDec(int64(policy.OverCommitRatio), 2))
+			cpuLimit = resource.MustParse(inf.NewDec(1, 0).Add(cls.CPU.AsDec(), overSize).String())
+		} else if !policy.OverCommitSize.IsZero() {
+			cpuLimit = resource.MustParse(cls.CPU.String())
+			cpuLimit.Add(policy.OverCommitSize)
+		}
+	}
+
+	if policy, ok := policies[corev1.ResourceMemory]; ok {
+		if policy.OverCommitRatio != 0 {
+			overSize := inf.NewDec(1, 0).Mul(cls.Memory.AsDec(), inf.NewDec(int64(policy.OverCommitRatio), 2))
+			memLimit = resource.MustParse(inf.NewDec(1, 0).Add(cls.Memory.AsDec(), overSize).String())
+		} else if !policy.OverCommitSize.IsZero() {
+			memLimit = resource.MustParse(cls.Memory.String())
+			memLimit.Add(policy.OverCommitSize)
+		}
+	}
+
+	resources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    cls.CPU,
+			corev1.ResourceMemory: cls.Memory,
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    cpuLimit,
+			corev1.ResourceMemory: memLimit,
+		},
+	}
+	return resources, nil
 }
 
 var _ graph.Transformer = &FillClassTransformer{}

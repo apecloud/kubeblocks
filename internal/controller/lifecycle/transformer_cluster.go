@@ -21,9 +21,11 @@ package lifecycle
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -98,7 +100,7 @@ func (c *ClusterTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		iParams := task
 		iParams.Component = synthesizedComp
 
-		if err := fillComponentClass(cluster, compSpec, synthesizedComp, clsMgr); err != nil {
+		if err := prepareDedicatedComponent(cluster, compSpec, synthesizedComp, clsMgr); err != nil {
 			return err
 		}
 
@@ -197,7 +199,15 @@ func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string
 	return compBackupMap, err
 }
 
-func fillComponentClass(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec, synthesizedComp *component.SynthesizedComponent, clsMgr *class.Manager) error {
+func prepareDedicatedComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec, synthesizedComp *component.SynthesizedComponent, clsMgr *class.Manager) error {
+	affinity := cluster.Spec.Affinity
+	if compSpec.Affinity != nil {
+		affinity = compSpec.Affinity
+	}
+	if affinity.Tenancy != appsv1alpha1.DedicatedNode {
+		return nil
+	}
+
 	cls, err := clsMgr.ChooseClass(compSpec)
 	if err != nil {
 		return err
@@ -206,116 +216,100 @@ func fillComponentClass(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cl
 		// TODO reconsider handling policy for this case
 		return nil
 	}
-	compSpec.ClassDefRef = &cls.ClassDefRef
+	return fillDedicatedComponentAffinity(cluster, compSpec, synthesizedComp, cls)
+}
 
-	// update pod resource requests and limits
-	requests := corev1.ResourceList{
-		corev1.ResourceCPU:    cls.CPU,
-		corev1.ResourceMemory: cls.Memory,
+func fillDedicatedComponentAffinity(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec, synthesizedComp *component.SynthesizedComponent, cls *class.ComponentClassWithRef) error {
+	policies := cluster.Spec.ResourceAllocationPolicies
+	if compSpec.ResourceAllocationPolicies != nil {
+		policies = compSpec.ResourceAllocationPolicies
 	}
-	synthesizedComp.PodSpec.Containers[0].Resources = corev1.ResourceRequirements{
-		Requests: requests,
-		Limits:   requests,
-	}
-	var volumes []corev1.PersistentVolumeClaimTemplate
-	if len(synthesizedComp.VolumeClaimTemplates) > 0 {
-		volumes = synthesizedComp.VolumeClaimTemplates
-	} else {
-		for _, volume := range cls.Volumes {
-			volumes = append(volumes, corev1.PersistentVolumeClaimTemplate{
-				Spec: corev1.PersistentVolumeClaimSpec{
-					// TODO define access mode in class
-					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: volume.Size,
-						},
-					},
-				},
-			})
-		}
-	}
-	synthesizedComp.VolumeClaimTemplates = volumes
-
-	// update tenancy affinity
-	affinity := cluster.Spec.Affinity
-	if compSpec.Affinity != nil {
-		affinity = compSpec.Affinity
-	}
+	resources := getDedicatedResourceTotalAndLimit(policies, cls)
 
 	podAntiAffinity := synthesizedComp.PodSpec.Affinity.PodAntiAffinity
 	// add pod anti-affinity to ensure isolated with other pods
-	if affinity.Tenancy == appsv1alpha1.DedicatedNode {
-		var labelSelectorReqs []metav1.LabelSelectorRequirement
-		labelSelectorReqs = append(labelSelectorReqs, metav1.LabelSelectorRequirement{
-			Key:      constant.WorkloadTypeLabelKey,
-			Operator: metav1.LabelSelectorOpIn,
-			Values:   appsv1alpha1.WorkloadTypes,
-		})
-		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, corev1.PodAffinityTerm{
-				TopologyKey: corev1.LabelHostname,
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: labelSelectorReqs,
-				},
+	var labelSelectorReqs []metav1.LabelSelectorRequirement
+	labelSelectorReqs = append(labelSelectorReqs, metav1.LabelSelectorRequirement{
+		Key:      constant.WorkloadTypeLabelKey,
+		Operator: metav1.LabelSelectorOpIn,
+		Values:   appsv1alpha1.WorkloadTypes,
+	})
+	podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, corev1.PodAffinityTerm{
+			TopologyKey: corev1.LabelHostname,
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: labelSelectorReqs,
 			},
-		)
+		},
+	)
+
+	normalizeQuantity := func(q resource.Quantity) string {
+		return fmt.Sprintf("%d", q.MilliValue())
 	}
 
 	// if class is specified, add node affinity to ensure node resource match with the class
-	nodeAffinity := synthesizedComp.PodSpec.Affinity.NodeAffinity
-	if affinity.Tenancy == appsv1alpha1.DedicatedNode && cls != nil {
-		var nodeSelectorTerms []corev1.NodeSelectorTerm
-		nodeSelectorTerms = append(nodeSelectorTerms, []corev1.NodeSelectorTerm{
+	var nodeSelectorTerms []corev1.NodeSelectorTerm
+	nodeSelectorTerms = append(nodeSelectorTerms, corev1.NodeSelectorTerm{
+		MatchExpressions: []corev1.NodeSelectorRequirement{
 			{
-				MatchExpressions: []corev1.NodeSelectorRequirement{
-					{
-						Key:      constant.ResourceCPULabelKey,
-						Operator: "In",
-						Values:   []string{cls.CPU.AsDec().String()},
-					},
-					{
-						Key:      constant.ResourceMemoryLabelKey,
-						Operator: "In",
-						Values:   []string{cls.Memory.AsDec().String()},
-					},
-				},
+				Key:      constant.ResourceCPULabelKey,
+				Operator: "In",
+				Values:   []string{normalizeQuantity(cls.CPU)},
 			},
 			{
-				MatchExpressions: []corev1.NodeSelectorRequirement{
-					{
-						Key:      constant.ResourceCPULabelKey,
-						Operator: "Gt",
-						Values:   []string{cls.CPU.AsDec().String()},
-					},
-					{
-						Key:      constant.ResourceMemoryLabelKey,
-						Operator: "Gt",
-						Values:   []string{cls.Memory.AsDec().String()},
-					},
+				Key:      constant.ResourceMemoryLabelKey,
+				Operator: "In",
+				Values:   []string{normalizeQuantity(cls.Memory)},
+			},
+		},
+	})
+	if resources.CPUTotal.Cmp(cls.CPU) > 0 || resources.MemTotal.Cmp(cls.Memory) > 0 {
+		nodeSelectorTerms = append(nodeSelectorTerms, corev1.NodeSelectorTerm{
+			MatchExpressions: []corev1.NodeSelectorRequirement{
+				{
+					Key:      constant.ResourceCPULabelKey,
+					Operator: "In",
+					Values:   []string{normalizeQuantity(resources.CPUTotal)},
+				},
+				{
+					Key:      constant.ResourceMemoryLabelKey,
+					Operator: "In",
+					Values:   []string{normalizeQuantity(resources.MemTotal)},
 				},
 			},
-		}...)
-		nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
-			nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, nodeSelectorTerms...)
+		})
+		nodeSelectorTerms = append(nodeSelectorTerms, corev1.NodeSelectorTerm{
+			MatchExpressions: []corev1.NodeSelectorRequirement{
+				{
+					Key:      constant.ResourceCPULabelKey,
+					Operator: "Gt",
+					Values:   []string{normalizeQuantity(cls.CPU)},
+				},
+				{
+					Key:      constant.ResourceMemoryLabelKey,
+					Operator: "Gt",
+					Values:   []string{normalizeQuantity(cls.Memory)},
+				},
+				{
+					Key:      constant.ResourceCPULabelKey,
+					Operator: "Lt",
+					Values:   []string{normalizeQuantity(resources.CPUTotal)},
+				},
+				{
+					Key:      constant.ResourceMemoryLabelKey,
+					Operator: "Lt",
+					Values:   []string{normalizeQuantity(resources.MemTotal)},
+				},
+			},
+		})
 	}
+	nodeAffinity := &corev1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+			NodeSelectorTerms: nodeSelectorTerms,
+		},
+	}
+	nodeAffinity.DeepCopyInto(synthesizedComp.PodSpec.Affinity.NodeAffinity)
 	return nil
-}
-
-func fillDedicatedComponentResources(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent, cls *class.ComponentClassWithRef) {
-	requests := corev1.ResourceList{
-		corev1.ResourceCPU:    cls.CPU,
-		corev1.ResourceMemory: cls.Memory,
-	}
-
-	policy, ok := synthesizedComp.ResourceAllocationPolicies[corev1.ResourceCPU]
-	if ok && policy.OverAllocationRatio != nil {
-		requests.Cpu()
-	}
-}
-
-func fillSharedComponentResources(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent, cls *class.ComponentClassWithRef) {
-
 }
 
 var _ graph.Transformer = &ClusterTransformer{}

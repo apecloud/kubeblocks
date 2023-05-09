@@ -171,6 +171,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.ValidateAndLoadRefResourcesTransformer{},
 			// validate config
 			&lifecycle.ValidateEnableLogsTransformer{},
+			// fix spec
+			// fill class related info
+			&lifecycle.FillClassTransformer{},
 			// generate objects
 			// cluster to K8s objects and put them into dag
 			&lifecycle.ClusterTransformer{Client: r.Client},

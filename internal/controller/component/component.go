@@ -45,27 +45,26 @@ func BuildComponent(
 
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
-		ClusterDefName:             clusterDef.Name,
-		Name:                       clusterCompSpec.Name,
-		Type:                       clusterCompDefObj.Name,
-		CharacterType:              clusterCompDefObj.CharacterType,
-		MaxUnavailable:             clusterCompDefObj.MaxUnavailable,
-		WorkloadType:               clusterCompDefObj.WorkloadType,
-		ConsensusSpec:              clusterCompDefObj.ConsensusSpec,
-		PodSpec:                    clusterCompDefObj.PodSpec,
-		Probes:                     clusterCompDefObj.Probes,
-		LogConfigs:                 clusterCompDefObj.LogConfigs,
-		HorizontalScalePolicy:      clusterCompDefObj.HorizontalScalePolicy,
-		Replicas:                   clusterCompSpec.Replicas,
-		EnabledLogs:                clusterCompSpec.EnabledLogs,
-		TLS:                        clusterCompSpec.TLS,
-		Issuer:                     clusterCompSpec.Issuer,
-		ClassDefRef:                clusterCompSpec.ClassDefRef,
-		ResourceAllocationPolicies: clusterCompSpec.ResourceAllocationPolicies,
-		VolumeTypes:                clusterCompDefObj.VolumeTypes,
-		CustomLabelSpecs:           clusterCompDefObj.CustomLabelSpecs,
-		ComponentDef:               clusterCompSpec.ComponentDefRef,
-		ServiceAccountName:         clusterCompSpec.ServiceAccountName,
+		ClusterDefName:        clusterDef.Name,
+		Name:                  clusterCompSpec.Name,
+		Type:                  clusterCompDefObj.Name,
+		CharacterType:         clusterCompDefObj.CharacterType,
+		MaxUnavailable:        clusterCompDefObj.MaxUnavailable,
+		WorkloadType:          clusterCompDefObj.WorkloadType,
+		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
+		PodSpec:               clusterCompDefObj.PodSpec,
+		Probes:                clusterCompDefObj.Probes,
+		LogConfigs:            clusterCompDefObj.LogConfigs,
+		HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
+		Replicas:              clusterCompSpec.Replicas,
+		EnabledLogs:           clusterCompSpec.EnabledLogs,
+		TLS:                   clusterCompSpec.TLS,
+		Issuer:                clusterCompSpec.Issuer,
+		ClassDefRef:           clusterCompSpec.ClassDefRef,
+		VolumeTypes:           clusterCompDefObj.VolumeTypes,
+		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
+		ComponentDef:          clusterCompSpec.ComponentDefRef,
+		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
 	}
 
 	// resolve component.ConfigTemplates
@@ -103,6 +102,12 @@ func BuildComponent(
 		tolerations = clusterCompSpec.Tolerations
 	}
 	component.PodSpec.Tolerations = PatchBuiltInToleration(tolerations)
+
+	resourceAllocationPolicies := cluster.Spec.ResourceAllocationPolicies
+	if len(clusterCompSpec.ResourceAllocationPolicies) == 0 {
+		resourceAllocationPolicies = cluster.Spec.ResourceAllocationPolicies
+	}
+	component.ResourceAllocationPolicies = resourceAllocationPolicies
 
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()

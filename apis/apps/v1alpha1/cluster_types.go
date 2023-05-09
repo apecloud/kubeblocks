@@ -63,7 +63,7 @@ type ClusterSpec struct {
 	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// +optional
-	ResourceAllocationPolicies ResourceAllocationPolicies `json:"ResourceAllocationPolicies,omitempty"`
+	ResourceAllocationPolicies ResourceAllocationPolicies `json:"resourceAllocationPolicies,omitempty"`
 
 	// tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -149,7 +149,7 @@ type ClusterComponentSpec struct {
 	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// +optional
-	ResourceAllocationPolicies ResourceAllocationPolicies `json:"ResourceAllocationPolicies,omitempty"`
+	ResourceAllocationPolicies ResourceAllocationPolicies `json:"resourceAllocationPolicies,omitempty"`
 
 	// Component tolerations will override ClusterSpec.Tolerations if specified.
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -384,22 +384,20 @@ type ResourceAllocationPolicies map[corev1.ResourceName]ResourceAllocationPolicy
 type ResourceAllocationPolicy struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
-	// +kubebuilder:default=0
 	// +optional
-	OverAllocationRatio *int `json:"overAllocationRatio,omitempty"`
+	OverCommitRatio int `json:"overCommitRatio,omitempty"`
 
 	// +optional
-	OverAllocationSize *resource.Quantity `json:"overAllocationSize,omitempty"`
+	OverCommitSize resource.Quantity `json:"overCommitSize,omitempty"`
 
 	// +kubebuilder:validation:ExclusiveMinimum=true
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
-	// +kubebuilder:default=100
 	// +optional
-	DedicateRatio *int `json:"dedicateRatio,omitempty"`
+	DedicatedReservedRatio *int `json:"dedicatedReservedRatio,omitempty"`
 
 	// +optional
-	DedicateSize *resource.Quantity `json:"dedicateSize,omitempty"`
+	DedicatedReservedSize resource.Quantity `json:"dedicatedReservedSize,omitempty"`
 }
 
 // Issuer defines Tls certs issuer

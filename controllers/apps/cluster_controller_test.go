@@ -1388,7 +1388,7 @@ var _ = Describe("Cluster Controller", func() {
 			switch compName {
 			case statefulCompName, consensusCompName, replicationCompName:
 				Context(fmt.Sprintf("[comp: %s] with pvc", compName), func() {
-					FIt("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
+					It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
 						testHorizontalScale(compName, compDefName)
 					})
 				})

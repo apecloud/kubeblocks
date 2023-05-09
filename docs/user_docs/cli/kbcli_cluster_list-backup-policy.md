@@ -14,7 +14,7 @@ kbcli cluster list-backup-policy [flags]
   # list all backup policy
   kbcli cluster list-backup-policy
   
-  # using short cmd to list backup policy of specified cluster
+  # using short cmd to list backup policy of the specified cluster
   kbcli cluster list-bp mycluster
 ```
 

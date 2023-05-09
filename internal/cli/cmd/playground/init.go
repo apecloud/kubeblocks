@@ -447,20 +447,42 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 
 // createCluster construct a cluster create options and run
 func (o *initOptions) createCluster() error {
-	// construct a cluster create options and run
-	options, err := o.newCreateOptions()
-	if err != nil {
+	options := &cmdcluster.CreateOptions{
+		CreateOptions: create.CreateOptions{
+			Factory:         util.NewFactory(),
+			IOStreams:       genericclioptions.NewTestIOStreamsDiscard(),
+			Namespace:       defaultNamespace,
+			Name:            kbClusterName,
+			CueTemplateName: cmdcluster.CueTemplateName,
+			GVR:             types.ClusterGVR(),
+		},
+		UpdatableFlags: cmdcluster.UpdatableFlags{
+			TerminationPolicy: "WipeOut",
+			Monitor:           true,
+			PodAntiAffinity:   "Preferred",
+			Tenancy:           "SharedNode",
+		},
+		ClusterDefRef:     o.clusterDef,
+		ClusterVersionRef: o.clusterVersion,
+	}
+	options.CreateOptions.Options = options
+	options.CreateOptions.PreCreate = options.PreCreate
+
+	// if we are running on cloud, create cluster with three replicas
+	if o.cloudProvider != cp.Local {
+		options.Values = append(options.Values, "replicas=3")
+	}
+
+	if err := options.CreateOptions.Complete(); err != nil {
 		return err
 	}
-
-	inputs := create.Inputs{
-		BaseOptionsObj:  &options.BaseOptions,
-		Options:         options,
-		CueTemplateName: cmdcluster.CueTemplateName,
-		ResourceName:    types.ResourceClusters,
+	if err := options.Validate(); err != nil {
+		return err
 	}
-
-	return options.Run(inputs)
+	if err := options.Complete(); err != nil {
+		return err
+	}
+	return options.Run()
 }
 
 // checkExistedCluster check playground kubernetes cluster exists or not, playground
@@ -490,37 +512,4 @@ func (o *initOptions) checkExistedCluster() error {
 		return cmdutil.ErrExit
 	}
 	return nil
-}
-
-func (o *initOptions) newCreateOptions() (*cmdcluster.CreateOptions, error) {
-	dynamicClient, err := util.NewFactory().DynamicClient()
-	if err != nil {
-		return nil, err
-	}
-	options := &cmdcluster.CreateOptions{
-		BaseOptions: create.BaseOptions{
-			IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
-			Namespace: defaultNamespace,
-			Name:      kbClusterName,
-			Dynamic:   dynamicClient,
-		},
-		UpdatableFlags: cmdcluster.UpdatableFlags{
-			TerminationPolicy: "WipeOut",
-			Monitor:           true,
-			PodAntiAffinity:   "Preferred",
-			Tenancy:           "SharedNode",
-		},
-		ClusterDefRef:     o.clusterDef,
-		ClusterVersionRef: o.clusterVersion,
-	}
-
-	// if we are running on cloud, create cluster with three replicas
-	if o.cloudProvider != cp.Local {
-		options.Values = append(options.Values, "replicas=3")
-	}
-
-	if err = options.Complete(); err != nil {
-		return nil, err
-	}
-	return options, nil
 }

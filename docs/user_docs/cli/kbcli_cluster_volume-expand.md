@@ -5,15 +5,14 @@ title: kbcli cluster volume-expand
 Expand volume with the specified components and volumeClaimTemplates in the cluster.
 
 ```
-kbcli cluster volume-expand [flags]
+kbcli cluster volume-expand NAME [flags]
 ```
 
 ### Examples
 
 ```
   # restart specifies the component, separate with commas when <component-name> more than one
-  kbcli cluster volume-expand <my-cluster> --components=<component-name> \
-  --volume-claim-templates=data --storage=10Gi
+  kbcli cluster volume-expand mycluster --components=mysql --volume-claim-templates=data --storage=10Gi
 ```
 
 ### Options

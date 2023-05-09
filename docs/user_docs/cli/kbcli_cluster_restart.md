@@ -5,17 +5,17 @@ title: kbcli cluster restart
 Restart the specified components in the cluster.
 
 ```
-kbcli cluster restart [flags]
+kbcli cluster restart NAME [flags]
 ```
 
 ### Examples
 
 ```
   # restart all components
-  kbcli cluster restart <my-cluster>
+  kbcli cluster restart mycluster
   
-  # restart specifies the component, separate with commas when <component-name> more than one
-  kbcli cluster restart <my-cluster> --components=<component-name>
+  # restart specifies the component, separate with commas when component more than one
+  kbcli cluster restart mycluster --components=mysql
 ```
 
 ### Options

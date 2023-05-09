@@ -20,16 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package create
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/printers"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/scheme"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
@@ -37,19 +35,35 @@ import (
 )
 
 var _ = Describe("Create", func() {
+	const (
+		clusterName = "test"
+		cueFileName = "create_template_test.cue"
+	)
+
 	var (
-		tf          *cmdtesting.TestFactory
-		streams     genericclioptions.IOStreams
-		baseOptions BaseOptions
+		tf      *cmdtesting.TestFactory
+		streams genericclioptions.IOStreams
+		options CreateOptions
 	)
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 		tf.Client = &clientfake.RESTClient{}
-		baseOptions = BaseOptions{
-			Name:      "test",
-			IOStreams: streams,
+		clusterOptions := map[string]interface{}{
+			"clusterDefRef":     "test-def",
+			"clusterVersionRef": "test-clusterversion-ref",
+			"components":        []string{},
+			"terminationPolicy": "Halt",
+		}
+		options = CreateOptions{
+			Factory:         tf,
+			Name:            clusterName,
+			Namespace:       testing.Namespace,
+			IOStreams:       streams,
+			GVR:             types.ClusterGVR(),
+			CueTemplateName: cueFileName,
+			Options:         clusterOptions,
 		}
 	})
 
@@ -58,96 +72,19 @@ var _ = Describe("Create", func() {
 	})
 
 	Context("Create Objects", func() {
-		It("test Create run", func() {
-			clusterOptions := map[string]interface{}{
-				"name":              "test",
-				"namespace":         testing.Namespace,
-				"clusterDefRef":     "test-def",
-				"clusterVersionRef": "test-clusterversion-ref",
-				"components":        []string{},
-				"terminationPolicy": "Halt",
-			}
-
-			inputs := Inputs{
-				CueTemplateName: "create_template_test.cue",
-				ResourceName:    types.ResourceClusters,
-				BaseOptionsObj:  &baseOptions,
-				Options:         clusterOptions,
-				Factory:         tf,
-				Validate: func() error {
-					return nil
-				},
-				Complete: func() error {
-					return nil
-				},
-				BuildFlags: func(cmd *cobra.Command) {
-					cmd.Flags().StringVar(&baseOptions.Namespace, "clusterDefRef", "", "cluster definition")
-				},
-			}
-			cmd := BuildCommand(inputs)
-			Expect(cmd).ShouldNot(BeNil())
-			Expect(cmd.Flags().Lookup("clusterDefRef")).ShouldNot(BeNil())
-
-			Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
-			Expect(baseOptions.Validate(inputs)).Should(Succeed())
-			Expect(baseOptions.Run(inputs)).Should(Succeed())
+		It("Complete", func() {
+			options.Args = []string{}
+			Expect(options.Complete()).Should(Succeed())
 		})
 
-		It("test create dry-run", func() {
-			clusterOptions := map[string]interface{}{
-				"name":              "test",
-				"namespace":         testing.Namespace,
-				"clusterDefRef":     "test-def",
-				"clusterVersionRef": "test-clusterversion-ref",
-				"components":        []string{},
-				"terminationPolicy": "Halt",
-			}
-
-			inputs := Inputs{
-				CueTemplateName: "create_template_test.cue",
-				ResourceName:    types.ResourceClusters,
-				BaseOptionsObj:  &baseOptions,
-				Options:         clusterOptions,
-				Factory:         tf,
-				Validate: func() error {
-					return nil
-				},
-				Complete: func() error {
-					baseOptions.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
-						var p printers.ResourcePrinter
-						var err error
-						switch baseOptions.Format {
-						case printer.JSON:
-							p = &printers.JSONPrinter{}
-						case printer.YAML:
-							p = &printers.YAMLPrinter{}
-						default:
-							return nil, genericclioptions.NoCompatiblePrinterError{AllowedFormats: []string{"JOSN", "YAML"}}
-						}
-
-						p, err = printers.NewTypeSetter(scheme.Scheme).WrapToPrinter(p, nil)
-						if err != nil {
-							return nil, err
-						}
-						return p.PrintObj, nil
-					}
-					return nil
-				},
-				BuildFlags: func(cmd *cobra.Command) {
-					cmd.Flags().StringVar(&baseOptions.Namespace, "clusterDefRef", "", "cluster definition")
-					cmd.Flags().StringVar(&baseOptions.DryRunStrategy, "dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-					cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
-					printer.AddOutputFlagForCreate(cmd, &baseOptions.Format)
-				},
-			}
-			cmd := BuildCommand(inputs)
-
+		It("test create with dry-run", func() {
+			options.Format = printer.YAML
 			testCases := []struct {
-				clusterName   string
-				isUseDryRun   bool
-				mode          string
-				dryRunStrateg DryRunStrategy
-				success       bool
+				clusterName    string
+				isUseDryRun    bool
+				mode           string
+				dryRunStrategy DryRunStrategy
+				success        bool
 			}{
 				{ // test do not use dry-run strategy
 					"test1",
@@ -187,64 +124,22 @@ var _ = Describe("Create", func() {
 			}
 
 			for _, t := range testCases {
-				clusterOptions["name"] = t.clusterName
-				Expect(cmd).ShouldNot(BeNil())
-				Expect(cmd.Flags().Lookup("clusterDefRef")).ShouldNot(BeNil())
-				Expect(cmd.Flags().Lookup("dry-run")).ShouldNot(BeNil())
-				Expect(cmd.Flags().Lookup("output")).ShouldNot(BeNil())
+				By(fmt.Sprintf("when isDryRun %v, dryRunStrategy %v, mode %s",
+					t.isUseDryRun, t.dryRunStrategy, t.mode))
+				options.Name = t.clusterName
 				if t.isUseDryRun {
-					Expect(cmd.Flags().Set("dry-run", t.mode)).Should(Succeed())
+					options.DryRun = t.mode
 				}
+				Expect(options.Complete()).Should(Succeed())
 
-				Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
-				Expect(baseOptions.Validate(inputs)).Should(Succeed())
-
-				dryRunStrateg, _ := baseOptions.GetDryRunStrategy()
+				s, _ := options.GetDryRunStrategy()
 				if t.success {
-					Expect(dryRunStrateg == t.dryRunStrateg).Should(BeTrue())
-					Expect(baseOptions.Run(inputs)).Should(Succeed())
+					Expect(s == t.dryRunStrategy).Should(BeTrue())
+					Expect(options.Run()).Should(Succeed())
 				} else {
-					Expect(dryRunStrateg == t.dryRunStrateg).Should(BeFalse())
+					Expect(s).ShouldNot(Equal(t.dryRunStrategy))
 				}
 			}
-		})
-
-		It("test Create runAsApply", func() {
-			clusterOptions := map[string]interface{}{
-				"name":              "test-apply",
-				"namespace":         testing.Namespace,
-				"clusterDefRef":     "test-def",
-				"clusterVersionRef": "test-clusterversion-ref",
-				"components":        []string{},
-				"terminationPolicy": "Halt",
-			}
-
-			inputs := Inputs{
-				CueTemplateName: "create_template_test.cue",
-				ResourceName:    types.ResourceClusters,
-				BaseOptionsObj:  &baseOptions,
-				Options:         clusterOptions,
-				Factory:         tf,
-				Validate: func() error {
-					return nil
-				},
-				Complete: func() error {
-					return nil
-				},
-				BuildFlags: func(cmd *cobra.Command) {
-					cmd.Flags().StringVar(&baseOptions.Namespace, "clusterDefRef", "", "cluster definition")
-				},
-			}
-			cmd := BuildCommand(inputs)
-			Expect(cmd).ShouldNot(BeNil())
-			Expect(cmd.Flags().Lookup("clusterDefRef")).ShouldNot(BeNil())
-
-			Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
-			Expect(baseOptions.Validate(inputs)).Should(Succeed())
-			// create
-			Expect(baseOptions.RunAsApply(inputs)).Should(Succeed())
-			// apply if exists
-			Expect(baseOptions.RunAsApply(inputs)).Should(Succeed())
 		})
 	})
 })

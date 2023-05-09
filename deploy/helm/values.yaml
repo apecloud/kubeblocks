@@ -346,7 +346,7 @@ prometheus:
       ## If true, use a statefulset instead of a deployment for pod management.
       ## This allows to scale replicas to more than 1 pod
       ##
-      enabled: false
+      enabled: true
 
       ## Alertmanager headless service to use for the statefulset
       ##
@@ -553,7 +553,7 @@ prometheus:
       ## If true, use a statefulset instead of a deployment for pod management.
       ## This allows to scale replicas to more than 1 pod
       ##
-      enabled: false
+      enabled: true
 
     ## Prometheus server resource requests and limits
     ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
@@ -1679,23 +1679,6 @@ csi-s3:
     create: true
     singleBucket: ""
     mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666"
-
-csi-oss:
-  enabled: false
-  ## @param csi-oss.secret.akId -- oss Access Key.
-  ## @param csi-oss.secret.akSecret -- oss Secret Key.
-  secret:
-    akId: ""
-    akSecret: ""
-  ## @param csi-oss.storageConfig.bucket -- oss bucket name.
-  ## @param csi-oss.storageConfig.endpoint -- endpoint of the oss service, e.g. oss-cn-hangzhou.aliyuncs.com.
-  ## @param csi-oss.storageConfig.path -- mount path of the oss bucket.
-  ## @param csi-oss.storageConfig.otherOpts -- mount options.
-  storageConfig:
-    bucket: ""
-    endpoint: "oss-cn-hangzhou.aliyuncs.com"
-    path: "/"
-    otherOpts: "-o max_stat_cache_size=0 -o allow_other"
 
 alertmanager-webhook-adaptor:
   ## Linkage with prometheus.enabled

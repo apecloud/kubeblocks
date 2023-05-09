@@ -22,6 +22,7 @@ package kubeblocks
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/containerd/stargz-snapshotter/estargz/errorutil"
@@ -46,6 +47,9 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
+
+	tablePrinter "github.com/jedib0t/go-pretty/v6/table"
+	text "github.com/jedib0t/go-pretty/v6/text"
 )
 
 var (
@@ -209,6 +213,35 @@ func (o *statusOptions) buildSelectorList(ctx context.Context, allErrs *[]error)
 func (o *statusOptions) showAddons() {
 	fmt.Fprintln(o.Out, "\nKubeBlocks Addons:")
 	tbl := printer.NewTablePrinter(o.Out)
+
+	tbl.Tbl.SetColumnConfigs([]tablePrinter.ColumnConfig{
+		{
+			Name: "STATUS",
+			Transformer: func(val interface{}) string {
+				var ok bool
+				var addonPhase extensionsv1alpha1.AddonPhase
+				if addonPhase, ok = val.(extensionsv1alpha1.AddonPhase); !ok {
+					return fmt.Sprint(val)
+				}
+				var color text.Color
+				switch addonPhase {
+				case extensionsv1alpha1.AddonEnabled:
+					color = text.FgGreen
+				case extensionsv1alpha1.AddonFailed:
+					color = text.FgRed
+				case extensionsv1alpha1.AddonDisabled:
+					color = text.Faint
+				case extensionsv1alpha1.AddonEnabling, extensionsv1alpha1.AddonDisabling:
+					color = text.FgCyan
+				default:
+					return fmt.Sprint(addonPhase)
+				}
+				return color.Sprint(addonPhase)
+			},
+		},
+	},
+	)
+
 	tbl.SetHeader("NAME", "STATUS", "TYPE", "PROVIDER")
 
 	var provider string
@@ -336,6 +369,38 @@ func (o *statusOptions) showHelmResources(ctx context.Context, allErrs *[]error)
 func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 	fmt.Fprintln(o.Out, "\nKubeBlocks Workloads:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.Tbl.SetColumnConfigs([]tablePrinter.ColumnConfig{
+		{
+			Name: "READY PODS",
+			Transformer: func(val interface{}) (valStr string) {
+				var ok bool
+				if valStr, ok = val.(string); !ok {
+					return fmt.Sprint(val)
+				}
+				if valStr == notAvailable || len(valStr) == 0 {
+					return valStr
+				}
+				// split string by '/'
+				podsInfo := strings.Split(valStr, "/")
+				if len(podsInfo) != 2 {
+					return valStr
+				}
+				readyPods, totalPods := int(0), int(0)
+				readyPods, _ = strconv.Atoi(podsInfo[0])
+				totalPods, _ = strconv.Atoi(podsInfo[1])
+
+				var color text.Color
+				if readyPods != totalPods {
+					color = text.FgRed
+				} else {
+					color = text.FgGreen
+				}
+				return color.Sprint(valStr)
+			},
+		},
+	},
+	)
+
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "READY PODS", "CPU(cores)", "MEMORY(bytes)", "CREATED-AT")
 
 	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksWorkloads, o.selectorList, allErrs)

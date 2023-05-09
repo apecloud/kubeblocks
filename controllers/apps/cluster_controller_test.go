@@ -994,7 +994,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(func(g Gomega) {
 			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(len(pods)).Should(Equal(int(*sts.Spec.Replicas)))
+			g.Expect(pods).Should(HaveLen(int(*sts.Spec.Replicas)))
 			for _, pod := range pods {
 				g.Expect(pod.Annotations).ShouldNot(BeNil())
 				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*sts.Spec.Replicas))))

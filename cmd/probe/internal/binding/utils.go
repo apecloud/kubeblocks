@@ -20,12 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package binding
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"os"
+	"text/template"
 	"time"
 
 	"github.com/dapr/components-contrib/bindings"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 )
 
 type UserInfo struct {
@@ -211,4 +220,88 @@ func String2RoleType(roleName string) RoleType {
 		return NoPrivileges
 	}
 	return CustomizedRole
+}
+
+func SentProbeEvent(opsResult OpsResult) error {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+	event, _ := createProbeEvent(opsResult)
+
+	namespace := os.Getenv("KB_NAMESPACE")
+	_, err = clientset.CoreV1().Events(namespace).Create(context.TODO(), event, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createProbeEvent(opsResult OpsResult) (*corev1.Event, error) {
+	eventTmpl := `
+apiVersion: v1
+kind: Event
+metadata:
+  name: {{ .PodName }}.{{ .EventSeq }}
+  namespace: {{ .Namespace }}
+involvedObject:
+  apiVersion: v1
+  fieldPath: spec.containers{kbprobe-rolecheck}
+  kind: Pod
+  name: {{ .PodName }}
+  namespace: default
+message: "{\"data\":{\"role\":\"{{ .Role }}\"}}"
+reason: RoleChanged
+type: Normal
+`
+
+	// get pod object
+	podName := os.Getenv("KB_POD_NAME")
+	namespace := os.Getenv("KB_NAMESPACE")
+	msg, _ := json.Marshal(opsResult)
+	seq := randStringBytes(16)
+	roleValue := map[string]string{
+		"PodName":   podName,
+		"Namespace": namespace,
+		"Message":   string(msg),
+		"EventSeq":  seq,
+	}
+	tmpl, err := template.New("event-tmpl").Parse(eventTmpl)
+	if err != nil {
+		return nil, err
+	}
+	buf := new(bytes.Buffer)
+	err = tmpl.Execute(buf, roleValue)
+	if err != nil {
+		return nil, err
+	}
+
+	event, _, err := scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return event.(*corev1.Event), nil
+}
+
+type roleEventValue struct {
+	PodName  string
+	EventSeq string
+	Role     string
+}
+
+const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+func randStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
 }

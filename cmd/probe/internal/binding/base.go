@@ -223,6 +223,8 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	if ops.OriRole != role {
 		ops.OriRole = role
 		ops.RoleUnchangedCount = 0
+		err := SentProbeEvent(opsRes)
+		ops.Logger.Infof("send event failed: %v", err)
 	} else {
 		ops.RoleUnchangedCount++
 	}

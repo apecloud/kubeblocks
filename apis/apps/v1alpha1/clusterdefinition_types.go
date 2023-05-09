@@ -567,7 +567,7 @@ type ClusterDefinitionProbes struct {
 }
 
 type StatelessSetSpec struct {
-	// llStrategy defines the underlying deployment strategy to use to replace existing pods with new ones.
+	// updateStrategy defines the underlying deployment strategy to use to replace existing pods with new ones.
 	// +optional
 	// +patchStrategy=retainKeys
 	UpdateStrategy appsv1.DeploymentStrategy `json:"updateStrategy,omitempty"`
@@ -595,12 +595,13 @@ type StatefulSetSpec struct {
 	// to match the desired scale without waiting, and on scale down will delete
 	// all pods at once.
 	// +optional
-	LLPodManagementPolicy appsv1.PodManagementPolicyType `json:"llPodManagementPolicy,omitempty" protobuf:"bytes,6,opt,name=podManagementPolicy,casttype=PodManagementPolicyType"`
+	LLPodManagementPolicy appsv1.PodManagementPolicyType `json:"llPodManagementPolicy,omitempty"`
 
 	// llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy that will be
 	// employed to update Pods in the StatefulSet when a revision is made to
 	// Template. Will ignore `updateStrategy` attribute if provided.
-	LLUpdateStrategy *appsv1.StatefulSetUpdateStrategy `json:"llUpdateStrategy,omitempty" protobuf:"bytes,7,opt,name=updateStrategy"`
+	// +optional
+	LLUpdateStrategy *appsv1.StatefulSetUpdateStrategy `json:"llUpdateStrategy,omitempty"`
 }
 
 var _ StatefulSetWorkload = &StatefulSetSpec{}

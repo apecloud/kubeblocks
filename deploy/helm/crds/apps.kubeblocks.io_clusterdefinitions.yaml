@@ -8105,8 +8105,7 @@ spec:
                       type: object
                     replicationSpec:
                       description: replicationSpec defines replication related spec
-                        if workloadType is Replication, required if workloadType is
-                        Replication.
+                        if workloadType is Replication.
                       properties:
                         llPodManagementPolicy:
                           description: llPodManagementPolicy is the low-level controls
@@ -8608,7 +8607,7 @@ spec:
                         workloadType is Stateless.
                       properties:
                         updateStrategy:
-                          description: llStrategy defines the underlying deployment
+                          description: updateStrategy defines the underlying deployment
                             strategy to use to replace existing pods with new ones.
                           properties:
                             rollingUpdate:

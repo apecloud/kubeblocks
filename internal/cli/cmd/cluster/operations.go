@@ -186,6 +186,12 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 }
 
 func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error {
+	if o.Class != "" && (o.CPU != "" || o.Memory != "") {
+		return fmt.Errorf("class and cpu/memory cannot be both specified")
+	}
+	if o.Class == "" && o.CPU == "" && o.Memory == "" {
+		return fmt.Errorf("class or cpu/memory must be specified")
+	}
 	componentClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, cluster.Spec.ClusterDefRef)
 	if err != nil {
 		return err

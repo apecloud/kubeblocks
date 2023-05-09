@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/kit/logger"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -222,28 +223,35 @@ func String2RoleType(roleName string) RoleType {
 	return CustomizedRole
 }
 
-func SentProbeEvent(opsResult OpsResult) error {
+func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger) error {
+	log.Infof("send event: %v", opsResult)
 	event, err := createProbeEvent(opsResult)
 	if err != nil {
+		log.Infof("generate event failed: %v", err)
 		return err
 	}
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
+		log.Infof("get k8s client config failed: %v", err)
 		return err
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
+		log.Infof("k8s client create failed: %v", err)
 		return err
 	}
 	namespace := os.Getenv("KB_NAMESPACE")
-	_, err = clientset.CoreV1().Events(namespace).Create(context.TODO(), event, metav1.CreateOptions{})
-	if err != nil {
-		return err
+	for i := 0; i < 3; i++ {
+		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
+		if err == nil {
+			break
+		}
+		log.Infof("send event failed: %v", err)
 	}
 
-	return nil
+	return err
 }
 
 func createProbeEvent(opsResult OpsResult) (*corev1.Event, error) {
@@ -255,7 +263,7 @@ metadata:
   namespace: {{ .Namespace }}
 involvedObject:
   apiVersion: v1
-  fieldPath: spec.containers{kb-checkrole}
+  fieldPath: spec.containers{sqlchannel}
   kind: Pod
   name: {{ .PodName }}
   namespace: {{ .Namespace }}
@@ -289,6 +297,7 @@ type: Normal
 		return nil, err
 	}
 	event.Message = string(msg)
+	event.Reason = opsResult["operation"].(string)
 	event.FirstTimestamp = metav1.Now()
 	event.LastTimestamp = metav1.Now()
 

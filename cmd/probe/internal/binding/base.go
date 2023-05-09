@@ -188,6 +188,7 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 
 func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
+	opsRes["operation"] = CheckRoleOperation
 	opsRes["originalRole"] = ops.OriRole
 	if ops.GetRole == nil {
 		message := fmt.Sprintf("roleCheck operation is not implemented for %v", ops.DBType)
@@ -222,11 +223,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	opsRes["role"] = role
 	if ops.OriRole != role {
 		ops.OriRole = role
-		ops.RoleUnchangedCount = 0
-		err := SentProbeEvent(opsRes)
-		ops.Logger.Infof("send event failed: %v", err)
-	} else {
-		ops.RoleUnchangedCount++
+		SentProbeEvent(ctx, opsRes, ops.Logger)
 	}
 
 	// RoleUnchangedCount is the count of consecutive role unchanged checks.
@@ -234,9 +231,9 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	// then the roleCheck event will be reported at roleEventReportFrequency so that the event controller
 	// can always get relevant roleCheck events in order to maintain the pod label accurately, even in cases
 	// of roleChanged events being lost or the pod role label being deleted or updated incorrectly.
-	if ops.RoleUnchangedCount < ops.RoleDetectionThreshold && ops.RoleUnchangedCount%roleEventReportFrequency == 0 {
-		resp.Metadata[StatusCode] = OperationFailedHTTPCode
-	}
+	// if ops.RoleUnchangedCount < ops.RoleDetectionThreshold && ops.RoleUnchangedCount%roleEventReportFrequency == 0 {
+	// 	resp.Metadata[StatusCode] = OperationFailedHTTPCode
+	// }
 	return opsRes, nil
 }
 

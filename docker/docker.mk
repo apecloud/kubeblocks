@@ -67,7 +67,7 @@ endif
 
 
 .PHONY: build-manager-image
-build-manager-image: DOCKER_BUILD_ARGS += --cache-to type=gha --cache-from type=gha
+build-manager-image: DOCKER_BUILD_ARGS += --cache-to type=gha,scope=${GITHUB_REF_NAME}-manager-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-manager-image
 build-manager-image: generate ## Build Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 	$(DOCKER) build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile -t ${IMG}:${VERSION} -t ${IMG}:latest
@@ -81,7 +81,7 @@ endif
 
 
 .PHONY: push-manager-image
-push-manager-image: DOCKER_BUILD_ARGS += --cache-to type=gha --cache-from type=gha
+push-manager-image: DOCKER_BUILD_ARGS += --cache-to type=gha,scope=${GITHUB_REF_NAME}-manager-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-manager-image
 push-manager-image: generate ## Push Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
@@ -98,7 +98,7 @@ endif
 endif
 
 .PHONY: build-tools-image
-build-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha --cache-from type=gha
+build-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha,scope=${GITHUB_REF_NAME}-tools-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-tools-image
 build-tools-image: generate ## Build tools container image.
 ifneq ($(BUILDX_ENABLED), true)
 	$(DOCKER) build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile-tools -t ${TOOL_IMG}:${VERSION} -t ${TOOL_IMG}:latest
@@ -111,7 +111,7 @@ endif
 endif
 
 .PHONY: push-tools-image
-push-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha --cache-from type=gha
+push-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha,scope=${GITHUB_REF_NAME}-tools-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-tools-image
 push-tools-image: generate ## Push tools container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)

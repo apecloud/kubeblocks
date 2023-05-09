@@ -243,7 +243,7 @@ func GetClusterDefByName(dynamic dynamic.Interface, name string) (*appsv1alpha1.
 }
 
 func GetDefaultCompName(cd *appsv1alpha1.ClusterDefinition) (string, error) {
-	if len(cd.Spec.ComponentDefs) > 0 {
+	if len(cd.Spec.ComponentDefs) == 1 {
 		return cd.Spec.ComponentDefs[0].Name, nil
 	}
 	return "", fmt.Errorf("failed to get the default component definition name")

@@ -33,30 +33,6 @@ rules:
 - apiGroups:
   - apps
   resources:
-  - pods
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - pods/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - pods/status
-  verbs:
-  - get
-- apiGroups:
-  - apps
-  resources:
   - replicasets
   verbs:
   - create
@@ -421,6 +397,7 @@ rules:
   resources:
   - pods
   verbs:
+  - create
   - delete
   - deletecollection
   - get
@@ -437,10 +414,22 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - pods/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - pods/log
   verbs:
   - get
   - list
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
+  verbs:
+  - get
 - apiGroups:
   - ""
   resources:

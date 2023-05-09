@@ -273,12 +273,12 @@ type CustomAction struct {
 }
 
 type Action struct {
-	// utility container contains command that can be used to retrieve of process role info
+	// utility image contains command that can be used to retrieve of process role info
+	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
 	// +optional
-	Container *corev1.Container `json:"container,omitempty"`
+	Image string `json:"image,omitempty"`
 
 	// Command will be executed in Container to retrieve or process role info
-	// Command should be in the Container, or latest [BusyBox](https://busybox.net/) if Container not configured
 	// Environment variables can be used in Command:
 	// - KB_CONSENSUS_SET_LAST_STDOUT stdout from last action
 	// - KB_CONSENSUS_SET_USERNAME username part of credential

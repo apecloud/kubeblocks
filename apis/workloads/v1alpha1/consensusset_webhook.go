@@ -93,41 +93,6 @@ func (r *ConsensusSet) validate() error {
 				"leader is required"))
 	}
 
-	for _, role := range r.Spec.Roles {
-		if len(role.Name) == 0 {
-			allErrs = append(allErrs,
-				field.Required(field.NewPath("spec.roles[*].name"),
-					"role name can't be empty"))
-		}
-		if role.AccessMode != NoneMode &&
-			role.AccessMode != ReadonlyMode &&
-			role.AccessMode != ReadWriteMode {
-			allErrs = append(allErrs,
-				field.Required(field.NewPath("spec.roles[*].accessMode"),
-					"invalid accessMode, should be one of [None, Readonly, ReadWrite]"))
-		}
-	}
-
-	if r.Spec.RoleObservation.BuiltIn != nil {
-		binding := r.Spec.RoleObservation.BuiltIn.BindingType
-		if binding != ApeCloudMySQLBinding &&
-			binding != ETCDBinding &&
-			binding != ZooKeeperBinding &&
-			binding != MongoDBBinding {
-			allErrs = append(allErrs,
-				field.Required(field.NewPath("spec.roleObservation.builtIn.bindingType"),
-					"invalid bindingType, should be one of [apecloud-mysql, etcd, zookeeper, mongodb]"))
-		}
-	}
-
-	if r.Spec.UpdateStrategy != SerialUpdateStrategy &&
-		r.Spec.UpdateStrategy != ParallelUpdateStrategy &&
-		r.Spec.UpdateStrategy != BestEffortParallelUpdateStrategy {
-		allErrs = append(allErrs,
-			field.Required(field.NewPath("spec.updateStrategy"),
-				"invalid updateStrategy, should be one of [Serial, BestEffortParallel, Parallel]"))
-	}
-
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{

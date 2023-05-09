@@ -241,7 +241,7 @@ func injectRoleObservationContainer(csSet workloads.ConsensusSet, template *core
 	if bindingType == customBinding && roleObservation.Custom != nil {
 		allUsedPorts := findAllUsedPorts(template)
 		svcPort := actionSvcPortBase
-		for _, _ = range roleObservation.Custom.Actions {
+		for range roleObservation.Custom.Actions {
 			svcPort = findNextAvailablePort(svcPort, allUsedPorts)
 			actionSvcPorts = append(actionSvcPorts, svcPort)
 		}
@@ -283,11 +283,11 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 	roleObservation := csSet.Spec.RoleObservation
 	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
 	if len(image) == 0 {
-		image = defaultBuiltInRoleObservationImage
+		image = defaultRoleObservationImage
 	}
 	observationDaemonPort := viper.GetInt("ROLE_OBSERVATION_SERVICE_PORT")
 	if observationDaemonPort == 0 {
-		observationDaemonPort = defaultBuiltInRoleObservationDaemonPort
+		observationDaemonPort = defaultRoleObservationDaemonPort
 	}
 	roleObserveURI := fmt.Sprintf(roleObservationURIFormat, strconv.Itoa(observationDaemonPort), bindingType)
 	env := make([]corev1.EnvVar, 0)
@@ -421,22 +421,26 @@ func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template
 	}
 	template.Spec.InitContainers = append(template.Spec.InitContainers, initContainer)
 
-	// mount agent volume to all utility containers
-	for _, action := range csSet.Spec.RoleObservation.Custom.Actions {
-		// inject volumeMount
-		// TODO(free6om): handle nil container
-		action.Container.VolumeMounts = append(action.Container.VolumeMounts, agentVolumeMount)
-
-		// inject agent start cmd to container command
+	// inject action containers based on utility images
+	for i, action := range csSet.Spec.RoleObservation.Custom.Actions {
+		image := action.Image
+		if len(image) == 0 {
+			image = defaultActionImage
+		}
 		command := []string{
 			agentPath,
+			"-port", fmt.Sprintf("%d", actionSvcPorts[i]),
 			shell2httpServePath,
 			strings.Join(action.Command, " "),
 		}
-		action.Container.Command = command
-
-		// inject action containers into template
-		template.Spec.Containers = append(template.Spec.Containers, *action.Container)
+		container := corev1.Container{
+			Name:            fmt.Sprintf("action-%d", i),
+			Image:           image,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			VolumeMounts:    []corev1.VolumeMount{agentVolumeMount},
+			Command:         command,
+		}
+		template.Spec.Containers = append(template.Spec.Containers, container)
 	}
 }
 

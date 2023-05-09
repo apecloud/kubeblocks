@@ -44,10 +44,11 @@ const (
 	roleAgentName                                                 = "agent"
 	shell2httpImage                                               = "msoap/shell2http:1.16.0"
 	shell2httpBinaryPath                                          = "/app/shell2http"
-	shell2httpServePath                                           = "/role"
-	defaultBuiltInRoleObservationImage                            = "registry.cn-hangzhou.aliyuncs.com/apecloud/kubeblocks-tools:latest"
-	defaultBuiltInRoleObservationDaemonPort                       = 3501
-	roleObservationURIFormat                                      = "http://localhost:%s/v1.0/bindings/%s" // http://localhost:<port>/v1.0/bindings/<binding_type>
+	shell2httpServePath                     = "/role"
+	defaultRoleObservationImage      = "registry.cn-hangzhou.aliyuncs.com/apecloud/kubeblocks-tools:latest"
+	defaultRoleObservationDaemonPort = 3501
+	roleObservationURIFormat         = "http://localhost:%s/v1.0/bindings/%s" // http://localhost:<port>/v1.0/bindings/<binding_type>
+	defaultActionImage = "busybox:latest"
 	usernameCredentialVarName                                     = "KB_CONSENSUS_SET_USERNAME"
 	passwordCredentialVarName                                     = "KB_CONSENSUS_SET_PASSWORD"
 	servicePortVarName                                            = "KB_CONSENSUS_SET_SERVICE_PORT"

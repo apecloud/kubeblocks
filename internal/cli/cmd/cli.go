@@ -21,9 +21,10 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
 	"os"
 	"strings"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

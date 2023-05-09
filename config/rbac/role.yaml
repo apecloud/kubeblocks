@@ -397,6 +397,7 @@ rules:
   resources:
   - pods
   verbs:
+  - create
   - delete
   - deletecollection
   - get
@@ -413,10 +414,22 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - pods/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - pods/log
   verbs:
   - get
   - list
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
+  verbs:
+  - get
 - apiGroups:
   - ""
   resources:

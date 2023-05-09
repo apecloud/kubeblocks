@@ -47,6 +47,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/sync2foxlake"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -153,6 +154,7 @@ A Command Line Interface for KubeBlocks`,
 		migration.NewMigrationCmd(f, ioStreams),
 		plugin.NewPluginCmd(ioStreams),
 		fault.NewFaultCmd(f, ioStreams),
+		sync2foxlake.NewSync2FoxLakeCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

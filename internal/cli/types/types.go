@@ -156,6 +156,13 @@ const (
 	ResourceCustomResourceDefinition   = "customresourcedefinitions"
 )
 
+// Sync2FoxLake API group
+const (
+	Sync2FoxLakeAPIGroup      = "sync2foxlake.apecloud.io"
+	Sync2FoxLakeAPIVersion    = "v1alpha1"
+	ResourceSync2FoxLakeTasks = "sync2foxlaketasks"
+)
+
 const (
 	None = "<none>"
 
@@ -372,4 +379,12 @@ func JobGVR() schema.GroupVersionResource {
 }
 func CronJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: K8SBatchAPIGroup, Version: K8sBatchAPIVersion, Resource: ResourceCronJobs}
+}
+
+func Sync2FoxLakeTaskGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    Sync2FoxLakeAPIGroup,
+		Version:  Sync2FoxLakeAPIVersion,
+		Resource: ResourceSync2FoxLakeTasks,
+	}
 }

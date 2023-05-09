@@ -1,33 +1,32 @@
 ---
-title: kbcli
+title: kbcli sync2foxlake pause
 ---
 
-KubeBlocks CLI.
-
-### Synopsis
+Pause database synchronization.
 
 ```
-
-=============================================
- __    __ _______   ______  __       ______ 
-|  \  /  \       \ /      \|  \     |      \
-| ▓▓ /  ▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓\ ▓▓      \▓▓▓▓▓▓
-| ▓▓/  ▓▓| ▓▓__/ ▓▓ ▓▓   \▓▓ ▓▓       | ▓▓  
-| ▓▓  ▓▓ | ▓▓    ▓▓ ▓▓     | ▓▓       | ▓▓  
-| ▓▓▓▓▓\ | ▓▓▓▓▓▓▓\ ▓▓   __| ▓▓       | ▓▓  
-| ▓▓ \▓▓\| ▓▓__/ ▓▓ ▓▓__/  \ ▓▓_____ _| ▓▓_ 
-| ▓▓  \▓▓\ ▓▓    ▓▓\▓▓    ▓▓ ▓▓     \   ▓▓ \
- \▓▓   \▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓ \▓▓▓▓▓▓▓▓\▓▓▓▓▓▓
-
-=============================================
-A Command Line Interface for KubeBlocks
+kbcli sync2foxlake pause NAME [flags]
 ```
 
+### Examples
+
 ```
-kbcli [flags]
+  # pause a sync2foxlake task named mytask
+  kbcli sync2foxlake pause mytask
 ```
 
 ### Options
+
+```
+      --allow-missing-template-keys    If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
+      --dry-run string[="unchanged"]   Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+  -h, --help                           help for pause
+  -o, --output string                  Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
+      --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
+      --template string                Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
+```
+
+### Options inherited from parent commands
 
 ```
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
@@ -40,7 +39,6 @@ kbcli [flags]
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
-  -h, --help                           help for kbcli
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -54,22 +52,7 @@ kbcli [flags]
 
 ### SEE ALSO
 
-* [kbcli addon](kbcli_addon.md)	 - Addon command.
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
-* [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
-* [kbcli class](kbcli_class.md)	 - Manage classes
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
-* [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command.
-* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards.
-* [kbcli fault](kbcli_fault.md)	 - Inject faults to pod.
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
-* [kbcli migration](kbcli_migration.md)	 - Data migration between two data sources.
-* [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands.
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud.
-* [kbcli plugin](kbcli_plugin.md)	 - Provides utilities for interacting with plugins.
 * [kbcli sync2foxlake](kbcli_sync2foxlake.md)	 - Sync data from other database to FoxLake
-* [kbcli version](kbcli_version.md)	 - Print the version information, include kubernetes, KubeBlocks and kbcli version.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

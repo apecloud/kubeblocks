@@ -1,33 +1,54 @@
 ---
-title: kbcli
+title: kbcli sync2foxlake create
 ---
 
-KubeBlocks CLI.
-
-### Synopsis
+Create a sync2foxlake task.
 
 ```
-
-=============================================
- __    __ _______   ______  __       ______ 
-|  \  /  \       \ /      \|  \     |      \
-| ▓▓ /  ▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓\ ▓▓      \▓▓▓▓▓▓
-| ▓▓/  ▓▓| ▓▓__/ ▓▓ ▓▓   \▓▓ ▓▓       | ▓▓  
-| ▓▓  ▓▓ | ▓▓    ▓▓ ▓▓     | ▓▓       | ▓▓  
-| ▓▓▓▓▓\ | ▓▓▓▓▓▓▓\ ▓▓   __| ▓▓       | ▓▓  
-| ▓▓ \▓▓\| ▓▓__/ ▓▓ ▓▓__/  \ ▓▓_____ _| ▓▓_ 
-| ▓▓  \▓▓\ ▓▓    ▓▓\▓▓    ▓▓ ▓▓     \   ▓▓ \
- \▓▓   \▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓ \▓▓▓▓▓▓▓▓\▓▓▓▓▓▓
-
-=============================================
-A Command Line Interface for KubeBlocks
+kbcli sync2foxlake create NAME [flags]
 ```
 
+### Examples
+
 ```
-kbcli [flags]
+  # create a sync2foxlake task to synchronize data from mysql:testdb to foxlake
+  kbcli sync2foxlake create mytask --source user:12345@127.0.0.1:3306 --sink foxlake-cluster --database testdb
+  
+  # create a sync2foxlake task to synchronize data from wesql:testdb to foxlake
+  kbcli sync2foxlake create mytask --source wesql-cluster --sink foxlake-cluster --database testdb
+  
+  # create a sync2foxlake task with specific latency, engine, and quota
+  kbcli sync2foxlake create mytask
+  --source wesql-cluster
+  --sink foxlake-cluster
+  --database testdb
+  --lag "10 seconds"
+  --engine "columnar@myengine"
+  --quota "myquota"
+  
+  # create a sync2foxlake task to synchronize specific tables in testdb
+  kbcli sync2foxlake create mytask
+  --source wesql-cluster
+  --sink foxlake-cluster
+  --database testdb
+  --tables-included '"tb1","tb2","tb3"'
 ```
 
 ### Options
+
+```
+      --database string           Set the database name to be synchronized in the source database.
+      --database-type string      Set the database type of the source database. (default "mysql")
+      --engine string             Set the engine of the synchronized database. (default "columnar@default")
+  -h, --help                      help for create
+      --lag string                Set the latency of the synchronized database. (default "1 seconds")
+      --quota string              Set the quota of the synchronized database. (default "default")
+      --sink string               Set the source database information for synchronization. Supports clustername or connection string like '{username}:{password}@{connection_address}:{connection_port}'.
+      --source string             Set the source database information for synchronization. Supports clustername or connection string like '{username}:{password}@{connection_address}:{connection_port}'.
+      --tables-included strings   Set the tables to be synchronized in the source database.
+```
+
+### Options inherited from parent commands
 
 ```
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
@@ -40,7 +61,6 @@ kbcli [flags]
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
-  -h, --help                           help for kbcli
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -54,22 +74,7 @@ kbcli [flags]
 
 ### SEE ALSO
 
-* [kbcli addon](kbcli_addon.md)	 - Addon command.
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
-* [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
-* [kbcli class](kbcli_class.md)	 - Manage classes
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
-* [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command.
-* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards.
-* [kbcli fault](kbcli_fault.md)	 - Inject faults to pod.
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
-* [kbcli migration](kbcli_migration.md)	 - Data migration between two data sources.
-* [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands.
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud.
-* [kbcli plugin](kbcli_plugin.md)	 - Provides utilities for interacting with plugins.
 * [kbcli sync2foxlake](kbcli_sync2foxlake.md)	 - Sync data from other database to FoxLake
-* [kbcli version](kbcli_version.md)	 - Print the version information, include kubernetes, KubeBlocks and kbcli version.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

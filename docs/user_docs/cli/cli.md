@@ -175,6 +175,18 @@ Provides utilities for interacting with plugins.
 * [kbcli plugin upgrade](kbcli_plugin_upgrade.md)	 - Upgrade kbcli or kubectl plugins
 
 
+## [sync2foxlake](kbcli_sync2foxlake.md)
+
+Sync data from other database to FoxLake
+
+* [kbcli sync2foxlake create](kbcli_sync2foxlake_create.md)	 - Create a sync2foxlake task.
+* [kbcli sync2foxlake describe](kbcli_sync2foxlake_describe.md)	 - Show details of a specific sync2foxlake task.
+* [kbcli sync2foxlake list](kbcli_sync2foxlake_list.md)	 - List sync2foxlake tasks.
+* [kbcli sync2foxlake pause](kbcli_sync2foxlake_pause.md)	 - Pause database synchronization.
+* [kbcli sync2foxlake resume](kbcli_sync2foxlake_resume.md)	 - Resume database synchronization.
+* [kbcli sync2foxlake terminate](kbcli_sync2foxlake_terminate.md)	 - Delete sync2foxlake tasks.
+
+
 ## [version](kbcli_version.md)
 
 Print the version information, include kubernetes, KubeBlocks and kbcli version.

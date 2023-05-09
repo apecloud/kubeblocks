@@ -7,22 +7,22 @@
 {{- if gt $phy_memory 0 }}
 {{- $shared_buffers = div $phy_memory 4 }}
 {{- $max_connections = min ( div $phy_memory 9531392 ) 5000 }}
-{{- end -}}
+{{- end }}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
-{{- $buffer_unit = "KB" }}
-{{- end -}}
+{{- $buffer_unit = "kB" }}
+{{- end }}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
 {{- $buffer_unit = "MB" }}
-{{- end -}}
+{{- end }}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
 {{ $buffer_unit = "GB" }}
-{{- end -}}
+{{- end }}
 
 listen_addresses = '*'
 port = '5432'
@@ -125,7 +125,7 @@ work_mem = '32MB'
 {{- $cert_file := getCertFile }}
 {{- $key_file := getKeyFile }}
 # tls
-ssl=ON
+ssl= 'True'
 ssl_ca_file={{ $ca_file }}
 ssl_cert_file={{ $cert_file }}
 ssl_key_file={{ $key_file }}

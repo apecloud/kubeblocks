@@ -15,6 +15,10 @@ data:
     idx=${KB_POD_NAME##*-}
     host=$(eval echo \$KB_MYSQL_"$idx"_HOSTNAME)
     echo "host=$host"
+    # update replicas to persistent file
+    component_replicas_path=/data/mysql/.kb_component_replicas
+    current_component_replicas=`cat /etc/annotations/component-replicas`
+    echo $current_component_replicas > $component_replicas_path
     if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" ]; then
       echo "no leader or self is leader, no need to call add."
     else 
@@ -70,7 +74,7 @@ data:
     mkdir -p /data/mysql/data /data/mysql/log
     chmod +777 -R /data/mysql; 
     echo "KB_MYSQL_CLUSTER_UID=$KB_MYSQL_CLUSTER_UID"
-    cluster_uid_path=/data/mysql/data/.kb_cluster_uid
+    cluster_uid_path=/data/mysql/.kb_cluster_uid
     if [ -f $cluster_uid_path ] && [ ! -f /data/mysql/data/.restore_new_cluster ]; then
       last_cluster_uid=`cat $cluster_uid_path`
       if [ "$last_cluster_uid" != "$KB_MYSQL_CLUSTER_UID" ]; then
@@ -155,16 +159,17 @@ data:
     done
   pre-stop.sh: |
     #!/bin/bash
+    drop_followers() {
     leader=`cat /etc/annotations/leader`
-    echo "leader=$leader"
-    echo "KB_POD_NAME=$KB_POD_NAME"
+    echo "leader=$leader" >> /data/mysql/.kb_pre_stop.log
+    echo "KB_POD_NAME=$KB_POD_NAME" >> /data/mysql/.kb_pre_stop.log
     if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" ]; then
-      echo "no leader or self is leader, exit"
+      echo "no leader or self is leader, exit" >> /data/mysql/.kb_pre_stop.log
       exit 0
     fi
     idx=${KB_POD_NAME##*-}
     host=$(eval echo \$KB_MYSQL_"$idx"_HOSTNAME)
-    echo "host=$host"
+    echo "host=$host" >> /data/mysql/.kb_pre_stop.log
     leader_idx=${leader##*-}
     leader_host=$(eval echo \$KB_MYSQL_"$leader_idx"_HOSTNAME)
     if [ ! -z $leader_host ]; then 
@@ -173,7 +178,20 @@ data:
     if [ ! -z $MYSQL_ROOT_PASSWORD ]; then 
       password_flag="-p$MYSQL_ROOT_PASSWORD"
     fi
-    echo "mysql $host_flag -uroot $password_flag -e \"call dbms_consensus.downgrade_follower('$host:13306');\" 2>&1 " 
+    echo "mysql $host_flag -uroot $password_flag -e \"call dbms_consensus.downgrade_follower('$host:13306');\" 2>&1 " >> /data/mysql/.kb_pre_stop.log
     mysql $host_flag -uroot $password_flag -e "call dbms_consensus.downgrade_follower('$host:13306');" 2>&1
-    echo "mysql $host_flag -uroot $password_flag -e \"call dbms_consensus.drop_learner('$host:13306');\" 2>&1 " 
+    echo "mysql $host_flag -uroot $password_flag -e \"call dbms_consensus.drop_learner('$host:13306');\" 2>&1 " >> /data/mysql/.kb_pre_stop.log
     mysql $host_flag -uroot $password_flag -e "call dbms_consensus.drop_learner('$host:13306');" 2>&1
+    }
+    component_replicas_path=/data/mysql/.kb_component_replicas
+    current_component_replicas=`cat /etc/annotations/component-replicas`
+    if [ -f $component_replicas_path ]; then 
+      last_component_replicas=`cat $component_replicas_path`
+      # check is scaling in but not scaling in to 0
+      if [ "$last_component_replicas" -gt "$current_component_replicas" ] && [ $current_component_replicas -ne 0 ]; then
+        # only scaling in need to drop followers
+        drop_followers
+      else 
+        echo "no need to drop followers"
+      fi
+    fi

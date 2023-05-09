@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
@@ -203,7 +204,7 @@ func (r *BackupPolicyReconciler) removeExpiredBackups(reqCtx intctrlutil.Request
 	now := metav1.Now()
 	for _, item := range backups.Items {
 		// ignore retained backup.
-		if item.GetLabels()[constant.BackupProtectionLabelKey] == constant.BackupRetain {
+		if strings.EqualFold(item.GetLabels()[constant.BackupProtectionLabelKey], constant.BackupRetain) {
 			continue
 		}
 		if item.Status.Expiration != nil && item.Status.Expiration.Before(&now) {

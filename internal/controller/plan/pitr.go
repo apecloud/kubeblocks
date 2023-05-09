@@ -466,9 +466,6 @@ func (p *PointInTimeRecoveryManager) buildResourceObjs() (objs []client.Object, 
 		}
 		dataVolumeMount := getVolumeMount(recoveryInfo)
 		for _, dataPVC := range dataPVCs {
-			if dataPVC.Status.Phase != corev1.ClaimBound {
-				return objs, errors.New("waiting PVC Bound")
-			}
 			volumes := []corev1.Volume{
 				{Name: "data", VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.Name}}},

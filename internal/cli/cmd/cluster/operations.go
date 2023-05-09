@@ -200,17 +200,19 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 	fillClassParams := func(comp *appsv1alpha1.ClusterComponentSpec) {
 		if o.Class != "" {
 			comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: o.Class}
+			comp.Resources = corev1.ResourceRequirements{}
+		} else {
+			comp.ClassDefRef = &appsv1alpha1.ClassDefRef{}
+			requests := make(corev1.ResourceList)
+			if o.CPU != "" {
+				requests[corev1.ResourceCPU] = resource.MustParse(o.CPU)
+			}
+			if o.Memory != "" {
+				requests[corev1.ResourceMemory] = resource.MustParse(o.Memory)
+			}
+			requests.DeepCopyInto(&comp.Resources.Requests)
+			requests.DeepCopyInto(&comp.Resources.Limits)
 		}
-
-		requests := make(corev1.ResourceList)
-		if o.CPU != "" {
-			requests[corev1.ResourceCPU] = resource.MustParse(o.CPU)
-		}
-		if o.Memory != "" {
-			requests[corev1.ResourceMemory] = resource.MustParse(o.Memory)
-		}
-		requests.DeepCopyInto(&comp.Resources.Requests)
-		requests.DeepCopyInto(&comp.Resources.Limits)
 	}
 
 	for _, name := range o.ComponentNames {

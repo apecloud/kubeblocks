@@ -28,6 +28,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -400,7 +402,7 @@ var _ = Describe("Cluster Controller", func() {
 			compName, "data").SetStorage("1Gi").CheckedCreate(&testCtx)
 	}
 
-	mockPodsForConsensusTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
+	mockPodsForTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
 		componentName := cluster.Spec.ComponentSpecs[0].Name
 		clusterName := cluster.Name
 		stsName := cluster.Name + "-" + componentName
@@ -411,6 +413,7 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      stsName + "-" + strconv.Itoa(i),
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
+						constant.AppManagedByLabelKey:         constant.AppName,
 						constant.AppInstanceLabelKey:          clusterName,
 						constant.KBAppComponentLabelKey:       componentName,
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
@@ -447,8 +450,12 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
 
 		By("Creating mock pods in StatefulSet")
-		pods := mockPodsForConsensusTest(clusterObj, int(comp.Replicas))
-		for _, pod := range pods {
+		pods := mockPodsForTest(clusterObj, int(comp.Replicas))
+		for i, pod := range pods {
+			if comp.ComponentDefRef == replicationCompDefName && i == 0 {
+				By("mocking primary for replication to pass check")
+				pods[0].ObjectMeta.Labels[constant.RoleLabelKey] = "primary"
+			}
 			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			// mock the status to pass the isReady(pod) check in consensus_set
 			pod.Status.Conditions = []corev1.PodCondition{{
@@ -942,9 +949,10 @@ var _ = Describe("Cluster Controller", func() {
 			sts = &stsList.Items[0]
 		}).Should(Succeed())
 
-		By("Creating mock pods in StatefulSet")
-		pods := mockPodsForConsensusTest(clusterObj, replicas)
+		By("Creating mock pods in StatefulSet, and set controller reference")
+		pods := mockPodsForTest(clusterObj, replicas)
 		for _, pod := range pods {
+			Expect(controllerutil.SetControllerReference(sts, &pod, scheme.Scheme)).Should(Succeed())
 			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			// mock the status to pass the isReady(pod) check in consensus_set
 			pod.Status.Conditions = []corev1.PodCondition{{
@@ -980,6 +988,17 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			g.Expect(leaderCount).Should(Equal(1))
 			g.Expect(followerCount).Should(Equal(2))
+		}).Should(Succeed())
+
+		By("Checking pods' annotations")
+		Eventually(func(g Gomega) {
+			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(pods).Should(HaveLen(int(*sts.Spec.Replicas)))
+			for _, pod := range pods {
+				g.Expect(pod.Annotations).ShouldNot(BeNil())
+				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*sts.Spec.Replicas))))
+			}
 		}).Should(Succeed())
 
 		By("Updating StatefulSet's status")

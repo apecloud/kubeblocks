@@ -2,11 +2,7 @@
 title: kbcli bench sysbench
 ---
 
-Create a sysbench benchmark
-
-```
-kbcli bench sysbench [NAME] [flags]
-```
+run a SysBench benchmark
 
 ### Options
 
@@ -15,10 +11,9 @@ kbcli bench sysbench [NAME] [flags]
       --driver string     database driver
   -h, --help              help for sysbench
       --host string       the host of database
-      --mode string       sysbench mode (default "prepare")
       --password string   the password of database
       --port int          the port of database
-      --size int          the number of rows per table (default 20000)
+      --size int          the data size of per table (default 20000)
       --tables int        the number of tables (default 10)
       --times int         the number of test times (default 100)
       --type string       sysbench type (default "oltp_read_write_pct")
@@ -51,6 +46,9 @@ kbcli bench sysbench [NAME] [flags]
 ### SEE ALSO
 
 * [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
+* [kbcli bench sysbench cleanup](kbcli_bench_sysbench_cleanup.md)	 - Cleanup the data of SysBench for cluster
+* [kbcli bench sysbench prepare](kbcli_bench_sysbench_prepare.md)	 - Prepare the data of SysBench for a cluster
+* [kbcli bench sysbench run](kbcli_bench_sysbench_run.md)	 - Run  SysBench on cluster
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

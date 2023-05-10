@@ -75,12 +75,12 @@ func (o *BenchBaseOptions) BaseValidate() error {
 }
 
 func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.Driver, "driver", "", "database driver")
-	cmd.Flags().StringVar(&o.Database, "database", "", "database name")
-	cmd.Flags().StringVar(&o.Host, "host", "", "the host of database")
-	cmd.Flags().StringVar(&o.User, "user", "", "the user of database")
-	cmd.Flags().StringVar(&o.Password, "password", "", "the password of database")
-	cmd.Flags().IntVar(&o.Port, "port", 0, "the port of database")
+	cmd.PersistentFlags().StringVar(&o.Driver, "driver", "", "database driver")
+	cmd.PersistentFlags().StringVar(&o.Database, "database", "", "database name")
+	cmd.PersistentFlags().StringVar(&o.Host, "host", "", "the host of database")
+	cmd.PersistentFlags().StringVar(&o.User, "user", "", "the user of database")
+	cmd.PersistentFlags().StringVar(&o.Password, "password", "", "the password of database")
+	cmd.PersistentFlags().IntVar(&o.Port, "port", 0, "the port of database")
 }
 
 // NewBenchCmd creates the bench command

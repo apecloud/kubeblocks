@@ -45,6 +45,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	probeutil "github.com/apecloud/kubeblocks/cmd/probe/util"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -893,8 +894,8 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      pod.Name + "-event",
 					Namespace: testCtx.DefaultNamespace,
 				},
-				Reason:  "Unhealthy",
-				Message: `Readiness probe failed: {"event":"Success","originalRole":"Leader","role":"Follower"}`,
+				Reason:  string(probeutil.CheckRoleOperation),
+				Message: `{"event":"Success","originalRole":"Leader","role":"Follower"}`,
 				InvolvedObject: corev1.ObjectReference{
 					Name:      pod.Name,
 					Namespace: testCtx.DefaultNamespace,
@@ -904,7 +905,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			events = append(events, event)
 		}
-		events[0].Message = `Readiness probe failed: {"event":"Success","originalRole":"Leader","role":"Leader"}`
+		events[0].Message = `{"event":"Success","originalRole":"Leader","role":"Leader"}`
 		return events
 	}
 

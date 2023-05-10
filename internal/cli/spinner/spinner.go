@@ -24,7 +24,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -32,7 +31,7 @@ import (
 	"github.com/briandowns/spinner"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 type Spinner struct {
@@ -46,31 +45,25 @@ type Interface interface {
 	Done(status string)
 	Success()
 	Fail()
-	UpdateSpinnerMessage(msg string)
 	SetMessage(msg string)
 	SetFinalMsg(msg string)
+	updateSpinnerMessage(msg string)
 }
 
 type Option func(Interface)
 
 func WithMessage(msg string) Option {
 	return func(s Interface) {
-		s.UpdateSpinnerMessage(msg)
+		s.updateSpinnerMessage(msg)
 	}
 }
 
-// func WithDelay(delay time.Duration) Option {
-// 	return func(s Spinner) {
-// 		// s.delay = delay
-// 	}
-// }
-
-func (s *Spinner) UpdateSpinnerMessage(msg string) {
+func (s *Spinner) updateSpinnerMessage(msg string) {
 	s.s.Suffix = fmt.Sprintf(" %s", msg)
 }
 
 func (s *Spinner) SetMessage(msg string) {
-	s.UpdateSpinnerMessage(msg)
+	s.updateSpinnerMessage(msg)
 	if !s.s.Active() {
 		s.Start()
 	}
@@ -134,8 +127,8 @@ func (s *Spinner) Fail() {
 }
 
 func New(w io.Writer, opts ...Option) Interface {
-	if runtime.GOOS == types.GoosWindows {
-		return WindowsSpinnerConstructor(w, opts...)
+	if util.IsWindows() {
+		return NewWindowsSpinner(w, opts...)
 	}
 
 	res := &Spinner{}

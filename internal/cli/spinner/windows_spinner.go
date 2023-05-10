@@ -28,7 +28,7 @@ type WindowsSpinner struct { // no thread/goroutine safe
 	mu           *sync.RWMutex
 }
 
-func WindowsSpinnerConstructor(w io.Writer, opts ...Option) *WindowsSpinner {
+func NewWindowsSpinner(w io.Writer, opts ...Option) *WindowsSpinner {
 	res := &WindowsSpinner{
 		chars:  char,
 		active: false,
@@ -52,7 +52,7 @@ func WindowsSpinnerConstructor(w io.Writer, opts ...Option) *WindowsSpinner {
 	return res
 }
 
-func (s *WindowsSpinner) UpdateSpinnerMessage(msg string) {
+func (s *WindowsSpinner) updateSpinnerMessage(msg string) {
 	s.msg = fmt.Sprintf(" %s", msg)
 }
 

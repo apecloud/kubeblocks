@@ -22,7 +22,6 @@ package operations
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -62,11 +61,18 @@ var _ = Describe("Restart OpsRequest", func() {
 	AfterEach(cleanEnv)
 
 	Context("Test OpsRequest", func() {
-		It("Test restart OpsRequest", func() {
+		var (
+			opsRes  *OpsResource
+			cluster *appsv1alpha1.Cluster
+			reqCtx  intctrlutil.RequestCtx
+		)
+		BeforeEach(func() {
 			By("init operations resources ")
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, cluster = initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			reqCtx = intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+		})
 
+		It("Test restart OpsRequest", func() {
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp, statelessComp)
@@ -90,6 +96,21 @@ var _ = Describe("Restart OpsRequest", func() {
 			Expect(len(h.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(2))
 		})
 
+		It("expect failed when cluster is stopped", func() {
+			By("mock cluster is stopped")
+			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+				cluster.Status.Phase = appsv1alpha1.StoppedClusterPhase
+			})).Should(Succeed())
+			By("create Restart opsRequest")
+			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("opsRequest kind: Restart is forbidden when Cluster.status.Phase is Stopped"))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest),
+				func(g Gomega, fetched *appsv1alpha1.OpsRequest) {
+					g.Expect(fetched.Status.Phase).To(Equal(appsv1alpha1.OpsFailedPhase))
+				})).Should(Succeed())
+		})
 	})
 })
 

@@ -33,6 +33,7 @@ import (
 	"github.com/dapr/kit/logger"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -269,10 +270,14 @@ involvedObject:
   namespace: {{ .Namespace }}
 reason: RoleChanged
 type: Normal
+source:
+  component: sqlchannel
 `
 
 	// get pod object
 	podName := os.Getenv("KB_POD_NAME")
+	podUID := os.Getenv("KB_POD_UID")
+	nodeName := os.Getenv("KB_NODENAME")
 	namespace := os.Getenv("KB_NAMESPACE")
 	msg, _ := json.Marshal(opsResult)
 	seq := randStringBytes(16)
@@ -297,6 +302,8 @@ type: Normal
 		return nil, err
 	}
 	event.Message = string(msg)
+	event.InvolvedObject.UID = types.UID(podUID)
+	event.Source.Host = nodeName
 	event.Reason = opsResult["operation"].(string)
 	event.FirstTimestamp = metav1.Now()
 	event.LastTimestamp = metav1.Now()

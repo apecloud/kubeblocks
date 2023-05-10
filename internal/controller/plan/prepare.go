@@ -165,15 +165,14 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return buildStsWithCustomAttributes(reqCtx, task, envConfig.Name, nil)
+				return builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfig.Name)
 			}); err != nil {
 			return err
 		}
-
 	}
 
 	// conditional build PodDisruptionBudget
-	if comp := task.Component; comp.WorkloadType == appsv1alpha1.Consensus && comp.MaxUnavailable != nil {
+	if task.Component.MaxUnavailable != nil {
 		pdb, err := builder.BuildPDB(task.GetBuilderParams())
 		if err != nil {
 			return err
@@ -204,21 +203,6 @@ func addLeaderSelectorLabels(service *corev1.Service, component *component.Synth
 	if len(leader.Name) > 0 {
 		service.Spec.Selector[constant.RoleLabelKey] = leader.Name
 	}
-}
-
-// buildStsWithCustomAttributes build a statefulset
-func buildStsWithCustomAttributes(reqCtx intctrlutil.RequestCtx,
-	task *intctrltypes.ReconcileTask, envConfigName string,
-	customAttrSetter func(*appsv1.StatefulSet)) (*appsv1.StatefulSet, error) {
-	sts, err := builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfigName)
-	if err != nil {
-		return nil, err
-	}
-	if customAttrSetter == nil {
-		return sts, nil
-	}
-	customAttrSetter(sts)
-	return sts, nil
 }
 
 // renderConfigNScriptFiles generate volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,

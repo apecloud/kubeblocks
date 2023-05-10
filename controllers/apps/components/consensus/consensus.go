@@ -214,7 +214,7 @@ func (r *ConsensusComponent) HandleUpdate(ctx context.Context, obj client.Object
 				}
 			}
 			return nil
-		}, ComposeRolePriorityMap, generateConsensusSerialPlan, generateConsensusBestEffortParallelPlan, nil)
+		}, ComposeRolePriorityMap, generateConsensusSerialPlan, generateConsensusBestEffortParallelPlan, generateConsensusParallelPlan)
 }
 
 func NewConsensusComponent(

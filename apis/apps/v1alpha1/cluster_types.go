@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // ClusterSpec defines the desired state of Cluster
@@ -185,6 +186,17 @@ type ClusterComponentSpec struct {
 	// serviceAccountName is the name of the ServiceAccount that component runs depend on.
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+}
+
+func (r *ClusterComponentSpec) GetMaxUnavailable(prefer *intstr.IntOrString) *intstr.IntOrString {
+	if r == nil || prefer == nil {
+		return nil
+	}
+	if r.Replicas <= 1 {
+		m := intstr.FromString("100%")
+		return &m
+	}
+	return prefer
 }
 
 type ComponentMessageMap map[string]string

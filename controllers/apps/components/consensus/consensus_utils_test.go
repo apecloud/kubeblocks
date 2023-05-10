@@ -160,7 +160,7 @@ func TestSortPods(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.args.pods = randSort(tt.want)
-			util.SortPods(tt.args.pods, tt.args.rolePriorityMap)
+			util.SortPods(tt.args.pods, tt.args.rolePriorityMap, constant.RoleLabelKey)
 			if !tt.wantErr {
 				assert.Equal(t, tt.args.pods, tt.want)
 			}

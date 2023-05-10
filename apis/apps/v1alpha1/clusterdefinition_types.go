@@ -85,8 +85,7 @@ type SystemAccountSpec struct {
 // CmdExecutorConfig specifies how to perform creation and deletion statements.
 type CmdExecutorConfig struct {
 	CommandExecutorEnvItem `json:",inline"`
-
-	CommandExecutorItem `json:",inline"`
+	CommandExecutorItem    `json:",inline"`
 }
 
 // PasswordConfig helps provide to customize complexity of password generation pattern.
@@ -269,14 +268,6 @@ type ClusterComponentDefinition struct {
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
-	// The maximum number of pods that can be unavailable during scaling.
-	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-	// Absolute number is calculated from percentage by rounding down. This value is ignored
-	// if workloadType is Consensus.
-	// +kubebuilder:validation:XIntOrString
-	// +optional
-	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
-
 	// The configSpec field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// +optional
@@ -372,10 +363,9 @@ type ClusterComponentDefinition struct {
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
-	if r.IsStatelessWorkload() {
-		return nil
-	}
 	switch r.WorkloadType {
+	case Stateless:
+		return nil
 	case Stateful:
 		return r.StatefulSpec
 	case Consensus:
@@ -383,7 +373,32 @@ func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkloa
 	case Replication:
 		return r.ReplicationSpec
 	}
-	return nil
+	panic("unreachable")
+}
+
+func (r *ClusterComponentDefinition) GetMaxUnavailable() *intstr.IntOrString {
+	if r == nil {
+		return nil
+	}
+
+	getMaxUnavailable := func(ssus appsv1.StatefulSetUpdateStrategy) *intstr.IntOrString {
+		if ssus.RollingUpdate == nil {
+			return nil
+		}
+		return ssus.RollingUpdate.MaxUnavailable
+	}
+
+	switch r.WorkloadType {
+	case Stateless:
+		if r.StatelessSpec == nil || r.StatelessSpec.UpdateStrategy.RollingUpdate == nil {
+			return nil
+		}
+		return r.StatelessSpec.UpdateStrategy.RollingUpdate.MaxUnavailable
+	case Stateful, Consensus, Replication:
+		_, s := r.GetStatefulSetWorkload().FinalStsUpdateStrategy()
+		return getMaxUnavailable(s)
+	}
+	panic("unreachable")
 }
 
 func (r *ClusterComponentDefinition) IsStatelessWorkload() bool {
@@ -406,7 +421,8 @@ func (r *ClusterComponentDefinition) GetCommonStatefulSpec() (*StatefulSetSpec, 
 			return &r.ReplicationSpec.StatefulSetSpec, nil
 		}
 	default:
-		return nil, ErrWorkloadTypeIsUnknown
+		panic("unreachable")
+		// return nil, ErrWorkloadTypeIsUnknown
 	}
 	return nil, nil
 }
@@ -681,10 +697,10 @@ func (r *ConsensusSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyT
 		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
 	}
 	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
-	switch r.UpdateStrategy {
-	case SerialStrategy, BestEffortParallelStrategy:
-		s.Type = appsv1.OnDeleteStatefulSetStrategyType
-	}
+	// switch r.UpdateStrategy {
+	// case SerialStrategy, BestEffortParallelStrategy:
+	s.Type = appsv1.OnDeleteStatefulSetStrategyType
+	// }
 	return appsv1.ParallelPodManagement, s
 }
 
@@ -744,7 +760,9 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 	if r == nil {
 		r = &ReplicationSetSpec{}
 	}
-	return r.StatefulSetSpec.finalStsUpdateStrategy()
+	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
+	s.Type = appsv1.OnDeleteStatefulSetStrategyType
+	return appsv1.ParallelPodManagement, s
 }
 
 type SwitchPolicy struct {

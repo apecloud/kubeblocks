@@ -116,15 +116,15 @@ func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod,
 	}
 }
 
-// // unknown & empty & leader & followers & learner
-// func generateConsensusParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
-// 	start := plan.Start
-// 	for _, pod := range pods {
-// 		nextStep := &util.Step{}
-// 		nextStep.Obj = pod
-// 		start.NextSteps = append(start.NextSteps, nextStep)
-// 	}
-// }
+// unknown & empty & leader & followers & learner
+func generateConsensusParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	for _, pod := range pods {
+		nextStep := &util.Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+}
 
 // unknown -> empty -> learner -> followers(none->readonly->readwrite) -> leader
 func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {

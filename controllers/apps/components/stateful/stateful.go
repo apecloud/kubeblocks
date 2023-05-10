@@ -122,8 +122,8 @@ func (r *StatefulComponent) HandleUpdateWithProcessors(ctx context.Context, obj 
 	}
 
 	// update cluster.status.component.consensusSetStatus based on all pods currently exist
-	componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
 	if compStatusProcessor != nil {
+		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
 		if err = compStatusProcessor(componentDef, pods, componentName); err != nil {
 			return err
 		}
@@ -160,7 +160,8 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 	serialStrategyHandler, bestEffortParallelStrategyHandler, parallelStrategyHandler func(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int)) *util.Plan {
 	stsWorkload := componentDef.GetStatefulSetWorkload()
 	_, s := stsWorkload.FinalStsUpdateStrategy()
-	if s.Type == appsv1.RollingUpdateStatefulSetStrategyType {
+	switch s.Type {
+	case appsv1.RollingUpdateStatefulSetStrategyType, "":
 		return nil
 	}
 
@@ -194,7 +195,7 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 	var rolePriorityMap map[string]int
 	if priorityMapper != nil {
 		rolePriorityMap = priorityMapper(componentDef)
-		util.SortPods(pods, rolePriorityMap)
+		util.SortPods(pods, rolePriorityMap, constant.RoleLabelKey)
 	}
 
 	// generate plan by UpdateStrategy
@@ -203,7 +204,6 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 		if parallelStrategyHandler != nil {
 			parallelStrategyHandler(plan, pods, rolePriorityMap)
 		}
-		return plan
 	case appsv1alpha1.BestEffortParallelStrategy:
 		if bestEffortParallelStrategyHandler != nil {
 			bestEffortParallelStrategyHandler(plan, pods, rolePriorityMap)

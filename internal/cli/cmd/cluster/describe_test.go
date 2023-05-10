@@ -109,13 +109,8 @@ var _ = Describe("Expose", func() {
 
 	It("showEvents", func() {
 		out := &bytes.Buffer{}
-		showEvents(testing.FakeEvents(), "test-cluster", namespace, out)
-		strs := strings.Split(out.String(), "\n")
-
-		// sorted
-		firstEvent := strs[3]
-		secondEvent := strs[4]
-		Expect(strings.Compare(firstEvent, secondEvent) < 0).Should(BeTrue())
+		showEvents("test-cluster", namespace, out)
+		Expect(out.String()).ShouldNot(BeEmpty())
 	})
 
 	It("showDataProtections", func() {

@@ -289,8 +289,6 @@ func (r *BackupReconciler) createPVCWithStorageClassName(reqCtx intctrlutil.Requ
 			},
 		},
 	}
-	// add a finalizer
-	controllerutil.AddFinalizer(pvc, dataProtectionFinalizerName)
 	err := r.Client.Create(reqCtx.Ctx, pvc)
 	return client.IgnoreAlreadyExists(err)
 }

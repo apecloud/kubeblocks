@@ -22,7 +22,6 @@ package k8score
 import (
 	"context"
 	"encoding/json"
-	"regexp"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	probeutil "github.com/apecloud/kubeblocks/cmd/probe/util"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
@@ -115,9 +115,10 @@ func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // Handle handles role changed event.
 func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
+	if event.Reason != string(probeutil.CheckRoleOperation) {
 		return nil
 	}
+	reqCtx.Log.Info("process event: %v", event)
 	var (
 		err         error
 		annotations = event.GetAnnotations()
@@ -195,14 +196,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 // ParseProbeEventMessage parses probe event message.
 func ParseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) *ProbeMessage {
 	message := &ProbeMessage{}
-	re := regexp.MustCompile(`Readiness probe failed: ({.*})`)
-	matches := re.FindStringSubmatch(event.Message)
-	if len(matches) != 2 {
-		reqCtx.Log.Info("parser Readiness probe event message failed", "message", event.Message)
-		return nil
-	}
-	msg := matches[1]
-	err := json.Unmarshal([]byte(msg), message)
+	err := json.Unmarshal([]byte(event.Message), message)
 	if err != nil {
 		// not role related message, ignore it
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)

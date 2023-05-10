@@ -304,7 +304,7 @@ source:
 	event.Message = string(msg)
 	event.InvolvedObject.UID = types.UID(podUID)
 	event.Source.Host = nodeName
-	event.Reason = opsResult["operation"].(string)
+	event.Reason = string(opsResult["operation"].(bindings.OperationKind))
 	event.FirstTimestamp = metav1.Now()
 	event.LastTimestamp = metav1.Now()
 

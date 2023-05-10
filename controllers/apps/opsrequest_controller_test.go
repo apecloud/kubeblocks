@@ -50,7 +50,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
-	const mysqlCompDefName = "consensus"
+	const mysqlCompDefName = "mysql"
 	const mysqlCompName = "mysql"
 	const defaultMinReadySeconds = 10
 
@@ -78,7 +78,6 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	BeforeEach(func() {
 		cleanEnv()
-
 	})
 
 	AfterEach(func() {
@@ -435,7 +434,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
 
-		It("HorizontalScaling when support snapshot", func() {
+		It("HorizontalScaling via volume snapshot backup", func() {
 			By("init backup policy template, mysql cluster and hscale ops")
 			viper.Set("VOLUMESNAPSHOT", true)
 			mockMysqlCluster()

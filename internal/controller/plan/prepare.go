@@ -171,14 +171,15 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		}
 	}
 
-	// conditional build PodDisruptionBudget
-	if task.Component.MaxUnavailable != nil {
-		pdb, err := builder.BuildPDB(task.GetBuilderParams())
-		if err != nil {
-			return err
-		}
-		task.AppendResource(pdb)
-	}
+	// TODO: need to handle PDB setup
+	// // conditional build PodDisruptionBudget
+	// if task.Component.MaxUnavailable != nil {
+	// 	pdb, err := builder.BuildPDB(task.GetBuilderParams())
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	task.AppendResource(pdb)
+	// }
 
 	svcList, err := builder.BuildSvcListWithCustomAttributes(task.GetBuilderParams(), func(svc *corev1.Service) {
 		switch task.Component.WorkloadType {

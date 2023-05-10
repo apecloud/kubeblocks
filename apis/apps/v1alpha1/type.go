@@ -534,6 +534,7 @@ var (
 	ErrNotMatchingCompDef      = errors.New("not matching componentDefRef")
 )
 
+// StatefulSetWorkload interface
 // +kubebuilder:object:generate=false
 type StatefulSetWorkload interface {
 	FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy)

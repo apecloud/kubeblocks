@@ -647,21 +647,26 @@ func (r *StatefulSetSpec) finalStsUpdateStrategy() (appsv1.PodManagementPolicyTy
 	case BestEffortParallelStrategy:
 		m := intstr.FromString("49%")
 		return appsv1.ParallelPodManagement, appsv1.StatefulSetUpdateStrategy{
+			Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
 				MaxUnavailable: &m,
 			},
 		}
 	case ParallelStrategy:
-		return appsv1.ParallelPodManagement, appsv1.StatefulSetUpdateStrategy{}
+		return appsv1.ParallelPodManagement, appsv1.StatefulSetUpdateStrategy{
+			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+		}
 	case SerialStrategy:
+		fallthrough
+	default:
 		m := intstr.FromInt(1)
 		return appsv1.OrderedReadyPodManagement, appsv1.StatefulSetUpdateStrategy{
+			Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
 				MaxUnavailable: &m,
 			},
 		}
 	}
-	return "", appsv1.StatefulSetUpdateStrategy{}
 }
 
 type ConsensusSetSpec struct {
@@ -700,6 +705,7 @@ func (r *ConsensusSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyT
 	// switch r.UpdateStrategy {
 	// case SerialStrategy, BestEffortParallelStrategy:
 	s.Type = appsv1.OnDeleteStatefulSetStrategyType
+	s.RollingUpdate = nil
 	// }
 	return appsv1.ParallelPodManagement, s
 }
@@ -760,9 +766,10 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 	if r == nil {
 		r = &ReplicationSetSpec{}
 	}
-	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
-	s.Type = appsv1.OnDeleteStatefulSetStrategyType
-	return appsv1.ParallelPodManagement, s
+	return r.StatefulSetSpec.finalStsUpdateStrategy()
+	// _, s := r.StatefulSetSpec.finalStsUpdateStrategy()
+	// s.Type = appsv1.OnDeleteStatefulSetStrategyType
+	// return appsv1.ParallelPodManagement, s
 }
 
 type SwitchPolicy struct {

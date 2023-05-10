@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 cluster: {
 	metadata: {
 		namespace: string
@@ -56,8 +55,8 @@ statefulset: {
 				"app.kubernetes.io/managed-by":      "kubeblocks"
 				"apps.kubeblocks.io/component-name": "\(component.name)"
 			}
-		serviceName:         "\(cluster.metadata.name)-\(component.name)-headless"
-		replicas:            component.replicas
+		serviceName: "\(cluster.metadata.name)-\(component.name)-headless"
+		replicas:    component.replicas
 		template: {
 			metadata: {
 				labels: {

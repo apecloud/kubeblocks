@@ -22,7 +22,7 @@ spec:
   versions:
   - additionalPrinterColumns:
     - description: leader pod name.
-      jsonPath: .status.membersStatus[0].podName
+      jsonPath: .status.membersStatus[?(@.role.isLeader==true)].podName
       name: LEADER
       type: string
     - description: ready replicas.

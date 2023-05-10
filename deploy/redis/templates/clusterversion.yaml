@@ -13,6 +13,7 @@ spec:
       - name: redis
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+    clientImage: {{ .Values.image.repository }}:{{ .Values.image.tag }}
   - componentDefRef: redis-sentinel
     versionsContext:
       initContainers:

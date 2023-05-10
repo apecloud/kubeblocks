@@ -52,7 +52,7 @@ import (
 
 var (
 	initExample = templates.Examples(`
-		# create a k3d cluster on local host and install KubeBlocks 
+		# create a k3d cluster on local host and install KubeBlocks
 		kbcli playground init
 
 		# create an AWS EKS cluster and install KubeBlocks, the region is required

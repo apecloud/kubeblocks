@@ -20,52 +20,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package clusterversion
 
 import (
-	"context"
-	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	_ "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	_ "k8s.io/cli-runtime/pkg/resource"
-	_ "k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	_ "net/http"
+	"bytes"
+	"net/http"
 
-	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	_ "k8s.io/client-go/kubernetes/scheme"
-	//cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes/scheme"
+	clientfake "k8s.io/client-go/rest/fake"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("clusterversion", func() {
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
-	//buf := new(bytes.Buffer)
-	const ClusterVersionName = testing.ClusterVersionName
-	const ClusterVersionNameV1 = testing.ClusterVersionName + "v1"
-	const ClusterDefName = testing.ClusterDefName
-	const ClusterDefNameV1 = testing.ClusterDefName + "v1"
+	out := new(bytes.Buffer)
 
-	//mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
-	//	tf := cmdtesting.NewTestFactory()
-	//	defer tf.Cleanup()
-	//
-	//	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	//	tf.UnstructuredClient = &fake.RESTClient{
-	//		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-	//		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, data)},
-	//	}
-	//	return tf
-	//}
+	mockRestTable := func() *v1.Table {
+		var Type = "string"
+		tableHeader := make([]v1.TableColumnDefinition, 4)
+		tableHeader[0].Name = "NAME"
+		tableHeader[0].Type = Type
+		tableHeader[1].Name = "CLUSTER-DEFINITION"
+		tableHeader[1].Type = Type
+		tableHeader[2].Name = "STATUS"
+		tableHeader[2].Type = Type
+		tableHeader[3].Name = "AGE"
+		tableHeader[3].Type = Type
+		value := make([]v1.TableRow, 1)
+		value[0].Cells = make([]interface{}, 4)
+		value[0].Cells[0] = testing.ClusterVersionName
+		value[0].Cells[1] = testing.ClusterDefName
+		value[0].Cells[2] = "Available"
+		value[0].Cells[3] = "0s"
+
+		table := &v1.Table{
+			TypeMeta: v1.TypeMeta{
+				Kind:       "Table",
+				APIVersion: "meta.k8s.io/v1",
+			},
+			ColumnDefinitions: tableHeader,
+			Rows:              value,
+		}
+		return table
+	}
+
+	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
+		tf := testing.NewTestFactory(testing.Namespace)
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+		tf.UnstructuredClient = &clientfake.RESTClient{
+			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
+			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, data)},
+		}
+		tf.Client = tf.UnstructuredClient
+		tf.FakeDynamicClient = testing.FakeDynamicClient(data)
+		return tf
+	}
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory()
+		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
+		_ = v1.AddMetaToScheme(scheme.Scheme)
+		streams, _, out, _ = genericclioptions.NewTestIOStreams()
+		table := mockRestTable()
+		tf = mockClient(table)
 	})
 
 	AfterEach(func() {
@@ -84,69 +111,11 @@ var _ = Describe("clusterversion", func() {
 	})
 
 	It("list --cluster-definition", func() {
-		cv1 := testing.FakeClusterVersion()
-		cv2 := testing.FakeClusterVersion()
-		cv2.Name = ClusterVersionNameV1
-
-		cv2.SetLabels(map[string]string{
-			constant.ClusterDefLabelKey: ClusterDefNameV1,
-		})
-		cv2.Spec.ClusterDefinitionRef = ClusterDefNameV1
-		cv1Obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cv1)
-		unstructuredCV1 := &unstructured.Unstructured{Object: cv1Obj}
-		unstructuredCV1.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   types.AppsAPIGroup,
-			Version: types.AppsAPIVersion,
-			Kind:    types.KindClusterVersion,
-		})
-
-		Expect(err).Should(Succeed())
-
-		tf.FakeDynamicClient = testing.FakeDynamicClient(cv1, cv2)
-		//_, err = tf.FakeDynamicClient.Resource(types.ClusterVersionGVR()).
-		//	Namespace("default").
-		//	Create(context.Background(), unstructuredCV1, metav1.CreateOptions{})
-		//if err != nil {
-		//	fmt.Println(err.Error())
-		//}
-		get, err := tf.FakeDynamicClient.
-			Resource(types.ClusterVersionGVR()).
-			Namespace("default").
-			Get(context.Background(), ClusterVersionName, metav1.GetOptions{})
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-		fmt.Println(get)
-		//fmt.Fprintln(GinkgoWriter, get)
-		//fmt.Fprintln(GinkgoWriter, "***123")
-		//cvlist := &v1alpha1.ClusterVersionList{
-		//	TypeMeta: metav1.TypeMeta{},
-		//	ListMeta: metav1.ListMeta{},
-		//	Items: []v1alpha1.ClusterVersion{
-		//		{
-		//			ObjectMeta: metav1.ObjectMeta{
-		//				Name:            ClusterVersionName,
-		//				ResourceVersion: "10",
-		//			}, Spec: v1alpha1.ClusterVersionSpec{
-		//				ClusterDefinitionRef: ClusterVersionNameV1,
-		//				ComponentVersions:    nil,
-		//			},
-		//		},
-		//	},
-		//}
-		//codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		//tf.UnstructuredClient = &fake.RESTClient{
-		//	NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		//	Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cvlist)},
-		//}
-
-		//cmd := NewListCmd(tf, streams)
-		//cmd.SetOut(buf)
-		//Expect(cmd).ShouldNot(BeNil())
-		//		expect := `NAME                      CLUSTER-DEFINITION    STATUS      AGE
-		//
-		//`
-		//cmd.Run(cmd, []string{})
-		//fmt.Println(buf)
+		cmd := NewListCmd(tf, streams)
+		cmd.Run(cmd, []string{"--cluster-definition=" + testing.ClusterDefName})
+		expected := `NAME                   CLUSTER-DEFINITION        STATUS      AGE
+fake-cluster-version   fake-cluster-definition   Available   0s
+`
+		Expect(expected).Should(Equal(out.String()))
 	})
 })

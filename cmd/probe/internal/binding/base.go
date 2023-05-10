@@ -255,7 +255,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("getRole failed %v times continuously", ops.CheckRoleFailedCount)
-			//resp.Metadata[StatusCode] = OperationFailedHTTPCode
+			// resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
@@ -306,7 +306,7 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 		opsRes["message"] = message
 		if ops.CheckRunningFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("running checks failed %v times continuously", ops.CheckRunningFailedCount)
-			//resp.Metadata[StatusCode] = OperationFailedHTTPCode
+			// resp.Metadata[StatusCode] = OperationFailedHTTPCode
 			SentProbeEvent(ctx, opsRes, ops.Logger)
 		}
 		ops.CheckRunningFailedCount++

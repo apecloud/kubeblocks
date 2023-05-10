@@ -224,24 +224,24 @@ func String2RoleType(roleName string) RoleType {
 	return CustomizedRole
 }
 
-func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger) error {
+func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger) {
 	log.Infof("send event: %v", opsResult)
 	event, err := createProbeEvent(opsResult)
 	if err != nil {
 		log.Infof("generate event failed: %v", err)
-		return err
+		return
 	}
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Infof("get k8s client config failed: %v", err)
-		return err
+		return
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Infof("k8s client create failed: %v", err)
-		return err
+		return
 	}
 	namespace := os.Getenv("KB_NAMESPACE")
 	for i := 0; i < 3; i++ {
@@ -251,8 +251,6 @@ func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger)
 		}
 		log.Infof("send event failed: %v", err)
 	}
-
-	return err
 }
 
 func createProbeEvent(opsResult OpsResult) (*corev1.Event, error) {
@@ -309,12 +307,6 @@ source:
 	event.LastTimestamp = metav1.Now()
 
 	return event, nil
-}
-
-type roleEventValue struct {
-	PodName  string
-	EventSeq string
-	Role     string
 }
 
 const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyz"

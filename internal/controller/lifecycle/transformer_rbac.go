@@ -49,8 +49,7 @@ func (c *RbacTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	dag.AddVertex(rbVertex)
 	dag.Connect(rbVertex, roleVertex)
 	dag.Connect(rbVertex, saVertex)
-	var secretVertices []graph.Vertex
-	secretVertices = findAll[*corev1.Secret](dag)
+	secretVertices := findAll[*corev1.Secret](dag)
 	for _, secretVertex := range secretVertices {
 		// connect all secret vertices to rbac vertices
 		dag.Connect(secretVertex, rbVertex)

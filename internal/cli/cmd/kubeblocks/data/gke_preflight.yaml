@@ -25,6 +25,13 @@ spec:
               message: This application requires at least 3 nodes
           - pass:
               message: This cluster has enough nodes.
+    - storageClass:
+        checkName: Required-Default-SC
+        outcomes:
+          - warning:
+              message: The default storage class was not found. To learn more details, please check https://docs.aws.amazon.com/zh_cn/eks/latest/userguide/storage-classes.html.
+          - pass:
+              message: default storage class is the presence, and all good on storage classes
   extendAnalyzers:
     - clusterAccess:
         checkName: Check-K8S-Access
@@ -33,12 +40,10 @@ spec:
               message: k8s cluster access fail
           - pass:
               message: k8s cluster access ok
-    - storageClass:
-        checkName: Required-PREMIUM-SC
-        storageClassType: "pd-ssd"
-        provisioner: "pd.csi.storage.gke.io"
+    - taint:
+        checkName: Required-Taint-Match
         outcomes:
           - fail:
-              message: The premium storage class was not found
+              message: The taint matching failed.
           - pass:
-              message: premium is the presence, and all good on storage classes
+              message: The taint matching succeeded.

@@ -28,8 +28,8 @@ spec:
     - storageClass:
         checkName: Required-Default-SC
         outcomes:
-          - fail:
-              message: The default storage class was not found
+          - warning:
+              message: The default storage class was not found. To learn more details, please check https://help.aliyun.com/document_detail/189288.html.
           - pass:
               message: default storage class is the presence, and all good on storage classes
   extendAnalyzers:

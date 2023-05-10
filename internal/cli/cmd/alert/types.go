@@ -102,9 +102,10 @@ type slackKey string
 
 // slackConfig keys
 const (
-	slackAPIURL   slackKey = "api_url"
-	slackChannel  slackKey = "channel"
-	slackUsername slackKey = "username"
+	slackAPIURL    slackKey = "api_url"
+	slackChannel   slackKey = "channel"
+	slackUsername  slackKey = "username"
+	slackTitleLink slackKey = "title_link"
 )
 
 // emailConfig is the email config of receiver
@@ -120,9 +121,10 @@ type webhookConfig struct {
 }
 
 type slackConfig struct {
-	APIURL   string `json:"api_url,omitempty"`
-	Channel  string `json:"channel,omitempty"`
-	Username string `json:"username,omitempty"`
+	APIURL    string `json:"api_url,omitempty"`
+	Channel   string `json:"channel,omitempty"`
+	Username  string `json:"username,omitempty"`
+	TitleLink string `json:"title_link"`
 }
 
 // receiver is the receiver of alert

@@ -1100,7 +1100,7 @@ prometheus:
                 description: 'MongoDB instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
       
             - alert: MongodbRestarted
-              expr: 'time() - process_start_time_seconds < 60'
+              expr: 'mongodb_instance_uptime_seconds < 60'
               for: 0m
               labels:
                 severity: info

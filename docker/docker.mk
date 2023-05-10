@@ -32,7 +32,7 @@ BUILDX_PLATFORMS ?= linux/amd64,linux/arm64
 
 # Image URL to use all building/pushing image targets
 IMG ?= docker.io/apecloud/$(APP_NAME)
-TOOL_IMG ?= docker.io/apecloud/$(APP_NAME)-tool
+TOOL_IMG ?= docker.io/apecloud/$(APP_NAME)-tools
 CLI_IMG ?= docker.io/apecloud/kbcli
 CLI_TAG ?= v$(CLI_VERSION)
 

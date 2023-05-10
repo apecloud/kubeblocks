@@ -1,9 +1,9 @@
 dependencies:
 - name: pgcluster
   repository: https://jihulab.com/api/v4/projects/85949/packages/helm/stable
-  version: 0.4.5
+  version: 0.5.0-beta.23
 - name: redis-cluster
   repository: https://jihulab.com/api/v4/projects/85949/packages/helm/stable
-  version: 0.4.5
-digest: sha256:e637e4eb46ad6bede70c04e7b1a5376f0bc7be5c9500513816b0472de56431c1
-generated: "2023-05-09T22:25:29.379529+08:00"
+  version: 0.5.0-beta.23
+digest: sha256:2455b2fe7ebbe34b584a623f17b9e57aaa9ef03160f4dee5ae1b8bf4efa04129
+generated: "2023-05-09T22:46:49.543381+08:00"

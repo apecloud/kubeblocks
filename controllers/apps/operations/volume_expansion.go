@@ -324,12 +324,21 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		}
 		objectKey := getPVCProgressObjectKey(v.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: vctName}
+		currStorageSize := v.Status.Capacity.Storage()
 		// if the volume expand succeed
-		if v.Status.Capacity.Storage().Cmp(requestStorage) >= 0 {
+		if currStorageSize.Cmp(requestStorage) == 0 {
 			succeedCount += 1
 			completedCount += 1
-			message := fmt.Sprintf("Successfully expand volume: %s in Component: %s ", objectKey, componentName)
+			message := fmt.Sprintf("Successfully expand volume: %s in Component: %s", objectKey, componentName)
 			progressDetail.SetStatusAndMessage(appsv1alpha1.SucceedProgressStatus, message)
+			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
+			continue
+		}
+		if currStorageSize.Cmp(requestStorage) > 0 {
+			completedCount += 1
+			message := fmt.Sprintf("requested storage size of %s can not less than current storage size: %s",
+				objectKey, currStorageSize.String())
+			progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, message)
 			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 			continue
 		}

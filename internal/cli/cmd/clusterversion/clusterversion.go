@@ -60,6 +60,6 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	o.AddFlags(cmd, true)
-	cmd.Flags().StringVar(&o.ClusterDefinitionRef, "cluster-definition", "", "list the clusterVersion belonging to the specified cluster definition")
+	cmd.Flags().StringVar(&o.LabelSelector, "cluster-definition", "", "list the clusterVersion belonging to the specified cluster definition")
 	return cmd
 }

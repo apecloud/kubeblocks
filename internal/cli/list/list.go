@@ -48,14 +48,13 @@ import (
 )
 
 type ListOptions struct {
-	Factory              cmdutil.Factory
-	Namespace            string
-	AllNamespaces        bool
-	LabelSelector        string
-	FieldSelector        string
-	ShowLabels           bool
-	ClusterDefinitionRef string
-	ToPrinter            func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
+	Factory       cmdutil.Factory
+	Namespace     string
+	AllNamespaces bool
+	LabelSelector string
+	FieldSelector string
+	ShowLabels    bool
+	ToPrinter     func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
 
 	// Names are the resource names
 	Names  []string
@@ -146,13 +145,8 @@ func (o *ListOptions) Run() (*resource.Result, error) {
 	if err := o.Complete(); err != nil {
 		return nil, err
 	}
-	if len(o.ClusterDefinitionRef) != 0 {
-		add := fmt.Sprintf("app.kubernetes.io/name= %s", o.ClusterDefinitionRef)
-		if len(o.LabelSelector) == 0 {
-			o.LabelSelector = add
-		} else {
-			o.LabelSelector += "," + add
-		}
+	if len(o.LabelSelector) != 0 {
+		o.LabelSelector = fmt.Sprintf("app.kubernetes.io/name= %s", o.LabelSelector)
 	}
 	r := o.Factory.NewBuilder().
 		Unstructured().

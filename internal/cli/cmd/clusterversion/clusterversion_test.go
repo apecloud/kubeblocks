@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -45,26 +45,34 @@ var _ = Describe("clusterversion", func() {
 	var tf *cmdtesting.TestFactory
 	out := new(bytes.Buffer)
 
-	mockRestTable := func() *v1.Table {
+	mockRestTable := func() *metav1.Table {
 		var Type = "string"
-		tableHeader := make([]v1.TableColumnDefinition, 4)
-		tableHeader[0].Name = "NAME"
-		tableHeader[0].Type = Type
-		tableHeader[1].Name = "CLUSTER-DEFINITION"
-		tableHeader[1].Type = Type
-		tableHeader[2].Name = "STATUS"
-		tableHeader[2].Type = Type
-		tableHeader[3].Name = "AGE"
-		tableHeader[3].Type = Type
-		value := make([]v1.TableRow, 1)
+		tableHeader := []metav1.TableColumnDefinition{
+			{
+				Name: "NAME",
+				Type: Type,
+			}, {
+				Name: "CLUSTER-DEFINITION",
+				Type: Type,
+			}, {
+				Name: "STATUS",
+				Type: Type,
+			},
+			{
+				Name: "AGE",
+				Type: Type,
+			},
+		}
+
+		value := make([]metav1.TableRow, 1)
 		value[0].Cells = make([]interface{}, 4)
 		value[0].Cells[0] = testing.ClusterVersionName
 		value[0].Cells[1] = testing.ClusterDefName
 		value[0].Cells[2] = "Available"
 		value[0].Cells[3] = "0s"
 
-		table := &v1.Table{
-			TypeMeta: v1.TypeMeta{
+		table := &metav1.Table{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "Table",
 				APIVersion: "meta.k8s.io/v1",
 			},
@@ -89,7 +97,7 @@ var _ = Describe("clusterversion", func() {
 
 	BeforeEach(func() {
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
-		_ = v1.AddMetaToScheme(scheme.Scheme)
+		_ = metav1.AddMetaToScheme(scheme.Scheme)
 		streams, _, out, _ = genericclioptions.NewTestIOStreams()
 		table := mockRestTable()
 		tf = mockClient(table)

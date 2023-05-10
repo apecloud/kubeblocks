@@ -138,7 +138,7 @@ func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 	return yamlDataList, nil
 }
 
-func (p *PreflightOptions) Preflight(f cmdutil.Factory, args []string, opts values.Options) *intctrlutil.Error {
+func (p *PreflightOptions) Preflight(f cmdutil.Factory, args []string, opts values.Options) error {
 	// if force flag set, skip preflight
 	if p.force {
 		return nil
@@ -146,20 +146,20 @@ func (p *PreflightOptions) Preflight(f cmdutil.Factory, args []string, opts valu
 	p.ValueOpts = opts
 	*p.Format = "yaml"
 
-	var err *intctrlutil.Error
+	var err error
 	if err = p.complete(f, args); err != nil {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeSkipPreflight) {
 			return nil
 		}
-		return err
+		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
 	if err = p.run(); err != nil {
-		return err
+		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
 	return nil
 }
 
-func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) *intctrlutil.Error {
+func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) error {
 	// default no args, and run default validating vendor
 	if len(args) == 0 {
 		clientSet, err := f.KubernetesClientSet()
@@ -199,7 +199,7 @@ func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) *intctrlut
 	return nil
 }
 
-func (p *PreflightOptions) run() *intctrlutil.Error {
+func (p *PreflightOptions) run() error {
 	var (
 		kbPreflight     *preflightv1beta2.Preflight
 		kbHostPreflight *preflightv1beta2.HostPreflight

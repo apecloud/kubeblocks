@@ -120,6 +120,8 @@ type webhookConfig struct {
 	MaxAlerts    int    `json:"max_alerts,omitempty"`
 }
 
+// slackConfig is the alertmanager slack config of receiver
+// ref: https://prometheus.io/docs/alerting/latest/configuration/#slack_config
 type slackConfig struct {
 	APIURL    string `json:"api_url,omitempty"`
 	Channel   string `json:"channel,omitempty"`

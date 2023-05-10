@@ -68,43 +68,56 @@ cloud
 local
 {{- end }}
 {{- end }}
+{{- define "foxlake-cluster.postJobName" -}}
+{{- if eq (include "foxlake-cluster.deployEnv" .) "cloud" -}}
+s3
+{{- else -}}
+minio
+{{- end }}
+{{- end }}
+{{- define "foxlake-cluster.postJobImage" -}}
+{{- if eq (include "foxlake-cluster.deployEnv" .) "cloud" -}}
+amazon/aws-cli
+{{- else -}}  
+minio/mc
+{{- end }}
+{{- end }}
 
-{{- define "post-job.env" -}}
+{{- define "foxlake-cluster.postJobEnv" -}}
 {{- if eq (include "foxlake-cluster.deployEnv" .) "cloud" -}}
 - name: S3_BUCKET_NAME
   value: {{ .Values.s3BucketName }}
 - name: AWS_ACCESS_KEY_ID
   valueFrom:
     secretKeyRef:
-      name: csi-s3-secret
-      key:  accessKeyID 
+      name: foxlake-s3-secret
+      key:  s3AccessKey
 - name: AWS_SECRET_ACCESS_KEY
   valueFrom:
     secretKeyRef:
-      name: csi-s3-secret
-      key: secretAccessKey
+      name: foxlake-s3-secret
+      key: s3SecretKey
 - name: AWS_DEFAULT_REGION
   value: cn-northwest-1
 {{- else -}}
 - name: MINIO_BUCKET_NAME
-  valueFrom:
-    configMapKeyRef:
-      name: minio-chart-kubeblocks-values
-      key: bucketName
+  value: {{ .Values.minioBucketName }}
 - name: MINIO_ACCESS_KEY_ID
   valueFrom:
     secretKeyRef:
-      name: kb-addon-minio
-      key: rootUser
+      name: foxlake-s3-secret
+      key: minioAccessKey
 - name: MINIO_SECRET_ACCESS_KEY
   valueFrom:
     secretKeyRef:
-      name: kb-addon-minio
-      key: rootPassword
+      name: foxlake-s3-secret
+      key: minioSecretKey
+- name: MINIO_FQDN
+  value: {{ .Release.Name }}-foxlake-minio.{{ .Release.Namespace }}.svc
 {{- end }}
 {{- end }}
 
-{{- define "foxlake-endpoint.env" -}}
+{{- define "foxlake-cluster.endPointEnv" -}}
 - name: FOXLAKE_HOST
   valueFrom:
     secretKeyRef:

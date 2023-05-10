@@ -9,19 +9,28 @@ fullnameOverride: ""
 
 clusterVersionOverride: ""
 
-# for foxlake
-image:
-  repository: apecloud/foxlake
-  pullPolicy: Always
-  tag: "main"
-
-# for foxlake-metadb
-mysql:
-  image:
+## @param application images
+##
+images:
+  pullPolicy: IfNotPresent
+  foxlake:
+    repository: apecloud/foxlake
+    pullPolicy: Always
+    tag: "main"
+  mysql:
     repository: mysql
     pullPolicy: IfNotPresent
     tag: "latest"
+  minio:
+    repository: docker.io/minio/minio
+    tag: RELEASE.2022-03-17T06-34-49Z
 
+## @param storage configuration
+##
+s3:
+  accessKey: ""
+  secretKey: ""
+  defaultRegion: ""
 minio:
-  bucketName: "foxlake"
-  rootUser: "foxlake"
+  accessKey: "rootuser"
+  secretKey: "rootpass123"

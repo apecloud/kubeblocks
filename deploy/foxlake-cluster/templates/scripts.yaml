@@ -13,7 +13,7 @@ data:
       -P${FOXLAKE_PORT} \
       -e \
       "CREATE OR REPLACE STORAGE default AT URI \
-        'minio://${KB_ADDON_MINIO_SERVICE_HOST}:${KB_ADDON_MINIO_SERVICE_PORT}/${MINIO_BUCKET_NAME}' \
+        'minio://${MINIO_FQDN}:9000/${MINIO_BUCKET_NAME}' \
         credentials (ACCESS_KEY_ID='${MINIO_ACCESS_KEY_ID}' SECRET_ACCESS_KEY='${MINIO_SECRET_ACCESS_KEY}');"
   setup_cloud_storage.sh: |
     #!/bin/bash
@@ -35,5 +35,14 @@ data:
       echo -e "s3 bucket ${S3_BUCKET_NAME} does not exist, creating...";
       aws s3 mb s3://${S3_BUCKET_NAME} --region ${AWS_DEFAULT_REGION};
     fi
-
-
+  create_minio_bucket.sh: |
+    #!/bin/bash
+    echo -e "auto create minio bucket";
+    mc alias set myminio http://${MINIO_FQDN}:9000 ${MINIO_ACCESS_KEY_ID} ${MINIO_SECRET_ACCESS_KEY};
+    # check if bucket exists
+    if mc stat myminio/${MINIO_BUCKET_NAME} > /dev/null 2>&1; then
+      echo -e "Bucket ${MINIO_BUCKET_NAME} already exists";
+    else
+      echo -e "Bucket ${MINIO_BUCKET_NAME} does not exist, creating...";
+      mc mb myminio/${MINIO_BUCKET_NAME};
+    fi     

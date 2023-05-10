@@ -44,5 +44,11 @@ spec:
             resources:
               requests:
                 storage: 16Gi
+    - name: foxlake-minio
+      componentDefRef: foxlake-minio
+      replicas: 1
+      resources:
+        requests:
+          memory: 512Mi
 
 

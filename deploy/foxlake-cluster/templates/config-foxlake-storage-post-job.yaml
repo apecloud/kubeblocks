@@ -22,7 +22,7 @@ spec:
             - "-c"
             - "while ! nc -z ${FOXLAKE_HOST} ${FOXLAKE_PORT}; do sleep 1; printf '-'; done; echo -e '  >> FoxLake Server has started';"
           env:
-            {{- include "foxlake-endpoint.env" . | nindent 12}} 
+            {{- include "foxlake-cluster.endPointEnv" . | nindent 12}} 
       containers:
         - name: config-storage
           image: "mysql:latest"
@@ -39,8 +39,8 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-conn-credential
                   key: password
-            {{- include "foxlake-endpoint.env" . | nindent 12}}
-            {{- include "post-job.env" . | nindent 12}}
+            {{- include "foxlake-cluster.endPointEnv" . | nindent 12}}
+            {{- include "foxlake-cluster.postJobEnv" . | nindent 12}}
           volumeMounts:
             - name: scripts
               mountPath: /scripts

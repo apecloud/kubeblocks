@@ -6,7 +6,7 @@ metadata:
     {{- include "foxlake.labels" . | nindent 4 }}
 
   annotations:
-    k8s.foxlake.io/mpp-worker-image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+    k8s.foxlake.io/mpp-worker-image: {{ .Values.images.foxlake.repository }}:{{ .Values.images.foxlake.tag }}
     k8s.foxlake.io/mpp-worker-tolerations: spot=true:NoSchedule
 spec:
   connectionCredential:
@@ -16,6 +16,8 @@ spec:
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_foxlake)"
     metaDbPasswd: "$(RANDOM_PASSWD)"
+    minioAccessKey: {{ .Values.minio.accessKey }}
+    minioSecretKey: {{ .Values.minio.secretKey }}
   componentDefs:
     - name: foxlake
       workloadType: Stateless
@@ -69,7 +71,7 @@ spec:
               {{- include "foxlake.env" . | nindent 14 }}
       systemAccounts:
         cmdExecutorConfig:
-          image: {{ .Values.mysql.image.repository }}:{{ .Values.mysql.image.tag }}
+          image: {{ .Values.images.mysql.repository }}:{{ .Values.images.mysql.tag }}
           command:
           - mysql
           args:
@@ -131,3 +133,77 @@ spec:
             volumeMounts:
               - name: data
                 mountPath: /var/lib/mysql
+    - name: foxlake-minio
+      workloadType: Stateful
+      characterType: minio
+      probes:
+      logconfigs:
+      configSpecs:
+      scriptsSpecs:
+      service:
+        ports:
+          - name: http
+            port: 9000
+            targetPort: 9000
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        containers:
+          - name: minio
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              fsGroup: 1000
+              runAsGroup: 1000
+              runAsUser: 1000
+            livenessProbe:
+              failureThreshold: 5
+              httpGet:
+                path: /minio/health/live
+                port: 9000
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              successThreshold: 1
+              timeoutSeconds: 5
+            readinessProbe:
+              failureThreshold: 5
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 9000
+              timeoutSeconds: 1
+            startupProbe:
+              failureThreshold: 60
+              periodSeconds: 10
+              successThreshold: 1
+              tcpSocket:
+                port: 9000
+              timeoutSeconds: 5
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            serviceAccountName: "$(KB_CLUSTER_NAME-minio)"
+            volumeMounts:
+              - mountPath: /export
+                name: export
+            volumes:
+              - name: minio-user
+                secret:
+                  defaultMode: 420
+                  secretName: $(CONN_CREDENTIAL_SECRET_NAME)
+            command:
+              - /bin/sh
+              - -ce
+              - /usr/bin/docker-entrypoint.sh minio -S /etc/minio/certs/ server /export
+            env:
+              - name: MINIO_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    key: minioAccessKey
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+              - name: MINIO_SECRET_KEY
+                valueFrom:
+                  secretKeyRef:
+                    key: minioSecretKey
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)

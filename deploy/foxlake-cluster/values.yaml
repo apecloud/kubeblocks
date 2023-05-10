@@ -24,3 +24,4 @@ topologyKeys:
   - kubernetes.io/hostname
 
 s3BucketName: "kb-support-foxlake-test"
+minioBucketName: "foxlake"

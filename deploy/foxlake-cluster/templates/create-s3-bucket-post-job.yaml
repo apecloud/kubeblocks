@@ -1,8 +1,7 @@
-{{- if eq (include "foxlake-cluster.deployEnv" .) "cloud" -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "{{ .Release.Name }}-create-s3-bucket-post-job"
+  name: "{{ .Release.Name }}-create-{{- include "foxlake-cluster.postJobName" . -}}-bucket-post-job"
   labels: {{ include "foxlake-cluster.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
@@ -11,17 +10,29 @@ metadata:
 spec:
   template:
     metadata:
-      name: "{{ .Release.Name }}-create-s3-bucket"
+      name: "{{ .Release.Name }}-create-{{- include "foxlake-cluster.postJobName" . -}}-bucket"
       labels: {{ include "foxlake-cluster.labels" . | nindent 8 }}
     spec:
       restartPolicy: Never
-      containers:
-        - name: create-s3-bucket
-          image: "amazon/aws-cli"
+      {{- if eq (include "foxlake-cluster.deployEnv" .) "local" }}
+      initContainers:
+        - name: wait-for-minio
+          image: "busybox:latest"
           command:
-            - "/scripts/create_s3_bucket.sh"
+            - "sh"
+            - "-c"
+            - "while ! nc -z ${MINIO_FQDN} 9000; do sleep 1; printf '-'; done; echo -e '  >> Minio Server has started';"
           env:
-            {{- include "post-job.env" . | nindent 12}}
+            {{- include "foxlake-cluster.postJobEnv" . | nindent 12}}
+      {{- end }}
+      containers:
+        - name: create-{{- include "foxlake-cluster.postJobName" . -}}-bucket
+          image: 
+            {{- include "foxlake-cluster.postJobImage" . | nindent 12}}
+          command:
+            - "/scripts/create_{{- include "foxlake-cluster.postJobName" . -}}_bucket.sh"
+          env:
+            {{- include "foxlake-cluster.postJobEnv" . | nindent 12}}
           volumeMounts:
             - name: scripts
               mountPath: /scripts
@@ -32,4 +43,3 @@ spec:
             name: foxlake-cluster-setup-scripts 
             defaultMode: 0777
   backoffLimit: 0
-{{- end}}

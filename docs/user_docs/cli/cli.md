@@ -27,7 +27,7 @@ Manage alert receiver, include add, list and delete receiver.
 
 Run a benchmark.
 
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
+* [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - Create a sysbench benchmark
 
 
 ## [builder](kbcli_builder.md)

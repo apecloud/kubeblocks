@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	"helm.sh/helm/v3/pkg/strvals"
@@ -40,7 +41,7 @@ import (
 const (
 	NodesPath   = "cluster-resources/nodes.json"
 	Tolerations = "tolerations"
-	KubeBlock   = "kubeblock"
+	KubeBlocks  = "kubeblocks"
 )
 
 type AnalyzeTaintClassByKb struct {
@@ -100,7 +101,9 @@ func (a *AnalyzeTaintClassByKb) doAnalyzeTaint(nodes v1.NodeList) (*analyze.Anal
 		}
 	}
 	if len(taintFailResult) > 0 {
-		return newAnalyzeResult(a.Title(), FailType, a.analyzer.Outcomes), nil
+		result := newAnalyzeResult(a.Title(), FailType, a.analyzer.Outcomes)
+		result.Message += fmt.Sprintf(" Taint check components: %s", strings.Join(taintFailResult, ", "))
+		return result, nil
 	}
 	return newAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
 }
@@ -123,12 +126,8 @@ func (a *AnalyzeTaintClassByKb) generateTolerations() error {
 func getTolerationsMap(tolerationData map[string]interface{}, addonName string, tolerationsMap map[string][]v1.Toleration) {
 	var tmpTolerationList []v1.Toleration
 	var tmpToleration v1.Toleration
-	for k, v := range tolerationData {
-		if addonName != "" {
-			addonName += "."
-		}
-		addonName += k
 
+	for k, v := range tolerationData {
 		if k == Tolerations {
 			tolerationList := v.([]interface{})
 			tmpTolerationList = []v1.Toleration{}
@@ -141,17 +140,18 @@ func getTolerationsMap(tolerationData map[string]interface{}, addonName string, 
 				tmpTolerationList = append(tmpTolerationList, tmpToleration)
 			}
 			if addonName == "" {
-				addonName = KubeBlock
+				addonName = KubeBlocks
 			}
 			tolerationsMap[addonName] = tmpTolerationList
-			return
+			continue
 		}
 
 		switch v := v.(type) {
 		case map[string]interface{}:
+			addonName += "." + k
 			getTolerationsMap(v, addonName, tolerationsMap)
 		default:
-			return
+			continue
 		}
 	}
 }

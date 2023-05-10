@@ -55,6 +55,10 @@ const (
 
 	// ErrorType for cluster controller
 	ErrorTypeBackupFailed ErrorType = "BackupFailed"
+
+	// ErrorType for preflight
+	ErrorTypePreflightCommon = "PreflightCommon"
+	ErrorTypeSkipPreflight   = "SkipPreflight"
 )
 
 var ErrFailedToAddFinalizer = errors.New("failed to add finalizer")

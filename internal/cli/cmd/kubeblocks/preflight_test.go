@@ -93,10 +93,8 @@ var _ = Describe("Preflight API Test", func() {
 			PreflightFlags: preflight.NewPreflightFlags(),
 		}
 		Expect(p.complete(tf, nil)).Should(HaveOccurred())
-		Expect(p.validate()).Should(HaveOccurred())
 		Expect(p.complete(tf, []string{"file1", "file2"})).Should(Succeed())
 		Expect(len(p.checkFileList)).Should(Equal(2))
-		Expect(p.validate()).Should(Succeed())
 	})
 
 	It("run test", func() {

@@ -151,13 +151,13 @@ type: Normal
 	}
 
 	event := &corev1.Event{}
-	_, _, err := scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, event)
+	_, _, err = scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, event)
 	if err != nil {
 		return nil, err
 	}
 	event.Reason = string(probeutil.CheckRoleOperation)
 
-	return event.(*corev1.Event), nil
+	return event, nil
 }
 
 func createInvolvedPod(name string) corev1.Pod {

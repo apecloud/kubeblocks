@@ -12,28 +12,46 @@ Follow the steps below to perform the full file backup and restore of a cluster.
 
 ## Back up the storage source
 
-:::caution
+Currently, the KubeBlocks backup and restore rely on the Kubernetes PersistentVolume and PersistentVolumeClaim and store the backup data on the specified PVC. The tables below list whether a PersistentVolume access mode is supported.
 
-1. The persistent volume requires `accessMode` to be ReadWriteMany.
+:paperclip: Table 1. Backup
 
-   If you use other access modes, these modes may not be applicable in many scenarios. For example,
-   a. ReadWriteOnce: If the pods of a cluster need to be scheduled to different nodes, the restore may fail.
-   b. ReadOnlyMany: Backups of multiple clusters to this PV may fail.
-2. The current backup strategy uses `nodeName` to specify the node affinity of the Pod running the backup task. If the `volumeBindingMode` of the StorageClass is `WaitForFirstConsumer`,  manually create a PV and PVC and wait for the PVC to be bound successfully.
+| Access Mode      | Same backup source <br />(All clusters share a PVC) | One PVC for one cluster |
+| :----------      | :----------------- | :---------------------- |
+| ReadWriteMany    | Yes                | Yes                     |
+| ReadWriteOnce    | NA                 | Yes (only for test)     |
+| ReadOnlyMany     | NA                 | Yes (only for test)     |
+| ReadWriteOncePod | NA                 | NA                      |
 
-:::
+:paperclip: Table 2. Restore
+
+| Access Mode      | One-replica cluster | Multiple-replicas cluster |
+| :----------      | :-----------------  | :----------------------   |
+| ReadWriteMany    | Yes                 | Yes                       |
+| ReadWriteOnce    | Yes (only for test) | NA                        |
+| ReadOnlyMany     | Yes (only for test) | Yes (only for test)       |
+| ReadWriteOncePod | NA                  | NA                        |
+
+If you use a local volume, the pods of backup and restore should be on the same node and can only be used for a test. Note that ReadWriteOnce pod is not supported.
+
+If the `volumeBindingMode` of the StorageClass for the local test is `WaitForFirstConsumer`,  manually create a PV and PVC and wait for the PVC to be bound successfully.
 
 ### Use S3 as the backup storage source
 
 1. Enable CSI-S3 and fill in the values based on your actual environment.
 
    ```bash
-   kbcli addon enable csi-s3 \
+   helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
+
+   helm install csi-s3  kubeblocks/csi-s3 --version=0.5.0 \
    --set secret.accessKey=<your_accessKey> \
    --set secret.secretKey=<your_secretKey> \
    --set storageClass.singleBucket=<s3_bucket>  \
    --set secret.endpoint=https://s3.<region>.amazonaws.com.cn \
    --set secret.region=<region> -n kb-system
+
+   # CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
+   --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
    ```
 
    :::note
@@ -65,135 +83,75 @@ Follow the steps below to perform the full file backup and restore of a cluster.
 
 ### Use OSS as the backup storage source
 
-:::caution
+```bash
+helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
 
-CSI-OSS does not support the dynamic volume provisioning of persistent volumes. The following systems are supported:
+helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
+--set secret.accessKey=<your_access_id> \
+--set secret.secretKey=<your_access_secret> \
+--set storageClass.singleBucket=<bucket_name>  \
+--set secret.endpoint=https://oss-<region>.aliyuncs.com \
+--set storageClass.mounter=s3fs,storageClass.mountOptions="" \
+ -n kb-system
 
-* Linux:
-  * CentOS 7.0 and above
-  * Ubuntu 18.04
-  * Anolis 7 and above
-* FUSE 2.8.4 and above
+# CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
+--set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
+```
+
+### Use minIO as the backup storage source
+
+1. Install minIO.
+
+   ```bash
+   helm upgrade --install minio oci://registry-1.docker.io/bitnamicharts/minio --set persistence.enabled=true,persistence.storageClass=csi-hostpath-sc,persistence.size=100Gi,defaultBuckets=backup
+   ```
+
+2. Get the minIO access key and secret key.
+
+   ```bash
+   export ROOT_USER=$(kubectl get secret --namespace default minio -o jsonpath="{.data.root-user}" | base64 -d)
+   export ROOT_PASSWORD=$(kubectl get secret --namespace default minio -o jsonpath="{.data.root-password}" | base64 -d)
+   ```
+
+3. Install CSI-S3.
+
+   ```bash
+   helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
+
+   helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0-beta.17 \
+   --set secret.accessKey=$ROOT_USER \
+   --set secret.secretKey=$ROOT_PASSWORD \
+   --set storageClass.singleBucket=backup  \
+   --set secret.endpoint=http://minio.default.svc.cluster.local:9000 \
+    -n kb-system
+
+   # CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
+   --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
+   ```
+
+## Configure global backup storage source by KubeBlocks
+
+You can configure a global backup storage source to make this source the default backup policy of all new clusters. Currently, the glocal backup storage source cannot be synchronized as the backup policy of created clusters.
+
+If there is no PVC, the system creates one automatically based on the configuration.
+
+It takes about 1 minute to make the configuration effective.
+
+:::note
+
+`-n kb-system` specifies the namespace in which KubeBlocks is installed. If you install KubeBlocks in another namespace, specify your namespace instead.
 
 :::
 
-1. Add a CSI driver.
-     * For the Kubernetes clusters that do not install any Alibaba Cloud CSI driver
+```bash
 
-        ```bash
-        kbcli addon enable csi-oss \
-        --set secret.akId=<your_akId> \
-        --set secret.akSecret=<your_akSecret> \
-        --set storageConfig.bucket=<your_bucket>  \
-        --set storageConfig.endpoint=oss-cn-hangzhou.aliyuncs.com
-        ```
+# CSI-driver suppoers the dynamic volume provisioning, such as CSI-S3
+kbcli kubeblocks config --set dataProtection.backupPVCName=backup-data \
+--set dataProtection.backupPVCCreatePolicy=IfNotPresent \
+--set dataProtection.backupPVCInitCapacity=100Gi \
+--set dataProtection.backupPVCStorageClassName=csi-s3 -n kb-system
 
-     * For the Kubernetes cluster that already installed Alibaba Cloud CSI driver, choose one of the following two methods to add OSS CSI.
-
-       * Add the OSS CSI driver.
-
-         ```yaml
-         kubectl apply -f -<< EOF
-         apiVersion: storage.k8s.io/v1
-         kind: CSIDriver
-         metadata:
-           name: ossplugin.csi.alibabacloud.com
-         spec:
-           attachRequired: false
-           podInfoOnMount: true
-         EOF
-         ```
-
-       * Modify the original DaemonSet.
-
-         1. Add an OSS registrar container.
-
-            ```yaml
-            - name: oss-driver-registrar
-              image: registry.cn-hangzhou.aliyuncs.com/acs/csi-node-driver-registrar:v1.2.0
-              imagePullPolicy: Always
-              args:
-                - "--v=5"
-                - "--csi-address=/var/lib/kubelet/csi-plugins/ossplugin.csi.alibabacloud.com/csi.sock"
-                - "--kubelet-registration-path=/var/lib/kubelet/csi-plugins/ossplugin.csi.alibabacloud.com/csi.sock"
-              volumeMounts:
-              - name: kubelet-dir
-                mountPath: /var/lib/kubelet/
-              - name: registration-dir
-                mountPath: /registration
-             ```
-
-         2. Modify the `args` parameter of the CSI plug-in container.
-
-             ```yaml
-              --driver=disk,oss  // add oss driver
-              --nodeid=$(KUBE_NODE_NAME) // add this arg (this option is required for services other than alibaba esc)
-              ```
-
-             Add the following parameters to `volumeMounts`
-
-             ```yaml
-             - name: ossconnectordir
-               mountPath: /host/usr/
-
-         3. Add the following parameters to `volumes`.
-
-              ```yaml
-              - name: ossconnectordir
-                hostPath:
-                  path: /usr/
-              ```
-
-2. Create PV and PVC.
-
-    ```yaml
-    kubectl apply -f -<< EOF
-    apiVersion: v1
-    kind: PersistentVolume
-    metadata:
-      name: backup-data-pv
-      labels:
-        alicloud-pvname: backup-data-pv
-    spec:
-      capacity:
-        storage: 100Gi
-      accessModes:
-        - ReadWriteMany
-      persistentVolumeReclaimPolicy: Retain
-      csi:
-        driver: ossplugin.csi.alibabacloud.com
-        # This value should be consistent with the PV name
-        volumeHandle: backup-data-pv
-        nodePublishSecretRef:
-          name: csi-oss-secret
-          # The same namespace as kubeblocks
-          namespace: kb-system
-        volumeAttributes:
-          # Fill in this value based on your actual environment
-          bucket: "<your_bucket>"
-          url: "oss-cn-hangzhou.aliyuncs.com"
-          otherOpts: "-o max_stat_cache_size=0 -o allow_other"
-          # Fill in this value based on your actual environment
-          path: "/"
-
-    ---
-    apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      name: backup-data
-    spec:
-      accessModes:
-      - ReadWriteMany
-      resources:
-        requests:
-          storage: 100Gi
-      # Fill in storageClassName with ""
-      storageClassName: ""
-      selector:
-        matchLabels:
-          alicloud-pvname: backup-data-pv
-    EOF
-    ```
+```
 
 ## Create a cluster
 
@@ -260,7 +218,9 @@ spec:
 EOF
 ```
 
-## Specify the PVC for storing backup
+## Check the backup policy synchronization
+
+Check whether the backup policy is automatically synchronized with the global backup storage source.
 
 **Option 1.** Use `kbcli`
 
@@ -414,87 +374,6 @@ spec:
 EOF
 ```
 
-## Configure full file backup storage source by KubeBlocks
-
-You can configure the full file backup storage source by using the commands below to make this source the default backup policy of all new clusters. Currently, the backup policy of created clusters cannot be synchronized.
-
-If there is no PVC, the system creates one automatically based on the configuration.
-
-:::note
-
-`-n kb-system` specifies the namespace in which KubeBlocks is installed. If you install KubeBlocks in another namespace, specify your namespace instead.
-
-:::
-
-### Dynamic volume provisioning
-
-This configuration applies to the CSI-driver which supports dynamic volume provisioning, such as CSI-S3.
-
-```bash
-kbcli kubeblocks config --set dataProtection.backupPVCName=backup-data \
---set dataProtection.backupPVCInitCapacity=100Gi \
---set dataProtection.backupPVCStorageClassName=csi-s3 -n kb-system
-```
-
-### Static volume provisioning
-
-This configuration applies to the CSI-driver which supports static volume provisioning, such as CSI-OSS.
-
-```bash
-kbcli kubeblocks config --set dataProtection.backupPVCName=backup-data \
---set dataProtection.backupPVCInitCapacity=100Gi \
---set dataProtection.backupPVConfigMapName=oss-persistent-volume-template \
---set dataProtection.backupPVConfigMapNamespace=kb-system -n kb-system
-```
-
-:::note
-
-`backupPVConfigMapName`: there exits a configMap whose key is "persistentVolume" and value is "PersistentVolume struct".
-
-:::
-
-### Self-installed OSS CSI driver
-
-If the OSS CSI driver is installed by yourself, create the persistent-volume-template configMap of OSS by running the commands below.
-
-```yaml
-kubectl apply -f -<< EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: oss-persistent-volume-template
-  namespace: default
-data:
-  persistentVolume: |
-    apiVersion: v1
-    kind: PersistentVolume
-    metadata:
-      # Self-generated name, the format is "pvcName-pvcNamespace"
-      # $(GENERATE_NAME) kubeblocks  
-      name: $(GENERATE_NAME)
-      labels:
-        alicloud-pvname: $(GENERATE_NAME)
-    spec:
-      capacity:
-        storage: 100Gi
-      accessModes:
-        - ReadWriteMany
-      persistentVolumeReclaimPolicy: Retain
-      csi:
-        driver: ossplugin.csi.alibabacloud.com
-        volumeHandle: $(GENERATE_NAME)
-        # Fill in the following parameters based on your actual environment
-        nodePublishSecretRef:
-          name: <your ak/sk secret name>
-          namespace: <secret namespace>
-        volumeAttributes:
-          bucket: <bucket-name>
-          url: "oss-cn-hangzhou.aliyuncs.com"
-          otherOpts: "-o max_stat_cache_size=0 -o allow_other"
-          path: "/"
-EOF
-```
-
 ## Enable scheduled backup
 
 **Option 1.** Use `kbcli`
@@ -513,7 +392,6 @@ spec:
       # Select the basic backup type, available options: snapshot and full
       # This example selects full as the basic backup type
       type: full
-  
 ```
 
 **Option 2.** Use `kubectl`
@@ -532,5 +410,4 @@ spec:
       # Select the basic backup type, available options: snapshot and full
       # This example selects full as the basic backup type
       type: full
-      
 ```

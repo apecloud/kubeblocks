@@ -169,6 +169,12 @@ type ClusterComponentSpec struct {
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
 
+	// candidateInstance is used to trigger switchover and describe the information of the candidate primary or leader.
+	// the value of candidateInstance index does not represent the real primary or leader  of the current instance,
+	// and the result of instance failover will not be synchronized to candidateInstance.
+	// +optional
+	CandidateInstance *CandidateInstance `json:"candidateInstance,omitempty"`
+
 	// switchPolicy defines the strategy for switchover and failover when workloadType is Replication.
 	// +optional
 	SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
@@ -271,6 +277,20 @@ type ReplicationMemberStatus struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
 	Pod string `json:"pod"`
+}
+
+type CandidateInstance struct {
+	// index of the candidate instance, 0 <= index <= componentSpecs[x].replicas-1.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Required
+	Index int32 `json:"index"`
+
+	// operator represents a relationship to the index value. Valid operators are Equal and NotEqual.
+	// Equal indicates that the user expects that new candidate primary or leader is equal to index, which is often used in the scenario of specifying the candidate primary or leader for switchover.
+	// NotEqual indicates that the user expects that the value of the new candidate primary or leader is not equal to index, which is often used in scenarios where the candidate primary or leader is not specified for switchover.
+	// In particular, if operator is NotEqual and the specified index is not the real primary or leader of the current instance, no switchover will be performed.
+	// +kubebuilder:validation:Required
+	Operator CandidateOperator `json:"operator"`
 }
 
 type ClusterSwitchPolicy struct {

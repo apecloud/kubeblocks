@@ -359,6 +359,11 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=key
 	// +optional
 	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
+
+	// switchoverSpec defines command to do switchover.
+	// in particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
+	// +optional
+	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
 }
 
 type ServiceSpec struct {
@@ -643,6 +648,12 @@ type CommandExecutorItem struct {
 	// args is used to perform statements.
 	// +optional
 	Args []string `json:"args,omitempty"`
+}
+
+type SwitchoverSpec struct {
+	CommandExecutorEnvItem `json:",inline"`
+
+	CommandExecutorItem `json:",inline"`
 }
 
 type CustomLabelSpec struct {

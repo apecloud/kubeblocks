@@ -156,6 +156,40 @@ spec:
                           type: array
                           x-kubernetes-list-type: set
                       type: object
+                    candidateInstance:
+                      description: candidateInstance is used to trigger switchover
+                        and describe the information of the candidate primary or leader.
+                        the value of candidateInstance index does not represent the
+                        real primary or leader  of the current instance, and the result
+                        of instance failover will not be synchronized to candidateInstance.
+                      properties:
+                        index:
+                          description: index of the candidate instance, 0 <= index
+                            <= componentSpecs[x].replicas-1.
+                          format: int32
+                          minimum: 0
+                          type: integer
+                        operator:
+                          description: operator represents a relationship to the index
+                            value. Valid operators are Equal and NotEqual. Equal indicates
+                            that the user expects that new candidate primary or leader
+                            is equal to index, which is often used in the scenario
+                            of specifying the candidate primary or leader for switchover.
+                            NotEqual indicates that the user expects that the value
+                            of the new candidate primary or leader is not equal to
+                            index, which is often used in scenarios where the candidate
+                            primary or leader is not specified for switchover. In
+                            particular, if operator is NotEqual and the specified
+                            index is not the real primary or leader of the current
+                            instance, no switchover will be performed.
+                          enum:
+                          - Equal
+                          - NotEqual
+                          type: string
+                      required:
+                      - index
+                      - operator
+                      type: object
                     classDefRef:
                       description: classDefRef reference class defined in ComponentClassDefinition.
                       properties:

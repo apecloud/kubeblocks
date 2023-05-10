@@ -225,4 +225,4 @@ const (
 	AccountPasswdForSecret = "password"
 )
 
-const DefaultBackupPvcInitCapacity = "100Gi"
+const DefaultBackupPvcInitCapacity = "20Gi"

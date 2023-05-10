@@ -123,10 +123,10 @@ func (o *UninstallOptions) PreCheck() error {
 			fmt.Fprintf(o.Out, "to find out the namespace where KubeBlocks is installed, please use:\n\t'kbcli kubeblocks status'\n")
 			fmt.Fprintf(o.Out, "to uninstall KubeBlocks completely, please use:\n\t`kbcli kubeblocks uninstall -n <namespace>`\n")
 		}
-	} else if o.Namespace != kbNamespace {
-		o.Namespace = kbNamespace
-		fmt.Fprintf(o.Out, "Uninstall KubeBlocks in namespace \"%s\"\n", kbNamespace)
 	}
+	o.Namespace = kbNamespace
+	fmt.Fprintf(o.Out, "Uninstall KubeBlocks in namespace \"%s\"\n", kbNamespace)
+
 	return nil
 }
 

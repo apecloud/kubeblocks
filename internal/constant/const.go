@@ -169,6 +169,7 @@ const (
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
 	ConfigMapKind             = "ConfigMap"
+	DaemonSetKind             = "DaemonSet"
 )
 
 const (

@@ -1152,28 +1152,10 @@ var _ = Describe("Cluster Controller", func() {
 
 	// Test cases
 	// Scenarios
+	// TODO: add case: empty image in cd, should report applyResourceFailed condition
 	Context("when creating cluster without clusterversion", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef(true)
-			Expect(testapps.ChangeObj(&testCtx, clusterDefObj, func(tmpClusterDef *appsv1alpha1.ClusterDefinition) {
-				for i, def := range tmpClusterDef.Spec.ComponentDefs {
-					switch def.WorkloadType {
-					case appsv1alpha1.Stateless:
-						tmpClusterDef.Spec.ComponentDefs[i].PodSpec.Containers[0].Image = testapps.NginxImage
-					default:
-						tmpClusterDef.Spec.ComponentDefs[i].PodSpec.Containers[0].Image = testapps.ApeCloudMySQLImage
-					}
-				}
-			})).ShouldNot(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			// reset image to empty
-			Expect(testapps.ChangeObj(&testCtx, clusterDefObj, func(tmpClusterDef *appsv1alpha1.ClusterDefinition) {
-				for i, _ := range tmpClusterDef.Spec.ComponentDefs {
-					tmpClusterDef.Spec.ComponentDefs[i].PodSpec.Containers[0].Image = ""
-				}
-			})).ShouldNot(HaveOccurred())
 		})
 
 		It("should reconcile to create cluster with no error", func() {

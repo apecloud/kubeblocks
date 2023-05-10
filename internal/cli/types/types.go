@@ -73,6 +73,7 @@ const (
 const (
 	AppsAPIGroup                        = "apps.kubeblocks.io"
 	AppsAPIVersion                      = "v1alpha1"
+	ResourcePods                        = "pods"
 	ResourceClusters                    = "clusters"
 	ResourceClusterDefs                 = "clusterdefinitions"
 	ResourceClusterVersions             = "clusterversions"
@@ -191,6 +192,10 @@ type ConfigTemplateInfo struct {
 	Name  string
 	TPL   appsv1alpha1.ComponentConfigSpec
 	CMObj *corev1.ConfigMap
+}
+
+func PodGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: "", Version: K8sCoreAPIVersion, Resource: ResourcePods}
 }
 
 func ClusterGVR() schema.GroupVersionResource {

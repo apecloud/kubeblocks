@@ -1,13 +1,28 @@
 ---
-title: kbcli bench
+title: kbcli bench sysbench
 ---
 
-Run a benchmark.
+Create a sysbench benchmark
+
+```
+kbcli bench sysbench [NAME] [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for bench
+      --database string   database name
+      --driver string     database driver
+  -h, --help              help for sysbench
+      --host string       the host of database
+      --mode string       sysbench mode (default "prepare")
+      --password string   the password of database
+      --port int          the port of database
+      --size int          the number of rows per table (default 20000)
+      --tables int        the number of tables (default 10)
+      --times int         the number of test times (default 100)
+      --type string       sysbench type (default "oltp_read_write_pct")
+      --user string       the user of database
 ```
 
 ### Options inherited from parent commands
@@ -31,13 +46,11 @@ Run a benchmark.
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
-      --user string                    The name of the kubeconfig user to use
 ```
 
 ### SEE ALSO
 
-
-* [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - Create a sysbench benchmark
+* [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

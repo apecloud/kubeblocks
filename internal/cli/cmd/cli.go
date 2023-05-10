@@ -140,7 +140,7 @@ A Command Line Interface for KubeBlocks`,
 	cmd.AddCommand(
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
-		bench.NewBenchCmd(),
+		bench.NewBenchCmd(f, ioStreams),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
 		dashboard.NewDashboardCmd(f, ioStreams),

@@ -15,7 +15,7 @@ images:
   pullPolicy: IfNotPresent
   foxlake:
     repository: apecloud/foxlake
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: "main"
   mysql:
     repository: mysql

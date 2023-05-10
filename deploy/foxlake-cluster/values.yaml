@@ -23,5 +23,9 @@ tolerations: []
 topologyKeys:
   - kubernetes.io/hostname
 
+## @param set aws s3 bucket name when foxlake is deployed on the cloud
+##
 s3BucketName: "kb-support-foxlake-test"
+## @param set minio bucket name when foxlake is deployed locally
+##
 minioBucketName: "foxlake"

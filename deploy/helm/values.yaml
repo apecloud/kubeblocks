@@ -1792,3 +1792,11 @@ aws-load-balancer-controller:
             operator: In
             values:
             - "true"
+
+## foxlake settings
+##
+foxlake:
+  s3:
+    accessKey: ""
+    secretKey: ""
+    defaultRegion: ""

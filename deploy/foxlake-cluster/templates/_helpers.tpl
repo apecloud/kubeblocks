@@ -117,6 +117,11 @@ minio/mc
 {{- end }}
 {{- end }}
 
+{{- define "foxlake-cluster.MinIOEndPointEnv" -}}
+{{- $serviceName := .Release.Name | upper | replace "-" "_" }}
+{{- printf "$%s_FOXLAKE_MINIO_SERVICE_HOST:$%s_FOXLAKE_MINIO_SERVICE_PORT" $serviceName $serviceName }}
+{{- end }}
+
 {{- define "foxlake-cluster.endPointEnv" -}}
 - name: FOXLAKE_HOST
   valueFrom:

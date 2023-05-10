@@ -1,0 +1,16 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: keda
+
+spec:
+  type: Helm
+
+  helm:
+    chartLocationURL: https://kedacore.github.io/charts/keda-2.10.2.tgz
+
+  installable:
+    autoInstall: true
+
+  defaultInstallValues:
+    - enabled: true

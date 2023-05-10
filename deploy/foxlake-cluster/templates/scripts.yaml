@@ -13,7 +13,7 @@ data:
       -P${FOXLAKE_PORT} \
       -e \
       "CREATE OR REPLACE STORAGE default AT URI \
-        'minio://${MINIO_FQDN}:9000/${MINIO_BUCKET_NAME}' \
+        'minio://{{- include "foxlake-cluster.MinIOEndPointEnv" . -}}/${MINIO_BUCKET_NAME}/default' \
         credentials (ACCESS_KEY_ID='${MINIO_ACCESS_KEY_ID}' SECRET_ACCESS_KEY='${MINIO_SECRET_ACCESS_KEY}');"
   setup_cloud_storage.sh: |
     #!/bin/bash

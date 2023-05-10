@@ -75,9 +75,15 @@ FoxLake Configration Environment Variables
 - name: FOXLAKE_ROOT_USER
   value: "foxlake_root"
 - name: FOXLAKE_ROOT_PASSWORD
-  value: "foxlake2023"
+  valueFrom:
+    secretKeyRef:
+      name: $(CONN_CREDENTIAL_SECRET_NAME)
+      key: password  
 - name: rootPasswd
-  value: "foxlake2023"
+  valueFrom:
+    secretKeyRef:
+      name: $(CONN_CREDENTIAL_SECRET_NAME)
+      key: password
 - name: instanceId
   valueFrom:
     fieldRef:

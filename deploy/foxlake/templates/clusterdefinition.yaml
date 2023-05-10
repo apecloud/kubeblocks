@@ -11,7 +11,7 @@ metadata:
 spec:
   connectionCredential:
     username: "foxlake_root"
-    password: "foxlake2023"
+    password: "$(RANDOM_PASSWD)"
     endpoint: "$(SVC_FQDN):$(SVC_PORT_foxlake)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_foxlake)"

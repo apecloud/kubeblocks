@@ -222,6 +222,26 @@ affinity:
               values:
                 - "true"
 
+## @param data plane settings
+##
+dataPlane:
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kb-data
+                operator: In
+                values:
+                  - "true"
+
 ## PDB settings
 ##
 ## @param podDisruptionBudget.minAvailable

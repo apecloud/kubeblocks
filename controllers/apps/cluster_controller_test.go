@@ -1250,13 +1250,13 @@ var _ = Describe("Cluster Controller", func() {
 			podSpec := stsList.Items[0].Spec.Template.Spec
 			By("Checking created sts pods template with built-in toleration")
 			Expect(podSpec.Tolerations).Should(HaveLen(1))
-			Expect(podSpec.Tolerations[0].Key).To(Equal(constant.KubeBlocksDataNodeTolerationKey))
+			Expect(podSpec.Tolerations[0].Key).To(Equal(testDataPlaneTolerationKey))
 
 			By("Checking created sts pods template with built-in Affinity")
 			Expect(podSpec.Affinity.PodAntiAffinity == nil && podSpec.Affinity.PodAffinity == nil).Should(BeTrue())
 			Expect(podSpec.Affinity.NodeAffinity).ShouldNot(BeNil())
 			Expect(podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).To(
-				Equal(constant.KubeBlocksDataNodeLabelKey))
+				Equal(testDataPlaneNodeAffinityKey))
 
 			By("Checking created sts pods template without TopologySpreadConstraints")
 			Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())

@@ -109,7 +109,11 @@ func (c *ClusterTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		compVer := clusterCompVerMap[compDefName]
 		compSpecs := clusterCompSpecMap[compDefName]
 		for _, compSpec := range compSpecs {
-			if err := prepareComp(component.BuildComponent(reqCtx, *cluster, *transCtx.ClusterDef, compDef, compSpec, compVer)); err != nil {
+			c, err := component.BuildComponent(reqCtx, *cluster, *transCtx.ClusterDef, compDef, compSpec, compVer)
+			if err != nil {
+				return err
+			}
+			if err := prepareComp(c); err != nil {
 				return err
 			}
 		}

@@ -56,11 +56,11 @@ type SysBenchOptions struct {
 	dynamic   dynamic.Interface
 	namespace string
 
-	Mode   string `json:"mode"`
-	Type   string `json:"type"`
-	Size   int    `json:"size"`
-	Tables int    `json:"tables"`
-	Times  int    `json:"times"`
+	Mode     string `json:"mode"`
+	Type     string `json:"type"`
+	DataSize int    `json:"size"`
+	Tables   int    `json:"tables"`
+	Times    int    `json:"times"`
 
 	BenchBaseOptions
 	*cluster.ClusterObjects     `json:"-"`
@@ -82,31 +82,33 @@ func (o *SysBenchOptions) Complete(name string) error {
 		return err
 	}
 
-	clusterGetter := cluster.ObjectsGetter{
-		Client:    o.client,
-		Dynamic:   o.dynamic,
-		Name:      name,
-		Namespace: o.namespace,
-		GetOptions: cluster.GetOptions{
-			WithClusterDef:     true,
-			WithService:        true,
-			WithPod:            true,
-			WithEvent:          true,
-			WithPVC:            true,
-			WithDataProtection: true,
-		},
-	}
-	if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
-		return err
-	}
-	o.Driver, o.Host, o.Port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
-	if err != nil {
-		return err
-	}
-	if driver, ok := driverMap[o.Driver]; ok {
-		o.Driver = driver
-	} else {
-		return fmt.Errorf("unsupported driver %s", o.Driver)
+	if o.Driver == "" || o.Host == "" || o.Port == 0 {
+		clusterGetter := cluster.ObjectsGetter{
+			Client:    o.client,
+			Dynamic:   o.dynamic,
+			Name:      name,
+			Namespace: o.namespace,
+			GetOptions: cluster.GetOptions{
+				WithClusterDef:     true,
+				WithService:        true,
+				WithPod:            true,
+				WithEvent:          true,
+				WithPVC:            true,
+				WithDataProtection: true,
+			},
+		}
+		if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
+			return err
+		}
+		o.Driver, o.Host, o.Port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
+		if err != nil {
+			return err
+		}
+		if driver, ok := driverMap[o.Driver]; ok {
+			o.Driver = driver
+		} else {
+			return fmt.Errorf("unsupported driver %s", o.Driver)
+		}
 	}
 
 	return nil
@@ -177,7 +179,6 @@ func (o *SysBenchOptions) Run() error {
 	if _, err := o.dynamic.Resource(types.PodGVR()).Namespace(o.namespace).Create(context.Background(), unstructureObj, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-	fmt.Fprintf(o.Out, "sysbench pod %s created\n", unstructureObj.GetName())
 
 	return nil
 }
@@ -201,7 +202,7 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 
 	cmd.Flags().StringVar(&o.Mode, "mode", "prepare", "sysbench mode")
 	cmd.Flags().StringVar(&o.Type, "type", "oltp_read_write_pct", "sysbench type")
-	cmd.Flags().IntVar(&o.Size, "size", 20000, "the number of rows per table")
+	cmd.Flags().IntVar(&o.DataSize, "size", 20000, "the number of rows per table")
 	cmd.Flags().IntVar(&o.Tables, "tables", 10, "the number of tables")
 	cmd.Flags().IntVar(&o.Times, "times", 100, "the number of test times")
 	o.BenchBaseOptions.AddFlags(cmd)

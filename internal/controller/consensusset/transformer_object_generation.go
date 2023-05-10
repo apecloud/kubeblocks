@@ -59,16 +59,16 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	// generate objects by current spec
 	svc := buildSvc(*csSet)
 	headLessSvc := buildHeadlessSvc(*csSet)
-	sts := buildSts(*csSet, headLessSvc.Name)
 	envConfig := buildEnvConfigMap(*csSet)
+	sts := buildSts(*csSet, headLessSvc.Name, *envConfig)
 
 	// put all objects into the dag
 	vertices := make([]*model.ObjectVertex, 0)
 	svcVertex := &model.ObjectVertex{Obj: svc}
 	headlessSvcVertex := &model.ObjectVertex{Obj: headLessSvc}
-	stsVertex := &model.ObjectVertex{Obj: sts}
 	envConfigVertex := &model.ObjectVertex{Obj: envConfig}
-	vertices = append(vertices, svcVertex, headlessSvcVertex, stsVertex, envConfigVertex)
+	stsVertex := &model.ObjectVertex{Obj: sts}
+	vertices = append(vertices, svcVertex, headlessSvcVertex, envConfigVertex, stsVertex)
 	for _, vertex := range vertices {
 		if err := controllerutil.SetOwnership(csSet, vertex.Obj, model.GetScheme(), csSetFinalizerName); err != nil {
 			return err
@@ -188,9 +188,9 @@ func buildHeadlessSvc(csSet workloads.ConsensusSet) *corev1.Service {
 	return hdlBuilder.GetObject()
 }
 
-func buildSts(csSet workloads.ConsensusSet, headlessSvcName string) *apps.StatefulSet {
+func buildSts(csSet workloads.ConsensusSet, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
 	stsBuilder := builder.NewStatefulSetBuilder(csSet.Namespace, csSet.Name)
-	template := buildPodTemplate(csSet)
+	template := buildPodTemplate(csSet, envConfig)
 	stsBuilder.AddLabels(model.AppInstanceLabelKey, csSet.Name).
 		AddLabels(model.KBManagedByKey, kindConsensusSet).
 		AddMatchLabel(model.AppInstanceLabelKey, csSet.Name).
@@ -213,7 +213,7 @@ func buildEnvConfigMap(csSet workloads.ConsensusSet) *corev1.ConfigMap {
 		SetData(envData).GetObject()
 }
 
-func buildPodTemplate(csSet workloads.ConsensusSet) *corev1.PodTemplateSpec {
+func buildPodTemplate(csSet workloads.ConsensusSet, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
 	template := csSet.Spec.Template
 	labels := template.Labels
 	if labels == nil {
@@ -222,6 +222,18 @@ func buildPodTemplate(csSet workloads.ConsensusSet) *corev1.PodTemplateSpec {
 	labels[model.AppInstanceLabelKey] = csSet.Name
 	labels[model.KBManagedByKey] = kindConsensusSet
 	template.Labels = labels
+
+	// inject env ConfigMap into workload pods only
+	for i := range template.Spec.Containers {
+		template.Spec.Containers[i].EnvFrom = append(template.Spec.Containers[i].EnvFrom,
+			corev1.EnvFromSource{
+				ConfigMapRef: &corev1.ConfigMapEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: envConfig.Name,
+					},
+					Optional: func() *bool { optional := false; return &optional }(),
+				}})
+	}
 
 	injectRoleObservationContainer(csSet, &template)
 

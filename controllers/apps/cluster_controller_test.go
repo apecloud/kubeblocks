@@ -153,7 +153,7 @@ var _ = Describe("Cluster Controller", func() {
 			AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
 			Create(&testCtx).GetObject()
 
-		if len(noCreateAssociateCV) > 0 && !noCreateAssociateCV[0] {
+		if len(noCreateAssociateCV) > 0 && noCreateAssociateCV[0] {
 			return
 		}
 		By("Create a clusterVersion obj")
@@ -1155,6 +1155,11 @@ var _ = Describe("Cluster Controller", func() {
 	Context("when creating cluster without clusterversion", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef(true)
+			Expect(testapps.ChangeObj(&testCtx, clusterDefObj, func(tmpClusterDef *appsv1alpha1.ClusterDefinition) {
+				for i, _ := range tmpClusterDef.Spec.ComponentDefs {
+					tmpClusterDef.Spec.ComponentDefs[i].PodSpec.Containers[0].Image = testapps.ApeCloudMySQLImage
+				}
+			})).ShouldNot(HaveOccurred())
 		})
 
 		It("should reconcile to create cluster with no error", func() {

@@ -94,6 +94,7 @@ var _ = Describe("bench", func() {
 	It("sysbench command", func() {
 		cmd := NewSysBenchCmd(tf, streams)
 		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd.HasSubCommands()).Should(BeTrue())
 	})
 
 	It("test sysbench run", func() {
@@ -109,7 +110,7 @@ var _ = Describe("bench", func() {
 			Mode:      "prepare",
 			Type:      "oltp_read_write_pct",
 			Tables:    1,
-			DataSize:  100,
+			Size:      100,
 			Times:     1,
 			factory:   tf,
 			IOStreams: streams,

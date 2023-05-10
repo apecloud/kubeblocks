@@ -40,7 +40,14 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+const (
+	prepareOperation = "prepare"
+	runOperation     = "run"
+	cleanupOperation = "cleanup"
 )
 
 var (
@@ -56,11 +63,11 @@ type SysBenchOptions struct {
 	dynamic   dynamic.Interface
 	namespace string
 
-	Mode     string `json:"mode"`
-	Type     string `json:"type"`
-	DataSize int    `json:"size"`
-	Tables   int    `json:"tables"`
-	Times    int    `json:"times"`
+	Mode   string `json:"mode"`
+	Type   string `json:"type"`
+	Size   int    `json:"size"`
+	Tables int    `json:"tables"`
+	Times  int    `json:"times"`
 
 	BenchBaseOptions
 	*cluster.ClusterObjects     `json:"-"`
@@ -190,24 +197,72 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 
 	cmd := &cobra.Command{
-		Use:   "sysbench [NAME]",
-		Short: "Create a sysbench benchmark",
-		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(args[0]))
-			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run())
-		},
+		Use:   "sysbench",
+		Short: "run a SysBench benchmark",
 	}
 
-	cmd.Flags().StringVar(&o.Mode, "mode", "prepare", "sysbench mode")
-	cmd.Flags().StringVar(&o.Type, "type", "oltp_read_write_pct", "sysbench type")
-	cmd.Flags().IntVar(&o.DataSize, "size", 20000, "the number of rows per table")
-	cmd.Flags().IntVar(&o.Tables, "tables", 10, "the number of tables")
-	cmd.Flags().IntVar(&o.Times, "times", 100, "the number of test times")
+	cmd.PersistentFlags().StringVar(&o.Type, "type", "oltp_read_write_pct", "sysbench type")
+	cmd.PersistentFlags().IntVar(&o.Size, "size", 20000, "the data size of per table")
+	cmd.PersistentFlags().IntVar(&o.Tables, "tables", 10, "the number of tables")
+	cmd.PersistentFlags().IntVar(&o.Times, "times", 100, "the number of test times")
 	o.BenchBaseOptions.AddFlags(cmd)
 
+	cmd.AddCommand(newPrepareCmd(f, o), newRunCmd(f, o), newCleanCmd(f, o))
+
 	return cmd
+}
+
+func newPrepareCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:               "prepare [NAME]",
+		Short:             "Prepare the data of SysBench for a cluster",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(executeSysBench(o, args[0], prepareOperation))
+		},
+	}
+	return cmd
+}
+
+func newRunCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:               "run [NAME]",
+		Short:             "Run  SysBench on cluster",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(executeSysBench(o, args[0], runOperation))
+		},
+	}
+	return cmd
+}
+
+func newCleanCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:               "cleanup [NAME]",
+		Short:             "Cleanup the data of SysBench for cluster",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(executeSysBench(o, args[0], cleanupOperation))
+		},
+	}
+	return cmd
+}
+
+func executeSysBench(o *SysBenchOptions, name string, mode string) error {
+	o.Mode = mode
+	if err := o.Complete(name); err != nil {
+		return err
+	}
+	if err := o.Validate(); err != nil {
+		return err
+	}
+	if err := o.Run(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func getDriverAndHostAndPort(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList) (driver string, host string, port int, err error) {

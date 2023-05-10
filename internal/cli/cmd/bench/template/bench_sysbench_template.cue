@@ -35,7 +35,7 @@ content: {
 	kind: "Pod",
 	metadata: {
 		namespace: "default",
-		generateName: "test-sysbench-prepare-pg-"
+		generateName: "test-sysbench-prepare-\(options.driver)-"
 	}
 	spec: {
 		containers: [

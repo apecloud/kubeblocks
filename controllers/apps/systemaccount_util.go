@@ -241,7 +241,7 @@ func renderSecret(key componentUniqueKey, username string, labels client.Matchin
 			Namespace:  key.namespace,
 			Name:       strings.Join([]string{key.clusterName, key.componentName, username}, "-"),
 			Labels:     labels,
-			Finalizers: []string{dbClusterFinalizerName},
+			Finalizers: []string{constant.DBClusterFinalizerName},
 		},
 		Data: data,
 	}

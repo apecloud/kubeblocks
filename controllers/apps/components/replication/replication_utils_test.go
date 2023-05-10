@@ -91,7 +91,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		}
 		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
 			clusterObj.Name+"-"+testapps.DefaultRedisCompName, clusterObj.Name, testapps.DefaultRedisCompName).
-			AddFinalizers([]string{DBClusterFinalizerName}).
+			AddFinalizers([]string{constant.DBClusterFinalizerName}).
 			AddContainer(container).
 			AddAppInstanceLabel(clusterObj.Name).
 			AddAppComponentLabel(testapps.DefaultRedisCompName).
@@ -234,7 +234,7 @@ var _ = Describe("ReplicationSet Util", func() {
 				AddLabelsInMap(sts.Labels).
 				AddRoleLabel(DefaultRole(i)).
 				Create(&testCtx).GetObject()
-			if pod.Labels[constant.RoleLabelKey] == string(Primary) {
+			if pod.Labels[constant.RoleLabelKey] == constant.Primary {
 				primaryPod = pod
 			} else {
 				secondaryPods = append(secondaryPods, pod)
@@ -249,11 +249,11 @@ var _ = Describe("ReplicationSet Util", func() {
 			Log: log.FromContext(ctx).WithValues("event", testCtx.DefaultNamespace),
 		}
 		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName,
-			secondaryPods[0], string(Primary))).ShouldNot(HaveOccurred())
+			secondaryPods[0], constant.Primary)).ShouldNot(HaveOccurred())
 
 		By("Test when secondary change to primary, the old primary label has been updated at the same time, so return nil directly.")
 		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName,
-			primaryPod, string(Secondary))).ShouldNot(HaveOccurred())
+			primaryPod, constant.Secondary)).ShouldNot(HaveOccurred())
 	}
 
 	// Scenarios

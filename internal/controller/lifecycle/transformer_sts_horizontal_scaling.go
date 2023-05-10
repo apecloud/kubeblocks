@@ -808,7 +808,7 @@ func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
 	}
 	rootVertex, _ := root.(*lifecycleVertex)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-	if err = intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName); err != nil {
+	if err = intctrlutil.SetOwnership(cluster, pvc, scheme, constant.DBClusterFinalizerName); err != nil {
 		return err
 	}
 	vertex := &lifecycleVertex{obj: pvc, action: actionPtr(CREATE)}

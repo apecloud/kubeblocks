@@ -75,6 +75,7 @@ const (
 
 	// kubeblocks.io labels
 	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
+	ClusterVersionLabelKey          = "clusterversion.kubeblocks.io/name"
 	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
 	KBAppComponentDefRefLabelKey    = "apps.kubeblocks.io/component-def-ref"
 	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
@@ -143,6 +144,9 @@ const (
 
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
+
+	// DBClusterFinalizerName is the finalizer for cluster
+	DBClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
 
 	// ClassAnnotationKey is used to specify the class of components
 	ClassAnnotationKey = "cluster.kubeblocks.io/component-class"
@@ -220,6 +224,11 @@ const (
 
 const (
 	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
+)
+
+const (
+	Primary   = "primary"
+	Secondary = "secondary"
 )
 
 // username and password are keys in created secrets for others to refer to.

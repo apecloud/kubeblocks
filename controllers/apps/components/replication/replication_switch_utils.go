@@ -182,7 +182,7 @@ func (f *SwitchElectionRoleFilter) filter(roleInfoList []*SwitchRoleInfo) ([]*Sw
 		if err != nil {
 			return filterRoles, err
 		}
-		if string(*roleInfo.RoleDetectInfo) != string(Primary) && !isPrimaryPod {
+		if string(*roleInfo.RoleDetectInfo) != constant.Primary && !isPrimaryPod {
 			filterRoles = append(filterRoles, roleInfo)
 		}
 	}
@@ -293,7 +293,7 @@ func (pdm *ProbeDetectManager) roleDetect(pod *corev1.Pod) (*RoleDetectResult, e
 	var res RoleDetectResult
 	role := pod.Labels[constant.RoleLabelKey]
 	res = DetectRoleSecondary
-	if role == string(Primary) {
+	if role == constant.Primary {
 		res = DetectRolePrimary
 	}
 	return &res, nil
@@ -492,33 +492,4 @@ func CheckPrimaryIndexChanged(ctx context.Context,
 	}
 	_, o := util.ParseParentNameAndOrdinal(pod.Name)
 	return currentPrimaryIndex != o, o, nil
-}
-
-// syncPrimaryIndex syncs cluster.spec.componentSpecs.[x].primaryIndex when failover occurs and switchPolicy is Noop.
-func syncPrimaryIndex(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	compName string) error {
-	clusterCompSpec := util.GetClusterComponentSpecByName(*cluster, compName)
-	if clusterCompSpec == nil || clusterCompSpec.SwitchPolicy == nil || clusterCompSpec.SwitchPolicy.Type != appsv1alpha1.Noop {
-		return nil
-	}
-	isChanged, currentPrimaryIndex, err := CheckPrimaryIndexChanged(ctx, cli, cluster, compName, clusterCompSpec.GetPrimaryIndex())
-	if err != nil {
-		return err
-	}
-	// if primaryIndex is changed, sync cluster.spec.componentSpecs.[x].primaryIndex
-	if isChanged {
-		clusterDeepCopy := cluster.DeepCopy()
-		for index := range cluster.Spec.ComponentSpecs {
-			if cluster.Spec.ComponentSpecs[index].Name == compName {
-				cluster.Spec.ComponentSpecs[index].PrimaryIndex = &currentPrimaryIndex
-				break
-			}
-		}
-		if err := cli.Patch(ctx, cluster, client.MergeFrom(clusterDeepCopy)); err != nil {
-			return err
-		}
-	}
-	return nil
 }

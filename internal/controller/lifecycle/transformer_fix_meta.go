@@ -22,6 +22,7 @@ package lifecycle
 import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
@@ -34,8 +35,8 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	// The object is not being deleted, so if it does not have our finalizer,
 	// then lets add the finalizer and update the object. This is equivalent
 	// registering our finalizer.
-	if !controllerutil.ContainsFinalizer(cluster, dbClusterFinalizerName) {
-		controllerutil.AddFinalizer(cluster, dbClusterFinalizerName)
+	if !controllerutil.ContainsFinalizer(cluster, constant.DBClusterFinalizerName) {
+		controllerutil.AddFinalizer(cluster, constant.DBClusterFinalizerName)
 	}
 
 	// patch the label to prevent the label from being modified by the user.
@@ -43,14 +44,14 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	cdLabelName := labels[clusterDefLabelKey]
-	cvLabelName := labels[clusterVersionLabelKey]
+	cdLabelName := labels[constant.ClusterDefLabelKey]
+	cvLabelName := labels[constant.ClusterVersionLabelKey]
 	cdName, cvName := cluster.Spec.ClusterDefRef, cluster.Spec.ClusterVersionRef
 	if cdLabelName == cdName && cvLabelName == cvName {
 		return nil
 	}
-	labels[clusterDefLabelKey] = cdName
-	labels[clusterVersionLabelKey] = cvName
+	labels[constant.ClusterDefLabelKey] = cdName
+	labels[constant.ClusterVersionLabelKey] = cvName
 	cluster.Labels = labels
 
 	return nil

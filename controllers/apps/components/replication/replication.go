@@ -113,7 +113,7 @@ func (r *ReplicationComponent) GetPhaseWhenPodsNotReady(ctx context.Context,
 			return "", nil
 		}
 		labelValue := v.Labels[constant.RoleLabelKey]
-		if labelValue == string(Primary) && intctrlutil.PodIsReady(&v) {
+		if labelValue == constant.Primary && intctrlutil.PodIsReady(&v) {
 			primaryIsReady = true
 			continue
 		}
@@ -144,36 +144,19 @@ func (r *ReplicationComponent) HandleUpdate(ctx context.Context, obj client.Obje
 	if sts.Generation != sts.Status.ObservedGeneration {
 		return nil
 	}
-	podList, err := util.GetPodListByStatefulSet(ctx, r.Cli, sts)
-	if err != nil {
+
+	// sync pod role label
+	if err := syncReplicationPodRoleLabel(ctx, r.Cli, sts); err != nil {
 		return err
 	}
-	if len(podList) == 0 {
-		return nil
-	}
-	for _, pod := range podList {
-		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
-		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
-			_, o := util.ParseParentNameAndOrdinal(pod.Name)
-			role := string(Secondary)
-			if o == r.Component.GetPrimaryIndex() {
-				role = string(Primary)
-			}
-			if err := updateObjRoleLabel(ctx, r.Cli, pod, role); err != nil {
-				return err
-			}
-		}
-		if err := util.DeleteStsPods(ctx, r.Cli, sts); err != nil {
-			return err
-		}
-	}
-	// sync cluster.spec.componentSpecs.[x].primaryIndex when failover occurs and switchPolicy is Noop.
-	if err := syncPrimaryIndex(ctx, r.Cli, r.Cluster, sts.Labels[constant.KBAppComponentLabelKey]); err != nil {
+
+	if err := util.DeleteStsPods(ctx, r.Cli, sts); err != nil {
 		return err
 	}
+
 	// sync cluster.status.components.replicationSet.status
 	clusterDeepCopy := r.Cluster.DeepCopy()
-	if err := syncReplicationSetClusterStatus(r.Cli, ctx, r.Cluster, podList); err != nil {
+	if err := syncReplicationSetClusterStatus(r.Cli, ctx, r.Cluster, sts); err != nil {
 		return err
 	}
 	if reflect.DeepEqual(clusterDeepCopy.Status.Components, r.Cluster.Status.Components) {
@@ -182,10 +165,50 @@ func (r *ReplicationComponent) HandleUpdate(ctx context.Context, obj client.Obje
 	return r.Cli.Status().Patch(ctx, r.Cluster, client.MergeFrom(clusterDeepCopy))
 }
 
+func syncReplicationPodRoleLabel(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
+	podList, err := util.GetPodListByStatefulSet(ctx, cli, sts)
+	if err != nil {
+		return err
+	}
+	if len(podList) == 0 {
+		return nil
+	}
+	existPrimary := false
+	var updateRolePodList []corev1.Pod
+	for _, pod := range podList {
+		// if there is no role label on the Pod, it needs to be patch role label.
+		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
+			updateRolePodList = append(updateRolePodList, pod)
+		} else {
+			if v == constant.Primary {
+				existPrimary = true
+			}
+		}
+	}
+	if len(updateRolePodList) > 0 {
+		for _, pod := range updateRolePodList {
+			// if exists primary Pod, it means that the Pod without a role label is a new secondary Pod created by h-scale.
+			if existPrimary {
+				if err := updateObjRoleLabel(ctx, cli, pod, constant.Secondary); err != nil {
+					return err
+				}
+			} else {
+				// if not exists primary Pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
+				_, o := util.ParseParentNameAndOrdinal(pod.Name)
+				role := DefaultRole(o)
+				if err := updateObjRoleLabel(ctx, cli, pod, role); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func DefaultRole(i int32) string {
-	role := string(Secondary)
+	role := constant.Secondary
 	if i == 0 {
-		role = string(Primary)
+		role = constant.Primary
 	}
 	return role
 }

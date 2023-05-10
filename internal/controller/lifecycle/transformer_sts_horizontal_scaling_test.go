@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -70,10 +71,10 @@ var _ = Describe("sts horizontal scaling test", func() {
 			pvc1 := apps.NewPersistentVolumeClaimFactory(namespace, pvcNameBase+"1", cluster.Name, componentName, volumeName).
 				AddAppInstanceLabel(clusterName).
 				GetObject()
-			Expect(intctrlutil.SetOwnership(cluster, pvc1, scheme, dbClusterFinalizerName)).Should(Succeed())
+			Expect(intctrlutil.SetOwnership(cluster, pvc1, scheme, constant.DBClusterFinalizerName)).Should(Succeed())
 			pvc2 := pvc1.DeepCopy()
 			pvc2.Name = pvcNameBase + "2"
-			Expect(intctrlutil.SetOwnership(cluster, pvc2, scheme, dbClusterFinalizerName)).Should(Succeed())
+			Expect(intctrlutil.SetOwnership(cluster, pvc2, scheme, constant.DBClusterFinalizerName)).Should(Succeed())
 
 			By("prepare params for transformer")
 			ctrl, k8sMock := testutil.SetupK8sMock()

@@ -85,7 +85,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				"cannot be deleted because of existing referencing Cluster.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, clusterVersion,
-			clusterVersionLabelKey, recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
+			constant.ClusterVersionLabelKey, recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, r.deleteExternalResources(reqCtx, clusterVersion)
@@ -132,12 +132,12 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 
-	if v, ok := clusterVersion.ObjectMeta.Labels[clusterDefLabelKey]; !ok || v != clusterdefinition.Name {
+	if v, ok := clusterVersion.ObjectMeta.Labels[constant.ClusterDefLabelKey]; !ok || v != clusterdefinition.Name {
 		patch := client.MergeFrom(clusterVersion.DeepCopy())
 		if clusterVersion.ObjectMeta.Labels == nil {
 			clusterVersion.ObjectMeta.Labels = map[string]string{}
 		}
-		clusterVersion.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
+		clusterVersion.ObjectMeta.Labels[constant.ClusterDefLabelKey] = clusterdefinition.Name
 		if err = r.Client.Patch(reqCtx.Ctx, clusterVersion, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
@@ -194,7 +194,7 @@ func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.Re
 }
 
 func clusterVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef *appsv1alpha1.ClusterDefinition) error {
-	labelSelector, err := labels.Parse(clusterDefLabelKey + "=" + clusterDef.GetName())
+	labelSelector, err := labels.Parse(constant.ClusterDefLabelKey + "=" + clusterDef.GetName())
 	if err != nil {
 		return err
 	}

@@ -199,7 +199,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		case appsv1alpha1.Consensus:
 			addLeaderSelectorLabels(svc, task.Component)
 		case appsv1alpha1.Replication:
-			svc.Spec.Selector[constant.RoleLabelKey] = string(replication.Primary)
+			svc.Spec.Selector[constant.RoleLabelKey] = constant.Primary
 		}
 		task.AppendResource(svc)
 	}

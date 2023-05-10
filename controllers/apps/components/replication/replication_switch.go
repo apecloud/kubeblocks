@@ -31,6 +31,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	utils "github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // Switch is the main high-availability switching implementation.
@@ -277,7 +278,7 @@ func (s *Switch) decision() bool {
 	}
 
 	// candidate primary role in kernel check
-	if string(*s.SwitchInstance.CandidatePrimaryRole.RoleDetectInfo) != string(Secondary) {
+	if string(*s.SwitchInstance.CandidatePrimaryRole.RoleDetectInfo) != constant.Secondary {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 		s.SwitchStatus.Reason = fmt.Sprintf("component %s the role of the candidate primary in the kernel is not secondary", s.SwitchResource.CompSpec.Name)
 		return false
@@ -351,18 +352,18 @@ func (s *Switch) updateRoleLabel() error {
 
 	for _, sts := range stsList.Items {
 		if utils.IsMemberOf(&sts, s.SwitchInstance.OldPrimaryRole.Pod) {
-			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Secondary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, constant.Secondary); err != nil {
 				return err
 			}
-			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.OldPrimaryRole.Pod, string(Secondary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.OldPrimaryRole.Pod, constant.Secondary); err != nil {
 				return err
 			}
 		}
 		if utils.IsMemberOf(&sts, s.SwitchInstance.CandidatePrimaryRole.Pod) {
-			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Primary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, constant.Primary); err != nil {
 				return err
 			}
-			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.CandidatePrimaryRole.Pod, string(Primary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.CandidatePrimaryRole.Pod, constant.Primary); err != nil {
 				return err
 			}
 		}

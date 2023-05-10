@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -131,9 +132,9 @@ var _ = Describe("ReplicationSet Switch", func() {
 				AddContainer(container).
 				AddLabelsInMap(replicationSetSts.Labels)
 			if i == 0 {
-				podBuilder.AddRoleLabel(string(Primary))
+				podBuilder.AddRoleLabel(constant.Primary)
 			} else {
-				podBuilder.AddRoleLabel(string(Secondary))
+				podBuilder.AddRoleLabel(constant.Secondary)
 			}
 			_ = podBuilder.Create(&testCtx).GetObject()
 		}

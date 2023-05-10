@@ -1685,7 +1685,7 @@ var _ = Describe("Cluster Controller", func() {
 func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 	By("Creating a BackupPolicyTemplate")
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
-		AddLabels(clusterDefLabelKey, clusterDefObj.Name).
+		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
 		SetClusterDefRef(clusterDefObj.Name)
 	for _, v := range clusterDefObj.Spec.ComponentDefs {
 		bpt = bpt.AddBackupPolicy(v.Name).AddSnapshotPolicy()

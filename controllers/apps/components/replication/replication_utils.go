@@ -37,20 +37,16 @@ import (
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
-type ReplicationRole string
-
-const (
-	Primary                ReplicationRole = "primary"
-	Secondary              ReplicationRole = "secondary"
-	DBClusterFinalizerName                 = "cluster.kubeblocks.io/finalizer"
-)
-
 // syncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
 func syncReplicationSetClusterStatus(
 	cli client.Client,
 	ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
-	podList []corev1.Pod) error {
+	sts *appsv1.StatefulSet) error {
+	podList, err := util.GetPodListByStatefulSet(ctx, cli, sts)
+	if err != nil {
+		return err
+	}
 	if len(podList) == 0 {
 		return nil
 	}
@@ -82,7 +78,7 @@ func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStat
 		if role == "" {
 			return fmt.Errorf("pod %s has no role label", pod.Name)
 		}
-		if role == string(Primary) {
+		if role == constant.Primary {
 			if replicationStatus.Primary.Pod == pod.Name {
 				continue
 			}
@@ -177,7 +173,7 @@ func checkObjRoleLabelIsPrimary[T generics.Object, PT generics.PObject[T]](obj P
 		// error type checking (errors.Is)
 		return false, fmt.Errorf("obj %s or obj labels key is nil, pls check", obj.GetName())
 	}
-	return obj.GetLabels()[constant.RoleLabelKey] == string(Primary), nil
+	return obj.GetLabels()[constant.RoleLabelKey] == constant.Primary, nil
 }
 
 // getReplicationSetPrimaryObj gets the primary obj(statefulSet or pod) of the replication workload.
@@ -190,7 +186,7 @@ func getReplicationSetPrimaryObj[T generics.Object, PT generics.PObject[T], L ge
 		constant.AppInstanceLabelKey:    cluster.Name,
 		constant.KBAppComponentLabelKey: compSpecName,
 		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.RoleLabelKey:           string(Primary),
+		constant.RoleLabelKey:           constant.Primary,
 	}
 	if err := cli.List(ctx, PL(&objList), client.InNamespace(cluster.Namespace), matchLabels); err != nil {
 		return nil, err
@@ -266,7 +262,7 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	pod *corev1.Pod,
 	newRole string) error {
 	// if newRole is not Primary or Secondary, ignore it.
-	if !slices.Contains([]string{string(Primary), string(Secondary)}, newRole) {
+	if !slices.Contains([]string{constant.Primary, constant.Secondary}, newRole) {
 		reqCtx.Log.Info("replicationSet new role is invalid, please check", "new role", newRole)
 		return nil
 	}
@@ -298,12 +294,12 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	}
 
 	// update old primary pod to secondary
-	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimaryPod, string(Secondary)); err != nil {
+	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimaryPod, constant.Secondary); err != nil {
 		return err
 	}
 
 	// update secondary pod to primary
-	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, string(Primary)); err != nil {
+	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, constant.Primary); err != nil {
 		return err
 	}
 	return nil

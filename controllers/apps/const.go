@@ -24,15 +24,9 @@ const (
 	maxConcurReconClusterDefKey     = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
 
 	// name of our custom finalizer
-	dbClusterFinalizerName      = "cluster.kubeblocks.io/finalizer"
 	dbClusterDefFinalizerName   = "clusterdefinition.kubeblocks.io/finalizer"
 	clusterVersionFinalizerName = "clusterversion.kubeblocks.io/finalizer"
 	opsRequestFinalizerName     = "opsrequest.kubeblocks.io/finalizer"
-
-	// label keys
-	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
-	clusterVersionLabelKey     = "clusterversion.kubeblocks.io/name"
-	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 
 	// annotations keys
 	lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"

@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,7 +53,6 @@ var _ = Describe("clusterdefinition list components", func() {
 		tf = mockClient(clusterDef)
 		streams, _, out, _ = genericclioptions.NewTestIOStreams()
 		cmd = NewListComponentsCmd(tf, streams)
-
 	})
 
 	AfterEach(func() {
@@ -76,6 +76,4 @@ fake-component-type-1                  mysql
 `
 		Expect(expected).Should(Equal(out.String()))
 	})
-
-	// test normal
 })

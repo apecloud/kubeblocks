@@ -20,7 +20,7 @@ import (
 var (
 	listComponentsExample = templates.Examples(`
 		# List all components belong to the cluster definition.
-		kbcli clusterdefinition list-components [CD-Name]`)
+		kbcli clusterdefinition list-components apecloud-mysql`)
 
 	componentsTableHeader = []interface{}{
 		"Name",
@@ -35,7 +35,7 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Use:               "list-components",
 		Short:             "List cluster definition components.",
 		Example:           listComponentsExample,
-		Aliases:           []string{"ls-components"},
+		Aliases:           []string{"ls-comps"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(validate(args))

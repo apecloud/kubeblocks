@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -59,7 +58,10 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 		if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(csSet), sts); err != nil {
 			return err
 		}
-		copyStatus(csSet, *sts)
+		// keep csSet's ObservedGeneration to avoid override by sts's ObservedGeneration
+		generation := csSet.Status.ObservedGeneration
+		csSet.Status.StatefulSetStatus = sts.Status
+		csSet.Status.ObservedGeneration = generation
 		// read all pods belong to the sts, hence belong to our consensus set
 		pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
 		if err != nil {
@@ -77,18 +79,6 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 	root.Action = model.ActionPtr(model.STATUS)
 
 	return nil
-}
-
-func copyStatus(csSet *workloads.ConsensusSet, sts apps.StatefulSet) {
-	csSet.Status.Replicas = sts.Status.Replicas
-	csSet.Status.ReadyReplicas = sts.Status.ReadyReplicas
-	csSet.Status.CurrentReplicas = sts.Status.CurrentReplicas
-	csSet.Status.UpdatedReplicas = sts.Status.UpdatedReplicas
-	csSet.Status.CurrentRevision = sts.Status.CurrentRevision
-	csSet.Status.UpdateRevision = sts.Status.UpdateRevision
-	csSet.Status.CollisionCount = sts.Status.CollisionCount
-	csSet.Status.Conditions = sts.Status.Conditions
-	csSet.Status.AvailableReplicas = sts.Status.AvailableReplicas
 }
 
 func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsObj *apps.StatefulSet) ([]corev1.Pod, error) {

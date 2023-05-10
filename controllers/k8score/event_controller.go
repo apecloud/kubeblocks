@@ -118,7 +118,6 @@ func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Re
 	if event.Reason != string(probeutil.CheckRoleOperation) {
 		return nil
 	}
-	reqCtx.Log.Info("process event: %v", event)
 	var (
 		err         error
 		annotations = event.GetAnnotations()

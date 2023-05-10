@@ -89,6 +89,7 @@ import (
 // read + update access
 // +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
 
 // read only + watch access

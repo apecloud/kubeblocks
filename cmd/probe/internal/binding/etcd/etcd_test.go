@@ -21,11 +21,11 @@ package etcd
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
-	"math/rand"
+	"net"
 	"net/url"
 	"os"
-	"strconv"
 	"testing"
 	"time"
 
@@ -41,15 +41,14 @@ const (
 	etcdStartTimeout = 30
 )
 
-// randomize the port to avoid conflicting
-var testEndpoint = "http://localhost:" + strconv.Itoa(52600+rand.Intn(1000))
-
 func TestETCD(t *testing.T) {
-	etcdServer, err := startEtcdServer(testEndpoint)
-	defer stopEtcdServer(etcdServer)
+	etcdServer, err := startEtcdServer("http://localhost:0")
 	if err != nil {
 		t.Errorf("start embedded etcd server error: %s", err)
 	}
+	defer stopEtcdServer(etcdServer)
+	testEndpoint := fmt.Sprintf("http://%s", etcdServer.ETCD.Clients[0].Addr().(*net.TCPAddr).String())
+
 	t.Run("Invoke GetRole", func(t *testing.T) {
 		e := mockEtcd(etcdServer)
 		role, err := e.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})

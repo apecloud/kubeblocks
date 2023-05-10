@@ -30,7 +30,7 @@ storageClass:
   #    aliyun OSS only support s3fs, and DO NOT set "-o use_path_request_style":
   #    mounter: s3fs
   #    mountOptions: ""
-  mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666"
+  mountOptions: ""
   # Volume reclaim policy
   reclaimPolicy: Retain
   # Annotations for the storage class

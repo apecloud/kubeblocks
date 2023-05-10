@@ -213,15 +213,16 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 }
 
 func (o *DeleteOptions) preDeleteResource(info *resource.Info) error {
-	if o.PreDeleteHook != nil {
-		if info.Object == nil {
-			if err := info.Get(); err != nil {
-				return err
-			}
-		}
-		return o.PreDeleteHook(o, info.Object)
+	if o.PreDeleteHook == nil {
+		return nil
 	}
-	return nil
+
+	if info.Object == nil {
+		if err := info.Get(); err != nil {
+			return err
+		}
+	}
+	return o.PreDeleteHook(o, info.Object)
 }
 
 func (o *DeleteOptions) postDeleteResource(object runtime.Object) error {

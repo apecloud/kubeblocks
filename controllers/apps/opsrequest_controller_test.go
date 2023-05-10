@@ -473,10 +473,10 @@ var _ = Describe("OpsRequest Controller", func() {
 		var stsList = &appsv1.StatefulSetList{}
 
 		createStsPodAndMockStsReady := func() {
-			Eventually(testapps.GetListLen(&testCtx, intctrlutil.StatefulSetSignature,
+			Eventually(testapps.List(&testCtx, intctrlutil.StatefulSetSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterObj.Name,
-				}, client.InNamespace(clusterObj.Namespace))).Should(BeEquivalentTo(1))
+				}, client.InNamespace(clusterObj.Namespace))).Should(HaveLen(1))
 			stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj),
 				testapps.DefaultRedisCompName)
 			Expect(stsList.Items).Should(HaveLen(1))

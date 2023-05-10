@@ -52,3 +52,8 @@ func (factory *MockPodFactory) AddVolume(volume corev1.Volume) *MockPodFactory {
 	*volumes = append(*volumes, volume)
 	return factory
 }
+
+func (factory *MockPodFactory) AddNodeName(nodeName string) *MockPodFactory {
+	factory.get().Spec.NodeName = nodeName
+	return factory
+}

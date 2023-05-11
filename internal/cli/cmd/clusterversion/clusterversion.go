@@ -36,7 +36,7 @@ var listExample = templates.Examples(`
 
 type ListClusterVersionOptions struct {
 	*list.ListOptions
-	ClusterDefinitionRef string
+	clusterDefinitionRef string
 }
 
 func NewClusterVersionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -61,8 +61,8 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Aliases:           []string{"ls"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(o.ClusterDefinitionRef) != 0 {
-				o.LabelSelector = util.BuildClusterDefinitionRefLable(o.LabelSelector, []string{o.ClusterDefinitionRef})
+			if len(o.clusterDefinitionRef) != 0 {
+				o.LabelSelector = util.BuildClusterDefinitionRefLable(o.LabelSelector, []string{o.clusterDefinitionRef})
 			}
 			o.Names = args
 			_, err := o.Run()
@@ -70,6 +70,6 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	o.AddFlags(cmd, true)
-	cmd.Flags().StringVar(&o.ClusterDefinitionRef, "cluster-definition", "", "list the clusterVersion belonging to the specified cluster definition")
+	cmd.Flags().StringVar(&o.clusterDefinitionRef, "cluster-definition", "", "list the clusterVersion belonging to the specified cluster definition")
 	return cmd
 }

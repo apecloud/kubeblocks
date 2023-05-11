@@ -39,19 +39,17 @@ const (
 	ServiceVPCName      = "vpc-lb"
 	ServiceInternetName = "internet-lb"
 
-	ReplicationPodRoleVolume       = "pod-role"
-	ReplicationRoleLabelFieldPath  = "metadata.labels['kubeblocks.io/role']"
-	DefaultReplicationPrimaryIndex = 0
-	DefaultReplicationReplicas     = 2
-
-	MySQLType                 = "state.mysql"
+	ReplicationPodRoleVolume                 = "pod-role"
+	ReplicationRoleLabelFieldPath            = "metadata.labels['kubeblocks.io/role']"
+	DefaultReplicationCandidateInstanceIndex = 0
+	DefaultReplicationReplicas               = 2
+	
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
 	DefaultMySQLContainerName = "mysql"
 
 	NginxImage                = "nginx"
 	DefaultNginxContainerName = "nginx"
 
-	RedisType                     = "state.redis"
 	DefaultRedisCompDefName       = "redis"
 	DefaultRedisCompName          = "redis-rsts"
 	DefaultRedisImageName         = "redis:7.0.5"

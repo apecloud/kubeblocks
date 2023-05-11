@@ -94,7 +94,6 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
-			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 			SetReplicas(replicas).AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -107,26 +106,17 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 		By("Checking statefulSet number")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		Expect(len(stsList.Items)).Should(BeEquivalentTo(replicas))
-
-		By("Checking statefulSet role label")
-		for _, sts := range stsList.Items {
-			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
-				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(constant.Primary))
-			} else {
-				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(constant.Secondary))
-			}
-		}
+		Expect(len(stsList.Items)).Should(BeEquivalentTo(1))
 
 		By("Checking pods number and role label in StatefulSet")
-		for _, sts := range stsList.Items {
-			podList, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
-			Expect(err).To(Succeed())
-			Expect(len(podList)).Should(BeEquivalentTo(1))
-			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
-				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(constant.Primary))
+		podList, err := util.GetPodListByStatefulSet(ctx, k8sClient, &stsList.Items[0])
+		Expect(err).To(Succeed())
+		Expect(len(podList)).Should(BeEquivalentTo(replicas))
+		for _, pod := range podList {
+			if strings.HasSuffix(pod.Name, strconv.Itoa(testapps.DefaultReplicationCandidateInstanceIndex)) {
+				Expect(pod.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(constant.Primary))
 			} else {
-				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(constant.Secondary))
+				Expect(pod.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(constant.Secondary))
 			}
 		}
 

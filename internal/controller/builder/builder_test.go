@@ -21,7 +21,6 @@ package builder
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -355,50 +354,6 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
 			Expect(len(cfg.Data) == 5).Should(BeTrue())
-		})
-
-		It("builds Env Config with Replication component correctly", func() {
-			reqCtx := newReqCtx()
-			params := newParams()
-			params.Component.WorkloadType = appsv1alpha1.Replication
-
-			var cfg *corev1.ConfigMap
-			var err error
-
-			checkEnvValues := func() {
-				cfg, err = BuildEnvConfig(*params, reqCtx, k8sClient)
-				Expect(err).Should(BeNil())
-				Expect(cfg).ShouldNot(BeNil())
-				Expect(len(cfg.Data) == int(3+params.Component.Replicas)).Should(BeTrue())
-				Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_N"]).
-					Should(Equal(strconv.Itoa(int(params.Component.Replicas))))
-				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)
-				svcName := fmt.Sprintf("%s-headless", stsName)
-				By("Checking KB_PRIMARY_POD_NAME value be right")
-				Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
-					Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
-				for i := 0; i < int(params.Component.Replicas); i++ {
-					if i == 0 {
-						By("Checking the 1st replica's hostname should not have suffix '-0'")
-						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
-							Should(Equal(stsName + "-" + strconv.Itoa(0) + "." + svcName))
-					} else {
-						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
-							Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
-					}
-				}
-			}
-
-			By("Checking env values with primaryIndex=0 ")
-			var mockPrimaryIndex = int32(testapps.DefaultReplicationPrimaryIndex)
-			params.Component.PrimaryIndex = &mockPrimaryIndex
-			checkEnvValues()
-
-			By("Checking env values with primaryIndex=1 ")
-			params.Component.Replicas = 2
-			var newPrimaryIndex = int32(1)
-			params.Component.PrimaryIndex = &newPrimaryIndex
-			checkEnvValues()
 		})
 
 		It("builds BackupJob correctly", func() {

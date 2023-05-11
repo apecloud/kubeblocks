@@ -165,10 +165,10 @@ func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory 
 	return factory
 }
 
-func (factory *MockClusterFactory) SetPrimaryIndex(primaryIndex int32) *MockClusterFactory {
+func (factory *MockClusterFactory) SetCandidateInstance(candidate *appsv1alpha1.CandidateInstance) *MockClusterFactory {
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
-		comps[len(comps)-1].PrimaryIndex = &primaryIndex
+		comps[len(comps)-1].CandidateInstance = candidate
 	}
 	factory.get().Spec.ComponentSpecs = comps
 	return factory

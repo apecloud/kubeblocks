@@ -444,11 +444,12 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 
 		// build env for replication workload
+		// TODO: (xingran) remove KBReplicationSetPrimaryPodName ENV or dynamic generate primary instance
 		if params.Component.WorkloadType == appsv1alpha1.Replication {
 			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s",
 				params.Cluster.Name,
 				params.Component.Name,
-				params.Component.GetPrimaryIndex(),
+				0,
 				svcName)
 		}
 	}

@@ -514,7 +514,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).SetPrimaryIndex(0).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				SetReplicas(testapps.DefaultReplicationReplicas).
 				Create(&testCtx).GetObject()
 			// mock sts ready and create pod

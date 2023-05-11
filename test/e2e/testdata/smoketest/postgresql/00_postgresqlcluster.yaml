@@ -106,7 +106,6 @@ spec:
       monitor: false
       replicas: 2
       serviceAccountName: kb-sa-mycluster
-      primaryIndex: 0
       switchPolicy:
         type: Noop
       enabledLogs:     ["running"]

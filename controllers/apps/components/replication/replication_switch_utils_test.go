@@ -70,18 +70,22 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 
 	testHandleReplicationSetHASwitch := func() {
 		var (
-			DefaultReplicationPrimaryIndex        = int32(0)
-			DefaultPrimaryIndexDiffWithStsOrdinal = int32(1)
+			defaultCandidateInstanceIndex = int32(0)
+			newCandidateInstanceIndex     = int32(1)
 		)
 		clusterSwitchPolicy := &appsv1alpha1.ClusterSwitchPolicy{
 			Type: appsv1alpha1.MaximumDataProtection,
+		}
+		candidateInstance := &appsv1alpha1.CandidateInstance{
+			Index:    defaultCandidateInstanceIndex,
+			Operator: appsv1alpha1.CandidateOpEqual,
 		}
 		By("Creating a cluster with replication workloadType.")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
 			SetReplicas(testapps.DefaultReplicationReplicas).
-			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
+			SetCandidateInstance(candidateInstance).
 			SetSwitchPolicy(clusterSwitchPolicy).
 			Create(&testCtx).GetObject()
 
@@ -113,29 +117,32 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 		}
 		clusterComponentSpec := &clusterObj.Spec.ComponentSpecs[0]
 
-		By("Test primaryIndex has not changed.")
-		changed, _, err := CheckPrimaryIndexChanged(testCtx.Ctx, k8sClient, clusterObj, clusterComponentSpec.Name,
-			clusterComponentSpec.GetPrimaryIndex())
+		By("Test candidateInstance has not changed.")
+		changed, currentPrimaryInstanceName, err := CheckCandidateInstanceChanged(testCtx.Ctx, k8sClient, clusterObj, clusterComponentSpec)
 		Expect(err).Should(Succeed())
 		Expect(changed).Should(BeFalse())
 
-		By("Test HandleReplicationSetHASwitch success when primaryIndex has not changed.")
+		By("Test HandleReplicationSetHASwitch success when candidateInstance has not changed.")
 		err = HandleReplicationSetHASwitch(testCtx.Ctx, k8sClient, clusterObj, clusterComponentSpec)
 		Expect(err).Should(Succeed())
 
-		By("Test update cluster component primaryIndex should be successful.")
-		testapps.UpdateClusterCompSpecPrimaryIndex(&testCtx, clusterObj, clusterComponentSpec.Name,
-			&DefaultPrimaryIndexDiffWithStsOrdinal)
+		By("Test update cluster component candidateInstance should be successful.")
+		candidateInstance = &appsv1alpha1.CandidateInstance{
+			Index:    newCandidateInstanceIndex,
+			Operator: appsv1alpha1.CandidateOpEqual,
+		}
+		testapps.UpdateClusterCompSpecCandidateInstance(&testCtx, clusterObj, clusterComponentSpec.Name, candidateInstance)
 
 		By("Test new Switch obj and init SwitchInstance should be successful.")
-		clusterObj.Spec.ComponentSpecs[0].PrimaryIndex = &DefaultPrimaryIndexDiffWithStsOrdinal
-		clusterComponentSpec.PrimaryIndex = &DefaultPrimaryIndexDiffWithStsOrdinal
+		clusterObj.Spec.ComponentSpecs[0].CandidateInstance = candidateInstance
+		clusterComponentSpec.CandidateInstance = candidateInstance
 		s := newSwitch(testCtx.Ctx, k8sClient, clusterObj, &clusterDefObj.Spec.ComponentDefs[0], clusterComponentSpec,
 			nil, nil, nil, nil, nil)
-		err = s.initSwitchInstance(DefaultReplicationPrimaryIndex, DefaultPrimaryIndexDiffWithStsOrdinal)
+		candidateInstanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, clusterComponentSpec.Name, candidateInstance.Index)
+		err = s.initSwitchInstance(currentPrimaryInstanceName, candidateInstanceName)
 		Expect(err).Should(Succeed())
 
-		By("Test HandleReplicationSetHASwitch failed when primaryIndex has changed because controller reconciles many times, and switch job has not finished.")
+		By("Test HandleReplicationSetHASwitch failed when candidateInstance has changed because controller reconciles many times, and switch job has not finished.")
 		err = HandleReplicationSetHASwitch(ctx, k8sClient, clusterObj, clusterComponentSpec)
 		Expect(err).ShouldNot(Succeed())
 		Expect(err.Error()).Should(ContainSubstring("switch command job"))

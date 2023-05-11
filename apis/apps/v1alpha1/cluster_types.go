@@ -164,11 +164,6 @@ type ClusterComponentSpec struct {
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
-	// primaryIndex determines which index is primary when workloadType is Replication, index number starts from zero.
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
-
 	// candidateInstance is used to trigger switchover and describe the information of the candidate primary or leader.
 	// the value of candidateInstance index does not represent the real primary or leader  of the current instance,
 	// and the result of instance failover will not be synchronized to candidateInstance.
@@ -666,14 +661,6 @@ func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolum
 		ts = append(ts, t.toVolumeClaimTemplate())
 	}
 	return ts
-}
-
-// GetPrimaryIndex provide safe operation get ClusterComponentSpec.PrimaryIndex, if value is nil, it's treated as 0.
-func (r *ClusterComponentSpec) GetPrimaryIndex() int32 {
-	if r == nil || r.PrimaryIndex == nil {
-		return 0
-	}
-	return *r.PrimaryIndex
 }
 
 // GetClusterTerminalPhases return Cluster terminal phases.

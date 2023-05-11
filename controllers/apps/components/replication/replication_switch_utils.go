@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -104,25 +103,25 @@ func HandleReplicationSetHASwitch(ctx context.Context,
 		return nil
 	}
 
-	primaryIndexChanged, currentPrimaryIndex, err := CheckPrimaryIndexChanged(ctx, cli, cluster, clusterCompSpec.Name,
-		clusterCompSpec.GetPrimaryIndex())
+	candidateInstanceChanged, currentPrimaryInstanceName, err := CheckCandidateInstanceChanged(ctx, cli, cluster, clusterCompSpec)
 	if err != nil {
 		return err
 	}
-	// there is no need to perform HA operation when primaryIndex has not changed
-	if !primaryIndexChanged {
+	// there is no need to perform HA operation when candidateInstance has not changed
+	if !candidateInstanceChanged {
 		return nil
 	}
 
 	// create a new Switch object
 	s := newSwitch(ctx, cli, cluster, compDef, clusterCompSpec, nil, nil, nil, nil, nil)
 
-	// initialize switchInstance according to the primaryIndex
-	if err := s.initSwitchInstance(currentPrimaryIndex, clusterCompSpec.GetPrimaryIndex()); err != nil {
+	// initialize switchInstance according to the candidateInstance
+	candidateInstanceName := fmt.Sprintf("%s-%s-%d", cluster.Name, clusterCompSpec.Name, clusterCompSpec.CandidateInstance.Index)
+	if err := s.initSwitchInstance(currentPrimaryInstanceName, candidateInstanceName); err != nil {
 		return err
 	}
 
-	// health detection, role detection, delay detection of oldPrimaryIndex and newPrimaryIndex
+	// health detection, role detection, delay detection of oldPrimaryInstance and candidateInstance
 	s.detection(true)
 	if err := checkSwitchStatus(s.SwitchStatus); err != nil {
 		return err
@@ -476,20 +475,28 @@ func getSwitchCmdJobLabel(clusterName, componentName string) map[string]string {
 	}
 }
 
-// CheckPrimaryIndexChanged checks whether primaryIndex has changed and returns current primaryIndex.
-// @return bool - true is primaryIndex inconsistent
-// @return int32 - current primaryIndex; -1 if error
+// CheckCandidateInstanceChanged checks whether candidateInstance has changed.
+// @return bool - true is candidateInstance inconsistent
+// @return string - current primaryInstance name; "" if error
 // @return error
-func CheckPrimaryIndexChanged(ctx context.Context,
+func CheckCandidateInstanceChanged(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	compName string,
-	currentPrimaryIndex int32) (bool, int32, error) {
-	// get the statefulSet object whose current role label is primary
-	pod, err := getReplicationSetPrimaryObj(ctx, cli, cluster, generics.PodSignature, compName)
-	if err != nil {
-		return false, -1, err
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (bool, string, error) {
+	if clusterCompSpec == nil || clusterCompSpec.CandidateInstance == nil {
+		return false, "", nil
 	}
-	_, o := util.ParseParentNameAndOrdinal(pod.Name)
-	return currentPrimaryIndex != o, o, nil
+	// get the Pod object whose current role label is primary
+	pod, err := getReplicationSetPrimaryObj(ctx, cli, cluster, generics.PodSignature, clusterCompSpec.Name)
+	if err != nil {
+		return false, "", err
+	}
+	candidateInstanceName := fmt.Sprintf("%s-%s-%d", cluster.Name, clusterCompSpec.Name, clusterCompSpec.CandidateInstance.Index)
+	if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
+		return pod.Name != candidateInstanceName, pod.Name, nil
+	}
+	if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual {
+		return pod.Name == candidateInstanceName, pod.Name, nil
+	}
+	return false, pod.Name, nil
 }

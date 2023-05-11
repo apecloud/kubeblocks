@@ -269,13 +269,6 @@ spec:
                       maxLength: 15
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
-                    primaryIndex:
-                      description: primaryIndex determines which index is primary
-                        when workloadType is Replication, index number starts from
-                        zero.
-                      format: int32
-                      minimum: 0
-                      type: integer
                     replicas:
                       default: 1
                       description: Component replicas, use default value in ClusterDefinition

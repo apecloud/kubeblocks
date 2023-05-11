@@ -411,21 +411,3 @@ spec:
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
 	return clusterDefinition, err
 }
-
-// createTestReplicationSetClusterDefinitionObj  other webhook_test called this function, carefully for modifying the function.
-func createTestReplicationSetClusterDefinitionObj(name string) (*ClusterDefinition, error) {
-	clusterDefYaml := fmt.Sprintf(`
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
-metadata:
-  name: %s
-spec:
-  componentDefs:
-    - name: redis
-      maxUnavailable: 1
-      workloadType: Replication
-`, name)
-	clusterDefinition := &ClusterDefinition{}
-	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
-	return clusterDefinition, err
-}

@@ -31,8 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
@@ -151,28 +149,6 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			return err
 		}
 	case appsv1alpha1.Replication:
-		// get the number of existing pods under the current component
-		var existPodList = &corev1.PodList{}
-		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, *task.Cluster, existPodList, task.Component.Name); err != nil {
-			return err
-		}
-
-		// If the Pods already exists, check whether there is an HA switching and the HA process is prioritized to handle.
-		// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
-		if len(existPodList.Items) > 0 {
-			primaryIndexChanged, _, err := replication.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster,
-				task.Component.Name, task.Component.GetPrimaryIndex())
-			if err != nil {
-				return err
-			}
-			if primaryIndexChanged {
-				if err := replication.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster,
-					componentutil.GetClusterComponentSpecByName(*task.Cluster, task.Component.Name)); err != nil {
-					return err
-				}
-			}
-		}
-
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return buildReplicationSet(reqCtx, task, envConfig.Name)

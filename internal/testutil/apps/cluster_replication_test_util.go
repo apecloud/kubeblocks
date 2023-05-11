@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -90,11 +91,11 @@ func MockReplicationComponentPods(
 	return pods
 }
 
-// UpdateClusterCompSpecPrimaryIndex updates cluster component spec primaryIndex.
-func UpdateClusterCompSpecPrimaryIndex(testCtx *testutil.TestContext,
+// UpdateClusterCompSpecCandidateInstance updates cluster component spec candidateInstance.
+func UpdateClusterCompSpecCandidateInstance(testCtx *testutil.TestContext,
 	cluster *appsv1alpha1.Cluster,
 	compName string,
-	primaryIndex *int32) {
+	candidateInstance *appsv1alpha1.CandidateInstance) {
 	objectKey := client.ObjectKey{Name: cluster.Name, Namespace: testCtx.DefaultNamespace}
 	gomega.Expect(GetAndChangeObj(testCtx, objectKey, func(newCluster *appsv1alpha1.Cluster) {
 		var index int
@@ -105,14 +106,14 @@ func UpdateClusterCompSpecPrimaryIndex(testCtx *testutil.TestContext,
 					index = i
 				}
 			}
-			comps[index].PrimaryIndex = primaryIndex
+			comps[index].CandidateInstance = candidateInstance
 		}
 		newCluster.Spec.ComponentSpecs = comps
 	})()).Should(gomega.Succeed())
 	gomega.Eventually(CheckObj(testCtx, objectKey, func(g gomega.Gomega, newCluster *appsv1alpha1.Cluster) {
 		for index, compSpec := range newCluster.Spec.ComponentSpecs {
 			if compSpec.Name == compName {
-				g.Expect(newCluster.Spec.ComponentSpecs[index].PrimaryIndex).Should(gomega.Equal(primaryIndex))
+				g.Expect(reflect.DeepEqual(newCluster.Spec.ComponentSpecs[index].CandidateInstance, candidateInstance)).Should(gomega.BeTrue())
 			}
 		}
 	})).Should(gomega.Succeed())

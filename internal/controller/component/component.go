@@ -64,6 +64,7 @@ func BuildComponent(
 		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
 		ComponentDef:          clusterCompSpec.ComponentDefRef,
 		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
+		CandidateInstance:     clusterCompSpec.CandidateInstance,
 	}
 
 	// resolve component.ConfigTemplates
@@ -128,7 +129,6 @@ func BuildComponent(
 		}
 	}
 
-	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
 	// set component.PodSpec.ServiceAccountName
 	component.PodSpec.ServiceAccountName = component.ServiceAccountName
 

@@ -351,7 +351,6 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(redisCompName, redisCompDefName).
 				SetReplicas(2).
-				SetPrimaryIndex(0).
 				GetObject()
 		})
 
@@ -408,7 +407,6 @@ var _ = Describe("Cluster Controller", func() {
 	// 			clusterDef.Name, clusterVersion.Name).
 	// 			AddComponentVersion(redisCompName, redisCompDefName).
 	// 			SetReplicas(2).
-	// 			SetPrimaryIndex(0).
 	// 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 	// 			GetObject()
 	// 	})

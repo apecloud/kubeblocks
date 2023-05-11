@@ -41,7 +41,6 @@ type SynthesizedComponent struct {
 	Replicas              int32                                  `json:"replicas"`
 	WorkloadType          v1alpha1.WorkloadType                  `json:"workloadType,omitempty"`
 	ConsensusSpec         *v1alpha1.ConsensusSetSpec             `json:"consensusSpec,omitempty"`
-	PrimaryIndex          *int32                                 `json:"primaryIndex,omitempty"`
 	PodSpec               *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Services              []corev1.Service                       `json:"services,omitempty"`
 	Probes                *v1alpha1.ClusterDefinitionProbes      `json:"probes,omitempty"`
@@ -58,16 +57,5 @@ type SynthesizedComponent struct {
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
 	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
-}
-
-// GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is
-// a nil pointer it's treated at 0, return -1 if function receiver is nil.
-func (r *SynthesizedComponent) GetPrimaryIndex() int32 {
-	if r == nil {
-		return -1
-	}
-	if r.PrimaryIndex == nil {
-		return 0
-	}
-	return *r.PrimaryIndex
+	CandidateInstance     *v1alpha1.CandidateInstance            `json:"candidateInstance,omitempty"`
 }

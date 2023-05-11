@@ -80,7 +80,6 @@ var _ = Describe("ReplicationSet Util", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
 			SetReplicas(testapps.DefaultReplicationReplicas).
-			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 			Create(&testCtx).GetObject()
 
 		By("Creating a statefulSet of replication workloadType.")
@@ -169,7 +168,6 @@ var _ = Describe("ReplicationSet Util", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
 			SetReplicas(testapps.DefaultReplicationReplicas).
-			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 			Create(&testCtx).GetObject()
 
 		By("Creating a statefulSet of replication workloadType.")
@@ -204,7 +202,6 @@ var _ = Describe("ReplicationSet Util", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
 			SetReplicas(testapps.DefaultReplicationReplicas).
-			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 			SetSwitchPolicy(clusterSwitchPolicy).
 			Create(&testCtx).GetObject()
 

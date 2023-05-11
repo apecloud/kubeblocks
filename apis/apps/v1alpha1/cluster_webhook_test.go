@@ -37,23 +37,17 @@ var _ = Describe("cluster webhook", func() {
 	var (
 		randomStr               string
 		clusterName             string
-		rsClusterName           string
 		clusterDefinitionName   string
-		rsClusterDefinitionName string
 		secondClusterDefinition string
 		clusterVersionName      string
-		rsClusterVersionName    string
 	)
 
 	initParams := func() {
 		randomStr = testCtx.GetRandomStr()
 		clusterName = "cluster-webhook-mysql-" + randomStr
-		rsClusterName = "cluster-webhook-rs-" + randomStr
 		clusterDefinitionName = "cluster-webhook-mysql-definition-" + randomStr
-		rsClusterDefinitionName = "cluster-webhook-rs-definition-" + randomStr
 		secondClusterDefinition = "cluster-webhook-mysql-definition2-" + randomStr
 		clusterVersionName = "cluster-webhook-mysql-clusterversion-" + randomStr
-		rsClusterVersionName = "cluster-webhook-rs-clusterversion-" + randomStr
 	}
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
@@ -166,37 +160,6 @@ var _ = Describe("cluster webhook", func() {
 			patch = client.MergeFrom(cluster.DeepCopy())
 			cluster.Spec.ComponentSpecs[0].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("80Mi")
 			Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
-
-			// A series of tests on clusters when workloadType=replication
-			By("By creating a new clusterDefinition when workloadType=replication")
-			rsClusterDef, _ := createTestReplicationSetClusterDefinitionObj(rsClusterDefinitionName)
-			Expect(testCtx.CreateObj(ctx, rsClusterDef)).Should(Succeed())
-
-			By("By creating a new clusterVersion when workloadType=replication")
-			rsClusterVersion := createTestReplicationSetClusterVersionObj(rsClusterDefinitionName, rsClusterVersionName)
-			Expect(testCtx.CreateObj(ctx, rsClusterVersion)).Should(Succeed())
-
-			By("By creating a new cluster when workloadType=replication")
-			rsCluster, _ := createTestReplicationSetCluster(rsClusterDefinitionName, rsClusterVersionName, rsClusterName)
-			Expect(testCtx.CreateObj(ctx, rsCluster)).Should(Succeed())
-
-			By("By updating cluster.Spec.ComponentDefs[0].PrimaryIndex larger than cluster.Spec.ComponentDefs[0].Replicas, expect not succeed")
-			patch = client.MergeFrom(cluster.DeepCopy())
-			*rsCluster.Spec.ComponentSpecs[0].PrimaryIndex = int32(3)
-			rsCluster.Spec.ComponentSpecs[0].Replicas = int32(3)
-			Expect(k8sClient.Patch(ctx, rsCluster, patch)).ShouldNot(Succeed())
-
-			By("By updating cluster.Spec.ComponentDefs[0].PrimaryIndex less than cluster.Spec.ComponentDefs[0].Replicas, expect succeed")
-			patch = client.MergeFrom(cluster.DeepCopy())
-			*rsCluster.Spec.ComponentSpecs[0].PrimaryIndex = int32(1)
-			rsCluster.Spec.ComponentSpecs[0].Replicas = int32(2)
-			Expect(k8sClient.Patch(ctx, rsCluster, patch)).Should(Succeed())
-
-			By("By updating cluster.Spec.ComponentDefs[0].PrimaryIndex less than 0, expect not succeed")
-			patch = client.MergeFrom(cluster.DeepCopy())
-			*rsCluster.Spec.ComponentSpecs[0].PrimaryIndex = int32(-1)
-			rsCluster.Spec.ComponentSpecs[0].Replicas = int32(2)
-			Expect(k8sClient.Patch(ctx, rsCluster, patch)).ShouldNot(Succeed())
 		})
 	})
 
@@ -255,31 +218,6 @@ var _ = Describe("cluster webhook", func() {
 			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
 		})
 	})
-
-	When("Create a cluster with replication component, but without specifying PrimaryIndex", func() {
-		It("should set default value to PrimaryIndex when PrimaryIndex is nil", func() {
-			By("By creating a new clusterDefinition when workloadType=replication")
-			clusterRef, _ := createTestReplicationSetClusterDefinitionObj(rsClusterDefinitionName)
-			Expect(testCtx.CreateObj(ctx, clusterRef)).Should(Succeed())
-
-			By("By creating a new clusterVersion when workloadType=replication")
-			clusterVersion := createTestReplicationSetClusterVersionObj(rsClusterDefinitionName, rsClusterVersionName)
-			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
-
-			By("By creating a new cluster when workloadType=replication")
-			cluster, _ := createTestReplicationSetCluster(rsClusterDefinitionName, rsClusterVersionName, rsClusterName)
-			cluster.Spec.ComponentSpecs[0].PrimaryIndex = nil
-			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
-			Eventually(func(g Gomega) int32 {
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
-				return *cluster.Spec.ComponentSpecs[0].PrimaryIndex
-			}).Should(Equal(int32(0)))
-
-			By("By update Replication component replicas to 0, expect succeed")
-			cluster.Spec.ComponentSpecs[0].Replicas = int32(0)
-			Expect(k8sClient.Update(ctx, cluster)).Should(Succeed())
-		})
-	})
 })
 
 func createTestCluster(clusterDefinitionName, clusterVersionName, clusterName string) (*Cluster, error) {
@@ -306,37 +244,6 @@ spec:
   - name: proxy
     componentDefRef: proxy
     replicas: 1
-`, clusterName, clusterDefinitionName, clusterVersionName)
-	cluster := &Cluster{}
-	err := yaml.Unmarshal([]byte(clusterYaml), cluster)
-	cluster.Spec.TerminationPolicy = WipeOut
-	return cluster, err
-}
-
-func createTestReplicationSetCluster(clusterDefinitionName, clusterVersionName, clusterName string) (*Cluster, error) {
-	clusterYaml := fmt.Sprintf(`
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: %s
-  namespace: default
-spec:
-  clusterDefinitionRef: %s
-  clusterVersionRef: %s
-  componentSpecs:
-  - name: replication
-    componentDefRef: redis
-    monitor: false
-    primaryIndex: 0
-    replicas: 2
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
 `, clusterName, clusterDefinitionName, clusterVersionName)
 	cluster := &Cluster{}
 	err := yaml.Unmarshal([]byte(clusterYaml), cluster)

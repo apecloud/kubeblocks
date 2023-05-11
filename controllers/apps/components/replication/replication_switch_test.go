@@ -85,8 +85,8 @@ var _ = Describe("ReplicationSet Switch", func() {
 
 	testReplicationSetSwitch := func() {
 		var (
-			DefaultReplicationPrimaryIndex        = int32(0)
-			DefaultPrimaryIndexDiffWithStsOrdinal = int32(1)
+			defaultCandidateInstanceIndex = int32(0)
+			newCandidateInstanceIndex     = int32(1)
 		)
 
 		var (
@@ -100,12 +100,16 @@ var _ = Describe("ReplicationSet Switch", func() {
 		clusterSwitchPolicy := &appsv1alpha1.ClusterSwitchPolicy{
 			Type: appsv1alpha1.MaximumAvailability,
 		}
+		candidateInstance := &appsv1alpha1.CandidateInstance{
+			Index:    defaultCandidateInstanceIndex,
+			Operator: appsv1alpha1.CandidateOpEqual,
+		}
 		By("Creating a cluster with replication workloadType.")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
 			SetReplicas(testapps.DefaultReplicationReplicas).
-			SetPrimaryIndex(DefaultPrimaryIndexDiffWithStsOrdinal).
+			SetCandidateInstance(candidateInstance).
 			SetSwitchPolicy(clusterSwitchPolicy).
 			Create(&testCtx).GetObject()
 
@@ -149,7 +153,9 @@ var _ = Describe("ReplicationSet Switch", func() {
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusFailed))
 
 		By("Test switch detection should be successful.")
-		err := s.initSwitchInstance(DefaultReplicationPrimaryIndex, DefaultPrimaryIndexDiffWithStsOrdinal)
+		currentPrimaryInstanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, clusterComponentSpec.Name, defaultCandidateInstanceIndex)
+		candidateInstanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, clusterComponentSpec.Name, newCandidateInstanceIndex)
+		err := s.initSwitchInstance(currentPrimaryInstanceName, candidateInstanceName)
 		Expect(err).Should(Succeed())
 
 		By("Test switch detection should be successful.")

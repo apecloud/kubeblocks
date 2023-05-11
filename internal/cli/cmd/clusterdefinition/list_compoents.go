@@ -67,9 +67,9 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 
 func validate(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("you must specify the clusterdefinition name to list")
+		return fmt.Errorf("missing clusterdefinition name")
 	} else if len(args) > 1 {
-		return fmt.Errorf("too many clusterdefinition names you have input")
+		return fmt.Errorf("only support one clusterdefinition name")
 	}
 	return nil
 }
@@ -88,20 +88,14 @@ func run(o *list.ListOptions) error {
 		return fmt.Errorf("no clusterdefinition %s found", o.Names[0])
 	}
 	p := printer.NewTablePrinter(o.Out)
-	p.SetHeader(componentsTableHeader...)
+	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE")
 	for _, info := range infos {
 		var cd v1alpha1.ClusterDefinition
-		err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd)
-		if err != nil {
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd); err != nil {
 			return err
 		}
 		for _, comp := range cd.Spec.ComponentDefs {
-			row := []interface{}{
-				comp.Name,
-				comp.WorkloadType,
-				comp.CharacterType,
-			}
-			p.AddRow(row...)
+			p.AddRow(comp.Name, comp.WorkloadType, comp.CharacterType)
 		}
 	}
 	p.Print()

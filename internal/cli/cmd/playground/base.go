@@ -30,7 +30,6 @@ import (
 
 type baseOptions struct {
 	startTime time.Time
-	Timeout   time.Duration
 	// prevCluster is the previous cluster info
 	prevCluster *cp.K8sClusterInfo
 	// kubeConfigPath is the tmp kubeconfig path that will be used when int and destroy

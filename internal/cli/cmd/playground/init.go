@@ -106,7 +106,6 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
 	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")
-	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for initing playground, such as --timeout=10m")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cloud-provider",
@@ -414,7 +413,6 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			Client:    client,
 			Dynamic:   dynamic,
 			Wait:      true,
-			Timeout:   o.Timeout,
 		},
 		Version: o.kbVersion,
 		Monitor: true,

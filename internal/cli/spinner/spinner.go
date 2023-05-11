@@ -31,7 +31,6 @@ import (
 	"github.com/briandowns/spinner"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 type Spinner struct {
@@ -40,30 +39,26 @@ type Spinner struct {
 	cancel chan struct{}
 }
 
-type Interface interface {
-	Start()
-	Done(status string)
-	Success()
-	Fail()
-	SetMessage(msg string)
-	SetFinalMsg(msg string)
-	updateSpinnerMessage(msg string)
-}
-
-type Option func(Interface)
+type Option func(*Spinner)
 
 func WithMessage(msg string) Option {
-	return func(s Interface) {
-		s.updateSpinnerMessage(msg)
+	return func(s *Spinner) {
+		s.UpdateSpinnerMessage(msg)
 	}
 }
 
-func (s *Spinner) updateSpinnerMessage(msg string) {
+func WithDelay(delay time.Duration) Option {
+	return func(s *Spinner) {
+		s.delay = delay
+	}
+}
+
+func (s *Spinner) UpdateSpinnerMessage(msg string) {
 	s.s.Suffix = fmt.Sprintf(" %s", msg)
 }
 
 func (s *Spinner) SetMessage(msg string) {
-	s.updateSpinnerMessage(msg)
+	s.UpdateSpinnerMessage(msg)
 	if !s.s.Active() {
 		s.Start()
 	}
@@ -126,11 +121,7 @@ func (s *Spinner) Fail() {
 	s.Done(printer.BoldRed("FAIL"))
 }
 
-func New(w io.Writer, opts ...Option) Interface {
-	if util.IsWindows() {
-		return NewWindowsSpinner(w, opts...)
-	}
-
+func New(w io.Writer, opts ...Option) *Spinner {
 	res := &Spinner{}
 	res.s = spinner.New(spinner.CharSets[11],
 		100*time.Millisecond,

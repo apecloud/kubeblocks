@@ -174,9 +174,6 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
-	// Todo: KubeBlocks maybe already install but it's status could be Failed.
-	// For example: 'kbcli playground init' in windows will fail and try 'kbcli playground init' again immediately,
-	// kbcli will output SUCCESSFULLY, however the addon csi is failed and KubeBlocks do not install SUCCESSFULLY
 	if v.KubeBlocks != "" {
 		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v.KubeBlocks)
 		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
@@ -316,12 +313,13 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	var (
 		allEnabled  bool
 		err         error
-		spinnerDone = func(s spinner.Interface) {
+		spinnerDone = func(s *spinner.Spinner) {
 			s.SetFinalMsg(allMsg)
 			s.Done("")
 			fmt.Fprintln(o.Out)
 		}
 	)
+
 	// wait all addons to be enabled, or timeout
 	if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
 		allEnabled, err = checkAddons()

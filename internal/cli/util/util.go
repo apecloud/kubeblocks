@@ -759,8 +759,3 @@ func CreateResourceIfAbsent(
 	}
 	return nil
 }
-
-// IsWindows return true if the kbcli runtime situation is windows
-func IsWindows() bool {
-	return runtime.GOOS == types.GoosWindows
-}

@@ -63,21 +63,23 @@ var _ = Describe("clusterversion", func() {
 				Type: Type,
 			},
 		}
-
-		value := make([]metav1.TableRow, 1)
-		value[0].Cells = make([]interface{}, 4)
-		value[0].Cells[0] = testing.ClusterVersionName
-		value[0].Cells[1] = testing.ClusterDefName
-		value[0].Cells[2] = "Available"
-		value[0].Cells[3] = "0s"
-
+		tableValue := []metav1.TableRow{
+			{
+				Cells: []interface{}{
+					testing.ClusterVersionName,
+					testing.ClusterDefName,
+					"Available",
+					"0s",
+				},
+			},
+		}
 		table := &metav1.Table{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Table",
 				APIVersion: "meta.k8s.io/v1",
 			},
 			ColumnDefinitions: tableHeader,
-			Rows:              value,
+			Rows:              tableValue,
 		}
 		return table
 	}

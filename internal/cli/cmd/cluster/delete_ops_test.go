@@ -79,13 +79,7 @@ var _ = Describe("Expose", func() {
 		tf.Cleanup()
 	})
 
-	initClient := func(opsRequests ...runtime.Object) {
-		opsList := &appsv1alpha1.OpsRequestList{}
-		opsList.Items = []appsv1alpha1.OpsRequest{}
-		for _, v := range opsRequests {
-			ops := v.(*appsv1alpha1.OpsRequest)
-			opsList.Items = append(opsList.Items, *ops)
-		}
+	initClient := func(opsRequest runtime.Object) {
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		httpResp := func(obj runtime.Object) *http.Response {
@@ -96,11 +90,11 @@ var _ = Describe("Expose", func() {
 			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				return httpResp(opsRequests[1]), nil
+				return httpResp(opsRequest), nil
 			}),
 		}
 
-		tf.FakeDynamicClient = clitesting.FakeDynamicClient(opsRequests...)
+		tf.FakeDynamicClient = clitesting.FakeDynamicClient(opsRequest)
 		tf.Client = tf.UnstructuredClient
 	}
 

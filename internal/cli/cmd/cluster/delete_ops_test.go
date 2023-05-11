@@ -47,7 +47,6 @@ var _ = Describe("Expose", func() {
 	const (
 		namespace = "test"
 		opsName   = "test-ops"
-		opsName1  = "test-ops1"
 	)
 
 	var (
@@ -122,7 +121,7 @@ var _ = Describe("Expose", func() {
 
 	It("Testing the deletion of running OpsRequest", func() {
 		By("init opsRequests and k8s client")
-		runningOps := generateOpsObject(opsName1, appsv1alpha1.OpsRunningPhase)
+		runningOps := generateOpsObject(opsName, appsv1alpha1.OpsRunningPhase)
 		initClient(runningOps)
 
 		By("expect error when deleting running opsRequest")

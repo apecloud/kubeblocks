@@ -57,12 +57,12 @@ data:
       if [ $i -ne 0 ]; then
         cluster_info="$cluster_info;";
       fi;
-      host=$(eval echo \$KB_MYSQL_"$i"_HOSTNAME)
+      tmp_host=$(eval echo \$KB_MYSQL_"$i"_HOSTNAME)
       # setup pod weight, prefer pod 0 to be leader
       if [ $i -eq 0 ]; then 
-        cluster_info="$cluster_info$host:13306#9N";
+        cluster_info="$cluster_info$tmp_host:13306#9N";
       else
-        cluster_info="$cluster_info$host:13306#1N";
+        cluster_info="$cluster_info$tmp_host:13306#1N";
       fi
     done; 
     cluster_info="$cluster_info@$(($idx+1))"; 

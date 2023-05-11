@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/briandowns/spinner"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

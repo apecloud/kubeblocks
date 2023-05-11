@@ -188,7 +188,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// make all workload objects depending on credential secret
 			&lifecycle.CredentialTransformer{},
 			// add rbac for pod if not exists
-			&lifecycle.RbacTransformer{},
+			// &lifecycle.RbacTransformer{},
 			// make all workload objects depending on all none workload objects
 			&lifecycle.WorkloadsLastTransformer{},
 			// make config configmap immutable

@@ -15,7 +15,7 @@ require (
 	github.com/chaos-mesh/chaos-mesh/api v0.0.0-20230423031423-0b31a519b502
 	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/containerd/stargz-snapshotter/estargz v0.13.0
-	github.com/containers/common v0.49.1
+	github.com/containers/common v0.48.1
 	github.com/dapr/components-contrib v1.9.6
 	github.com/dapr/dapr v1.9.5
 	github.com/dapr/go-sdk v1.7.0
@@ -49,7 +49,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.1-0.20220423185008-bf980b35cac4
 	github.com/onsi/ginkgo/v2 v2.9.1
 	github.com/onsi/gomega v1.27.4
-	github.com/opencontainers/image-spec v1.1.0-rc2
 	github.com/pingcap/go-tpc v1.0.9
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
@@ -133,7 +132,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
-	github.com/cloudflare/circl v1.1.0 // indirect
+	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/cockroachdb/apd/v2 v2.0.1 // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/containerd/containerd v1.6.18 // indirect
@@ -276,6 +275,7 @@ require (
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.1.0-rc2 // indirect
 	github.com/opencontainers/runc v1.1.5 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/opencontainers/selinux v1.10.2 // indirect

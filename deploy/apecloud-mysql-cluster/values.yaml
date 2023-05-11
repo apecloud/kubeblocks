@@ -37,7 +37,7 @@ persistence:
   enabled: true
   data:
     storageClassName:
-    size: 20Gi
+    size: 1Gi
   # separate log volume for WAL log
   wal:
     enabled: false

@@ -135,6 +135,8 @@ func NewNetworkChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		NewDuplicateCmd(f, streams),
 		NewCorruptCmd(f, streams),
 		NewBandwidthCmd(f, streams),
+		NewDNSChaosCmd(f, streams),
+		NewHTTPChaosCmd(f, streams),
 	)
 	return cmd
 }

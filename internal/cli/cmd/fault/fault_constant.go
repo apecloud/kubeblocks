@@ -35,6 +35,9 @@ const (
 	ResourceStressChaos  = "stresschaos"
 	ResourceDNSChaos     = "dnschaos"
 	ResourceTimeChaos    = "timechaos"
+	ResourceHTTPChaos    = "httpchaos"
+	ResourceAWSChaos     = "awschaos"
+	ResourceGCPChaos     = "gcpchaos"
 )
 
 // Cue Template Name
@@ -45,6 +48,9 @@ const (
 	CueTemplateStressChaos  = "stress_chaos_template.cue"
 	CueTemplateDNSChaos     = "dns_chaos_template.cue"
 	CueTemplateTimeChaos    = "time_chaos_template.cue"
+	CueTemplateHTTPChaos    = "http_chaos_template.cue"
+	CueTemplateAWSChaos     = "aws_chaos_template.cue"
+	CueTemplateGCPChaos     = "gcp_chaos_template.cue"
 )
 
 // Pod Chaos Command
@@ -103,4 +109,26 @@ const (
 const (
 	Time      = "time"
 	TimeShort = "Clock skew failure."
+)
+
+// HTTP Chaos Command
+const (
+	Abort          = "abort"
+	AbortShort     = "Abort the HTTP request and response."
+	HTTPDelay      = "delay"
+	HTTPDelayShort = "Delay the HTTP request and response."
+	Replace        = "replace"
+	ReplaceShort   = "Replace the HTTP request and response."
+	Patch          = "patch"
+	PatchShort     = "Patch the HTTP request and response."
+)
+
+// AWS And GCP Chaos Command
+const (
+	Stop              = "stop"
+	StopShort         = "Stop instance"
+	Restart           = "restart"
+	RestartShort      = "Restart instance"
+	DetachVolume      = "detach-volume"
+	DetachVolumeShort = "Detach volume"
 )

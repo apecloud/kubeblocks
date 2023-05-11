@@ -5,14 +5,14 @@ title: kbcli cluster stop
 Stop the cluster and release all the pods of the cluster.
 
 ```
-kbcli cluster stop [flags]
+kbcli cluster stop NAME [flags]
 ```
 
 ### Examples
 
 ```
   # stop the cluster and release all the pods of the cluster
-  kbcli cluster stop <my-cluster>
+  kbcli cluster stop mycluster
 ```
 
 ### Options

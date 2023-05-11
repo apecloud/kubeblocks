@@ -26,7 +26,6 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 14282,
   "graphTooltip": 0,
-  "id": 5,
   "links": [
     {
       "asDropdown": false,
@@ -110,7 +109,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -210,7 +210,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -310,7 +311,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -410,7 +412,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -510,7 +513,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -610,7 +614,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -710,7 +715,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -810,7 +816,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -910,7 +917,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -1010,7 +1018,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -1110,7 +1119,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2000,7 +2010,7 @@
           "refId": "A"
         }
       ],
-      "title": "Read Network Traffic",
+      "title": "Send Network Traffic",
       "type": "timeseries"
     },
     {
@@ -2260,7 +2270,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2276,7 +2287,7 @@
             "h": 6,
             "w": 8,
             "x": 0,
-            "y": 27
+            "y": 3
           },
           "id": 43,
           "options": {
@@ -2360,7 +2371,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2376,7 +2388,7 @@
             "h": 6,
             "w": 8,
             "x": 8,
-            "y": 27
+            "y": 3
           },
           "id": 44,
           "options": {
@@ -2460,7 +2472,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2476,7 +2489,7 @@
             "h": 6,
             "w": 8,
             "x": 16,
-            "y": 27
+            "y": 3
           },
           "id": 45,
           "options": {
@@ -2560,7 +2573,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2576,7 +2590,7 @@
             "h": 6,
             "w": 8,
             "x": 0,
-            "y": 33
+            "y": 9
           },
           "id": 46,
           "options": {
@@ -2660,7 +2674,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2676,7 +2691,7 @@
             "h": 6,
             "w": 8,
             "x": 8,
-            "y": 33
+            "y": 9
           },
           "id": 48,
           "options": {
@@ -2760,7 +2775,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2776,7 +2792,7 @@
             "h": 6,
             "w": 8,
             "x": 16,
-            "y": 33
+            "y": 9
           },
           "id": 47,
           "options": {
@@ -2860,7 +2876,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2876,7 +2893,7 @@
             "h": 6,
             "w": 8,
             "x": 0,
-            "y": 39
+            "y": 15
           },
           "id": 49,
           "options": {
@@ -2960,7 +2977,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2976,7 +2994,7 @@
             "h": 6,
             "w": 8,
             "x": 8,
-            "y": 39
+            "y": 15
           },
           "id": 50,
           "options": {

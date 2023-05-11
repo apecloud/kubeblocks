@@ -57,7 +57,7 @@ var (
 		# list all backup policy
 		kbcli cluster list-backup-policy 
         
-		# using short cmd to list backup policy of specified cluster 
+		# using short cmd to list backup policy of the specified cluster 
         kbcli cluster list-bp mycluster
 	`)
 	editExample = templates.Examples(`
@@ -69,16 +69,16 @@ var (
 	`)
 	createBackupExample = templates.Examples(`
 		# create a backup
-		kbcli cluster backup cluster-name
+		kbcli cluster backup mycluster
 
 		# create a snapshot backup
-		kbcli cluster backup cluster-name --backup-type snapshot
+		kbcli cluster backup mycluster --backup-type snapshot
 
 		# create a full backup
-		kbcli cluster backup cluster-name --backup-type full
+		kbcli cluster backup mycluster --backup-type full
 
 		# create a backup with specified backup policy
-		kbcli cluster backup cluster-name --backup-policy <backup-policy-name>
+		kbcli cluster backup mycluster --backup-policy <backup-policy-name>
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backup
@@ -104,7 +104,8 @@ type CreateBackupOptions struct {
 	BackupName   string `json:"backupName"`
 	Role         string `json:"role,omitempty"`
 	BackupPolicy string `json:"backupPolicy"`
-	create.BaseOptions
+
+	create.CreateOptions `json:"-"`
 }
 
 type ListBackupOptions struct {
@@ -117,7 +118,8 @@ func (o *CreateBackupOptions) Complete() error {
 	if len(o.BackupName) == 0 {
 		o.BackupName = strings.Join([]string{"backup", o.Namespace, o.Name, time.Now().Format("20060102150405")}, "-")
 	}
-	return nil
+
+	return o.CreateOptions.Complete()
 }
 
 func (o *CreateBackupOptions) Validate() error {
@@ -180,35 +182,42 @@ func (o *CreateBackupOptions) getDefaultBackupPolicy() (string, error) {
 }
 
 func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &CreateBackupOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
-	customOutPut := func(opt *create.BaseOptions) {
+	customOutPut := func(opt *create.CreateOptions) {
 		output := fmt.Sprintf("Backup %s created successfully, you can view the progress:", opt.Name)
 		printer.PrintLine(output)
 		nextLine := fmt.Sprintf("\tkbcli cluster list-backups --name=%s -n %s", opt.Name, opt.Namespace)
 		printer.PrintLine(nextLine)
 	}
-	inputs := create.Inputs{
-		Use:                          "backup",
-		Short:                        "Create a backup.",
-		Example:                      createBackupExample,
-		CueTemplateName:              "backup_template.cue",
-		ResourceName:                 types.ResourceBackups,
-		Group:                        types.DPAPIGroup,
-		Version:                      types.DPAPIVersion,
-		BaseOptionsObj:               &o.BaseOptions,
-		Options:                      o,
-		Factory:                      f,
-		Complete:                     o.Complete,
-		Validate:                     o.Validate,
-		CustomOutPut:                 customOutPut,
-		ResourceNameGVRForCompletion: types.ClusterGVR(),
-		BuildFlags: func(cmd *cobra.Command) {
-			cmd.Flags().StringVar(&o.BackupType, "backup-type", "snapshot", "Backup type")
-			cmd.Flags().StringVar(&o.BackupName, "backup-name", "", "Backup name")
-			cmd.Flags().StringVar(&o.BackupPolicy, "backup-policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
+
+	o := &CreateBackupOptions{
+		CreateOptions: create.CreateOptions{
+			IOStreams:       streams,
+			Factory:         f,
+			GVR:             types.BackupGVR(),
+			CueTemplateName: "backup_template.cue",
+			CustomOutPut:    customOutPut,
 		},
 	}
-	return create.BuildCommand(inputs)
+	o.CreateOptions.Options = o
+
+	cmd := &cobra.Command{
+		Use:               "backup NAME",
+		Short:             "Create a backup for the cluster.",
+		Example:           createBackupExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Args = args
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
+		},
+	}
+
+	cmd.Flags().StringVar(&o.BackupType, "backup-type", "snapshot", "Backup type")
+	cmd.Flags().StringVar(&o.BackupName, "backup-name", "", "Backup name")
+	cmd.Flags().StringVar(&o.BackupPolicy, "backup-policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
+
+	return cmd
 }
 
 // getClusterNameMap get cluster list by namespace and convert to map.
@@ -283,7 +292,7 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	cmd := &cobra.Command{
 		Use:               "list-backups",
 		Short:             "List backups.",
-		Aliases:           []string{"ls-backup"},
+		Aliases:           []string{"ls-backups"},
 		Example:           listBackupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -345,7 +354,7 @@ type CreateRestoreOptions struct {
 	RestoreTimeStr string     `json:"restoreTimeStr,omitempty"`
 	SourceCluster  string     `json:"sourceCluster,omitempty"`
 
-	create.BaseOptions
+	create.CreateOptions `json:"-"`
 }
 
 func (o *CreateRestoreOptions) getClusterObject(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
@@ -523,19 +532,20 @@ func (o *CreateRestoreOptions) Validate() error {
 
 func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateRestoreOptions{}
-	o.IOStreams = streams
-	inputs := create.Inputs{
-		BaseOptionsObj: &create.BaseOptions{IOStreams: streams},
-		Options:        o,
-		Factory:        f,
+	o.CreateOptions = create.CreateOptions{
+		IOStreams: streams,
+		Factory:   f,
+		Options:   o,
 	}
+
 	cmd := &cobra.Command{
 		Use:               "restore",
 		Short:             "Restore a new cluster from backup.",
 		Example:           createRestoreExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.Complete(inputs, args))
+			o.Args = args
+			util.CheckErr(o.Complete())
 			util.CheckErr(o.Validate())
 			util.CheckErr(o.Run())
 		},

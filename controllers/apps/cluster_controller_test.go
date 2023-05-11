@@ -28,6 +28,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -400,7 +402,7 @@ var _ = Describe("Cluster Controller", func() {
 			compName, "data").SetStorage("1Gi").CheckedCreate(&testCtx)
 	}
 
-	mockPodsForConsensusTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
+	mockPodsForTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
 		componentName := cluster.Spec.ComponentSpecs[0].Name
 		clusterName := cluster.Name
 		stsName := cluster.Name + "-" + componentName
@@ -411,6 +413,7 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      stsName + "-" + strconv.Itoa(i),
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
+						constant.AppManagedByLabelKey:         constant.AppName,
 						constant.AppInstanceLabelKey:          clusterName,
 						constant.KBAppComponentLabelKey:       componentName,
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
@@ -447,8 +450,12 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
 
 		By("Creating mock pods in StatefulSet")
-		pods := mockPodsForConsensusTest(clusterObj, int(comp.Replicas))
-		for _, pod := range pods {
+		pods := mockPodsForTest(clusterObj, int(comp.Replicas))
+		for i, pod := range pods {
+			if comp.ComponentDefRef == replicationCompDefName && i == 0 {
+				By("mocking primary for replication to pass check")
+				pods[0].ObjectMeta.Labels[constant.RoleLabelKey] = "primary"
+			}
 			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			// mock the status to pass the isReady(pod) check in consensus_set
 			pod.Status.Conditions = []corev1.PodCondition{{
@@ -475,11 +482,11 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("Checking Backup created")
-		Eventually(testapps.GetListLen(&testCtx, generics.BackupSignature,
+		Eventually(testapps.List(&testCtx, generics.BackupSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: comp.Name,
-			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(1))
+			}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
 
 		By("Mocking VolumeSnapshot and set it as ReadyToUse")
 		snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
@@ -522,11 +529,11 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("Check backup job cleanup")
-		Eventually(testapps.GetListLen(&testCtx, generics.BackupSignature,
+		Eventually(testapps.List(&testCtx, generics.BackupSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: comp.Name,
-			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
+			}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
 		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
 		checkUpdatedStsReplicas()
@@ -942,9 +949,10 @@ var _ = Describe("Cluster Controller", func() {
 			sts = &stsList.Items[0]
 		}).Should(Succeed())
 
-		By("Creating mock pods in StatefulSet")
-		pods := mockPodsForConsensusTest(clusterObj, replicas)
+		By("Creating mock pods in StatefulSet, and set controller reference")
+		pods := mockPodsForTest(clusterObj, replicas)
 		for _, pod := range pods {
+			Expect(controllerutil.SetControllerReference(sts, &pod, scheme.Scheme)).Should(Succeed())
 			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			// mock the status to pass the isReady(pod) check in consensus_set
 			pod.Status.Conditions = []corev1.PodCondition{{
@@ -980,6 +988,17 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			g.Expect(leaderCount).Should(Equal(1))
 			g.Expect(followerCount).Should(Equal(2))
+		}).Should(Succeed())
+
+		By("Checking pods' annotations")
+		Eventually(func(g Gomega) {
+			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(pods).Should(HaveLen(int(*sts.Spec.Replicas)))
+			for _, pod := range pods {
+				g.Expect(pod.Annotations).ShouldNot(BeNil())
+				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*sts.Spec.Replicas))))
+			}
 		}).Should(Succeed())
 
 		By("Updating StatefulSet's status")
@@ -1194,10 +1213,10 @@ var _ = Describe("Cluster Controller", func() {
 			})
 
 			By("Check deployment workload has been created")
-			Eventually(testapps.GetListLen(&testCtx, generics.DeploymentSignature,
+			Eventually(testapps.List(&testCtx, generics.DeploymentSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterKey.Name,
-				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEquivalentTo(0))
+				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(HaveLen(0))
 
 			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 
@@ -1223,31 +1242,31 @@ var _ = Describe("Cluster Controller", func() {
 			}
 
 			By("Check associated PDB has been created")
-			Eventually(testapps.GetListLen(&testCtx, generics.PodDisruptionBudgetSignature,
+			Eventually(testapps.List(&testCtx, generics.PodDisruptionBudgetSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterKey.Name,
-				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
+				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
 
 			podSpec := stsList.Items[0].Spec.Template.Spec
 			By("Checking created sts pods template with built-in toleration")
 			Expect(podSpec.Tolerations).Should(HaveLen(1))
-			Expect(podSpec.Tolerations[0].Key).To(Equal(constant.KubeBlocksDataNodeTolerationKey))
+			Expect(podSpec.Tolerations[0].Key).To(Equal(testDataPlaneTolerationKey))
 
 			By("Checking created sts pods template with built-in Affinity")
 			Expect(podSpec.Affinity.PodAntiAffinity == nil && podSpec.Affinity.PodAffinity == nil).Should(BeTrue())
 			Expect(podSpec.Affinity.NodeAffinity).ShouldNot(BeNil())
 			Expect(podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).To(
-				Equal(constant.KubeBlocksDataNodeLabelKey))
+				Equal(testDataPlaneNodeAffinityKey))
 
 			By("Checking created sts pods template without TopologySpreadConstraints")
 			Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
 
 			By("Check should create env configmap")
-			Eventually(testapps.GetListLen(&testCtx, generics.ConfigMapSignature,
+			Eventually(testapps.List(&testCtx, generics.ConfigMapSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey:   clusterKey.Name,
 					constant.AppConfigTypeLabelKey: "kubeblocks-env",
-				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
+				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(2))
 		}
 
 		checkAllServicesCreate := func() {
@@ -1383,18 +1402,18 @@ var _ = Describe("Cluster Controller", func() {
 				})
 			})
 
-			Context(fmt.Sprintf("[comp: %s] with pvc", compName), func() {
-				It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
-					testHorizontalScale(compName, compDefName)
-				})
-			})
-
 			// HACK/TODO: only Stateful and Consensus workload types passes following test, need to investigate.
 			//   Would expect that non-stateless workload types should all pass tests.
 			switch compName {
 			case statefulCompName, consensusCompName, replicationCompName:
+				Context(fmt.Sprintf("[comp: %s] with pvc", compName), func() {
+					It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
+						testHorizontalScale(compName, compDefName)
+					})
+				})
+
 				Context(fmt.Sprintf("[comp: %s] with pvc and dynamic-provisioning storage class", compName), func() {
-					It(fmt.Sprintf("[comp: %s] should update PVC request storage size accordingly", compName), func() {
+					It("should update PVC request storage size accordingly", func() {
 						testStorageExpansion(compName, compDefName)
 					})
 				})

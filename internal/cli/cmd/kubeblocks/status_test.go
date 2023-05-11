@@ -21,30 +21,84 @@ package kubeblocks
 
 import (
 	"context"
+	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/spf13/cobra"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("kubeblocks status", func() {
-	var cmd *cobra.Command
-	var streams genericclioptions.IOStreams
-	var tf *cmdtesting.TestFactory
+	var (
+		namespace  = "test"
+		streams    genericclioptions.IOStreams
+		tf         *cmdtesting.TestFactory
+		stsName    = "test-sts"
+		deployName = "test-deploy"
+	)
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
-		tf.Client = &clientfake.RESTClient{}
+		tf = cmdtesting.NewTestFactory().WithNamespace("test")
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+		// add workloads
+		extraLabels := map[string]string{
+			"appName": "JohnSnow",
+			"slogan":  "YouknowNothing",
+		}
+
+		deploy := testing.FakeDeploy(deployName, namespace, extraLabels)
+		deploymentList := &appsv1.DeploymentList{}
+		deploymentList.Items = []appsv1.Deployment{*deploy}
+
+		sts := testing.FakeStatefulSet(stsName, namespace, extraLabels)
+		statefulSetList := &appsv1.StatefulSetList{}
+		statefulSetList.Items = []appsv1.StatefulSet{*sts}
+		stsPods := testing.FakePodForSts(sts)
+
+		job := testing.FakeJob("test-job", namespace, extraLabels)
+		jobList := &batchv1.JobList{}
+		jobList.Items = []batchv1.Job{*job}
+
+		cronjob := testing.FakeCronJob("test-cronjob", namespace, extraLabels)
+		cronjobList := &batchv1.CronJobList{}
+		cronjobList.Items = []batchv1.CronJob{*cronjob}
+
+		httpResp := func(obj runtime.Object) *http.Response {
+			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
+		}
+
+		tf.UnstructuredClient = &clientfake.RESTClient{
+			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
+			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				urlPrefix := "/api/v1/namespaces/" + namespace
+				return map[string]*http.Response{
+					urlPrefix + "/deployments":  httpResp(deploymentList),
+					urlPrefix + "/statefulsets": httpResp(statefulSetList),
+					urlPrefix + "/jobs":         httpResp(jobList),
+					urlPrefix + "/cronjobs":     httpResp(cronjobList),
+					urlPrefix + "/pods":         httpResp(stsPods),
+				}[req.URL.Path], nil
+			}),
+		}
+
+		tf.Client = tf.UnstructuredClient
+		tf.FakeDynamicClient = testing.FakeDynamicClient(deploy, sts)
+		streams = genericclioptions.NewTestIOStreamsDiscard()
 	})
 
 	AfterEach(func() {
@@ -53,7 +107,7 @@ var _ = Describe("kubeblocks status", func() {
 
 	It("pre-run status", func() {
 		var cfg string
-		cmd = newStatusCmd(tf, streams)
+		cmd := newStatusCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
@@ -71,37 +125,39 @@ var _ = Describe("kubeblocks status", func() {
 		Expect(o.showAll).To(Equal(false))
 	})
 
-	It("run status", func() {
-		ns := "demo"
-
-		mockDeploy := func() *appsv1.Deployment {
-			deploy := &appsv1.Deployment{}
-			deploy.SetNamespace(ns)
-			deploy.SetLabels(map[string]string{
-				"app.kubernetes.io/name":    types.KubeBlocksChartName,
-				"app.kubernetes.io/version": "latest",
-			})
-			return deploy
-		}
-
+	It("list resources", func() {
+		clientSet, _ := tf.KubernetesClientSet()
 		o := &statusOptions{
 			IOStreams: streams,
-			ns:        ns,
-			client:    testing.FakeClientSet(mockDeploy()),
+			ns:        namespace,
+			client:    clientSet,
 			mc:        testing.FakeMetricsClientSet(),
-			dynamic:   testing.FakeDynamicClient(mockDeploy()),
+			dynamic:   tf.FakeDynamicClient,
 			showAll:   true,
 		}
 		By("make sure mocked deploy is injected")
 		ctx := context.Background()
-		deploys, err := o.dynamic.Resource(types.DeployGVR()).Namespace(ns).List(ctx, metav1.ListOptions{})
+		deploys, err := o.dynamic.Resource(types.DeployGVR()).Namespace(namespace).List(ctx, metav1.ListOptions{})
 		Expect(err).Should(Succeed())
 		Expect(len(deploys.Items)).Should(BeEquivalentTo(1))
 
+		statefulsets, err := o.dynamic.Resource(types.StatefulSetGVR()).Namespace(namespace).List(ctx, metav1.ListOptions{})
+		Expect(err).Should(Succeed())
+		Expect(len(statefulsets.Items)).Should(BeEquivalentTo(1))
+
 		By("check deployment can be hit by selector")
 		allErrs := make([]error, 0)
-		unstructuredList := listResourceByGVR(ctx, o.dynamic, ns, kubeBlocksWorkloads, selectorList, &allErrs)
-		Expect(len(unstructuredList)).Should(BeEquivalentTo(len(kubeBlocksWorkloads) * len(selectorList)))
+		o.buildSelectorList(ctx, &allErrs)
+		unstructuredList := listResourceByGVR(ctx, o.dynamic, namespace, kubeBlocksWorkloads, o.selectorList, &allErrs)
+		// will list update to five types of worklaods
+		Expect(len(unstructuredList)).Should(BeEquivalentTo(5))
+		for _, list := range unstructuredList {
+			if list.GetKind() == constant.DeploymentKind || list.GetKind() == constant.StatefulSetKind || list.GetKind() == constant.JobKind || list.GetKind() == constant.CronJobKind {
+				Expect(len(list.Items)).Should(BeEquivalentTo(1))
+			} else {
+				Expect(len(list.Items)).Should(BeEquivalentTo(0))
+			}
+		}
 		Expect(o.run()).To(Succeed())
 	})
 })

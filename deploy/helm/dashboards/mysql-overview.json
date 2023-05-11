@@ -26,7 +26,6 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 11323,
   "graphTooltip": 1,
-  "id": 3,
   "links": [
     {
       "asDropdown": false,
@@ -150,13 +149,15 @@
           "datasourceErrors": {},
           "editorMode": "code",
           "errors": {},
+          "exemplar": false,
           "expr": "sum(mysql_global_status_uptime{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
           "format": "time_series",
+          "instant": true,
           "interval": "1m",
           "intervalFactor": 1,
           "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
           "metric": "",
-          "range": true,
+          "range": false,
           "refId": "A",
           "step": 300
         }
@@ -166,6 +167,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$datasource"
       },
       "description": "**Current QPS**\n\nBased on the queries reported by MySQL's ``SHOW STATUS`` command, it is the number of statements executed by the server within the last second. This variable includes statements executed within stored programs, unlike the Questions variable. It does not count \n``COM_PING`` or ``COM_STATISTICS`` commands.",
@@ -237,13 +239,17 @@
             "uid": "$datasource"
           },
           "datasourceErrors": {},
+          "editorMode": "code",
           "errors": {},
+          "exemplar": false,
           "expr": "sum(rate(mysql_global_status_queries{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
           "format": "time_series",
+          "instant": true,
           "interval": "1m",
           "intervalFactor": 1,
           "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
           "metric": "",
+          "range": false,
           "refId": "A",
           "step": 20
         }
@@ -253,6 +259,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$datasource"
       },
       "description": "**InnoDB Buffer Pool Size**\n\nInnoDB maintains a storage area called the buffer pool for caching data and indexes in memory.  Knowing how the InnoDB buffer pool works, and taking advantage of it to keep frequently accessed data in memory, is one of the most important aspects of MySQL tuning. The goal is to keep the working set in memory. In most cases, this should be between 60%-90% of available memory on a dedicated database host, but depends on many factors.",
@@ -324,13 +331,17 @@
             "uid": "$datasource"
           },
           "datasourceErrors": {},
+          "editorMode": "code",
           "errors": {},
+          "exemplar": false,
           "expr": "sum(mysql_global_variables_innodb_buffer_pool_size{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
           "format": "time_series",
+          "instant": true,
           "interval": "1m",
           "intervalFactor": 1,
           "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
           "metric": "",
+          "range": false,
           "refId": "A",
           "step": 300
         }
@@ -1069,8 +1080,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1205,8 +1215,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1401,8 +1410,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1556,8 +1564,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1688,8 +1695,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1812,8 +1818,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2347,8 +2352,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2461,8 +2465,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2570,8 +2573,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2702,8 +2704,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2807,8 +2808,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2964,8 +2964,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3137,8 +3136,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3290,8 +3288,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",

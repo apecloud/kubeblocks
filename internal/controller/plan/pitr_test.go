@@ -66,6 +66,16 @@ var _ = Describe("PITR Functions", func() {
 		testapps.ClearClusterResources(&testCtx)
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
+
+		deletionPropagation := metav1.DeletePropagationBackground
+		deletionGracePeriodSeconds := int64(0)
+		opts := client.DeleteAllOfOptions{
+			DeleteOptions: client.DeleteOptions{
+				GracePeriodSeconds: &deletionGracePeriodSeconds,
+				PropagationPolicy:  &deletionPropagation,
+			},
+		}
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, &opts)
 		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
@@ -121,6 +131,18 @@ var _ = Describe("PITR Functions", func() {
 			pvc = testapps.NewPersistentVolumeClaimFactory(
 				testCtx.DefaultNamespace, "data-"+clusterName+"-"+mysqlCompName+"-0", clusterName, mysqlCompName, "data").
 				SetStorage("1Gi").
+				Create(&testCtx).GetObject()
+
+			By("By mocking a pod")
+			volume := corev1.Volume{Name: pvc.Name, VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}}}
+			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, clusterName+"-"+mysqlCompName+"-0").
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(mysqlCompName).
+				AddAppManangedByLabel().
+				AddVolume(volume).
+				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+				AddNodeName("fake-node-name").
 				Create(&testCtx).GetObject()
 
 			By("By creating backup tool: ")

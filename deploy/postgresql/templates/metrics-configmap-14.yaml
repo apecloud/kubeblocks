@@ -1,0 +1,319 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql14-custom-metrics
+  labels:
+      {{- include "postgresql.labels" . | nindent 4 }}
+data:
+  custom-metrics.yaml: |-
+    pg_postmaster:
+      query: "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()"
+      master: true
+      metrics:
+        - start_time_seconds:
+            usage: "GAUGE"
+            description: "Time at which postmaster started"
+
+    pg_replication:
+      query: |
+        SELECT
+        (case when (not pg_is_in_recovery() or pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn()) then 0 else greatest (0, extract(epoch from (now() - pg_last_xact_replay_timestamp()))) end) as lag,
+        (case when pg_is_in_recovery() then 0 else 1 end) as is_master
+      master: true
+      metrics:
+        - lag:
+            usage: "GAUGE"
+            description: "Replication lag behind master in seconds"
+        - is_master:
+            usage: "GAUGE"
+            description: "Instance is master or slave"
+
+    pg_stat_user_tables:
+      query: |
+        SELECT
+        current_database() datname,
+        schemaname,
+        relname,
+        seq_scan,
+        seq_tup_read,
+        idx_scan,
+        idx_tup_fetch,
+        n_tup_ins,
+        n_tup_upd,
+        n_tup_del,
+        n_tup_hot_upd,
+        n_live_tup,
+        n_dead_tup,
+        n_mod_since_analyze,
+        n_ins_since_vacuum,
+        COALESCE(last_vacuum, '1970-01-01Z') as last_vacuum,
+        COALESCE(last_autovacuum, '1970-01-01Z') as last_autovacuum,
+        COALESCE(last_analyze, '1970-01-01Z') as last_analyze,
+        COALESCE(last_autoanalyze, '1970-01-01Z') as last_autoanalyze,
+        vacuum_count,
+        autovacuum_count,
+        analyze_count,
+        autoanalyze_count
+        FROM
+        pg_stat_user_tables
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of current database"
+        - schemaname:
+            usage: "LABEL"
+            description: "Name of the schema that this table is in"
+        - relname:
+            usage: "LABEL"
+            description: "Name of this table"
+        - seq_scan:
+            usage: "COUNTER"
+            description: "Number of sequential scans initiated on this table"
+        - seq_tup_read:
+            usage: "COUNTER"
+            description: "Number of live rows fetched by sequential scans"
+        - idx_scan:
+            usage: "COUNTER"
+            description: "Number of index scans initiated on this table"
+        - idx_tup_fetch:
+            usage: "COUNTER"
+            description: "Number of live rows fetched by index scans"
+        - n_tup_ins:
+            usage: "COUNTER"
+            description: "Number of rows inserted"
+        - n_tup_upd:
+            usage: "COUNTER"
+            description: "Number of rows updated"
+        - n_tup_del:
+            usage: "COUNTER"
+            description: "Number of rows deleted"
+        - n_tup_hot_upd:
+            usage: "COUNTER"
+            description: "Number of rows HOT updated (i.e., with no separate index update required)"
+        - n_live_tup:
+            usage: "GAUGE"
+            description: "Estimated number of live rows"
+        - n_dead_tup:
+            usage: "GAUGE"
+            description: "Estimated number of dead rows"
+        - n_mod_since_analyze:
+            usage: "GAUGE"
+            description: "Estimated number of rows changed since last analyze"
+        - n_ins_since_vacuum:
+            usage: "GAUGE"
+            description: "Estimated number of rows inserted since this table was last vacuumed"
+        - last_vacuum:
+            usage: "GAUGE"
+            description: "Last time at which this table was manually vacuumed (not counting VACUUM FULL)"
+        - last_autovacuum:
+            usage: "GAUGE"
+            description: "Last time at which this table was vacuumed by the autovacuum daemon"
+        - last_analyze:
+            usage: "GAUGE"
+            description: "Last time at which this table was manually analyzed"
+        - last_autoanalyze:
+            usage: "GAUGE"
+            description: "Last time at which this table was analyzed by the autovacuum daemon"
+        - vacuum_count:
+            usage: "COUNTER"
+            description: "Number of times this table has been manually vacuumed (not counting VACUUM FULL)"
+        - autovacuum_count:
+            usage: "COUNTER"
+            description: "Number of times this table has been vacuumed by the autovacuum daemon"
+        - analyze_count:
+            usage: "COUNTER"
+            description: "Number of times this table has been manually analyzed"
+        - autoanalyze_count:
+            usage: "COUNTER"
+            description: "Number of times this table has been analyzed by the autovacuum daemon"
+
+    pg_statio_user_tables:
+      query: |
+        SELECT
+        current_database() datname,
+        schemaname,
+        relname,
+        heap_blks_read,
+        heap_blks_hit,
+        idx_blks_read,
+        idx_blks_hit,
+        toast_blks_read,
+        toast_blks_hit,
+        tidx_blks_read,
+        tidx_blks_hit
+        FROM
+        pg_statio_user_tables
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of current database"
+        - schemaname:
+            usage: "LABEL"
+            description: "Name of the schema that this table is in"
+        - relname:
+            usage: "LABEL"
+            description: "Name of this table"
+        - heap_blks_read:
+            usage: "COUNTER"
+            description: "Number of disk blocks read from this table"
+        - heap_blks_hit:
+            usage: "COUNTER"
+            description: "Number of buffer hits in this table"
+        - idx_blks_read:
+            usage: "COUNTER"
+            description: "Number of disk blocks read from all indexes on this table"
+        - idx_blks_hit:
+            usage: "COUNTER"
+            description: "Number of buffer hits in all indexes on this table"
+        - toast_blks_read:
+            usage: "COUNTER"
+            description: "Number of disk blocks read from this table's TOAST table (if any)"
+        - toast_blks_hit:
+            usage: "COUNTER"
+            description: "Number of buffer hits in this table's TOAST table (if any)"
+        - tidx_blks_read:
+            usage: "COUNTER"
+            description: "Number of disk blocks read from this table's TOAST table indexes (if any)"
+        - tidx_blks_hit:
+            usage: "COUNTER"
+            description: "Number of buffer hits in this table's TOAST table indexes (if any)"
+
+    # WARNING: This set of metrics can be very expensive on a busy server as every unique query executed will create an additional time series
+    pg_stat_statements:
+      query: |
+        SELECT
+        t2.rolname,
+        t3.datname,
+        queryid,
+        plans,
+        total_plan_time / 1000 as total_plan_time_seconds,
+        min_plan_time / 1000 as min_plan_time_seconds,
+        max_plan_time / 1000 as max_plan_time_seconds,
+        mean_plan_time / 1000 as mean_plan_time_seconds,
+        stddev_plan_time / 1000 as stddev_plan_time_seconds,
+        calls,
+        total_exec_time / 1000 as total_exec_time_seconds,
+        min_exec_time / 1000 as min_exec_time_seconds,
+        max_exec_time / 1000 as max_exec_time_seconds,
+        mean_exec_time / 1000 as mean_exec_time_seconds,
+        stddev_exec_time / 1000 as stddev_exec_time_seconds,
+        rows,
+        shared_blks_hit,
+        shared_blks_read,
+        shared_blks_dirtied,
+        shared_blks_written,
+        local_blks_hit,
+        local_blks_read,
+        local_blks_dirtied,
+        local_blks_written,
+        temp_blks_read,
+        temp_blks_written,
+        blk_read_time / 1000 as blk_read_time_seconds,
+        blk_write_time / 1000 as blk_write_time_seconds,
+        wal_records,
+        wal_fpi,
+        wal_bytes
+        FROM
+        pg_stat_statements t1
+        JOIN
+        pg_roles t2
+        ON (t1.userid=t2.oid)
+        JOIN
+        pg_database t3
+        ON (t1.dbid=t3.oid)
+        WHERE t2.rolname != 'rdsadmin'
+      master: true
+      metrics:
+        - rolname:
+            usage: "LABEL"
+            description: "Name of user"
+        - datname:
+            usage: "LABEL"
+            description: "Name of database"
+        - queryid:
+            usage: "LABEL"
+            description: "Query ID"
+        - plans:
+            usage: "COUNTER"
+            description: "Number of times the statement was planned"
+        - total_plan_time_seconds:
+            usage: "COUNTER"
+            description: "Total time spent planning the statement"
+        - min_plan_time_seconds:
+            usage: "GAUGE"
+            description: "Minimum time spent planning the statement"
+        - max_plan_time_seconds:
+            usage: "GAUGE"
+            description: "Maximum time spent planning the statement"
+        - mean_plan_time_seconds:
+            usage: "GAUGE"
+            description: "Mean time spent planning the statement"
+        - stddev_plan_time_seconds:
+            usage: "GAUGE"
+            description: "Population standard deviation of time spent planning the statement"
+        - calls:
+            usage: "COUNTER"
+            description: "Number of times executed"
+        - total_exec_time_seconds:
+            usage: "COUNTER"
+            description: "Total time spent in the statement"
+        - min_exec_time_seconds:
+            usage: "GAUGE"
+            description: "Minimum time spent in the statement"
+        - max_exec_time_seconds:
+            usage: "GAUGE"
+            description: "Maximum time spent in the statement"
+        - mean_exec_time_seconds:
+            usage: "GAUGE"
+            description: "Mean time spent in the statement"
+        - stddev_exec_time_seconds:
+            usage: "GAUGE"
+            description: "Population standard deviation of time spent in the statement"
+        - rows:
+            usage: "COUNTER"
+            description: "Total number of rows retrieved or affected by the statement"
+        - shared_blks_hit:
+            usage: "COUNTER"
+            description: "Total number of shared block cache hits by the statement"
+        - shared_blks_read:
+            usage: "COUNTER"
+            description: "Total number of shared blocks read by the statement"
+        - shared_blks_dirtied:
+            usage: "COUNTER"
+            description: "Total number of shared blocks dirtied by the statement"
+        - shared_blks_written:
+            usage: "COUNTER"
+            description: "Total number of shared blocks written by the statement"
+        - local_blks_hit:
+            usage: "COUNTER"
+            description: "Total number of local block cache hits by the statement"
+        - local_blks_read:
+            usage: "COUNTER"
+            description: "Total number of local blocks read by the statement"
+        - local_blks_dirtied:
+            usage: "COUNTER"
+            description: "Total number of local blocks dirtied by the statement"
+        - local_blks_written:
+            usage: "COUNTER"
+            description: "Total number of local blocks written by the statement"
+        - temp_blks_read:
+            usage: "COUNTER"
+            description: "Total number of temp blocks read by the statement"
+        - temp_blks_written:
+            usage: "COUNTER"
+            description: "Total number of temp blocks written by the statement"
+        - blk_read_time_seconds:
+            usage: "COUNTER"
+            description: "Total time the statement spent reading blocks, in milliseconds (if track_io_timing is enabled, otherwise zero)"
+        - blk_write_time_seconds:
+            usage: "COUNTER"
+            description: "Total time the statement spent writing blocks, in milliseconds (if track_io_timing is enabled, otherwise zero)"
+        - wal_records:
+            usage: "COUNTER"
+            description: "Total number of WAL records generated by the statement"
+        - wal_fpi:
+            usage: "COUNTER"
+            description: "Total number of WAL full page images generated by the statement"
+        - wal_bytes:
+            usage: "COUNTER"
+            description: "Total amount of WAL generated by the statement in bytes"

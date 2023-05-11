@@ -55,7 +55,6 @@ spec:
           values:
             - aliyun
       replicas: 1
-      storageClass: alicloud-disk-efficiency
       resources:
         requests:
           storage: 20Gi

@@ -23,8 +23,10 @@ import (
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -36,6 +38,9 @@ const (
 	CliDefaultHome = ".kbcli"
 	// CliHomeEnv defines kbcli home system env
 	CliHomeEnv = "KBCLI_HOME"
+
+	// DefaultLogFilePrefix is the default log file prefix
+	DefaultLogFilePrefix = "kbcli"
 
 	// DefaultNamespace is the namespace where kubeblocks is installed if
 	// no other namespace is specified
@@ -55,7 +60,16 @@ const (
 	ResourceDeployments  = "deployments"
 	ResourceConfigmaps   = "configmaps"
 	ResourceStatefulSets = "statefulsets"
+	ResourceDaemonSets   = "daemonsets"
 	ResourceSecrets      = "secrets"
+)
+
+// K8s batch API group
+const (
+	K8SBatchAPIGroup   = batchv1.GroupName
+	K8sBatchAPIVersion = "v1"
+	ResourceJobs       = "jobs"
+	ResourceCronJobs   = "cronjobs"
 )
 
 // K8s webhook API group
@@ -107,17 +121,17 @@ const (
 
 	ClassProviderLabelKey              = "class.kubeblocks.io/provider"
 	ResourceConstraintProviderLabelKey = "resourceconstraint.kubeblocks.io/provider"
+	ReloadConfigMapAnnotationKey       = "kubeblocks.io/reload-configmap" // mark an annotation to load configmap
 )
 
 // DataProtection API group
 const (
-	DPAPIGroup                    = "dataprotection.kubeblocks.io"
-	DPAPIVersion                  = "v1alpha1"
-	ResourceBackups               = "backups"
-	ResourceBackupTools           = "backuptools"
-	ResourceRestoreJobs           = "restorejobs"
-	ResourceBackupPolicies        = "backuppolicies"
-	ResourceBackupPolicyTemplates = "backuppolicytemplates"
+	DPAPIGroup             = "dataprotection.kubeblocks.io"
+	DPAPIVersion           = "v1alpha1"
+	ResourceBackups        = "backups"
+	ResourceBackupTools    = "backuptools"
+	ResourceRestoreJobs    = "restorejobs"
+	ResourceBackupPolicies = "backuppolicies"
 )
 
 // Extensions API group
@@ -254,6 +268,10 @@ func StatefulSetGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: K8sCoreAPIVersion, Resource: ResourceStatefulSets}
 }
 
+func DaemonSetGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: K8sCoreAPIVersion, Resource: ResourceDaemonSets}
+}
+
 func DeployGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: K8sCoreAPIVersion, Resource: ResourceDeployments}
 }
@@ -347,4 +365,11 @@ func CustomResourceDefinitionGVR() schema.GroupVersionResource {
 		Version:  CustomResourceDefinitionAPIVersion,
 		Resource: ResourceCustomResourceDefinition,
 	}
+}
+
+func JobGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: K8SBatchAPIGroup, Version: K8sBatchAPIVersion, Resource: ResourceJobs}
+}
+func CronJobGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: K8SBatchAPIGroup, Version: K8sBatchAPIVersion, Resource: ResourceCronJobs}
 }

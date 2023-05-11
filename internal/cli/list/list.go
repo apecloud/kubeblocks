@@ -63,8 +63,8 @@ type ListOptions struct {
 
 	// print the result or not, if true, use default printer to print, otherwise,
 	// only return the result to caller.
-	Print bool
-
+	Print  bool
+	SortBy string
 	genericclioptions.IOStreams
 }
 
@@ -75,6 +75,7 @@ func NewListOptions(f cmdutil.Factory, streams genericclioptions.IOStreams,
 		IOStreams: streams,
 		GVR:       gvr,
 		Print:     true,
+		SortBy:    ".metadata.name",
 	}
 }
 
@@ -84,6 +85,7 @@ func (o *ListOptions) AddFlags(cmd *cobra.Command, isClusterScope ...bool) {
 	}
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
 	cmd.Flags().BoolVar(&o.ShowLabels, "show-labels", false, "When printing, show all labels as the last column (default hide labels column)")
+	//Todo: --sortBy supports custom field sorting, now `list` is to sort using the `.metadata.name` field in default
 	printer.AddOutputFlag(cmd, &o.Format)
 }
 
@@ -130,6 +132,7 @@ func (o *ListOptions) Complete() error {
 		}
 
 		if o.Format.IsHumanReadable() {
+			p = &cmdget.SortingPrinter{Delegate: p, SortField: o.SortBy}
 			p = &cmdget.TablePrinter{Delegate: p}
 		}
 		return p.PrintObj, nil
@@ -178,6 +181,9 @@ func (o *ListOptions) transformRequests(req *rest.Request) {
 		fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1beta1.SchemeGroupVersion.Version, metav1beta1.GroupName),
 		"application/json",
 	}, ","))
+	if len(o.SortBy) > 0 {
+		req.Param("includeObject", "Object")
+	}
 }
 
 func (o *ListOptions) printResult(r *resource.Result) error {

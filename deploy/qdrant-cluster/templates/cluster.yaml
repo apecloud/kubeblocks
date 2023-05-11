@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "qdrant.fullname" . }}
   labels: {{ include "qdrant.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: qdrant # ref clusterdefinition.name

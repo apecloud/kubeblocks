@@ -345,18 +345,21 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 		mappingName("primary", sc))).Should(BeElementOf(mergedValues.SetValues))
 }
 
-func TestAddonSpecMisc(t *testing.T) {
+func TestAddonMisc(t *testing.T) {
 	g := NewGomegaWithT(t)
-	addonSpec := AddonSpec{}
-	g.Expect(addonSpec.InstallSpec.GetEnabled()).Should(BeFalse())
-	g.Expect(addonSpec.Helm.BuildMergedValues(nil)).Should(BeEquivalentTo(HelmInstallValues{}))
-	addonSpec.InstallSpec = &AddonInstallSpec{
+	addon := Addon{}
+	g.Expect(addon.GetExtraNames()).Should(BeEmpty())
+	g.Expect(addon.Spec.Installable.GetSelectorsStrings()).Should(BeEmpty())
+	g.Expect(addon.Spec.InstallSpec.GetEnabled()).Should(BeFalse())
+	g.Expect(addon.Spec.Helm.BuildMergedValues(nil)).Should(BeEquivalentTo(HelmInstallValues{}))
+
+	addon.Spec.InstallSpec = &AddonInstallSpec{
 		Enabled:              true,
 		AddonInstallSpecItem: NewAddonInstallSpecItem(),
 	}
-	g.Expect(addonSpec.InstallSpec.GetEnabled()).Should(BeTrue())
+	g.Expect(addon.Spec.InstallSpec.GetEnabled()).Should(BeTrue())
 
-	addonSpec.DefaultInstallValues = []AddonDefaultInstallSpecItem{
+	addon.Spec.DefaultInstallValues = []AddonDefaultInstallSpecItem{
 		{
 			AddonInstallSpec: AddonInstallSpec{
 				Enabled: true,
@@ -376,6 +379,32 @@ func TestAddonSpecMisc(t *testing.T) {
 		},
 	}
 
-	di := addonSpec.GetSortedDefaultInstallValues()
+	di := addon.Spec.GetSortedDefaultInstallValues()
 	g.Expect(di).Should(HaveLen(2))
+}
+
+func TestAddonInstallHasSetValues(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	installSpec := &AddonInstallSpec{
+		Enabled: true,
+		ExtraItems: []AddonInstallExtraItem{
+			{
+				Name: "extra",
+			},
+		},
+	}
+
+	g.Expect(installSpec.IsDisabled()).Should(BeFalse())
+	g.Expect(installSpec.HasSetValues()).Should(BeFalse())
+	installSpec.ExtraItems[0].AddonInstallSpecItem = AddonInstallSpecItem{
+		StorageClass: "sc",
+	}
+	g.Expect(installSpec.HasSetValues()).Should(BeTrue())
+	installSpec.ExtraItems = nil
+	g.Expect(installSpec.HasSetValues()).Should(BeFalse())
+	installSpec.AddonInstallSpecItem = AddonInstallSpecItem{
+		StorageClass: "sc",
+	}
+	g.Expect(installSpec.HasSetValues()).Should(BeTrue())
 }

@@ -5,14 +5,14 @@ title: kbcli cluster upgrade
 Upgrade the cluster version.
 
 ```
-kbcli cluster upgrade [flags]
+kbcli cluster upgrade NAME [flags]
 ```
 
 ### Examples
 
 ```
   # upgrade the cluster to the specified version
-  kbcli cluster upgrade <my-cluster> --cluster-version=<cluster-version>
+  kbcli cluster upgrade mycluster --cluster-version=ac-mysql-8.0.30
 ```
 
 ### Options

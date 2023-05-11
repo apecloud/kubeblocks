@@ -40,7 +40,7 @@ import (
 )
 
 type configEditContext struct {
-	create.BaseOptions
+	create.CreateOptions
 
 	clusterName    string
 	componentName  string
@@ -99,9 +99,9 @@ func (c *configEditContext) getUnifiedDiffString() (string, error) {
 	return difflib.GetUnifiedDiffString(diff)
 }
 
-func newConfigContext(baseOptions create.BaseOptions, clusterName, componentName, configSpec, file string) *configEditContext {
+func newConfigContext(baseOptions create.CreateOptions, clusterName, componentName, configSpec, file string) *configEditContext {
 	return &configEditContext{
-		BaseOptions:    baseOptions,
+		CreateOptions:  baseOptions,
 		clusterName:    clusterName,
 		componentName:  componentName,
 		configSpecName: configSpec,

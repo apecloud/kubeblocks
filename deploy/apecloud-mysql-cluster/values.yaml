@@ -37,7 +37,7 @@ persistence:
   enabled: true
   data:
     storageClassName:
-    size: 1Gi
+    size: 20Gi
   # separate log volume for WAL log
   wal:
     enabled: false
@@ -61,3 +61,7 @@ topologyKeys:
 ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
 ##
 tolerations: [ ]
+
+# The RABC permission used by cluster component pod, now include event.create
+serviceAccount:
+  name: ""

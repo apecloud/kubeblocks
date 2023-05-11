@@ -145,9 +145,7 @@ func (o *ListOptions) Run() (*resource.Result, error) {
 	if err := o.Complete(); err != nil {
 		return nil, err
 	}
-	if len(o.LabelSelector) != 0 {
-		o.LabelSelector = fmt.Sprintf("app.kubernetes.io/name= %s", o.LabelSelector)
-	}
+
 	r := o.Factory.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).

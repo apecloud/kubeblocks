@@ -40,12 +40,6 @@ var (
 	listComponentsExample = templates.Examples(`
 		# List all components belong to the cluster definition.
 		kbcli clusterdefinition list-components apecloud-mysql`)
-
-	componentsTableHeader = []interface{}{
-		"Name",
-		"WorkloadType",
-		"CharacterType",
-	}
 )
 
 func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

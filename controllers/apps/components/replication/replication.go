@@ -179,10 +179,8 @@ func syncReplicationPodRoleLabel(ctx context.Context, cli client.Client, sts *ap
 		// if there is no role label on the Pod, it needs to be patch role label.
 		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
 			updateRolePodList = append(updateRolePodList, pod)
-		} else {
-			if v == constant.Primary {
-				existPrimary = true
-			}
+		} else if v == constant.Primary {
+			existPrimary = true
 		}
 	}
 	if len(updateRolePodList) > 0 {

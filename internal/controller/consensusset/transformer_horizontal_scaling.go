@@ -39,7 +39,7 @@ import (
 // HorizontalScalingTransformer handles horizontal scaling.
 // mental model: event driven FSM,
 // i.e., reconciliation event -> calculate current state -> do corresponding action
-type HorizontalScalingTransformer struct {}
+type HorizontalScalingTransformer struct{}
 
 func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*CSSetTransformContext)
@@ -56,6 +56,8 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 }
 
 func scaleIn(transCtx *CSSetTransformContext, dag *graph.DAG, csSet *workloads.ConsensusSet) error {
+	// prepare meta info
+	// get switchover control jobs
 	switchoverJobList := &batchv1.JobList{}
 	ml := client.MatchingLabels{
 		model.AppInstanceLabelKey: csSet.Name,
@@ -66,11 +68,13 @@ func scaleIn(transCtx *CSSetTransformContext, dag *graph.DAG, csSet *workloads.C
 	if err := transCtx.Client.List(transCtx.Context, switchoverJobList, ml); err != nil {
 		return err
 	}
+	// get member-leave control jobs
 	memberLeaveJobList := &batchv1.JobList{}
 	ml[jobTypeLabel] = jobTypeMemberLeaveNotifying
 	if err := transCtx.Client.List(transCtx.Context, memberLeaveJobList, ml); err != nil {
 		return err
 	}
+	// get the underlying sts
 	vertices := model.FindAll[*apps.StatefulSet](dag)
 	if len(vertices) != 1 {
 		return fmt.Errorf("unexpected sts found, expected 1, but found: %d", len(vertices))
@@ -83,14 +87,12 @@ func scaleIn(transCtx *CSSetTransformContext, dag *graph.DAG, csSet *workloads.C
 	stsVertex.Immutable = true
 
 	memberLeaveControlAction := func(csSet *workloads.ConsensusSet, d *graph.DAG) (bool, error) {
-		if shouldDoMemberLeaveNotifying(csSet) {
-			if err := doMemberLeaveNotifying(csSet, dag); err != nil {
-				return true, err
-			}
-			return true, nil
+		if !shouldDoMemberLeaveNotifying(csSet) {
+			return false, nil
 		}
-		return false, nil
+		return true, doMemberLeaveNotifying(csSet, dag)
 	}
+
 	switch {
 	case stateBeginning(switchoverJobList, memberLeaveJobList):
 		return doBeginningAction(transCtx, dag, stsVertex)
@@ -158,7 +160,7 @@ func doAbnormalAnalysis(transCtx *CSSetTransformContext, pods []corev1.Pod, role
 		}
 		if role, ok := roleMap[roleName]; ok {
 			if role.IsLeader {
-				leaderCount ++
+				leaderCount++
 			}
 		}
 	}
@@ -223,7 +225,7 @@ func doControlJob(csSet *workloads.ConsensusSet, dag *graph.DAG, jobType string)
 		SetPodTemplateSpec(*template).
 		GetObject()
 	jobVertex := &model.ObjectVertex{
-		Obj: job,
+		Obj:    job,
 		Action: model.ActionPtr(model.CREATE),
 	}
 	dag.AddConnectRoot(jobVertex)
@@ -234,10 +236,10 @@ func buildJobPodTemplate(csSet *workloads.ConsensusSet, jobType string) *corev1.
 	reconfiguration := csSet.Spec.MembershipReconfiguration
 	image := findJobImage(reconfiguration, jobType)
 	container := corev1.Container{
-		Name: jobType,
-		Image: image,
+		Name:            jobType,
+		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command: reconfiguration.SwitchoverAction.Command,
+		Command:         reconfiguration.SwitchoverAction.Command,
 	}
 	template := &corev1.PodTemplateSpec{
 		Spec: corev1.PodSpec{
@@ -337,7 +339,7 @@ func stateControlJobSuccess(job batchv1.Job) bool {
 }
 
 func emitControlJobFailedEvent(transCtx *CSSetTransformContext, jobType string) {
-	transCtx.EventRecorder.Event(transCtx.CSSet, corev1.EventTypeWarning, strings.ToUpper(jobTypeSwitchover), jobType +" failed")
+	transCtx.EventRecorder.Event(transCtx.CSSet, corev1.EventTypeWarning, strings.ToUpper(jobTypeSwitchover), jobType+" failed")
 }
 
 func doControlJobCleanup(dag *graph.DAG, job batchv1.Job) {
@@ -356,7 +358,7 @@ func doControlJobCleanup(dag *graph.DAG, job batchv1.Job) {
 
 	// succeeded job: be deleted
 	vertex := &model.ObjectVertex{
-		Obj: &job,
+		Obj:    &job,
 		Action: model.ActionPtr(model.DELETE),
 	}
 	dag.AddConnectRoot(vertex)

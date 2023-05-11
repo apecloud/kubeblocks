@@ -96,7 +96,7 @@ func (o *pluginInstallOption) install() error {
 	var returnErr error
 	for _, entry := range o.plugins {
 		plugin := entry.plugin
-		fmt.Fprintf(os.Stderr, "Installing plugin: %s\n", plugin.Name)
+		fmt.Fprintf(o.Out, "Installing plugin: %s\n", plugin.Name)
 		err := Install(paths, plugin, entry.index, InstallOpts{})
 		if err == ErrIsAlreadyInstalled {
 			klog.Warningf("Skipping plugin %q, it is already installed", plugin.Name)
@@ -110,7 +110,7 @@ func (o *pluginInstallOption) install() error {
 			failed = append(failed, plugin.Name)
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "Installed plugin: %s\n", plugin.Name)
+		fmt.Fprintf(o.Out, "Installed plugin: %s\n", plugin.Name)
 		output := fmt.Sprintf("Use this plugin:\n\tkubectl %s\n", plugin.Name)
 		if plugin.Spec.Homepage != "" {
 			output += fmt.Sprintf("Documentation:\n\t%s\n", plugin.Spec.Homepage)
@@ -118,7 +118,7 @@ func (o *pluginInstallOption) install() error {
 		if plugin.Spec.Caveats != "" {
 			output += fmt.Sprintf("Caveats:\n%s\n", indent(plugin.Spec.Caveats))
 		}
-		fmt.Fprintln(os.Stderr, indent(output))
+		fmt.Fprintln(o.Out, indent(output))
 	}
 	if len(failed) > 0 {
 		return errors.Wrapf(returnErr, "failed to install some plugins: %+v", failed)

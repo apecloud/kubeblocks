@@ -299,6 +299,7 @@ spec:
     volumeClaimTemplates:
     - name: data
       spec:
+        storageClassName: standard
         resources:
           requests:
             storage: 1Gi

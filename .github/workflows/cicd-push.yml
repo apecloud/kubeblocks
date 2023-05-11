@@ -175,6 +175,7 @@ jobs:
       IMG: "apecloud/kubeblocks"
       VERSION: "check"
       GO_VERSION: "1.20"
+      BUILDX_PLATFORMS: "linux/amd64"
     secrets: inherit
 
   check-tools-image:
@@ -188,6 +189,7 @@ jobs:
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "check"
       GO_VERSION: "1.20"
+      BUILDX_PLATFORMS: "linux/amd64"
     secrets: inherit
 
   check-helm:

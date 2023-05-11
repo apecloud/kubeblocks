@@ -150,15 +150,14 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		sendWaringEventWithError(c.transCtx.GetRecorder(), c.transCtx.Cluster, ReasonApplyResourcesFailed, err)
 	}()
 
-	// new a DAG and apply chain on it, after that we should get the final Plan
+	// new a DAG and apply chain on it
 	dag := graph.NewDAG()
 	err = c.transformers.ApplyTo(c.transCtx, dag)
-	// log for debug
-	c.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
+	c.transCtx.Logger.V(1).Info(fmt.Sprintf("DAG: %s", dag))
 	// add dag to clusterPlanBuilder
 	c.dag = dag
 
-	// we got the execution plan
+	// construct execution plan
 	plan := &clusterPlan{
 		dag:      dag,
 		walkFunc: c.defaultWalkFunc,
@@ -181,10 +180,11 @@ func (p *clusterPlan) Execute() error {
 }
 
 func (p *clusterPlan) handlePlanExecutionError(err error) error {
+	clusterCopy := p.transCtx.OrigCluster.DeepCopy()
 	condition := newFailedApplyResourcesCondition(err)
-	meta.SetStatusCondition(&p.transCtx.Cluster.Status.Conditions, condition)
-	sendWaringEventWithError(p.transCtx.GetRecorder(), p.transCtx.Cluster, ReasonApplyResourcesFailed, err)
-	return p.cli.Status().Patch(p.transCtx.Context, p.transCtx.Cluster, client.MergeFrom(p.transCtx.OrigCluster.DeepCopy()))
+	meta.SetStatusCondition(&clusterCopy.Status.Conditions, condition)
+	sendWaringEventWithError(p.transCtx.GetRecorder(), clusterCopy, ReasonApplyResourcesFailed, err)
+	return p.cli.Status().Patch(p.transCtx.Context, clusterCopy, client.MergeFrom(p.transCtx.OrigCluster))
 }
 
 // Do the real works

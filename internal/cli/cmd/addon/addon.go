@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -745,6 +746,28 @@ func addonListRun(o *list.ListOptions) error {
 	}
 
 	printRows := func(tbl *printer.TablePrinter) error {
+		// sort addons with .status.Phase then .metadata.name
+		sort.SliceStable(infos, func(i, j int) bool {
+			toAddon := func(idx int) *extensionsv1alpha1.Addon {
+				addon := &extensionsv1alpha1.Addon{}
+				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(infos[idx].Object.(*unstructured.Unstructured).Object, addon); err != nil {
+					return nil
+				}
+				return addon
+			}
+			iAddon := toAddon(i)
+			jAddon := toAddon(j)
+			if iAddon == nil {
+				return true
+			}
+			if jAddon == nil {
+				return false
+			}
+			if iAddon.Status.Phase == jAddon.Status.Phase {
+				return iAddon.GetName() < jAddon.GetName()
+			}
+			return iAddon.Status.Phase < jAddon.Status.Phase
+		})
 		for _, info := range infos {
 			addon := &extensionsv1alpha1.Addon{}
 			obj := info.Object.(*unstructured.Unstructured)

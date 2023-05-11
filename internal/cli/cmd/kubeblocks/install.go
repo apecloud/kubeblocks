@@ -389,7 +389,7 @@ func (o *InstallOptions) preCheck(v util.Version) error {
 	}
 
 	// check kbcli version, now do nothing
-	fmt.Fprintf(o.Out, "Kbcli version %s\n", v.Cli)
+	fmt.Fprintf(o.Out, "kbcli version %s\n", v.Cli)
 
 	return nil
 }

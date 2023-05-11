@@ -45,7 +45,7 @@ type ExtendAnalyze struct {
 	// StorageClass is to determine the correctness of target storage class
 	// +optional
 	StorageClass *KBStorageClassAnalyze `json:"storageClass,omitempty"`
-	// StorageClass is to determine the correctness of target storage class
+	// Taint is to Determine the matching between the taint and tolerance
 	// +optional
 	Taint *KBTaintAnalyze `json:"taint,omitempty"`
 }

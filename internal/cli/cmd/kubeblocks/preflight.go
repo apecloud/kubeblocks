@@ -238,8 +238,10 @@ func (p *PreflightOptions) run() error {
 		fmt.Fprintln(p.Out, "no data has been collected")
 		return nil
 	}
-	err = kbpreflight.ShowTextResults(preflightName, analyzeResults, *p.Format, p.verbose)
-	return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
+	if err = kbpreflight.ShowTextResults(preflightName, analyzeResults, *p.Format, p.verbose); err != nil {
+		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
+	}
+	return nil
 }
 
 func CollectProgress(ctx context.Context, progressCh <-chan interface{}, verbose bool) func() error {

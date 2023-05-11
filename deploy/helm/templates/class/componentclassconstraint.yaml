@@ -4,7 +4,7 @@ metadata:
   name: kb-resource-constraint-general
   labels:
     resourceconstraint.kubeblocks.io/provider: kubeblocks
-    {{ include "kubeblocks.labels" $ | indent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
   constraints:
   - cpu:
@@ -31,7 +31,7 @@ metadata:
   name: kb-resource-constraint-memory-optimized
   labels:
     resourceconstraint.kubeblocks.io/provider: kubeblocks
-    {{ include "kubeblocks.labels" $ | indent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
   constraints:
   - cpu:

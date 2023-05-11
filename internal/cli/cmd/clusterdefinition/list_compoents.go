@@ -96,10 +96,11 @@ func run(o *list.ListOptions) error {
 			return err
 		}
 		for _, comp := range cd.Spec.ComponentDefs {
-			row := make([]interface{}, len(componentsTableHeader))
-			row[0] = comp.Name
-			row[1] = comp.WorkloadType
-			row[2] = comp.CharacterType
+			row := []interface{}{
+				comp.Name,
+				comp.WorkloadType,
+				comp.CharacterType,
+			}
 			p.AddRow(row...)
 		}
 	}

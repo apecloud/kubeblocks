@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package consensusset
 
 import (
+	"context"
 	"sort"
 	"strings"
 
@@ -29,7 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -156,4 +159,23 @@ func ownedKinds() []client.ObjectList {
 		&corev1.ConfigMapList{},
 		&policyv1.PodDisruptionBudgetList{},
 	}
+}
+
+func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList,
+		&client.ListOptions{Namespace: stsObj.Namespace},
+		client.MatchingLabels{
+			model.KBManagedByKey:      stsObj.Labels[model.KBManagedByKey],
+			model.AppInstanceLabelKey: stsObj.Labels[model.AppInstanceLabelKey],
+		}); err != nil {
+		return nil, err
+	}
+	var pods []corev1.Pod
+	for _, pod := range podList.Items {
+		if util.IsMemberOf(stsObj, &pod) {
+			pods = append(pods, pod)
+		}
+	}
+	return pods, nil
 }

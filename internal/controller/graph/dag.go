@@ -134,6 +134,15 @@ func (d *DAG) AddConnect(from, to Vertex) bool {
 	return d.Connect(from, to)
 }
 
+// AddConnectRoot add 'v' to the DAG 'd' and connect root to 'v'
+func (d *DAG) AddConnectRoot(v Vertex) bool {
+	root := d.Root()
+	if root == nil {
+		return false
+	}
+	return d.AddConnect(root, v)
+}
+
 // WalkTopoOrder walk the DAG 'd' in topology order
 func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 	if err := d.validate(); err != nil {

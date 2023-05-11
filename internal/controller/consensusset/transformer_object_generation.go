@@ -190,7 +190,7 @@ func buildHeadlessSvc(csSet workloads.ConsensusSet) *corev1.Service {
 
 func buildSts(csSet workloads.ConsensusSet, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
 	stsBuilder := builder.NewStatefulSetBuilder(csSet.Namespace, csSet.Name)
-	template := buildPodTemplate(csSet, envConfig)
+	template := buildStsPodTemplate(csSet, envConfig)
 	stsBuilder.AddLabels(model.AppInstanceLabelKey, csSet.Name).
 		AddLabels(model.KBManagedByKey, kindConsensusSet).
 		AddMatchLabel(model.AppInstanceLabelKey, csSet.Name).
@@ -213,7 +213,7 @@ func buildEnvConfigMap(csSet workloads.ConsensusSet) *corev1.ConfigMap {
 		SetData(envData).GetObject()
 }
 
-func buildPodTemplate(csSet workloads.ConsensusSet, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
+func buildStsPodTemplate(csSet workloads.ConsensusSet, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
 	template := csSet.Spec.Template
 	labels := template.Labels
 	if labels == nil {
@@ -242,6 +242,7 @@ func buildPodTemplate(csSet workloads.ConsensusSet, envConfig corev1.ConfigMap) 
 
 func injectRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec) {
 	roleObservation := csSet.Spec.RoleObservation
+	credential := csSet.Spec.Credential
 	bindingType := customBinding
 	if roleObservation.BuiltIn != nil {
 		bindingType = roleObservation.BuiltIn.BindingType
@@ -250,17 +251,17 @@ func injectRoleObservationContainer(csSet workloads.ConsensusSet, template *core
 		}
 	}
 	credentialEnv := make([]corev1.EnvVar, 0)
-	if roleObservation.Credential != nil {
+	if credential != nil {
 		credentialEnv = append(credentialEnv,
 			corev1.EnvVar{
 				Name:      usernameCredentialVarName,
-				Value:     roleObservation.Credential.Username.Value,
-				ValueFrom: roleObservation.Credential.Username.ValueFrom,
+				Value:     credential.Username.Value,
+				ValueFrom: credential.Username.ValueFrom,
 			},
 			corev1.EnvVar{
 				Name:      passwordCredentialVarName,
-				Value:     roleObservation.Credential.Password.Value,
-				ValueFrom: roleObservation.Credential.Password.ValueFrom,
+				Value:     credential.Password.Value,
+				ValueFrom: credential.Password.ValueFrom,
 			})
 	}
 	actionSvcPorts := make([]int32, 0)
@@ -307,6 +308,7 @@ func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
 func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, bindingType workloads.BindingType, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role observation container
 	roleObservation := csSet.Spec.RoleObservation
+	credential := csSet.Spec.Credential
 	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
 	if len(image) == 0 {
 		image = defaultRoleObservationImage
@@ -322,18 +324,18 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 			Name:  actionSvcListVarName,
 			Value: actionSvcList,
 		})
-	if roleObservation.Credential != nil {
+	if credential != nil {
 		// for compatibility with old probe env var names
 		env = append(env,
 			corev1.EnvVar{
 				Name:      "KB_SERVICE_USER",
-				Value:     roleObservation.Credential.Username.Value,
-				ValueFrom: roleObservation.Credential.Username.ValueFrom,
+				Value:     credential.Username.Value,
+				ValueFrom: credential.Username.ValueFrom,
 			},
 			corev1.EnvVar{
 				Name:      "KB_SERVICE_PASSWORD",
-				Value:     roleObservation.Credential.Password.Value,
-				ValueFrom: roleObservation.Credential.Password.ValueFrom,
+				Value:     credential.Password.Value,
+				ValueFrom: credential.Password.ValueFrom,
 			})
 	}
 	// find service port of th db engine

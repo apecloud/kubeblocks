@@ -37,6 +37,17 @@ const (
 
 	csSetFinalizerName = "cs.workloads.kubeblocks.io/finalizer"
 
+	jobHandledLabel             = "cs.workloads.kubeblocks.io/job-handled"
+	jobNameLabel                = "cs.workloads.kubeblocks.io/job-name"
+	jobTypeLabel                = "cs.workloads.kubeblocks.io/job-type"
+	jobHandledTrue              = "true"
+	jobHandledFalse             = "false"
+	jobTypeSwitchover           = "switchover"
+	jobTypeMemberJoinNotifying  = "member-join"
+	jobTypeMemberLeaveNotifying = "member-leave"
+	jobTypeLogSync              = "log-sync"
+	jobTypePromote              = "promote"
+
 	roleObservationName                                    = "role-observe"
 	roleAgentVolumeName                                    = "role-agent"
 	roleAgentInstallerName                                 = "role-agent-installer"

@@ -20,14 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package consensusset
 
 import (
-	"context"
-
 	apps "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
@@ -79,25 +74,6 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 	root.Action = model.ActionPtr(model.STATUS)
 
 	return nil
-}
-
-func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsObj *apps.StatefulSet) ([]corev1.Pod, error) {
-	podList := &corev1.PodList{}
-	if err := cli.List(ctx, podList,
-		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels{
-			model.KBManagedByKey:      stsObj.Labels[model.KBManagedByKey],
-			model.AppInstanceLabelKey: stsObj.Labels[model.AppInstanceLabelKey],
-		}); err != nil {
-		return nil, err
-	}
-	var pods []corev1.Pod
-	for _, pod := range podList.Items {
-		if util.IsMemberOf(stsObj, &pod) {
-			pods = append(pods, pod)
-		}
-	}
-	return pods, nil
 }
 
 var _ graph.Transformer = &CSSetStatusTransformer{}

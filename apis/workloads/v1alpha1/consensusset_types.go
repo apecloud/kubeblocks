@@ -59,7 +59,12 @@ type ConsensusSetSpec struct {
 	Roles []ConsensusRole `json:"roles"`
 
 	// RoleObservation provides method to observe role.
+	// +kubebuilder:validation:Required
 	RoleObservation RoleObservation `json:"roleObservation"`
+
+	// MembershipReconfiguration provides actions to do membership dynamic reconfiguration.
+	// +optional
+	MembershipReconfiguration *MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
 
 	// UpdateStrategy, Pods update strategy.
 	// serial: update Pods one by one that guarantee minimum component unavailable time.
@@ -71,6 +76,10 @@ type ConsensusSetSpec struct {
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
 	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// Credential used to connect to DB engine
+	// +optional
+	Credential *Credential `json:"credential,omitempty"`
 }
 
 // ConsensusSetStatus defines the observed state of ConsensusSet
@@ -199,10 +208,6 @@ type RoleObservation struct {
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
-
-	// Credential used to connect to DB engine
-	// +optional
-	Credential *Credential `json:"credential,omitempty"`
 }
 
 type ObservationHandler struct {
@@ -227,23 +232,13 @@ type BuiltInAction struct {
 type CustomAction struct {
 	// Actions to be taken in serial
 	// after all actions done, the final output should be a single string of the role name defined in spec.Roles
-	// +kubebuilder:validation:Required
-	Actions []Action `json:"actions"`
-}
-
-type Action struct {
-	// utility image contains command that can be used to retrieve of process role info
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
-	// +optional
-	Image string `json:"image,omitempty"`
-
-	// Command will be executed in Container to retrieve or process role info
 	// Environment variables can be used in Command:
 	// - v_KB_CONSENSUS_SET_LAST_STDOUT stdout from last action, watch 'v_' prefixed
 	// - KB_CONSENSUS_SET_USERNAME username part of credential
 	// - KB_CONSENSUS_SET_PASSWORD password part of credential
 	// +kubebuilder:validation:Required
-	Command []string `json:"command"`
+	Actions []Action `json:"actions"`
 }
 
 type Credential struct {
@@ -276,6 +271,47 @@ type CredentialVar struct {
 	// Source for the environment variable's value. Cannot be used if value is not empty.
 	// +optional
 	ValueFrom *corev1.EnvVarSource `json:"valueFrom,omitempty"`
+}
+
+type MembershipReconfiguration struct {
+	// Environment variables can be used in all following Actions:
+	// - KB_CONSENSUS_SET_USERNAME username part of credential
+	// - KB_CONSENSUS_SET_PASSWORD password part of credential
+
+	// SwitchoverAction specifies how to do switchover
+	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
+	// +optional
+	SwitchoverAction *Action `json:"switchoverAction,omitempty"`
+
+	// MemberJoinAction specifies how to add member
+	// previous none-nil action's Image wil be used if not configured
+	// +optional
+	MemberJoinAction *Action `json:"memberJoinAction,omitempty"`
+
+	// MemberLeaveAction specifies how to remove member
+	// previous none-nil action's Image wil be used if not configured
+	// +optional
+	MemberLeaveAction *Action `json:"memberLeaveAction,omitempty"`
+
+	// LogSyncAction specifies how to trigger the new member to start log syncing
+	// previous none-nil action's Image wil be used if not configured
+	// +optional
+	LogSyncAction *Action `json:"logSyncAction,omitempty"`
+
+	// PromoteAction specifies how to tell the cluster that the new member can join voting now
+	// previous none-nil action's Image wil be used if not configured
+	// +optional
+	PromoteAction *Action `json:"promoteAction,omitempty"`
+}
+
+type Action struct {
+	// utility image contains command that can be used to retrieve of process role info
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// Command will be executed in Container to retrieve or process role info
+	// +kubebuilder:validation:Required
+	Command []string `json:"command"`
 }
 
 type ConsensusMemberStatus struct {

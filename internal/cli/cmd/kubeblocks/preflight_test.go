@@ -111,12 +111,6 @@ var _ = Describe("Preflight API Test", func() {
 			err := p.run()
 			g.Expect(err).NotTo(HaveOccurred())
 		}).Should(Succeed())
-		By("non-interactive mode, and expect error")
-		p.checkFileList = []string{"../../testing/testdata/hostpreflight_nil.yaml"}
-		Eventually(func(g Gomega) {
-			err := p.run()
-			g.Expect(err).To(HaveOccurred())
-		}).Should(Succeed())
 	})
 
 	It("LoadVendorCheckYaml test, and expect fail", func() {

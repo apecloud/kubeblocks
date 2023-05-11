@@ -11,6 +11,6 @@ roleRef:
   name: kb-role-{{ .Release.Namespace }}-{{ .Release.Name }}
 subjects:
   - kind: ServiceAccount
-    name: kb-sa-{{ .Release.Name }}
+    name: {{ include "postgresqlcluster.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
 {{- end }}

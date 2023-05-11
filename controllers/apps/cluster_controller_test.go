@@ -153,7 +153,7 @@ var _ = Describe("Cluster Controller", func() {
 			AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
 			Create(&testCtx).GetObject()
 
-		if len(noCreateAssociateCV) > 0 && !noCreateAssociateCV[0] {
+		if len(noCreateAssociateCV) > 0 && noCreateAssociateCV[0] {
 			return
 		}
 		By("Create a clusterVersion obj")
@@ -1152,6 +1152,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	// Test cases
 	// Scenarios
+	// TODO: add case: empty image in cd, should report applyResourceFailed condition
 	Context("when creating cluster without clusterversion", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef(true)
@@ -1591,6 +1592,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("test when clusterDefinition not found")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+				g.Expect(tmpCluster.Status.ObservedGeneration).Should(BeZero())
 				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Reason).Should(BeEquivalentTo(lifecycle.ReasonPreCheckFailed))
@@ -1629,6 +1631,7 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(func(g Gomega) {
 				updateClusterAnnotation(cluster)
 				g.Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+					g.Expect(cluster.Status.ObservedGeneration).Should(BeZero())
 					condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 					g.Expect(condition).ShouldNot(BeNil())
 					g.Expect(condition.Reason).Should(BeEquivalentTo(lifecycle.ReasonPreCheckFailed))
@@ -1648,6 +1651,7 @@ var _ = Describe("Cluster Controller", func() {
 			updateClusterAnnotation(cluster)
 			By("test preCheckFailed")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				g.Expect(cluster.Status.ObservedGeneration).Should(BeZero())
 				condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 				g.Expect(condition != nil && condition.Reason == lifecycle.ReasonPreCheckFailed).Should(BeTrue())
 			})).Should(Succeed())
@@ -1669,6 +1673,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+					g.Expect(tmpCluster.Status.ObservedGeneration).ShouldNot(BeEquivalentTo(tmpCluster.Generation))
 					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, appsv1alpha1.ConditionTypeApplyResources)
 					g.Expect(condition != nil && condition.Reason == lifecycle.ReasonApplyResourcesFailed).Should(BeTrue())
 				})).Should(Succeed())

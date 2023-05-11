@@ -116,6 +116,7 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1alpha1": {
 					{Name: "clusters", Namespaced: true, Kind: "Cluster"},
+					{Name: "opsrequests", Namespaced: true, Kind: "OpsRequest"},
 				},
 			},
 		},

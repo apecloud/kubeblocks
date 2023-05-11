@@ -90,7 +90,7 @@ const (
 // Network Chaos Command
 const (
 	Latency        = "latency"
-	LatencyShort   = "delayed IO operations."
+	LatencyShort   = "Delayed IO operations."
 	Fault          = "fault"
 	FaultShort     = "Causes IO operations to return specific errors."
 	Attribute      = "attribute"

@@ -126,7 +126,7 @@ func NewNetworkChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStrea
 func NewNetworkChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "network",
-		Short: "network chaos.",
+		Short: "Network chaos.",
 	}
 	cmd.AddCommand(
 		NewPartitionCmd(f, streams),

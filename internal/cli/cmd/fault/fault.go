@@ -50,7 +50,7 @@ type FaultBaseOptions struct {
 func NewFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fault",
-		Short: "inject faults to pod.",
+		Short: "Inject faults to pod.",
 	}
 	cmd.AddCommand(
 		NewNetworkChaosCmd(f, streams),

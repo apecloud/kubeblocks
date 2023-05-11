@@ -1,33 +1,38 @@
 ---
-title: kbcli
+title: kbcli fault network dns random
 ---
 
-KubeBlocks CLI.
-
-### Synopsis
+Make DNS return any IP when resolving external domain names.
 
 ```
-
-=============================================
- __    __ _______   ______  __       ______ 
-|  \  /  \       \ /      \|  \     |      \
-| ▓▓ /  ▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓\ ▓▓      \▓▓▓▓▓▓
-| ▓▓/  ▓▓| ▓▓__/ ▓▓ ▓▓   \▓▓ ▓▓       | ▓▓  
-| ▓▓  ▓▓ | ▓▓    ▓▓ ▓▓     | ▓▓       | ▓▓  
-| ▓▓▓▓▓\ | ▓▓▓▓▓▓▓\ ▓▓   __| ▓▓       | ▓▓  
-| ▓▓ \▓▓\| ▓▓__/ ▓▓ ▓▓__/  \ ▓▓_____ _| ▓▓_ 
-| ▓▓  \▓▓\ ▓▓    ▓▓\▓▓    ▓▓ ▓▓     \   ▓▓ \
- \▓▓   \▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓ \▓▓▓▓▓▓▓▓\▓▓▓▓▓▓
-
-=============================================
-A Command Line Interface for KubeBlocks
+kbcli fault network dns random [flags]
 ```
 
+### Examples
+
 ```
-kbcli [flags]
+  // Inject DNS faults into all pods under the default namespace, so that any IP is returned when accessing the baidu.com domain name.
+  kbcli fault DNS random --patterns=baidu.com --duration=1m
+  
+  // Inject DNS faults into all pods under the default namespace, so that error is returned when accessing the baidu.com domain name.
+  kbcli fault DNS error --patterns=baidu.com --duration=1m
 ```
 
 ### Options
+
+```
+      --dry-run string[="unchanged"]     Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --duration string                  Supported formats of the duration are: ms / s / m / h. (default "10s")
+  -h, --help                             help for random
+      --label stringToString             label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"' (default [])
+      --mode string                      You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with. (default "all")
+      --namespace-selector stringArray   Specifies the namespace into which you want to inject faults. (default [default])
+  -o, --output format                    prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --patterns stringArray             Select the domain name template that matches the failure behavior, and support placeholders ? and wildcards *.
+      --value string                     If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
+```
+
+### Options inherited from parent commands
 
 ```
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
@@ -40,7 +45,6 @@ kbcli [flags]
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
-  -h, --help                           help for kbcli
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -54,21 +58,7 @@ kbcli [flags]
 
 ### SEE ALSO
 
-* [kbcli addon](kbcli_addon.md)	 - Addon command.
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
-* [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
-* [kbcli class](kbcli_class.md)	 - Manage classes
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
-* [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command.
-* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards.
-* [kbcli fault](kbcli_fault.md)	 - Inject faults to pod.
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
-* [kbcli migration](kbcli_migration.md)	 - Data migration between two data sources.
-* [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands.
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud.
-* [kbcli plugin](kbcli_plugin.md)	 - Provides utilities for interacting with plugins.
-* [kbcli version](kbcli_version.md)	 - Print the version information, include kubernetes, KubeBlocks and kbcli version.
+* [kbcli fault network dns](kbcli_fault_network_dns.md)	 - Inject faults into DNS server.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

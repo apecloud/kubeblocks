@@ -152,7 +152,7 @@ var _ = Describe("RestoreJob Controller", func() {
 	testRestoreJob := func(withResources ...bool) {
 		By("By creating a statefulset and pod")
 		sts := assureStatefulSetObj()
-		testapps.MockConsensusComponentPods(testCtx, sts, clusterName, compName)
+		testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, compName)
 
 		By("By creating a backupTool")
 		backupTool := assureBackupToolObj(withResources...)

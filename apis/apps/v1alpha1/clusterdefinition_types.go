@@ -376,6 +376,53 @@ func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkloa
 	panic("unreachable")
 }
 
+// GetMinAvailable get workload's minAvailable settings, return 51% for workloadType=Consensus,
+// value 1 pod for workloadType=[Stateless|Stateful|Replication].
+func (r *ClusterComponentDefinition) GetMinAvailable() *intstr.IntOrString {
+	if r == nil {
+		return nil
+	}
+	switch r.WorkloadType {
+	case Consensus:
+		// Consensus workload have min pods of >50%.
+		v := intstr.FromString("51%")
+		return &v
+	case Replication, Stateful, Stateless:
+		// Stateful & Replication workload have min. pod being 1.
+		v := intstr.FromInt(1)
+		return &v
+	}
+	return nil
+}
+
+// GetMaxUnavailable get workload's maxUnavailable settings, this value is not suitable for PDB.spec.maxUnavailable
+// usage, as a PDB with maxUnavailable=49% and if workload's replicaCount=3 and allowed disruption pod count is 2,
+// check following setup:
+//
+// #cmd: kubectl get sts,po,pdb  -l app.kubernetes.io/instance=consul
+// NAME                      READY   AGE
+// statefulset.apps/consul   3/3     3h23m
+//
+// NAME           READY   STATUS    RESTARTS   AGE
+// pod/consul-0   1/1     Running   0          3h
+// pod/consul-2   1/1     Running   0          16s
+// pod/consul-1   1/1     Running   0          16s
+//
+// NAME                                MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS   AGE
+// poddisruptionbudget.policy/consul   N/A             49%               2                     3h23m
+//
+// VS. using minAvailable=51% will result allowed disruption pod count is 1
+//
+// NAME                      READY   AGE
+// statefulset.apps/consul   3/3     3h26m
+//
+// NAME           READY   STATUS    RESTARTS   AGE
+// pod/consul-0   1/1     Running   0          3h3m
+// pod/consul-2   1/1     Running   0          3m35s
+// pod/consul-1   1/1     Running   0          3m35s
+//
+// NAME                                MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS   AGE
+// poddisruptionbudget.policy/consul   51%             N/A               1                     3h26m
 func (r *ClusterComponentDefinition) GetMaxUnavailable() *intstr.IntOrString {
 	if r == nil {
 		return nil
@@ -649,6 +696,8 @@ func (r *StatefulSetSpec) finalStsUpdateStrategy() (appsv1.PodManagementPolicyTy
 		return appsv1.ParallelPodManagement, appsv1.StatefulSetUpdateStrategy{
 			Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+				// alpha feature since v1.24
+				// ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
 				MaxUnavailable: &m,
 			},
 		}
@@ -663,6 +712,8 @@ func (r *StatefulSetSpec) finalStsUpdateStrategy() (appsv1.PodManagementPolicyTy
 		return appsv1.OrderedReadyPodManagement, appsv1.StatefulSetUpdateStrategy{
 			Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+				// alpha feature since v1.24
+				// ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
 				MaxUnavailable: &m,
 			},
 		}

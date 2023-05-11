@@ -167,7 +167,7 @@ var _ = Describe("Cluster Controller", func() {
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		for _, compName := range compNames {
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 		}
 	}
 
@@ -714,13 +714,13 @@ var _ = Describe("Cluster Controller", func() {
 		case replicationCompDefName:
 			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterObj.Name, compDefName, nil)
 		case statefulCompDefName, consensusCompDefName:
-			testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, compName)
+			testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
 		}
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Updating the PVC storage size")
@@ -732,7 +732,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking the resize operation finished")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
-		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking PVCs are resized")
@@ -1054,7 +1054,7 @@ var _ = Describe("Cluster Controller", func() {
 		}).Should(Succeed())
 
 		By("Waiting the component be running")
-		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, compName)).
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).
 			Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 	}
 
@@ -1272,7 +1272,7 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.List(&testCtx, generics.PodDisruptionBudgetSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterKey.Name,
-				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
+				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEmpty())
 
 			podSpec := stsList.Items[0].Spec.Template.Spec
 			By("Checking created sts pods template with built-in toleration")
@@ -1531,11 +1531,11 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(sts.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
 
 			By("mock pod/sts are available and wait for component enter running phase")
-			testapps.MockConsensusComponentPods(testCtx, &sts, clusterObj.Name, compName)
+			testapps.MockConsensusComponentPods(&testCtx, &sts, clusterObj.Name, compName)
 			Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
 				testk8s.MockStatefulSetReady(&sts)
 			})).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 			By("remove init container after all components are Running")
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(clusterObj))).Should(BeEquivalentTo(1))
@@ -1548,7 +1548,7 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
 				g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 			})).Should(Succeed())
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 
 			By("clean up annotations after cluster running")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
@@ -1609,7 +1609,7 @@ var _ = Describe("Cluster Controller", func() {
 	Context("test cluster Failed/Abnormal phase", func() {
 		It("test cluster conditions", func() {
 			By("init cluster")
-			cluster := testapps.CreateConsensusMysqlCluster(testCtx, clusterDefNameRand,
+			cluster := testapps.CreateConsensusMysqlCluster(&testCtx, clusterDefNameRand,
 				clusterVersionNameRand, clusterNameRand, consensusCompDefName, consensusCompName)
 			clusterKey := client.ObjectKeyFromObject(cluster)
 
@@ -1645,8 +1645,8 @@ var _ = Describe("Cluster Controller", func() {
 			// })).Should(Succeed())
 
 			By("test when clusterVersion not Available")
-			_ = testapps.CreateConsensusMysqlClusterDef(testCtx, clusterDefNameRand, consensusCompDefName)
-			clusterVersion := testapps.CreateConsensusMysqlClusterVersion(testCtx, clusterDefNameRand, clusterVersionNameRand, consensusCompDefName)
+			_ = testapps.CreateConsensusMysqlClusterDef(&testCtx, clusterDefNameRand, consensusCompDefName)
+			clusterVersion := testapps.CreateConsensusMysqlClusterVersion(&testCtx, clusterDefNameRand, clusterVersionNameRand, consensusCompDefName)
 			clusterVersionKey := client.ObjectKeyFromObject(clusterVersion)
 			// mock clusterVersion unavailable
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterVersionKey, func(clusterVersion *appsv1alpha1.ClusterVersion) {

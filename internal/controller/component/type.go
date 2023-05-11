@@ -37,7 +37,7 @@ type SynthesizedComponent struct {
 	Name                  string                                 `json:"name,omitempty"`
 	Type                  string                                 `json:"type,omitempty"`
 	CharacterType         string                                 `json:"characterType,omitempty"`
-	MaxUnavailable        *intstr.IntOrString                    `json:"maxUnavailable,omitempty"`
+	MinAvailable          *intstr.IntOrString                    `json:"minAvailable,omitempty"`
 	Replicas              int32                                  `json:"replicas"`
 	WorkloadType          v1alpha1.WorkloadType                  `json:"workloadType,omitempty"`
 	StatelessSpec         *v1alpha1.StatelessSetSpec             `json:"statelessSpec,omitempty"`

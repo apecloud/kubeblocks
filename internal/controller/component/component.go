@@ -63,7 +63,7 @@ func BuildComponent(
 		VolumeTypes:           clusterCompDefObj.VolumeTypes,
 		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
 		StatefulSetWorkload:   clusterCompDefObj.GetStatefulSetWorkload(),
-		MaxUnavailable:        clusterCompSpec.GetMaxUnavailable(clusterCompDefObj.GetMaxUnavailable()),
+		MinAvailable:          clusterCompSpec.GetMinAvailable(clusterCompDefObj.GetMinAvailable()),
 		Replicas:              clusterCompSpec.Replicas,
 		EnabledLogs:           clusterCompSpec.EnabledLogs,
 		TLS:                   clusterCompSpec.TLS,

@@ -151,6 +151,33 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 
 	}
 
+	// TODO: need to handle PDB setup
+	// conditional build PodDisruptionBudget
+	if task.Component.MinAvailable != nil {
+		pdb, err := builder.BuildPDB(task.GetBuilderParams())
+		if err != nil {
+			return err
+		}
+		task.AppendResource(pdb)
+	} else {
+		panic("this shouldn't happen")
+	}
+
+	svcList, err := builder.BuildSvcListWithCustomAttributes(task.GetBuilderParams(), func(svc *corev1.Service) {
+		switch task.Component.WorkloadType {
+		case appsv1alpha1.Consensus:
+			addLeaderSelectorLabels(svc, task.Component)
+		case appsv1alpha1.Replication:
+			svc.Spec.Selector[constant.RoleLabelKey] = string(replication.Primary)
+		}
+	})
+	if err != nil {
+		return err
+	}
+	for _, svc := range svcList {
+		task.AppendResource(svc)
+	}
+
 	// REVIEW/TODO:
 	// - need higher level abstraction handling
 	// - or move this module to part operator controller handling
@@ -171,30 +198,6 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		}
 	}
 
-	// TODO: need to handle PDB setup
-	// // conditional build PodDisruptionBudget
-	// if task.Component.MaxUnavailable != nil {
-	// 	pdb, err := builder.BuildPDB(task.GetBuilderParams())
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	task.AppendResource(pdb)
-	// }
-
-	svcList, err := builder.BuildSvcListWithCustomAttributes(task.GetBuilderParams(), func(svc *corev1.Service) {
-		switch task.Component.WorkloadType {
-		case appsv1alpha1.Consensus:
-			addLeaderSelectorLabels(svc, task.Component)
-		case appsv1alpha1.Replication:
-			svc.Spec.Selector[constant.RoleLabelKey] = string(replication.Primary)
-		}
-	})
-	if err != nil {
-		return err
-	}
-	for _, svc := range svcList {
-		task.AppendResource(svc)
-	}
 	return nil
 }
 

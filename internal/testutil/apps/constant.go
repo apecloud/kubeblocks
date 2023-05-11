@@ -43,7 +43,7 @@ const (
 	ReplicationRoleLabelFieldPath            = "metadata.labels['kubeblocks.io/role']"
 	DefaultReplicationCandidateInstanceIndex = 0
 	DefaultReplicationReplicas               = 2
-	
+
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
 	DefaultMySQLContainerName = "mysql"
 

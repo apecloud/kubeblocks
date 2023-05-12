@@ -28,7 +28,7 @@ spec:
     - storageClass:
         checkName: Required-Default-SC
         outcomes:
-          - warning:
+          - fail:
               message: The default storage class was not found. To learn more details, please check https://cloud.tencent.com/document/product/457/44235.
           - pass:
               message: default storage class is the presence, and all good on storage classes

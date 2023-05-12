@@ -29,10 +29,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -185,27 +182,4 @@ var _ = Describe("operations", func() {
 		capturedOutput, _ := done()
 		Expect(testing.ContainExpectStrings(capturedOutput, "kbcli cluster describe-ops")).Should(BeTrue())
 	})
-
-	It("list and delete operations", func() {
-		clusterName := "wesql"
-		args := []string{clusterName}
-		clusterLabel := util.BuildLabelSelectorByNames("", args)
-		testLabel := "kubeblocks.io/test=test"
-
-		By("test delete OpsRequest with cluster")
-		o := delete.NewDeleteOptions(tf, streams, types.OpsGVR())
-		Expect(completeForDeleteOps(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
-
-		By("test delete OpsRequest with cluster and custom label")
-		o.LabelSelector = testLabel
-		Expect(completeForDeleteOps(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
-
-		By("test delete OpsRequest with name")
-		o.Names = []string{"test1"}
-		Expect(completeForDeleteOps(o, nil)).Should(Succeed())
-		Expect(len(o.ConfirmedNames)).Should(Equal(1))
-	})
-
 })

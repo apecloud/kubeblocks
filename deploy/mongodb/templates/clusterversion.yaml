@@ -13,3 +13,4 @@ spec:
           - name: mongodb
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+      clientImage: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}

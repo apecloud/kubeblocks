@@ -179,7 +179,6 @@ jobs:
     secrets: inherit
 
   check-tools-image:
-    name: check image
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
     uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0

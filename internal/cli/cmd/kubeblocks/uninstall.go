@@ -131,7 +131,7 @@ func (o *UninstallOptions) PreCheck() error {
 }
 
 func (o *UninstallOptions) Uninstall() error {
-	printSpinner := func(s *spinner.Spinner, err error) {
+	printSpinner := func(s spinner.Interface, err error) {
 		if err == nil || apierrors.IsNotFound(err) ||
 			strings.Contains(err.Error(), "release: not found") {
 			s.Success()
@@ -140,7 +140,7 @@ func (o *UninstallOptions) Uninstall() error {
 		s.Fail()
 		fmt.Fprintf(o.Out, "  %s\n", err.Error())
 	}
-	newSpinner := func(msg string) *spinner.Spinner {
+	newSpinner := func(msg string) spinner.Interface {
 		return spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", msg)))
 	}
 
@@ -282,7 +282,7 @@ func (o *UninstallOptions) uninstallAddons() error {
 		}
 	)
 
-	var s *spinner.Spinner
+	var s spinner.Interface
 	if !o.Wait {
 		s = spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Uninstall KubeBlocks addons")))
 	} else {
@@ -300,7 +300,7 @@ func (o *UninstallOptions) uninstallAddons() error {
 		return nil
 	}
 
-	spinnerDone := func(s *spinner.Spinner, msg string) {
+	spinnerDone := func(s spinner.Interface, msg string) {
 		s.SetFinalMsg(msg)
 		s.Done("")
 		fmt.Fprintln(o.Out)

@@ -68,12 +68,6 @@ spec:
         echo "uploading ${i}";
         mv -f ${i} ${TODAY_INCR_LOG}/;
       done
-      if [ -d ${LOG_DIR} ]; then
-        cd ${LOG_DIR};
-        LATEST_LOG=$(ls -t . | grep '[[:digit:]]$\|.partial$'|head -n 1);
-        echo "uploading ${TODAY_INCR_LOG}/${LATEST_LOG}.gz";
-        gzip -kqc ${LATEST_LOG} > ${TODAY_INCR_LOG}/${LATEST_LOG}.gz;
-      fi
       echo "done."
       sync;
 

@@ -6,7 +6,7 @@ Expand the mountOptions of the storageClass.
   {{- if hasSuffix ".aliyuncs.com" .Values.secret.endpoint }}
     {{- printf "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --subdomain %s" .Values.storageClass.mountOptions }}
   {{- else if .Values.secret.region }}
-    {{- printf "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region %s %s" .Values.storageClass.mountOptions .Values.secret.region }}
+    {{- printf "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region %s %s" .Values.secret.region .Values.storageClass.mountOptions }}
   {{- else }}
     {{- printf "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 %s" .Values.storageClass.mountOptions }}
   {{- end }}

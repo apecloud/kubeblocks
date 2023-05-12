@@ -20,7 +20,6 @@ spec:
       componentDefRef: kafka-server
       replicas: {{ $.Values.kafkaServer.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}
-      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       {{- with $.Values.tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
       {{- end }}
@@ -75,7 +74,6 @@ spec:
       componentDefRef: kafka-controller
       replicas: {{ $.Values.kafkaController.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}
-      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       {{- with $.Values.tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
       {{- end }}
@@ -119,7 +117,6 @@ spec:
       componentDefRef: kafka-broker
       replicas: {{ $.Values.kafkaBroker.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}
-      serviceType: {{ $.Values.service.type | default "None" }}
       {{- with $.Values.tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
       {{- end }}
@@ -165,7 +162,6 @@ spec:
       componentDefRef: kafka-exporter
       replicas: {{ $.Values.monitor.kafkaExporter.replicaCount }}
       monitor: true
-      serviceType: "ClusterIP"
       {{- with $.Values.tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
       {{- end }}

@@ -392,7 +392,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	// use backup tool such as xtrabackup
 	case appsv1alpha1.HScaleDataClonePolicyFromBackup:
 		// TODO: db core not support yet, leave it empty
-		reqCtx.Recorder.Eventf(cluster,
+		reqCtx.Eventf(cluster,
 			corev1.EventTypeWarning,
 			"HorizontalScaleFailed",
 			"scale with backup tool not support yet")
@@ -404,7 +404,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		}
 		vcts := component.VolumeClaimTemplates
 		if len(vcts) == 0 {
-			reqCtx.Recorder.Eventf(cluster,
+			reqCtx.Eventf(cluster,
 				corev1.EventTypeNormal,
 				"HorizontalScale",
 				"no VolumeClaimTemplates, no need to do data clone.")
@@ -508,7 +508,7 @@ func checkedCreateDeletePVCCronJob(cli roclient.ReadonlyClient,
 		vertex := &lifecycleVertex{obj: cronJob, action: actionPtr(CREATE)}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
-		reqCtx.Recorder.Eventf(cluster,
+		reqCtx.Eventf(cluster,
 			corev1.EventTypeNormal,
 			"CronJobCreate",
 			"create cronjob to delete pvc/%s",
@@ -576,7 +576,7 @@ func deleteSnapshot(cli roclient.ReadonlyClient,
 	vertex := &lifecycleVertex{obj: vs, oriObj: vs, action: actionPtr(DELETE)}
 	dag.AddVertex(vertex)
 	dag.Connect(root, vertex)
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", snapshotKey.Name)
+	reqCtx.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", snapshotKey.Name)
 	return nil
 }
 
@@ -597,7 +597,7 @@ func deleteBackup(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient,
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotName)
+	reqCtx.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotName)
 	return nil
 }
 
@@ -667,8 +667,7 @@ func doSnapshot(cli roclient.ReadonlyClient,
 		vertex := &lifecycleVertex{obj: snapshot, action: actionPtr(CREATE)}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
-
-		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
+		reqCtx.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
 	}
 	return nil
 }
@@ -791,7 +790,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupJob/%s", backupKey.Name)
+	reqCtx.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupJob/%s", backupKey.Name)
 	return nil
 }
 

@@ -175,10 +175,11 @@ func (p *clusterPlan) Execute() error {
 }
 
 func (p *clusterPlan) handlePlanExecutionError(err error) error {
+	clusterCopy := p.transCtx.OrigCluster.DeepCopy()
 	condition := newFailedApplyResourcesCondition(err)
-	meta.SetStatusCondition(&p.transCtx.Cluster.Status.Conditions, condition)
-	sendWaringEventWithError(p.transCtx.GetRecorder(), p.transCtx.Cluster, ReasonApplyResourcesFailed, err)
-	return p.cli.Status().Patch(p.transCtx.Context, p.transCtx.Cluster, client.MergeFrom(p.transCtx.OrigCluster.DeepCopy()))
+	meta.SetStatusCondition(&clusterCopy.Status.Conditions, condition)
+	sendWaringEventWithError(p.transCtx.GetRecorder(), clusterCopy, ReasonApplyResourcesFailed, err)
+	return p.cli.Status().Patch(p.transCtx.Context, clusterCopy, client.MergeFrom(p.transCtx.OrigCluster))
 }
 
 // Do the real works

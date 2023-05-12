@@ -1,0 +1,24 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: flink
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'Apache Flink is a framework and distributed processing engine for stateful computations over unbounded and bounded data streams.'
+
+  type: Helm
+
+  helm:
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/flink-{{ default .Chart.Version .Values.versionOverride }}.tgz
+
+  installable:
+    autoInstall: false
+
+  defaultInstallValues:
+    - enabled: true

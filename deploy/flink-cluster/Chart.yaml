@@ -1,0 +1,9 @@
+apiVersion: v2
+name: flink-cluster
+description: An Flink Cluster Helm chart for KubeBlocks.
+
+type: application
+
+version: 0.1.0
+
+appVersion: "1.16"

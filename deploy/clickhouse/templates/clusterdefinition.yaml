@@ -34,11 +34,13 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      componentConfigSpec:
+      configSpecs:
         - name: clickhouse-tpl
           templateRef: clickhouse-tpl
           volumeName: config
           namespace: {{ .Release.Namespace }}
+      constraints:
+        numberOfOccurrence: OnceOrMore
       service:
         ports:
           - name: http
@@ -160,7 +162,7 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      componentConfigSpec:
+      configSpecs:
         - name: clickhouse-keeper-tpl
           templateRef: clickhouse-keeper-tpl
           volumeName: config
@@ -173,6 +175,8 @@ spec:
           - name: http-metrics
             targetPort: http-metrics
             port: 8001
+      constraints:
+        numberOfOccurrence: ZeroOrOnce
       podSpec:
         securityContext:
           fsGroup: 1001
@@ -272,6 +276,8 @@ spec:
             port: 9141
             targetPort: metrics
             nodePort: null
+      constraints:
+        numberOfOccurrence: ZeroOrOnce
       podSpec:
         securityContext:
           fsGroup: 1001
@@ -326,7 +332,7 @@ spec:
               # HACK: hack for single ZK node only
               - name: ZOO_SERVERS
                 value: "$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc:2888:3888::1"
-                # value: myck-zookeeper-0.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::1 myck-zookeeper-1.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::2 myck-zookeeper-2.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::3 
+                # value: myck-zookeeper-0.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::1 myck-zookeeper-1.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::2 myck-zookeeper-2.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::3
               - name: ZOO_ENABLE_AUTH
                 value: "no"
               - name: ZOO_ENABLE_QUORUM_AUTH

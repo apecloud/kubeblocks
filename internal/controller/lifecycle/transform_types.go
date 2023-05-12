@@ -68,4 +68,15 @@ type delegateClient struct {
 	client.Client
 }
 
+// validationError implements error interface BUT-NOT  RequeueError.
+type validationError struct {
+	reason string
+}
+
+func (r *validationError) Error() string {
+	return r.reason
+}
+
+var _ error = &validationError{}
+
 var _ client2.ReadonlyClient = delegateClient{}

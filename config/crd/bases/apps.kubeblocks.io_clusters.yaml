@@ -175,6 +175,93 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
+                    componentRef:
+                      description: componentRef defines inter-component field reference.
+                        componentRef defined in ClusterComponentSpec will override
+                        componentRef defined in ClusterDefinition.
+                      items:
+                        properties:
+                          componentDefName:
+                            description: componentDefName is the name of the componentDef
+                              to select.
+                            type: string
+                          componentName:
+                            description: componentName is the name of the component
+                              to select.
+                            type: string
+                          fieldRefs:
+                            description: FieldRefs is the field of the component to
+                              select.
+                            items:
+                              properties:
+                                envName:
+                                  description: envName is the name of the env to be
+                                    injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                fieldPath:
+                                  description: fieldPath is the field of the component
+                                    to select.
+                                  type: string
+                              required:
+                              - envName
+                              - fieldPath
+                              type: object
+                            type: array
+                          referenceStrategy:
+                            description: referenceStrategy is the strategy of the
+                              component to select.
+                            enum:
+                            - optional
+                            - required
+                            type: string
+                          resourceFieldRefs:
+                            description: resourceFieldRef is the field of the resource
+                              to select.
+                            items:
+                              properties:
+                                divisor:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: divisor specifies the output format
+                                    of the exposed resources, defaults to "1"
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                envName:
+                                  description: envName is the name of the env to be
+                                    injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                resource:
+                                  description: resource to select
+                                  type: string
+                              required:
+                              - envName
+                              - resource
+                              type: object
+                            type: array
+                          serviceFieldRefs:
+                            description: serviceFieldRef is the field of the service
+                              to select.
+                            items:
+                              properties:
+                                envNamePrefix:
+                                  description: envNamePrefix is the prefix of the
+                                    env to be injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                serviceName:
+                                  description: serviceName is the name of the service
+                                    to select.
+                                  type: string
+                              required:
+                              - envNamePrefix
+                              - serviceName
+                              type: object
+                            type: array
+                        type: object
+                      type: array
                     enabledLogs:
                       description: enabledLogs indicate which log file takes effect
                         in database cluster element is the log type which defined

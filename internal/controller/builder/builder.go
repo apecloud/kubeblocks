@@ -187,6 +187,11 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			{Name: "KB_TLS_KEY_FILE", Value: KeyName},
 		}...)
 	}
+
+	if len(params.Component.ComponentRefEnvs) > 0 {
+		toInjectEnvs = append(toInjectEnvs, params.Component.ComponentRefEnvs...)
+	}
+
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
 		c.Env = toInjectEnvs

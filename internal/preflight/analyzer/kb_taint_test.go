@@ -47,6 +47,9 @@ var (
 			{Key: "dev", Value: "false", Effect: v1.TaintEffectNoSchedule},
 		}}},
 	}}
+	nodeList3 = v1.NodeList{Items: []v1.Node{
+		{Spec: v1.NodeSpec{}},
+	}}
 )
 
 var _ = Describe("taint_class_test", func() {
@@ -128,6 +131,20 @@ var _ = Describe("taint_class_test", func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(res[0].IsPass).Should(BeFalse())
 				g.Expect(res[0].IsFail).Should(BeTrue())
+			}).Should(Succeed())
+		})
+		It("Analyze test, the taints are nil, and analyzer result is expected that pass is true", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(analyzer.IsExcluded()).Should(BeFalse())
+				b, err := json.Marshal(nodeList3)
+				g.Expect(err).NotTo(HaveOccurred())
+				getCollectedFileContents := func(filename string) ([]byte, error) {
+					return b, nil
+				}
+				res, err := analyzer.Analyze(getCollectedFileContents, nil)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(res[0].IsPass).Should(BeTrue())
+				g.Expect(res[0].IsFail).Should(BeFalse())
 			}).Should(Succeed())
 		})
 	})

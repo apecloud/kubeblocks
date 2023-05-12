@@ -93,6 +93,12 @@ func (a *AnalyzeTaintClassByKb) doAnalyzeTaint(nodes v1.NodeList) (*analyze.Anal
 		return newAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
 	}
 	taintFailResult := []string{}
+	for _, node := range nodes.Items {
+		if node.Spec.Taints == nil || len(node.Spec.Taints) == 0 {
+			return newAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
+		}
+	}
+
 	for k, tolerations := range a.analyzer.TolerationsMap {
 		count := 0
 		for _, node := range nodes.Items {

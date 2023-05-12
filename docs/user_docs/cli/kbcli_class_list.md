@@ -18,7 +18,7 @@ kbcli class list [flags]
 ### Options
 
 ```
-      --cluster-definition string   Specify cluster definition, run "kbcli clusterdefinition list" to show all available cluster definition
+      --cluster-definition string   list the clusterVersion belonging to the specified cluster definition
   -h, --help                        help for list
 ```
 

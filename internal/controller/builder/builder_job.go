@@ -51,3 +51,8 @@ func (builder *JobBuilder) AddSelector(key, value string) *JobBuilder {
 	builder.get().Spec.Selector = selector
 	return builder
 }
+
+func (builder *JobBuilder) SetSuspend(suspend bool) *JobBuilder {
+	builder.get().Spec.Suspend = &suspend
+	return builder
+}

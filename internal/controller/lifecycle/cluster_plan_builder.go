@@ -65,7 +65,6 @@ type clusterPlanBuilder struct {
 	cli          client.Client
 	transCtx     *ClusterTransformContext
 	transformers graph.TransformerChain
-	dag          *graph.DAG
 }
 
 // clusterPlan a graph.Plan implementation for Cluster reconciliation
@@ -152,8 +151,6 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	dag := graph.NewDAG()
 	err = c.transformers.ApplyTo(c.transCtx, dag)
 	c.transCtx.Logger.V(1).Info(fmt.Sprintf("DAG: %s", dag))
-	// add dag to clusterPlanBuilder
-	c.dag = dag
 
 	// construct execution plan
 	plan := &clusterPlan{

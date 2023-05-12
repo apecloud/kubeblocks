@@ -21,6 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -364,6 +365,87 @@ type ClusterComponentDefinition struct {
 	// in particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
 	// +optional
 	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
+	// componentRef is used to select the component to be referenced.
+	// +optional
+	ComponentRef []*ComponentRef `json:"componentRef,omitempty"`
+}
+
+// FailurePolicyType specifies the type of failure policy
+type FailurePolicyType string
+
+const (
+	// Ignore means that an error will be ignore but logged.
+	FailurePolicyIgnore FailurePolicyType = "Ignore"
+	// ReportError means that an error will be reported.
+	FailurePolicyFail FailurePolicyType = "Fail"
+)
+
+// ComponentRef is used to select the component and its fields to be referenced.
+type ComponentRef struct {
+	// componentSelector is the selector of the component.
+	// +kubebuilder:validation:Required
+	ComponentSelector ComponentSelector `json:"componentSelector"`
+	// failurePolicy is the failure policy of the component.
+	// If failed to find the component, the failure policy will be used.
+	// +optional
+	// +default=Fail
+	FailurePolicy FailurePolicyType `json:"failurePolicy,omitempty"`
+	// fieldRefs is the field of the component to select.
+	// +optional
+	FieldRefs []*ComponentFieldRef `json:"fieldRefs,omitempty"`
+	// serviceFieldRef is the field of the service to select.
+	// +optional
+	ServiceRefs []*ComponentServiceRef `json:"serviceFieldRefs,omitempty"`
+	// resourceFieldRef is the field of the resource to select.
+	// +optional
+	ResourceFieldRefs []*ComponentResourceFieldRef `json:"resourceFieldRefs,omitempty"`
+}
+
+// ComponentSelector is used to select the component to be referenced.
+// Either componentName or componentDefName must be specified.
+type ComponentSelector struct {
+	// componentName is the name of the component to select.
+	// +optional
+	ComponentName string `json:"componentName,omitempty"`
+	// componentDefName is the name of the componentDef to select.
+	// +optional
+	ComponentDefName string `json:"componentDefName,omitempty"`
+}
+
+// ComponentFieldRef is used to select the field of the component to be referenced.
+type ComponentFieldRef struct {
+	// envName is the name of the env to be injected.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	EnvName string `json:"envName"`
+	// fieldPath is the field of the component to select.
+	// +kubebuilder:validation:Required
+	FieldPath string `json:"fieldPath"`
+}
+
+// ComponentResourceFieldRef is used to select the field of the resource to be referenced.
+type ComponentResourceFieldRef struct {
+	// envName is the name of the env to be injected.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	EnvName string `json:"envName"`
+	// resource to select
+	// +kubebuilder:validation:Required
+	Resource string `json:"resource"`
+	// divisor specifies the output format of the exposed resources, defaults to "1"
+	// +optional
+	Divisor resource.Quantity `json:"divisor,omitempty"`
+}
+
+// ComponentServiceRef is used to select service to be referenced.
+type ComponentServiceRef struct {
+	// envNamePrefix is the prefix of the env to be injected.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	EnvNamePrefix string `json:"envNamePrefix"`
+	// serviceName is the name of the service to select.
+	// +kubebuilder:validation:Required
+	ServiceName string `json:"serviceName"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {

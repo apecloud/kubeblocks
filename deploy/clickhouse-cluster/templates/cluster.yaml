@@ -20,7 +20,9 @@ spec:
     - name: shard-{{ $i }}
       componentDefRef: clickhouse
       monitor: {{ $.Values.monitor.enabled }}
-      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
+      services:
+        - name: svc-shard-{{ $i }}
+          serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       replicas: {{ .replicaCount | default 2 }}
       serviceAccountName: {{ include "clickhouse-cluster.serviceAccountName" $ }}
       {{- with .tolerations }}

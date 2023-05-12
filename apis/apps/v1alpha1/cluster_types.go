@@ -185,6 +185,11 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:default=false
 	// +optional
 	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
+
+	// componentRef defines inter-component field reference.
+	// componentRef defined in ClusterComponentSpec will override componentRef defined in ClusterDefinition.
+	// +optional
+	ComponentRef []*ComponentRef `json:"componentRef,omitempty"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,

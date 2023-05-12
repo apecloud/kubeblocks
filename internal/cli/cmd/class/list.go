@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 )
 
 type ListOptions struct {
@@ -60,7 +61,7 @@ func NewListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 			util.CheckErr(o.run())
 		},
 	}
-	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli clusterdefinition list\" to show all available cluster definition")
+	flags.AddAddClusterDefinitionFlag(&f, cmd, &o.ClusterDefRef)
 	util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
 	return cmd
 }

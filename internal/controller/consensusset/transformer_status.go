@@ -66,12 +66,9 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 		setMembersStatus(csSet, pods)
 	}
 
-	// get root vertex(i.e. consensus set)
-	root, err := model.FindRootVertex(dag)
-	if err != nil {
+	if err := model.PrepareRootStatus(dag); err != nil {
 		return err
 	}
-	root.Action = model.ActionPtr(model.STATUS)
 
 	return nil
 }

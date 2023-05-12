@@ -30,14 +30,12 @@ type initTransformer struct {
 }
 
 func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	obj, origObj := t.ConsensusSet, t.ConsensusSet.DeepCopy()
 	// init context
 	transCtx, _ := ctx.(*CSSetTransformContext)
-	transCtx.CSSet, transCtx.OrigCSSet = obj, origObj
+	transCtx.CSSet, transCtx.OrigCSSet = t.ConsensusSet, t.ConsensusSet.DeepCopy()
 
 	// init dag
-	vertex := &model.ObjectVertex{Obj: transCtx.CSSet, OriObj: transCtx.OrigCSSet}
-	dag.AddVertex(vertex)
+	model.PrepareStatus(dag, transCtx.OrigCSSet, transCtx.CSSet)
 	return nil
 }
 

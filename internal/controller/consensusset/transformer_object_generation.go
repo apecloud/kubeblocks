@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -50,34 +51,18 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	// get root vertex(i.e. consensus set)
-	root, err := model.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
-
 	// generate objects by current spec
 	svc := buildSvc(*csSet)
 	headLessSvc := buildHeadlessSvc(*csSet)
 	envConfig := buildEnvConfigMap(*csSet)
 	sts := buildSts(*csSet, headLessSvc.Name, *envConfig)
+	objects := []client.Object{svc, headLessSvc, envConfig, sts}
 
-	// put all objects into the dag
-	vertices := make([]*model.ObjectVertex, 0)
-	svcVertex := &model.ObjectVertex{Obj: svc}
-	headlessSvcVertex := &model.ObjectVertex{Obj: headLessSvc}
-	envConfigVertex := &model.ObjectVertex{Obj: envConfig}
-	stsVertex := &model.ObjectVertex{Obj: sts}
-	vertices = append(vertices, svcVertex, headlessSvcVertex, envConfigVertex, stsVertex)
-	for _, vertex := range vertices {
-		if err := controllerutil.SetOwnership(csSet, vertex.Obj, model.GetScheme(), csSetFinalizerName); err != nil {
+	for _, object := range objects {
+		if err := controllerutil.SetOwnership(csSet, object, model.GetScheme(), csSetFinalizerName); err != nil {
 			return err
 		}
-		dag.AddConnect(root, vertex)
 	}
-	dag.Connect(stsVertex, svcVertex)
-	dag.Connect(stsVertex, headlessSvcVertex)
-	dag.Connect(stsVertex, envConfigVertex)
 
 	// read cache snapshot
 	oldSnapshot, err := model.ReadCacheSnapshot(ctx, csSet, ownedKinds()...)
@@ -86,61 +71,51 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// compute create/update/delete set
-	// we have the target objects snapshot in dag
-	allNoneRootVertices := model.FindAllNot[*workloads.ConsensusSet](dag)
-	newNameVertices := make(map[model.GVKName]graph.Vertex)
-	for _, vertex := range allNoneRootVertices {
-		v, _ := vertex.(*model.ObjectVertex)
-		name, err := model.GetGVKName(v.Obj)
+	newSnapshot := make(map[model.GVKName]client.Object)
+	for _, object := range objects {
+		name, err := model.GetGVKName(object)
 		if err != nil {
 			return err
 		}
-		newNameVertices[*name] = vertex
+		newSnapshot[*name] = object
 	}
 
 	// now compute the diff between old and target snapshot and generate the plan
 	oldNameSet := sets.KeySet(oldSnapshot)
-	newNameSet := sets.KeySet(newNameVertices)
+	newNameSet := sets.KeySet(newSnapshot)
 
 	createSet := newNameSet.Difference(oldNameSet)
 	updateSet := newNameSet.Intersection(oldNameSet)
 	deleteSet := oldNameSet.Difference(newNameSet)
 
-	createNewVertices := func() {
+	createNewObjects := func() {
 		for name := range createSet {
-			v, _ := newNameVertices[name].(*model.ObjectVertex)
-			if v.Action == nil {
-				v.Action = model.ActionPtr(model.CREATE)
-			}
+			model.PrepareCreate(dag, newSnapshot[name])
 		}
 	}
-	updateVertices := func() {
+	updateObjects := func() {
 		for name := range updateSet {
-			v, _ := newNameVertices[name].(*model.ObjectVertex)
-			v.OriObj = oldSnapshot[name]
-			if v.Action == nil || *v.Action != model.DELETE {
-				v.Action = model.ActionPtr(model.UPDATE)
-			}
+			model.PrepareUpdate(dag, oldSnapshot[name], newSnapshot[name])
 		}
 	}
-	deleteOrphanVertices := func() {
+	deleteOrphanObjects := func() {
 		for name := range deleteSet {
-			v := &model.ObjectVertex{
-				Obj:      oldSnapshot[name],
-				OriObj:   oldSnapshot[name],
-				IsOrphan: true,
-				Action:   model.ActionPtr(model.DELETE),
-			}
-			dag.AddConnect(root, v)
+			model.PrepareDelete(dag, oldSnapshot[name])
 		}
 	}
 
-	// vertices to be created
-	createNewVertices()
-	// vertices to be updated
-	updateVertices()
-	// vertices to be deleted
-	deleteOrphanVertices()
+	handleDependencies := func() {
+		model.DependOn(dag, sts, svc, headLessSvc, envConfig)
+	}
+
+	// objects to be created
+	createNewObjects()
+	// objects to be updated
+	updateObjects()
+	// objects to be deleted
+	deleteOrphanObjects()
+	// handle object dependencies
+	handleDependencies()
 
 	return nil
 }

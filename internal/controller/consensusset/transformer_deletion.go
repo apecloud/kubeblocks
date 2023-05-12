@@ -42,15 +42,13 @@ func (t *CSSetDeletionTransformer) Transform(ctx graph.TransformContext, dag *gr
 	if err != nil {
 		return err
 	}
-	root, err := model.FindRootVertex(dag)
-	if err != nil {
+	for _, object := range snapshot {
+		model.PrepareDelete(dag, object)
+	}
+
+	if err := model.PrepareRootDelete(dag); err != nil {
 		return err
 	}
-	for _, object := range snapshot {
-		vertex := &model.ObjectVertex{Obj: object, Action: model.ActionPtr(model.DELETE)}
-		dag.AddConnect(root, vertex)
-	}
-	root.Action = model.ActionPtr(model.DELETE)
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrFastReturn

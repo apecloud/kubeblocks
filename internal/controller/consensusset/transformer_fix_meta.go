@@ -35,11 +35,6 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		return nil
 	}
 
-	root, err := model.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
-
 	// The object is not being deleted, so if it does not have our finalizer,
 	// then lets add the finalizer and update the object. This is equivalent
 	// registering our finalizer.
@@ -48,8 +43,7 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	}
 	csSetCopy := csSet.DeepCopy()
 	controllerutil.AddFinalizer(csSetCopy, csSetFinalizerName)
-	vertex := &model.ObjectVertex{Obj: csSetCopy, OriObj: transCtx.OrigCSSet, Action: model.ActionPtr(model.UPDATE)}
-	dag.AddConnect(root, vertex)
+	model.PrepareUpdate(dag, transCtx.OrigCSSet, csSetCopy)
 
 	return nil
 }

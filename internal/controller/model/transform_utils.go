@@ -35,18 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-func FindMatchedVertex[T interface{}](dag *graph.DAG, objectKey client.ObjectKey) graph.Vertex {
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*ObjectVertex)
-		if _, ok := v.Obj.(T); ok {
-			if client.ObjectKeyFromObject(v.Obj) == objectKey {
-				return vertex
-			}
-		}
-	}
-	return nil
-}
-
 func FindAll[T interface{}](dag *graph.DAG) []graph.Vertex {
 	vertices := make([]graph.Vertex, 0)
 	for _, vertex := range dag.Vertices() {
@@ -207,4 +195,80 @@ func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, kind
 	}
 
 	return snapshot, nil
+}
+
+func PrepareCreate(dag *graph.DAG, object client.Object) {
+	vertex := &ObjectVertex{
+		Obj:    object,
+		Action: ActionPtr(CREATE),
+	}
+	dag.AddConnectRoot(vertex)
+}
+
+func PrepareUpdate(dag *graph.DAG, objectOld, objectNew client.Object) {
+	vertex := &ObjectVertex{
+		Obj:    objectNew,
+		OriObj: objectOld,
+		Action: ActionPtr(UPDATE),
+	}
+	dag.AddConnectRoot(vertex)
+}
+
+func PrepareDelete(dag *graph.DAG, object client.Object) {
+	vertex := &ObjectVertex{
+		Obj:    object,
+		Action: ActionPtr(DELETE),
+	}
+	dag.AddConnectRoot(vertex)
+}
+
+func PrepareStatus(dag *graph.DAG, objectOld, objectNew client.Object) {
+	vertex := &ObjectVertex{
+		Obj:    objectNew,
+		OriObj: objectOld,
+		Action: ActionPtr(STATUS),
+	}
+	dag.AddVertex(vertex)
+}
+
+func PrepareRootDelete(dag *graph.DAG) error {
+	root, err := FindRootVertex(dag)
+	if err != nil {
+		return err
+	}
+	root.Action = ActionPtr(DELETE)
+	return nil
+}
+
+func PrepareRootStatus(dag *graph.DAG) error {
+	root, err := FindRootVertex(dag)
+	if err != nil {
+		return err
+	}
+	root.Action = ActionPtr(STATUS)
+	return nil
+}
+
+func DependOn(dag *graph.DAG, object client.Object, dependency ...client.Object) {
+	objectVertex := findMatchedVertex(dag, object)
+	if objectVertex == nil {
+		return
+	}
+	for _, d := range dependency {
+		v := findMatchedVertex(dag, d)
+		if v != nil {
+			dag.Connect(objectVertex, v)
+		}
+	}
+}
+
+func findMatchedVertex(dag *graph.DAG, object client.Object) graph.Vertex {
+	for _, vertex := range dag.Vertices() {
+		v, _ := vertex.(*ObjectVertex)
+		if v.Obj == object || v.OriObj == object {
+			return vertex
+		}
+		// TODO(free6om): compare by type and objectKey
+	}
+	return nil
 }

@@ -70,14 +70,8 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 	if err != nil {
 		return err
 	}
-	// get root vertex(i.e. consensus set)
-	root, err := model.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
 	for _, pod := range podsToBeUpdated {
-		vertex := &model.ObjectVertex{Obj: pod, Action: model.ActionPtr(model.DELETE)}
-		dag.AddConnect(root, vertex)
+		model.PrepareDelete(dag, pod)
 	}
 
 	return nil

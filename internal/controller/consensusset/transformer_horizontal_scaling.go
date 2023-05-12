@@ -492,12 +492,7 @@ func startControlJob(dag *graph.DAG, job batchv1.Job) error {
 	jobOld := job.DeepCopy()
 	suspend := false
 	job.Spec.Suspend = &suspend
-	vertex := &model.ObjectVertex{
-		Obj:    &job,
-		OriObj: jobOld,
-		Action: model.ActionPtr(model.UPDATE),
-	}
-	dag.AddConnectRoot(vertex)
+	model.PrepareUpdate(dag, jobOld, &job)
 	return nil
 }
 
@@ -513,19 +508,10 @@ func doControlJobCleanup(transCtx *CSSetTransformContext, jobType string, dag *g
 		// failed job: update label
 		jobOld := job.DeepCopy()
 		job.Labels[jobHandledLabel] = jobHandledTrue
-		vertex := &model.ObjectVertex{
-			Obj:    &job,
-			OriObj: jobOld,
-			Action: model.ActionPtr(model.UPDATE),
-		}
-		dag.AddConnectRoot(vertex)
+		model.PrepareUpdate(dag, jobOld, &job)
 	case stateControlJobSuccess(job):
 		// succeeded job: be deleted
-		vertex := &model.ObjectVertex{
-			Obj:    &job,
-			Action: model.ActionPtr(model.DELETE),
-		}
-		dag.AddConnectRoot(vertex)
+		model.PrepareDelete(dag, &job)
 	}
 }
 

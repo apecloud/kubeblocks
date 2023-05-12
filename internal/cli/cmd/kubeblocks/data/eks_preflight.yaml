@@ -25,6 +25,13 @@ spec:
               message: This application requires at least 3 nodes
           - pass:
               message: This cluster has enough nodes.
+    - storageClass:
+        checkName: Required-Default-SC
+        outcomes:
+          - fail:
+              message: The default storage class was not found. To learn more details, please check https://docs.aws.amazon.com/zh_cn/eks/latest/userguide/storage-classes.html.
+          - pass:
+              message: default storage class is the presence, and all good on storage classes
     - deploymentStatus:
         checkName: AWS-Load-Balancer-Check
         name: aws-load-balancer-controller
@@ -49,12 +56,10 @@ spec:
               message: k8s cluster access fail
           - pass:
               message: k8s cluster access ok
-    - storageClass:
-        checkName: Required-GP3-SC
-        storageClassType: "gp3"
-        provisioner: "ebs.csi.aws.com"
+    - taint:
+        checkName: Required-Taint-Match
         outcomes:
           - fail:
-              message: The gp3 storage class was not found
+              message: The taint matching failed.
           - pass:
-              message: gp3 is the presence, and all good on storage classes
+              message: The taint matching succeeded.

@@ -31,6 +31,7 @@ import (
 	"github.com/replicatedhq/troubleshoot/pkg/logger"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/viper"
+	"helm.sh/helm/v3/pkg/cli/values"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -39,14 +40,14 @@ import (
 	kbcollector "github.com/apecloud/kubeblocks/internal/preflight/collector"
 )
 
-func CollectPreflight(f cmdutil.Factory, ctx context.Context, kbPreflight *preflightv1beta2.Preflight, kbHostPreflight *preflightv1beta2.HostPreflight, progressCh chan interface{}) ([]preflight.CollectResult, error) {
+func CollectPreflight(f cmdutil.Factory, helmOpts *values.Options, ctx context.Context, kbPreflight *preflightv1beta2.Preflight, kbHostPreflight *preflightv1beta2.HostPreflight, progressCh chan interface{}) ([]preflight.CollectResult, error) {
 	var (
 		collectResults []preflight.CollectResult
 		err            error
 	)
 	// deal with preflight
 	if kbPreflight != nil && (len(kbPreflight.Spec.ExtendCollectors) > 0 || len(kbPreflight.Spec.Collectors) > 0) {
-		res, err := CollectClusterData(ctx, kbPreflight, f, progressCh)
+		res, err := CollectClusterData(ctx, kbPreflight, f, helmOpts, progressCh)
 		if err != nil {
 			return collectResults, errors.Wrap(err, "failed to collect data in cluster")
 		}
@@ -127,7 +128,7 @@ func CollectHost(ctx context.Context, opts preflight.CollectOpts, collectors []p
 }
 
 // CollectClusterData transforms the specs of Preflight to Collector, and sets the collectOpts, such as restConfig, Namespace, and ProgressChan
-func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, f cmdutil.Factory, progressCh chan interface{}) (*preflight.CollectResult, error) {
+func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, f cmdutil.Factory, helmOpts *values.Options, progressCh chan interface{}) (*preflight.CollectResult, error) {
 	var err error
 	v := viper.GetViper()
 
@@ -182,12 +183,18 @@ func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Prefl
 	//	// todo user defined cluster collector
 	// }
 
-	collectResults, err := CollectCluster(ctx, collectOpts, collectors, allCollectorsMap, kbPreflight)
+	collectResults, err := CollectCluster(ctx, collectOpts, collectors, allCollectorsMap, kbPreflight, helmOpts)
 	return &collectResults, err
 }
 
-// CollectCluster collects ciuster data against by Collector，and returns the collected data which is encapsulated in CollectResult struct
-func CollectCluster(ctx context.Context, opts preflight.CollectOpts, allCollectors []pkgcollector.Collector, allCollectorsMap map[reflect.Type][]pkgcollector.Collector, kbPreflight *preflightv1beta2.Preflight) (preflight.CollectResult, error) {
+// CollectCluster collects cluster data against by Collector，and returns the collected data which is encapsulated in CollectResult struct
+func CollectCluster(ctx context.Context,
+	opts preflight.CollectOpts,
+	allCollectors []pkgcollector.Collector,
+	allCollectorsMap map[reflect.Type][]pkgcollector.Collector,
+	kbPreflight *preflightv1beta2.Preflight,
+	helmOpts *values.Options,
+) (preflight.CollectResult, error) {
 	var foundForbidden bool
 	allCollectedData := make(map[string][]byte)
 	collectorList := map[string]preflight.CollectorStatus{}
@@ -223,6 +230,7 @@ func CollectCluster(ctx context.Context, opts preflight.CollectOpts, allCollecto
 		},
 		AnalyzerSpecs:   kbPreflight.Spec.Analyzers,
 		KbAnalyzerSpecs: kbPreflight.Spec.ExtendAnalyzers,
+		HelmOptions:     helmOpts,
 	}
 
 	if foundForbidden && !opts.IgnorePermissionErrors {

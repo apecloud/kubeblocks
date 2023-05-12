@@ -47,5 +47,3 @@ spec:
               message: The taint matching failed.
           - pass:
               message: The taint matching succeeded.
-    - storageClass:
-        checkName: Required-Default-SC

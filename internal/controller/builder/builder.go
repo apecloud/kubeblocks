@@ -262,7 +262,7 @@ func BuildHeadlessSvc(params BuilderParams) (*corev1.Service, error) {
 	return &service, nil
 }
 
-func BuildRbac(params BuilderParams) (*corev1.ServiceAccount, *rbacv1.Role, *rbacv1.RoleBinding, error) {
+func BuildRBAC(params BuilderParams) (*corev1.ServiceAccount, *rbacv1.Role, *rbacv1.RoleBinding, error) {
 	const tplFile = "rbac_template.cue"
 
 	sa := &corev1.ServiceAccount{}

@@ -40,7 +40,7 @@ func (c *RbacTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	params := builder.BuilderParams{
 		Cluster: cluster,
 	}
-	serviceAccount, role, roleBinding, _ := builder.BuildRbac(params)
+	serviceAccount, role, roleBinding, _ := builder.BuildRBAC(params)
 	saVertex := &lifecycleVertex{obj: serviceAccount}
 	dag.AddVertex(saVertex)
 	roleVertex := &lifecycleVertex{obj: role}

@@ -302,7 +302,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		})
 
 		Context("creating a backupPolicy with global backup config", func() {
-			It("ccreating a backupPolicy with global backup config", func() {
+			It("creating a backupPolicy with global backup config", func() {
 				By("By creating a backupPolicy with empty secret")
 				pvcName := "backup-data"
 				pvcInitCapacity := "10Gi"
@@ -320,6 +320,52 @@ var _ = Describe("Backup Policy Controller", func() {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.Name).To(Equal(pvcName))
 					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.InitCapacity.String()).To(Equal(pvcInitCapacity))
+				})).Should(Succeed())
+			})
+		})
+		Context("creating a logfile backupPolicy", func() {
+			It("with reconfigure config", func() {
+				By("creating a backupPolicy")
+				pvcName := "backup-data"
+				pvcInitCapacity := "10Gi"
+				viper.SetDefault(constant.CfgKeyBackupPVCName, pvcName)
+				viper.SetDefault(constant.CfgKeyBackupPVCInitCapacity, pvcInitCapacity)
+				reconfigureRef := `{
+					"name": "postgresql-configuration",
+					"key": "postgresql.conf",
+					"enable": {
+					  "logfile": [{"key":"archive_command","value":"''"}]
+					},
+					"disable": {
+					  "logfile": [{"key": "archive_command","value":"'/bin/true'"}]
+					}
+				  }`
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddAnnotations(constant.ReconfigureRefAnnotationKey, reconfigureRef).
+					SetBackupToolName(backupToolName).
+					AddIncrementalPolicy().
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					AddSnapshotPolicy().
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					Create(&testCtx).GetObject()
+				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+				})).Should(Succeed())
+				By("enable schedule for reconfigure")
+				Expect(testapps.GetAndChangeObj(&testCtx, backupPolicyKey, func(fetched *dpv1alpha1.BackupPolicy) {
+					fetched.Spec.Schedule.Logfile = &dpv1alpha1.SchedulePolicy{Enable: true, CronExpression: "* * * * *"}
+				})()).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotation]).To(Equal(`[{"key":"archive_command","value":"''"}]`))
+				})).Should(Succeed())
+
+				By("disable schedule for reconfigure")
+				Expect(testapps.GetAndChangeObj(&testCtx, backupPolicyKey, func(fetched *dpv1alpha1.BackupPolicy) {
+					fetched.Spec.Schedule.Logfile.Enable = false
+				})()).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotation]).To(Equal(`[{"key":"archive_command","value":"'/bin/true'"}]`))
 				})).Should(Succeed())
 			})
 		})

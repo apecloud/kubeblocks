@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flink-jm-config
+  labels:
+    {{- include "flink.labels" . | nindent 4 }}
+data:
+  flink-conf.yaml: |-
+    {{- .Files.Get "configs/jm-flink-config.yaml.tpl" | nindent 4 }}
+  log4j-console.properties: |-
+    {{- .Files.Get "configs/log4j-console.prop.tpl" | nindent 4 }}
+  logback-console.xml: |-
+    {{- .Files.Get "configs/logback-console.xml.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flink-tm-config
+  labels:
+    {{- include "flink.labels" . | nindent 4 }}
+data:
+  flink-conf.yaml: |-
+    {{- .Files.Get "configs/tm-flink-config.yaml.tpl" | nindent 4 }}
+  log4j-console.properties: |-
+    {{- .Files.Get "configs/log4j-console.prop.tpl" | nindent 4 }}
+  logback-console.xml: |-
+    {{- .Files.Get "configs/logback-console.xml.tpl" | nindent 4 }}

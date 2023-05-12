@@ -1,0 +1,93 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: flink
+  labels:
+    {{- include "flink.labels" . | nindent 4 }}
+spec:
+  type: flink
+  componentDefs:
+    - name: jobmanager
+      characterType: flink
+      workloadType: Stateless
+      service:
+        ports:
+          - name: tcp-rpc
+            port: 6123
+            targetPort: tcp-rpc
+          - name: tcp-http
+            port: 8081
+            targetPort: tcp-http
+          - name: tcp-blob
+            port: 6124
+            targetPort: tcp-blob
+      configSpecs:
+        - name: flink-config
+          templateRef: flink-jm-config
+          volumeName: flink-config
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0644
+      podSpec:
+        securityContext:
+          runAsUser: 9999
+          runAsGroup: 9999
+          fsGroup: 9999
+        containers:
+          - name: jobmanager-main-container
+            volumeMounts:
+              - mountPath: /opt/flink/conf
+                name: flink-config
+            command:
+              - /docker-entrypoint.sh
+            args:
+              - jobmanager
+            ports:
+              - containerPort: 8081
+                name: tcp-http
+                protocol: TCP
+              - containerPort: 6123
+                name: tcp-rpc
+                protocol: TCP
+              - containerPort: 6124
+                name: tcp-blob
+                protocol: TCP
+            env:
+              - name: JOB_MANAGER_RPC_ADDRESS
+                value: $(KB_CLUSTER_COMP_NAME)
+            securityContext:
+              allowPrivilegeEscalation: false
+    - name: taskmanager
+      characterType: flink
+      workloadType: Stateless
+      configSpecs:
+        - name: flink-config
+          templateRef: flink-tm-config
+          volumeName: flink-config
+          namespace: {{ .Release.Namespace }}
+      podSpec:
+        securityContext:
+          runAsUser: 9999
+          runAsGroup: 9999
+          fsGroup: 9999
+        containers:
+          - name: taskmanager-main-container
+            command:
+              - /docker-entrypoint.sh
+            args:
+              - taskmanager
+            volumeMounts:
+              - mountPath: /opt/flink/conf
+                name: flink-config
+            ports:
+              - name: data
+                containerPort: 6121
+              - name: rpc
+                containerPort: 6122
+                protocol: TCP
+            env:
+              - name: JOB_MANAGER_RPC_ADDRESS
+                value: "myflink-flink-cluster-jobmanager"
+              - name: TASK_MANAGER_NUMBER_OF_TASK_SLOTS
+                value: "6"
+            securityContext:
+              allowPrivilegeEscalation: false

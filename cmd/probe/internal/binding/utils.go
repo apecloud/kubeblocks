@@ -24,7 +24,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"os"
 	"text/template"
 	"time"
@@ -37,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 type UserInfo struct {
@@ -278,7 +278,7 @@ source:
 	nodeName := os.Getenv("KB_NODENAME")
 	namespace := os.Getenv("KB_NAMESPACE")
 	msg, _ := json.Marshal(opsResult)
-	seq := randStringBytes(16)
+	seq := rand.String(16)
 	roleValue := map[string]string{
 		"PodName":   podName,
 		"Namespace": namespace,
@@ -307,14 +307,4 @@ source:
 	event.LastTimestamp = metav1.Now()
 
 	return event, nil
-}
-
-const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyz"
-
-func randStringBytes(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
 }

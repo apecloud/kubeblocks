@@ -36,7 +36,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -260,33 +259,6 @@ func BuildHeadlessSvc(params BuilderParams) (*corev1.Service, error) {
 		return nil, err
 	}
 	return &service, nil
-}
-
-func BuildRBAC(params BuilderParams) (*corev1.ServiceAccount, *rbacv1.Role, *rbacv1.RoleBinding, error) {
-	const tplFile = "rbac_template.cue"
-
-	sa := &corev1.ServiceAccount{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster": params.Cluster,
-	}, "sa", sa); err != nil {
-		return nil, nil, nil, err
-	}
-
-	role := &rbacv1.Role{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster": params.Cluster,
-	}, "role", role); err != nil {
-		return nil, nil, nil, err
-	}
-
-	rb := &rbacv1.RoleBinding{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster": params.Cluster,
-	}, "rolebinding", rb); err != nil {
-		return nil, nil, nil, err
-	}
-
-	return sa, role, rb, nil
 }
 
 func BuildSts(reqCtx intctrlutil.RequestCtx, params BuilderParams, envConfigName string) (*appsv1.StatefulSet, error) {

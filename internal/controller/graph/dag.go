@@ -159,7 +159,7 @@ func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 func (d *DAG) Root() Vertex {
 	roots := make([]Vertex, 0)
 	for n := range d.vertices {
-		if len(d.inAdj(n)) == 0 {
+		if len(d.InAdj(n)) == 0 {
 			roots = append(roots, n)
 		}
 	}
@@ -211,7 +211,7 @@ func (d *DAG) validate() error {
 		}
 
 		marked[v] = true
-		adjacent := d.outAdj(v)
+		adjacent := d.OutAdj(v)
 		for _, vertex := range adjacent {
 			if err := walk(vertex); err != nil {
 				return err
@@ -246,9 +246,9 @@ func (d *DAG) topologicalOrder(reverse bool) []Vertex {
 		}
 		var adjacent []Vertex
 		if reverse {
-			adjacent = d.outAdj(v)
+			adjacent = d.OutAdj(v)
 		} else {
-			adjacent = d.inAdj(v)
+			adjacent = d.InAdj(v)
 		}
 		for _, vertex := range adjacent {
 			walk(vertex)
@@ -262,8 +262,8 @@ func (d *DAG) topologicalOrder(reverse bool) []Vertex {
 	return orders
 }
 
-// outAdj returns all adjacent vertices that v points to
-func (d *DAG) outAdj(v Vertex) []Vertex {
+// OutAdj returns all adjacent vertices that v points to
+func (d *DAG) OutAdj(v Vertex) []Vertex {
 	vertices := make([]Vertex, 0)
 	for e := range d.edges {
 		if e.From() == v {
@@ -273,8 +273,8 @@ func (d *DAG) outAdj(v Vertex) []Vertex {
 	return vertices
 }
 
-// inAdj returns all adjacent vertices that point to v
-func (d *DAG) inAdj(v Vertex) []Vertex {
+// InAdj returns all adjacent vertices that point to v
+func (d *DAG) InAdj(v Vertex) []Vertex {
 	vertices := make([]Vertex, 0)
 	for e := range d.edges {
 		if e.To() == v {

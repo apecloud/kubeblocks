@@ -227,8 +227,9 @@ func (w *envWrapper) checkAndReplaceEnv(value string, container *corev1.Containe
 
 func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValue string, container *corev1.Container) (string, error) {
 	var (
+		clusterName   = w.localObjects.Cluster.Name
 		componentName = w.localObjects.Component.Name
-		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(w.localObjects.Cluster, componentName)
+		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, componentName)
 	)
 
 	builtInEnvMap[constant.ConnCredentialPlaceHolder] = component.GenerateConnCredential(w.localObjects.Cluster.Name)

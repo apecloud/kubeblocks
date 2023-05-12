@@ -7,7 +7,7 @@ spec:
     - clusterInfo: {}
   analyzers:
     - clusterVersion:
-        checkName: ACK-Version
+        checkName: GKE-Version
         outcomes:
           - fail:
               when: "< 1.22.0"
@@ -25,13 +25,6 @@ spec:
               message: This application requires at least 3 nodes
           - pass:
               message: This cluster has enough nodes.
-    - storageClass:
-        checkName: Required-Default-SC
-        outcomes:
-          - fail:
-              message: The default storage class was not found. To learn more details, please check https://help.aliyun.com/document_detail/189288.html.
-          - pass:
-              message: default storage class is the presence, and all good on storage classes
   extendAnalyzers:
     - clusterAccess:
         checkName: Check-K8S-Access
@@ -40,10 +33,12 @@ spec:
               message: k8s cluster access fail
           - pass:
               message: k8s cluster access ok
-    - taint:
-        checkName: Required-Taint-Match
+    - storageClass:
+        checkName: Required-Cloud-SSD-SC
+        storageClassType: "cloud_ssd"
+        provisioner: "diskplugin.csi.alibabacloud.com"
         outcomes:
           - fail:
-              message: The taint matching failed.
+              message: The cloud_ssd storage class was not found
           - pass:
-              message: The taint matching succeeded.
+              message: cloud_ssd is the presence, and all good on storage classes

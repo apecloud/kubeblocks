@@ -25,13 +25,6 @@ spec:
               message: This application requires at least 3 nodes
           - pass:
               message: This cluster has enough nodes.
-    - storageClass:
-        checkName: Required-Default-SC
-        outcomes:
-          - fail:
-              message: The default storage class was not found. To learn more details, please check https://cloud.tencent.com/document/product/457/44235.
-          - pass:
-              message: default storage class is the presence, and all good on storage classes
   extendAnalyzers:
     - clusterAccess:
         checkName: Check-K8S-Access
@@ -40,10 +33,12 @@ spec:
               message: k8s cluster access fail
           - pass:
               message: k8s cluster access ok
-    - taint:
-        checkName: Required-Taint-Match
+    - storageClass:
+        checkName: Required-CBS-SC
+        storageClassType: "cbs"
+        provisioner: "com.tencent.cloud.csi.cbs"
         outcomes:
           - fail:
-              message: The taint matching failed.
+              message: The cbs storage class was not found
           - pass:
-              message: The taint matching succeeded.
+              message: cbs is the presence, and all good on storage classes

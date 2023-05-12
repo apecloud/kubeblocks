@@ -106,7 +106,7 @@ var _ = Describe("backupconfig", func() {
 		}
 		cmd := NewConfigCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(o.PrecheckBeforeInstall()).Should(Succeed())
+		Expect(o.Install()).Should(Succeed())
 	})
 
 	It("run describe config cmd", func() {

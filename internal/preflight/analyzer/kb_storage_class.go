@@ -31,7 +31,12 @@ import (
 )
 
 const (
-	StorageClassPath = "cluster-resources/storage-classes.json"
+	StorageClassPath      = "cluster-resources/storage-classes.json"
+	MissingOutcomeMessage = "there is a missing outcome message"
+	IncorrectOutcomeType  = "there is an incorrect outcome type"
+	PassType              = "Pass"
+	WarnType              = "Warn"
+	FailType              = "Fail"
 )
 
 type AnalyzeStorageClassByKb struct {

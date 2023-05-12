@@ -52,7 +52,7 @@ var _ = Describe("analyze_test", func() {
 
 	It("doAnalyze test, and expect success", func() {
 		Eventually(func(g Gomega) {
-			analyzeList := doAnalyze(ctx, allCollectedData, analyzers, kbAnalyzers, hostAnalyzers, kbhHostAnalyzers, nil)
+			analyzeList := doAnalyze(ctx, allCollectedData, analyzers, kbAnalyzers, hostAnalyzers, kbhHostAnalyzers)
 			g.Expect(len(analyzeList)).Should(Equal(4))
 			g.Expect(analyzeList[0].IsPass).Should(Equal(true))
 			g.Expect(analyzeList[1].IsFail).Should(Equal(true))

@@ -43,6 +43,12 @@ var _ = Describe("text_results_test", func() {
 				URI:     "https://kubernetes.io",
 			},
 			{
+				IsFail:  true,
+				Title:   "fail item",
+				Message: "message for fail test",
+				URI:     "https://kubernetes.io",
+			},
+			{
 				IsWarn:  true,
 				Title:   "warn item",
 				Message: "message for warn test",
@@ -59,26 +65,6 @@ var _ = Describe("text_results_test", func() {
 			g.Expect(err).NotTo(HaveOccurred())
 			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false)
 			g.Expect(err).To(HaveOccurred())
-		}).ShouldNot(HaveOccurred())
-	})
-	It("ShowStdoutResults Test", func() {
-		analyzeResults := []*analyzerunner.AnalyzeResult{
-			{
-				IsFail:  true,
-				Title:   "fail item",
-				Message: "message for fail test",
-				URI:     "https://kubernetes.io",
-			},
-		}
-		Eventually(func(g Gomega) {
-			err := ShowTextResults(preflightName, analyzeResults, humanFormat, false)
-			g.Expect(err).To(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, jsonFormat, true)
-			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, yamlFormat, false)
-			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false)
-			g.Expect(err).To(HaveOccurred())
-		}).Should(HaveOccurred())
+		}).Should(Succeed())
 	})
 })

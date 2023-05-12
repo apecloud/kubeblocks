@@ -1,0 +1,129 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: flink
+  labels:
+    {{- include "flink.labels" . | nindent 4 }}
+spec:
+  type: flink
+  componentDefs:
+    - name: jobmanager
+      characterType: flink
+      workloadType: Stateless
+      constraints:
+        numberOfOccurrence: ExactlyOnce
+      service:
+        ports:
+          - name: tcp-rpc
+            port: 6123
+            targetPort: tcp-rpc
+          - name: tcp-http
+            port: 8081
+            targetPort: tcp-http
+          - name: tcp-blob
+            port: 6124
+            targetPort: tcp-blob
+      scriptSpecs:
+        - name: flink-scripts
+          templateRef: flink-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
+      podSpec:
+        {{- with .Values.jobmanager }}
+        securityContext:
+          {{- toYaml .podSecurityContext | nindent 10 }}
+        {{- end }}
+        containers:
+          - name: jobmanager-main-container
+            command:
+              - /scripts/setup.sh
+            args:
+              - jobmanager
+            ports:
+              - containerPort: 8081
+                name: tcp-http
+                protocol: TCP
+              - containerPort: 6123
+                name: tcp-rpc
+                protocol: TCP
+              - containerPort: 6124
+                name: tcp-blob
+                protocol: TCP
+            {{- with .Values.jobmanager }}
+            securityContext:
+              {{- toYaml .containerSecurityContext | nindent 14 }}
+            {{- end }}
+            env:
+              - name: JOB_MANAGER_RPC_ADDRESS
+                value: $(KB_CLUSTER_COMP_NAME)
+              - name: JOB_MANAGER_PROCESS_SIZE
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: jobmanager-main-container
+                    resource: limits.memory
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+                readOnly: true
+    - name: taskmanager
+      characterType: flink
+      workloadType: Stateless
+      constraints:
+        numberOfOccurrence: ExactlyOnce
+      # two envs will be injected into the pod before user-defined envs are
+      # JOBMANAGER_RPC_NAME: $clusterName-$componentName
+      # JOBMANAGER_RPC_PORT: 6123
+      componentRef:
+        - componentDefName: jobmanager
+          serviceFieldRefs:
+            - envNamePrefix: JOBMANAGER_RPC_SVC
+              serviceName: tcp-rpc
+          fieldRefs:
+            - envName: JOBMANAGER_COMP_NAME
+              fieldPath: name
+      scriptSpecs:
+        - name: flink-scripts
+          templateRef: flink-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
+      podSpec:
+        {{- with .Values.taskmanager }}
+        securityContext:
+          {{- toYaml .podSecurityContext | nindent 10 }}
+        {{- end }}
+        containers:
+          - name: taskmanager-main-container
+            command:
+              - /scripts/setup.sh
+            args:
+              - taskmanager
+            ports:
+              - name: data
+                containerPort: 6121
+              - name: rpc
+                containerPort: 6122
+                protocol: TCP
+            env:
+              - name: TASK_MANAGER_PROCESS_SIZE
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: taskmanager-main-container
+                    resource: limits.memory
+              - name: JOB_MANAGER_RPC_ADDRESS
+                value: $(JOBMANAGER_RPC_SVC_NAME)
+              - name: JOB_MANAGER_RPC_PORT
+                value: $(JOBMANAGER_RPC_SVC_PORT)
+            {{- with .Values.taskmanager }}
+              - name: TASK_MANAGER_NUMBER_OF_TASK_SLOTS
+                value: {{ .numberOfTaskSlots | quote }}
+            {{- end }}
+            {{- with .Values.taskmanager }}
+            securityContext:
+              {{- toYaml .containerSecurityContext | nindent 14 }}
+            {{- end }}
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+                readOnly: true

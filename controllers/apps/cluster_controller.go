@@ -170,6 +170,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.ValidateAndLoadRefResourcesTransformer{},
 			// validate config
 			&lifecycle.ValidateEnableLogsTransformer{},
+			// validate againt cluster def constraints
+			&lifecycle.ConstraintsValidationTransformer{},
 			// fix spec
 			// fill class related info
 			&lifecycle.FillClassTransformer{},

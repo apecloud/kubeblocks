@@ -148,7 +148,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	validateSystemAccount := func(component *ClusterComponentDefinition) {
 		sysAccountSpec := component.SystemAccounts
 		if sysAccountSpec != nil {
-			sysAccountSpec.validateSysAccounts(allErrs)
+			sysAccountSpec.validate(allErrs)
 		}
 	}
 
@@ -188,6 +188,10 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	}
 
 	for _, component := range r.Spec.ComponentDefs {
+		for _, compRef := range component.ComponentRef {
+			compRef.validate(allErrs)
+		}
+
 		if err := r.validateConfigSpec(component); err != nil {
 			*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
 			continue
@@ -214,8 +218,8 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	}
 }
 
-// validateSysAccounts validate spec.components[].systemAccounts
-func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
+// validate validates spec.components[].systemAccounts
+func (r *SystemAccountSpec) validate(allErrs *field.ErrorList) {
 	accountName := make(map[AccountName]bool)
 	for _, sysAccount := range r.Accounts {
 		// validate provision policy
@@ -284,4 +288,11 @@ func validateConfigTemplateList(ctpls []ComponentConfigSpec) error {
 		volumeSet[tpl.VolumeName] = struct{}{}
 	}
 	return nil
+}
+
+func (r ComponentRef) validate(allErrs *field.ErrorList) {
+	if len(r.ComponentDefName) == 0 && len(r.ComponentName) == 0 {
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentDefName"), r.ComponentDefName,
+			"componentDefName and componentName cannot be empty at the same time"))
+	}
 }

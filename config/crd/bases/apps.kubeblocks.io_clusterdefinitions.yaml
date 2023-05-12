@@ -64,6 +64,92 @@ spec:
                         KubeBlocks will generate proper monitor configs for well-known
                         characterType when builtIn is true.
                       type: string
+                    componentRef:
+                      description: componentRef is used to select the component to
+                        be referenced.
+                      items:
+                        properties:
+                          componentDefName:
+                            description: componentDefName is the name of the componentDef
+                              to select.
+                            type: string
+                          componentName:
+                            description: componentName is the name of the component
+                              to select.
+                            type: string
+                          fieldRefs:
+                            description: FieldRefs is the field of the component to
+                              select.
+                            items:
+                              properties:
+                                envName:
+                                  description: envName is the name of the env to be
+                                    injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                fieldPath:
+                                  description: fieldPath is the field of the component
+                                    to select.
+                                  type: string
+                              required:
+                              - envName
+                              - fieldPath
+                              type: object
+                            type: array
+                          referenceStrategy:
+                            description: referenceStrategy is the strategy of the
+                              component to select.
+                            enum:
+                            - optional
+                            - required
+                            type: string
+                          resourceFieldRefs:
+                            description: resourceFieldRef is the field of the resource
+                              to select.
+                            items:
+                              properties:
+                                divisor:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: divisor specifies the output format
+                                    of the exposed resources, defaults to "1"
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                envName:
+                                  description: envName is the name of the env to be
+                                    injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                resource:
+                                  description: resource to select
+                                  type: string
+                              required:
+                              - envName
+                              - resource
+                              type: object
+                            type: array
+                          serviceFieldRefs:
+                            description: serviceFieldRef is the field of the service
+                              to select.
+                            items:
+                              properties:
+                                envNamePrefix:
+                                  description: envNamePrefix is the prefix of the
+                                    env to be injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                serviceName:
+                                  description: serviceName is the name of the service
+                                    to select.
+                                  type: string
+                              required:
+                              - envNamePrefix
+                              - serviceName
+                              type: object
+                            type: array
+                        type: object
+                      type: array
                     configSpecs:
                       description: The configSpec field provided by provider, and
                         finally this configTemplateRefs will be rendered into the
@@ -293,6 +379,20 @@ spec:
                           type: string
                       required:
                       - leader
+                      type: object
+                    constraints:
+                      description: constraints is used to describe the constraints
+                        of the component.
+                      properties:
+                        numberOfOccurrence:
+                          description: numberOfOccurrence is the number of occurrences
+                            of the component.
+                          enum:
+                          - ZeroOrOnce
+                          - ExactlyOnce
+                          - OnceOrMore
+                          - Unlimited
+                          type: string
                       type: object
                     customLabelSpecs:
                       description: customLabelSpecs is used for custom label tags

@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -360,6 +361,99 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=key
 	// +optional
 	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
+
+	// constraints is used to describe the constraints of the component.
+	Constraints *Constraints `json:"constraints,omitempty"`
+	// componentRef is used to select the component to be referenced.
+	// +optional
+	ComponentRef []*ComponentRef `json:"componentRef,omitempty"`
+}
+
+// Constraints is used to describe the constraints of the component.
+type Constraints struct {
+	// numberOfOccurrence is the number of occurrences of the component.
+	// +kubebuilder:validation:Enum={ZeroOrOnce,ExactlyOnce, OnceOrMore, Unlimited}
+	// +default="ExactlyOnce"
+	// +optional
+	NumberOfOccurrence CompNumberOfOccType `json:"numberOfOccurrence,omitempty"`
+}
+
+type CompNumberOfOccType string
+
+const (
+	// ZeroOrOnce means the component can be zero or once.
+	ZeroOrOnce CompNumberOfOccType = "ZeroOrOnce"
+	// ExactlyOnce means the component can be exactly once.
+	ExactlyOnce CompNumberOfOccType = "ExactlyOnce"
+	// OnceOrMore means the component can be once or more.
+	OnceOrMore CompNumberOfOccType = "OnceOrMore"
+	// Unlimited means the component can be unlimited.
+	Unlimited CompNumberOfOccType = "Unlimited"
+)
+
+type ComponentRef struct {
+	// componentName is the name of the component to select.
+	// +optional
+	ComponentName string `json:"componentName,omitempty"`
+	// componentDefName is the name of the componentDef to select.
+	// +optional
+	ComponentDefName string `json:"componentDefName,omitempty"`
+	// referenceStrategy is the strategy of the component to select.
+	// +default="Required"
+	// +optional
+	ReferenceStrategy ComponentReferenceStrategy `json:"referenceStrategy,omitempty"`
+	// FieldRefs is the field of the component to select.
+	// +optional
+	FieldRefs []*ComponentFieldRef `json:"fieldRefs,omitempty"`
+	// serviceFieldRef is the field of the service to select.
+	// +optional
+	ServiceRefs []*ComponentServiceRef `json:"serviceFieldRefs,omitempty"`
+	// resourceFieldRef is the field of the resource to select.
+	// +optional
+	ResourceFieldRefs []*ComponentResourceFieldRef `json:"resourceFieldRefs,omitempty"`
+}
+
+type ComponentFieldRef struct {
+	// envName is the name of the env to be injected.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	EnvName string `json:"envName"`
+	// fieldPath is the field of the component to select.
+	// +kubebuilder:validation:Required
+	FieldPath string `json:"fieldPath"`
+}
+
+// ComponentReferenceStrategy defines the strategy of the component to select.
+// +enum
+// +kubebuilder:validation:Enum={optional,required}
+type ComponentReferenceStrategy string
+
+const (
+	OptionalStrategy ComponentReferenceStrategy = "optional"
+	RequiredStrategy ComponentReferenceStrategy = "required"
+)
+
+type ComponentResourceFieldRef struct {
+	// envName is the name of the env to be injected.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	EnvName string `json:"envName"`
+	// resource to select
+	// +kubebuilder:validation:Required
+	Resource string `json:"resource"`
+	// divisor specifies the output format of the exposed resources, defaults to "1"
+	// +optional
+	Divisor resource.Quantity `json:"divisor,omitempty"`
+}
+
+type ComponentServiceRef struct {
+	// envNamePrefix is the prefix of the env to be injected.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	EnvNamePrefix string `json:"envNamePrefix"`
+	// serviceName is the name of the service to select.
+	// +kubebuilder:validation:Required
+	ServiceName string `json:"serviceName"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {

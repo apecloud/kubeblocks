@@ -249,7 +249,7 @@ func GetReplacementMapForBuiltInEnv(cluster *appsv1alpha1.Cluster, componentName
 		constant.KBCompNamePlaceHolder:        componentName,
 		constant.KBClusterCompNamePlaceHolder: fmt.Sprintf("%s-%s", cluster.Name, componentName),
 	}
-	if cluster.UID != "" && len(cluster.UID) > 8 {
+	if len(cluster.UID) > 8 {
 		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = string(cluster.UID)[len(cluster.UID)-8:]
 	} else {
 		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = string(cluster.UID)

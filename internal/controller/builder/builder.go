@@ -164,7 +164,7 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 	}
 
 	var kbClusterPostfix8 string
-	if params.Cluster.UID != "" && len(params.Cluster.UID) > 8 {
+	if len(params.Cluster.UID) > 8 {
 		kbClusterPostfix8 = string(params.Cluster.UID)[len(params.Cluster.UID)-8:]
 	} else {
 		kbClusterPostfix8 = string(params.Cluster.UID)

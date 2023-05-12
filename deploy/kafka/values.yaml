@@ -17,7 +17,7 @@ images:
   pullPolicy: IfNotPresent
   kafka:
     repository: docker.io/bitnami/kafka
-    tag: 3.4.0-debian-11-r8
+    tag: 3.4.0-debian-11-r22
   kafkaExporter:
     repository: docker.io/bitnami/kafka-exporter
     tag: 1.6.0-debian-11-r67
@@ -29,6 +29,9 @@ images:
 ## @param debugEnabled enables containers' debug logging
 ##
 debugEnabled: true
+
+kafkaBroker:
+  minNodeId: 100
 
 ## @param mountOptions set the storageclass mountOptions attributes
 ##

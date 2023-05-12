@@ -31,14 +31,17 @@ kbcli kubeblocks preflight [flags]
       --collector-image string        the full name of the collector image to use
       --collector-pullpolicy string   the pull policy of the collector image
       --debug                         enable debug logging
-      --format string                 output format, one of human, json, yaml. only used when interactive is set to false, default format is yaml (default "yaml")
   -h, --help                          help for preflight
-      --interactive                   interactive preflights, default value is false
   -n, --namespace string              If present, the namespace scope for this CLI request
   -o, --output string                 specify the output file path for the preflight checks
       --selector string               selector (label query) to filter remote collection nodes on.
+      --set stringArray               Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+      --set-file stringArray          Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)
+      --set-json stringArray          Set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)
+      --set-string stringArray        Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
       --since string                  force pod logs collectors to return logs newer than a relative duration like 5s, 2m, or 3h.
       --since-time string             force pod logs collectors to return logs after a specific date (RFC3339)
+  -f, --values strings                Specify values in a YAML file or a URL (can specify multiple)
       --verbose                       print more verbose logs, default value is false
 ```
 

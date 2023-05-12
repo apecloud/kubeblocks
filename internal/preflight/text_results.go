@@ -29,6 +29,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	FailMessage = "Fail items were found. Please resolve the fail items and try again."
+	PassMessage = "The kubernetes cluster preflight check pass, and you can enjoy KubeBlocks now."
+)
+
 type TextResultOutput struct {
 	Title   string `json:"title" yaml:"title"`
 	Message string `json:"message" yaml:"message"`
@@ -71,11 +76,19 @@ func ShowTextResults(preflightName string, analyzeResults []*analyzerunner.Analy
 }
 
 func showTextResultsJSON(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, verbose bool) error {
-	b, err := json.MarshalIndent(showStdoutResultsStructured(preflightName, analyzeResults, verbose), "", "  ")
+	output := showStdoutResultsStructured(preflightName, analyzeResults, verbose)
+	b, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal results as json")
 	}
-	fmt.Printf("%s\n", b)
+	if len(b) <= 5 {
+		fmt.Println(PassMessage)
+	} else {
+		fmt.Printf("%s\n", b)
+	}
+	if len(output.Fail) > 0 {
+		return errors.New(FailMessage)
+	}
 	return nil
 }
 
@@ -87,10 +100,10 @@ func showStdoutResultsYAML(preflightName string, analyzeResults []*analyzerunner
 		failInfo = color.New(color.FgRed)
 	)
 	if len(data.Warn) == 0 && len(data.Fail) == 0 {
-		passInfo.Println("congratulations, your kubernetes cluster preflight check pass, and begin to enjoy KubeBlocks...")
+		fmt.Println(PassMessage)
 	}
 	if len(data.Pass) > 0 {
-		passInfo.Println("pass items")
+		passInfo.Println("Pass items")
 		if b, err := yaml.Marshal(data.Pass); err != nil {
 			return errors.Wrap(err, "failed to marshal results as yaml")
 		} else {
@@ -98,7 +111,7 @@ func showStdoutResultsYAML(preflightName string, analyzeResults []*analyzerunner
 		}
 	}
 	if len(data.Warn) > 0 {
-		warnInfo.Println("warn items")
+		warnInfo.Println("Warn items")
 		if b, err := yaml.Marshal(data.Warn); err != nil {
 			return errors.Wrap(err, "failed to marshal results as yaml")
 		} else {
@@ -106,12 +119,13 @@ func showStdoutResultsYAML(preflightName string, analyzeResults []*analyzerunner
 		}
 	}
 	if len(data.Fail) > 0 {
-		failInfo.Println("fail items")
+		failInfo.Println("Fail items")
 		if b, err := yaml.Marshal(data.Fail); err != nil {
 			return errors.Wrap(err, "failed to marshal results as yaml")
 		} else {
 			fmt.Printf("%s\n", b)
 		}
+		return errors.New(FailMessage)
 	}
 	return nil
 }

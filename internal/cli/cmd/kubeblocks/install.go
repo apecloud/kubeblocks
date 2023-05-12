@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -100,6 +101,12 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
+	p := &PreflightOptions{
+		PreflightFlags: preflight.NewPreflightFlags(),
+		IOStreams:      streams,
+	}
+	*p.Interactive = false
+
 	cmd := &cobra.Command{
 		Use:     "install",
 		Short:   "Install KubeBlocks.",
@@ -107,6 +114,8 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
+			util.CheckErr(o.PrecheckBeforeInstall())
+			util.CheckErr(p.Preflight(f, args, o.ValueOpts))
 			util.CheckErr(o.Install())
 		},
 	}
@@ -116,6 +125,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before install")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks")
+	cmd.Flags().BoolVar(&p.force, flagForce, p.force, "If present, just print fail item and continue with the following steps")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -155,7 +165,7 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	return err
 }
 
-func (o *InstallOptions) Install() error {
+func (o *InstallOptions) PrecheckBeforeInstall() error {
 	// check if KubeBlocks has been installed
 	versionInfo, err := util.GetVersionInfo(o.Client)
 	if err != nil {
@@ -182,7 +192,11 @@ func (o *InstallOptions) Install() error {
 	if err = o.preCheck(versionInfo); err != nil {
 		return err
 	}
+	return nil
+}
 
+func (o *InstallOptions) Install() error {
+	var err error
 	// add monitor parameters
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 

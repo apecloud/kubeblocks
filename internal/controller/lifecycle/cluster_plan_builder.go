@@ -261,6 +261,11 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 			c.transCtx.Logger.Error(err, fmt.Sprintf("update %T error: %s", o, node.oriObj.GetName()))
 			return err
 		}
+	case PATCH:
+		patch := client.MergeFrom(node.oriObj)
+		if err := c.cli.Patch(c.transCtx.Context, node.obj, patch); err != nil {
+			return client.IgnoreNotFound(err)
+		}
 	case DELETE:
 		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
 			err := c.cli.Update(c.transCtx.Context, node.obj)
@@ -344,7 +349,11 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		if pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] == pvcProto.Spec.Resources.Requests[corev1.ResourceStorage] {
 			return pvcObj, nil
 		}
-		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
+		if pvcObj.Spec.Resources.Requests == nil {
+			pvcObj.Spec.Resources.Requests = pvcProto.Spec.Resources.Requests
+		} else {
+			pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
+		}
 		return pvcObj, nil
 	}
 

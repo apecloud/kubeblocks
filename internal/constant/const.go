@@ -80,6 +80,7 @@ const (
 	AppConfigTypeLabelKey           = "apps.kubeblocks.io/config-type"
 	WorkloadTypeLabelKey            = "apps.kubeblocks.io/workload-type"
 	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
+	PVCNameLabelKey                 = "pvc.kubeblocks.io/name"
 	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
 	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"

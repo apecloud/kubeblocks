@@ -54,12 +54,6 @@ data:
         postgresql = local_config['postgresql']
         postgresql['config_dir'] = '/home/postgres/pgdata/conf'
         postgresql['custom_conf'] = '/home/postgres/conf/postgresql.conf'
-        # TODO add local postgresql.parameters
-        if not 'parameters' in postgresql:
-            postgresql['parameters'] = {}
-        parameters = postgresql_conf_to_dict("/home/postgres/conf/postgresql.conf")
-        if 'archive_command' in parameters:
-            postgresql['parameters']['archive_command'] = parameters['archive_command']
         # add pg_hba.conf
         with open('/home/postgres/conf/pg_hba.conf', 'r') as f:
             lines = read_file_lines(f)

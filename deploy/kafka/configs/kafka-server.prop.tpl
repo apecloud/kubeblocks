@@ -18,30 +18,8 @@ log.retention.hours=168
 log.retention.bytes=1073741824
 log.segment.bytes=1073741824
 log.retention.check.interval.ms=300000
-group.initial.rebalance.delay.ms=0
+group.initial.rebalance.delay.ms=3000
 message.max.bytes=1000012
-{{- $component := fromJson "{}" }}
-{{- if ne "broker" ( getEnvByName ( index $.component.podSpec.containers 0 ) "KAFKA_CFG_PROCESS_ROLES" ) }}
-  {{- $component = $.component }}
-{{- else }} 
-{{- /* find kafka-controller component */}}
-  {{- range $i, $e := $.cluster.spec.componentSpecs }}
-    {{- if eq $e.componentDefRef "kafka-controller" }}
-      {{- $component = $e }}
-    {{- end }}
-  {{- end }}
-{{- end }}
-{{- /* build controller.quorum.voters value string */}}
-{{- $clusterName := $.cluster.metadata.name }}
-{{- $namespace := $.cluster.metadata.namespace }}
-{{- $replicas := $component.replicas | int }}
-{{- $voters := "" }}
-{{- range $i, $e := until $replicas }}
-  {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc" $clusterName $component.name $i $clusterName $component.name $namespace }}
-  {{- $voter := printf "%d@%s:9093" $i $podFQDN }}
-  {{- $voters = printf "%s,%s" $voters $voter }}
-{{- end }}
-{{- $voters = trimPrefix "," $voters }}
-controller.quorum.voters={{ $voters }}
+controller.quorum.voters=
 authorizer.class.name=
 # end (DON'T REMOVE THIS LINE)

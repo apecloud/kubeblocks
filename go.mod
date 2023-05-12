@@ -12,6 +12,7 @@ require (
 	github.com/authzed/controller-idioms v0.7.0
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/briandowns/spinner v1.23.0
+	github.com/chaos-mesh/chaos-mesh/api v0.0.0-20230423031423-0b31a519b502
 	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/containerd/stargz-snapshotter/estargz v0.13.0
 	github.com/containers/common v0.49.1
@@ -117,6 +118,7 @@ require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
+	github.com/alecthomas/units v0.0.0-20210927113745-59d0afb8317a // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
@@ -290,6 +292,7 @@ require (
 	github.com/prometheus/statsd_exporter v0.22.3 // indirect
 	github.com/protocolbuffers/txtpbfmt v0.0.0-20201118171849-f6a6b3f636fc // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rubenv/sql-migrate v1.2.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/savsgio/gotils v0.0.0-20220530130905-52f3993e8d6d // indirect

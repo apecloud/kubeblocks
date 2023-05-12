@@ -41,7 +41,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -135,7 +134,6 @@ func (o *describeOptions) describeCluster(name string) error {
 			WithClusterDef:     true,
 			WithService:        true,
 			WithPod:            true,
-			WithEvent:          true,
 			WithPVC:            true,
 			WithDataProtection: true,
 		},
@@ -166,7 +164,7 @@ func (o *describeOptions) describeCluster(name string) error {
 	showDataProtection(o.BackupPolicies, o.Backups, o.Out)
 
 	// events
-	showEvents(o.Events, o.Cluster.Name, o.Cluster.Namespace, o.Out)
+	showEvents(o.Cluster.Name, o.Cluster.Namespace, o.Out)
 	fmt.Fprintln(o.Out)
 
 	return nil
@@ -206,27 +204,9 @@ func showImages(comps []*cluster.ComponentInfo, out io.Writer) {
 	tbl.Print()
 }
 
-func showEvents(events *corev1.EventList, name string, namespace string, out io.Writer) {
-	objs := util.SortEventsByLastTimestamp(events, corev1.EventTypeWarning)
-
-	// print last 5 events
-	title := fmt.Sprintf("\nEvents(last 5 warnings, see more:kbcli cluster list-events -n %s %s):", namespace, name)
-	tbl := newTbl(out, title, "TIME", "TYPE", "REASON", "OBJECT", "MESSAGE")
-	cnt := 0
-	for _, o := range *objs {
-		e := o.(*corev1.Event)
-		// do not output KubeBlocks probe events
-		if e.InvolvedObject.FieldPath == constant.ProbeCheckRolePath {
-			continue
-		}
-
-		tbl.AddRow(util.GetEventTimeStr(e), e.Type, e.Reason, util.GetEventObject(e), e.Message)
-		cnt++
-		if cnt == 5 {
-			break
-		}
-	}
-	tbl.Print()
+func showEvents(name string, namespace string, out io.Writer) {
+	// hint user how to get events
+	fmt.Fprintf(out, "\nShow cluster events: kbcli cluster list-events -n %s %s", namespace, name)
 }
 
 func showEndpoints(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList, out io.Writer) {

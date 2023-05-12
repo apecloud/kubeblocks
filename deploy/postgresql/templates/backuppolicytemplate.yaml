@@ -36,6 +36,8 @@ spec:
       backupToolName: postgres-basebackup
     incremental:
       backupToolName: postgres-pitr
+      target:
+        role: primary
       backupStatusUpdates:
         - path: manifests.backupLog
           containerName: postgresql

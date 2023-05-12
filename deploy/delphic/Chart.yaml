@@ -25,13 +25,9 @@ appVersion: "1.16.0"
 
 
 dependencies:
-  - condition: postgres.enabled
-    name: pgcluster
-    alias: postgres
-    repository: file://../postgresql-cluster
-    version: 0.5.0-beta.2
-  - condition: redis.enabled
-    name: redis-cluster
-    alias: redis
-    repository: file://../redis-cluster
-    version: 0.5.0-beta.2
+  - name: pgcluster
+    repository: https://jihulab.com/api/v4/projects/85949/packages/helm/stable
+    version: ~0.5.0-0
+  - name: redis-cluster
+    repository: https://jihulab.com/api/v4/projects/85949/packages/helm/stable
+    version: ~0.5.0-0

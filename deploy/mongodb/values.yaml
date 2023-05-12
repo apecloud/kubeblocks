@@ -39,8 +39,6 @@ metrics:
     pullPolicy: IfNotPresent
   config:
     extensions:
-      memory_ballast:
-        size_mib: 512
       health_check:
         endpoint: 0.0.0.0:13133
         path: /health/status
@@ -90,4 +88,4 @@ metrics:
           processors: [memory_limiter]
           exporters: [prometheus]
 
-      extensions: [memory_ballast, health_check]
+      extensions: [health_check]

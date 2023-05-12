@@ -107,6 +107,13 @@ List and open the KubeBlocks dashboards.
 * [kbcli dashboard open](kbcli_dashboard_open.md)	 - Open one dashboard.
 
 
+## [fault](kbcli_fault.md)
+
+Inject faults to pod.
+
+* [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
+
+
 ## [kubeblocks](kbcli_kubeblocks.md)
 
 KubeBlocks operation commands.

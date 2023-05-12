@@ -26,6 +26,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -645,6 +646,152 @@ func FakeRoleBinding(name string, sa *corev1.ServiceAccount, role *rbacv1.Role) 
 				Kind:      "ServiceAccount",
 				Name:      sa.Name,
 				Namespace: sa.Namespace,
+			},
+		},
+	}
+}
+
+func FakeDeploy(name string, namespace string, extraLabels map[string]string) *appsv1.Deployment {
+	labels := map[string]string{
+		constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+	}
+	// extraLabels will override the labels above if there is a conflict
+	for k, v := range extraLabels {
+		labels[k] = v
+	}
+	labels["app"] = name
+
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: pointer.Int32(1),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+			},
+		},
+	}
+}
+
+func FakeStatefulSet(name string, namespace string, extraLabels map[string]string) *appsv1.StatefulSet {
+	labels := map[string]string{
+		constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+	}
+	// extraLabels will override the labels above if there is a conflict
+	for k, v := range extraLabels {
+		labels[k] = v
+	}
+	labels["app"] = name
+	return &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: pointer.Int32(1),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+			},
+		},
+		Status: appsv1.StatefulSetStatus{
+			Replicas: 1,
+		},
+	}
+}
+
+func FakePodForSts(sts *appsv1.StatefulSet) *corev1.PodList {
+	pods := &corev1.PodList{}
+	for i := 0; i < int(*sts.Spec.Replicas); i++ {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%d", sts.Name, i),
+				Namespace: sts.Namespace,
+				Labels:    sts.Spec.Template.Labels,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  sts.Name,
+						Image: "fake-image",
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		}
+		pods.Items = append(pods.Items, *pod)
+	}
+	return pods
+}
+
+func FakeJob(name string, namespace string, extraLabels map[string]string) *batchv1.Job {
+	labels := map[string]string{
+		constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+	}
+	// extraLabels will override the labels above if there is a conflict
+	for k, v := range extraLabels {
+		labels[k] = v
+	}
+	labels["app"] = name
+
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: batchv1.JobSpec{
+			Completions: pointer.Int32(1),
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+			},
+		},
+		Status: batchv1.JobStatus{
+			Active: 1,
+			Ready:  pointer.Int32(1),
+		},
+	}
+}
+
+func FakeCronJob(name string, namespace string, extraLabels map[string]string) *batchv1.CronJob {
+	labels := map[string]string{
+		constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+	}
+	// extraLabels will override the labels above if there is a conflict
+	for k, v := range extraLabels {
+		labels[k] = v
+	}
+	labels["app"] = name
+
+	return &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule: "*/1 * * * *",
+			JobTemplate: batchv1.JobTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
 			},
 		},
 	}

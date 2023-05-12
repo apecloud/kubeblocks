@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -64,6 +65,7 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 		}
 		if verticalScaling.Class != "" {
 			component.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: verticalScaling.Class}
+			component.Resources = corev1.ResourceRequirements{}
 		} else {
 			// clear old class ref
 			component.ClassDefRef = &appsv1alpha1.ClassDefRef{}

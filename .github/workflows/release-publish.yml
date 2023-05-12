@@ -147,9 +147,9 @@ jobs:
       - uses: actions/checkout@v3
       - name: send message
         run: |
-          CONTENT="release\u00a0kbcli\u00a0error"
+          CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
           if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
-              CONTENT="release\u00a0kbcli\u00a0success"
+              CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
           fi
           
           bash .github/utils/utils.sh --type 12 \

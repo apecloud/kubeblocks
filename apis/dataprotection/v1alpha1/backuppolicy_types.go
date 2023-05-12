@@ -30,11 +30,9 @@ import (
 
 // BackupPolicySpec defines the desired state of BackupPolicy
 type BackupPolicySpec struct {
-	// ttl is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
-	// the Backup should be retained. if not set, will be retained forever.
-	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
+	// retention describe how long the Backup should be retained. if not set, will be retained forever.
 	// +optional
-	TTL *string `json:"ttl,omitempty"`
+	Retention *RetentionSpec `json:"retention,omitempty"`
 
 	// schedule policy for backup.
 	// +optional
@@ -44,36 +42,52 @@ type BackupPolicySpec struct {
 	// +optional
 	Snapshot *SnapshotPolicy `json:"snapshot,omitempty"`
 
-	// the policy for full backup.
+	// the policy for datafile backup.
 	// +optional
-	Full *CommonBackupPolicy `json:"full,omitempty"`
+	Datafile *CommonBackupPolicy `json:"datafile,omitempty"`
 
-	// the policy for incremental backup.
+	// the policy for logfile backup.
 	// +optional
-	Incremental *CommonBackupPolicy `json:"incremental,omitempty"`
+	Logfile *CommonBackupPolicy `json:"logfile,omitempty"`
+}
+
+type RetentionSpec struct {
+	// ttl is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
+	// the Backup should be retained. if not set, will be retained forever.
+	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
+	// +optional
+	TTL *string `json:"ttl,omitempty"`
 }
 
 type Schedule struct {
-	// schedule policy for base backup.
+	// schedule policy for snapshot backup.
 	// +optional
-	BaseBackup *BaseBackupSchedulePolicy `json:"baseBackup,omitempty"`
+	Snapshot *SchedulePolicy `json:"snapshot,omitempty"`
 
-	// schedule policy for incremental backup.
+	// schedule policy for datafile backup.
 	// +optional
-	Incremental *SchedulePolicy `json:"incremental,omitempty"`
-}
+	Datafile *SchedulePolicy `json:"datafile,omitempty"`
 
-type BaseBackupSchedulePolicy struct {
-	SchedulePolicy `json:",inline"`
-	// the type of base backup, only support full and snapshot.
-	// +kubebuilder:validation:Required
-	Type BaseBackupType `json:"type"`
+	// schedule policy for logfile backup.
+	// +optional
+	Logfile *LogSchedulePolicy `json:"logfile,omitempty"`
 }
 
 type SchedulePolicy struct {
 	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
 	// +kubebuilder:validation:Required
 	CronExpression string `json:"cronExpression"`
+
+	// enable or disable the schedule.
+	// +kubebuilder:validation:Required
+	Enable bool `json:"enable"`
+}
+
+type LogSchedulePolicy struct {
+	// the interval expression for schedule
+	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H|m|M]$`
+	// +kubebuilder:default="5m"
+	Interval string `json:"interval"`
 
 	// enable or disable the schedule.
 	// +kubebuilder:validation:Required
@@ -301,10 +315,10 @@ func init() {
 
 func (r *BackupPolicySpec) GetCommonPolicy(backupType BackupType) *CommonBackupPolicy {
 	switch backupType {
-	case BackupTypeFull:
-		return r.Full
-	case BackupTypeIncremental:
-		return r.Incremental
+	case BackupTypeDataFile:
+		return r.Datafile
+	case BackupTypeLogFile:
+		return r.Logfile
 	}
 	return nil
 }

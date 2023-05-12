@@ -158,13 +158,13 @@ func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 		backupPolicy.Spec.Snapshot.Target = syncTheRoleLabel(backupPolicy.Spec.Snapshot.Target,
 			policyTPL.Snapshot.BasePolicy)
 	}
-	if backupPolicy.Spec.Full != nil && policyTPL.Full != nil {
-		backupPolicy.Spec.Full.Target = syncTheRoleLabel(backupPolicy.Spec.Full.Target,
-			policyTPL.Full.BasePolicy)
+	if backupPolicy.Spec.Datafile != nil && policyTPL.Datafile != nil {
+		backupPolicy.Spec.Datafile.Target = syncTheRoleLabel(backupPolicy.Spec.Datafile.Target,
+			policyTPL.Datafile.BasePolicy)
 	}
-	if backupPolicy.Spec.Incremental != nil && policyTPL.Incremental != nil {
-		backupPolicy.Spec.Incremental.Target = syncTheRoleLabel(backupPolicy.Spec.Incremental.Target,
-			policyTPL.Incremental.BasePolicy)
+	if backupPolicy.Spec.Logfile != nil && policyTPL.Logfile != nil {
+		backupPolicy.Spec.Logfile.Target = syncTheRoleLabel(backupPolicy.Spec.Logfile.Target,
+			policyTPL.Logfile.BasePolicy)
 	}
 }
 
@@ -196,11 +196,17 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 		},
 	}
 	bpSpec := backupPolicy.Spec
-	bpSpec.TTL = policyTPL.TTL
-	bpSpec.Schedule.BaseBackup = r.convertBaseBackupSchedulePolicy(policyTPL.Schedule.BaseBackup)
-	bpSpec.Schedule.Incremental = r.convertSchedulePolicy(policyTPL.Schedule.Incremental)
-	bpSpec.Full = r.convertCommonPolicy(policyTPL.Full, cluster.Name, *component, workloadType)
-	bpSpec.Incremental = r.convertCommonPolicy(policyTPL.Incremental, cluster.Name, *component, workloadType)
+	if policyTPL.Retention != nil {
+		bpSpec.Retention = &dataprotectionv1alpha1.RetentionSpec{
+			TTL: policyTPL.Retention.TTL,
+		}
+	}
+
+	bpSpec.Schedule.Snapshot = r.convertSchedulePolicy(policyTPL.Schedule.Snapshot)
+	bpSpec.Schedule.Datafile = r.convertSchedulePolicy(policyTPL.Schedule.Datafile)
+	bpSpec.Schedule.Logfile = r.convertLogSchedulePolicy(policyTPL.Schedule.Logfile)
+	bpSpec.Datafile = r.convertCommonPolicy(policyTPL.Datafile, cluster.Name, *component, workloadType)
+	bpSpec.Logfile = r.convertCommonPolicy(policyTPL.Logfile, cluster.Name, *component, workloadType)
 	bpSpec.Snapshot = r.convertSnapshotPolicy(policyTPL.Snapshot, cluster.Name, *component, workloadType)
 	backupPolicy.Spec = bpSpec
 	return backupPolicy
@@ -228,15 +234,14 @@ func (r *BackupPolicyTPLTransformer) convertSchedulePolicy(sp *appsv1alpha1.Sche
 	}
 }
 
-// convertBaseBackupSchedulePolicy converts the baseBackupSchedulePolicy from backupPolicyTemplate.
-func (r *BackupPolicyTPLTransformer) convertBaseBackupSchedulePolicy(sp *appsv1alpha1.BaseBackupSchedulePolicy) *dataprotectionv1alpha1.BaseBackupSchedulePolicy {
+// convertLogSchedulePolicy converts the logSchedulePolicy from backupPolicyTemplate.
+func (r *BackupPolicyTPLTransformer) convertLogSchedulePolicy(sp *appsv1alpha1.LogSchedulePolicy) *dataprotectionv1alpha1.LogSchedulePolicy {
 	if sp == nil {
 		return nil
 	}
-	schedulePolicy := r.convertSchedulePolicy(&sp.SchedulePolicy)
-	return &dataprotectionv1alpha1.BaseBackupSchedulePolicy{
-		Type:           dataprotectionv1alpha1.BaseBackupType(sp.Type),
-		SchedulePolicy: *schedulePolicy,
+	return &dataprotectionv1alpha1.LogSchedulePolicy{
+		Enable:   sp.Enable,
+		Interval: sp.Interval,
 	}
 }
 

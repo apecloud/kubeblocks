@@ -72,10 +72,10 @@ var (
 		kbcli cluster backup mycluster
 
 		# create a snapshot backup
-		kbcli cluster backup mycluster --backup-type snapshot
+		kbcli cluster backup mycluster --type snapshot
 
-		# create a full backup
-		kbcli cluster backup mycluster --backup-type full
+		# create a datafile backup
+		kbcli cluster backup mycluster --type datafile
 
 		# create a backup with specified backup policy
 		kbcli cluster backup mycluster --backup-policy <backup-policy-name>
@@ -213,7 +213,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		},
 	}
 
-	cmd.Flags().StringVar(&o.BackupType, "backup-type", "snapshot", "Backup type")
+	cmd.Flags().StringVar(&o.BackupType, "type", "snapshot", "Backup type")
 	cmd.Flags().StringVar(&o.BackupName, "backup-name", "", "Backup name")
 	cmd.Flags().StringVar(&o.BackupPolicy, "backup-policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
 

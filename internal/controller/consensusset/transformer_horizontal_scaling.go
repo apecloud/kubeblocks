@@ -69,7 +69,7 @@ func scaleIn(transCtx *CSSetTransformContext, dag *graph.DAG) error {
 	}
 
 	// get the underlying sts
-	stsVertex, err := getSts(dag)
+	stsVertex, err := getStsVertex(dag)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func scaleOut(transCtx *CSSetTransformContext, dag *graph.DAG) error {
 	}
 
 	// get the underlying sts
-	stsVertex, err := getSts(dag)
+	stsVertex, err := getStsVertex(dag)
 	if err != nil {
 		return err
 	}
@@ -234,7 +234,7 @@ func getJobList(transCtx *CSSetTransformContext, jobTypeList []string) ([]*batch
 	return jobLists, nil
 }
 
-func getSts(dag *graph.DAG) (*model.ObjectVertex, error) {
+func getStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
 	vertices := model.FindAll[*apps.StatefulSet](dag)
 	if len(vertices) != 1 {
 		return nil, fmt.Errorf("unexpected sts found, expected 1, but found: %d", len(vertices))

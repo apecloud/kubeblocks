@@ -204,6 +204,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.ClusterStatusTransformer{},
 			// handle PITR
 			&lifecycle.PITRTransformer{Client: r.Client},
+			// update the real-time component replicas info to pods
+			&lifecycle.StsPodsTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()

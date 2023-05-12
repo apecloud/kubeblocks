@@ -122,28 +122,44 @@ func (r flagName) viperName() string {
 }
 
 func validateRequiredToParseConfigs() error {
+	validateTolerations := func(val string) error {
+		if val == "" {
+			return nil
+		}
+		var tolerations []corev1.Toleration
+		return json.Unmarshal([]byte(val), &tolerations)
+	}
+
+	validateAffinity := func(val string) error {
+		if val == "" {
+			return nil
+		}
+		affinity := corev1.Affinity{}
+		return json.Unmarshal([]byte(val), &affinity)
+	}
+
 	if jobTTL := viper.GetString(constant.CfgKeyAddonJobTTL); jobTTL != "" {
 		if _, err := time.ParseDuration(jobTTL); err != nil {
 			return err
 		}
 	}
-	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
-		Tolerations := []corev1.Toleration{}
-		if err := json.Unmarshal([]byte(cmTolerations), &Tolerations); err != nil {
-			return err
-		}
+	if err := validateTolerations(viper.GetString(constant.CfgKeyCtrlrMgrTolerations)); err != nil {
+		return err
 	}
-	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
-		affinity := corev1.Affinity{}
-		if err := json.Unmarshal([]byte(cmAffinity), &affinity); err != nil {
-			return err
-		}
+	if err := validateAffinity(viper.GetString(constant.CfgKeyCtrlrMgrAffinity)); err != nil {
+		return err
 	}
 	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
 		nodeSelector := map[string]string{}
 		if err := json.Unmarshal([]byte(cmNodeSelector), &nodeSelector); err != nil {
 			return err
 		}
+	}
+	if err := validateTolerations(viper.GetString(constant.CfgKeyDataPlaneTolerations)); err != nil {
+		return err
+	}
+	if err := validateAffinity(viper.GetString(constant.CfgKeyDataPlaneAffinity)); err != nil {
+		return err
 	}
 	return nil
 }

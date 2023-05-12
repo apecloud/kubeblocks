@@ -26,17 +26,22 @@ const (
 	CfgKeyCtrlrMgrAffinity              = "CM_AFFINITY"
 	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
 	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
-	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"    // accept time
-	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"               // the global pvc name which persistent volume claim to store the backup data
-	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"      // the init capacity of pvc for creating the pvc, e.g. 10Gi.
-	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"      // the pvc storage class name.
-	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"      // the pvc create policy. support "IfNotPresent" or "Never"
-	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"      // the configmap name which contains a persistentVolume template.
-	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE" // the configmap namespace which contains a persistentVolume template.
+	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"       // accept time
+	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"                  // the global pvc name which persistent volume claim to store the backup data
+	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"         // the init capacity of pvc for creating the pvc, e.g. 10Gi.
+	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"         // the pvc storage class name.
+	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"         // the pvc create policy. support "IfNotPresent" or "Never"
+	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"         // the configmap name which contains a persistentVolume template.
+	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE"    // the configmap namespace which contains a persistentVolume template.
+	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
 	CfgAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
+
+	// data plane config key
+	CfgKeyDataPlaneTolerations = "DATA_PLANE_TOLERATIONS"
+	CfgKeyDataPlaneAffinity    = "DATA_PLANE_AFFINITY"
 )
 
 const (
@@ -169,6 +174,7 @@ const (
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
 	ConfigMapKind             = "ConfigMap"
+	DaemonSetKind             = "DaemonSet"
 )
 
 const (
@@ -194,15 +200,6 @@ const (
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
 	ProbeCheckRunningPath = "spec.containers{" + RunningProbeContainerName + "}"
-
-	// KubeBlocksDataNodeLabelKey is the node label key of the built-in data node label
-	KubeBlocksDataNodeLabelKey = "kb-data"
-	// KubeBlocksDataNodeLabelValue is the node label value of the built-in data node label
-	KubeBlocksDataNodeLabelValue = "true"
-	// KubeBlocksDataNodeTolerationKey is the taint label key of the built-in data node taint
-	KubeBlocksDataNodeTolerationKey = "kb-data"
-	// KubeBlocksDataNodeTolerationValue is the taint label value of the built-in data node taint
-	KubeBlocksDataNodeTolerationValue = "true"
 )
 
 const (
@@ -229,4 +226,4 @@ const (
 	AccountPasswdForSecret = "password"
 )
 
-const DefaultBackupPvcInitCapacity = "100Gi"
+const DefaultBackupPvcInitCapacity = "20Gi"

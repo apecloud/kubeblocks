@@ -28,6 +28,7 @@ import (
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
+	"helm.sh/helm/v3/pkg/cli/values"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	kbanalyzer "github.com/apecloud/kubeblocks/internal/preflight/analyzer"
@@ -35,6 +36,7 @@ import (
 
 type KBClusterCollectResult struct {
 	preflight.ClusterCollectResult
+	HelmOptions     *values.Options
 	AnalyzerSpecs   []*troubleshoot.Analyze
 	KbAnalyzerSpecs []*preflightv1beta2.ExtendAnalyze
 }
@@ -46,19 +48,19 @@ type KBHostCollectResult struct {
 }
 
 func (c KBClusterCollectResult) Analyze() []*analyze.AnalyzeResult {
-	return doAnalyze(c.Context, c.AllCollectedData, c.AnalyzerSpecs, c.KbAnalyzerSpecs, nil, nil)
+	return doAnalyze(c.Context, c.AllCollectedData, c.AnalyzerSpecs, c.KbAnalyzerSpecs, nil, nil, c.HelmOptions)
 }
 
 func (c KBHostCollectResult) Analyze() []*analyze.AnalyzeResult {
-	return doAnalyze(c.Context, c.AllCollectedData, nil, nil, c.AnalyzerSpecs, c.KbAnalyzerSpecs)
+	return doAnalyze(c.Context, c.AllCollectedData, nil, nil, c.AnalyzerSpecs, c.KbAnalyzerSpecs, nil)
 }
 
-func doAnalyze(ctx context.Context,
-	allCollectedData map[string][]byte,
+func doAnalyze(ctx context.Context, allCollectedData map[string][]byte,
 	analyzers []*troubleshoot.Analyze,
 	kbAnalyzers []*preflightv1beta2.ExtendAnalyze,
 	hostAnalyzers []*troubleshoot.HostAnalyze,
 	kbhHostAnalyzers []*preflightv1beta2.ExtendHostAnalyze,
+	options *values.Options,
 ) []*analyze.AnalyzeResult {
 	getCollectedFileContents := func(fileName string) ([]byte, error) {
 		contents, ok := allCollectedData[fileName]
@@ -102,7 +104,7 @@ func doAnalyze(ctx context.Context,
 		}
 	}
 	for _, kbAnalyzer := range kbAnalyzers {
-		analyzeResult := kbanalyzer.KBAnalyze(ctx, kbAnalyzer, getCollectedFileContents, getChildCollectedFileContents)
+		analyzeResult := kbanalyzer.KBAnalyze(ctx, kbAnalyzer, getCollectedFileContents, getChildCollectedFileContents, options)
 		analyzeResults = append(analyzeResults, analyzeResult...)
 	}
 	for _, hostAnalyzer := range hostAnalyzers {

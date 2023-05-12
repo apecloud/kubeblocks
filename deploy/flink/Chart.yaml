@@ -1,0 +1,18 @@
+apiVersion: v2
+name: flink
+description: Apache Flink is a framework and distributed processing engine for stateful computations over unbounded and bounded data streams.
+
+type: application
+
+version: 0.1.0
+
+home: https://github.com/bitnami/charts/tree/main/bitnami/flink
+sources:
+  - https://github.com/apache/flink
+  - https://flink.apache.org/
+
+maintainers:
+- name: ApeCloud
+  url: https://github.com/apecloud/kubeblocks/
+
+appVersion: "1.16"

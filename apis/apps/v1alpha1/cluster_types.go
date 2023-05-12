@@ -186,12 +186,16 @@ type ClusterComponentSpec struct {
 	// serviceAccountName is the name of the ServiceAccount that component runs depend on.
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
-
 	// noCreatePDB defines PodDistruptionBudget creation behavior, set to true if creation of PodDistruptionBudget
 	// for this component is not needed. Defaults to false.
 	// +kubebuilder:default=false
 	// +optional
 	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
+
+	// componentRef defines inter-component field reference.
+	// componentRef defined in ClusterComponentSpec will override componentRef defined in ClusterDefinition.
+	// +optional
+	ComponentRef []*ComponentRef `json:"componentRef,omitempty"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return, as for component replicaCount <= 1 will return 0 value,

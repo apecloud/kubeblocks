@@ -61,7 +61,8 @@ type SynthesizedComponent struct {
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
 	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
-	StatefulSetWorkload   v1alpha1.StatefulSetWorkload
+	StatefulSetWorkload   v1alpha1.StatefulSetWorkload           `json:"statefulSetWorkload,omitempty"`
+	ComponentRefEnvs      []corev1.EnvVar                        `json:"componentRefEnvs,omitempty"`
 }
 
 // GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is

@@ -43,6 +43,7 @@ func BuildComponent(
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
 	var err error
+	// make a copy of clusterCompDef
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
@@ -137,12 +138,18 @@ func BuildComponent(
 	//	 }
 	// }
 
-	buildMonitorConfig(&clusterCompDef, &clusterCompSpec, component)
+	buildMonitorConfig(clusterCompDefObj, &clusterCompSpec, component)
 	if err = buildProbeContainers(reqCtx, component); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
 	}
+
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
+
+	if err = buildCompoentRef(&clusterDef, &cluster, clusterCompDefObj, &clusterCompSpec, component); err != nil {
+		reqCtx.Log.Error(err, "failed to merge componentRef")
+		return nil, err
+	}
 	return component, nil
 }
 

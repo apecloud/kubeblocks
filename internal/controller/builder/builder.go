@@ -187,6 +187,11 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 			{Name: "KB_TLS_KEY_FILE", Value: KeyName},
 		}...)
 	}
+
+	if len(params.Component.ComponentRefEnvs) > 0 {
+		toInjectEnvs = append(toInjectEnvs, params.Component.ComponentRefEnvs...)
+	}
+
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
 		c.Env = toInjectEnvs
@@ -403,6 +408,7 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, params BuilderParams) (*appsv1.D
 	}, "deployment", &deploy); err != nil {
 		return nil, err
 	}
+
 	if params.Component.StatelessSpec != nil {
 		deploy.Spec.Strategy = params.Component.StatelessSpec.UpdateStrategy
 	}

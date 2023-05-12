@@ -96,6 +96,15 @@ func newRequeueError(after time.Duration, reason string) error {
 	}
 }
 
+// newValidationError creates a new validation error.
+// The reason is used to generate the error message.
+// When validation fails, cluster reconciler should prefer `RequeWithError` over `RequeueAfter`.
+func newValidationError(reason string) error {
+	return &validationError{
+		reason: reason,
+	}
+}
+
 func isClusterDeleting(cluster appsv1alpha1.Cluster) bool {
 	return !cluster.GetDeletionTimestamp().IsZero()
 }

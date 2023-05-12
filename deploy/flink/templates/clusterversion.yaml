@@ -1,0 +1,21 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: flink-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "flink.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: flink
+  componentVersions:
+  - componentDefRef: jobmanager
+    versionsContext:
+      containers:
+      - name: jobmanager-main-container
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.jobmanager.repository }}:{{ .Values.image.jobmanager.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+  - componentDefRef: taskmanager
+    versionsContext:
+      containers:
+      - name: taskmanager-main-container
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.taskmanager.repository }}:{{ .Values.image.taskmanager.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

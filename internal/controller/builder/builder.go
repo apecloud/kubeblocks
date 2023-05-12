@@ -167,6 +167,7 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 		{Name: "KB_CLUSTER_NAME", Value: params.Cluster.Name},
 		{Name: "KB_COMP_NAME", Value: params.Component.Name},
 		{Name: "KB_CLUSTER_COMP_NAME", Value: params.Cluster.Name + "-" + params.Component.Name},
+		{Name: "KB_CLUSTER_UID_POSTFIX_8", Value: string(params.Cluster.UID)[len(string(params.Cluster.UID))-8:]},
 		{Name: "KB_POD_FQDN", Value: fmt.Sprintf("%s.%s-headless.%s.svc", "$(KB_POD_NAME)",
 			"$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
 	}...)

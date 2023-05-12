@@ -28,6 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 )
 
 var listExample = templates.Examples(`
@@ -70,6 +71,6 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	o.AddFlags(cmd, true)
-	cmd.Flags().StringVar(&o.clusterDefinitionRef, "cluster-definition", "", "list the clusterVersion belonging to the specified cluster definition")
+	flags.AddAddClusterDefinitionFlag(&f, cmd, &o.clusterDefinitionRef)
 	return cmd
 }

@@ -47,39 +47,37 @@ var _ = Describe("clusterversion", func() {
 
 	mockRestTable := func() *metav1.Table {
 		var Type = "string"
-		tableHeader := []metav1.TableColumnDefinition{
-			{
-				Name: "NAME",
-				Type: Type,
-			}, {
-				Name: "CLUSTER-DEFINITION",
-				Type: Type,
-			}, {
-				Name: "STATUS",
-				Type: Type,
-			},
-			{
-				Name: "AGE",
-				Type: Type,
-			},
-		}
-		tableValue := []metav1.TableRow{
-			{
-				Cells: []interface{}{
-					testing.ClusterVersionName,
-					testing.ClusterDefName,
-					"Available",
-					"0s",
-				},
-			},
-		}
 		table := &metav1.Table{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Table",
 				APIVersion: "meta.k8s.io/v1",
 			},
-			ColumnDefinitions: tableHeader,
-			Rows:              tableValue,
+			ColumnDefinitions: []metav1.TableColumnDefinition{
+				{
+					Name: "NAME",
+					Type: Type,
+				}, {
+					Name: "CLUSTER-DEFINITION",
+					Type: Type,
+				}, {
+					Name: "STATUS",
+					Type: Type,
+				},
+				{
+					Name: "AGE",
+					Type: Type,
+				},
+			},
+			Rows: []metav1.TableRow{
+				{
+					Cells: []interface{}{
+						testing.ClusterVersionName,
+						testing.ClusterDefName,
+						"Available",
+						"0s",
+					},
+				},
+			},
 		}
 		return table
 	}

@@ -15,7 +15,7 @@ require (
 	github.com/chaos-mesh/chaos-mesh/api v0.0.0-20230423031423-0b31a519b502
 	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/containerd/stargz-snapshotter/estargz v0.13.0
-	github.com/containers/common v0.48.1
+	github.com/containers/common v0.49.1
 	github.com/dapr/components-contrib v1.9.6
 	github.com/dapr/dapr v1.9.5
 	github.com/dapr/go-sdk v1.7.0

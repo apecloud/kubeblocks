@@ -54,11 +54,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the name of the service account to use
 */}}
 {{- define "foxlake-cluster.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "foxlake-cluster.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
+{{- printf "kb-sa-%s" .Release.Name | trunc 63 | trimSuffix "-"  }}
 {{- end }}
 
 {{- define "foxlake-cluster.deployEnv" -}}

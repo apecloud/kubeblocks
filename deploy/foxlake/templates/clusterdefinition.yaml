@@ -33,7 +33,6 @@ spec:
             port: 10030
             nodePort: null
       podSpec:
-        serviceAccountName: foxlake-cluster-admin
         securityContext:
           fsGroup: 1001
           seccompProfile:

@@ -17,6 +17,7 @@ spec:
   componentSpecs:
     - name: foxlake # user-defined
       componentDefRef: foxlake # ref clusterdefinition componentDefs.name
+      serviceAccountName: {{ include "foxlake-cluster.serviceAccountName" . }}
       replicas: 1
       resources:
         requests:

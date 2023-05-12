@@ -21,6 +21,7 @@ package clusterdefinition
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -89,10 +90,11 @@ var _ = Describe("clusterdefinition list components", func() {
 
 	It("list-components ", func() {
 		cmd.Run(cmd, []string{clusterdefinitionName})
-		expected := `NAME                    WORKLOADTYPE   CHARACTERTYPE   
-fake-component-type                    mysql           
-fake-component-type-1                  mysql           
+		expected := `NAME                    WORKLOAD-TYPE   CHARACTER-TYPE   
+fake-component-type                     mysql            
+fake-component-type-1                   mysql            
 `
+		fmt.Println(out.String())
 		Expect(expected).Should(Equal(out.String()))
 	})
 })

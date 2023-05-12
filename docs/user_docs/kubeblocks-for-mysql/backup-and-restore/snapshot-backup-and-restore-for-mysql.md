@@ -2,13 +2,15 @@
 title: Snapshot backup and restore for MySQL
 description: Guide for backup and restore for MySQL
 keywords: [mysql, snapshot, backup, restore]
-sidebar_position: 2
-sidebar_label: Snapshot backup and restore
+sidebar_position: 1
+sidebar_label: By snapshot
 ---
 
 # Snapshot backup and restore for MySQL
 
-This section shows how to use `kbcli` to back up and restore a MySQL cluster.
+Snapshot backup is one type of full backup. Snapshot backup and restore is the recommended option of KubeBlocks but it also depends on whether your environment support snapshot. If snapshot backup is not supported, try [Data file backup and restore](./data-file-backup-and-restore.md)
+
+This guide shows how to use `kbcli` to back up and restore a MySQL cluster.
 
 ***Before you start***
 

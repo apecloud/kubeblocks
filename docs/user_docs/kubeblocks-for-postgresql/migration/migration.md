@@ -285,13 +285,13 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
     # Execute the above script in the target database
     ```
 
-  * Slot lifecycle
+* Slot lifecycle
 
-    The CDC phase (the incremental migration) relies on the slot. A replication slot and publication are created during the CDC phase and these metadata should be deleted first before deleting the migration task metadata.
+  The CDC phase (the incremental migration) relies on the slot. A replication slot and publication are created during the CDC phase and these metadata should be deleted first before deleting the migration task metadata.
 
-    If the incremental migration is performed, the migration task creates a replication slot named after the task name during the initialization phase of the init-data step (hyphens, "-", in the task name are replaced with underlines, "_"). When the incremental migration starts, the migration task creates a publication with the previous replication slot name and "_publication_for_all_tables" in the name to perform WAL consumption.
+  If the incremental migration is performed, the migration task creates a replication slot named after the task name during the initialization phase of the init-data step (hyphens, "-", in the task name are replaced with underlines, "_"). When the incremental migration starts, the migration task creates a publication with the previous replication slot name and "_publication_for_all_tables" in the name to perform WAL consumption.
 
-    When the migration task is deleted (running `kbcli migration terminate`), this task changes to the Terminating status. The termination operation first stops the CDC process, then tries to clear the above replication slot and publication. Only when the above metadata are cleared, is the metadata of the migration task deleted.
+  When the migration task is deleted (running `kbcli migration terminate`), this task changes to the Terminating status. The termination operation first stops the CDC process, then tries to clear the above replication slot and publication. Only when the above metadata are cleared, is the metadata of the migration task deleted.
 
   :::note
 

@@ -1,14 +1,16 @@
 ---
-title: Full file backup and restore for MySQL
-description: How to back up and restore full files for MySQL
-keywords: [full file backup and restore, mysql]
-sidebar_position: 3
-sidebar_label: Full file backup and restore
+title: Data file backup and restore for PostgreSQL
+description: How to back up and restore data files for PostgreSQL
+keywords: [data file backup and restore, postgresql]
+sidebar_position: 2
+sidebar_label: By data file
 ---
 
-# Full file backup and restore
+# Data file backup and restore
 
-Follow the steps below to perform the full file backup and restore of a cluster.
+Data file backup of KubeBlocks is one type of full backup.
+
+Follow the steps below to back up and restore a cluster by data files.
 
 ## Back up the storage source
 
@@ -16,7 +18,7 @@ Currently, the KubeBlocks backup and restore rely on the Kubernetes PersistentVo
 
 :paperclip: Table 1. Backup
 
-| Access Mode      | Same backup source <br />(All clusters share a PVC) | One PVC for one cluster |
+| Access Mode      | Same backup source <br />(All clusters share one PVC) | One PVC for one cluster |
 | :----------      | :----------------- | :---------------------- |
 | ReadWriteMany    | Yes                | Yes                     |
 | ReadWriteOnce    | NA                 | Yes (only for test)     |
@@ -92,7 +94,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
 --set storageClass.singleBucket=<bucket_name>  \
 --set secret.endpoint=https://oss-<region>.aliyuncs.com \
 --set storageClass.mounter=s3fs,storageClass.mountOptions="" \
- -n kb-system
+-n kb-system
 
 # CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
 --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
@@ -162,16 +164,16 @@ kbcli kubeblocks config --set dataProtection.backupPVCName=backup-data \
 1. Create a cluster.
 
    ```bash
-   kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+   kbcli cluster create pg-cluster --cluster-definition='postgresql'
    ```
 
 2. View the backup policy.
 
    ```bash
-   kbcli cluster list-backup-policy mysql-cluster
+   kbcli cluster list-backup-policy pg-cluster
    >
-   NAME                                DEFAULT   CLUSTER         CREATE-TIME                  
-   mysql-cluster-mysql-backup-policy   true      mysql-cluster   Apr 18,2023 11:40 UTC+0800
+   NAME                                  DEFAULT   CLUSTER      CREATE-TIME                  
+   pg-cluster-postgresql-backup-policy   true      pg-cluster   Apr 18,2023 11:40 UTC+0800
    ```
 
 **Option 2.** Use `kubectl`
@@ -181,20 +183,20 @@ kubectl apply -f -<< EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mysql-cluster
+  name: pg-cluster
 spec:
-  clusterDefinitionRef: apecloud-mysql
-  clusterVersionRef: ac-mysql-8.0.30
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-14.7.0
   componentSpecs:
   - classDefRef:
       class: general-1c1g
-    componentDefRef: mysql
+    componentDefRef: postgresql
     enabledLogs:
     - error
     - general
     - slow
     monitor: true
-    name: mysql
+    name: postgresql
     replicas: 1
     resources:
       limits:
@@ -225,11 +227,11 @@ Check whether the backup policy is automatically synchronized with the global ba
 **Option 1.** Use `kbcli`
 
 ```bash
-kbcli cluster edit-backup-policy mysql-cluster-mysql-backup-policy
+kbcli cluster edit-backup-policy pg-cluster-postgresql-backup-policy
 > 
 spec:
   full:
-    backupToolName: xtrabackup-for-apecloud-mysql
+    backupToolName: postgres-basebackup
     backupsHistoryLimit: 7
     persistentVolumeClaim:
       # This policy creates a PVC automatically if there is no PVC
@@ -244,11 +246,11 @@ spec:
 **Option 2.** Use `kubectl`
 
 ```bash
-kubectl edit backuppolicy mysql-cluster-mysql-backup-policy
+kubectl edit backuppolicy pg-cluster-postgresql-backup-policy
 > 
 spec:
   full:
-    backupToolName: xtrabackup-for-apecloud-mysql
+    backupToolName: postgres-basebackup
     backupsHistoryLimit: 7
     persistentVolumeClaim:
       # This policy creates a PVC automatically if there is no PVC
@@ -267,28 +269,28 @@ spec:
 1. Check whether the cluster is running.
 
    ```bash
-   kbcli cluster list mysql-cluster
+   kbcli cluster list pg-cluster
    > 
-   NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME                 
-   mysql-cluster   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Apr 18,2023 11:40 UTC+0800  
+   NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME                 
+   pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Apr 18,2023 11:40 UTC+0800  
    ```
 
 2. Create a backup for this cluster.
 
    ```bash
-   kbcli cluster backup mysql-cluster --backup-type=full
+   kbcli cluster backup pg-cluster --backup-type=full
    > 
-   Backup backup-default-mysql-cluster-20230418124113 created successfully, you can view the progress:
-           kbcli cluster list-backup --name=backup-default-mysql-cluster-20230418124113 -n default
+   Backup backup-default-pg-cluster-20230418124113 created successfully, you can view the progress:
+           kbcli cluster list-backup --name=backup-default-pg-cluster-20230418124113 -n default
    ```
 
 3. View the backup set.
 
    ```bash
-   kbcli cluster list-backups mysql-cluster 
+   kbcli cluster list-backups pg-cluster 
    > 
-   NAME                                          CLUSTER         TYPE   STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              
-   backup-default-mysql-cluster-20230418124113   mysql-cluster   full   Completed                21s        Apr 18,2023 12:41 UTC+0800   Apr 18,2023 12:41 UTC+0800
+   NAME                                       CLUSTER         TYPE   STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              
+   backup-default-pg-cluster-20230418124113   pg-cluster      full   Completed                21s        Apr 18,2023 12:41 UTC+0800   Apr 18,2023 12:41 UTC+0800
    ```
 
 **Option 2.** Use `kuebctl`
@@ -298,10 +300,10 @@ kubectl apply -f -<< EOF
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: Backup
 metadata:
-  name: backup-default-mysql-cluster
+  name: backup-default-pg-cluster
   namespace: default
 spec:
-  backupPolicyName: mysql-cluster-mysql-backup-policy
+  backupPolicyName: pg-cluster-postgresql-backup-policy
   backupType: full
 EOF
 ```
@@ -313,18 +315,18 @@ EOF
 1. Restore data from the backup.
 
    ```bash
-   kbcli cluster restore new-mysql-cluster --backup backup-default-mysql-cluster-20230418124113
+   kbcli cluster restore new-pg-cluster --backup backup-default-pg-cluster-20230418124113
    >
-   Cluster new-mysql-cluster created
+   Cluster new-pg-cluster created
    ```
 
 2. View this new cluster.
 
    ```bash
-   kbcli cluster list new-mysql-cluster
+   kbcli cluster list new-pg-cluster
    >
-   NAME                NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME                 
-   new-mysql-cluster   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Apr 18,2023 12:42 UTC+0800
+   NAME             NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS     CREATED-TIME                 
+   new-pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Apr 18,2023 12:42 UTC+0800
    ```
 
 **Option 2.** Use `kubectl`
@@ -336,21 +338,21 @@ kind: Cluster
 metadata:
   annotations:
     # Add the restored annotation
-    kubeblocks.io/restore-from-backup: '{"mysql":"backup-default-wesql-20230418140448"}'
-  name: new-mysql-cluster
+    kubeblocks.io/restore-from-backup: '{"postgresql":"backup-default-postgresql-20230418140448"}'
+  name: new-pg-cluster
 spec:
-  clusterDefinitionRef: apecloud-mysql
-  clusterVersionRef: ac-mysql-8.0.30
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-14.7.0
   componentSpecs:
   - classDefRef:
       class: general-1c1g
-    componentDefRef: mysql
+    componentDefRef: postgresql
     enabledLogs:
     - error
     - general
     - slow
     monitor: true
-    name: mysql
+    name: postgresql
     replicas: 1
     resources:
       limits:
@@ -379,7 +381,7 @@ EOF
 **Option 1.** Use `kbcli`
 
 ```bash
-kbcli cluster edit-backup-policy mysql-cluster-mysql-backup-policy
+kbcli cluster edit-backup-policy pg-cluster-postgresql-backup-policy
 >
 spec:
   ...
@@ -392,12 +394,13 @@ spec:
       # Select the basic backup type, available options: snapshot and full
       # This example selects full as the basic backup type
       type: full
+  
 ```
 
 **Option 2.** Use `kubectl`
 
 ```bash
-kubectl edit backuppolicy mysql-cluster-mysql-backup-policy
+kubectl edit backuppolicy pg-cluster-postgresql-backup-policy
 > 
 spec:
   ...
@@ -410,4 +413,5 @@ spec:
       # Select the basic backup type, available options: snapshot and full
       # This example selects full as the basic backup type
       type: full
+      
 ```

@@ -23,12 +23,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cockroachdb/errors"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -71,7 +73,7 @@ func uninstall(p *Paths, name string) error {
 
 	klog.V(1).Infof("Deleting plugin %s", name)
 
-	symlinkPath := filepath.Join(p.BinPath(), pluginNameToBin(name, IsWindows()))
+	symlinkPath := filepath.Join(p.BinPath(), pluginNameToBin(name, util.IsWindows()))
 	klog.V(3).Infof("Unlink %q", symlinkPath)
 	if err := removeLink(symlinkPath); err != nil {
 		return errors.Wrap(err, "could not uninstall symlink of plugin")

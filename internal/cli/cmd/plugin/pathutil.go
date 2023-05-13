@@ -28,6 +28,8 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
+
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 type move struct {
@@ -256,8 +258,8 @@ func isCrossDeviceRenameErr(err error) bool {
 	if !ok {
 		return false
 	}
-	return (IsWindows() && errno == 17) || // syscall.ERROR_NOT_SAME_DEVICE
-		(!IsWindows() && errno == 18) // syscall.EXDEV
+	return (util.IsWindows() && errno == 17) || // syscall.ERROR_NOT_SAME_DEVICE
+		(!util.IsWindows() && errno == 18) // syscall.EXDEV
 }
 
 // IsSubPath checks if the extending path is an extension of the basePath, it will return the extending path
@@ -293,7 +295,7 @@ func CanonicalPluginName(in string) (string, string) {
 }
 
 func createOrUpdateLink(binDir, binary, plugin string) error {
-	dst := filepath.Join(binDir, pluginNameToBin(plugin, IsWindows()))
+	dst := filepath.Join(binDir, pluginNameToBin(plugin, util.IsWindows()))
 
 	if err := removeLink(dst); err != nil {
 		return errors.Wrap(err, "failed to remove old symlink")

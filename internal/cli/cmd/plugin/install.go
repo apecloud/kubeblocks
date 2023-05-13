@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -124,11 +123,6 @@ func (o *pluginInstallOption) install() error {
 		return errors.Wrapf(returnErr, "failed to install some plugins: %+v", failed)
 	}
 	return nil
-}
-
-func IsWindows() bool {
-	goos := runtime.GOOS
-	return goos == "windows"
 }
 
 // Install will download and install a plugin. The operation tries

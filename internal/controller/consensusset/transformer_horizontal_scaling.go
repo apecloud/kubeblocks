@@ -22,6 +22,7 @@ package consensusset
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	apps "k8s.io/api/apps/v1"
@@ -34,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // HorizontalScalingTransformer handles horizontal scaling.
@@ -42,7 +44,7 @@ import (
 type HorizontalScalingTransformer struct{}
 
 type preConditionChecker = func() bool
-type postHandler = func() error
+type memberUpdateHandler = func()
 
 func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*CSSetTransformContext)
@@ -51,15 +53,34 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	if model.IsObjectDeleting(csSet) {
 		return nil
 	}
+
+	// get the underlying sts
+	stsVertex, err := getStsVertex(dag)
+	if err != nil {
+		return err
+	}
+	sts, _ := stsVertex.Obj.(*apps.StatefulSet)
+	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
+	if err != nil {
+		return err
+	}
+
+	// set immutable=true at beginning, to disable object Update.
+	// if abnormal analysis passes and corresponding control jobs done,
+	// immutable will be reset to false by following updateHandler
+	stsVertex.Immutable = true
+	updateHandler := func() {
+		stsVertex.Immutable = false
+	}
 	switch {
 	case csSet.Spec.Replicas < csSet.Status.Replicas:
-		return scaleIn(transCtx, dag)
+		return scaleIn(transCtx, dag, pods, updateHandler)
 	default:
-		return scaleOut(transCtx, dag)
+		return scaleOut(transCtx, dag, pods, updateHandler)
 	}
 }
 
-func scaleIn(transCtx *CSSetTransformContext, dag *graph.DAG) error {
+func scaleIn(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod, memberUpdateHandler memberUpdateHandler) error {
 	// prepare meta info
 	// get control jobs
 	jobTypeList := []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
@@ -68,34 +89,24 @@ func scaleIn(transCtx *CSSetTransformContext, dag *graph.DAG) error {
 		return err
 	}
 
-	// get the underlying sts
-	stsVertex, err := getStsVertex(dag)
-	if err != nil {
-		return err
-	}
+	// sort descend
+	sort.SliceStable(pods, func(i, j int) bool {
+		return pods[j].Name < pods[i].Name
+	})
 
-	// set immutable=true at beginning,
-	// if abnormal analysis passes and switchover done and member leave notifying done,
-	// immutable will be reset to false
-	stsVertex.Immutable = true
-
-	memberDeletionHandler := func() error {
-		doMemberDeletion(stsVertex)
-		return nil
-	}
 	scaleInChecker := func() bool {
 		return transCtx.CSSet.Spec.Replicas < transCtx.CSSet.Status.Replicas
 	}
 
 	switch {
 	case stateBeginning(scaleInChecker, jobLists...):
-		return doScaleInBeginningAction(transCtx, dag, stsVertex)
+		return doScaleInBeginningAction(transCtx, dag, pods, memberUpdateHandler)
 	default:
-		return doControlJobAction(transCtx, dag, jobTypeList, jobLists, memberDeletionHandler)
+		return doControlJobAction(transCtx, dag, jobTypeList, jobLists, memberUpdateHandler)
 	}
 }
 
-func scaleOut(transCtx *CSSetTransformContext, dag *graph.DAG) error {
+func scaleOut(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod, memberUpdateHandler memberUpdateHandler) error {
 	// prepare meta info
 	// get control jobs
 	jobTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
@@ -104,16 +115,10 @@ func scaleOut(transCtx *CSSetTransformContext, dag *graph.DAG) error {
 		return err
 	}
 
-	// get the underlying sts
-	stsVertex, err := getStsVertex(dag)
-	if err != nil {
-		return err
-	}
-
-	// set immutable=true at beginning,
-	// if abnormal analysis passes and switchover done and member leave notifying done,
-	// immutable will be reset to false
-	stsVertex.Immutable = true
+	// sort ascend
+	sort.SliceStable(pods, func(i, j int) bool {
+		return pods[i].Name < pods[j].Name
+	})
 
 	scaleOutBeginChecker := func() bool {
 		return transCtx.CSSet.Spec.Replicas > transCtx.CSSet.Status.Replicas
@@ -123,7 +128,7 @@ func scaleOut(transCtx *CSSetTransformContext, dag *graph.DAG) error {
 	}
 	switch {
 	case stateBeginning(scaleOutBeginChecker, jobLists...):
-		return doScaleOutBeginningAction(transCtx, dag, stsVertex, jobTypeList)
+		return doScaleOutBeginningAction(transCtx, dag, pods, jobTypeList, memberUpdateHandler)
 	case stateDoingMemberCreation(scaleOutInProgressChecker, jobLists...):
 		return doMemberCreationAction(transCtx, dag, jobTypeList, jobLists)
 	default:
@@ -145,11 +150,11 @@ func stateBeginning(checker preConditionChecker, controlJobLists ...*batchv1.Job
 	return allListEmpty
 }
 
-func doScaleInBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, stsVertex *model.ObjectVertex) error {
-	sts, _ := stsVertex.Obj.(*apps.StatefulSet)
-	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
-	if err != nil {
-		return err
+func doScaleInBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod, memberUpdateHandler memberUpdateHandler) error {
+	// if scale to 0 replicas, delete all pods directly
+	if transCtx.CSSet.Spec.Replicas == 0 {
+		memberUpdateHandler()
+		return nil
 	}
 
 	roleMap := composeRoleMap(*transCtx.CSSet)
@@ -157,21 +162,42 @@ func doScaleInBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, s
 	if err := doAbnormalAnalysis(transCtx, pods, roleMap); err != nil {
 		return err
 	}
-	if shouldDoSwitchover(transCtx.CSSet, pods, roleMap) {
-		if err := doControlJob(transCtx.CSSet, dag, jobTypeSwitchover, false); err != nil {
+	leaderPodName := getLeaderPodName(pods, roleMap)
+	if shouldDoSwitchover(transCtx.CSSet, pods, leaderPodName) {
+		// choose pod-0 as new leader
+		env := buildControlJobEnv(transCtx.CSSet, leaderPodName, pods[len(pods)-1].Name)
+		if err := doControlJob(transCtx.CSSet, dag, env, jobTypeSwitchover, 0, false); err != nil {
 			return err
 		}
 		return nil
 	}
 	if shouldDoControlJob(transCtx.CSSet, jobTypeMemberLeaveNotifying) {
-		if err := doControlJob(transCtx.CSSet, dag, jobTypeMemberLeaveNotifying, false); err != nil {
-			return err
+		for i := transCtx.CSSet.Spec.Replicas; i > transCtx.CSSet.Status.Replicas; i-- {
+			env := buildControlJobEnv(transCtx.CSSet, leaderPodName, pods[i].Name)
+			_, ordinal := controllerutil.GetParentNameAndOrdinal(&pods[i])
+			if err := doControlJob(transCtx.CSSet, dag, env, jobTypeMemberLeaveNotifying, ordinal, false); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
 
-	doMemberDeletion(stsVertex)
+	memberUpdateHandler()
 	return nil
+}
+
+func getLeaderPodName(pods []corev1.Pod, roleMap map[string]workloads.ConsensusRole) string {
+	for _, pod := range pods {
+		roleName := getRoleName(pod)
+		role, ok := roleMap[roleName]
+		if !ok {
+			continue
+		}
+		if role.IsLeader {
+			return pod.Name
+		}
+	}
+	return ""
 }
 
 func stateDoingMemberCreation(checker preConditionChecker, jobList ...*batchv1.JobList) bool {
@@ -192,17 +218,30 @@ func stateDoingMemberCreation(checker preConditionChecker, jobList ...*batchv1.J
 
 func doMemberCreationAction(transCtx *CSSetTransformContext, dag *graph.DAG, jobTypeList []string, jobLists []*batchv1.JobList) error {
 	if stateMemberCreationSucceed(transCtx.CSSet) {
-		return startFirstPendingControlJob(transCtx, dag, jobTypeList, jobLists)
+		return startFirstPendingControlJob(dag, jobTypeList, jobLists)
 	}
 	return nil
 }
 
-func doScaleOutBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, stsVertex *model.ObjectVertex, jobTypeList []string) error {
-	doMemberCreation(stsVertex)
-	// TODO: one job for one pod
+func doScaleOutBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod, jobTypeList []string, memberUpdateHandler memberUpdateHandler) error {
+	roleMap := composeRoleMap(*transCtx.CSSet)
+	if err := doAbnormalAnalysis(transCtx, pods, roleMap); err != nil {
+		return err
+	}
+
+	// create new pods
+	memberUpdateHandler()
+
+	// create control jobs
+	leaderPodName := getLeaderPodName(pods, roleMap)
 	for _, jobType := range jobTypeList {
-		if shouldDoControlJob(transCtx.CSSet, jobType) {
-			if err := doControlJob(transCtx.CSSet, dag, jobType, true); err != nil {
+		if !shouldDoControlJob(transCtx.CSSet, jobType) {
+			continue
+		}
+		for i := transCtx.CSSet.Status.Replicas; i < transCtx.CSSet.Spec.Replicas; i++ {
+			env := buildControlJobEnv(transCtx.CSSet, leaderPodName, pods[i].Name)
+			_, ordinal := controllerutil.GetParentNameAndOrdinal(&pods[i])
+			if err := doControlJob(transCtx.CSSet, dag, env, jobType, ordinal, true); err != nil {
 				return err
 			}
 		}
@@ -243,8 +282,7 @@ func getStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
 	return stsVertex, nil
 }
 
-// switchoverAction specified and leader in pods to be deleted
-func shouldDoSwitchover(csSet *workloads.ConsensusSet, pods []corev1.Pod, roleMap map[string]workloads.ConsensusRole) bool {
+func shouldDoSwitchover(csSet *workloads.ConsensusSet, pods []corev1.Pod, leaderPodName string) bool {
 	reconfiguration := csSet.Spec.MembershipReconfiguration
 	if reconfiguration == nil {
 		return false
@@ -252,15 +290,9 @@ func shouldDoSwitchover(csSet *workloads.ConsensusSet, pods []corev1.Pod, roleMa
 	if reconfiguration.SwitchoverAction == nil {
 		return false
 	}
-	sort.SliceStable(pods, func(i, j int) bool {
-		return pods[j].Name < pods[i].Name
-	})
 	for i := csSet.Status.Replicas - 1; i >= csSet.Spec.Replicas; i-- {
-		roleName := getRoleName(pods[i])
-		if role, ok := roleMap[roleName]; ok {
-			if role.IsLeader {
-				return true
-			}
+		if pods[i].Name == leaderPodName {
+			return true
 		}
 	}
 	return false
@@ -286,41 +318,63 @@ func shouldDoControlJob(csSet *workloads.ConsensusSet, jobType string) bool {
 	return false
 }
 
-func stateControlJobInProgress(job batchv1.Job) bool {
-	return job.Status.Succeeded == 0 && job.Status.Failed == 0
+// in progress if any job is in progress
+func stateControlJobInProgress(jobList *batchv1.JobList) bool {
+	for _, job := range jobList.Items {
+		if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
+			return true
+		}
+	}
+	return false
 }
 
-func stateControlJobFailed(job batchv1.Job) bool {
-	return job.Status.Failed > 0
+// failed if any job is failed
+func stateControlJobFailed(jobList *batchv1.JobList) bool {
+	for _, job := range jobList.Items {
+		if job.Status.Failed > 0 {
+			return true
+		}
+	}
+	return false
 }
 
-func stateControlJobSuccess(job batchv1.Job) bool {
-	return job.Status.Succeeded > 0 && job.Status.Failed == 0
+// success if all jobs are succeeded
+func stateControlJobSuccess(jobList *batchv1.JobList) bool {
+	for _, job := range jobList.Items {
+		if job.Status.Succeeded == 0 || job.Status.Failed > 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func isControlJobRunning(jobList batchv1.JobList) bool {
-	if len(jobList.Items) != 1 {
+	if len(jobList.Items) == 0 {
 		return false
 	}
-	suspend := jobList.Items[0].Spec.Suspend
-	if suspend != nil && *suspend {
-		return false
+	for _, job := range jobList.Items {
+		suspend := job.Spec.Suspend
+		if suspend != nil && *suspend {
+			return false
+		}
 	}
 	return true
 }
 
 func isControlJobPending(jobList batchv1.JobList) bool {
-	if len(jobList.Items) != 1 {
+	if len(jobList.Items) == 0 {
 		return false
 	}
-	suspend := jobList.Items[0].Spec.Suspend
-	if suspend != nil && *suspend {
-		return true
+	for _, job := range jobList.Items {
+		suspend := job.Spec.Suspend
+		if suspend != nil && *suspend {
+			return true
+		}
 	}
 	return false
 }
 
-func doControlJobAction(transCtx *CSSetTransformContext, dag *graph.DAG, jobTypeList []string, jobLists []*batchv1.JobList, postHandler postHandler) error {
+func doControlJobAction(transCtx *CSSetTransformContext, dag *graph.DAG, jobTypeList []string, jobLists []*batchv1.JobList, memberUpdateHandler memberUpdateHandler) error {
 	// find running job
 	var (
 		jobType string
@@ -340,29 +394,28 @@ func doControlJobAction(transCtx *CSSetTransformContext, dag *graph.DAG, jobType
 	}
 
 	// do action
-	job := jobList.Items[0]
-	if stateControlJobInProgress(job) {
+	if stateControlJobInProgress(jobList) {
 		return nil
 	}
 
-	doControlJobCleanup(transCtx, jobType, dag, job)
+	doControlJobCleanup(transCtx, jobType, dag, jobList)
 	jobTypeList = jobTypeList[index+1:]
 	jobLists = jobLists[index+1:]
 	if len(jobTypeList) > 0 {
-		return startFirstPendingControlJob(transCtx, dag, jobTypeList, jobLists)
+		return startFirstPendingControlJob(dag, jobTypeList, jobLists)
 	}
-	if postHandler != nil {
-		return postHandler()
+	if memberUpdateHandler != nil {
+		memberUpdateHandler()
 	}
 	return nil
 }
 
-func startFirstPendingControlJob(transCtx *CSSetTransformContext, dag *graph.DAG, jobTypeList []string, jobLists []*batchv1.JobList) error {
+func startFirstPendingControlJob(dag *graph.DAG, jobTypeList []string, jobLists []*batchv1.JobList) error {
 	for i := range jobTypeList {
 		if !isControlJobPending(*jobLists[i]) {
 			continue
 		}
-		return startControlJob(dag, jobLists[i].Items[0])
+		return startControlJob(dag, jobLists[i])
 	}
 	return nil
 }
@@ -397,18 +450,11 @@ func doAbnormalAnalysis(transCtx *CSSetTransformContext, pods []corev1.Pod, role
 	return nil
 }
 
-func doMemberCreation(stsVertex *model.ObjectVertex) {
-	stsVertex.Immutable = false
-}
-
-func doMemberDeletion(stsVertex *model.ObjectVertex) {
-	stsVertex.Immutable = false
-}
-
-func doControlJob(csSet *workloads.ConsensusSet, dag *graph.DAG, jobType string, suspend bool) error {
-	jobName := csSet.Name + "-" + jobType + "-" + rand.String(6)
+//ordinal is the ordinal of pod which this control job apply to
+func doControlJob(csSet *workloads.ConsensusSet, dag *graph.DAG, env []corev1.EnvVar, jobType string, ordinal int, suspend bool) error {
+	jobName := fmt.Sprintf("%s-%s-%d-%s", csSet.Name, jobType, ordinal, rand.String(6))
 	// TODO(free6om): env injection
-	template := buildJobPodTemplate(csSet, jobType)
+	template := buildJobPodTemplate(csSet, env, jobType)
 	job := builder.NewJobBuilder(csSet.Namespace, jobName).
 		AddLabels(model.AppInstanceLabelKey, csSet.Name).
 		AddLabels(model.KBManagedByKey, kindConsensusSet).
@@ -429,7 +475,23 @@ func doControlJob(csSet *workloads.ConsensusSet, dag *graph.DAG, jobType string,
 	return nil
 }
 
-func buildJobPodTemplate(csSet *workloads.ConsensusSet, jobType string) *corev1.PodTemplateSpec {
+func buildJobPodTemplate(csSet *workloads.ConsensusSet, env []corev1.EnvVar, jobType string) *corev1.PodTemplateSpec {
+	credential := csSet.Spec.Credential
+	credentialEnv := make([]corev1.EnvVar, 0)
+	if credential != nil {
+		credentialEnv = append(credentialEnv,
+			corev1.EnvVar{
+				Name:      usernameCredentialVarName,
+				Value:     credential.Username.Value,
+				ValueFrom: credential.Username.ValueFrom,
+			},
+			corev1.EnvVar{
+				Name:      passwordCredentialVarName,
+				Value:     credential.Password.Value,
+				ValueFrom: credential.Password.ValueFrom,
+			})
+	}
+	env = append(env, credentialEnv...)
 	reconfiguration := csSet.Spec.MembershipReconfiguration
 	image := findJobImage(reconfiguration, jobType)
 	container := corev1.Container{
@@ -437,6 +499,7 @@ func buildJobPodTemplate(csSet *workloads.ConsensusSet, jobType string) *corev1.
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Command:         reconfiguration.SwitchoverAction.Command,
+		Env:             env,
 	}
 	template := &corev1.PodTemplateSpec{
 		Spec: corev1.PodSpec{
@@ -444,6 +507,27 @@ func buildJobPodTemplate(csSet *workloads.ConsensusSet, jobType string) *corev1.
 		},
 	}
 	return template
+}
+
+func buildControlJobEnv(csSet *workloads.ConsensusSet, leader, target string) []corev1.EnvVar {
+	svcName := getHeadlessSvcName(*csSet)
+	leaderHost := fmt.Sprintf("%s.%s.local", leader, svcName)
+	targetHost := fmt.Sprintf("%s.%s.local", target, svcName)
+	svcPort := findSvcPort(*csSet)
+	return []corev1.EnvVar{
+		{
+			Name:  leaderHostVarName,
+			Value: leaderHost,
+		},
+		{
+			Name:  servicePortVarName,
+			Value: strconv.Itoa(svcPort),
+		},
+		{
+			Name:  targetHostVarName,
+			Value: targetHost,
+		},
+	}
 }
 
 func findJobImage(reconfiguration *workloads.MembershipReconfiguration, jobType string) string {
@@ -488,11 +572,14 @@ func findJobImage(reconfiguration *workloads.MembershipReconfiguration, jobType 
 	return ""
 }
 
-func startControlJob(dag *graph.DAG, job batchv1.Job) error {
-	jobOld := job.DeepCopy()
-	suspend := false
-	job.Spec.Suspend = &suspend
-	model.PrepareUpdate(dag, jobOld, &job)
+func startControlJob(dag *graph.DAG, jobList *batchv1.JobList) error {
+	for _, job := range jobList.Items {
+		jobOld := job.DeepCopy()
+		jobNew := jobOld.DeepCopy()
+		suspend := false
+		jobNew.Spec.Suspend = &suspend
+		model.PrepareUpdate(dag, jobOld, jobNew)
+	}
 	return nil
 }
 
@@ -500,18 +587,24 @@ func emitControlJobFailedEvent(transCtx *CSSetTransformContext, jobType string) 
 	transCtx.EventRecorder.Event(transCtx.CSSet, corev1.EventTypeWarning, strings.ToUpper(jobTypeSwitchover), jobType+" failed")
 }
 
-func doControlJobCleanup(transCtx *CSSetTransformContext, jobType string, dag *graph.DAG, job batchv1.Job) {
+func doControlJobCleanup(transCtx *CSSetTransformContext, jobType string, dag *graph.DAG, jobList *batchv1.JobList) {
 	switch {
-	case stateControlJobFailed(job):
+	case stateControlJobFailed(jobList):
 		// TODO(free6om): control job policy: stop, retry, ignore
 		emitControlJobFailedEvent(transCtx, jobType)
 		// failed job: update label
-		jobOld := job.DeepCopy()
-		job.Labels[jobHandledLabel] = jobHandledTrue
-		model.PrepareUpdate(dag, jobOld, &job)
-	case stateControlJobSuccess(job):
+		for _, job := range jobList.Items {
+			jobOld := job.DeepCopy()
+			jobNew := jobOld.DeepCopy()
+			jobNew.Labels[jobHandledLabel] = jobHandledTrue
+			model.PrepareUpdate(dag, jobOld, jobNew)
+		}
+	case stateControlJobSuccess(jobList):
 		// succeeded job: be deleted
-		model.PrepareDelete(dag, &job)
+		for _, job := range jobList.Items {
+			jobOld := job.DeepCopy()
+			model.PrepareDelete(dag, jobOld)
+		}
 	}
 }
 

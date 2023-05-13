@@ -314,17 +314,7 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 			})
 	}
 	// find service port of th db engine
-	servicePort := 0
-	port := csSet.Spec.Service.Ports[0]
-	for _, c := range csSet.Spec.Template.Spec.Containers {
-		for _, p := range c.Ports {
-			if port.TargetPort.Type == intstr.String && p.Name == port.TargetPort.StrVal ||
-				port.TargetPort.Type == intstr.Int && p.ContainerPort == port.TargetPort.IntVal {
-				servicePort = int(p.ContainerPort)
-				break
-			}
-		}
-	}
+	servicePort := findSvcPort(csSet)
 	if servicePort > 0 {
 		env = append(env,
 			corev1.EnvVar{
@@ -439,10 +429,6 @@ func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template
 		}
 		template.Spec.Containers = append(template.Spec.Containers, container)
 	}
-}
-
-func getHeadlessSvcName(set workloads.ConsensusSet) string {
-	return strings.Join([]string{set.Name, "headless"}, "-")
 }
 
 func buildEnvConfigData(set workloads.ConsensusSet) map[string]string {

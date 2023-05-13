@@ -27,6 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -178,4 +179,21 @@ func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsO
 		}
 	}
 	return pods, nil
+}
+
+func getHeadlessSvcName(set workloads.ConsensusSet) string {
+	return strings.Join([]string{set.Name, "headless"}, "-")
+}
+
+func findSvcPort(csSet workloads.ConsensusSet) int {
+	port := csSet.Spec.Service.Ports[0]
+	for _, c := range csSet.Spec.Template.Spec.Containers {
+		for _, p := range c.Ports {
+			if port.TargetPort.Type == intstr.String && p.Name == port.TargetPort.StrVal ||
+				port.TargetPort.Type == intstr.Int && p.ContainerPort == port.TargetPort.IntVal {
+				return int(p.ContainerPort)
+			}
+		}
+	}
+	return 0
 }

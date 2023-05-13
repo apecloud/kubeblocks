@@ -64,6 +64,8 @@ const (
 	passwordCredentialVarName                              = "KB_CONSENSUS_SET_PASSWORD"
 	servicePortVarName                                     = "KB_CONSENSUS_SET_SERVICE_PORT"
 	actionSvcListVarName                                   = "KB_CONSENSUS_SET_ACTION_SVC_LIST"
+	leaderHostVarName                                      = "KB_CONSENSUS_SET_LEADER_HOST"
+	targetHostVarName                                      = "KB_CONSENSUS_SET_TARGET_HOST"
 	roleObservationEventFieldPath                          = "spec.containers{" + roleObservationName + "}"
 	mySQLBinding                     workloads.BindingType = "mysql"
 	customBinding                    workloads.BindingType = "custom"

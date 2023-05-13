@@ -186,20 +186,6 @@ func doScaleInBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, p
 	return nil
 }
 
-func getLeaderPodName(pods []corev1.Pod, roleMap map[string]workloads.ConsensusRole) string {
-	for _, pod := range pods {
-		roleName := getRoleName(pod)
-		role, ok := roleMap[roleName]
-		if !ok {
-			continue
-		}
-		if role.IsLeader {
-			return pod.Name
-		}
-	}
-	return ""
-}
-
 func stateDoingMemberCreation(checker preConditionChecker, jobList ...*batchv1.JobList) bool {
 	if !checker() {
 		return false
@@ -253,33 +239,6 @@ func doScaleOutBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, 
 func stateMemberCreationSucceed(csSet *workloads.ConsensusSet) bool {
 	return csSet.Spec.Replicas == csSet.Status.Replicas &&
 		csSet.Status.ReadyReplicas == csSet.Status.Replicas
-}
-
-func getJobList(transCtx *CSSetTransformContext, jobTypeList []string) ([]*batchv1.JobList, error) {
-	jobLists := make([]*batchv1.JobList, 0)
-	ml := client.MatchingLabels{
-		model.AppInstanceLabelKey: transCtx.CSSet.Name,
-		model.KBManagedByKey:      kindConsensusSet,
-		jobHandledLabel:           jobHandledFalse,
-	}
-	for _, jobType := range jobTypeList {
-		ml[jobTypeLabel] = jobType
-		jobList := &batchv1.JobList{}
-		if err := transCtx.Client.List(transCtx.Context, jobList, ml); err != nil {
-			return nil, err
-		}
-		jobLists = append(jobLists, jobList)
-	}
-	return jobLists, nil
-}
-
-func getStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
-	vertices := model.FindAll[*apps.StatefulSet](dag)
-	if len(vertices) != 1 {
-		return nil, fmt.Errorf("unexpected sts found, expected 1, but found: %d", len(vertices))
-	}
-	stsVertex, _ := vertices[0].(*model.ObjectVertex)
-	return stsVertex, nil
 }
 
 func shouldDoSwitchover(csSet *workloads.ConsensusSet, pods []corev1.Pod, leaderPodName string) bool {
@@ -418,6 +377,48 @@ func startFirstPendingControlJob(dag *graph.DAG, jobTypeList []string, jobLists 
 		return startControlJob(dag, jobLists[i])
 	}
 	return nil
+}
+
+
+func getJobList(transCtx *CSSetTransformContext, jobTypeList []string) ([]*batchv1.JobList, error) {
+	jobLists := make([]*batchv1.JobList, 0)
+	ml := client.MatchingLabels{
+		model.AppInstanceLabelKey: transCtx.CSSet.Name,
+		model.KBManagedByKey:      kindConsensusSet,
+		jobHandledLabel:           jobHandledFalse,
+	}
+	for _, jobType := range jobTypeList {
+		ml[jobTypeLabel] = jobType
+		jobList := &batchv1.JobList{}
+		if err := transCtx.Client.List(transCtx.Context, jobList, ml); err != nil {
+			return nil, err
+		}
+		jobLists = append(jobLists, jobList)
+	}
+	return jobLists, nil
+}
+
+func getStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
+	vertices := model.FindAll[*apps.StatefulSet](dag)
+	if len(vertices) != 1 {
+		return nil, fmt.Errorf("unexpected sts found, expected 1, but found: %d", len(vertices))
+	}
+	stsVertex, _ := vertices[0].(*model.ObjectVertex)
+	return stsVertex, nil
+}
+
+func getLeaderPodName(pods []corev1.Pod, roleMap map[string]workloads.ConsensusRole) string {
+	for _, pod := range pods {
+		roleName := getRoleName(pod)
+		role, ok := roleMap[roleName]
+		if !ok {
+			continue
+		}
+		if role.IsLeader {
+			return pod.Name
+		}
+	}
+	return ""
 }
 
 // normal conditions: all pods with role label set and one is leader

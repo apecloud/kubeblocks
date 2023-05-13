@@ -277,6 +277,9 @@ type MembershipReconfiguration struct {
 	// Environment variables can be used in all following Actions:
 	// - KB_CONSENSUS_SET_USERNAME username part of credential
 	// - KB_CONSENSUS_SET_PASSWORD password part of credential
+	// - KB_CONSENSUS_SET_LEADER_HOST leader host
+	// - KB_CONSENSUS_SET_TARGET_HOST target host
+	// - KB_CONSENSUS_SET_SERVICE_PORT port
 
 	// SwitchoverAction specifies how to do switchover
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured

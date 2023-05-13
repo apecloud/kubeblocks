@@ -399,8 +399,8 @@ func PatchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv
 	if err := GetObjectListByCustomLabels(ctx, cli, *cluster, objectList, client.MatchingLabels(matchLabels)); err != nil {
 		return err
 	}
-	labelKey = replaceKBEnvPlaceholderTokens(cluster.Name, componentName, labelKey)
-	labelValue = replaceKBEnvPlaceholderTokens(cluster.Name, componentName, labelValue)
+	labelKey = replaceKBEnvPlaceholderTokens(cluster, componentName, labelKey)
+	labelValue = replaceKBEnvPlaceholderTokens(cluster, componentName, labelValue)
 	switch gvk.Kind {
 	case constant.StatefulSetKind:
 		stsList := objectList.(*appsv1.StatefulSetList)
@@ -506,7 +506,7 @@ func getObjectListMapOfResourceKind() map[string]client.ObjectList {
 }
 
 // replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.
-func replaceKBEnvPlaceholderTokens(clusterName, componentName, strToReplace string) string {
-	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(clusterName, componentName)
+func replaceKBEnvPlaceholderTokens(cluster *appsv1alpha1.Cluster, componentName, strToReplace string) string {
+	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(cluster, componentName)
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }

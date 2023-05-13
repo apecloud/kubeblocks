@@ -39,7 +39,7 @@ var _ = Describe("analyzer_test", func() {
 	Context("KBAnalyze test", func() {
 		It("KBAnalyze test, and ExtendAnalyze is nil", func() {
 			Eventually(func(g Gomega) {
-				res := KBAnalyze(context.TODO(), &preflightv1beta2.ExtendAnalyze{}, nil, nil)
+				res := KBAnalyze(context.TODO(), &preflightv1beta2.ExtendAnalyze{}, nil, nil, nil)
 				g.Expect(res[0].IsFail).Should(BeTrue())
 			}).Should(Succeed())
 		})
@@ -77,7 +77,7 @@ var _ = Describe("analyzer_test", func() {
 				getCollectedFileContents := func(string) ([]byte, error) {
 					return b, nil
 				}
-				res := KBAnalyze(context.TODO(), kbAnalyzer, getCollectedFileContents, nil)
+				res := KBAnalyze(context.TODO(), kbAnalyzer, getCollectedFileContents, nil, nil)
 				Expect(len(res)).Should(Equal(1))
 				g.Expect(res[0].IsPass).Should(BeTrue())
 			}).Should(Succeed())
@@ -125,10 +125,10 @@ var _ = Describe("analyzer_test", func() {
 
 	It("GetAnalyzer test, and expect success", func() {
 		Eventually(func(g Gomega) {
-			collector, ok := GetAnalyzer(&preflightv1beta2.ExtendAnalyze{ClusterAccess: &preflightv1beta2.ClusterAccessAnalyze{}})
+			collector, ok := GetAnalyzer(&preflightv1beta2.ExtendAnalyze{ClusterAccess: &preflightv1beta2.ClusterAccessAnalyze{}}, nil)
 			g.Expect(collector).ShouldNot(BeNil())
 			g.Expect(ok).Should(BeTrue())
-			collector, ok = GetAnalyzer(&preflightv1beta2.ExtendAnalyze{})
+			collector, ok = GetAnalyzer(&preflightv1beta2.ExtendAnalyze{}, nil)
 			g.Expect(collector).Should(BeNil())
 			g.Expect(ok).Should(BeFalse())
 		}).Should(Succeed())

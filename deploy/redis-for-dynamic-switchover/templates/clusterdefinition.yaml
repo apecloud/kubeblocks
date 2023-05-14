@@ -198,6 +198,11 @@ spec:
           constraintRef: redis7-config-constraints-new
           namespace: {{ .Release.Namespace }}
           volumeName: redis-config
+        - name: redis-replicas-config
+          templateRef: redis7-sentinel-config-template-new
+          constraintRef: redis7-sentinel-config-constraints-new
+          namespace: {{ .Release.Namespace }}
+          volumeName: redis-sentinel-config
       scriptSpecs:
         - name: redis-scripts
           templateRef: redis-scripts-new
@@ -216,6 +221,8 @@ spec:
               mountPath: /data
             - name: redis-config
               mountPath: /etc/conf
+            - name: redis-sentinel-config
+              mountPath: /etc/sentinel-conf
             - name: sentinel-conf
               mountPath: /etc/sentinel
             - name: scripts
@@ -232,6 +239,8 @@ spec:
               mountPath: /data
             - name: redis-config
               mountPath: /etc/conf
+            - name: redis-sentinel-config
+              mountPath: /etc/sentinel-conf
             - name: sentinel-conf
               mountPath: /etc/sentinel
             - name: scripts

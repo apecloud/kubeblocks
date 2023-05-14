@@ -1,0 +1,47 @@
+{{- $cc := .Files.Get "config/redis7-config-effect-scope.yaml" | fromYaml }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: redis7-sentinel-config-constraints-new
+  labels:
+    {{- include "redis.labels" . | nindent 4 }}
+spec:
+
+  ## require db instance restart
+  # redis configuration file format
+  formatterConfig:
+    format: dotenv
+
+  #  shared_volume:
+  #    name: redis-config
+  #    mountPath: /etc/redis
+
+  ## for tools
+  reloadOptions:
+    shellTrigger:
+      command:
+        - "redis-replicas-update.sh"
+
+  scriptConfigs:
+    - scriptConfigMapRef: redis-reload-script-new
+      namespace: {{ .Release.Namespace }}
+
+  toolConfigs:
+    - name: init-redis-tools
+      command:
+        - cp
+        - /usr/local/bin/redis-cli
+        - /kb/tools/redis-cli
+      image: docker.io/library/redis:7.0.11-alpine
+      mountPoint: /kb/tools
+      volumeName: redis-tools
+
+  downwardAPIOptions:
+    - name: "pod-info"
+      mountPoint: "/etc/pod_info"
+      command:
+        - "redis-sentinel-process-replicas-lables.sh /etc/pod_info/replica"
+      items:
+        - path: "replica"
+          fieldRef:
+            fieldPath: metadata.labels['kubeblocks.io/role_replicas']

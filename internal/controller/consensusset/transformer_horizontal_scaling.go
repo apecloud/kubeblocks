@@ -182,7 +182,7 @@ func doScaleInBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, p
 		return nil
 	}
 	if shouldDoControlJob(transCtx.CSSet, jobTypeMemberLeaveNotifying) {
-		for i := transCtx.CSSet.Spec.Replicas; i > transCtx.OrigCSSet.Status.Replicas; i-- {
+		for i := transCtx.OrigCSSet.Status.Replicas; i > transCtx.CSSet.Spec.Replicas; i-- {
 			ordinal := int(i - 1)
 			podName := fmt.Sprintf("%s-%d", transCtx.CSSet.Name, ordinal)
 			env := buildControlJobEnv(transCtx.CSSet, leaderPodName, podName)
@@ -336,6 +336,9 @@ func isControlJobRunning(jobList batchv1.JobList) bool {
 		return false
 	}
 	for _, job := range jobList.Items {
+		if !job.DeletionTimestamp.IsZero() {
+			continue
+		}
 		suspend := job.Spec.Suspend
 		if suspend != nil && *suspend {
 			return false
@@ -349,6 +352,9 @@ func isControlJobPending(jobList batchv1.JobList) bool {
 		return false
 	}
 	for _, job := range jobList.Items {
+		if !job.DeletionTimestamp.IsZero() {
+			continue
+		}
 		suspend := job.Spec.Suspend
 		if suspend != nil && *suspend {
 			return true

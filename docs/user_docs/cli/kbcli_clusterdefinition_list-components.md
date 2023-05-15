@@ -1,13 +1,24 @@
 ---
-title: kbcli fault
+title: kbcli clusterdefinition list-components
 ---
 
-Inject faults to pod.
+List cluster definition components.
+
+```
+kbcli clusterdefinition list-components [flags]
+```
+
+### Examples
+
+```
+  # List all components belong to the cluster definition.
+  kbcli clusterdefinition list-components apecloud-mysql
+```
 
 ### Options
 
 ```
-  -h, --help   help for fault
+  -h, --help   help for list-components
 ```
 
 ### Options inherited from parent commands
@@ -36,9 +47,7 @@ Inject faults to pod.
 
 ### SEE ALSO
 
-
-* [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
-* [kbcli fault pod](kbcli_fault_pod.md)	 - pod chaos.
+* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -1,13 +1,13 @@
 ---
-title: kbcli fault
+title: kbcli fault pod
 ---
 
-Inject faults to pod.
+pod chaos.
 
 ### Options
 
 ```
-  -h, --help   help for fault
+  -h, --help   help for pod
 ```
 
 ### Options inherited from parent commands
@@ -36,9 +36,10 @@ Inject faults to pod.
 
 ### SEE ALSO
 
-
-* [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
-* [kbcli fault pod](kbcli_fault_pod.md)	 - pod chaos.
+* [kbcli fault](kbcli_fault.md)	 - Inject faults to pod.
+* [kbcli fault pod failure](kbcli_fault_pod_failure.md)	 - failure pod
+* [kbcli fault pod kill](kbcli_fault_pod_kill.md)	 - kill pod
+* [kbcli fault pod kill-container](kbcli_fault_pod_kill-container.md)	 - kill containers
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

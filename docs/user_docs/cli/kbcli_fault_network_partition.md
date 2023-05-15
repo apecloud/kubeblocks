@@ -46,21 +46,25 @@ kbcli fault network partition [flags]
 ### Options
 
 ```
-      --direction string                   You can select "to"" or "from"" or "both"". (default "to")
-      --dry-run string[="unchanged"]       Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
-      --duration string                    Supported formats of the duration are: ms / s / m / h. (default "10s")
-  -e, --external-targets stringArray       a network target outside of Kubernetes, which can be an IPv4 address or a domain name,
-                                           	 such as "www.baidu.com". Only works with direction: to.
-  -h, --help                               help for partition
-      --label stringToString               label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"' (default [])
-      --mode string                        You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with. (default "all")
-      --namespace-selector stringArray     Specifies the namespace into which you want to inject faults. (default [default])
-  -o, --output format                      prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --target-label stringToString        label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"' (default [])
-      --target-mode string                 You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with. (default "all")
-      --target-namespace-selector string   Specifies the namespace into which you want to inject faults. (default "default")
-      --target-value string                If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
-      --value string                       If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
+      --annotation stringToString      Select the pod to inject the fault according to Annotation. (default [])
+      --direction string               You can select "to"" or "from"" or "both"". (default "to")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --duration string                Supported formats of the duration are: ms / s / m / h. (default "10s")
+  -e, --external-target stringArray    a network target outside of Kubernetes, which can be an IPv4 address or a domain name,
+                                       	 such as "www.baidu.com". Only works with direction: to.
+  -h, --help                           help for partition
+      --label stringToString           label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0. (default [])
+      --mode string                    You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with. (default "all")
+      --node stringArray               Inject faults into pods in the specified node.
+      --node-label stringToString      label for node, such as '"kubernetes.io/arch=arm64,kubernetes.io/hostname=minikube-m03,kubernetes.io/os=linux. (default [])
+      --ns-fault stringArray           Specifies the namespace into which you want to inject faults. (default [default])
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --phase stringArray              Specify the pod that injects the fault by the state of the pod.
+      --target-label stringToString    label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"' (default [])
+      --target-mode string             You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.
+      --target-ns-fault stringArray    Specifies the namespace into which you want to inject faults. (default [default])
+      --target-value string            If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
+      --value string                   If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
 ```
 
 ### Options inherited from parent commands

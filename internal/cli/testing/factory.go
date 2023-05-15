@@ -118,6 +118,7 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 					{Name: "clusters", Namespaced: true, Kind: "Cluster"},
 					{Name: "clusterdefinitions", Namespaced: false, Kind: "clusterdefinition"},
 					{Name: "clusterversions", Namespaced: false, Kind: "clusterversion"},
+					{Name: "opsrequests", Namespaced: true, Kind: "OpsRequest"},
 				},
 			},
 		},

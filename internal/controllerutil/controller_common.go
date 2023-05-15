@@ -134,11 +134,11 @@ func HandleCRDeletion(reqCtx RequestCtx,
 				cluster, ok := cr.(*v1alpha1.Cluster)
 				// throw warning event if terminationPolicy set to DoNotTerminate
 				if ok && cluster.Spec.TerminationPolicy == v1alpha1.DoNotTerminate {
-					reqCtx.Recorder.Eventf(cr, corev1.EventTypeWarning, constant.ReasonDeleteFailed,
+					reqCtx.Eventf(cr, corev1.EventTypeWarning, constant.ReasonDeleteFailed,
 						"Deleting %s: %s failed due to terminationPolicy set to DoNotTerminate",
 						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 				} else {
-					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s: %s",
+					reqCtx.Eventf(cr, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s: %s",
 						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 				}
 			}
@@ -162,10 +162,8 @@ func HandleCRDeletion(reqCtx RequestCtx,
 					return ResultToP(CheckedRequeueWithError(err, reqCtx.Log, ""))
 				}
 				// record resources deleted event
-				if reqCtx.Recorder != nil {
-					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, constant.ReasonDeletedCR, "Deleted %s: %s",
-						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
-				}
+				reqCtx.Eventf(cr, corev1.EventTypeNormal, constant.ReasonDeletedCR, "Deleted %s: %s",
+					strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 			}
 		}
 

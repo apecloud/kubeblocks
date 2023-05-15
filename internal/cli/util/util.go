@@ -763,3 +763,8 @@ func CreateResourceIfAbsent(
 func BuildClusterDefinitionRefLable(prefix string, clusterDef []string) string {
 	return buildLabelSelectors(prefix, constant.AppNameLabelKey, clusterDef)
 }
+
+// IsWindows return true if the kbcli runtime situation is windows
+func IsWindows() bool {
+	return runtime.GOOS == types.GoosWindows
+}

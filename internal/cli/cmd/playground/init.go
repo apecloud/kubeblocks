@@ -444,6 +444,9 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 		)
 	}
 
+	if err = insOpts.PreCheck(); err != nil {
+		return err
+	}
 	return insOpts.Install()
 }
 

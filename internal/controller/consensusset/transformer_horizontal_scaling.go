@@ -59,6 +59,9 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
+	if stsVertex.Action == nil || *stsVertex.Action != model.UPDATE {
+		return nil
+	}
 	sts, _ := stsVertex.Obj.(*apps.StatefulSet)
 	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
 	if err != nil {
@@ -101,8 +104,13 @@ func scaleIn(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod,
 	switch {
 	case stateBeginning(scaleInChecker, jobLists...):
 		return doScaleInBeginningAction(transCtx, dag, pods, memberUpdateHandler)
-	default:
+	case stateDoingControlJob(scaleInChecker, jobLists...):
 		return doControlJobAction(transCtx, dag, jobTypeList, jobLists, memberUpdateHandler)
+	default:
+		if memberUpdateHandler != nil {
+			memberUpdateHandler()
+		}
+		return nil
 	}
 }
 
@@ -131,8 +139,13 @@ func scaleOut(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod
 		return doScaleOutBeginningAction(transCtx, dag, pods, jobTypeList, memberUpdateHandler)
 	case stateDoingMemberCreation(scaleOutInProgressChecker, jobLists...):
 		return doMemberCreationAction(transCtx, dag, jobTypeList, jobLists)
-	default:
+	case stateDoingControlJob(scaleOutInProgressChecker, jobLists...):
 		return doControlJobAction(transCtx, dag, jobTypeList, jobLists, nil)
+	default:
+		if memberUpdateHandler != nil {
+			memberUpdateHandler()
+		}
+		return nil
 	}
 }
 
@@ -277,6 +290,18 @@ func shouldDoControlJob(csSet *workloads.ConsensusSet, jobType string) bool {
 	return false
 }
 
+func stateDoingControlJob(checker preConditionChecker, controlJobLists ...*batchv1.JobList) bool {
+	if !checker() {
+		return false
+	}
+	for _, jobList := range controlJobLists {
+		if isControlJobRunning(*jobList) {
+			return true
+		}
+	}
+	return false
+}
+
 // in progress if any job is in progress
 func stateControlJobInProgress(jobList *batchv1.JobList) bool {
 	for _, job := range jobList.Items {
@@ -348,7 +373,7 @@ func doControlJobAction(transCtx *CSSetTransformContext, dag *graph.DAG, jobType
 			break
 		}
 	}
-	if jobLists == nil {
+	if jobList == nil {
 		return nil
 	}
 
@@ -427,6 +452,10 @@ func doAbnormalAnalysis(transCtx *CSSetTransformContext, pods []corev1.Pod, role
 		// TODO(free6om): should handle this error in a more user-friendly way
 		// set condition, emit event if error happens consecutive x times.
 		return fmt.Errorf("cluster unhealthy: # of pods %d not equals to replicas %d", len(pods), transCtx.CSSet.Status.Replicas)
+	}
+	// if no pods, no need to check the following conditions
+	if len(pods) == 0 {
+		return nil
 	}
 	allRoleLabelSet := true
 	leaderCount := 0

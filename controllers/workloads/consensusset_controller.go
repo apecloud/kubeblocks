@@ -94,7 +94,7 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//    If you do need to create/update/delete object, make your intent operation a model.ObjectVertex and put it into the DAG.
 	//
 	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
-	plan, errBuild := planBuilder.
+	plan, err := planBuilder.
 		AddTransformer(
 			// fix meta
 			&consensusset.FixMetaTransformer{},
@@ -107,10 +107,14 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			&consensusset.CSSetStatusTransformer{},
 			// handle UpdateStrategy
 			&consensusset.UpdateStrategyTransformer{},
+			// handle horizontal scaling
+			&consensusset.HorizontalScalingTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()
-
+	if err != nil {
+		return requeueError(err)
+	}
 	// TODO: define error categories in Build stage and handle them here like this:
 	// switch errBuild.(type) {
 	// case NOTFOUND:
@@ -118,14 +122,10 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// }
 
 	// Execute stage
-	// errBuild not nil means build stage partial success or validation error
-	// execute the plan first, delay error handling
-	if errExec := plan.Execute(); errExec != nil {
-		return requeueError(errExec)
+	if err = plan.Execute(); err != nil {
+		return requeueError(err)
 	}
-	if errBuild != nil {
-		return requeueError(errBuild)
-	}
+
 
 	return intctrlutil.Reconciled()
 }

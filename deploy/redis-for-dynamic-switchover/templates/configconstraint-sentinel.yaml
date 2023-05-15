@@ -45,3 +45,6 @@ spec:
         - path: "replica"
           fieldRef:
             fieldPath: metadata.labels['kubeblocks.io/role_replicas']
+
+  staticParameters:
+    - None

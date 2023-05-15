@@ -73,7 +73,9 @@ spec:
     - name: "pod-info"
       mountPoint: "/etc/pod_info"
       command:
-      - "redis-process-switchover.sh /etc/pod_info/labels/role"
+      - sh
+      - -c
+      - redis-process-switchover.sh /etc/pod_info/labels/role
       items:
         - path: "labels/role"
           fieldRef:

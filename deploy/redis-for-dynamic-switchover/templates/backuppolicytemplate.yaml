@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: redis-backup-policy-template
+  name: redis-new-backup-policy-template
   labels:
     clusterdefinition.kubeblocks.io/name: redis
     {{- include "redis.labels" . | nindent 4 }}

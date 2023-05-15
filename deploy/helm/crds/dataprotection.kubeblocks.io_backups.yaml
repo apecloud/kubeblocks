@@ -61,12 +61,12 @@ spec:
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               backupType:
-                default: full
-                description: Backup Type. full or incremental or snapshot. if unset,
-                  default is full.
+                default: datafile
+                description: Backup Type. datafile or logfile or snapshot. if unset,
+                  default is datafile.
                 enum:
-                - full
-                - incremental
+                - datafile
+                - logfile
                 - snapshot
                 type: string
               parentBackupName:

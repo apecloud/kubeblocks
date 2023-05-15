@@ -258,7 +258,7 @@ var _ = Describe("DataProtection", func() {
 		baseBackup.TypeMeta = backupTypeMeta
 		baseBackup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 		incrBackup := testapps.NewBackupFactory(testing.Namespace, backupName).
-			SetBackupType(dataprotectionv1alpha1.BackupTypeIncremental).
+			SetBackupType(dataprotectionv1alpha1.BackupTypeLogFile).
 			SetBackLog(now.Add(-time.Minute), now.Add(time.Minute)).
 			SetLabels(backupLabels).GetObject()
 		incrBackup.TypeMeta = backupTypeMeta

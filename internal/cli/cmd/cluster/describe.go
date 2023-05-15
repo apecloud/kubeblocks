@@ -259,16 +259,22 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 		backupSchedule := printer.NoneString
 		backupType := printer.NoneString
 		scheduleEnable := "Disabled"
-		if policy.Spec.Schedule.BaseBackup != nil {
-			if policy.Spec.Schedule.BaseBackup.Enable {
+		if policy.Spec.Schedule.Snapshot != nil {
+			if policy.Spec.Schedule.Snapshot.Enable {
 				scheduleEnable = "Enabled"
+				backupSchedule = policy.Spec.Schedule.Snapshot.CronExpression
+				backupType = string(dpv1alpha1.BackupTypeSnapshot)
 			}
-			backupSchedule = policy.Spec.Schedule.BaseBackup.CronExpression
-			backupType = string(policy.Spec.Schedule.BaseBackup.Type)
-
 		}
-		if policy.Spec.TTL != nil {
-			ttlString = *policy.Spec.TTL
+		if policy.Spec.Schedule.Datafile != nil {
+			if policy.Spec.Schedule.Datafile.Enable {
+				scheduleEnable = "Enabled"
+				backupSchedule = policy.Spec.Schedule.Datafile.CronExpression
+				backupType = string(dpv1alpha1.BackupTypeDataFile)
+			}
+		}
+		if policy.Spec.Retention != nil && policy.Spec.Retention.TTL != nil {
+			ttlString = *policy.Spec.Retention.TTL
 		}
 		lastScheduleTime := printer.NoneString
 		if policy.Status.LastScheduleTime != nil {

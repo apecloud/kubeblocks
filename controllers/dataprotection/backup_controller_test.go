@@ -158,7 +158,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetBackupPolicyName(backupPolicyName).
-					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
@@ -200,7 +200,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetBackupPolicyName(backupPolicyName).
-					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 
@@ -408,7 +408,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetBackupPolicyName(backupPolicyName).
-					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 			}
@@ -459,7 +459,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("set persistentVolumeConfigmap")
 				configMapName := "pv-template-configmap"
 				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(tmpObj *dataprotectionv1alpha1.BackupPolicy) {
-					tmpObj.Spec.Full.PersistentVolumeClaim.PersistentVolumeConfigMap = &dataprotectionv1alpha1.PersistentVolumeConfigMap{
+					tmpObj.Spec.Datafile.PersistentVolumeClaim.PersistentVolumeConfigMap = &dataprotectionv1alpha1.PersistentVolumeConfigMap{
 						Name:      configMapName,
 						Namespace: testCtx.DefaultNamespace,
 					}
@@ -537,7 +537,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetBackupPolicyName(backupPolicyName).
-					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 			})

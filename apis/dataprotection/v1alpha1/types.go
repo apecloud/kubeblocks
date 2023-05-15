@@ -31,26 +31,21 @@ const (
 	BackupFailed     BackupPhase = "Failed"
 )
 
-// BackupType the backup type, marked backup set is full or incremental or snapshot.
+// BackupType the backup type, marked backup set is datafile or logfile or snapshot.
 // +enum
-// +kubebuilder:validation:Enum={full,incremental,snapshot}
+// +kubebuilder:validation:Enum={datafile,logfile,snapshot}
 type BackupType string
 
 const (
-	BackupTypeFull        BackupType = "full"
-	BackupTypeIncremental BackupType = "incremental"
-	BackupTypeSnapshot    BackupType = "snapshot"
+	BackupTypeDataFile BackupType = "datafile"
+	BackupTypeLogFile  BackupType = "logfile"
+	BackupTypeSnapshot BackupType = "snapshot"
 )
 
 // BaseBackupType the base backup type.
 // +enum
 // +kubebuilder:validation:Enum={full,snapshot}
 type BaseBackupType string
-
-const (
-	BaseBackupTypeFull     BaseBackupType = "full"
-	BaseBackupTypeSnapshot BaseBackupType = "snapshot"
-)
 
 // CreatePVCPolicy the policy how to create the PersistentVolumeClaim for backup.
 // +enum

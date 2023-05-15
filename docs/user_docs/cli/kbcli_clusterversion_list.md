@@ -18,7 +18,7 @@ kbcli clusterversion list [flags]
 ### Options
 
 ```
-      --cluster-definition string   list the clusterVersion belonging to the specified cluster definition
+      --cluster-definition string   list the resources related to the specified cluster definition
   -h, --help                        help for list
   -o, --output format               prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
   -l, --selector string             Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.

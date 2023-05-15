@@ -38,7 +38,7 @@ func (t *CSSetDeletionTransformer) Transform(ctx graph.TransformContext, dag *gr
 	// there is chance that objects leak occurs because of cache stale
 	// ignore the problem currently
 	// TODO: GC the leaked objects
-	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ownedKinds()...)
+	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, deletionKinds()...)
 	if err != nil {
 		return err
 	}

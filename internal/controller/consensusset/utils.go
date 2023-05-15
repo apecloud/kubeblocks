@@ -162,6 +162,12 @@ func ownedKinds() []client.ObjectList {
 	}
 }
 
+func deletionKinds() []client.ObjectList {
+	kinds := ownedKinds()
+	kinds = append(kinds, &corev1.PersistentVolumeClaimList{})
+	return kinds
+}
+
 func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList,

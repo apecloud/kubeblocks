@@ -151,7 +151,8 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 
 	}
 
-	// TODO: need to handle PDB setup
+	// TODO: may add a PDB transform to Create/Update/Delete.
+	// if no these handle, the cluster controller will occur an error during reconciling.
 	// conditional build PodDisruptionBudget
 	if task.Component.MinAvailable != nil {
 		pdb, err := builder.BuildPDB(task.GetBuilderParams())

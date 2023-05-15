@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -65,7 +66,8 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd.Flags().StringVar(&o.Version, "version", "", "Set KubeBlocks version")
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before upgrade")
-	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for upgrading KubeBlocks")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for upgrading KubeBlocks, such as --timeout=10m")
+	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be ready. It will wait for as long as --timeout")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -90,48 +92,48 @@ func (o *InstallOptions) Upgrade() error {
 	}
 
 	// check if KubeBlocks has been installed
-	versionInfo, err := util.GetVersionInfo(o.Client)
+	v, err := util.GetVersionInfo(o.Client)
 	if err != nil {
 		return err
 	}
 
-	v := versionInfo[util.KubeBlocksApp]
-	if len(v) == 0 {
+	kbVersion := v.KubeBlocks
+	if kbVersion == "" {
 		return errors.New("KubeBlocks does not exist, try to run \"kbcli kubeblocks install\" to install")
 	}
 
-	if v == o.Version && helm.ValueOptsIsEmpty(&o.ValueOpts) {
+	if kbVersion == o.Version && helm.ValueOptsIsEmpty(&o.ValueOpts) {
 		fmt.Fprintf(o.Out, "Current version %s is the same as the upgraded version, no need to upgrade.\n", o.Version)
 		return nil
 	}
 	fmt.Fprintf(o.Out, "Current KubeBlocks version %s.\n", v)
 
-	if err = o.preCheck(versionInfo); err != nil {
+	if err = o.preCheck(v); err != nil {
 		return err
 	}
 
 	// add helm repo
-	spinner := printer.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Add and update repo "+types.KubeBlocksChartName))
+	defer s.Fail()
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
-	spinner(true)
+	s.Success()
 
 	// it's time to upgrade
 	msg := ""
 	if o.Version != "" {
 		msg = "to " + o.Version
 	}
-	spinner = printer.Spinner(o.Out, "%-40s", "Upgrading KubeBlocks "+msg)
-	defer spinner(false)
+	s = spinner.New(o.Out, spinnerMsg("Upgrading KubeBlocks "+msg))
+	defer s.Fail()
 	// upgrade KubeBlocks chart
 	if err = o.upgradeChart(); err != nil {
 		return err
 	}
 	// successfully upgraded
-	spinner(true)
+	s.Success()
 
 	if !o.Quiet {
 		fmt.Fprintf(o.Out, "\nKubeBlocks has been upgraded %s SUCCESSFULLY!\n", msg)

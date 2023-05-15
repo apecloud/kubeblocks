@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-vexpand
 spec:
-  clusterRef: mycluster
+  clusterRef: mycluster-redis-cluster
   type: VolumeExpansion
   volumeExpansion:
     - componentName: postgresql

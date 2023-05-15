@@ -33,8 +33,8 @@ type BackupSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupPolicyName string `json:"backupPolicyName"`
 
-	// Backup Type. full or incremental or snapshot. if unset, default is full.
-	// +kubebuilder:default=full
+	// Backup Type. datafile or logfile or snapshot. if unset, default is datafile.
+	// +kubebuilder:default=datafile
 	BackupType BackupType `json:"backupType"`
 
 	// if backupType is incremental, parentBackupName is required.
@@ -195,13 +195,13 @@ func (r *BackupSpec) Validate(backupPolicy *BackupPolicy) error {
 		if backupPolicy.Spec.Snapshot == nil {
 			return fmt.Errorf(notSupportedMessage, r.BackupPolicyName, BackupTypeSnapshot)
 		}
-	case BackupTypeFull:
-		if backupPolicy.Spec.Full == nil {
-			return fmt.Errorf(notSupportedMessage, r.BackupPolicyName, BackupTypeFull)
+	case BackupTypeDataFile:
+		if backupPolicy.Spec.Datafile == nil {
+			return fmt.Errorf(notSupportedMessage, r.BackupPolicyName, BackupTypeDataFile)
 		}
-	case BackupTypeIncremental:
-		if backupPolicy.Spec.Incremental == nil {
-			return fmt.Errorf(notSupportedMessage, r.BackupPolicyName, BackupTypeIncremental)
+	case BackupTypeLogFile:
+		if backupPolicy.Spec.Logfile == nil {
+			return fmt.Errorf(notSupportedMessage, r.BackupPolicyName, BackupTypeLogFile)
 		}
 	}
 	return nil
@@ -217,9 +217,9 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 			b.Status.Manifests.BackupLog.StopTime == nil {
 			continue
 		}
-		if b.Spec.BackupType == BackupTypeIncremental {
+		if b.Spec.BackupType == BackupTypeLogFile {
 			incrementalBackup = &b
-		} else if b.Spec.BackupType != BackupTypeIncremental && b.Status.Phase == BackupCompleted {
+		} else if b.Spec.BackupType != BackupTypeLogFile && b.Status.Phase == BackupCompleted {
 			baseBackups = append(baseBackups, b)
 		}
 	}

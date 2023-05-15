@@ -76,7 +76,7 @@ func BuildRestoredInfo2(
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupNotCompleted, "backup %s is not completed", backup.Name)
 	}
 	switch backup.Spec.BackupType {
-	case dataprotectionv1alpha1.BackupTypeFull:
+	case dataprotectionv1alpha1.BackupTypeDataFile:
 		return buildInitContainerWithFullBackup(component, backup, backupTool)
 	case dataprotectionv1alpha1.BackupTypeSnapshot:
 		return buildVolumeClaimTemplatesWithSnapshot(component, backup)

@@ -15,10 +15,10 @@ kbcli cluster backup [flags]
   kbcli cluster backup cluster-name
   
   # create a snapshot backup
-  kbcli cluster backup cluster-name --backup-type snapshot
+  kbcli cluster backup cluster-name --type snapshot
   
   # create a full backup
-  kbcli cluster backup cluster-name --backup-type full
+  kbcli cluster backup cluster-name --type full
   
   # create a backup with specified backup policy
   kbcli cluster backup cluster-name --backup-policy <backup-policy-name>
@@ -29,8 +29,8 @@ kbcli cluster backup [flags]
 ```
       --backup-name string     Backup name
       --backup-policy string   Backup policy name, this flag will be ignored when backup-type is snapshot
-      --backup-type string     Backup type (default "snapshot")
   -h, --help                   help for backup
+      --type string            Backup type (default "snapshot")
 ```
 
 ### Options inherited from parent commands

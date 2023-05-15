@@ -217,14 +217,14 @@ var _ = Describe("PITR Functions", func() {
 			incrBackupLabels := map[string]string{
 				constant.AppInstanceLabelKey:    sourceCluster,
 				constant.KBAppComponentLabelKey: mysqlCompName,
-				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeIncremental),
+				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeLogFile),
 			}
 			incrStartTime := &startTime
 			incrStopTime := &stopTime
 			backupIncr := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(incrBackupLabels).
 				SetBackupPolicyName("test-fake").
-				SetBackupType(dpv1alpha1.BackupTypeIncremental).
+				SetBackupType(dpv1alpha1.BackupTypeLogFile).
 				Create(&testCtx).GetObject()
 			backupStatus = dpv1alpha1.BackupStatus{
 				Phase:                     dpv1alpha1.BackupCompleted,

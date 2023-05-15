@@ -47,8 +47,8 @@ import (
 type OperationsOptions struct {
 	create.CreateOptions  `json:"-"`
 	HasComponentNamesFlag bool `json:"-"`
-	// RequireConfirm if it is true, the second verification will be performed before creating ops.
-	RequireConfirm         bool     `json:"-"`
+	// AutoApprove if it is true, will skip the double check.
+	AutoApprove            bool     `json:"-"`
 	ComponentNames         []string `json:"componentNames,omitempty"`
 	OpsRequestName         string   `json:"opsRequestName"`
 	TTLSecondsAfterSucceed int      `json:"ttlSecondsAfterSucceed"`
@@ -100,7 +100,7 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 		KeyValues:             map[string]string{},
 		OpsType:               opsType,
 		HasComponentNamesFlag: hasComponentNamesFlag,
-		RequireConfirm:        true,
+		AutoApprove:           false,
 		CreateOptions: create.CreateOptions{
 			Factory:         f,
 			IOStreams:       streams,
@@ -268,7 +268,7 @@ func (o *OperationsOptions) Validate() error {
 			return err
 		}
 	}
-	if o.RequireConfirm && o.DryRun == "none" {
+	if !o.AutoApprove && o.DryRun == "none" {
 		return delete.Confirm([]string{o.Name}, o.In)
 	}
 	return nil
@@ -385,6 +385,7 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 	o.addCommonFlags(cmd)
+	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before restarting")
 	return cmd
 }
 
@@ -410,6 +411,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 	o.addCommonFlags(cmd)
 	cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference cluster version (required)")
+	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before stopping")
 	return cmd
 }
 
@@ -564,6 +566,7 @@ func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	o.addCommonFlags(cmd)
+	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before stopping")
 	return cmd
 }
 
@@ -575,7 +578,7 @@ var startExample = templates.Examples(`
 // NewStartCmd creates a start command
 func NewStartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.StartType, false)
-	o.RequireConfirm = false
+	o.AutoApprove = true
 	cmd := &cobra.Command{
 		Use:               "start NAME",
 		Short:             "Start the cluster if cluster is stopped.",

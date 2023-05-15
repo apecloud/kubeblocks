@@ -41,8 +41,9 @@ import (
 type configOpsOptions struct {
 	*OperationsOptions
 
-	editMode bool
-	wrapper  *configWrapper
+	editMode    bool
+	autoApprove bool
+	wrapper     *configWrapper
 
 	// Reconfiguring options
 	ComponentName string
@@ -53,11 +54,11 @@ type configOpsOptions struct {
 var (
 	createReconfigureExample = templates.Examples(`
 		# update component params 
-		kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
+		kbcli cluster reconfigure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
 
 		# if only one component, and one config spec, and one config file, simplify the use of configure. e.g:
 		# update mysql max_connections, cluster name is mycluster
-		kbcli cluster configure mycluster --set max_connections=2000
+		kbcli cluster reconfigure mycluster --set max_connections=2000
 	`)
 )
 
@@ -132,7 +133,7 @@ func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.C
 		return r
 	}
 
-	if !cfgcm.IsSupportReload(cc.ReloadOptions) {
+	if !cfgcm.IsSupportReload(cc.ReloadOptions) && !o.autoApprove {
 		return o.confirmReconfigureWithRestart()
 	}
 
@@ -146,6 +147,9 @@ func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.C
 		return nil
 	}
 	if dynamicUpdated {
+		return nil
+	}
+	if o.autoApprove {
 		return nil
 	}
 	return o.confirmReconfigureWithRestart()

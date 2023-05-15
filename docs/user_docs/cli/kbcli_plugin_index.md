@@ -1,19 +1,17 @@
 ---
-title: kbcli plugin
+title: kbcli plugin index
 ---
 
-Provides utilities for interacting with plugins.
+Manage custom plugin indexes
 
 ### Synopsis
 
-Provides utilities for interacting with plugins.
-
- Plugins provide extended functionality that is not part of the major command-line distribution.
+Manage which repositories are used to discover plugins and install plugins from
 
 ### Options
 
 ```
-  -h, --help   help for plugin
+  -h, --help   help for index
 ```
 
 ### Options inherited from parent commands
@@ -42,14 +40,11 @@ Provides utilities for interacting with plugins.
 
 ### SEE ALSO
 
-
-* [kbcli plugin describe](kbcli_plugin_describe.md)	 - Describe a plugin
-* [kbcli plugin index](kbcli_plugin_index.md)	 - Manage custom plugin indexes
-* [kbcli plugin install](kbcli_plugin_install.md)	 - Install kbcli or kubectl plugins
-* [kbcli plugin list](kbcli_plugin_list.md)	 - List all visible plugin executables on a user's PATH
-* [kbcli plugin search](kbcli_plugin_search.md)	 - Search kbcli or kubectl plugins
-* [kbcli plugin uninstall](kbcli_plugin_uninstall.md)	 - Uninstall kbcli or kubectl plugins
-* [kbcli plugin upgrade](kbcli_plugin_upgrade.md)	 - Upgrade kbcli or kubectl plugins
+* [kbcli plugin](kbcli_plugin.md)	 - Provides utilities for interacting with plugins.
+* [kbcli plugin index add](kbcli_plugin_index_add.md)	 - Add a new index
+* [kbcli plugin index delete](kbcli_plugin_index_delete.md)	 - Remove a configured index
+* [kbcli plugin index list](kbcli_plugin_index_list.md)	 - List configured indexes
+* [kbcli plugin index update](kbcli_plugin_index_update.md)	 - update all configured indexes
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

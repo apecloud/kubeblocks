@@ -51,23 +51,17 @@ spec:
     - scriptConfigMapRef: redis-reload-script-new
       namespace: {{ .Release.Namespace }}
 
-  toolConfigs:
-    - name: init-redis-tools
-      command:
-        - cp
-        - /usr/local/bin/redis-cli
-        - /kb/tools/redis-cli
-      image: docker.io/library/redis:7.0.11-alpine
-      mountPoint: /kb/tools
-      volumeName: redis-tools
-    - name: init-secondary-render-tools
-      command:
-        - cp
-        - /bin/config_render
-        - /kb/tools/config_render
-      image: "$(KUBEBLOCKS_TOOLS_IMAGE)"
-      mountPoint: /kb/tools
-      volumeName: redis-tools
+  toolImageSpec:
+    mountPoint: /kb/tools
+    toolConfigs:
+      - name: init-redis-tools
+        command:
+          - cp
+          - /usr/local/bin/redis-cli
+          - /kb/tools/redis-cli
+        image: docker.io/library/redis:7.0.11-alpine
+        mountPoint: /kb/tools
+        volumeName: redis-tools
 
   downwardAPIOptions:
     - name: "pod-info"

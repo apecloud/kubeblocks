@@ -37,8 +37,8 @@ type ConfigSpecMeta struct {
 	ConfigSpec appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
 
 	ScriptConfig       []appsv1alpha1.ScriptConfig
-	ToolConfigs        []appsv1alpha1.ToolConfig
-	DownwardAPIOptions []appsv1alpha1.DownwardAPIOption
+	ToolImageSpec      *appsv1alpha1.ToolImageSpec
+	DownwardAPIOptions []appsv1alpha1.DownwardAPIOption `json:"downwardAPIOptions"`
 
 	// config volume mount path
 	TPLConfig  string `json:"tplConfig"`

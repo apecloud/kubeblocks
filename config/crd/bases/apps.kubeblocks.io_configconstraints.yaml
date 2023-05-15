@@ -370,40 +370,37 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
-              toolConfigs:
+              toolImageSpec:
                 description: toolConfig used to config init container.
-                items:
-                  properties:
-                    command:
-                      description: exec used to execute for init containers.
-                      items:
-                        type: string
-                      type: array
-                    image:
-                      description: tools Container image name.
-                      type: string
-                    mountPoint:
-                      description: mountPoint is the mount point of the scripts file.
-                      maxLength: 128
-                      type: string
-                    name:
-                      description: Specify the name of initContainer.
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                      type: string
-                    volumeName:
-                      description: volumeName is the volume name of PodTemplate, which
-                        the configuration file produced through the configuration
-                        template will be mounted to the corresponding volume. The
-                        volume name must be defined in podSpec.containers[*].volumeMounts.
-                      maxLength: 32
-                      type: string
-                  required:
-                  - command
-                  - mountPoint
-                  - volumeName
-                  type: object
-                type: array
+                properties:
+                  mountPoint:
+                    description: mountPoint is the mount point of the scripts file.
+                    maxLength: 128
+                    type: string
+                  toolConfigs:
+                    description: toolConfig used to config init container.
+                    items:
+                      properties:
+                        command:
+                          description: exec used to execute for init containers.
+                          items:
+                            type: string
+                          type: array
+                        image:
+                          description: tools Container image name.
+                          type: string
+                        name:
+                          description: Specify the name of initContainer.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - command
+                      type: object
+                    type: array
+                required:
+                - mountPoint
+                type: object
             required:
             - formatterConfig
             type: object

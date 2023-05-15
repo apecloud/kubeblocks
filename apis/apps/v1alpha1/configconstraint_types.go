@@ -32,7 +32,8 @@ type ConfigConstraintSpec struct {
 
 	// toolConfig used to config init container.
 	// +optional
-	ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
+	ToolImageSpec *ToolImageSpec `json:"toolImageSpec,omitempty"`
+	// ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
 
 	// downwardAPIOptions is used to watch pod fields.
 	// +optional
@@ -143,13 +144,25 @@ type UnixSignalTrigger struct {
 	ProcessName string `json:"processName"`
 }
 
-type ToolConfig struct {
+type ToolImageSpec struct {
+	// auto generate
 	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
-	VolumeName string `json:"volumeName"`
+	// VolumeName string `json:"volumeName"`
 
+	// mountPoint is the mount point of the scripts file.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	MountPoint string `json:"mountPoint"`
+
+	// toolConfig used to config init container.
+	// +optional
+	ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
+}
+
+type ToolConfig struct {
 	// Specify the name of initContainer.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
@@ -159,11 +172,6 @@ type ToolConfig struct {
 	// tools Container image name.
 	// +optional
 	Image string `json:"image,omitempty"`
-
-	// mountPoint is the mount point of the scripts file.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=128
-	MountPoint string `json:"mountPoint"`
 
 	// exec used to execute for init containers.
 	// +kubebuilder:validation:Required

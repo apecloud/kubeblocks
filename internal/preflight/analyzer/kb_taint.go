@@ -70,9 +70,6 @@ func (a *AnalyzeTaintClassByKb) Analyze(getFile GetCollectedFileContents, findFi
 }
 
 func (a *AnalyzeTaintClassByKb) analyzeTaint(getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) (*analyze.AnalyzeResult, error) {
-	if a.HelmOpts == nil {
-		return newAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
-	}
 	nodesData, err := getFile(NodesPath)
 	if err != nil {
 		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
@@ -99,6 +96,10 @@ func (a *AnalyzeTaintClassByKb) doAnalyzeTaint(nodes v1.NodeList) (*analyze.Anal
 		}
 	}
 
+	if a.analyzer.TolerationsMap == nil || len(a.analyzer.TolerationsMap) == 0 {
+		return newAnalyzeResult(a.Title(), FailType, a.analyzer.Outcomes), nil
+	}
+
 	for k, tolerations := range a.analyzer.TolerationsMap {
 		count := 0
 		for _, node := range nodes.Items {
@@ -117,13 +118,14 @@ func (a *AnalyzeTaintClassByKb) doAnalyzeTaint(nodes v1.NodeList) (*analyze.Anal
 }
 
 func (a *AnalyzeTaintClassByKb) generateTolerations() error {
-	optsMap, err := a.getHelmValues()
-	if err != nil {
-		return err
-	}
-
 	tolerations := map[string][]v1.Toleration{}
-	getTolerationsMap(optsMap, "", tolerations)
+	if a.HelmOpts != nil {
+		optsMap, err := a.getHelmValues()
+		if err != nil {
+			return err
+		}
+		getTolerationsMap(optsMap, "", tolerations)
+	}
 	a.analyzer.TolerationsMap = tolerations
 	return nil
 }

@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
-
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -40,12 +39,12 @@ var faultNetWorkExample = templates.Examples(`
 	kbcli fault network partition
 
 	# The specified pod is isolated from the k8s external network "kubeblocks.io".
-	kbcli fault network partition mycluster-mysql-1 --external-target=kubeblocks.io
+	kbcli fault network partition mycluster-mysql-1 --external-targets=kubeblocks.io
 	
 	# Isolate the network between two pods.
-	kbcli fault network partition mycluster-mysql-1 --target-mode=one --target-label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2
+	kbcli fault network partition mycluster-mysql-1 --target-label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2
 	
-	// Like the partition command, the target can be specified through --target-label or --external-target. The pod only has obstacles in communicating with this target. If the target is not specified, all communication will be blocked.
+	// Like the partition command, the target can be specified through --target-label or --external-targets. The pod only has obstacles in communicating with this target. If the target is not specified, all communication will be blocked.
 	# Block all pod communication under the default namespace, resulting in a 50% packet loss rate.
 	kbcli fault network loss --loss=50
 	
@@ -66,7 +65,7 @@ var faultNetWorkExample = templates.Examples(`
 
 	# Block the communication of the specified pod, causing its network delay for 10s.
 	kbcli fault network delay mysql-cluster-mysql-2 --latency=10s
-	
+
 	# Limit the communication bandwidth between mysql-cluster-mysql-2 and the outside.
 	kbcli fault network bandwidth mysql-cluster-mysql-2 --rate=1kbps --duration=1m
 `)

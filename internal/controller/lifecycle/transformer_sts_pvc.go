@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"reflect"
 
-	errors2 "github.com/go-errors/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -50,13 +49,10 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 	// 3. Delete the claimRef entry from PV specs, so as new PVC can bind to it. This should make the PV Available.
 	// 4. Re-create the PVC with smaller size than PV and set volumeName field of the PVC to the name of the PV. This should bind new PVC to existing PV.
 	// 5. Don't forget to restore the reclaim policy of the PV.
-	updatePVCSize := func(vertex *lifecycleVertex, pvcKey types.NamespacedName, pvc *corev1.PersistentVolumeClaim, vctProto *corev1.PersistentVolumeClaim) error {
+	updatePVCSize := func(vertex *lifecycleVertex, pvcKey types.NamespacedName, pvc *corev1.PersistentVolumeClaim, pvcNotFound bool, vctProto *corev1.PersistentVolumeClaim) error {
 
 		newPVC := pvc.DeepCopy()
-		if newPVC == nil {
-			newPVC = &corev1.PersistentVolumeClaim{}
-		}
-		if pvc == nil {
+		if pvcNotFound {
 			newPVC.Name = pvcKey.Name
 			newPVC.Namespace = pvcKey.Namespace
 			newPVC.Spec = vctProto.Spec
@@ -67,9 +63,9 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 			if err := transCtx.Client.List(transCtx.Context, &pvList, ml); err != nil {
 				return err
 			}
-			if len(pvList.Items) == 0 {
-				return errors2.Errorf("pvc deleted but pv not found")
-			}
+			//if len(pvList.Items) == 0 {
+			//	return errors2.Errorf("pvc deleted but pv not found")
+			//}
 			for _, pv := range pvList.Items {
 				// find pv referenced this pvc
 				if pv.Spec.ClaimRef.Name == pvcKey.Name {
@@ -88,6 +84,8 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 			action: actionPtr(UPDATE),
 		}
 
+		pvNotFound := false
+
 		// step 1: update pv to retain
 		pv := &corev1.PersistentVolume{}
 		pvKey := types.NamespacedName{
@@ -95,7 +93,11 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 			Name:      newPVC.Spec.VolumeName,
 		}
 		if err := transCtx.Client.Get(transCtx.Context, pvKey, pv); err != nil {
-			return err
+			if errors.IsNotFound(err) {
+				pvNotFound = true
+			} else {
+				return err
+			}
 		}
 		retainPV := pv.DeepCopy()
 		if retainPV.Labels == nil {
@@ -113,9 +115,6 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 		// step 2: delete pvc, this will not delete pv because policy is 'retain'
 		deletePVCVertex := &lifecycleVertex{obj: pvc, action: actionPtr(DELETE)}
 		removeFinalizerPVC := pvc.DeepCopy()
-		if removeFinalizerPVC == nil {
-			removeFinalizerPVC = &corev1.PersistentVolumeClaim{}
-		}
 		removeFinalizerPVC.SetFinalizers([]string{})
 		removeFinalizerPVCVertex := &lifecycleVertex{
 			obj:    removeFinalizerPVC,
@@ -149,7 +148,7 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 		}
 
 		targetQuantity := vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
-		if pvc == nil {
+		if pvcNotFound && !pvNotFound {
 			// this could happen if some steps failed
 			// step 3: remove claimRef in pv
 			dag.AddVertex(removeClaimRefVertex)
@@ -160,6 +159,8 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 			dag.AddVertex(restorePVVertex)
 			dag.Connect(restorePVVertex, createNewPVCVertex)
 			dag.Connect(vertex, restorePVVertex)
+		} else if pvcNotFound && pvNotFound {
+			// if both pvc and pv not found, do nothing
 		} else if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
 			// this could happen if create pvc succeeded but last step failed
 			// step 5: restore to previous pv policy
@@ -216,6 +217,7 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 				continue
 			}
 
+			pvcNotFound := false
 			for i := *stsObj.Spec.Replicas - 1; i >= 0; i-- {
 				pvc := &corev1.PersistentVolumeClaim{}
 				pvcKey := types.NamespacedName{
@@ -224,14 +226,13 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 				}
 				if err := transCtx.Client.Get(transCtx.Context, pvcKey, pvc); err != nil {
 					if errors.IsNotFound(err) {
-						// set to nil to let updatePVCSize know it's empty
-						pvc = nil
+						pvcNotFound = true
 					} else {
 						return err
 					}
 				}
 
-				if err := updatePVCSize(vertex, pvcKey, pvc, vctProto); err != nil {
+				if err := updatePVCSize(vertex, pvcKey, pvc, pvcNotFound, vctProto); err != nil {
 					return err
 				}
 			}

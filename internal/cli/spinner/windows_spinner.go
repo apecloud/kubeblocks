@@ -17,15 +17,15 @@ import (
 var char = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
 
 type WindowsSpinner struct { // no thread/goroutine safe
-	msg          string
-	lastOutplain string
-	FinalMSG     string
-	active       bool
-	chars        []string
-	cancel       chan struct{}
-	Writer       io.Writer
-	delay        time.Duration
-	mu           *sync.RWMutex
+	msg        string
+	lastOutput string
+	FinalMSG   string
+	active     bool
+	chars      []string
+	cancel     chan struct{}
+	Writer     io.Writer
+	delay      time.Duration
+	mu         *sync.RWMutex
 }
 
 func NewWindowsSpinner(w io.Writer, opts ...Option) *WindowsSpinner {
@@ -95,10 +95,10 @@ func (s *WindowsSpinner) Start() {
 					}
 					outPlain := fmt.Sprintf("\r%s%s", s.chars[i], s.msg)
 					s.erase()
-					s.lastOutplain = outPlain
-					fmt.Print(outPlain)
+					s.lastOutput = outPlain
+					fmt.Fprint(s.Writer, outPlain)
+					//fmt.Print(outPlain)
 					s.mu.Unlock()
-					// fmt.Fprint(s.Writer, outPlain)
 					time.Sleep(s.delay)
 				}
 			}
@@ -116,14 +116,16 @@ func (s *WindowsSpinner) SetFinalMsg(msg string) {
 	s.FinalMSG = msg
 }
 
-// remove lastOutplain
+// remove lastOutput
 func (s *WindowsSpinner) erase() {
-	split := strings.Split(s.lastOutplain, "\n")
+	split := strings.Split(s.lastOutput, "\n")
 	for i := 0; i < len(split); i++ {
 		if i > 0 {
-			fmt.Print("\033[A")
+			fmt.Fprint(s.Writer, "\033[A")
+			//fmt.Print("\033[A")
 		}
-		fmt.Print("\r\033[K")
+		//fmt.Print("\r\033[K")
+		fmt.Fprint(s.Writer, "\r\033[K")
 	}
 }
 
@@ -135,7 +137,8 @@ func (s *WindowsSpinner) stop() {
 		s.active = false
 		if s.FinalMSG != "" {
 			s.erase()
-			fmt.Print(s.FinalMSG)
+			//fmt.Print(s.FinalMSG)
+			fmt.Fprint(s.Writer, s.FinalMSG)
 		}
 		s.cancel <- struct{}{}
 		close(s.cancel)

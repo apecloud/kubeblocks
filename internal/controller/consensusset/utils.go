@@ -21,6 +21,7 @@ package consensusset
 
 import (
 	"context"
+	batchv1 "k8s.io/api/batch/v1"
 	"sort"
 	"strings"
 
@@ -164,7 +165,7 @@ func ownedKinds() []client.ObjectList {
 
 func deletionKinds() []client.ObjectList {
 	kinds := ownedKinds()
-	kinds = append(kinds, &corev1.PersistentVolumeClaimList{})
+	kinds = append(kinds, &corev1.PersistentVolumeClaimList{}, &batchv1.JobList{})
 	return kinds
 }
 

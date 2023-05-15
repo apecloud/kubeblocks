@@ -22,6 +22,7 @@ package consensusset
 import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // CSSetDeletionTransformer handles ConsensusSet deletion
@@ -38,7 +39,8 @@ func (t *CSSetDeletionTransformer) Transform(ctx graph.TransformContext, dag *gr
 	// there is chance that objects leak occurs because of cache stale
 	// ignore the problem currently
 	// TODO: GC the leaked objects
-	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, deletionKinds()...)
+	ml := client.MatchingLabels{model.AppInstanceLabelKey: obj.Name, model.KBManagedByKey: kindConsensusSet}
+	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, deletionKinds()...)
 	if err != nil {
 		return err
 	}

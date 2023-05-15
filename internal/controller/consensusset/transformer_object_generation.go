@@ -65,7 +65,8 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// read cache snapshot
-	oldSnapshot, err := model.ReadCacheSnapshot(ctx, csSet, ownedKinds()...)
+	ml := client.MatchingLabels{model.AppInstanceLabelKey: csSet.Name, model.KBManagedByKey: kindConsensusSet}
+	oldSnapshot, err := model.ReadCacheSnapshot(ctx, csSet, ml, ownedKinds()...)
 	if err != nil {
 		return err
 	}

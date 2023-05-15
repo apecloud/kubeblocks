@@ -488,10 +488,10 @@ func doControlJob(csSet *workloads.ConsensusSet, dag *graph.DAG, env []corev1.En
 		AddLabels(model.KBManagedByKey, kindConsensusSet).
 		AddLabels(jobTypeLabel, jobType).
 		AddLabels(jobHandledLabel, jobHandledFalse).
-		AddSelector(model.AppInstanceLabelKey, csSet.Name).
-		AddSelector(model.KBManagedByKey, kindConsensusSet).
-		AddSelector(jobTypeLabel, jobType).
-		AddSelector(jobNameLabel, jobName).
+		//AddSelector(model.AppInstanceLabelKey, csSet.Name).
+		//AddSelector(model.KBManagedByKey, kindConsensusSet).
+		//AddSelector(jobTypeLabel, jobType).
+		//AddSelector(jobNameLabel, jobName).
 		SetPodTemplateSpec(*template).
 		SetSuspend(suspend).
 		GetObject()
@@ -522,16 +522,25 @@ func buildJobPodTemplate(csSet *workloads.ConsensusSet, env []corev1.EnvVar, job
 	env = append(env, credentialEnv...)
 	reconfiguration := csSet.Spec.MembershipReconfiguration
 	image := findJobImage(reconfiguration, jobType)
+	command := getJobCommand(reconfiguration, jobType)
 	container := corev1.Container{
 		Name:            jobType,
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command:         reconfiguration.SwitchoverAction.Command,
+		Command:         command,
 		Env:             env,
 	}
 	template := &corev1.PodTemplateSpec{
+		//ObjectMeta: metav1.ObjectMeta{
+		//	Labels: map[string]string{
+		//		model.AppInstanceLabelKey: csSet.Name,
+		//		model.KBManagedByKey:      kindConsensusSet,
+		//		jobTypeLabel:              jobType,
+		//	},
+		//},
 		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{container},
+			Containers:    []corev1.Container{container},
+			RestartPolicy: corev1.RestartPolicyOnFailure,
 		},
 	}
 	return template
@@ -539,8 +548,8 @@ func buildJobPodTemplate(csSet *workloads.ConsensusSet, env []corev1.EnvVar, job
 
 func buildControlJobEnv(csSet *workloads.ConsensusSet, leader, target string) []corev1.EnvVar {
 	svcName := getHeadlessSvcName(*csSet)
-	leaderHost := fmt.Sprintf("%s.%s.local", leader, svcName)
-	targetHost := fmt.Sprintf("%s.%s.local", target, svcName)
+	leaderHost := fmt.Sprintf("%s.%s", leader, svcName)
+	targetHost := fmt.Sprintf("%s.%s", target, svcName)
 	svcPort := findSvcPort(*csSet)
 	return []corev1.EnvVar{
 		{
@@ -598,6 +607,31 @@ func findJobImage(reconfiguration *workloads.MembershipReconfiguration, jobType 
 	}
 
 	return ""
+}
+
+func getJobCommand(reconfiguration *workloads.MembershipReconfiguration, jobType string) []string {
+	if reconfiguration == nil {
+		return nil
+	}
+	getCommand := func(action *workloads.Action) []string {
+		if action == nil {
+			return nil
+		}
+		return action.Command
+	}
+	switch jobType {
+	case jobTypeSwitchover:
+		return getCommand(reconfiguration.SwitchoverAction)
+	case jobTypeMemberJoinNotifying:
+		return getCommand(reconfiguration.MemberJoinAction)
+	case jobTypeMemberLeaveNotifying:
+		return getCommand(reconfiguration.MemberLeaveAction)
+	case jobTypeLogSync:
+		return getCommand(reconfiguration.LogSyncAction)
+	case jobTypePromote:
+		return getCommand(reconfiguration.PromoteAction)
+	}
+	return nil
 }
 
 func startControlJob(dag *graph.DAG, jobList *batchv1.JobList) error {

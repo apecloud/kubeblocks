@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -166,10 +165,9 @@ func IsObjectStatusUpdating(object client.Object) bool {
 }
 
 // ReadCacheSnapshot reads all objects owned by our cluster
-func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, kinds ...client.ObjectList) (ObjectSnapshot, error) {
+func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml client.MatchingLabels, kinds ...client.ObjectList) (ObjectSnapshot, error) {
 	// list what kinds of object cluster owns
 	snapshot := make(ObjectSnapshot)
-	ml := client.MatchingLabels{AppInstanceLabelKey: root.GetName()}
 	inNS := client.InNamespace(root.GetNamespace())
 	for _, list := range kinds {
 		if err := transCtx.GetClient().List(transCtx.GetContext(), list, inNS, ml); err != nil {
@@ -181,16 +179,11 @@ func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, kind
 		for i := 0; i < l; i++ {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
-			// put to snapshot if owned by our cluster
-			// pvcs created by sts don't have cluster in ownerReferences
-			_, isPVC := object.(*corev1.PersistentVolumeClaim)
-			if isPVC || IsOwnerOf(root, object) {
-				name, err := GetGVKName(object)
-				if err != nil {
-					return nil, err
-				}
-				snapshot[*name] = object
+			name, err := GetGVKName(object)
+			if err != nil {
+				return nil, err
 			}
+			snapshot[*name] = object
 		}
 	}
 

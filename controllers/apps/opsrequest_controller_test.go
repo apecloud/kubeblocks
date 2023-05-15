@@ -410,7 +410,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			testVerticalScaleCPUAndMemory(testapps.ConsensusMySQLComponent, ctx)
 		})
 
-		PIt("HorizontalScaling when not support snapshot", func() {
+		It("HorizontalScaling when not support snapshot", func() {
 			By("init backup policy template, mysql cluster and hscale ops")
 			viper.Set("VOLUMESNAPSHOT", false)
 			createMysqlCluster(3)
@@ -419,25 +419,28 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("expect component is Running if don't support volume snapshot during doing h-scale ops")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-			// cluster phase changes to HorizontalScalingPhase first. then, it will be ConditionsError because it does not support snapshot backup after a period of time.
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase)) // HorizontalScalingPhase
-			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Eventually(testapps.GetClusterGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
+				// expect cluster phase is Updating during Hscale.
+				g.Expect(fetched.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+				// when snapshot is not supported, the expected component phase is running.
+				g.Expect(fetched.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+				// expect preCheckFailed condition to occur.
+				condition := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Status).Should(BeFalse())
+				g.Expect(condition.Reason).Should(Equal(lifecycle.ReasonPreCheckFailed))
+				g.Expect(condition.Message).Should(Equal("HorizontalScaleFailed: volume snapshot not support"))
+			}))
 
-			By("delete h-scale ops")
-			testapps.DeleteObject(&testCtx, opsKey, ops)
-			Expect(testapps.ChangeObj(&testCtx, ops, func(lopsReq *appsv1alpha1.OpsRequest) {
-				lopsReq.SetFinalizers([]string{})
-			})).ShouldNot(HaveOccurred())
-
-			By("reset replicas to 1 and cluster should reconcile to Running")
+			By("reset replicas to 3 and cluster phase should be reconciled to Running")
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 				cluster.Spec.ComponentSpecs[0].Replicas = int32(3)
 			})()).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
 
-		PIt("HorizontalScaling via volume snapshot backup", func() {
+		It("HorizontalScaling via volume snapshot backup", func() {
 			By("init backup policy template, mysql cluster and hscale ops")
 			viper.Set("VOLUMESNAPSHOT", true)
 			createMysqlCluster(3)
@@ -449,15 +452,13 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("expect component is Running")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetClusterGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
-			// cluster phase changes to SpecReconcilingClusterPhase first. then, it will be ConditionsError because it does not support snapshot backup after a period of time.
-			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+			// the expected cluster phase is Updating during Hscale.
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 			// component phase should be running during snapshot backup
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
-			By("mock VolumeSnapshot ready to use status, component phase should change to Updating to do horizontalScaling")
+			By("mock VolumeSnapshot status is ready, component phase should change to Updating when component is horizontally scaling.")
 			snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
 				clusterKey.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}
 			volumeSnapshot := &snapshotv1.VolumeSnapshot{}

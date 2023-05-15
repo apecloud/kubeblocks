@@ -21,7 +21,6 @@ package consensusset
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	"regexp"
 	"sort"
 	"strconv"
@@ -30,13 +29,13 @@ import (
 	apps "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // HorizontalScalingTransformer handles horizontal scaling.
@@ -500,7 +499,7 @@ func getLeaderPodName(pods []corev1.Pod, roleMap map[string]workloads.ConsensusR
 
 // normal conditions: all pods with role label set and one is leader
 func doAbnormalAnalysis(transCtx *CSSetTransformContext, pods []corev1.Pod, roleMap map[string]workloads.ConsensusRole) error {
-	if len(pods) != int(transCtx.OrigCSSet.Status.Replicas) {
+	if len(pods) != int(transCtx.CSSet.Status.Replicas) {
 		// TODO(free6om): should handle this error in a more user-friendly way
 		// set condition, emit event if error happens consecutive x times.
 		return fmt.Errorf("cluster unhealthy: # of pods %d not equals to replicas %d", len(pods), transCtx.OrigCSSet.Status.Replicas)
@@ -534,7 +533,7 @@ func doAbnormalAnalysis(transCtx *CSSetTransformContext, pods []corev1.Pod, role
 
 // ordinal is the ordinal of pod which this control job apply to
 func doControlJob(csSet *workloads.ConsensusSet, dag *graph.DAG, env []corev1.EnvVar, jobType string, ordinal int, suspend bool) error {
-	jobName := fmt.Sprintf("%s-%s-%d-%s", csSet.Name, jobType, ordinal, rand.String(6))
+	jobName := fmt.Sprintf("%s-%s-%d-%d", csSet.Name, jobType, ordinal, csSet.Generation)
 	template := buildJobPodTemplate(csSet, env, jobType)
 	job := builder.NewJobBuilder(csSet.Namespace, jobName).
 		AddLabels(model.AppInstanceLabelKey, csSet.Name).
@@ -695,21 +694,13 @@ func doControlJobCleanup(transCtx *CSSetTransformContext, jobType string, dag *g
 	case stateControlJobFailed(jobList):
 		// TODO(free6om): control job policy: stop, retry, ignore
 		emitControlJobFailedEvent(transCtx, jobType)
-		// failed job: update label
+		fallthrough
+	case stateControlJobSuccess(jobList):
 		for _, job := range jobList.Items {
 			jobOld := job.DeepCopy()
 			jobNew := jobOld.DeepCopy()
 			jobNew.Labels[jobHandledLabel] = jobHandledTrue
 			model.PrepareUpdate(dag, jobOld, jobNew)
-		}
-	case stateControlJobSuccess(jobList):
-		// succeeded job: be deleted
-		for _, job := range jobList.Items {
-			if !job.DeletionTimestamp.IsZero() {
-				continue
-			}
-			jobOld := job.DeepCopy()
-			model.PrepareDelete(dag, jobOld)
 		}
 	}
 }

@@ -75,7 +75,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		stsVertex.Immutable = false
 	}
 	switch {
-	case csSet.Spec.Replicas < csSet.Status.Replicas:
+	case csSet.Spec.Replicas < transCtx.CSSet.Status.Replicas:
 		return scaleIn(transCtx, dag, pods, updateHandler)
 	default:
 		return scaleOut(transCtx, dag, pods, updateHandler)
@@ -97,7 +97,7 @@ func scaleIn(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod,
 	})
 
 	scaleInChecker := func() bool {
-		return transCtx.CSSet.Spec.Replicas < transCtx.OrigCSSet.Status.Replicas
+		return transCtx.CSSet.Spec.Replicas < transCtx.CSSet.Status.Replicas
 	}
 
 	switch {
@@ -128,10 +128,10 @@ func scaleOut(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod
 	})
 
 	scaleOutBeginChecker := func() bool {
-		return transCtx.CSSet.Spec.Replicas > transCtx.OrigCSSet.Status.Replicas
+		return transCtx.CSSet.Spec.Replicas > transCtx.CSSet.Status.Replicas
 	}
 	scaleOutInProgressChecker := func() bool {
-		return transCtx.CSSet.Spec.Replicas == transCtx.OrigCSSet.Status.Replicas
+		return transCtx.CSSet.Spec.Replicas == transCtx.CSSet.Status.Replicas
 	}
 	switch {
 	case stateBeginning(scaleOutBeginChecker, jobLists...):

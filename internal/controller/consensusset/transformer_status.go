@@ -46,7 +46,6 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 	case model.IsObjectUpdating(origCSSet):
 		// use consensus set's generation instead of sts's
 		csSet.Status.ObservedGeneration = csSet.Generation
-		csSet.Status.Replicas = csSet.Spec.Replicas
 	case model.IsObjectStatusUpdating(origCSSet):
 		// read the underlying sts
 		sts := &apps.StatefulSet{}

@@ -35,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // HorizontalScalingTransformer handles horizontal scaling.
@@ -98,7 +97,7 @@ func scaleIn(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod,
 	})
 
 	scaleInChecker := func() bool {
-		return transCtx.CSSet.Spec.Replicas < transCtx.CSSet.Status.Replicas
+		return transCtx.CSSet.Spec.Replicas < transCtx.OrigCSSet.Status.Replicas
 	}
 
 	switch {
@@ -129,10 +128,10 @@ func scaleOut(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod
 	})
 
 	scaleOutBeginChecker := func() bool {
-		return transCtx.CSSet.Spec.Replicas > transCtx.CSSet.Status.Replicas
+		return transCtx.CSSet.Spec.Replicas > transCtx.OrigCSSet.Status.Replicas
 	}
 	scaleOutInProgressChecker := func() bool {
-		return transCtx.CSSet.Spec.Replicas == transCtx.CSSet.Status.Replicas
+		return transCtx.CSSet.Spec.Replicas == transCtx.OrigCSSet.Status.Replicas
 	}
 	switch {
 	case stateBeginning(scaleOutBeginChecker, jobLists...):
@@ -153,14 +152,12 @@ func stateBeginning(checker preConditionChecker, controlJobLists ...*batchv1.Job
 	if !checker() {
 		return false
 	}
-	allListEmpty := true
 	for _, list := range controlJobLists {
 		if len(list.Items) > 0 {
-			allListEmpty = false
-			break
+			return false
 		}
 	}
-	return allListEmpty
+	return true
 }
 
 func doScaleInBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod, memberUpdateHandler memberUpdateHandler) error {
@@ -176,7 +173,7 @@ func doScaleInBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, p
 		return err
 	}
 	leaderPodName := getLeaderPodName(pods, roleMap)
-	if shouldDoSwitchover(transCtx.CSSet, pods, leaderPodName) {
+	if shouldDoSwitchover(transCtx.CSSet, transCtx.OrigCSSet, pods, leaderPodName) {
 		// choose pod-0 as new leader
 		env := buildControlJobEnv(transCtx.CSSet, leaderPodName, pods[len(pods)-1].Name)
 		if err := doControlJob(transCtx.CSSet, dag, env, jobTypeSwitchover, 0, false); err != nil {
@@ -185,9 +182,10 @@ func doScaleInBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, p
 		return nil
 	}
 	if shouldDoControlJob(transCtx.CSSet, jobTypeMemberLeaveNotifying) {
-		for i := transCtx.CSSet.Spec.Replicas; i > transCtx.CSSet.Status.Replicas; i-- {
-			env := buildControlJobEnv(transCtx.CSSet, leaderPodName, pods[i].Name)
-			_, ordinal := controllerutil.GetParentNameAndOrdinal(&pods[i])
+		for i := transCtx.CSSet.Spec.Replicas; i > transCtx.OrigCSSet.Status.Replicas; i-- {
+			ordinal := int(i - 1)
+			podName := fmt.Sprintf("%s-%d", transCtx.CSSet.Name, ordinal)
+			env := buildControlJobEnv(transCtx.CSSet, leaderPodName, podName)
 			if err := doControlJob(transCtx.CSSet, dag, env, jobTypeMemberLeaveNotifying, ordinal, false); err != nil {
 				return err
 			}
@@ -237,9 +235,10 @@ func doScaleOutBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, 
 		if !shouldDoControlJob(transCtx.CSSet, jobType) {
 			continue
 		}
-		for i := transCtx.CSSet.Status.Replicas; i < transCtx.CSSet.Spec.Replicas; i++ {
-			env := buildControlJobEnv(transCtx.CSSet, leaderPodName, pods[i].Name)
-			_, ordinal := controllerutil.GetParentNameAndOrdinal(&pods[i])
+		for i := transCtx.OrigCSSet.Status.Replicas; i < transCtx.CSSet.Spec.Replicas; i++ {
+			ordinal := int(i)
+			podName := fmt.Sprintf("%s-%d", transCtx.CSSet.Name, ordinal)
+			env := buildControlJobEnv(transCtx.CSSet, leaderPodName, podName)
 			if err := doControlJob(transCtx.CSSet, dag, env, jobType, ordinal, true); err != nil {
 				return err
 			}
@@ -254,15 +253,15 @@ func stateMemberCreationSucceed(csSet *workloads.ConsensusSet) bool {
 		csSet.Status.ReadyReplicas == csSet.Status.Replicas
 }
 
-func shouldDoSwitchover(csSet *workloads.ConsensusSet, pods []corev1.Pod, leaderPodName string) bool {
-	reconfiguration := csSet.Spec.MembershipReconfiguration
+func shouldDoSwitchover(csSetNew, csSetOld *workloads.ConsensusSet, pods []corev1.Pod, leaderPodName string) bool {
+	reconfiguration := csSetNew.Spec.MembershipReconfiguration
 	if reconfiguration == nil {
 		return false
 	}
 	if reconfiguration.SwitchoverAction == nil {
 		return false
 	}
-	for i := csSet.Status.Replicas - 1; i >= csSet.Spec.Replicas; i-- {
+	for i := csSetOld.Status.Replicas - 1; i >= csSetNew.Spec.Replicas; i-- {
 		if pods[i].Name == leaderPodName {
 			return true
 		}
@@ -404,7 +403,6 @@ func startFirstPendingControlJob(dag *graph.DAG, jobTypeList []string, jobLists 
 	return nil
 }
 
-
 func getJobList(transCtx *CSSetTransformContext, jobTypeList []string) ([]*batchv1.JobList, error) {
 	jobLists := make([]*batchv1.JobList, 0)
 	ml := client.MatchingLabels{
@@ -448,10 +446,10 @@ func getLeaderPodName(pods []corev1.Pod, roleMap map[string]workloads.ConsensusR
 
 // normal conditions: all pods with role label set and one is leader
 func doAbnormalAnalysis(transCtx *CSSetTransformContext, pods []corev1.Pod, roleMap map[string]workloads.ConsensusRole) error {
-	if len(pods) != int(transCtx.CSSet.Status.Replicas) {
+	if len(pods) != int(transCtx.OrigCSSet.Status.Replicas) {
 		// TODO(free6om): should handle this error in a more user-friendly way
 		// set condition, emit event if error happens consecutive x times.
-		return fmt.Errorf("cluster unhealthy: # of pods %d not equals to replicas %d", len(pods), transCtx.CSSet.Status.Replicas)
+		return fmt.Errorf("cluster unhealthy: # of pods %d not equals to replicas %d", len(pods), transCtx.OrigCSSet.Status.Replicas)
 	}
 	// if no pods, no need to check the following conditions
 	if len(pods) == 0 {
@@ -480,7 +478,7 @@ func doAbnormalAnalysis(transCtx *CSSetTransformContext, pods []corev1.Pod, role
 	return nil
 }
 
-//ordinal is the ordinal of pod which this control job apply to
+// ordinal is the ordinal of pod which this control job apply to
 func doControlJob(csSet *workloads.ConsensusSet, dag *graph.DAG, env []corev1.EnvVar, jobType string, ordinal int, suspend bool) error {
 	jobName := fmt.Sprintf("%s-%s-%d-%s", csSet.Name, jobType, ordinal, rand.String(6))
 	// TODO(free6om): env injection

@@ -21,6 +21,7 @@ package workloads
 
 import (
 	"context"
+	batchv1 "k8s.io/api/batch/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -135,6 +136,7 @@ func (r *ConsensusSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&workloads.ConsensusSet{}).
 		Owns(&appsv1.StatefulSet{}).
+		Owns(&batchv1.Job{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}},
 			&consensusset.EnqueueRequestForAncestor{
 				Client:    r.Client,

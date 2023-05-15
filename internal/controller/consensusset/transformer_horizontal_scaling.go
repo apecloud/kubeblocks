@@ -21,6 +21,8 @@ package consensusset
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,6 +46,8 @@ type HorizontalScalingTransformer struct{}
 
 type preConditionChecker = func() bool
 type memberUpdateHandler = func()
+
+var jobNameRegex = regexp.MustCompile("(.*)-([0-9]+)-([0-9a-zA-Z]+)$")
 
 func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*CSSetTransformContext)
@@ -174,6 +178,13 @@ func doScaleInBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, p
 	}
 	leaderPodName := getLeaderPodName(pods, roleMap)
 	if shouldDoSwitchover(transCtx.CSSet, transCtx.OrigCSSet, pods, leaderPodName) {
+		jobList, err := getJobList(transCtx, []string{jobTypeSwitchover})
+		if err != nil {
+			return err
+		}
+		if isControlJobExist(0, jobList[0]) {
+			return nil
+		}
 		// choose pod-0 as new leader
 		env := buildControlJobEnv(transCtx.CSSet, leaderPodName, pods[len(pods)-1].Name)
 		if err := doControlJob(transCtx.CSSet, dag, env, jobTypeSwitchover, 0, false); err != nil {
@@ -181,12 +192,21 @@ func doScaleInBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, p
 		}
 		return nil
 	}
-	if shouldDoControlJob(transCtx.CSSet, jobTypeMemberLeaveNotifying) {
+	jobType := jobTypeMemberLeaveNotifying
+	if shouldDoControlJob(transCtx.CSSet, jobType) {
+		jobList, err := getJobList(transCtx, []string{jobType})
+		if err != nil {
+			return err
+		}
 		for i := transCtx.OrigCSSet.Status.Replicas; i > transCtx.CSSet.Spec.Replicas; i-- {
 			ordinal := int(i - 1)
 			podName := fmt.Sprintf("%s-%d", transCtx.CSSet.Name, ordinal)
+
+			if isControlJobExist(ordinal, jobList[0]) {
+				continue
+			}
 			env := buildControlJobEnv(transCtx.CSSet, leaderPodName, podName)
-			if err := doControlJob(transCtx.CSSet, dag, env, jobTypeMemberLeaveNotifying, ordinal, false); err != nil {
+			if err := doControlJob(transCtx.CSSet, dag, env, jobType, ordinal, false); err != nil {
 				return err
 			}
 		}
@@ -195,6 +215,27 @@ func doScaleInBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, p
 
 	memberUpdateHandler()
 	return nil
+}
+
+func isControlJobExist(ordinal int, jobList *batchv1.JobList) bool {
+	if jobList == nil {
+		return false
+	}
+	for _, job := range jobList.Items {
+		if !job.DeletionTimestamp.IsZero() {
+			continue
+		}
+		subMatches := jobNameRegex.FindStringSubmatch(job.Name)
+		if len(subMatches) < 4 {
+			continue
+		}
+		if i, err := strconv.Atoi(subMatches[2]); err == nil {
+			if ordinal == i {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func stateDoingMemberCreation(checker preConditionChecker, jobList ...*batchv1.JobList) bool {
@@ -235,9 +276,16 @@ func doScaleOutBeginningAction(transCtx *CSSetTransformContext, dag *graph.DAG, 
 		if !shouldDoControlJob(transCtx.CSSet, jobType) {
 			continue
 		}
+		jobList, err := getJobList(transCtx, []string{jobType})
+		if err != nil {
+			return err
+		}
 		for i := transCtx.OrigCSSet.Status.Replicas; i < transCtx.CSSet.Spec.Replicas; i++ {
 			ordinal := int(i)
 			podName := fmt.Sprintf("%s-%d", transCtx.CSSet.Name, ordinal)
+			if isControlJobExist(ordinal, jobList[0]) {
+				continue
+			}
 			env := buildControlJobEnv(transCtx.CSSet, leaderPodName, podName)
 			if err := doControlJob(transCtx.CSSet, dag, env, jobType, ordinal, true); err != nil {
 				return err
@@ -487,25 +535,19 @@ func doAbnormalAnalysis(transCtx *CSSetTransformContext, pods []corev1.Pod, role
 // ordinal is the ordinal of pod which this control job apply to
 func doControlJob(csSet *workloads.ConsensusSet, dag *graph.DAG, env []corev1.EnvVar, jobType string, ordinal int, suspend bool) error {
 	jobName := fmt.Sprintf("%s-%s-%d-%s", csSet.Name, jobType, ordinal, rand.String(6))
-	// TODO(free6om): env injection
 	template := buildJobPodTemplate(csSet, env, jobType)
 	job := builder.NewJobBuilder(csSet.Namespace, jobName).
 		AddLabels(model.AppInstanceLabelKey, csSet.Name).
 		AddLabels(model.KBManagedByKey, kindConsensusSet).
 		AddLabels(jobTypeLabel, jobType).
 		AddLabels(jobHandledLabel, jobHandledFalse).
-		//AddSelector(model.AppInstanceLabelKey, csSet.Name).
-		//AddSelector(model.KBManagedByKey, kindConsensusSet).
-		//AddSelector(jobTypeLabel, jobType).
-		//AddSelector(jobNameLabel, jobName).
 		SetPodTemplateSpec(*template).
 		SetSuspend(suspend).
 		GetObject()
-	jobVertex := &model.ObjectVertex{
-		Obj:    job,
-		Action: model.ActionPtr(model.CREATE),
+	if err := controllerutil.SetOwnership(csSet, job, model.GetScheme(), csSetFinalizerName); err != nil {
+		return err
 	}
-	dag.AddConnectRoot(jobVertex)
+	model.PrepareCreate(dag, job)
 	return nil
 }
 

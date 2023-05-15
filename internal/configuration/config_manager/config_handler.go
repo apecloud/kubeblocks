@@ -174,6 +174,19 @@ type shellCommandHandler struct {
 }
 
 func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
+	commonHandle := func(args []string) error {
+		command := exec.CommandContext(ctx, s.command, args...)
+		stdout, err := cfgutil.ExecShellCommand(command)
+		logger.Info(fmt.Sprintf("exec: [%s], stdout: [%s], stderr:%v", command.String(), stdout, err))
+		return err
+	}
+	volumeHandle := func(baseCMD []string, paramName, paramValue string) error {
+		args := make([]string, len(baseCMD))
+		copy(args, baseCMD)
+		args = append(args, paramName, paramValue)
+		return commonHandle(args)
+	}
+
 	if mountPoint, ok := s.downwardAPIVolume(event); ok {
 		return s.processDownwardAPI(ctx, mountPoint, event)
 	}
@@ -181,24 +194,32 @@ func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.E
 	for i, v := range s.arg {
 		args[i] = strings.ReplaceAll(v, "$volume_dir", event.Name)
 	}
+	if s.configMeta == nil {
+		// process downward api
+		return commonHandle(args)
+	}
 
 	logger.V(1).Info(fmt.Sprintf("mountpoint change trigger: [%s], %s", s.mountPoint, event.Name))
 	updatedParams, files, err := s.checkAndPrepareUpdate(event)
 	if err != nil {
 		return err
 	}
-	if len(updatedParams) != 0 {
-		args = append(args, cfgutil.ToArgs(updatedParams)...)
+	if len(updatedParams) == 0 {
+		logger.Info("not parameter updated, skip")
+		return nil
 	}
 
-	command := exec.CommandContext(ctx, s.command, args...)
-	stdout, err := cfgutil.ExecShellCommand(command)
-	logger.V(1).Info(fmt.Sprintf("exec: [%s], stdout: [%s], stderr:%v", command.String(), stdout, err))
+	logger.Info(fmt.Sprintf("updated parameters: %v", updatedParams))
+	for key, value := range updatedParams {
+		if err := volumeHandle(args, key, value); err != nil {
+			return err
+		}
+	}
 
-	if err == nil && len(files) != 0 {
+	if len(files) != 0 {
 		return backupLastConfigFiles(files, s.backupPath)
 	}
-	return err
+	return nil
 }
 
 func (s *shellCommandHandler) MountPoint() []string {

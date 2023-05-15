@@ -435,27 +435,11 @@ func (r *BackupPolicyReconciler) handleIncrementalPolicy(
 	var cronExpression string
 	schedule := backupPolicy.Spec.Schedule.Logfile
 	if schedule != nil && schedule.Enable {
-		cronExpression = intervalToCronExpression(schedule.Interval)
+		cronExpression = schedule.CronExpression
 	}
 	r.setGlobalPersistentVolumeClaim(backupPolicy.Spec.Logfile)
 	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Logfile.BasePolicy,
 		cronExpression, dataprotectionv1alpha1.BackupTypeLogFile)
-}
-
-func intervalToCronExpression(interval string) string {
-	cronExpression := ""
-	interval = strings.ToLower(interval)
-	unit := interval[len(interval)-1:]
-	value := interval[0 : len(interval)-1]
-	switch unit {
-	case "m":
-		cronExpression = fmt.Sprintf("*/%s * * * *", value)
-	case "h":
-		cronExpression = fmt.Sprintf("* */%s * * *", value)
-	case "d":
-		cronExpression = fmt.Sprintf("* * */%s * *", value)
-	}
-	return cronExpression
 }
 
 // setGlobalPersistentVolumeClaim sets global config of pvc to common policy.

@@ -110,8 +110,8 @@ func (factory *MockBackupPolicyTemplateFactory) setScheduleField(setField func(s
 		backupPolicy.Schedule.Datafile = &appsv1alpha1.SchedulePolicy{}
 		schedulePolicy = backupPolicy.Schedule.Datafile
 	case dataprotectionv1alpha1.BackupTypeLogFile:
-		schedulePolicy = &appsv1alpha1.SchedulePolicy{}
-		backupPolicy.Schedule.Logfile = &appsv1alpha1.LogSchedulePolicy{}
+		backupPolicy.Schedule.Logfile = &appsv1alpha1.SchedulePolicy{}
+		schedulePolicy = backupPolicy.Schedule.Logfile
 	}
 	if schedulePolicy == nil {
 		// ignore

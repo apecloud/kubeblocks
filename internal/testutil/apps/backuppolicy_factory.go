@@ -82,12 +82,8 @@ func (factory *MockBackupPolicyFactory) setScheduleField(setField func(scheduleP
 		schedulePolicy = factory.get().Spec.Schedule.Snapshot
 	// todo: set logfile schedule
 	case dataprotectionv1alpha1.BackupTypeLogFile:
-		logSchedulePolicy := &dataprotectionv1alpha1.LogSchedulePolicy{}
-		factory.get().Spec.Schedule.Logfile = logSchedulePolicy
-		schedulePolicy = &dataprotectionv1alpha1.SchedulePolicy{
-			Enable: logSchedulePolicy.Enable,
-			// CronExpression: logSchedulePolicy.Interval,
-		}
+		factory.get().Spec.Schedule.Logfile = &dataprotectionv1alpha1.SchedulePolicy{}
+		schedulePolicy = factory.get().Spec.Schedule.Snapshot
 	}
 	if schedulePolicy == nil {
 		// ignore

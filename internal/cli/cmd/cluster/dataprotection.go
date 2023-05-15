@@ -595,14 +595,19 @@ func printBackupPolicyList(o list.ListOptions) error {
 	}
 
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAME", "DEFAULT", "CLUSTER", "CREATE-TIME")
+	tbl.SetHeader("NAME", "DEFAULT", "CLUSTER", "CREATE-TIME", "STATUS")
 	for _, obj := range backupPolicyList.Items {
 		defaultPolicy, ok := obj.GetAnnotations()[constant.DefaultBackupPolicyAnnotationKey]
+		backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backupPolicy); err != nil {
+			return err
+		}
 		if !ok {
 			defaultPolicy = "false"
 		}
 		createTime := obj.GetCreationTimestamp()
-		tbl.AddRow(obj.GetName(), defaultPolicy, obj.GetLabels()[constant.AppInstanceLabelKey], util.TimeFormat(&createTime))
+		tbl.AddRow(obj.GetName(), defaultPolicy, obj.GetLabels()[constant.AppInstanceLabelKey],
+			util.TimeFormat(&createTime), backupPolicy.Status.Phase)
 	}
 	tbl.Print()
 	return nil

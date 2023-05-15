@@ -20,7 +20,7 @@ spec:
         cronExpression: "0 18 * * *"
       logfile:
         enable: false
-        interval: "5m"
+        cronExpression: "*/5 * * * *"
     snapshot:
       target:
         connectionCredentialKey:

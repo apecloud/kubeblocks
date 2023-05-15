@@ -204,7 +204,7 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 
 	bpSpec.Schedule.Snapshot = r.convertSchedulePolicy(policyTPL.Schedule.Snapshot)
 	bpSpec.Schedule.Datafile = r.convertSchedulePolicy(policyTPL.Schedule.Datafile)
-	bpSpec.Schedule.Logfile = r.convertLogSchedulePolicy(policyTPL.Schedule.Logfile)
+	bpSpec.Schedule.Logfile = r.convertSchedulePolicy(policyTPL.Schedule.Logfile)
 	bpSpec.Datafile = r.convertCommonPolicy(policyTPL.Datafile, cluster.Name, *component, workloadType)
 	bpSpec.Logfile = r.convertCommonPolicy(policyTPL.Logfile, cluster.Name, *component, workloadType)
 	bpSpec.Snapshot = r.convertSnapshotPolicy(policyTPL.Snapshot, cluster.Name, *component, workloadType)
@@ -231,17 +231,6 @@ func (r *BackupPolicyTPLTransformer) convertSchedulePolicy(sp *appsv1alpha1.Sche
 	return &dataprotectionv1alpha1.SchedulePolicy{
 		Enable:         sp.Enable,
 		CronExpression: sp.CronExpression,
-	}
-}
-
-// convertLogSchedulePolicy converts the logSchedulePolicy from backupPolicyTemplate.
-func (r *BackupPolicyTPLTransformer) convertLogSchedulePolicy(sp *appsv1alpha1.LogSchedulePolicy) *dataprotectionv1alpha1.LogSchedulePolicy {
-	if sp == nil {
-		return nil
-	}
-	return &dataprotectionv1alpha1.LogSchedulePolicy{
-		Enable:   sp.Enable,
-		Interval: sp.Interval,
 	}
 }
 

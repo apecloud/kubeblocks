@@ -70,24 +70,13 @@ type Schedule struct {
 
 	// schedule policy for logfile backup.
 	// +optional
-	Logfile *LogSchedulePolicy `json:"logfile,omitempty"`
+	Logfile *SchedulePolicy `json:"logfile,omitempty"`
 }
 
 type SchedulePolicy struct {
 	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
 	// +kubebuilder:validation:Required
 	CronExpression string `json:"cronExpression"`
-
-	// enable or disable the schedule.
-	// +kubebuilder:validation:Required
-	Enable bool `json:"enable"`
-}
-
-type LogSchedulePolicy struct {
-	// the interval expression for schedule
-	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H|m|M]$`
-	// +kubebuilder:default="5m"
-	Interval string `json:"interval"`
 
 	// enable or disable the schedule.
 	// +kubebuilder:validation:Required

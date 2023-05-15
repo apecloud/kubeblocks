@@ -95,7 +95,7 @@ type Schedule struct {
 
 	// schedule policy for logfile backup.
 	// +optional
-	Logfile *LogSchedulePolicy `json:"logfile,omitempty"`
+	Logfile *SchedulePolicy `json:"logfile,omitempty"`
 }
 
 type SchedulePolicy struct {
@@ -143,17 +143,6 @@ type BasePolicy struct {
 	// define how to update metadata for backup status.
 	// +optional
 	BackupStatusUpdates []BackupStatusUpdate `json:"backupStatusUpdates,omitempty"`
-}
-
-type LogSchedulePolicy struct {
-	// the interval for schedule
-	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H|m|M]$`
-	// +kubebuilder:default="5m"
-	Interval string `json:"interval"`
-
-	// enable or disable the schedule.
-	// +kubebuilder:validation:Required
-	Enable bool `json:"enable"`
 }
 
 type TargetInstance struct {

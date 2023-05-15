@@ -445,17 +445,16 @@ spec:
                   logfile:
                     description: schedule policy for logfile backup.
                     properties:
+                      cronExpression:
+                        description: the cron expression for schedule, the timezone
+                          is in UTC. see https://en.wikipedia.org/wiki/Cron.
+                        type: string
                       enable:
                         description: enable or disable the schedule.
                         type: boolean
-                      interval:
-                        default: 5m
-                        description: the interval expression for schedule
-                        pattern: ^\d+[d|D|h|H|m|M]$
-                        type: string
                     required:
+                    - cronExpression
                     - enable
-                    - interval
                     type: object
                   snapshot:
                     description: schedule policy for snapshot backup.

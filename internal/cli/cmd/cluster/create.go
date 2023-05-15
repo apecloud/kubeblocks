@@ -1043,30 +1043,6 @@ func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[strin
 	return allClusterVersions, defaultVersion, existedDefault, nil
 }
 
-func shouldCreateDependencies(cd *appsv1alpha1.ClusterDefinition, compSpec *appsv1alpha1.ClusterComponentSpec) (bool, error) {
-	var compDef *appsv1alpha1.ClusterComponentDefinition
-	if cd.Spec.Type != "postgresql" {
-		return false, nil
-	}
-
-	// get cluster component definition
-	for i, def := range cd.Spec.ComponentDefs {
-		if def.Name == compSpec.ComponentDefRef {
-			compDef = &cd.Spec.ComponentDefs[i]
-		}
-	}
-
-	if compDef == nil {
-		return false, fmt.Errorf("failed to find component definition for componnet %s", compSpec.Name)
-	}
-
-	// for postgresql, we need to create a service account, a role and a rolebinding
-	if compDef.CharacterType != "postgresql" {
-		return false, nil
-	}
-	return true, nil
-}
-
 func buildResourceLabels(clusterName string) map[string]string {
 	return map[string]string{
 		constant.AppInstanceLabelKey:  clusterName,

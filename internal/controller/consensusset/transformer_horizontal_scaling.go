@@ -579,13 +579,6 @@ func buildJobPodTemplate(csSet *workloads.ConsensusSet, env []corev1.EnvVar, job
 		Env:             env,
 	}
 	template := &corev1.PodTemplateSpec{
-		//ObjectMeta: metav1.ObjectMeta{
-		//	Labels: map[string]string{
-		//		model.AppInstanceLabelKey: csSet.Name,
-		//		model.KBManagedByKey:      kindConsensusSet,
-		//		jobTypeLabel:              jobType,
-		//	},
-		//},
 		Spec: corev1.PodSpec{
 			Containers:    []corev1.Container{container},
 			RestartPolicy: corev1.RestartPolicyOnFailure,

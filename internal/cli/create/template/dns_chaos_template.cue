@@ -19,13 +19,11 @@
 options: {
 	namespace:        string
 	action:						string
-
-	namespaceSelector: [...]
+	selector:					{}
 	mode:							string
 	value:						string
 	duration: 				string
-	label?:						{}
-
+	
 	patterns:					[...]
 }
 
@@ -38,14 +36,7 @@ content: {
     namespace: options.namespace
   }
   spec:{
-    selector:{
-    	namespaces: options.namespaceSelector
-    	if options.label != _|_ {
-    		labelSelectors:{
-    			options.label
-				}
-    	}
-    }
+    selector: options.selector
     action: options.action
     mode: options.mode
     value: options.value

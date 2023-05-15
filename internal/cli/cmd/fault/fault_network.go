@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -74,13 +73,13 @@ type NetworkChaosOptions struct {
 	// Indicates a network target outside of Kubernetes, which can be an IPv4 address or a domain name,
 	// such as "www.baidu.com". Only works with direction: to.
 	ExternalTargets []string `json:"externalTargets,omitempty"`
-	// Specifies the labels that target Pods come with.
-	TargetLabel map[string]string `json:"targetLabel,omitempty"`
-	// Specifies the namespaces to which target Pods belong.
-	TargetNamespaceSelector string `json:"targetNamespaceSelector"`
 
-	TargetMode  string `json:"targetMode"`
+	TargetMode  string `json:"targetMode,omitempty"`
 	TargetValue string `json:"targetValue"`
+	// Specifies the labels that target Pods come with.
+	TargetLabelSelectors map[string]string `json:"targetLabelSelectors,omitempty"`
+	// Specifies the namespaces to which target Pods belong.
+	TargetNamespaceSelectors []string `json:"targetNamespaceSelectors"`
 
 	// The percentage of packet loss
 	Loss string `json:"loss,omitempty"`
@@ -104,19 +103,18 @@ type NetworkChaosOptions struct {
 	Minburst uint32 `json:"minburst"`
 
 	FaultBaseOptions
-
-	create.CreateOptions `json:"-"`
 }
 
 func NewNetworkChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, action string) *NetworkChaosOptions {
 	o := &NetworkChaosOptions{
-		CreateOptions: create.CreateOptions{
+		FaultBaseOptions: FaultBaseOptions{CreateOptions: create.CreateOptions{
 			Factory:         f,
 			IOStreams:       streams,
 			CueTemplateName: CueTemplateNetworkChaos,
 			GVR:             GetGVR(Group, Version, ResourceNetworkChaos),
 		},
-		FaultBaseOptions: FaultBaseOptions{Action: action},
+			Action: action,
+		},
 	}
 	o.CreateOptions.PreCreate = o.PreCreate
 	o.CreateOptions.Options = o
@@ -260,24 +258,14 @@ func (o *NetworkChaosOptions) NewCobraCommand(use, short string) *cobra.Command 
 }
 
 func (o *NetworkChaosOptions) AddCommonFlag(cmd *cobra.Command) {
-
-	cmd.Flags().StringVar(&o.Mode, "mode", "all", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
-	cmd.Flags().StringVar(&o.Value, "value", "", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
-	cmd.Flags().StringVar(&o.Duration, "duration", "10s", "Supported formats of the duration are: ms / s / m / h.")
-	cmd.Flags().StringToStringVar(&o.Label, "label", map[string]string{}, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
-	cmd.Flags().StringArrayVar(&o.NamespaceSelector, "namespace-selector", []string{"default"}, `Specifies the namespace into which you want to inject faults.`)
+	o.FaultBaseOptions.AddCommonFlag(cmd)
 
 	cmd.Flags().StringVar(&o.Direction, "direction", "to", `You can select "to"" or "from"" or "both"".`)
-	cmd.Flags().StringArrayVarP(&o.ExternalTargets, "external-targets", "e", nil, "a network target outside of Kubernetes, which can be an IPv4 address or a domain name,\n\t such as \"www.baidu.com\". Only works with direction: to.")
-	cmd.Flags().StringVar(&o.TargetMode, "target-mode", "all", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
+	cmd.Flags().StringArrayVarP(&o.ExternalTargets, "external-target", "e", nil, "a network target outside of Kubernetes, which can be an IPv4 address or a domain name,\n\t such as \"www.baidu.com\". Only works with direction: to.")
+	cmd.Flags().StringVar(&o.TargetMode, "target-mode", "", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
 	cmd.Flags().StringVar(&o.TargetValue, "target-value", "", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
-	cmd.Flags().StringToStringVar(&o.TargetLabel, "target-label", nil, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
-	cmd.Flags().StringVar(&o.TargetNamespaceSelector, "target-namespace-selector", "default", `Specifies the namespace into which you want to inject faults.`)
-
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
-
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
+	cmd.Flags().StringToStringVar(&o.TargetLabelSelectors, "target-label", nil, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
+	cmd.Flags().StringArrayVar(&o.TargetNamespaceSelectors, "target-ns-fault", []string{"default"}, `Specifies the namespace into which you want to inject faults.`)
 }
 
 func (o *NetworkChaosOptions) Validate() error {

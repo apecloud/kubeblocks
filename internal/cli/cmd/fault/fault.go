@@ -30,8 +30,26 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
+
+type Selector struct {
+	PodNameSelectors map[string][]string `json:"pods"`
+
+	NamespaceSelectors []string `json:"namespaces"`
+
+	LabelSelectors map[string]string `json:"labelSelectors"`
+
+	PodPhaseSelectors []string `json:"podPhaseSelectors"`
+
+	NodeLabelSelectors map[string]string `json:"nodeSelectors"`
+
+	AnnotationSelectors map[string]string `json:"annotationSelectors"`
+
+	NodeNameSelectors []string `json:"nodes"`
+}
 
 type FaultBaseOptions struct {
 	Action string `json:"action"`
@@ -40,11 +58,11 @@ type FaultBaseOptions struct {
 
 	Value string `json:"value"`
 
-	NamespaceSelector []string `json:"namespaceSelector"`
-
-	Label map[string]string `json:"label"`
-
 	Duration string `json:"duration"`
+
+	Selector `json:"selector"`
+
+	create.CreateOptions `json:"-"`
 }
 
 func NewFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -53,6 +71,7 @@ func NewFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Short: "Inject faults to pod.",
 	}
 	cmd.AddCommand(
+		NewPodChaosCmd(f, streams),
 		NewNetworkChaosCmd(f, streams),
 	)
 	return cmd
@@ -75,6 +94,23 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 		}))
 }
 
+func (o *FaultBaseOptions) AddCommonFlag(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&o.Mode, "mode", "all", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
+	cmd.Flags().StringVar(&o.Value, "value", "", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
+	cmd.Flags().StringVar(&o.Duration, "duration", "10s", "Supported formats of the duration are: ms / s / m / h.")
+	cmd.Flags().StringToStringVar(&o.LabelSelectors, "label", map[string]string{}, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0.`)
+	cmd.Flags().StringArrayVar(&o.NamespaceSelectors, "ns-fault", []string{"default"}, `Specifies the namespace into which you want to inject faults.`)
+	cmd.Flags().StringArrayVar(&o.PodPhaseSelectors, "phase", []string{}, `Specify the pod that injects the fault by the state of the pod.`)
+	cmd.Flags().StringToStringVar(&o.NodeLabelSelectors, "node-label", map[string]string{}, `label for node, such as '"kubernetes.io/arch=arm64,kubernetes.io/hostname=minikube-m03,kubernetes.io/os=linux.`)
+	cmd.Flags().StringArrayVar(&o.NodeNameSelectors, "node", []string{}, `Inject faults into pods in the specified node.`)
+	cmd.Flags().StringToStringVar(&o.AnnotationSelectors, "annotation", map[string]string{}, `Select the pod to inject the fault according to Annotation.`)
+
+	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
+
+	printer.AddOutputFlagForCreate(cmd, &o.Format)
+}
+
 func (o *FaultBaseOptions) BaseValidate() error {
 	if ok, err := IsRegularMatch(o.Duration); !ok {
 		return err
@@ -92,6 +128,12 @@ func (o *FaultBaseOptions) BaseValidate() error {
 }
 
 func (o *FaultBaseOptions) BaseComplete() error {
+	if len(o.Args) > 0 {
+		o.PodNameSelectors = make(map[string][]string, len(o.NamespaceSelectors))
+		for _, ns := range o.NamespaceSelectors {
+			o.PodNameSelectors[ns] = o.Args
+		}
+	}
 	return nil
 }
 

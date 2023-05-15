@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
 )
 
 var faultHTTPExample = templates.Examples(`
@@ -84,19 +83,19 @@ type HTTPChaosOptions struct {
 	PatchBodyType  string `json:"patchBodyType,omitempty"`
 
 	FaultBaseOptions
-
-	create.CreateOptions `json:"-"`
 }
 
 func NewHTTPChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, action string) *HTTPChaosOptions {
 	o := &HTTPChaosOptions{
-		CreateOptions: create.CreateOptions{
-			Factory:         f,
-			IOStreams:       streams,
-			CueTemplateName: CueTemplateHTTPChaos,
-			GVR:             GetGVR(Group, Version, ResourceHTTPChaos),
+		FaultBaseOptions: FaultBaseOptions{
+			CreateOptions: create.CreateOptions{
+				Factory:         f,
+				IOStreams:       streams,
+				CueTemplateName: CueTemplateHTTPChaos,
+				GVR:             GetGVR(Group, Version, ResourceHTTPChaos),
+			},
+			Action: action,
 		},
-		FaultBaseOptions: FaultBaseOptions{Action: action},
 	}
 	o.CreateOptions.PreCreate = o.PreCreate
 	o.CreateOptions.Options = o
@@ -192,23 +191,13 @@ func (o *HTTPChaosOptions) NewCobraCommand(use, short string) *cobra.Command {
 }
 
 func (o *HTTPChaosOptions) AddCommonFlag(cmd *cobra.Command) {
-
-	cmd.Flags().StringVar(&o.Mode, "mode", "all", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
-	cmd.Flags().StringVar(&o.Value, "value", "", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
-	cmd.Flags().StringVar(&o.Duration, "duration", "10s", "Supported formats of the duration are: ms / s / m / h.")
-	cmd.Flags().StringToStringVar(&o.Label, "label", map[string]string{}, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
-	cmd.Flags().StringArrayVar(&o.NamespaceSelector, "namespace-selector", []string{"default"}, `Specifies the namespace into which you want to inject faults.`)
+	o.FaultBaseOptions.AddCommonFlag(cmd)
 
 	cmd.Flags().StringVar(&o.Target, "target", "Request", `Specifies whether the target of fault injuection is Request or Response. The target-related fields should be configured at the same time.`)
 	cmd.Flags().Int32Var(&o.Port, "port", 80, `The TCP port that the target service listens on.`)
 	cmd.Flags().StringVar(&o.Path, "path", "*", `The URI path of the target request. Supports Matching wildcards.`)
 	cmd.Flags().StringVar(&o.Method, "method", "GET", `The HTTP method of the target request method.For example: GET, POST, PUT, DELETE, HEAD, OPTIONS, PATCH.`)
 	cmd.Flags().Int32Var(&o.Code, "code", 0, `The status code responded by target.`)
-
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
-
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
 }
 
 func (o *HTTPChaosOptions) Validate() error {

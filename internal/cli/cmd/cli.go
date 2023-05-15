@@ -21,7 +21,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
 	"os"
 	"strings"
 

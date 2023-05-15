@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package fault
 
 import (
@@ -10,7 +29,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -24,42 +42,54 @@ var faultPodExample = templates.Examples(`
 	# kill two pods in default namespace
 	kbcli fault pod kill --mode=fixed --value=2
 
+	# kill 50% pods in default namespace
+	kbcli fault pod kill --mode=percentage --value=50
+
+	# kill mysql-cluster-mysql-0 pod in default namespace
+	kbcli fault pod kill mysql-cluster-mysql-0
+
+	# kill all pods in default namespace
+	kbcli fault pod kill --ns-fault="default"
+
 	# --label is required to specify the pods that need to be killed. 
 	kbcli fault pod kill --label statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2
+
+	# kill pod under the specified node.
+	kbcli fault pod kill --node=minikube-m02
 	
-	kbcli kbcli fault pod failure --duration=1m
+	# kill pod under the specified node-label.
+	kbcli fault pod kill --node-label=kubernetes.io/arch=arm64
+
+	# Allow the experiment to last for one minute.
+	kbcli fault pod failure --duration=1m
 
 	# kill container in pod
-	kbcli fault pod kill-container --container-names=mysql --label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2
+	kbcli fault pod kill-container mysql-cluster-mysql-0 --container=mysql
 `)
 
 type PodChaosOptions struct {
 	// GracePeriod waiting time, after which fault injection is performed
-	GracePeriod    int      `json:"gracePeriod"`
+	GracePeriod    int64    `json:"gracePeriod"`
 	ContainerNames []string `json:"containerNames,omitempty"`
 
 	FaultBaseOptions
-
-	create.BaseOptions
 }
 
-func (o *PodChaosOptions) createInputs(f cmdutil.Factory, use string, short string, buildFlags func(*cobra.Command)) *create.Inputs {
-	return &create.Inputs{
-		Use:             use,
-		Short:           short,
-		Example:         faultPodExample,
-		CueTemplateName: CueTemplatePodChaos,
-		Group:           Group,
-		Version:         Version,
-		ResourceName:    ResourcePodChaos,
-		BaseOptionsObj:  &o.BaseOptions,
-		Options:         o,
-		Factory:         f,
-		Validate:        o.Validate,
-		Complete:        o.Complete,
-		PreCreate:       o.PreCreate,
-		BuildFlags:      buildFlags,
+func NewPodChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, action string) *PodChaosOptions {
+	o := &PodChaosOptions{
+		FaultBaseOptions: FaultBaseOptions{
+			CreateOptions: create.CreateOptions{
+				Factory:         f,
+				IOStreams:       streams,
+				CueTemplateName: CueTemplatePodChaos,
+				GVR:             GetGVR(Group, Version, ResourcePodChaos),
+			},
+			Action: action,
+		},
 	}
+	o.CreateOptions.PreCreate = o.PreCreate
+	o.CreateOptions.Options = o
+	return o
 }
 
 func NewPodChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -76,90 +106,61 @@ func NewPodChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 }
 
 func NewPodKillCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &PodChaosOptions{
-		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.PodKillAction)},
-	}
+	o := NewPodChaosOptions(f, streams, string(v1alpha1.PodKillAction))
+	cmd := o.NewCobraCommand(Kill, KillShort)
 
-	var BuildFlags = func(cmd *cobra.Command) {
-		o.AddCommonFlag(cmd)
-		cmd.Flags().IntVar(&o.GracePeriod, "grace-period", 0, "Grace period represents the duration in seconds before the pod should be killed")
+	o.AddCommonFlag(cmd)
+	cmd.Flags().Int64VarP(&o.GracePeriod, "grace-period", "g", 0, "Grace period represents the duration in seconds before the pod should be killed")
 
-		// register flag completion func
-		registerFlagCompletionFunc(cmd, f)
-	}
-	inputs := o.createInputs(
-		f,
-		Kill,
-		KillShort,
-		BuildFlags,
-	)
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
 
-	return create.BuildCommand(*inputs)
+	return cmd
 }
 
 func NewPodFailureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &PodChaosOptions{
-		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.PodFailureAction)},
-	}
+	o := NewPodChaosOptions(f, streams, string(v1alpha1.PodFailureAction))
+	cmd := o.NewCobraCommand(Failure, FailureShort)
 
-	var BuildFlags = func(cmd *cobra.Command) {
-		o.AddCommonFlag(cmd)
+	o.AddCommonFlag(cmd)
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
 
-		util.CheckErr(cmd.MarkFlagRequired("duration"))
-
-		// register flag completion func
-		registerFlagCompletionFunc(cmd, f)
-	}
-	inputs := o.createInputs(
-		f,
-		Failure,
-		FailureShort,
-		BuildFlags,
-	)
-
-	return create.BuildCommand(*inputs)
+	return cmd
 }
 
 func NewContainerKillCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &PodChaosOptions{
-		BaseOptions:      create.BaseOptions{IOStreams: streams},
-		FaultBaseOptions: FaultBaseOptions{Action: string(v1alpha1.ContainerKillAction)},
+	o := NewPodChaosOptions(f, streams, string(v1alpha1.ContainerKillAction))
+	cmd := o.NewCobraCommand(KillContainer, KillContainerShort)
+
+	o.AddCommonFlag(cmd)
+	cmd.Flags().StringArrayVarP(&o.ContainerNames, "container", "c", nil, "the name of the container you want to kill, such as mysql, prometheus.")
+
+	util.CheckErr(cmd.MarkFlagRequired("container"))
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
+
+	return cmd
+}
+
+func (o *PodChaosOptions) NewCobraCommand(use, short string) *cobra.Command {
+	return &cobra.Command{
+		Use:     use,
+		Short:   short,
+		Example: faultPodExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Args = args
+			cmdutil.CheckErr(o.CreateOptions.Complete())
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Run())
+		},
 	}
-
-	var BuildFlags = func(cmd *cobra.Command) {
-
-		o.AddCommonFlag(cmd)
-		cmd.Flags().StringArrayVar(&o.ContainerNames, "container-names", nil, "the name of the container you want to kill, such as mysql, prometheus.")
-
-		util.CheckErr(cmd.MarkFlagRequired("container-names"))
-
-		// register flag completion func
-		registerFlagCompletionFunc(cmd, f)
-	}
-	inputs := o.createInputs(
-		f,
-		KillContainer,
-		KillContainerShort,
-		BuildFlags,
-	)
-
-	return create.BuildCommand(*inputs)
 }
 
 func (o *PodChaosOptions) AddCommonFlag(cmd *cobra.Command) {
-
-	cmd.Flags().StringVar(&o.Mode, "mode", "all", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
-	cmd.Flags().StringVar(&o.Value, "value", "", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
-	cmd.Flags().StringVar(&o.Duration, "duration", "10s", "Supported formats of the duration are: ms / s / m / h.")
-	cmd.Flags().StringToStringVar(&o.Label, "label", map[string]string{}, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
-	cmd.Flags().StringArrayVar(&o.NamespaceSelector, "namespace-selector", []string{"default"}, `Specifies the namespace into which you want to inject faults.`)
-
-	cmd.Flags().StringVar(&o.DryRunStrategy, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
-
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
+	o.FaultBaseOptions.AddCommonFlag(cmd)
 }
 
 func (o *PodChaosOptions) Validate() error {

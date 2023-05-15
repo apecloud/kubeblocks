@@ -115,7 +115,7 @@ func (s *WindowsSpinner) Start() {
 					outPlain := fmt.Sprintf("\r%s%s", s.chars[i], s.msg)
 					s.erase()
 					s.lastOutput = outPlain
-					_, _ = fmt.Fprint(s.Writer, outPlain)
+					fmt.Fprint(s.Writer, outPlain)
 					s.mu.Unlock()
 					time.Sleep(s.delay)
 				}
@@ -139,9 +139,9 @@ func (s *WindowsSpinner) erase() {
 	split := strings.Split(s.lastOutput, "\n")
 	for i := 0; i < len(split); i++ {
 		if i > 0 {
-			_, _ = fmt.Fprint(s.Writer, "\033[A")
+			fmt.Fprint(s.Writer, "\033[A")
 		}
-		_, _ = fmt.Fprint(s.Writer, "\r\033[K")
+		fmt.Fprint(s.Writer, "\r\033[K")
 	}
 }
 
@@ -153,7 +153,7 @@ func (s *WindowsSpinner) stop() {
 		s.active = false
 		if s.FinalMSG != "" {
 			s.erase()
-			_, _ = fmt.Fprint(s.Writer, s.FinalMSG)
+			fmt.Fprint(s.Writer, s.FinalMSG)
 		}
 		s.cancel <- struct{}{}
 		close(s.cancel)

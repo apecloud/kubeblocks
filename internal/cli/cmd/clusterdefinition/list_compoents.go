@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -54,8 +53,8 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(validate(args))
-			o.FieldSelector = fmt.Sprintf("metadata.name=%s", args[0])
-			util.CheckErr(run(o, args[0]))
+			o.Names = args
+			util.CheckErr(run(o))
 		},
 	}
 	return cmd
@@ -64,38 +63,32 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 func validate(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("missing clusterdefinition name")
-	} else if len(args) > 1 {
-		return fmt.Errorf("only support one clusterdefinition name")
 	}
 	return nil
 }
 
-func run(o *list.ListOptions, resource string) error {
+func run(o *list.ListOptions) error {
 	o.Print = false
-	var allErrs []error
+
 	r, err := o.Run()
 	if err != nil {
-		allErrs = append(allErrs, err)
+		return err
 	}
 	infos, err := r.Infos()
 	if err != nil {
 		return err
 	}
-	if len(infos) == 0 {
-		o.PrintNotFoundResources()
-		return utilerrors.NewAggregate(allErrs)
-	}
 	p := printer.NewTablePrinter(o.Out)
-	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE")
+	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE", "CLUSTER DEFINITION")
 	for _, info := range infos {
 		var cd v1alpha1.ClusterDefinition
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd); err != nil {
-			allErrs = append(allErrs, err)
+			return err
 		}
 		for _, comp := range cd.Spec.ComponentDefs {
-			p.AddRow(comp.Name, comp.WorkloadType, comp.CharacterType)
+			p.AddRow(comp.Name, comp.WorkloadType, comp.CharacterType, cd.Name)
 		}
 	}
 	p.Print()
-	return utilerrors.NewAggregate(allErrs)
+	return nil
 }

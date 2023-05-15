@@ -21,6 +21,7 @@ package clusterdefinition
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -45,7 +47,6 @@ var _ = Describe("clusterdefinition list components", func() {
 		cmd     *cobra.Command
 		streams genericclioptions.IOStreams
 		out     *bytes.Buffer
-		errbuf  *bytes.Buffer
 		tf      *cmdtesting.TestFactory
 	)
 
@@ -71,7 +72,7 @@ var _ = Describe("clusterdefinition list components", func() {
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 		clusterDef := testing.FakeClusterDef()
 		tf = mockClient(clusterDef)
-		streams, _, out, errbuf = genericclioptions.NewTestIOStreams()
+		streams, _, out, _ = genericclioptions.NewTestIOStreams()
 		cmd = NewListComponentsCmd(tf, streams)
 	})
 
@@ -89,22 +90,25 @@ var _ = Describe("clusterdefinition list components", func() {
 	})
 
 	It("cd list-components when the cd do not exist", func() {
+		o := list.NewListOptions(tf, streams, types.ClusterDefGVR())
+		o.AllNamespaces = true
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		tf.UnstructuredClient = &clientfake.RESTClient{
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
-			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, testing.FakeEmptyClusterDefinitionList())},
+			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, testing.FakeResourceNotFound(types.ClusterDefGVR(), clusterdefinitionName+"-no-exist"))},
 		}
-		cmd.Run(cmd, []string{clusterdefinitionName + "-no-exist"})
-		Expect(errbuf.String()).Should(Equal("No clusterdefinitions found\n"))
+		Expect(run(o)).Should(HaveOccurred())
+
 	})
 
 	It("list-components", func() {
 		cmd.Run(cmd, []string{clusterdefinitionName})
-		expected := `NAME                    WORKLOAD-TYPE   CHARACTER-TYPE   
-fake-component-type                     mysql            
-fake-component-type-1                   mysql            
+		expected := `NAME                    WORKLOAD-TYPE   CHARACTER-TYPE   CLUSTER DEFINITION        
+fake-component-type                     mysql            fake-cluster-definition   
+fake-component-type-1                   mysql            fake-cluster-definition   
 `
 		Expect(expected).Should(Equal(out.String()))
+		fmt.Println(out.String())
 	})
 })

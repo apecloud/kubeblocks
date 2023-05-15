@@ -32,6 +32,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/utils/pointer"
 
@@ -794,10 +795,16 @@ func FakeCronJob(name string, namespace string, extraLabels map[string]string) *
 	}
 }
 
-func FakeEmptyClusterDefinitionList() *appsv1alpha1.ClusterVersionList {
-	return &appsv1alpha1.ClusterVersionList{
-		TypeMeta: metav1.TypeMeta{},
-		ListMeta: metav1.ListMeta{},
-		Items:    nil,
+func FakeResourceNotFound(versionResource schema.GroupVersionResource, name string) *metav1.Status {
+	return &metav1.Status{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Status",
+			APIVersion: "v1",
+		},
+		Status:  "Failure",
+		Message: fmt.Sprintf("%s.%s \"%s\" not found", versionResource.Resource, versionResource.Group, name),
+		Reason:  "NotFound",
+		Details: nil,
+		Code:    404,
 	}
 }

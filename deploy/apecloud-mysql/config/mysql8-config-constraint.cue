@@ -69,7 +69,7 @@
 	binlog_expire_logs_seconds: int & >=0 & <=4294967295 | *2592000
 
 	// Row-based, Statement-based or Mixed replication
-	binlog_format?: string & "ROW" | "STATEMENT" | "MIXED"
+	binlog_format?: string & "ROW" | "STATEMENT" | "MIXED" | "row" | "statement" | "mixed"
 
 	// Controls how many microseconds the binary log commit waits before synchronizing the binary log file to disk.
 	binlog_group_commit_sync_delay?: int & >=0 & <=1000000
@@ -87,10 +87,10 @@
 	binlog_order_commits?: string & "0" | "1" | "OFF" | "ON"
 
 	// Whether the server logs full or minimal rows with row-based replication.
-	binlog_row_image?: string & "FULL" | "MINIMAL" | "NOBLOB"
+	binlog_row_image?: string & "FULL" | "MINIMAL" | "NOBLOB" | "full" | "minimal" | "noblob"
 
 	// Controls whether metadata is logged using FULL or MINIMAL format. FULL causes all metadata to be logged; MINIMAL means that only metadata actually required by slave is logged. Default: MINIMAL.
-	binlog_row_metadata?: string & "FULL" | "MINIMAL"
+	binlog_row_metadata?: string & "FULL" | "MINIMAL" | "full" | "minimal"
 
 	// When enabled, it causes a MySQL 5.6.2 or later server to write informational log events such as row query log events into its binary log.
 	binlog_rows_query_log_events?: string & "0" | "1" | "OFF" | "ON"
@@ -187,7 +187,7 @@
 	default_password_lifetime: int & >=0 & <=65535 | *0
 
 	// The default storage engine (table type).
-	default_storage_engine?: string & "InnoDB" | "MRG_MYISAM" | "BLACKHOLE" | "CSV" | "MEMORY" | "FEDERATED" | "ARCHIVE" | "MyISAM" | "xengine"
+	default_storage_engine?: string & "InnoDB" | "MRG_MYISAM" | "BLACKHOLE" | "CSV" | "MEMORY" | "FEDERATED" | "ARCHIVE" | "MyISAM" | "xengine" | "XENGINE" | "INNODB" | "innodb"
 
 	// Server current time zone
 	default_time_zone?: string

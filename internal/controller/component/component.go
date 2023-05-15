@@ -41,8 +41,8 @@ func BuildComponent(
 	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
-) *SynthesizedComponent {
-
+) (*SynthesizedComponent, error) {
+	var err error
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
@@ -92,15 +92,15 @@ func BuildComponent(
 	if clusterCompSpec.Affinity != nil {
 		affinity = clusterCompSpec.Affinity
 	}
-	podAffinity := buildPodAffinity(&cluster, affinity, component)
-	component.PodSpec.Affinity = patchBuiltInAffinity(podAffinity)
-	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
-
-	tolerations := cluster.Spec.Tolerations
-	if len(clusterCompSpec.Tolerations) != 0 {
-		tolerations = clusterCompSpec.Tolerations
+	if component.PodSpec.Affinity, err = buildPodAffinity(&cluster, affinity, component); err != nil {
+		reqCtx.Log.Error(err, "build pod affinity failed.")
+		return nil, err
 	}
-	component.PodSpec.Tolerations = PatchBuiltInToleration(tolerations)
+	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
+	if component.PodSpec.Tolerations, err = BuildTolerations(&cluster, &clusterCompSpec); err != nil {
+		reqCtx.Log.Error(err, "build pod tolerations failed.")
+		return nil, err
+	}
 
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
@@ -143,15 +143,14 @@ func BuildComponent(
 	// }
 
 	buildMonitorConfig(&clusterCompDef, &clusterCompSpec, component)
-	err := buildProbeContainers(reqCtx, component)
-	if err != nil {
+	if err = buildProbeContainers(reqCtx, component); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
-		return nil
+		return nil, err
 	}
 
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
 
-	return component
+	return component, nil
 }
 
 // appendOrOverrideContainerAttr is used to append targetContainer to compContainers or override the attributes of compContainers with a given targetContainer,
@@ -244,12 +243,18 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 }
 
 // GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
-func GetReplacementMapForBuiltInEnv(clusterName, componentName string) map[string]string {
-	return map[string]string{
-		constant.KBClusterNamePlaceHolder:     clusterName,
+func GetReplacementMapForBuiltInEnv(cluster *appsv1alpha1.Cluster, componentName string) map[string]string {
+	replacementMap := map[string]string{
+		constant.KBClusterNamePlaceHolder:     cluster.Name,
 		constant.KBCompNamePlaceHolder:        componentName,
-		constant.KBClusterCompNamePlaceHolder: fmt.Sprintf("%s-%s", clusterName, componentName),
+		constant.KBClusterCompNamePlaceHolder: fmt.Sprintf("%s-%s", cluster.Name, componentName),
 	}
+	if len(cluster.UID) > 8 {
+		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = string(cluster.UID)[len(cluster.UID)-8:]
+	} else {
+		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = string(cluster.UID)
+	}
+	return replacementMap
 }
 
 // ReplaceNamedVars replaces the placeholder in targetVar if it is match and returns the replaced result

@@ -163,10 +163,17 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 		})
 	}
 
+	var kbClusterPostfix8 string
+	if len(params.Cluster.UID) > 8 {
+		kbClusterPostfix8 = string(params.Cluster.UID)[len(params.Cluster.UID)-8:]
+	} else {
+		kbClusterPostfix8 = string(params.Cluster.UID)
+	}
 	toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
 		{Name: "KB_CLUSTER_NAME", Value: params.Cluster.Name},
 		{Name: "KB_COMP_NAME", Value: params.Component.Name},
 		{Name: "KB_CLUSTER_COMP_NAME", Value: params.Cluster.Name + "-" + params.Component.Name},
+		{Name: "KB_CLUSTER_UID_POSTFIX_8", Value: kbClusterPostfix8},
 		{Name: "KB_POD_FQDN", Value: fmt.Sprintf("%s.%s-headless.%s.svc", "$(KB_POD_NAME)",
 			"$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
 	}...)

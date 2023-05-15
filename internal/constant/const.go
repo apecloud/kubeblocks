@@ -26,24 +26,30 @@ const (
 	CfgKeyCtrlrMgrAffinity              = "CM_AFFINITY"
 	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
 	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
-	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"    // accept time
-	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"               // the global pvc name which persistent volume claim to store the backup data
-	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"      // the init capacity of pvc for creating the pvc, e.g. 10Gi.
-	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"      // the pvc storage class name.
-	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"      // the pvc create policy. support "IfNotPresent" or "Never"
-	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"      // the configmap name which contains a persistentVolume template.
-	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE" // the configmap namespace which contains a persistentVolume template.
+	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"       // accept time
+	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"                  // the global pvc name which persistent volume claim to store the backup data
+	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"         // the init capacity of pvc for creating the pvc, e.g. 10Gi.
+	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"         // the pvc storage class name.
+	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"         // the pvc create policy. support "IfNotPresent" or "Never"
+	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"         // the configmap name which contains a persistentVolume template.
+	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE"    // the configmap namespace which contains a persistentVolume template.
+	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
 	CfgAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
+
+	// data plane config key
+	CfgKeyDataPlaneTolerations = "DATA_PLANE_TOLERATIONS"
+	CfgKeyDataPlaneAffinity    = "DATA_PLANE_AFFINITY"
 )
 
 const (
-	ConnCredentialPlaceHolder    = "$(CONN_CREDENTIAL_SECRET_NAME)"
-	KBCompNamePlaceHolder        = "$(KB_COMP_NAME)"
-	KBClusterNamePlaceHolder     = "$(KB_CLUSTER_NAME)"
-	KBClusterCompNamePlaceHolder = "$(KB_CLUSTER_COMP_NAME)"
+	ConnCredentialPlaceHolder       = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBCompNamePlaceHolder           = "$(KB_COMP_NAME)"
+	KBClusterNamePlaceHolder        = "$(KB_CLUSTER_NAME)"
+	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
+	KBClusterUIDPostfix8PlaceHolder = "$(KB_CLUSTER_UID_POSTFIX_8)"
 )
 
 const (
@@ -84,6 +90,7 @@ const (
 	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
 	BackupToolTypeLabelKey          = "kubeblocks.io/backup-tool-type"
 	BackupTypeLabelKeyKey           = "dataprotection.kubeblocks.io/backup-type"
+	AddonProviderLableKey           = "kubeblocks.io/provider" // AddonProviderLableKey marks the addon provider
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey                  = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -93,6 +100,7 @@ const (
 	RestoreFromBackUpAnnotationKey           = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
 	ClusterSnapshotAnnotationKey             = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	LeaderAnnotationKey                      = "cs.apps.kubeblocks.io/leader"
+	ComponentReplicasAnnotationKey           = "apps.kubeblocks.io/component-replicas"                   // ComponentReplicasAnnotationKey specifies the number of pods in replicas
 	DefaultBackupPolicyAnnotationKey         = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
 	DefaultBackupPolicyTemplateAnnotationKey = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
 	BackupDataPathPrefixAnnotationKey        = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
@@ -167,6 +175,7 @@ const (
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
 	ConfigMapKind             = "ConfigMap"
+	DaemonSetKind             = "DaemonSet"
 )
 
 const (
@@ -192,15 +201,6 @@ const (
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
 	ProbeCheckRunningPath = "spec.containers{" + RunningProbeContainerName + "}"
-
-	// KubeBlocksDataNodeLabelKey is the node label key of the built-in data node label
-	KubeBlocksDataNodeLabelKey = "kb-data"
-	// KubeBlocksDataNodeLabelValue is the node label value of the built-in data node label
-	KubeBlocksDataNodeLabelValue = "true"
-	// KubeBlocksDataNodeTolerationKey is the taint label key of the built-in data node taint
-	KubeBlocksDataNodeTolerationKey = "kb-data"
-	// KubeBlocksDataNodeTolerationValue is the taint label value of the built-in data node taint
-	KubeBlocksDataNodeTolerationValue = "true"
 )
 
 const (
@@ -227,4 +227,4 @@ const (
 	AccountPasswdForSecret = "password"
 )
 
-const DefaultBackupPvcInitCapacity = "100Gi"
+const DefaultBackupPvcInitCapacity = "20Gi"

@@ -134,7 +134,7 @@ func (o *destroyOptions) destroyLocal() error {
 func (o *destroyOptions) destroyCloud() error {
 	var err error
 
-	printer.Warning(o.Out, `This action will destroy the kubernetes cluster, there may be residual resources, 
+	printer.Warning(o.Out, `This action will destroy the kubernetes cluster, there may be residual resources,
   please confirm and manually clean up related resources after this action.
 
 `)

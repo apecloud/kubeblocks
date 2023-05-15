@@ -5,9 +5,7 @@ metadata:
   labels:
     {{- include "delphic.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
-  {{- end }}
   selector:
     matchLabels:
       {{- include "delphic.selectorLabels" . | nindent 6 }}

@@ -5,14 +5,14 @@ title: kbcli cluster start
 Start the cluster if cluster is stopped.
 
 ```
-kbcli cluster start [flags]
+kbcli cluster start NAME [flags]
 ```
 
 ### Examples
 
 ```
   # start the cluster when cluster is stopped
-  kbcli cluster start <my-cluster>
+  kbcli cluster start mycluster
 ```
 
 ### Options

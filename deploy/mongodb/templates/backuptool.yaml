@@ -4,6 +4,7 @@ metadata:
   name: mongodb-physical-backup-tool
   labels:
     clusterdefinition.kubeblocks.io/name: mongodb
+    {{- include "mongodb.labels" . | nindent 4 }}
 spec:
   image: mongo:5.0.14
   deployKind: job

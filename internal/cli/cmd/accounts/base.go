@@ -167,7 +167,7 @@ func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams 
 	case sqlchannel.CreateUserOp:
 		o.printGeneralInfo(response)
 		if response.Event == sqlchannel.RespEveSucc {
-			printer.Alert(o.Out, "Please do REMEMBER the password for the new user! Once forgotten, it cannot be retrieved!")
+			printer.Alert(o.Out, "Please do REMEMBER the password for the new user! Once forgotten, it cannot be retrieved!\n")
 		}
 		err = nil
 	case sqlchannel.DescribeUserOp:

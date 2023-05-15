@@ -26,7 +26,7 @@ spec:
       hooks:
         containerName: postgresql
         preCommands:
-          - psql -c "SELECT txid_current();CHECKPOINT;"
+          - psql -c "CHECKPOINT;"
       backupStatusUpdates:
         - path: manifests.backupLog
           containerName: postgresql
@@ -36,6 +36,8 @@ spec:
       backupToolName: postgres-basebackup
     incremental:
       backupToolName: postgres-pitr
+      target:
+        role: primary
       backupStatusUpdates:
         - path: manifests.backupLog
           containerName: postgresql

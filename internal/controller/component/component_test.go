@@ -82,45 +82,49 @@ var _ = Describe("component module", func() {
 				Ctx: ctx,
 				Log: tlog,
 			}
-			component := BuildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				*cluster,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 
 			By("leave clusterVersion.versionCtx empty initContains and containers")
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.Containers = nil
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.InitContainers = nil
-			component = BuildComponent(
+			component, err = BuildComponent(
 				reqCtx,
 				*cluster,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 
 			By("new container in clusterVersion not in clusterDefinition")
-			component = BuildComponent(
+			component, err = BuildComponent(
 				reqCtx,
 				*cluster,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[1])
+			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
 
 			By("new init container in clusterVersion not in clusterDefinition")
-			component = BuildComponent(
+			component, err = BuildComponent(
 				reqCtx,
 				*cluster,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[1])
+			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
 		})
 

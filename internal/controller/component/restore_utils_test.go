@@ -84,7 +84,7 @@ var _ = Describe("probe_utils", func() {
 			}
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				SetBackupPolicyName(backupPolicyName).
-				SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+				SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 				Create(&testCtx).GetObject()
 			updateBackupStatus(backup, backupToolName, dataprotectionv1alpha1.BackupCompleted)
 			component := &SynthesizedComponent{

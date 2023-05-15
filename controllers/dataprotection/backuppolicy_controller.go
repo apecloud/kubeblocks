@@ -131,8 +131,8 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 	// delete cronjob resource
 	cronjob := &batchv1.CronJob{}
 
-	for _, v := range []dataprotectionv1alpha1.BackupType{dataprotectionv1alpha1.BackupTypeFull,
-		dataprotectionv1alpha1.BackupTypeIncremental, dataprotectionv1alpha1.BackupTypeSnapshot} {
+	for _, v := range []dataprotectionv1alpha1.BackupType{dataprotectionv1alpha1.BackupTypeDataFile,
+		dataprotectionv1alpha1.BackupTypeLogFile, dataprotectionv1alpha1.BackupTypeSnapshot} {
 		key := types.NamespacedName{
 			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 			Name:      r.getCronJobName(backupPolicy.Name, backupPolicy.Namespace, v),
@@ -279,8 +279,8 @@ func (r *BackupPolicyReconciler) buildCronJob(
 		return nil, err
 	}
 	var ttl metav1.Duration
-	if backupPolicy.Spec.TTL != nil {
-		ttl = metav1.Duration{Duration: dataprotectionv1alpha1.ToDuration(backupPolicy.Spec.TTL)}
+	if backupPolicy.Spec.Retention != nil && backupPolicy.Spec.Retention.TTL != nil {
+		ttl = metav1.Duration{Duration: dataprotectionv1alpha1.ToDuration(backupPolicy.Spec.Retention.TTL)}
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	options := backupPolicyOptions{
@@ -303,8 +303,8 @@ func (r *BackupPolicyReconciler) buildCronJob(
 		return nil, err
 	}
 	cuePath := "cronjob"
-	if backType == dataprotectionv1alpha1.BackupTypeIncremental {
-		cuePath = "cronjob_incremental"
+	if backType == dataprotectionv1alpha1.BackupTypeLogFile {
+		cuePath = "cronjob_logfile"
 	}
 	cronjobByte, err := cueValue.Lookup(cuePath)
 	if err != nil {
@@ -399,47 +399,47 @@ func (r *BackupPolicyReconciler) handleSnapshotPolicy(
 		return nil
 	}
 	var cronExpression string
-	schedule := backupPolicy.Spec.Schedule.BaseBackup
-	if schedule != nil && schedule.Enable && schedule.Type == dataprotectionv1alpha1.BaseBackupTypeSnapshot {
+	schedule := backupPolicy.Spec.Schedule.Snapshot
+	if schedule != nil && schedule.Enable {
 		cronExpression = schedule.CronExpression
 	}
 	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Snapshot.BasePolicy,
 		cronExpression, dataprotectionv1alpha1.BackupTypeSnapshot)
 }
 
-// handleFullPolicy handles full policy.
+// handleFullPolicy handles datafile policy.
 func (r *BackupPolicyReconciler) handleFullPolicy(
 	reqCtx intctrlutil.RequestCtx,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
-	if backupPolicy.Spec.Full == nil {
+	if backupPolicy.Spec.Datafile == nil {
 		// TODO delete cronjob if exists
 		return nil
 	}
 	var cronExpression string
-	schedule := backupPolicy.Spec.Schedule.BaseBackup
-	if schedule != nil && schedule.Enable && schedule.Type == dataprotectionv1alpha1.BaseBackupTypeFull {
+	schedule := backupPolicy.Spec.Schedule.Datafile
+	if schedule != nil && schedule.Enable {
 		cronExpression = schedule.CronExpression
 	}
-	r.setGlobalPersistentVolumeClaim(backupPolicy.Spec.Full)
-	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Full.BasePolicy,
-		cronExpression, dataprotectionv1alpha1.BackupTypeFull)
+	r.setGlobalPersistentVolumeClaim(backupPolicy.Spec.Datafile)
+	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Datafile.BasePolicy,
+		cronExpression, dataprotectionv1alpha1.BackupTypeDataFile)
 }
 
 // handleIncrementalPolicy handles incremental policy.
 func (r *BackupPolicyReconciler) handleIncrementalPolicy(
 	reqCtx intctrlutil.RequestCtx,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
-	if backupPolicy.Spec.Incremental == nil {
+	if backupPolicy.Spec.Logfile == nil {
 		return nil
 	}
 	var cronExpression string
-	schedule := backupPolicy.Spec.Schedule.Incremental
+	schedule := backupPolicy.Spec.Schedule.Logfile
 	if schedule != nil && schedule.Enable {
 		cronExpression = schedule.CronExpression
 	}
-	r.setGlobalPersistentVolumeClaim(backupPolicy.Spec.Incremental)
-	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Incremental.BasePolicy,
-		cronExpression, dataprotectionv1alpha1.BackupTypeIncremental)
+	r.setGlobalPersistentVolumeClaim(backupPolicy.Spec.Logfile)
+	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Logfile.BasePolicy,
+		cronExpression, dataprotectionv1alpha1.BackupTypeLogFile)
 }
 
 // setGlobalPersistentVolumeClaim sets global config of pvc to common policy.

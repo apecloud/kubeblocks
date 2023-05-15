@@ -119,7 +119,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
-			util.CheckErr(o.PrecheckBeforeInstall())
+			util.CheckErr(o.PreCheck())
 			util.CheckErr(p.Preflight(f, args, o.ValueOpts))
 			util.CheckErr(o.Install())
 		},
@@ -177,7 +177,7 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	return err
 }
 
-func (o *InstallOptions) PrecheckBeforeInstall() error {
+func (o *InstallOptions) PreCheck() error {
 	// check if KubeBlocks has been installed
 	v, err := util.GetVersionInfo(o.Client)
 	if err != nil {
@@ -204,7 +204,7 @@ func (o *InstallOptions) PrecheckBeforeInstall() error {
 		return err
 	}
 
-	if err = o.preCheck(v); err != nil {
+	if err = o.checkVersion(v); err != nil {
 		return err
 	}
 	return nil
@@ -359,7 +359,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	return nil
 }
 
-func (o *InstallOptions) preCheck(v util.Version) error {
+func (o *InstallOptions) checkVersion(v util.Version) error {
 	if !o.Check {
 		return nil
 	}

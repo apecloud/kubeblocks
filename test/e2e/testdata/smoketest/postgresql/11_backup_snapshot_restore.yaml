@@ -1,16 +1,17 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster-sbapshot
+  name: mycluster-snapshot
   annotations:
-    kubeblocks.io/restore-from-backup: "{\"postgresql\":\"backup-sbapshot-mycluster\"}"
+    kubeblocks.io/restore-from-backup: "{\"postgresql\":\"backup-snapshot-mycluster\"}"
 spec:
   clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-14.7.0
+  clusterVersionRef: postgresql-14.7.1
   terminationPolicy: WipeOut
   componentSpecs:
-    - name: wesql
-      componentDefRef: mysql
+    - name: postgresql
+      componentDefRef: postgresql
+      serviceAccountName: kb-sa-mycluster
       monitor: false
       replicas: 1
       volumeClaimTemplates:
@@ -20,4 +21,4 @@ spec:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 1Gi
+                storage: 20Gi

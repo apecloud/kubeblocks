@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-upgrade
 spec:
-  clusterRef: mycluster
+  clusterRef: mycluster-pgcluster
   type: Upgrade
   upgrade:
-    clusterVersionRef: postgresql-14.7.0-latest
+    clusterVersionRef: postgresql-14.7.1-latest

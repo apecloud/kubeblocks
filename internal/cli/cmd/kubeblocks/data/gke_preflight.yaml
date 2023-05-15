@@ -11,11 +11,11 @@ spec:
         outcomes:
           - fail:
               when: "< 1.22.0"
-              message: This application requires at least Kubernetes 1.20.0 or later, and recommends 1.22.0.
+              message: This application requires at least Kubernetes 1.20.0 or later, and recommends 1.22.0
               uri: https://www.kubernetes.io
           - pass:
               when: ">= 1.22.0"
-              message: Your cluster meets the recommended and required versions（>= 1.22.0） of Kubernetes.
+              message: Your cluster meets the recommended and required versions（>= 1.22.0） of Kubernetes
               uri: https://www.kubernetes.io
     - nodeResources:
         checkName: At-Least-3-Nodes
@@ -24,14 +24,7 @@ spec:
               when: "count() < 3"
               message: This application requires at least 3 nodes
           - pass:
-              message: This cluster has enough nodes.
-    - storageClass:
-        checkName: Required-Default-SC
-        outcomes:
-          - fail:
-              message: The default storage class was not found. To learn more details, please check https://docs.aws.amazon.com/zh_cn/eks/latest/userguide/storage-classes.html.
-          - pass:
-              message: default storage class is the presence, and all good on storage classes
+              message: This cluster has enough nodes
   extendAnalyzers:
     - clusterAccess:
         checkName: Check-K8S-Access
@@ -44,6 +37,13 @@ spec:
         checkName: Required-Taint-Match
         outcomes:
           - fail:
-              message: The taint matching failed.
+              message: all nodes had taints that the pod didn't tolerate
           - pass:
-              message: The taint matching succeeded.
+              message: The taint matching succeeded
+    - storageClass:
+        checkName: Required-Default-SC
+        outcomes:
+          - warn:
+              message: The default storage class was not found. To learn more details, please check https://cloud.google.com/anthos/clusters/docs/on-prem/latest/how-to/default-storage-class; Alternatively use option --set storageClass=<storageClassName> when creating cluster
+          - pass:
+              message: default storage class is the presence, and all good on storage classes

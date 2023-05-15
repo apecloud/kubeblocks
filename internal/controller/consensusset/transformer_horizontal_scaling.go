@@ -664,6 +664,9 @@ func doControlJobCleanup(transCtx *CSSetTransformContext, jobType string, dag *g
 	case stateControlJobSuccess(jobList):
 		// succeeded job: be deleted
 		for _, job := range jobList.Items {
+			if !job.DeletionTimestamp.IsZero() {
+				continue
+			}
 			jobOld := job.DeepCopy()
 			model.PrepareDelete(dag, jobOld)
 		}

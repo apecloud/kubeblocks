@@ -31,6 +31,7 @@ kbcli kubeblocks preflight [flags]
       --collector-image string        the full name of the collector image to use
       --collector-pullpolicy string   the pull policy of the collector image
       --debug                         enable debug logging
+      --format string                 output format, one of json, yaml. only used when interactive is set to false, default format is yaml (default "yaml")
   -h, --help                          help for preflight
   -n, --namespace string              If present, the namespace scope for this CLI request
   -o, --output string                 specify the output file path for the preflight checks

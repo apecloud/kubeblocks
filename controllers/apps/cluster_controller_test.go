@@ -724,8 +724,6 @@ var _ = Describe("Cluster Controller", func() {
 
 	testVolumeExpansionFailedAndRecover := func(compName, compDefName string) {
 
-		return
-
 		const storageClassName = "test-sc"
 		const replicas = 3
 
@@ -1430,10 +1428,10 @@ var _ = Describe("Cluster Controller", func() {
 
 	When("creating cluster with workloadType=[Stateless|Stateful|Consensus|Replication] component", func() {
 		compNameNDef := map[string]string{
-			//statelessCompName:   statelessCompDefName,
-			//statefulCompName:    statefulCompDefName,
-			consensusCompName: consensusCompDefName,
-			//replicationCompName: replicationCompDefName,
+			statelessCompName:   statelessCompDefName,
+			statefulCompName:    statefulCompDefName,
+			consensusCompName:   consensusCompDefName,
+			replicationCompName: replicationCompDefName,
 		}
 
 		BeforeEach(func() {
@@ -1486,7 +1484,7 @@ var _ = Describe("Cluster Controller", func() {
 				})
 			})
 
-			It("should be able to recover if volume expansion fails", func() {
+			FIt("should be able to recover if volume expansion fails", func() {
 				testVolumeExpansionFailedAndRecover(compName, compDefName)
 			})
 

@@ -32,6 +32,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -290,13 +291,8 @@ func (o *CreateOptions) Validate() error {
 		return fmt.Errorf("a valid termination policy is needed, use --termination-policy to specify one of: DoNotTerminate, Halt, Delete, WipeOut")
 	}
 
-	if o.ClusterVersionRef == "" {
-		version, err := cluster.GetLatestVersion(o.Dynamic, o.ClusterDefRef)
-		if err != nil {
-			return err
-		}
-		o.ClusterVersionRef = version
-		fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
+	if err := o.validateClusterVersion(); err != nil {
+		return err
 	}
 
 	if len(o.Values) > 0 && len(o.SetFile) > 0 {
@@ -941,11 +937,67 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 	for _, item := range list.Items {
 		allStorageClasses[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
-		if !existedDefault && annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == "true" || annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true") {
+		if !existedDefault && annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == annotationTrueValue || annotations[storage.BetaIsDefaultStorageClassAnnotation] == annotationTrueValue) {
 			existedDefault = true
 		}
 	}
 	return allStorageClasses, existedDefault, nil
+}
+
+// validateClusterVersion check whether the cluster version we need is exist in K8S or
+// the default cluster version is exist
+func (o *CreateOptions) validateClusterVersion() error {
+	existedClusterVersions, defaultVersion, existedDefault, err := getClusterVersions(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return err
+	}
+	switch {
+	case o.ClusterVersionRef != "":
+		if _, ok := existedClusterVersions[o.ClusterVersionRef]; !ok {
+			return fmt.Errorf("failed to find the specified cluster version \"%s\"", o.ClusterVersionRef)
+		}
+	case !existedDefault:
+		// if default version is not set and there is only one version, use it
+		if len(existedClusterVersions) == 1 {
+			o.ClusterVersionRef = maps.Keys(existedClusterVersions)[0]
+			fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
+		} else {
+			return fmt.Errorf("failed to find the default cluster version, use '--cluster-version ClusterVersion' to set it")
+		}
+	case existedDefault:
+		// TODO: achieve this in operator
+		if existedDefault {
+			o.ClusterVersionRef = defaultVersion
+			fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
+		}
+	}
+
+	return nil
+}
+
+// getClusterVersions return all cluster versions in K8S and return true if the cluster have a default cluster version
+func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[string]struct{}, string, bool, error) {
+	allClusterVersions := make(map[string]struct{})
+	existedDefault := false
+	defaultVersion := ""
+	list, err := dynamic.Resource(types.ClusterVersionGVR()).List(context.Background(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
+	})
+	if err != nil {
+		return nil, defaultVersion, false, err
+	}
+	for _, item := range list.Items {
+		allClusterVersions[item.GetName()] = struct{}{}
+		annotations := item.GetAnnotations()
+		if annotations != nil && annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue {
+			if existedDefault {
+				return nil, defaultVersion, existedDefault, fmt.Errorf("clusterDef %s has more than one default cluster version", clusterDef)
+			}
+			existedDefault = true
+			defaultVersion = item.GetName()
+		}
+	}
+	return allClusterVersions, defaultVersion, existedDefault, nil
 }
 
 func shouldCreateDependencies(cd *appsv1alpha1.ClusterDefinition, compSpec *appsv1alpha1.ClusterComponentSpec) (bool, error) {

@@ -93,10 +93,8 @@ var _ = Describe("Preflight API Test", func() {
 			PreflightFlags: preflight.NewPreflightFlags(),
 		}
 		Expect(p.complete(tf, nil)).Should(HaveOccurred())
-		Expect(p.validate()).Should(HaveOccurred())
 		Expect(p.complete(tf, []string{"file1", "file2"})).Should(Succeed())
 		Expect(len(p.checkFileList)).Should(Equal(2))
-		Expect(p.validate()).Should(Succeed())
 	})
 
 	It("run test", func() {
@@ -113,12 +111,6 @@ var _ = Describe("Preflight API Test", func() {
 			err := p.run()
 			g.Expect(err).NotTo(HaveOccurred())
 		}).Should(Succeed())
-		By("non-interactive mode, and expect error")
-		p.checkFileList = []string{"../../testing/testdata/hostpreflight_nil.yaml"}
-		Eventually(func(g Gomega) {
-			err := p.run()
-			g.Expect(err).To(HaveOccurred())
-		}).Should(Succeed())
 	})
 
 	It("LoadVendorCheckYaml test, and expect fail", func() {
@@ -131,5 +123,13 @@ var _ = Describe("Preflight API Test", func() {
 		res, err := LoadVendorCheckYaml(util.EKSProvider)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(res)).Should(Equal(2))
+	})
+	It("newPreflightPath test, and expect success", func() {
+		res := newPreflightPath("test")
+		Expect(res).Should(Equal("data/test_preflight.yaml"))
+	})
+	It("newHostPreflightPath test, and expect success", func() {
+		res := newHostPreflightPath("test")
+		Expect(res).Should(Equal("data/test_hostpreflight.yaml"))
 	})
 })

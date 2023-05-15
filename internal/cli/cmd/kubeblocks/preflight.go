@@ -58,6 +58,7 @@ const (
 	flagNamespace                 = "namespace"
 	flagVerbose                   = "verbose"
 	flagForce                     = "force"
+	flagFormat                    = "format"
 
 	PreflightPattern     = "data/%s_preflight.yaml"
 	HostPreflightPattern = "data/%s_hostpreflight.yaml"
@@ -110,6 +111,7 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		},
 	}
 	// add flags
+	cmd.Flags().StringVar(p.Format, flagFormat, "yaml", "output format, one of human, json, yaml. only used when interactive is set to false, default format is yaml")
 	cmd.Flags().StringVar(p.CollectorImage, flagCollectorImage, *p.CollectorImage, "the full name of the collector image to use")
 	cmd.Flags().StringVar(p.CollectorPullPolicy, flagCollectorPullPolicy, *p.CollectorPullPolicy, "the pull policy of the collector image")
 	cmd.Flags().BoolVar(p.CollectWithoutPermissions, flagCollectWithoutPermissions, *p.CollectWithoutPermissions, "always run preflight checks even if some require permissions that preflight does not have")

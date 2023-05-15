@@ -228,9 +228,9 @@ var _ = Describe("Backup Policy Controller", func() {
 				patchCronJobStatus(getCronjobKey(dpv1alpha1.BackupTypeDataFile))
 
 				By("retain the latest backup")
-				Eventually(testapps.List(&testCtx, intctrlutil.BackupSignature,
+				Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
 					client.MatchingLabels(backupPolicy.Spec.Datafile.Target.LabelsSelector.MatchLabels),
-					client.InNamespace(backupPolicy.Namespace))).Should(HaveLen(1))
+					client.InNamespace(backupPolicy.Namespace))).Should(Equal(1))
 			})
 		})
 

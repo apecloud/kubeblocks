@@ -12,11 +12,11 @@ kbcli cluster reconfigure NAME --set key=value[,key=value] [--component=componen
 
 ```
   # update component params
-  kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
+  kbcli cluster reconfigure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
   
   # if only one component, and one config spec, and one config file, simplify the use of configure. e.g:
   # update mysql max_connections, cluster name is mycluster
-  kbcli cluster configure mycluster --set max_connections=2000
+  kbcli cluster reconfigure mycluster --set max_connections=2000
 ```
 
 ### Options

@@ -30,6 +30,7 @@ kbcli playground init [flags]
 ### Options
 
 ```
+      --auto-approve                Skip interactive approval during initialization
       --cloud-provider string       Cloud provider type, one of [local aws gcp alicloud tencentcloud] (default "local")
       --cluster-definition string   Cluster definition (default "apecloud-mysql")
       --cluster-version string      Cluster definition

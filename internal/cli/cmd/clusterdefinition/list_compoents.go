@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -44,6 +45,7 @@ var (
 
 func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.ClusterDefGVR())
+	o.AllNamespaces = true
 	cmd := &cobra.Command{
 		Use:               "list-components",
 		Short:             "List cluster definition components.",
@@ -53,7 +55,7 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(validate(args))
 			o.FieldSelector = fmt.Sprintf("metadata.name=%s", args[0])
-			util.CheckErr(run(o))
+			util.CheckErr(run(o, args[0]))
 		},
 	}
 	return cmd
@@ -68,30 +70,32 @@ func validate(args []string) error {
 	return nil
 }
 
-func run(o *list.ListOptions) error {
+func run(o *list.ListOptions, resource string) error {
 	o.Print = false
+	var allErrs []error
 	r, err := o.Run()
 	if err != nil {
-		return err
+		allErrs = append(allErrs, err)
 	}
 	infos, err := r.Infos()
 	if err != nil {
 		return err
 	}
 	if len(infos) == 0 {
-		return fmt.Errorf("no clusterdefinition %s found", o.Names[0])
+		o.PrintNotFoundResources()
+		return utilerrors.NewAggregate(allErrs)
 	}
 	p := printer.NewTablePrinter(o.Out)
 	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE")
 	for _, info := range infos {
 		var cd v1alpha1.ClusterDefinition
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd); err != nil {
-			return err
+			allErrs = append(allErrs, err)
 		}
 		for _, comp := range cd.Spec.ComponentDefs {
 			p.AddRow(comp.Name, comp.WorkloadType, comp.CharacterType)
 		}
 	}
 	p.Print()
-	return nil
+	return utilerrors.NewAggregate(allErrs)
 }

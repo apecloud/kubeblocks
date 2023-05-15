@@ -793,3 +793,11 @@ func FakeCronJob(name string, namespace string, extraLabels map[string]string) *
 		},
 	}
 }
+
+func FakeEmptyClusterDefinitionList() *appsv1alpha1.ClusterVersionList {
+	return &appsv1alpha1.ClusterVersionList{
+		TypeMeta: metav1.TypeMeta{},
+		ListMeta: metav1.ListMeta{},
+		Items:    nil,
+	}
+}

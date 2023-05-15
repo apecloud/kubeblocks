@@ -21,7 +21,6 @@ package clusterdefinition
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -46,6 +45,7 @@ var _ = Describe("clusterdefinition list components", func() {
 		cmd     *cobra.Command
 		streams genericclioptions.IOStreams
 		out     *bytes.Buffer
+		errbuf  *bytes.Buffer
 		tf      *cmdtesting.TestFactory
 	)
 
@@ -71,7 +71,7 @@ var _ = Describe("clusterdefinition list components", func() {
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 		clusterDef := testing.FakeClusterDef()
 		tf = mockClient(clusterDef)
-		streams, _, out, _ = genericclioptions.NewTestIOStreams()
+		streams, _, out, errbuf = genericclioptions.NewTestIOStreams()
 		cmd = NewListComponentsCmd(tf, streams)
 	})
 
@@ -88,13 +88,23 @@ var _ = Describe("clusterdefinition list components", func() {
 		Expect(validate([]string{})).Should(HaveOccurred())
 	})
 
-	It("list-components ", func() {
+	It("cd list-components when the cd do not exist", func() {
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+		tf.UnstructuredClient = &clientfake.RESTClient{
+			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
+			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, testing.FakeEmptyClusterDefinitionList())},
+		}
+		cmd.Run(cmd, []string{clusterdefinitionName + "-no-exist"})
+		Expect(errbuf.String()).Should(Equal("No clusterdefinitions found\n"))
+	})
+
+	It("list-components", func() {
 		cmd.Run(cmd, []string{clusterdefinitionName})
 		expected := `NAME                    WORKLOAD-TYPE   CHARACTER-TYPE   
 fake-component-type                     mysql            
 fake-component-type-1                   mysql            
 `
-		fmt.Println(out.String())
 		Expect(expected).Should(Equal(out.String()))
 	})
 })

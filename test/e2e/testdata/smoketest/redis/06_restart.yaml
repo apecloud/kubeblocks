@@ -3,8 +3,8 @@ kind: OpsRequest
 metadata:
   name: ops-restart
 spec:
-  clusterRef: mycluster
+  clusterRef: mycluster-redis-cluster
   ttlSecondsAfterSucceed: 3600
   type: Restart
   restart:
-    - componentName: redis-repl
+    - componentName: redis

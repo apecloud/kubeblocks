@@ -50,8 +50,8 @@ spec:
           spec:
             description: BackupPolicySpec defines the desired state of BackupPolicy
             properties:
-              full:
-                description: the policy for full backup.
+              datafile:
+                description: the policy for datafile backup.
                 properties:
                   backupStatusUpdates:
                     description: define how to update metadata for backup status.
@@ -232,8 +232,8 @@ spec:
                 - persistentVolumeClaim
                 - target
                 type: object
-              incremental:
-                description: the policy for incremental backup.
+              logfile:
+                description: the policy for logfile backup.
                 properties:
                   backupStatusUpdates:
                     description: define how to update metadata for backup status.
@@ -413,12 +413,23 @@ spec:
                 required:
                 - persistentVolumeClaim
                 - target
+                type: object
+              retention:
+                description: retention describe how long the Backup should be retained.
+                  if not set, will be retained forever.
+                properties:
+                  ttl:
+                    description: ttl is a time string ending with the 'd'|'D'|'h'|'H'
+                      character to describe how long the Backup should be retained.
+                      if not set, will be retained forever.
+                    pattern: ^\d+[d|D|h|H]$
+                    type: string
                 type: object
               schedule:
                 description: schedule policy for backup.
                 properties:
-                  baseBackup:
-                    description: schedule policy for base backup.
+                  datafile:
+                    description: schedule policy for datafile backup.
                     properties:
                       cronExpression:
                         description: the cron expression for schedule, the timezone
@@ -427,20 +438,26 @@ spec:
                       enable:
                         description: enable or disable the schedule.
                         type: boolean
-                      type:
-                        description: the type of base backup, only support full and
-                          snapshot.
-                        enum:
-                        - full
-                        - snapshot
-                        type: string
                     required:
                     - cronExpression
                     - enable
-                    - type
                     type: object
-                  incremental:
-                    description: schedule policy for incremental backup.
+                  logfile:
+                    description: schedule policy for logfile backup.
+                    properties:
+                      cronExpression:
+                        description: the cron expression for schedule, the timezone
+                          is in UTC. see https://en.wikipedia.org/wiki/Cron.
+                        type: string
+                      enable:
+                        description: enable or disable the schedule.
+                        type: boolean
+                    required:
+                    - cronExpression
+                    - enable
+                    type: object
+                  snapshot:
+                    description: schedule policy for snapshot backup.
                     properties:
                       cronExpression:
                         description: the cron expression for schedule, the timezone
@@ -596,12 +613,6 @@ spec:
                 required:
                 - target
                 type: object
-              ttl:
-                description: ttl is a time string ending with the 'd'|'D'|'h'|'H'
-                  character to describe how long the Backup should be retained. if
-                  not set, will be retained forever.
-                pattern: ^\d+[d|D|h|H]$
-                type: string
             type: object
           status:
             description: BackupPolicyStatus defines the observed state of BackupPolicy

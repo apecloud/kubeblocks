@@ -262,7 +262,7 @@ func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, 
 	// 2. get the latest backup object
 	var latestBackup *dpv1alpha1.Backup
 	for _, item := range backups {
-		if item.Spec.BackupType != dpv1alpha1.BackupTypeIncremental &&
+		if item.Spec.BackupType != dpv1alpha1.BackupTypeLogFile &&
 			item.Status.Manifests.BackupLog.StopTime != nil && !p.restoreTime.Before(item.Status.Manifests.BackupLog.StopTime) {
 			latestBackup = &item
 			break
@@ -367,7 +367,7 @@ func (p *PointInTimeRecoveryManager) getIncrementalBackup(componentName string) 
 		client.MatchingLabels{
 			constant.AppInstanceLabelKey:    p.sourceCluster,
 			constant.KBAppComponentLabelKey: componentName,
-			constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeIncremental),
+			constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeLogFile),
 		}); err != nil {
 		return nil, err
 	}

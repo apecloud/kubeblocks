@@ -61,7 +61,7 @@ func NewListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 			util.CheckErr(o.run())
 		},
 	}
-	flags.AddAddClusterDefinitionFlag(&f, cmd, &o.ClusterDefRef)
+	flags.AddClusterDefinitionFlag(f, cmd, &o.ClusterDefRef)
 	util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
 	return cmd
 }

@@ -71,6 +71,6 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	o.AddFlags(cmd, true)
-	flags.AddAddClusterDefinitionFlag(&f, cmd, &o.clusterDefinitionRef)
+	flags.AddClusterDefinitionFlag(f, cmd, &o.clusterDefinitionRef)
 	return cmd
 }

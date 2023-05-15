@@ -37,6 +37,9 @@ const (
 	// CliHomeEnv defines kbcli home system env
 	CliHomeEnv = "KBCLI_HOME"
 
+	// DefaultLogFilePrefix is the default log file prefix
+	DefaultLogFilePrefix = "kbcli"
+
 	// DefaultNamespace is the namespace where kubeblocks is installed if
 	// no other namespace is specified
 	DefaultNamespace = "kb-system"
@@ -94,6 +97,9 @@ const (
 	RBACAPIVersion      = "v1"
 	ClusterRoles        = "clusterroles"
 	ClusterRoleBindings = "clusterrolebindings"
+	Roles               = "roles"
+	RoleBindings        = "rolebindings"
+	ServiceAccounts     = "serviceaccounts"
 )
 
 // Annotations
@@ -109,13 +115,12 @@ const (
 
 // DataProtection API group
 const (
-	DPAPIGroup                    = "dataprotection.kubeblocks.io"
-	DPAPIVersion                  = "v1alpha1"
-	ResourceBackups               = "backups"
-	ResourceBackupTools           = "backuptools"
-	ResourceRestoreJobs           = "restorejobs"
-	ResourceBackupPolicies        = "backuppolicies"
-	ResourceBackupPolicyTemplates = "backuppolicytemplates"
+	DPAPIGroup             = "dataprotection.kubeblocks.io"
+	DPAPIVersion           = "v1alpha1"
+	ResourceBackups        = "backups"
+	ResourceBackupTools    = "backuptools"
+	ResourceRestoreJobs    = "restorejobs"
+	ResourceBackupPolicies = "backuppolicies"
 )
 
 // Extensions API group
@@ -148,6 +153,9 @@ const (
 )
 
 var (
+	// KubeBlocksName is the name of KubeBlocks project
+	KubeBlocksName = "kubeblocks"
+
 	// KubeBlocksRepoName helm repo name for kubeblocks
 	KubeBlocksRepoName = "kubeblocks"
 
@@ -306,6 +314,18 @@ func ClusterRoleGVR() schema.GroupVersionResource {
 }
 func ClusterRoleBindingGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: ClusterRoleBindings}
+}
+
+func RoleGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: Roles}
+}
+
+func RoleBindingGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: RBACAPIGroup, Version: RBACAPIVersion, Resource: RoleBindings}
+}
+
+func ServiceAccountGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: K8sCoreAPIVersion, Resource: ServiceAccounts}
 }
 
 func MigrationTaskGVR() schema.GroupVersionResource {

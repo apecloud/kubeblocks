@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package printer
+package spinner
 
 import (
 	"os"
@@ -27,10 +27,10 @@ import (
 
 var _ = Describe("Spinner", func() {
 	It("Test Spinner", func() {
-		spinner := Spinner(os.Stdout, "spinner test ... ")
-		spinner(true)
+		s := New(os.Stdout, WithMessage("spinner test ... "))
+		s.Success()
 
-		spinner = Spinner(os.Stdout, "spinner test ... ")
-		spinner(false)
+		s = New(os.Stdout, WithMessage("spinner test ... "))
+		s.Fail()
 	})
 })

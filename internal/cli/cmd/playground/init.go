@@ -42,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -67,6 +68,10 @@ var (
 		kbcli playground init --cloud-provider gcp --region us-central1`)
 
 	supportedCloudProviders = []string{cp.Local, cp.AWS, cp.GCP, cp.AliCloud, cp.TencentCloud}
+
+	spinnerMsg = func(format string, a ...any) spinner.Option {
+		return spinner.WithMessage(fmt.Sprintf("%-50s", fmt.Sprintf(format, a...)))
+	}
 )
 
 type initOptions struct {
@@ -160,12 +165,12 @@ func (o *initOptions) local() error {
 	}
 
 	// create a local kubernetes cluster (k3d cluster) to deploy KubeBlocks
-	spinner := printer.Spinner(o.Out, "%-50s", "Create k3d cluster: "+clusterInfo.ClusterName)
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Create k3d cluster: "+clusterInfo.ClusterName))
+	defer s.Fail()
 	if err = provider.CreateK8sCluster(clusterInfo); err != nil {
 		return errors.Wrap(err, "failed to set up k3d cluster")
 	}
-	spinner(true)
+	s.Success()
 
 	clusterInfo, err = o.writeStateFile(provider)
 	if err != nil {
@@ -311,8 +316,8 @@ func (o *initOptions) writeStateFile(provider cp.Interface) (*cp.K8sClusterInfo,
 
 // merge created kubernetes cluster kubeconfig to ~/.kube/config and set it as default
 func (o *initOptions) setKubeConfig(info *cp.K8sClusterInfo) error {
-	spinner := printer.Spinner(o.Out, "%-50s", "Merge kubeconfig to "+defaultKubeConfigPath)
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Merge kubeconfig to "+defaultKubeConfigPath))
+	defer s.Fail()
 
 	// check if the default kubeconfig file exists, if not, create it
 	if _, err := os.Stat(defaultKubeConfigPath); os.IsNotExist(err) {
@@ -328,15 +333,15 @@ func (o *initOptions) setKubeConfig(info *cp.K8sClusterInfo) error {
 		writeKubeConfigOptions{UpdateExisting: true, UpdateCurrentContext: true}); err != nil {
 		return errors.Wrapf(err, "failed to write cluster %s kubeconfig", info.ClusterName)
 	}
-	spinner(true)
+	s.Success()
 
 	currentContext, err := kubeConfigCurrentContext(info.KubeConfig)
-	spinner = printer.Spinner(o.Out, "%-50s", "Switch current context to "+currentContext)
-	defer spinner(false)
+	s = spinner.New(o.Out, spinnerMsg("Switch current context to "+currentContext))
+	defer s.Fail()
 	if err != nil {
 		return err
 	}
-	spinner(true)
+	s.Success()
 
 	return nil
 }
@@ -370,12 +375,12 @@ func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	if o.clusterVersion != "" {
 		clusterInfo += ", ClusterVersion: " + o.clusterVersion
 	}
-	spinner := printer.Spinner(o.Out, "Create cluster %s (%s)", kbClusterName, clusterInfo)
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Create cluster %s (%s)", kbClusterName, clusterInfo))
+	defer s.Fail()
 	if err = o.createCluster(); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "failed to create cluster %s", kbClusterName)
 	}
-	spinner(true)
+	s.Success()
 
 	fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n\n")
 	fmt.Fprintf(os.Stdout, "Kubernetes cluster \"%s\" has been created.\n", info.ClusterName)
@@ -407,6 +412,7 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			IOStreams: o.IOStreams,
 			Client:    client,
 			Dynamic:   dynamic,
+			Wait:      true,
 		},
 		Version: o.kbVersion,
 		Monitor: true,
@@ -419,10 +425,6 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			// use hostpath csi driver to support snapshot
 			"snapshot-controller.enabled=true",
 			"csi-hostpath-driver.enabled=true",
-
-			// enable aws loadbalancer controller addon automatically on playground
-			"aws-loadbalancer-controller.enabled=true",
-			fmt.Sprintf("aws-loadbalancer-controller.clusterName=%s", k8sClusterName),
 
 			// disable the persistent volume of prometheus, if not, the prometheus
 			// will dependent the hostpath csi driver ready to create persistent
@@ -440,6 +442,9 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 		)
 	}
 
+	if err = insOpts.PreCheck(); err != nil {
+		return err
+	}
 	return insOpts.Install()
 }
 

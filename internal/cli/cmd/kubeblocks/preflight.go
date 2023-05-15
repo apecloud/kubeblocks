@@ -172,7 +172,7 @@ func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) error {
 		if err != nil {
 			return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, "get k8s version of server failed, and please check your k8s accessibility")
 		}
-		vendorName, err := util.GetK8sProvider(versionInfo[util.KubernetesApp], clientSet)
+		vendorName, err := util.GetK8sProvider(versionInfo.Kubernetes, clientSet)
 		if err != nil {
 			return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, "get k8s cloud provider failed, and please check your k8s accessibility")
 		}

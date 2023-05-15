@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package lifecycle
 
 import (
-	"github.com/apecloud/kubeblocks/internal/constant"
 	appv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 

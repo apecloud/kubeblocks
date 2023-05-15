@@ -90,13 +90,13 @@ var _ = Describe("kubeblocks install", func() {
 			CreateNamespace: true,
 		}
 		Expect(o.Install()).Should(HaveOccurred())
-		Expect(len(o.ValueOpts.Values)).To(Equal(1))
+		Expect(o.ValueOpts.Values).Should(HaveLen(1))
 		Expect(o.ValueOpts.Values[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
 		Expect(o.installChart()).Should(HaveOccurred())
 		o.printNotes()
 	})
 
-	It("preCheck", func() {
+	It("checkVersion", func() {
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
@@ -105,18 +105,15 @@ var _ = Describe("kubeblocks install", func() {
 			Check: true,
 		}
 		By("kubernetes version is empty")
-		versionInfo := map[util.AppName]string{}
-		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("failed to get kubernetes version"))
-
-		versionInfo[util.KubernetesApp] = ""
-		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("failed to get kubernetes version"))
+		v := util.Version{}
+		Expect(o.checkVersion(v).Error()).Should(ContainSubstring("failed to get kubernetes version"))
 
 		By("kubernetes is provided by cloud provider")
-		versionInfo[util.KubernetesApp] = "v1.25.0-eks"
-		Expect(o.preCheck(versionInfo)).Should(Succeed())
+		v.Kubernetes = "v1.25.0-eks"
+		Expect(o.checkVersion(v)).Should(Succeed())
 
 		By("kubernetes is not provided by cloud provider")
-		versionInfo[util.KubernetesApp] = "v1.25.0"
-		Expect(o.preCheck(versionInfo)).Should(Succeed())
+		v.Kubernetes = "v1.25.0"
+		Expect(o.checkVersion(v)).Should(Succeed())
 	})
 })

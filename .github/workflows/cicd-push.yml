@@ -154,9 +154,9 @@ jobs:
           bash .github/utils/utils.sh --type 8
 
   remove-runner:
-    needs: make-test
+    needs: [ trigger-mode, make-test ]
     runs-on: ubuntu-latest
-    if: ${{ needs.make-test.result != 'skipped' }}
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
     steps:
       - uses: actions/checkout@v3
       - name: remove runner

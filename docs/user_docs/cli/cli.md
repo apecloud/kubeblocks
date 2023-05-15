@@ -90,6 +90,7 @@ Cluster command.
 ClusterDefinition command.
 
 * [kbcli clusterdefinition list](kbcli_clusterdefinition_list.md)	 - List ClusterDefinitions.
+* [kbcli clusterdefinition list-components](kbcli_clusterdefinition_list-components.md)	 - List cluster definition components.
 
 
 ## [clusterversion](kbcli_clusterversion.md)
@@ -105,6 +106,13 @@ List and open the KubeBlocks dashboards.
 
 * [kbcli dashboard list](kbcli_dashboard_list.md)	 - List all dashboards.
 * [kbcli dashboard open](kbcli_dashboard_open.md)	 - Open one dashboard.
+
+
+## [fault](kbcli_fault.md)
+
+Inject faults to pod.
+
+* [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
 
 
 ## [kubeblocks](kbcli_kubeblocks.md)

@@ -41,7 +41,7 @@ fullnameOverride: ""
 updateStrategy:
   rollingUpdate:
     maxSurge: 1
-    maxUnavailable: 0
+    maxUnavailable: 40%
   type: RollingUpdate
 
 ## Change `hostNetwork` to `true` when you want the KubeBlocks's pod to share its host's network namespace.
@@ -59,6 +59,19 @@ hostNetwork: false
 ## @param dnsPolicy
 ##
 dnsPolicy: ClusterFirst
+
+## Configure podDisruptionBudget spec settings
+##
+## @param podDisruptionBudget.minAvailable
+## @param podDisruptionBudget.maxUnavailable
+podDisruptionBudget:
+  # Configures the minimum available pods for Kubeblocks disruptions.
+  # Cannot be used if `maxUnavailable` is set.
+  minAvailable: 1
+  # Configures the maximum unavailable pods for Kubeblocks disruptions.
+  # Cannot be used if `minAvailable` is set.
+  maxUnavailable:
+
 
 ## Logger settings
 ##
@@ -153,15 +166,16 @@ serviceMonitor:
   # Only used if `service.type` is `NodePort`.
   nodePort:
 
-## @param topologySpreadConstraints
+## KubeBlocks pods deployment topologySpreadConstraints settings
 ##
+## @param topologySpreadConstraints
 topologySpreadConstraints: []
 
 
 ## Resource settings
 ##
-## @param topologySpreadConstraints.limits
-## @param topologySpreadConstraints.requests
+## @param resources.limits
+## @param resources.requests
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
@@ -242,14 +256,6 @@ dataPlane:
                 values:
                   - "true"
 
-## PDB settings
-##
-## @param podDisruptionBudget.minAvailable
-## @param podDisruptionBudget.maxUnavailable
-podDisruptionBudget:
-  minAvailable: 1
-  maxUnavailable:
-
 ## AdmissionWebhooks settings
 ##
 ## @param admissionWebhooks.enabled
@@ -262,14 +268,14 @@ admissionWebhooks:
 
 ## Data protection settings
 ##
+## @param dataProtection.enableVolumeSnapshot - set this to true if cluster does have snapshot.storage.k8s.io API installed
+## @param dataProtection.backupPVCName - set the default pvc to store the file for backup
+## @param dataProtection.backupPVCInitCapacity - set the default pvc initCapacity if the pvc need to be created by backup controller
+## @param dataProtection.backupPVCStorageClassName - set the default pvc storageClassName if the pvc need to be created by backup controller
+## @param dataProtection.backupPVCCreatePolicy - set the default create policy of the pvc, optional values: IfNotPresent, Never
+## @param dataProtection.backupPVConfigMapName - set the default configmap name which contains key "persistentVolume" and value of the persistentVolume struct.
+## @param dataProtection.backupPVConfigMapNamespace - set the default configmap namespace of pv template.
 dataProtection:
-  ## @param dataProtection.enableVolumeSnapshot - set this to true if cluster does have snapshot.storage.k8s.io API installed
-  ## @param dataProtection.backupPVCName - set the default pvc to store the file for backup
-  ## @param dataProtection.backupPVCInitCapacity - set the default pvc initCapacity if the pvc need to be created by backup controller
-  ## @param dataProtection.backupPVCStorageClassName - set the default pvc storageClassName if the pvc need to be created by backup controller
-  ## @param dataProtection.backupPVCCreatePolicy - set the default create policy of the pvc, optional values: IfNotPresent, Never
-  ## @param dataProtection.backupPVConfigMapName - set the default configmap name which contains key "persistentVolume" and value of the persistentVolume struct.
-  ## @param dataProtection.backupPVConfigMapNamespace - set the default configmap namespace of pv template.
   enableVolumeSnapshot: false
   backupPVCName: ""
   backupPVCInitCapacity: ""

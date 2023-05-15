@@ -79,10 +79,6 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
-
-	// adjust the dependency resource deletion order
-	adjustDependencyResourceDeletionOrder(root, dag)
-
 	root.action = actionPtr(DELETE)
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
@@ -122,22 +118,6 @@ func kindsForWipeOut() []client.ObjectList {
 		&dataprotectionv1alpha1.BackupList{},
 	}
 	return append(kinds, kindsPlus...)
-}
-
-// adjustDependencyResourceDeletionOrder adjusts the deletion order of resources by adjusting DAG topology.
-// find all vertices of StatefulSets and connect them to ConfigMap,
-// this is to ensure that ConfigMap is deleted after StatefulSet Workloads are deleted.
-func adjustDependencyResourceDeletionOrder(root *lifecycleVertex, dag *graph.DAG) {
-	vertices := findAll[*appsv1.StatefulSet](dag)
-	cmVertices := findAll[*corev1.ConfigMap](dag)
-	if len(vertices) > 0 && len(cmVertices) > 0 {
-		for _, vertex := range vertices {
-			dag.RemoveEdge(graph.RealEdge(root, vertex))
-			for _, cmVertex := range cmVertices {
-				dag.Connect(cmVertex, vertex)
-			}
-		}
-	}
 }
 
 var _ graph.Transformer = &ClusterDeletionTransformer{}

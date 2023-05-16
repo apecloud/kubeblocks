@@ -36,7 +36,7 @@ type cloudProvider struct {
 
 var _ Interface = &cloudProvider{}
 
-func NewCloudProvider(provider, rootPath string, stdout, stderr io.Writer) (Interface, error) {
+func newCloudProvider(provider, rootPath string, stdout, stderr io.Writer) (Interface, error) {
 	k8sSvc := K8sService(provider)
 	if k8sSvc == "" {
 		return nil, fmt.Errorf("unknown cloud provider %s", provider)

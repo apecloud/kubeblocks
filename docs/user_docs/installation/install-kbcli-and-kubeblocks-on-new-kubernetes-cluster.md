@@ -148,12 +148,12 @@ Use the following command.
    ```
 2. Configure and connect to cloud environment. See the table below.
 
-|         Cloud Environment         |                                                                               Commands                                                                              |
-|:---------------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
-| EKS v1.22 / v1.23 / v1.24 / v1.25 |         $ export AWS_ACCESS_KEY_ID="anaccesskey" $ export AWS_SECRET_ACCESS_KEY="asecretkey" kbcli playground init --cloud-provider aws --region regionname         |
-|         ACK v1.22 / v1.24         |       export ALICLOUD_ACCESS_KEY="************" export ALICLOUD_SECRET_KEY="************" kbcli playground init --cloud-provider alicloud --region regionname       |
-|         TKE v1.22 / v1.24         | export TENCENTCLOUD_SECRET_ID=YOUR_SECRET_ID export TENCENTCLOUD_SECRET_KEY=YOUR_SECRET_KEY kbcli playground init --cloud-provider tencentcloud --region regionname |
-|         GKE v1.24 / v1.25         |        gcloud init gcloud auth application-default login export GOOGLE_PROJECT=<project-name> kbcli playground init --cloud-provider gcp --region regionname        |
+| Cloud Environment                 | Commands                                                                                                                                                                |
+|-----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| EKS v1.22 / v1.23 / v1.24 / v1.25 | $ export AWS_ACCESS_KEY_ID="anaccesskey"  $ export  AWS_SECRET_ACCESS_KEY="asecretkey"  kbcli playground init  --cloud-provider aws --region regionname                 |
+| ACK v1.22 / v1.24                 | export ALICLOUD_ACCESS_KEY="************"  export ALICLOUD_SECRET_KEY="************"  kbcli playground init --cloud-provider alicloud --region regionname               |
+| TKE v1.22 / v1.24                 | export TENCENTCLOUD_SECRET_ID=YOUR_SECRET_ID  export  TENCENTCLOUD_SECRET_KEY=YOUR_SECRET_KEY  kbcli playground init  --cloud-provider tencentcloud --region regionname |
+| GKE v1.24 / v1.25                 | gcloud init  gcloud auth application-default login   export GOOGLE_PROJECT= <project name> kbcli playground init --cloud-provider gcp  --region regionname              |
 
 **Step 2: One-click Deployment of KubeBlocks**
 Use the `kbcli playground init` command. This command:

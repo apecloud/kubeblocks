@@ -26,25 +26,5 @@ spec:
     - scriptConfigMapRef: redis-reload-script-new
       namespace: {{ .Release.Namespace }}
 
-  toolConfigs:
-    - name: init-redis-tools
-      command:
-        - cp
-        - /usr/local/bin/redis-cli
-        - /kb/tools/redis-cli
-      image: docker.io/library/redis:7.0.11-alpine
-      mountPoint: /kb/tools
-      volumeName: redis-tools
-
-  downwardAPIOptions:
-    - name: "pod-info"
-      mountPoint: "/etc/pod_info"
-      command:
-        - "redis-sentinel-process-replicas-lables.sh /etc/pod_info/replica"
-      items:
-        - path: "replica"
-          fieldRef:
-            fieldPath: metadata.labels['kubeblocks.io/role_replicas']
-
   staticParameters:
     - None

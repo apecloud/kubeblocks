@@ -111,6 +111,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		IOStreams:      streams,
 	}
 	*p.Interactive = false
+	*p.Format = "kbcli"
 
 	cmd := &cobra.Command{
 		Use:     "install",

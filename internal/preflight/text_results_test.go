@@ -29,9 +29,9 @@ import (
 var _ = Describe("text_results_test", func() {
 	var (
 		preflightName = "stdoutPreflightName"
-		humanFormat   = "human"
 		jsonFormat    = "json"
 		yamlFormat    = "yaml"
+		kbcliFormat   = "kbcli"
 		unknownFormat = "unknown"
 	)
 	It("ShowStdoutResults Test", func() {
@@ -51,13 +51,13 @@ var _ = Describe("text_results_test", func() {
 			},
 		}
 		Eventually(func(g Gomega) {
-			err := ShowTextResults(preflightName, analyzeResults, humanFormat, false)
-			g.Expect(err).To(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, jsonFormat, true)
+			err := ShowTextResults(preflightName, analyzeResults, jsonFormat, true, nil)
 			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, yamlFormat, false)
+			err = ShowTextResults(preflightName, analyzeResults, yamlFormat, false, nil)
 			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false)
+			err = ShowTextResults(preflightName, analyzeResults, kbcliFormat, false, nil)
+			g.Expect(err).NotTo(HaveOccurred())
+			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false, nil)
 			g.Expect(err).To(HaveOccurred())
 		}).ShouldNot(HaveOccurred())
 	})
@@ -71,13 +71,11 @@ var _ = Describe("text_results_test", func() {
 			},
 		}
 		Eventually(func(g Gomega) {
-			err := ShowTextResults(preflightName, analyzeResults, humanFormat, false)
-			g.Expect(err).To(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, jsonFormat, true)
+			err := ShowTextResults(preflightName, analyzeResults, jsonFormat, true, nil)
 			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, yamlFormat, false)
+			err = ShowTextResults(preflightName, analyzeResults, yamlFormat, false, nil)
 			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false)
+			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false, nil)
 			g.Expect(err).To(HaveOccurred())
 		}).Should(HaveOccurred())
 	})

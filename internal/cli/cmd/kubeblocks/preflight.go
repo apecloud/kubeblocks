@@ -27,7 +27,6 @@ import (
 	"os/signal"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
@@ -40,8 +39,8 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
+	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	kbpreflight "github.com/apecloud/kubeblocks/internal/preflight"
 )
@@ -62,7 +61,7 @@ const (
 
 	PreflightPattern     = "data/%s_preflight.yaml"
 	HostPreflightPattern = "data/%s_hostpreflight.yaml"
-	PreflightMessage     = "Run a preflight to check that the environment meets the requirement for KubeBlocks. It takes 10~20 seconds."
+	PreflightMessage     = "Kubernetes cluster preflight"
 )
 
 var (
@@ -106,8 +105,7 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Short:   "Run and retrieve preflight checks for KubeBlocks.",
 		Example: preflightExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(p.complete(f, args))
-			util.CheckErr(p.run())
+			util.CheckErr(p.Preflight(f, args, values.Options{}))
 		},
 	}
 	// add flags
@@ -122,7 +120,6 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().BoolVar(p.Debug, flagDebug, *p.Debug, "enable debug logging")
 	cmd.Flags().StringVarP(&p.namespace, flagNamespace, "n", "", "If present, the namespace scope for this CLI request")
 	cmd.Flags().BoolVar(&p.verbose, flagVerbose, p.verbose, "print more verbose logs, default value is false")
-	helm.AddValueOptionsFlags(cmd.Flags(), &p.ValueOpts)
 	return cmd
 }
 
@@ -142,11 +139,11 @@ func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 
 func (p *PreflightOptions) Preflight(f cmdutil.Factory, args []string, opts values.Options) error {
 	// if force flag set, skip preflight
+
 	if p.force {
 		return nil
 	}
 	p.ValueOpts = opts
-	*p.Format = "yaml"
 
 	var err error
 	if err = p.complete(f, args); err != nil {
@@ -180,10 +177,8 @@ func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) error {
 		if err != nil {
 			return intctrlutil.NewError(intctrlutil.ErrorTypeSkipPreflight, err.Error())
 		}
-		color.New(color.FgCyan).Println(PreflightMessage)
 	} else {
 		p.checkFileList = args
-		color.New(color.FgCyan).Println(PreflightMessage)
 	}
 	if len(p.checkFileList) < 1 && len(p.checkYamlData) < 1 {
 		return intctrlutil.NewError(intctrlutil.ErrorTypeSkipPreflight, "must specify at least one checks yaml")
@@ -223,10 +218,14 @@ func (p *PreflightOptions) run() error {
 		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
 	// 2. collect data
+	s := spinner.New(p.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Collecting data from cluster")))
+	defer s.Fail()
 	collectResults, err = kbpreflight.CollectPreflight(p.factory, &p.ValueOpts, ctx, kbPreflight, kbHostPreflight, progressCh)
 	if err != nil {
 		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
+	s.Success()
+
 	// 3. analyze data
 	for _, res := range collectResults {
 		analyzeResults = append(analyzeResults, res.Analyze()...)
@@ -240,7 +239,7 @@ func (p *PreflightOptions) run() error {
 		fmt.Fprintln(p.Out, "no data has been collected")
 		return nil
 	}
-	if err = kbpreflight.ShowTextResults(preflightName, analyzeResults, *p.Format, p.verbose); err != nil {
+	if err = kbpreflight.ShowTextResults(preflightName, analyzeResults, *p.Format, p.verbose, p.Out); err != nil {
 		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
 	return nil

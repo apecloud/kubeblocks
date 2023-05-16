@@ -13,7 +13,6 @@ require (
 	github.com/briandowns/spinner v1.23.0
 	github.com/chaos-mesh/chaos-mesh/api v0.0.0-20230423031423-0b31a519b502
 	github.com/clbanning/mxj/v2 v2.5.7
-	github.com/cockroachdb/errors v1.2.4
 	github.com/containerd/stargz-snapshotter/estargz v0.13.0
 	github.com/containers/common v0.49.1
 	github.com/dapr/components-contrib v1.9.6
@@ -132,13 +131,11 @@ require (
 	github.com/c9s/goprocinfo v0.0.0-20170724085704-0010a05ce49f // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
-	github.com/certifi/gocertifi v0.0.0-20200922220541-2c3bb06c6054 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/cockroachdb/apd/v2 v2.0.1 // indirect
-	github.com/cockroachdb/logtags v0.0.0-20190617123548-eb05cc24525f // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/containerd/containerd v1.6.18 // indirect
 	github.com/containers/image/v5 v5.24.0 // indirect
@@ -169,7 +166,6 @@ require (
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/fvbommel/sortorder v1.0.2 // indirect
-	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/go-errors/errors v1.4.0 // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
 	github.com/go-git/go-billy/v5 v5.4.0 // indirect

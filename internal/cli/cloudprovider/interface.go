@@ -43,9 +43,9 @@ type Interface interface {
 func New(provider, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {
 	switch provider {
 	case AWS, TencentCloud, AliCloud, GCP:
-		return NewCloudProvider(provider, tfRootPath, stdout, stderr)
+		return newCloudProvider(provider, tfRootPath, stdout, stderr)
 	case Local:
-		return NewLocalCloudProvider(stdout, stderr), nil
+		return newLocalCloudProvider(stdout, stderr), nil
 	default:
 		return nil, errors.New(fmt.Sprintf("Unknown cloud provider %s", provider))
 	}

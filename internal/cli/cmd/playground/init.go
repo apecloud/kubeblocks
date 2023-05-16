@@ -52,7 +52,7 @@ import (
 
 var (
 	initExample = templates.Examples(`
-		# create a k3d cluster on local host and install KubeBlocks 
+		# create a k3d cluster on local host and install KubeBlocks
 		kbcli playground init
 
 		# create an AWS EKS cluster and install KubeBlocks, the region is required
@@ -517,8 +517,11 @@ func (o *initOptions) newCreateOptions() (*cmdcluster.CreateOptions, error) {
 		ClusterVersionRef: o.clusterVersion,
 	}
 
-	// if we are running on cloud, create cluster with three replicas
-	if o.cloudProvider != cp.Local {
+	// if we are running on local, create cluster with one replica
+	if o.cloudProvider == cp.Local {
+		options.Values = append(options.Values, "replicas=1")
+	} else {
+		// if we are running on cloud, create cluster with three replicas
 		options.Values = append(options.Values, "replicas=3")
 	}
 

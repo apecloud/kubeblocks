@@ -48,16 +48,16 @@ var _ = Describe("Fault Time", func() {
 
 		It("fault time", func() {
 			inputs := [][]string{
-				{"--mode=one", "--timeOffset=-5s", "--dry-run=client"},
-				{"--mode=fixed", "--value=2", "--timeOffset=-5s", "--dry-run=client"},
-				{"--mode=fixed-percent", "--value=50", "--timeOffset=-5s", "--dry-run=client"},
-				{"--mode=random-max-percent", "--value=50", "--timeOffset=-5s", "--dry-run=client"},
-				{"--ns-fault=kb-system", "--timeOffset=-5s", "--dry-run=client"},
-				{"--node=minikube-m02", "--timeOffset=-5s", "--dry-run=client"},
-				{"--label=app.kubernetes.io/component=mysql", "--timeOffset=-5s", "--dry-run=client"},
-				{"--node-label=kubernetes.io/arch=arm64", "--timeOffset=-5s", "--dry-run=client"},
-				{"--annotation=example-annotation=group-a", "--timeOffset=-5s", "--dry-run=client"},
-				{"--timeOffset=-5s", "--clockIds=CLOCK_REALTIME", "--container=mysql", "--dry-run=client"},
+				{"--mode=one", "--time-offset=-5s", "--dry-run=client"},
+				{"--mode=fixed", "--value=2", "--time-offset=-5s", "--dry-run=client"},
+				{"--mode=fixed-percent", "--value=50", "--time-offset=-5s", "--dry-run=client"},
+				{"--mode=random-max-percent", "--value=50", "--time-offset=-5s", "--dry-run=client"},
+				{"--ns-fault=kb-system", "--time-offset=-5s", "--dry-run=client"},
+				{"--node=minikube-m02", "--time-offset=-5s", "--dry-run=client"},
+				{"--label=app.kubernetes.io/component=mysql", "--time-offset=-5s", "--dry-run=client"},
+				{"--node-label=kubernetes.io/arch=arm64", "--time-offset=-5s", "--dry-run=client"},
+				{"--annotation=example-annotation=group-a", "--time-offset=-5s", "--dry-run=client"},
+				{"--time-offset=-5s", "--clockIds=CLOCK_REALTIME", "--container=mysql", "--dry-run=client"},
 			}
 			o := NewTimeChaosOptions(tf, streams, "")
 			cmd := o.NewCobraCommand(Time, TimeShort)

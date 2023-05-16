@@ -34,16 +34,16 @@ import (
 
 var faultIOExample = templates.Examples(`
 	# Injects a delay fault into the /data directory, causing a 10-second delay for all filesystem operations (including reading, writing, listing directory contents, etc.) under this directory.
-	kbcli fault IO latency --delay=10s --volume-path=/data
+	kbcli fault io latency --delay=10s --volume-path=/data
 	
 	# Inject a file error fault into the /data directory, so that all file system operations under this directory have a 100% probability of error and return error code 22 (Invalid argument).
-	kbcli fault IO fault --volume-path=/data --errno=22
+	kbcli fault io fault --volume-path=/data --errno=22
 	
 	# Inject the attrOverride fault into the /data directory, so that all file system operations in this directory will have a 100% probability of changing the permission of the target file to 72 (that is, 110 in octal), which will make the file only accessible by the owner and the location Executed by the group and has no right to perform other operations.
-	kbcli fault IO attribute --volume-path=/data --perm=72
+	kbcli fault io attribute --volume-path=/data --perm=72
 	
 	# Inject read and write error faults into the /data directory, so that read and write operations under this directory will have a 100% probability of error. Among them, random positions of 1 with a maximum length of 10 in bytes will be replaced with 0.
-	kbcli fault IO mistake --volume-path=/data --filling=zero --maxOccurrences=10 --maxLength=1
+	kbcli fault io mistake --volume-path=/data --filling=zero --maxOccurrences=10 --maxLength=1
 `)
 
 type IOChaosOptions struct {

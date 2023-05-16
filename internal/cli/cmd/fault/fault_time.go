@@ -35,7 +35,7 @@ import (
 
 var faultTimeExample = templates.Examples(`
 	#Shifts the clock back five seconds.
-	kbcli fault time --timeOffset=-5s
+	kbcli fault time --time-offset=-5s
 `)
 
 type TimeChaosOptions struct {
@@ -97,7 +97,7 @@ func (o *TimeChaosOptions) NewCobraCommand(use, short string) *cobra.Command {
 func (o *TimeChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 	o.FaultBaseOptions.AddCommonFlag(cmd)
 
-	cmd.Flags().StringVar(&o.TimeOffset, "timeOffset", "", "Specifies the length of the time offset. For example: -5s, -10m100ns.")
+	cmd.Flags().StringVar(&o.TimeOffset, "time-offset", "", "Specifies the length of the time offset. For example: -5s, -10m100ns.")
 	cmd.Flags().StringArrayVar(&o.ClockIds, "clockIds", nil, `Specifies the clock on which the time offset acts.If it's empty, it will be set to ['CLOCK_REALTIME'].See clock_gettime [https://man7.org/linux/man-pages/man2/clock_gettime.2.html] document for details.`)
 	cmd.Flags().StringArrayVarP(&o.ContainerNames, "container", "c", nil, `Specifies the injected container name. For example: mysql. If it's empty, the first container will be injected.`)
 }

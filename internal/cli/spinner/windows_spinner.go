@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package spinner
 
 import (
@@ -17,15 +36,15 @@ import (
 var char = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
 
 type WindowsSpinner struct { // no thread/goroutine safe
-	msg          string
-	lastOutplain string
-	FinalMSG     string
-	active       bool
-	chars        []string
-	cancel       chan struct{}
-	Writer       io.Writer
-	delay        time.Duration
-	mu           *sync.RWMutex
+	msg        string
+	lastOutput string
+	FinalMSG   string
+	active     bool
+	chars      []string
+	cancel     chan struct{}
+	Writer     io.Writer
+	delay      time.Duration
+	mu         *sync.RWMutex
 }
 
 func NewWindowsSpinner(w io.Writer, opts ...Option) *WindowsSpinner {
@@ -95,10 +114,9 @@ func (s *WindowsSpinner) Start() {
 					}
 					outPlain := fmt.Sprintf("\r%s%s", s.chars[i], s.msg)
 					s.erase()
-					s.lastOutplain = outPlain
-					fmt.Print(outPlain)
+					s.lastOutput = outPlain
+					fmt.Fprint(s.Writer, outPlain)
 					s.mu.Unlock()
-					// fmt.Fprint(s.Writer, outPlain)
 					time.Sleep(s.delay)
 				}
 			}
@@ -116,14 +134,14 @@ func (s *WindowsSpinner) SetFinalMsg(msg string) {
 	s.FinalMSG = msg
 }
 
-// remove lastOutplain
+// remove lastOutput
 func (s *WindowsSpinner) erase() {
-	split := strings.Split(s.lastOutplain, "\n")
+	split := strings.Split(s.lastOutput, "\n")
 	for i := 0; i < len(split); i++ {
 		if i > 0 {
-			fmt.Print("\033[A")
+			fmt.Fprint(s.Writer, "\033[A")
 		}
-		fmt.Print("\r\033[K")
+		fmt.Fprint(s.Writer, "\r\033[K")
 	}
 }
 
@@ -135,7 +153,7 @@ func (s *WindowsSpinner) stop() {
 		s.active = false
 		if s.FinalMSG != "" {
 			s.erase()
-			fmt.Print(s.FinalMSG)
+			fmt.Fprint(s.Writer, s.FinalMSG)
 		}
 		s.cancel <- struct{}{}
 		close(s.cancel)

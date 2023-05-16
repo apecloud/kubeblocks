@@ -25,6 +25,7 @@ import (
 
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	"k8s.io/kubectl/pkg/util/storage"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/preflight/util"
@@ -70,6 +71,15 @@ func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2
 	}
 
 	for _, storageClass := range storageClasses.Items {
+		// if storageClassType not set, check if default storageClass exists
+		if analyzer.StorageClassType == "" {
+			val := storageClass.Annotations[storage.IsDefaultStorageClassAnnotation]
+			if val == "true" {
+				return newAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
+			}
+			continue
+		}
+
 		if storageClass.Parameters["type"] != analyzer.StorageClassType {
 			continue
 		}
@@ -77,7 +87,7 @@ func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2
 			return newAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
 		}
 	}
-	return newAnalyzeResult(a.Title(), FailType, a.analyzer.Outcomes), nil
+	return newAnalyzeResult(a.Title(), WarnType, a.analyzer.Outcomes), nil
 }
 
 var _ KBAnalyzer = &AnalyzeStorageClassByKb{}

@@ -1602,7 +1602,7 @@ var _ = Describe("Cluster Controller", func() {
 			By("creating backup")
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				SetBackupPolicyName(backupPolicyName).
-				SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+				SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 				Create(&testCtx).GetObject()
 
 			By("waiting for backup failed, because no backup policy exists")

@@ -31,7 +31,6 @@ import (
 	"helm.sh/helm/v3/pkg/cli/values"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	v1helper "k8s.io/component-helpers/scheduling/corev1"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/preflight/util"
@@ -70,9 +69,6 @@ func (a *AnalyzeTaintClassByKb) Analyze(getFile GetCollectedFileContents, findFi
 }
 
 func (a *AnalyzeTaintClassByKb) analyzeTaint(getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) (*analyze.AnalyzeResult, error) {
-	if a.HelmOpts == nil {
-		return newAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
-	}
 	nodesData, err := getFile(NodesPath)
 	if err != nil {
 		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
@@ -89,9 +85,6 @@ func (a *AnalyzeTaintClassByKb) analyzeTaint(getFile GetCollectedFileContents, f
 }
 
 func (a *AnalyzeTaintClassByKb) doAnalyzeTaint(nodes v1.NodeList) (*analyze.AnalyzeResult, error) {
-	if a.analyzer.TolerationsMap == nil {
-		return newAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
-	}
 	taintFailResult := []string{}
 	for _, node := range nodes.Items {
 		if node.Spec.Taints == nil || len(node.Spec.Taints) == 0 {
@@ -99,10 +92,16 @@ func (a *AnalyzeTaintClassByKb) doAnalyzeTaint(nodes v1.NodeList) (*analyze.Anal
 		}
 	}
 
+	if a.analyzer.TolerationsMap == nil || len(a.analyzer.TolerationsMap) == 0 {
+		return newAnalyzeResult(a.Title(), FailType, a.analyzer.Outcomes), nil
+	}
+
 	for k, tolerations := range a.analyzer.TolerationsMap {
 		count := 0
 		for _, node := range nodes.Items {
-			count += countTolerableTaints(node.Spec.Taints, tolerations)
+			if isTolerableTaints(node.Spec.Taints, tolerations) {
+				count++
+			}
 		}
 		if count <= 0 {
 			taintFailResult = append(taintFailResult, k)
@@ -117,13 +116,14 @@ func (a *AnalyzeTaintClassByKb) doAnalyzeTaint(nodes v1.NodeList) (*analyze.Anal
 }
 
 func (a *AnalyzeTaintClassByKb) generateTolerations() error {
-	optsMap, err := a.getHelmValues()
-	if err != nil {
-		return err
-	}
-
 	tolerations := map[string][]v1.Toleration{}
-	getTolerationsMap(optsMap, "", tolerations)
+	if a.HelmOpts != nil {
+		optsMap, err := a.getHelmValues()
+		if err != nil {
+			return err
+		}
+		getTolerationsMap(optsMap, "", tolerations)
+	}
 	a.analyzer.TolerationsMap = tolerations
 	return nil
 }
@@ -173,17 +173,19 @@ func getTolerationsMap(tolerationData map[string]interface{}, addonName string, 
 	}
 }
 
-func countTolerableTaints(taints []v1.Taint, tolerations []v1.Toleration) int {
-	tolerableTaints := 0
+func isTolerableTaints(taints []v1.Taint, tolerations []v1.Toleration) bool {
+	tolerableCount := 0
 	for _, taint := range taints {
 		// check only on taints that have effect NoSchedule
 		if taint.Effect != v1.TaintEffectNoSchedule {
 			continue
 		}
-
-		if v1helper.TolerationsTolerateTaint(tolerations, &taint) {
-			tolerableTaints++
+		for _, toleration := range tolerations {
+			if toleration.ToleratesTaint(&taint) {
+				tolerableCount++
+				break
+			}
 		}
 	}
-	return tolerableTaints
+	return tolerableCount >= len(taints)
 }

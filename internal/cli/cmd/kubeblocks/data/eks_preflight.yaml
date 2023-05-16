@@ -25,13 +25,6 @@ spec:
               message: This application requires at least 3 nodes
           - pass:
               message: This cluster has enough nodes.
-    - storageClass:
-        checkName: Required-Default-SC
-        outcomes:
-          - fail:
-              message: The default storage class was not found. To learn more details, please check https://docs.aws.amazon.com/zh_cn/eks/latest/userguide/storage-classes.html.
-          - pass:
-              message: default storage class is the presence, and all good on storage classes
     - deploymentStatus:
         checkName: AWS-Load-Balancer-Check
         name: aws-load-balancer-controller
@@ -39,15 +32,15 @@ spec:
         outcomes:
           - warn:
               when: "absent" # note that the "absent" failure state must be listed first if used.
-              message: The aws-load-balancer-controller deployment is not present.
+              message: The aws-load-balancer-controller deployment is not present
           - warn:
               when: "< 1"
-              message: The aws-load-balancer-controller deployment does not have any ready replicas.
+              message: The aws-load-balancer-controller deployment does not have any ready replicas
           - warn:
               when: "= 1"
-              message: The aws-load-balancer-controller deployment has only a single ready replica.
+              message: The aws-load-balancer-controller deployment has only a single ready replica
           - pass:
-              message: There are multiple replicas of the aws-load-balancer-controller deployment ready.
+              message: There are multiple replicas of the aws-load-balancer-controller deployment ready
   extendAnalyzers:
     - clusterAccess:
         checkName: Check-K8S-Access
@@ -60,6 +53,13 @@ spec:
         checkName: Required-Taint-Match
         outcomes:
           - fail:
-              message: The taint matching failed.
+              message: all nodes had taints that the pod didn't tolerate
           - pass:
-              message: The taint matching succeeded.
+              message: The taint matching succeeded
+    - storageClass:
+        checkName: Required-Default-SC
+        outcomes:
+          - warn:
+              message: The default storage class was not found. To learn more details, please check https://docs.aws.amazon.com/zh_cn/eks/latest/userguide/storage-classes.html; Alternatively use option --set storageClass=<storageClassName> when creating cluster
+          - pass:
+              message: default storage class is the presence, and all good on storage classes

@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-stop
 spec:
-  clusterRef: mycluster
+  clusterRef: mycluster-pgcluster
   ttlSecondsAfterSucceed: 5432
   type: Stop
   restart:

@@ -549,7 +549,15 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-version",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			var clusterVersion []string
+			clusterDefinition, err := cmd.Flags().GetString("cluster-definition")
+			if clusterDefinition == "" || err != nil {
+				clusterVersion = utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete)
+			} else {
+				label := fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDefinition)
+				clusterVersion = util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.ClusterVersionGVR()), []string{label}, toComplete)
+			}
+			return clusterVersion, cobra.ShellCompDirectiveNoFileComp
 		}))
 
 	var formatsWithDesc = map[string]string{

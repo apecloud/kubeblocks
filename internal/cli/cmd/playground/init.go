@@ -106,7 +106,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
 	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")
-	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for initing playground, such as --timeout=10m")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for init playground, such as --timeout=10m")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cloud-provider",
@@ -473,8 +473,11 @@ func (o *initOptions) createCluster() error {
 	options.CreateOptions.Options = options
 	options.CreateOptions.PreCreate = options.PreCreate
 
-	// if we are running on cloud, create cluster with three replicas
-	if o.cloudProvider != cp.Local {
+	// if we are running on local, create cluster with one replica
+	if o.cloudProvider == cp.Local {
+		options.Values = append(options.Values, "replicas=1")
+	} else {
+		// if we are running on cloud, create cluster with three replicas
 		options.Values = append(options.Values, "replicas=3")
 	}
 

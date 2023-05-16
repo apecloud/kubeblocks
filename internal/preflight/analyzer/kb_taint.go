@@ -31,7 +31,6 @@ import (
 	"helm.sh/helm/v3/pkg/cli/values"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	v1helper "k8s.io/component-helpers/scheduling/corev1"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/preflight/util"
@@ -86,9 +85,6 @@ func (a *AnalyzeTaintClassByKb) analyzeTaint(getFile GetCollectedFileContents, f
 }
 
 func (a *AnalyzeTaintClassByKb) doAnalyzeTaint(nodes v1.NodeList) (*analyze.AnalyzeResult, error) {
-	if a.analyzer.TolerationsMap == nil {
-		return newAnalyzeResult(a.Title(), PassType, a.analyzer.Outcomes), nil
-	}
 	taintFailResult := []string{}
 	for _, node := range nodes.Items {
 		if node.Spec.Taints == nil || len(node.Spec.Taints) == 0 {
@@ -103,7 +99,9 @@ func (a *AnalyzeTaintClassByKb) doAnalyzeTaint(nodes v1.NodeList) (*analyze.Anal
 	for k, tolerations := range a.analyzer.TolerationsMap {
 		count := 0
 		for _, node := range nodes.Items {
-			count += countTolerableTaints(node.Spec.Taints, tolerations)
+			if isTolerableTaints(node.Spec.Taints, tolerations) {
+				count++
+			}
 		}
 		if count <= 0 {
 			taintFailResult = append(taintFailResult, k)
@@ -175,17 +173,19 @@ func getTolerationsMap(tolerationData map[string]interface{}, addonName string, 
 	}
 }
 
-func countTolerableTaints(taints []v1.Taint, tolerations []v1.Toleration) int {
-	tolerableTaints := 0
-	for _, taint := range taints {
+func isTolerableTaints(taints []v1.Taint, tolerations []v1.Toleration) bool {
+	tolerableCount := 0
+	for _, toleration := range tolerations {
 		// check only on taints that have effect NoSchedule
-		if taint.Effect != v1.TaintEffectNoSchedule {
+		if toleration.Effect != v1.TaintEffectNoSchedule {
 			continue
 		}
-
-		if v1helper.TolerationsTolerateTaint(tolerations, &taint) {
-			tolerableTaints++
+		for _, taint := range taints {
+			if toleration.ToleratesTaint(&taint) {
+				tolerableCount++
+				break
+			}
 		}
 	}
-	return tolerableTaints
+	return tolerableCount >= len(tolerations)
 }

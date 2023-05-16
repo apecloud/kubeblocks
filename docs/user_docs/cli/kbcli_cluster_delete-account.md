@@ -22,7 +22,7 @@ kbcli cluster delete-account [flags]
 ### Options
 
 ```
-      --auto-approve       Skip interactive approval before deleting
+      --auto-approve       Skip interactive approval before deleting account
       --component string   Specify the name of component to be connected. If not specified, the first component will be used.
   -h, --help               help for delete-account
   -i, --instance string    Specify the name of instance to be connected.

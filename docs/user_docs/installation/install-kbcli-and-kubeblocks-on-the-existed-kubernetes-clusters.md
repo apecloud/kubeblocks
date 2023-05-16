@@ -1,3 +1,12 @@
+---
+title: Install kbcli and KubeBlocks on the existed Kubernetes clusters
+description: Install kbcli and KubeBlocks on the existed Kubernetes clusters
+keywords: [taints, affinity, tolerance, install]
+sidebar_position: 4
+sidebar_label: Install kbcli and KubeBlocks on the existed Kubernetes clusters
+---
+
+
 # Install kbcli and KubeBlocks on the existed Kubernetes clusters
 
 In the actual environment, it is normal to install kbcli and KubeBlocks on the existed Kubernetes clusters.

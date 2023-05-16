@@ -6,9 +6,6 @@ sidebar_position: 1
 sidebar_label: kbcli and KubeBlocks
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 
 # Handle an exception
 

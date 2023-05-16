@@ -1,3 +1,13 @@
+---
+title: Enable add-ons when installing KubeBlocks
+description: Enable add-ons when installing KubeBlocks
+keywords: [addons, enable, KubeBlocks, prometheus, s3, alertmanager,]
+sidebar_position: 4
+sidebar_label: Enable add-ons 
+---
+
+
+
 # Enable add-ons
 
 An add-on provides extension capabilities, i.e., manifests or application software, to the KubeBlocks control plane.

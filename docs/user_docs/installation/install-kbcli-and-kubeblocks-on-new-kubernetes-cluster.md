@@ -1,3 +1,11 @@
+---
+title: Install kbcli and KubeBlocks on new Kubernetes cluster
+description: Install kbcli and KubeBlocks on new Kubernetes cluster, the environment is clean
+keywords: [playground, install, KubeBlocks,]
+sidebar_position: 4
+sidebar_label: Install kbcli and KubeBlocks on new Kubernetes cluster
+---
+
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 

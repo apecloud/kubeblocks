@@ -34,10 +34,13 @@ import (
 )
 
 var faultAWSExample = templates.Examples(`
+	# Stop a specified EC2 instance.
 	kbcli fault aws stop --secret-name=cloud-key-secret --aws-region=cn-northwest-1 --ec2-instance=i-0a4986881adf30039 --duration=3m
 	
+	# Restart a specified EC2 instance.
 	kbcli fault aws restart --secret-name=cloud-key-secret --aws-region=cn-northwest-1 --ec2-instance=i-0ff10a1487cf6bbac --duration=1m
 	
+	# Detach a specified volume from a specified EC2 instance.
 	kbcli fault aws detach-volume --secret-name=cloud-key-secret --aws-region=cn-northwest-1 --ec2-instance=i-0df0732607d54dd8e --duration=1m --volume-id=vol-072f0940c28664f74 --device-name=/dev/xvdab
 `)
 

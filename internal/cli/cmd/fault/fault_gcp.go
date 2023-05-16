@@ -34,6 +34,14 @@ import (
 )
 
 var faultGCPExample = templates.Examples(`
+	# Stop a specified GCK node
+	kbcli fault node gcp stop --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-45rl --secret-name=cloud-key-secret
+	
+	# Restart a specified GCK node
+	kbcli fault node gcp restart --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-d9nd --secret-name=cloud-key-secret
+	
+	# Detach a specified GCK volume
+	kbcli fault node gcp detach-volume --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-d9nd --secret-name=cloud-key-secret --device-name=xxx
 `)
 
 type GCPChaosOptions struct {

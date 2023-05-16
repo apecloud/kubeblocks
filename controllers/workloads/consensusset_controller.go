@@ -109,7 +109,7 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			// handle UpdateStrategy
 			&consensusset.UpdateStrategyTransformer{},
 			// handle horizontal scaling
-			&consensusset.HorizontalScalingTransformer{},
+			&consensusset.HorizontalScaling2Transformer{},
 			// always safe to put your transformer below
 		).
 		Build()

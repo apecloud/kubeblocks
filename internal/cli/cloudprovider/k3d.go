@@ -80,7 +80,7 @@ func init() {
 	}
 }
 
-func NewLocalCloudProvider(stdout, stderr io.Writer) *localCloudProvider {
+func newLocalCloudProvider(stdout, stderr io.Writer) Interface {
 	return &localCloudProvider{
 		stdout: stdout,
 		stderr: stderr,

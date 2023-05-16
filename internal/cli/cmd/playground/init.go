@@ -451,6 +451,9 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 		)
 	}
 
+	if err = insOpts.PreCheck(); err != nil {
+		return err
+	}
 	return insOpts.Install()
 }
 
@@ -477,8 +480,11 @@ func (o *initOptions) createCluster() error {
 	options.CreateOptions.Options = options
 	options.CreateOptions.PreCreate = options.PreCreate
 
-	// if we are running on cloud, create cluster with three replicas
-	if o.cloudProvider != cp.Local {
+	// if we are running on local, create cluster with one replica
+	if o.cloudProvider == cp.Local {
+		options.Values = append(options.Values, "replicas=1")
+	} else {
+		// if we are running on cloud, create cluster with three replicas
 		options.Values = append(options.Values, "replicas=3")
 	}
 

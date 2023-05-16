@@ -105,6 +105,7 @@ var _ = Describe("Cluster", func() {
 			tf.FakeDynamicClient = testing.FakeDynamicClient(
 				clusterDef,
 				testing.FakeStorageClass(testing.StorageClassName, testing.IsDefautl),
+				testing.FakeClusterVersion(),
 				testing.FakeComponentClassDef(fmt.Sprintf("custom-%s", testing.ComponentDefName), clusterDef.Name, testing.ComponentDefName),
 				testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
 			)
@@ -119,7 +120,7 @@ var _ = Describe("Cluster", func() {
 				},
 				SetFile:           "",
 				ClusterDefRef:     testing.ClusterDefName,
-				ClusterVersionRef: "cluster-version",
+				ClusterVersionRef: testing.ClusterVersionName,
 				UpdatableFlags: UpdatableFlags{
 					PodAntiAffinity: "Preferred",
 					TopologyKeys:    []string{"kubernetes.io/hostname"},

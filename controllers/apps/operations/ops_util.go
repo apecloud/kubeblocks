@@ -125,7 +125,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	}
 	// TODO: judge whether ops is Failed according to whether progressDetail has failed pods.
 	// now we check the ops is Failed by the component phase, it may be not accurate during h-scale replicas.
-	if isFailed {
+	if isFailed && opsRes.Cluster.Status.ObservedGeneration >= opsRes.OpsRequest.Status.ClusterGeneration {
 		return appsv1alpha1.OpsFailedPhase, 0, nil
 	}
 	if completedProgressCount != expectProgressCount {

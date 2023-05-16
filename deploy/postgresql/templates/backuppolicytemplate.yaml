@@ -9,13 +9,16 @@ spec:
   clusterDefinitionRef: postgresql
   backupPolicies:
   - componentDefRef: postgresql
-    ttl: 7d
+    retention:
+      ttl: 7d
     schedule:
-      baseBackup:
-        type: snapshot
+      snapshot:
         enable: false
         cronExpression: "0 18 * * *"
-      incremental:
+      datafile:
+        enable: false
+        cronExpression: "0 18 * * *"
+      logfile:
         enable: false
         cronExpression: "*/5 * * * *"
     snapshot:
@@ -32,9 +35,9 @@ spec:
           containerName: postgresql
           script: /kb-scripts/backup-log-collector.sh true
           updateStage: post
-    full:
+    datafile:
       backupToolName: postgres-basebackup
-    incremental:
+    logfile:
       backupToolName: postgres-pitr
       target:
         role: primary

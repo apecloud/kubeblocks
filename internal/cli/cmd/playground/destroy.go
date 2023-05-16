@@ -111,7 +111,7 @@ func (o *destroyOptions) destroy() error {
 
 // destroyLocal destroy local k3d cluster that will destroy all resources
 func (o *destroyOptions) destroyLocal() error {
-	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
+	provider, _ := cp.New(cp.Local, "", o.Out, o.ErrOut)
 	s := spinner.New(o.Out, spinnerMsg("Delete playground k3d cluster "+o.prevCluster.ClusterName))
 	defer s.Fail()
 	if err := provider.DeleteK8sCluster(o.prevCluster); err != nil {

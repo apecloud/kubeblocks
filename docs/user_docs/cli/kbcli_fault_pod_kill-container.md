@@ -1,61 +1,65 @@
 ---
-title: kbcli fault network http abort
+title: kbcli fault pod kill-container
 ---
 
-Abort the HTTP request and response.
+kill containers
 
 ```
-kbcli fault network http abort [flags]
+kbcli fault pod kill-container [flags]
 ```
 
 ### Examples
 
 ```
-  # By default, the method of GET from port 80 is blocked.
-  kbcli fault network http abort --duration=1m
+  # kill all pods in default namespace
+  kbcli fault pod kill
   
-  # Block the method of GET from port 4399.
-  kbcli fault network http abort --port=4399 --duration=1m
+  # kill any pod in default namespace
+  kbcli fault pod kill --mode=one
   
-  # Block the method of POST from port 4399.
-  kbcli fault network http abort --port=4399 --method=POST --duration=1m
+  # kill two pods in default namespace
+  kbcli fault pod kill --mode=fixed --value=2
   
-  # Delays post requests from port 4399.
-  kbcli fault network http delay --port=4399 --method=POST --delay=15s
+  # kill 50% pods in default namespace
+  kbcli fault pod kill --mode=percentage --value=50
   
-  # Replace the GET method sent from port 80 with the PUT method.
-  kbcli fault network http replace --replace-method=PUT --duration=1m
+  # kill mysql-cluster-mysql-0 pod in default namespace
+  kbcli fault pod kill mysql-cluster-mysql-0
   
-  # Replace the GET method sent from port 80 with the PUT method, and replace the request body.
-  kbcli fault network http replace --body="you are good luck" --replace-method=PUT --duration=2m
+  # kill all pods in default namespace
+  kbcli fault pod kill --ns-fault="default"
   
-  # Replace the response content "you" from port 80.
-  kbcli fault network http replace --target=Response --body=you --duration=30s
+  # --label is required to specify the pods that need to be killed.
+  kbcli fault pod kill --label statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2
   
-  # Append content to the body of the post request sent from port 4399, in JSON format.
-  kbcli fault network http patch --method=POST --port=4399 --body="you are good luck" --type=JSON --duration=30s
+  # kill pod under the specified node.
+  kbcli fault pod kill --node=minikube-m02
+  
+  # kill pod under the specified node-label.
+  kbcli fault pod kill --node-label=kubernetes.io/arch=arm64
+  
+  # Allow the experiment to last for one minute.
+  kbcli fault pod failure --duration=1m
+  
+  # kill container in pod
+  kbcli fault pod kill-container mysql-cluster-mysql-0 --container=mysql
 ```
 
 ### Options
 
 ```
-      --abort                          Indicates whether to inject the fault that interrupts the connection. (default true)
       --annotation stringToString      Select the pod to inject the fault according to Annotation. (default [])
-      --code int32                     The status code responded by target.
+  -c, --container stringArray          the name of the container you want to kill, such as mysql, prometheus.
       --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
       --duration string                Supported formats of the duration are: ms / s / m / h. (default "10s")
-  -h, --help                           help for abort
+  -h, --help                           help for kill-container
       --label stringToString           label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0. (default [])
-      --method string                  The HTTP method of the target request method.For example: GET, POST, PUT, DELETE, HEAD, OPTIONS, PATCH. (default "GET")
       --mode string                    You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with. (default "all")
       --node stringArray               Inject faults into pods in the specified node.
       --node-label stringToString      label for node, such as '"kubernetes.io/arch=arm64,kubernetes.io/hostname=minikube-m03,kubernetes.io/os=linux. (default [])
       --ns-fault stringArray           Specifies the namespace into which you want to inject faults. (default [default])
   -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --path string                    The URI path of the target request. Supports Matching wildcards. (default "*")
       --phase stringArray              Specify the pod that injects the fault by the state of the pod.
-      --port int32                     The TCP port that the target service listens on. (default 80)
-      --target string                  Specifies whether the target of fault injuection is Request or Response. The target-related fields should be configured at the same time. (default "Request")
       --value string                   If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
 ```
 
@@ -85,7 +89,7 @@ kbcli fault network http abort [flags]
 
 ### SEE ALSO
 
-* [kbcli fault network http](kbcli_fault_network_http.md)	 - Intercept HTTP requests and responses.
+* [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

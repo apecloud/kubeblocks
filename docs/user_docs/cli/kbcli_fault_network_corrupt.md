@@ -15,54 +15,61 @@ kbcli fault network corrupt [flags]
   kbcli fault network partition
   
   # The specified pod is isolated from the k8s external network "kubeblocks.io".
-  kbcli fault network partition --label=statefulset.kubernetes.io/pod-name=mycluster-mysql-1 --external-targets=kubeblocks.io
+  kbcli fault network partition mycluster-mysql-1 --external-targets=kubeblocks.io
   
   # Isolate the network between two pods.
-  kbcli fault network partition --label=statefulset.kubernetes.io/pod-name=mycluster-mysql-1 --target-label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2
+  kbcli fault network partition mycluster-mysql-1 --target-label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2
   
   // Like the partition command, the target can be specified through --target-label or --external-targets. The pod only has obstacles in communicating with this target. If the target is not specified, all communication will be blocked.
   # Block all pod communication under the default namespace, resulting in a 50% packet loss rate.
   kbcli fault network loss --loss=50
   
   # Block the specified pod communication, so that the packet loss rate is 50%.
-  kbcli fault network loss --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --loss=50
+  kbcli fault network loss mysql-cluster-mysql-2 --loss=50
   
   kbcli fault network corrupt --corrupt=50
   
   # Blocks specified pod communication with a 50% packet corruption rate.
-  kbcli fault network corrupt --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --corrupt=50
+  kbcli fault network corrupt mysql-cluster-mysql-2 --corrupt=50
   
   kbcli fault network duplicate --duplicate=50
   
   # Block specified pod communication so that the packet repetition rate is 50%.
-  kbcli fault network duplicate --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --duplicate=50
+  kbcli fault network duplicate mysql-cluster-mysql-2 --duplicate=50
   
   kbcli fault network delay --latency=10s
   
   # Block the communication of the specified pod, causing its network delay for 10s.
-  kbcli fault network delay --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --latency=10s
+  kbcli fault network delay mysql-cluster-mysql-2 --latency=10s
+  
+  # Limit the communication bandwidth between mysql-cluster-mysql-2 and the outside.
+  kbcli fault network bandwidth mysql-cluster-mysql-2 --rate=1kbps --duration=1m
 ```
 
 ### Options
 
 ```
-  -c, --correlation string                 Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100]. (default "0")
-      --corrupt string                     Indicates the probability of a packet error occurring. Value range: [0, 100].
-      --direction string                   You can select "to"" or "from"" or "both"". (default "to")
-      --dry-run string[="unchanged"]       Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
-      --duration string                    Supported formats of the duration are: ms / s / m / h. (default "10s")
-  -e, --external-targets stringArray       a network target outside of Kubernetes, which can be an IPv4 address or a domain name,
-                                           	 such as "www.baidu.com". Only works with direction: to.
-  -h, --help                               help for corrupt
-      --label stringToString               label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"' (default [])
-      --mode string                        You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with. (default "all")
-      --namespace-selector stringArray     Specifies the namespace into which you want to inject faults. (default [default])
-  -o, --output format                      prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --target-label stringToString        label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"' (default [])
-      --target-mode string                 You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with. (default "all")
-      --target-namespace-selector string   Specifies the namespace into which you want to inject faults. (default "default")
-      --target-value string                If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
-      --value string                       If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
+      --annotation stringToString      Select the pod to inject the fault according to Annotation. (default [])
+  -c, --correlation string             Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100]. (default "0")
+      --corrupt string                 Indicates the probability of a packet error occurring. Value range: [0, 100].
+      --direction string               You can select "to"" or "from"" or "both"". (default "to")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --duration string                Supported formats of the duration are: ms / s / m / h. (default "10s")
+  -e, --external-target stringArray    a network target outside of Kubernetes, which can be an IPv4 address or a domain name,
+                                       	 such as "www.baidu.com". Only works with direction: to.
+  -h, --help                           help for corrupt
+      --label stringToString           label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0. (default [])
+      --mode string                    You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with. (default "all")
+      --node stringArray               Inject faults into pods in the specified node.
+      --node-label stringToString      label for node, such as '"kubernetes.io/arch=arm64,kubernetes.io/hostname=minikube-m03,kubernetes.io/os=linux. (default [])
+      --ns-fault stringArray           Specifies the namespace into which you want to inject faults. (default [default])
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --phase stringArray              Specify the pod that injects the fault by the state of the pod.
+      --target-label stringToString    label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"' (default [])
+      --target-mode string             You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.
+      --target-ns-fault stringArray    Specifies the namespace into which you want to inject faults. (default [default])
+      --target-value string            If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
+      --value string                   If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
 ```
 
 ### Options inherited from parent commands

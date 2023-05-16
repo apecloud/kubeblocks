@@ -45,6 +45,9 @@ SERVER_PROP_FILE=${SERVER_PROP_FILE:-server.properties}
 if [[ -f "$SERVER_PROP_FILE" ]]; then
     IFS='='
     while read -r line; do
+        if [[ "$line" =~ ^#.* ]]; then
+          continue
+        fi
         echo "convert prop ${line}"
         read -ra kv <<< "$line"
         len=${#kv[@]}
@@ -54,8 +57,10 @@ if [[ -f "$SERVER_PROP_FILE" ]]; then
         fi
         env_suffix=${kv[0]^^}
         env_suffix=${env_suffix//./_}
-        export KAFKA_CFG_${env_suffix}="${kv[1]}"
-        echo "export KAFKA_CFG_${env_suffix}=${kv[1]}"
+        env_suffix=`eval echo "${env_suffix}"`
+        env_value=`eval echo "${kv[1]}"`
+        export KAFKA_CFG_${env_suffix}="${env_value}"
+        echo "export KAFKA_CFG_${env_suffix}=${env_value}"
     done <$SERVER_PROP_FILE
     unset IFS
 fi

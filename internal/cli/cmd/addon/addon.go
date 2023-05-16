@@ -44,6 +44,7 @@ import (
 	"k8s.io/utils/strings/slices"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -305,6 +306,11 @@ func (o *addonCmdOpts) validate() error {
 			return fmt.Errorf("addon %s INSTALLABLE-SELECTOR has no matching requirement", o.Names)
 		}
 	}
+
+	if err := o.installAndUpgradePlugins(); err != nil {
+		fmt.Fprintf(o.Out, "failed to install/upgrade plugins: %v\n", err)
+	}
+
 	return nil
 }
 
@@ -796,5 +802,45 @@ func addonListRun(o *list.ListOptions) error {
 		"NAME", "TYPE", "STATUS", "EXTRAS", "AUTO-INSTALL", "AUTO-INSTALLABLE-SELECTOR"); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (o *addonCmdOpts) installAndUpgradePlugins() error {
+	if len(o.addon.Spec.CliPlugins) == 0 {
+		return nil
+	}
+
+	plugin.InitPlugin()
+
+	var plugins []string
+	var names []string
+	for _, p := range o.addon.Spec.CliPlugins {
+		names = append(names, p.Name)
+		plugins = append(plugins, fmt.Sprintf("%s/%s", p.Index, p.Name))
+	}
+
+	installOption := &plugin.PluginInstallOption{
+		IOStreams: o.IOStreams,
+	}
+	upgradeOption := &plugin.UpgradeOptions{
+		IOStreams: o.IOStreams,
+	}
+
+	// install plugins
+	if err := installOption.Complete(plugins); err != nil {
+		return err
+	}
+	if err := installOption.Install(); err != nil {
+		return err
+	}
+
+	// upgrade existed plugins
+	if err := upgradeOption.Complete(names); err != nil {
+		return err
+	}
+	if err := upgradeOption.Run(); err != nil {
+		return err
+	}
+
 	return nil
 }

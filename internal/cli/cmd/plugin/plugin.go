@@ -25,7 +25,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -35,6 +34,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -58,26 +58,9 @@ func NewPluginCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Use:   "plugin",
 		Short: "Provides utilities for interacting with plugins.",
 		Long:  pluginLong,
-	}
-
-	if err := EnsureDirs(paths.BasePath(),
-		paths.BinPath(),
-		paths.InstallPath(),
-		paths.IndexBase(),
-		paths.InstallReceiptsPath()); err != nil {
-		klog.Fatal(err)
-	}
-
-	// check if index exist, if indexes don't exist, download default index
-	indexes, err := ListIndexes(paths)
-	if err != nil {
-		klog.Fatal(err)
-	}
-	if len(indexes) == 0 {
-		klog.Info("start download default index")
-		if err := AddIndex(paths, DefaultIndexName, DefaultIndexURI); err != nil {
-			klog.Fatal("failed to download default index", err)
-		}
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			InitPlugin()
+		},
 	}
 
 	cmd.AddCommand(
@@ -257,7 +240,7 @@ func isExecutable(fullPath string) (bool, error) {
 		return false, err
 	}
 
-	if runtime.GOOS == "windows" {
+	if util.IsWindows() {
 		fileExt := strings.ToLower(filepath.Ext(fullPath))
 
 		switch fileExt {
@@ -304,4 +287,27 @@ func NewPluginPrinter(out io.Writer) *printer.TablePrinter {
 
 func addPluginRow(name, path string, p *printer.TablePrinter) {
 	p.AddRow(name, path)
+}
+
+func InitPlugin() {
+	// Ensure that the base directories exist
+	if err := EnsureDirs(paths.BasePath(),
+		paths.BinPath(),
+		paths.InstallPath(),
+		paths.IndexBase(),
+		paths.InstallReceiptsPath()); err != nil {
+		klog.Fatal(err)
+	}
+
+	// check if index exist, if indexes don't exist, download default index
+	indexes, err := ListIndexes(paths)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	if len(indexes) == 0 {
+		klog.V(1).Info("no indexes found, downloading default index")
+		if err := AddIndex(paths, DefaultIndexName, DefaultIndexURI); err != nil {
+			klog.Fatal("failed to download default index", err)
+		}
+	}
 }

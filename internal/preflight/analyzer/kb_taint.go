@@ -175,17 +175,17 @@ func getTolerationsMap(tolerationData map[string]interface{}, addonName string, 
 
 func isTolerableTaints(taints []v1.Taint, tolerations []v1.Toleration) bool {
 	tolerableCount := 0
-	for _, toleration := range tolerations {
+	for _, taint := range taints {
 		// check only on taints that have effect NoSchedule
-		if toleration.Effect != v1.TaintEffectNoSchedule {
+		if taint.Effect != v1.TaintEffectNoSchedule {
 			continue
 		}
-		for _, taint := range taints {
+		for _, toleration := range tolerations {
 			if toleration.ToleratesTaint(&taint) {
 				tolerableCount++
 				break
 			}
 		}
 	}
-	return tolerableCount >= len(tolerations)
+	return tolerableCount >= len(taints)
 }

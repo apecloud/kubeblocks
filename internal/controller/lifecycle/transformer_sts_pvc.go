@@ -22,6 +22,7 @@ package lifecycle
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -169,23 +170,32 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 		} else if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(targetQuantity) == 1 && // check if it's compressing volume
 			targetQuantity.Cmp(*pvc.Status.Capacity.Storage()) >= 0 { // check if target size is greater than or equal to actual size
 			// this branch means we can update pvc size by recreate it
-			// step 1: update pv to retain
-			dag.AddVertex(retainPVVertex)
-			// step 2: delete pvc, this will not delete pv because policy is 'retain'
-			dag.AddVertex(deletePVCVertex)
-			dag.Connect(deletePVCVertex, retainPVVertex)
-			dag.AddVertex(removeFinalizerPVCVertex)
-			dag.Connect(retainPVVertex, removeFinalizerPVCVertex)
-			// step 3: remove claimRef in pv
-			dag.AddVertex(removeClaimRefVertex)
-			dag.Connect(removeClaimRefVertex, deletePVCVertex)
-			// step 4: create new pvc
-			dag.AddVertex(createNewPVCVertex)
-			dag.Connect(createNewPVCVertex, removeClaimRefVertex)
-			// step 5: restore to previous pv policy
-			dag.AddVertex(restorePVVertex)
-			dag.Connect(restorePVVertex, createNewPVCVertex)
-			dag.Connect(vertex, restorePVVertex)
+			tmpPV := &corev1.PersistentVolume{}
+			if err := transCtx.Client.Get(transCtx.Context, pvKey, tmpPV); client.IgnoreNotFound(err) != nil {
+				return err
+			}
+			if tmpPV.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+				// make sure pv policy is 'retain' before deleting pvc
+				// step 2: delete pvc, this will not delete pv because policy is 'retain'
+				dag.AddVertex(deletePVCVertex)
+				dag.AddVertex(removeFinalizerPVCVertex)
+				dag.Connect(removeFinalizerPVCVertex, deletePVCVertex)
+				// step 3: remove claimRef in pv
+				dag.AddVertex(removeClaimRefVertex)
+				dag.Connect(removeClaimRefVertex, deletePVCVertex)
+				// step 4: create new pvc
+				dag.AddVertex(createNewPVCVertex)
+				dag.Connect(createNewPVCVertex, removeClaimRefVertex)
+				// step 5: restore to previous pv policy
+				dag.AddVertex(restorePVVertex)
+				dag.Connect(restorePVVertex, createNewPVCVertex)
+				dag.Connect(vertex, restorePVVertex)
+			} else {
+				// step 1: update pv to retain
+				dag.AddVertex(retainPVVertex)
+				dag.Connect(vertex, retainPVVertex)
+				return newRequeueError(time.Second, "pv not in retain policy")
+			}
 		} else if pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 			// use pvc's update without anything extra
 			dag.AddVertex(simpleUpdateVertex)

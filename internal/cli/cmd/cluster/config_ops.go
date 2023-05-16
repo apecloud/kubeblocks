@@ -132,7 +132,7 @@ func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.C
 		return r
 	}
 
-	if !cfgcm.IsSupportReload(cc.ReloadOptions) && !o.autoApprove {
+	if !cfgcm.IsSupportReload(cc.ReloadOptions) {
 		return o.confirmReconfigureWithRestart()
 	}
 
@@ -148,13 +148,13 @@ func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.C
 	if dynamicUpdated {
 		return nil
 	}
-	if o.autoApprove {
-		return nil
-	}
 	return o.confirmReconfigureWithRestart()
 }
 
 func (o *configOpsOptions) confirmReconfigureWithRestart() error {
+	if o.autoApprove {
+		return nil
+	}
 	const confirmStr = "yes"
 	printer.Warning(o.Out, restartConfirmPrompt)
 	_, err := prompt.NewPrompt(fmt.Sprintf("Please type \"%s\" to confirm:", confirmStr),

@@ -47,7 +47,7 @@ import (
 type OperationsOptions struct {
 	create.CreateOptions  `json:"-"`
 	HasComponentNamesFlag bool `json:"-"`
-	// AutoApprove if it is true, will skip the double check.
+	// autoApprove if it is true, will skip the double check.
 	autoApprove            bool     `json:"-"`
 	ComponentNames         []string `json:"componentNames,omitempty"`
 	OpsRequestName         string   `json:"opsRequestName"`
@@ -443,6 +443,7 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	cmd.Flags().StringVar(&o.CPU, "cpu", "", "Requested and limited size of component cpu")
 	cmd.Flags().StringVar(&o.Memory, "memory", "", "Requested and limited size of component memory")
 	cmd.Flags().StringVar(&o.Class, "class", "", "Component class")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before vertically scaling the cluster")
 	return cmd
 }
 
@@ -470,6 +471,7 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 
 	o.addCommonFlags(cmd)
 	cmd.Flags().IntVar(&o.Replicas, "replicas", o.Replicas, "Replicas with the specified components")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before horizontally scaling the cluster")
 	_ = cmd.MarkFlagRequired("replicas")
 	return cmd
 }
@@ -479,7 +481,7 @@ var volumeExpansionExample = templates.Examples(`
 		kbcli cluster volume-expand mycluster --components=mysql --volume-claim-templates=data --storage=10Gi
 `)
 
-// NewVolumeExpansionCmd creates a vertical scaling command
+// NewVolumeExpansionCmd creates a volume expanding command
 func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.VolumeExpansionType, true)
 	cmd := &cobra.Command{
@@ -498,6 +500,7 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	o.addCommonFlags(cmd)
 	cmd.Flags().StringSliceVarP(&o.VCTNames, "volume-claim-templates", "t", nil, "VolumeClaimTemplate names in components (required)")
 	cmd.Flags().StringVar(&o.Storage, "storage", "", "Volume storage size (required)")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before expanding the cluster volume")
 	return cmd
 }
 
@@ -533,6 +536,7 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o.addCommonFlags(cmd)
 	cmd.Flags().StringVar(&o.ExposeType, "type", "", "Expose type, currently supported types are 'vpc', 'internet'")
 	cmd.Flags().StringVar(&o.ExposeEnabled, "enable", "", "Enable or disable the expose, values can be true or false")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before exposing the cluster")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{string(util.ExposeToVPC), string(util.ExposeToInternet)}, cobra.ShellCompDirectiveNoFileComp

@@ -1,9 +1,10 @@
 package fault
 
 import (
-	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -29,15 +30,16 @@ var _ = Describe("Fault Network DNS", func() {
 
 		It("fault network dns random", func() {
 			inputs := [][]string{
-				{"--mode=one", "--patterns=baidu.com", "--dry-run=client"},
-				{"--mode=fixed", "--value=2", "--patterns=baidu.com", "--dry-run=client"},
-				{"--mode=fixed-percent", "--value=50", "--patterns=baidu.com", "--dry-run=client"},
-				{"--mode=random-max-percent", "--value=50", "--patterns=baidu.com", "--dry-run=client"},
-				{"--ns-fault=kb-system", "--patterns=baidu.com", "--dry-run=client"},
-				{"--node=minikube-m02", "--patterns=baidu.com", "--dry-run=client"},
-				{"--label=app.kubernetes.io/component=mysql", "--patterns=baidu.com", "--dry-run=client"},
-				{"--node-label=kubernetes.io/arch=arm64", "--patterns=baidu.com", "--dry-run=client"},
-				{"--annotation=example-annotation=group-a", "--patterns=baidu.com", "--dry-run=client"},
+				{"--dry-run=client", "--patterns=kubeblocks.io"},
+				{"--mode=one", "--patterns=kubeblocks.io", "--dry-run=client"},
+				{"--mode=fixed", "--value=2", "--patterns=kubeblocks.io", "--dry-run=client"},
+				{"--mode=fixed-percent", "--value=50", "--patterns=kubeblocks.io", "--dry-run=client"},
+				{"--mode=random-max-percent", "--value=50", "--patterns=kubeblocks.io", "--dry-run=client"},
+				{"--ns-fault=kb-system", "--patterns=kubeblocks.io", "--dry-run=client"},
+				{"--node=minikube-m02", "--patterns=kubeblocks.io", "--dry-run=client"},
+				{"--label=app.kubernetes.io/component=mysql", "--patterns=kubeblocks.io", "--dry-run=client"},
+				{"--node-label=kubernetes.io/arch=arm64", "--patterns=kubeblocks.io", "--dry-run=client"},
+				{"--annotation=example-annotation=group-a", "--patterns=kubeblocks.io", "--dry-run=client"},
 			}
 			o := NewDNSChaosOptions(tf, streams, string(v1alpha1.RandomAction))
 			cmd := o.NewCobraCommand(Random, RandomShort)
@@ -54,15 +56,7 @@ var _ = Describe("Fault Network DNS", func() {
 
 		It("fault network dns error", func() {
 			inputs := [][]string{
-				{"--mode=one", "--patterns=baidu.com", "--dry-run=client"},
-				{"--mode=fixed", "--value=2", "--patterns=baidu.com", "--dry-run=client"},
-				{"--mode=fixed-percent", "--value=50", "--patterns=baidu.com", "--dry-run=client"},
-				{"--mode=random-max-percent", "--value=50", "--patterns=baidu.com", "--dry-run=client"},
-				{"--ns-fault=kb-system", "--patterns=baidu.com", "--dry-run=client"},
-				{"--node=minikube-m02", "--patterns=baidu.com", "--dry-run=client"},
-				{"--label=app.kubernetes.io/component=mysql", "--patterns=baidu.com", "--dry-run=client"},
-				{"--node-label=kubernetes.io/arch=arm64", "--patterns=baidu.com", "--dry-run=client"},
-				{"--annotation=example-annotation=group-a", "--patterns=baidu.com", "--dry-run=client"},
+				{"--patterns=kubeblocks.io", "--dry-run=client"},
 			}
 			o := NewDNSChaosOptions(tf, streams, string(v1alpha1.ErrorAction))
 			cmd := o.NewCobraCommand(Error, ErrorShort)

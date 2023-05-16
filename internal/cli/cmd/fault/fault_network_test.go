@@ -1,9 +1,10 @@
 package fault
 
 import (
-	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -29,7 +30,7 @@ var _ = Describe("Fault Network", func() {
 	Context("test fault network", func() {
 		It("fault network partition", func() {
 			inputs := [][]string{
-				{""},
+				{"--dry-run=client"},
 				{"--mode=one", "--dry-run=client"},
 				{"--mode=fixed", "--value=2", "--dry-run=client"},
 				{"--mode=fixed-percent", "--value=50", "--dry-run=client"},
@@ -39,7 +40,7 @@ var _ = Describe("Fault Network", func() {
 				{"--label=app.kubernetes.io/component=mysql", "--dry-run=client"},
 				{"--node-label=kubernetes.io/arch=arm64", "--dry-run=client"},
 				{"--annotation=example-annotation=group-a", "--dry-run=client"},
-				{"--external-target=www.baidu.com", "--dry-run=client"},
+				{"--external-target=kubeblocks.io", "--dry-run=client"},
 				{"--target-mode=one", "--target-label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2", "--target-ns-fault=default", "--dry-run=client"},
 			}
 			o := NewNetworkChaosOptions(tf, streams, string(v1alpha1.PartitionAction))
@@ -77,9 +78,10 @@ var _ = Describe("Fault Network", func() {
 
 		It("fault network delay", func() {
 			inputs := [][]string{
+				{"--latency=50s", "--dry-run=client"},
 				{"--latency=50s", "--jitter=10s", "--dry-run=client"},
-				{"--latency=50s", "--jitter=10s", "--correlation=100", "--dry-run=client"},
 				{"--latency=50s", "--correlation=100", "--dry-run=client"},
+				{"--latency=50s", "--jitter=10s", "--correlation=100", "--dry-run=client"},
 			}
 			o := NewNetworkChaosOptions(tf, streams, string(v1alpha1.DelayAction))
 			cmd := o.NewCobraCommand(Delay, DelayShort)

@@ -1,9 +1,10 @@
 package fault
 
 import (
-	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -27,9 +28,9 @@ var _ = Describe("Fault POD", func() {
 	})
 
 	Context("test fault pod", func() {
-
 		It("fault pod kill", func() {
 			inputs := [][]string{
+				{"--dry-run=client"},
 				{"--mode=one", "--dry-run=client"},
 				{"--mode=fixed", "--value=2", "--dry-run=client"},
 				{"--mode=fixed-percent", "--value=50", "--dry-run=client"},
@@ -45,6 +46,7 @@ var _ = Describe("Fault POD", func() {
 			cmd := o.NewCobraCommand(Kill, KillShort)
 			o.AddCommonFlag(cmd)
 			cmd.Flags().Int64VarP(&o.GracePeriod, "grace-period", "g", 0, "Grace period represents the duration in seconds before the pod should be killed")
+
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())
 				Expect(o.CreateOptions.Complete())
@@ -56,7 +58,7 @@ var _ = Describe("Fault POD", func() {
 
 		It("fault pod kill-container", func() {
 			inputs := [][]string{
-				{"--container=mysql", "--container=nginx", "--container=config-manager"},
+				{"--container=mysql", "--container=config-manager", "--dry-run=client"},
 			}
 			o := NewPodChaosOptions(tf, streams, string(v1alpha1.ContainerKillAction))
 			cmd := o.NewCobraCommand(KillContainer, KillContainerShort)

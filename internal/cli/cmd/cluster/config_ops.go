@@ -224,6 +224,6 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 	o.buildReconfigureCommonFlags(cmd)
-	// cmd.Flags().BoolVar(,o.autoApprove)
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before reconfigure the cluster")
 	return cmd
 }

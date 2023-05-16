@@ -83,7 +83,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd.Flags().BoolVar(&o.purge, "purge", true, "Purge all resources before destroy kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks.")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
-	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before destroying")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before destroying the playground")
 	return cmd
 }
 

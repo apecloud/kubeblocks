@@ -224,5 +224,6 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 	o.buildReconfigureCommonFlags(cmd)
+	// cmd.Flags().BoolVar(,o.autoApprove)
 	return cmd
 }

@@ -1,32 +1,30 @@
 ---
 title: Expand volume
 description: How to expand the volume of a MongoDB cluster
+keywords: [mongodb, expand volume, volume expansion]
 sidebar_position: 3
 sidebar_label: Expand volume
 ---
 
 # Expand volume
+
 You can expand the storage volume size of each pod.
-
-:::note
-
-Volume expansion triggers pod restart, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the operation.
-
-:::
 
 ## Before you start
 
 Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+
 ```bash
-kbcli cluster list <name>
+kbcli cluster list mongodb-cluster
 ```
 
-   
 ## Option 1. Use kbcli
-Use `kbcli cluster  volume-expand ` command, configure the resources required and enter the cluster name again to expand the volume.
+
+Use `kbcli cluster volume-expand` command, configure the resources required and enter the cluster name again to expand the volume.
+
 ```bash
-kbcli cluster  volume-expand --storage=30G --component-names=mongodb --volume-claim-template-names=data mongodb-cluster
-Please type the name again(separate with white space when more than one): mongodb-cluster
+kbcli cluster volume-expand --storage=30G --component-names=mongodb --volume-claim-template-names=data mongodb-cluster
+>
 OpsRequest mongodb-cluster-volumeexpansion-gcfzp created successfully, you can view the progress:
         kbcli cluster describe-ops mongodb-cluster-volumeexpansion-gcfzp -n default
 ```
@@ -37,7 +35,7 @@ OpsRequest mongodb-cluster-volumeexpansion-gcfzp created successfully, you can v
 
 ## Option 2. Change the YAML file of the cluster
 
-Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster. 
+Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1

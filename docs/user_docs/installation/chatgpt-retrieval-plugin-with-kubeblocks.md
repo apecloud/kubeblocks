@@ -16,7 +16,7 @@ The purpose of Plugin is to extend the OpenAI abilities from a public large mode
 
 The remote Chatbox engages in dialogue with the user, processing their natural language queries and retrieving relevant data from both OpenAI's large model and our private knowledge base, and then combines this information to provide a more accurate and comprehensive answer.
 
-With ChatGPT Retrieval Plugin, data privacy and benefits of ChatGPT are balanced.
+With the ChatGPT Retrieval Plugin, data privacy and benefits of ChatGPT are balanced.
 
 ## ChatGPT Retrieval Plugin on KubeBlocks
 
@@ -75,6 +75,7 @@ These improvements achieve a better experience for running your own Plugin.
    ```
 
    ***Result:***
+
    In the above example, a qdrant standalone cluster named `Cluster lilac26` is created.
 
 4. Install the plugin with Qdrant as datastore with helm.

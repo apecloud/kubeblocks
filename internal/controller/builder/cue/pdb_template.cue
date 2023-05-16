@@ -24,10 +24,7 @@ cluster: {
 component: {
 	clusterDefName: string
 	name:           string
-	// FIXME not defined in apis
 	minAvailable: string | int
-	podSpec: containers: [...]
-	volumeClaimTemplates: [...]
 }
 
 pdb: {
@@ -48,7 +45,6 @@ pdb: {
 		if component.minAvailable != _|_ {
 			minAvailable: component.minAvailable
 		}
-//		minAvailable: 0
 		selector: {
 			matchLabels: {
 				"app.kubernetes.io/name":       "\(component.clusterDefName)"

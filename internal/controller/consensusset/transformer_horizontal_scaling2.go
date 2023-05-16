@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 
 	apps "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -47,7 +48,7 @@ type podAction struct {
 	actionList    []*batchv1.Job
 }
 
-var actionNameRegex = regexp.MustCompile("(.*)-([0-9]+)-([0-9]+)-([a-zA-Z]+)$")
+var actionNameRegex = regexp.MustCompile("(.*)-([0-9]+)-([0-9]+)-([a-zA-Z\\-]+)$")
 
 func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// handle Update only, i.e. consensus cluster exists
@@ -63,7 +64,7 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	if stsVertex.Action == nil || *stsVertex.Action != model.UPDATE {
 		return nil
 	}
-	sts, _ := stsVertex.Obj.(*apps.StatefulSet)
+	sts, _ := stsVertex.OriObj.(*apps.StatefulSet)
 	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
 	if err != nil {
 		return err
@@ -112,7 +113,7 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 			checker := func() bool {
 				return podName == leaderPodName
 			}
-			if actionType == jobTypeSwitchover {
+			if actionType != jobTypeSwitchover {
 				checker = nil
 			}
 			if !shouldDoAction(transCtx.CSSet, actionType, checker) {
@@ -127,9 +128,9 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 		return hasActionCreated, nil
 	}
 	// handle member join
-	jobTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
+	actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
 	for i := transCtx.CSSet.Status.Replicas; i < transCtx.CSSet.Spec.Replicas; i++ {
-		if _, err := createActions(int(i), jobTypeList); err != nil {
+		if _, err := createActions(int(i), actionTypeList); err != nil {
 			return err
 		}
 	}
@@ -140,10 +141,10 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	}
 
 	// handle member leave
-	jobTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
+	actionTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
 	memberLeaveList := make([]string, 0)
 	for i := transCtx.CSSet.Spec.Replicas; i < transCtx.CSSet.Status.Replicas; i++ {
-		hasActionCreated, err := createActions(int(i), jobTypeList)
+		hasActionCreated, err := createActions(int(i), actionTypeList)
 		if err != nil {
 			return err
 		}
@@ -159,9 +160,15 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 		return err
 	}
 
-	// if pod to be deleted with no pre actions(but should), return and wait actions synced into cache
-	for _, podName := range memberLeaveList {
-		if pAction, ok := podActionMap[podName]; !ok || !pAction.hasPreAction {
+	// if all pods to be deleted have no pre actions(but should), return and wait actions synced into cache
+	if len(memberLeaveList) > 0 {
+		noActions := true
+		for _, podName := range memberLeaveList {
+			if pAction, ok := podActionMap[podName]; ok && pAction.hasPreAction {
+				noActions = false
+			}
+		}
+		if noActions {
 			return nil
 		}
 	}
@@ -174,11 +181,11 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 		if !pAction.hasPreAction || !pAction.hasPostAction {
 			continue
 		}
-		if !isAllSuspend(pAction.actionList) {
+		if !isAllActionSuspend(pAction.actionList) {
 			continue
 		}
-		for _, job := range pAction.actionList {
-			doActionCleanup(dag, job)
+		for _, action := range pAction.actionList {
+			doActionCleanup(dag, action)
 		}
 		delete(podActionMap, podName)
 	}
@@ -189,23 +196,38 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	}
 
 	// handle membership actions
-	for _, pAction := range podActionMap {
-		job := pAction.actionList[0]
-		switch {
-		case *job.Spec.Suspend:
-			// TODO(free6om): validate cluster state: all pods without actions should be ok(role label set and has one leader)
-			if err := abnormalAnalysis(transCtx, pods, roleMap); err != nil {
-				return err
-			}
-			startAction(dag, pAction.actionList[0])
-		case job.Status.Succeeded == 0 && job.Status.Failed == 0:
-			// in progress, do nothing and wait job done event
-		case job.Status.Failed > 0:
-			emitControlJobFailedEvent(transCtx, job.Labels[jobTypeLabel])
-			fallthrough
-		case job.Status.Succeeded > 0:
-			doActionCleanup(dag, job)
+	podList := make([]string, 0, len(podActionMap))
+	for podName := range podActionMap {
+		podList = append(podList, podName)
+	}
+	sort.SliceStable(podList, func(i, j int) bool {
+		return podList[i] < podList[j]
+	})
+	// handle pods in sequence to minimum disrupt on current cluster
+	podName := podList[0]
+	pAction := podActionMap[podName]
+	action := pAction.actionList[0]
+	switch {
+	case *action.Spec.Suspend:
+		// TODO(free6om): validate cluster state: all pods without actions should be ok(role label set and has one leader)
+		if err := abnormalAnalysis(pods, podActionMap, roleMap); err != nil {
+			return err
 		}
+		startAction(dag, pAction.actionList[0])
+	case action.Status.Succeeded == 0 && action.Status.Failed == 0:
+		// in progress, do nothing and wait action done event
+	case action.Status.Failed > 0:
+		emitActionFailedEvent(transCtx, action.Labels[jobTypeLabel], action.Name)
+		fallthrough
+	case action.Status.Succeeded > 0:
+		doActionCleanup(dag, action)
+	}
+
+	// all actions finished
+	if len(podActionMap) == 1 &&
+		len(pAction.actionList) == 1 &&
+		(action.Status.Succeeded > 0 || action.Status.Failed > 0) {
+		updateStsHandler()
 	}
 	return nil
 }
@@ -234,31 +256,31 @@ func shouldDoAction(csSet *workloads.ConsensusSet, actionType string, checker pr
 }
 
 func getAllActionList(transCtx *CSSetTransformContext) ([]*batchv1.JobList, error) {
-	jobTypeList := []string{jobTypeSwitchover, jobTypeMemberJoinNotifying, jobTypeMemberLeaveNotifying, jobTypeLogSync, jobTypePromote}
-	jobLists := make([]*batchv1.JobList, 0)
+	actionTypeList := []string{jobTypeSwitchover, jobTypeMemberJoinNotifying, jobTypeMemberLeaveNotifying, jobTypeLogSync, jobTypePromote}
+	actionLists := make([]*batchv1.JobList, 0)
 	ml := client.MatchingLabels{
 		model.AppInstanceLabelKey: transCtx.CSSet.Name,
 		model.KBManagedByKey:      kindConsensusSet,
 		jobHandledLabel:           jobHandledFalse,
 	}
-	for _, jobType := range jobTypeList {
-		ml[jobTypeLabel] = jobType
-		jobList := &batchv1.JobList{}
-		if err := transCtx.Client.List(transCtx.Context, jobList, ml); err != nil {
+	for _, actionType := range actionTypeList {
+		ml[jobTypeLabel] = actionType
+		actionList := &batchv1.JobList{}
+		if err := transCtx.Client.List(transCtx.Context, actionList, ml); err != nil {
 			return nil, err
 		}
-		jobLists = append(jobLists, jobList)
+		actionLists = append(actionLists, actionList)
 	}
-	return jobLists, nil
+	return actionLists, nil
 }
 
 func getPodName(parent string, ordinal int) string {
 	return fmt.Sprintf("%s-%d", parent, ordinal)
 }
 
-func isAllSuspend(jobList []*batchv1.Job) bool {
-	for _, job := range jobList {
-		suspend := job.Spec.Suspend
+func isAllActionSuspend(actionList []*batchv1.Job) bool {
+	for _, action := range actionList {
+		suspend := action.Spec.Suspend
 		if suspend == nil || !*suspend {
 			return false
 		}
@@ -267,7 +289,7 @@ func isAllSuspend(jobList []*batchv1.Job) bool {
 }
 
 func getPodActionMap(transCtx *CSSetTransformContext) (map[string]*podAction, []*batchv1.Job, error) {
-	// sort actions by generation and jobType
+	// sort actions by generation and actionType
 	actionLists, err := getAllActionList(transCtx)
 	if err != nil {
 		return nil, nil, err
@@ -288,6 +310,13 @@ func getPodActionMap(transCtx *CSSetTransformContext) (map[string]*podAction, []
 			pAction, ok := podActionMap[podName]
 			if !ok {
 				pAction = &podAction{}
+			}
+			pAction.podName = podName
+			switch action.Labels[jobTypeLabel] {
+			case jobTypeSwitchover, jobTypeMemberLeaveNotifying:
+				pAction.hasPreAction = true
+			case jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote:
+				pAction.hasPostAction = true
 			}
 			actionList := pAction.actionList
 			if actionList == nil {
@@ -310,7 +339,7 @@ func getPodActionMap(transCtx *CSSetTransformContext) (map[string]*podAction, []
 func getActionOrdinal(actionName string) (int, error) {
 	subMatches := actionNameRegex.FindStringSubmatch(actionName)
 	if len(subMatches) < 5 {
-		return 0, fmt.Errorf("error jobName: %s", actionName)
+		return 0, fmt.Errorf("error actionName: %s", actionName)
 	}
 	return strconv.Atoi(subMatches[3])
 }
@@ -339,19 +368,22 @@ func getLeaderPod(pods []corev1.Pod, roleMap map[string]workloads.ConsensusRole)
 }
 
 // abnormalAnalysis normal conditions: all pods with role label set and one is leader
-func abnormalAnalysis(transCtx *CSSetTransformContext, pods []corev1.Pod, roleMap map[string]workloads.ConsensusRole) error {
-	if len(pods) != int(transCtx.CSSet.Status.Replicas) {
-		// TODO(free6om): should handle this error in a more user-friendly way
-		// set condition, emit event if error happens consecutive x times.
-		return fmt.Errorf("cluster unhealthy: # of pods %d not equals to replicas %d", len(pods), transCtx.OrigCSSet.Status.Replicas)
+func abnormalAnalysis(pods []corev1.Pod, podActionMap map[string]*podAction, roleMap map[string]workloads.ConsensusRole) error {
+	// find all members in current cluster
+	memberPods := make([]corev1.Pod, 0)
+	for _, pod := range pods {
+		if _, ok := podActionMap[pod.Name]; ok {
+			continue
+		}
+		memberPods = append(memberPods, pod)
 	}
 	// if no pods, no need to check the following conditions
-	if len(pods) == 0 {
+	if len(memberPods) == 0 {
 		return nil
 	}
 	allRoleLabelSet := true
 	leaderCount := 0
-	for _, pod := range pods {
+	for _, pod := range memberPods {
 		roleName := getRoleName(pod)
 		if len(roleName) == 0 {
 			allRoleLabelSet = false
@@ -528,6 +560,11 @@ func doActionCleanup(dag *graph.DAG, action *batchv1.Job) {
 	actionNew := actionOld.DeepCopy()
 	actionNew.Labels[jobHandledLabel] = jobHandledTrue
 	model.PrepareUpdate(dag, actionOld, actionNew)
+}
+
+func emitActionFailedEvent(transCtx *CSSetTransformContext, actionType, actionName string) {
+	message := fmt.Sprintf("%s action failed, job name: %s", actionType, actionName)
+	transCtx.EventRecorder.Event(transCtx.CSSet, corev1.EventTypeWarning, strings.ToUpper(actionType), message)
 }
 
 var _ graph.Transformer = &HorizontalScaling2Transformer{}

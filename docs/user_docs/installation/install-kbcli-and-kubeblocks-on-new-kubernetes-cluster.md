@@ -156,6 +156,7 @@ Use the following command.
 | GKE v1.24 / v1.25                 | gcloud init  gcloud auth application-default login   export GOOGLE_PROJECT= <project name> kbcli playground init --cloud-provider gcp  --region regionname              |
 
 **Step 2: One-click Deployment of KubeBlocks**
+
 Use the `kbcli playground init` command. This command:
     - Creates a Kubernetes cluster in a K3d container.
     - Deploys KubeBlocks in the Kubernetes cluster.

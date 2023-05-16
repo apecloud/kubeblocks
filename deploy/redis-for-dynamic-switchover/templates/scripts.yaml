@@ -19,7 +19,13 @@ data:
     set -ex
     # echo "include /etc/conf/redis.conf" >> /etc/redis/redis.conf
     # echo "replica-announce-ip $KB_POD_FQDN" >> /etc/redis/redis.conf
-    /kb/tools/config_render --config-volume /etc/conf/ --config /opt/kb-tools/config/redis-replication-config --output-dir /etc/redis
+
+    role="secondary"
+    KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
+    if [ "$KB_PRIMARY_POD_NAME_PREFIX" = "$KB_POD_NAME" ]; then
+    role="primary"
+    fi
+    /kb/tools/config_render --config-volume /etc/conf/ --config /opt/kb-tools/config/redis-replication-config --output-dir /etc/redis --set role=${role},primary=${KB_PRIMARY_POD_NAME}
     exec redis-server /etc/redis/redis.conf \
     --loadmodule /opt/redis-stack/lib/redisearch.so ${REDISEARCH_ARGS} \
     --loadmodule /opt/redis-stack/lib/redisgraph.so ${REDISGRAPH_ARGS} \

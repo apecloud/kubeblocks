@@ -55,12 +55,12 @@ spec:
                   properties:
                     description:
                       type: string
-                    index:
+                    indexRepository:
                       type: string
                     name:
                       type: string
                   required:
-                  - index
+                  - indexRepository
                   - name
                   type: object
                 type: array

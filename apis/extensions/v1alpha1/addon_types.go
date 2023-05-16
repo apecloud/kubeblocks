@@ -238,9 +238,9 @@ type ResourceMappingItem struct {
 }
 
 type CliPlugin struct {
-	Name        string `json:"name"`
-	Index       string `json:"index"`
-	Description string `json:"description,omitempty"`
+	Name            string `json:"name"`
+	IndexRepository string `json:"indexRepository"`
+	Description     string `json:"description,omitempty"`
 }
 
 func (r *ResourceMappingItem) HasStorageMapping() bool {

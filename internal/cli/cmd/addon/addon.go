@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -812,11 +813,30 @@ func (o *addonCmdOpts) installAndUpgradePlugins() error {
 
 	plugin.InitPlugin()
 
+	paths := plugin.GetKbcliPluginPath()
+	indexes, err := plugin.ListIndexes(paths)
+	if err != nil {
+		return err
+	}
+
+	indexRepositoryToNme := make(map[string]string)
+	for _, index := range indexes {
+		indexRepositoryToNme[index.URL] = index.Name
+	}
+
 	var plugins []string
 	var names []string
 	for _, p := range o.addon.Spec.CliPlugins {
 		names = append(names, p.Name)
-		plugins = append(plugins, fmt.Sprintf("%s/%s", p.Index, p.Name))
+		indexName, ok := indexRepositoryToNme[p.IndexRepository]
+		if !ok {
+			// index not found, add it
+			_, indexName = path.Split(p.IndexRepository)
+			if err := plugin.AddIndex(paths, indexName, p.IndexRepository); err != nil {
+				return err
+			}
+		}
+		plugins = append(plugins, fmt.Sprintf("%s/%s", indexName, p.Name))
 	}
 
 	installOption := &plugin.PluginInstallOption{

@@ -89,7 +89,7 @@ kbcli fault pod kill [flags]
 
 ### SEE ALSO
 
-* [kbcli fault pod](kbcli_fault_pod.md)	 - pod chaos.
+* [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

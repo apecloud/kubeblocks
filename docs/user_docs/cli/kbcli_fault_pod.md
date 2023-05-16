@@ -2,7 +2,7 @@
 title: kbcli fault pod
 ---
 
-pod chaos.
+Pod chaos.
 
 ### Options
 

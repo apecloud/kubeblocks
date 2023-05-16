@@ -87,5 +87,5 @@ spec:
         resources:
           requests:
             storage: 1Gi # Change the volume storage size.
-  terminationPolicy: Halt
+  terminationPolicy: Delete
 ```

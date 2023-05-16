@@ -40,10 +40,9 @@ type ClusterSpec struct {
 	// +optional
 	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
 
-	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
+	// Cluster termination policy. One of DoNotTerminate, Delete, WipeOut.
 	// DoNotTerminate will block delete operation.
-	// Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
-	// Delete is based on Halt and deletes PVCs.
+	// Delete will delete workload resources such as statefulset, deployment workloads and PVCs.
 	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
 	// +kubebuilder:validation:Required
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`

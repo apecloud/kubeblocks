@@ -240,7 +240,7 @@ make run-delve GO_PACKAGE=./cmd/manager/main.go
 
 #### Pass arguments
 ```shell
- make run-delve GO_PACKAGE=./cmd/cli/main.go ARGUMENTS='cluster create test-cluster --termination-policy=Halt'
+ make run-delve GO_PACKAGE=./cmd/cli/main.go ARGUMENTS='cluster create test-cluster --termination-policy=Delete'
 ```
 
 #### Debug envtest

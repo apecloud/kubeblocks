@@ -237,12 +237,11 @@ var WorkloadTypes = []string{"Stateless", "Stateful", "Consensus", "Replication"
 
 // TerminationPolicyType defines termination policy types.
 // +enum
-// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
+// +kubebuilder:validation:Enum={DoNotTerminate,Delete,WipeOut}
 type TerminationPolicyType string
 
 const (
 	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
-	Halt           TerminationPolicyType = "Halt"
 	Delete         TerminationPolicyType = "Delete"
 	WipeOut        TerminationPolicyType = "WipeOut"
 )

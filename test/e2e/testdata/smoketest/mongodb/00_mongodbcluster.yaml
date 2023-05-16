@@ -13,7 +13,7 @@ metadata:
 spec:
   clusterDefinitionRef: mongodb
   clusterVersionRef: mongodb-5.0.14
-  terminationPolicy: Halt
+  terminationPolicy: Delete
   affinity:
     topologyKeys: 
       - kubernetes.io/hostname

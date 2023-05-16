@@ -54,7 +54,7 @@ var _ = Describe("Create", func() {
 			"clusterDefRef":     "test-def",
 			"clusterVersionRef": "test-clusterversion-ref",
 			"components":        []string{},
-			"terminationPolicy": "Halt",
+			"terminationPolicy": "Delete",
 		}
 		options = CreateOptions{
 			Factory:         tf,

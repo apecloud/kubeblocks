@@ -108,7 +108,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
            resources:
              requests:
                storage: 1Gi
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
   
 2. Validate the vertical scaling.
@@ -217,7 +217,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
            resources:
              requests:
                storage: 1Gi
-    terminationPolicy: Halt
+    terminationPolicy: Delete
    ```
 2. Validate the horizontal scaling operation.
    Run the command below to check the cluster STATUS to identify the horizontal scaling status.

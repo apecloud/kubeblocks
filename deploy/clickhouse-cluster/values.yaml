@@ -1,7 +1,7 @@
 
-## @param terminationPolicy define Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
+## @param terminationPolicy define Cluster termination policy. One of DoNotTerminate, Delete, WipeOut.
 ##
-terminationPolicy: Halt
+terminationPolicy: Delete
 
 ## Monitoring configurations
 monitor:

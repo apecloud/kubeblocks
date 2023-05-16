@@ -498,15 +498,13 @@ spec:
                 - name
                 x-kubernetes-list-type: map
               terminationPolicy:
-                description: Cluster termination policy. One of DoNotTerminate, Halt,
-                  Delete, WipeOut. DoNotTerminate will block delete operation. Halt
-                  will delete workload resources such as statefulset, deployment workloads
-                  but keep PVCs. Delete is based on Halt and deletes PVCs. WipeOut
-                  is based on Delete and wipe out all volume snapshots and snapshot
-                  data from backup storage location.
+                description: Cluster termination policy. One of DoNotTerminate, Delete,
+                  WipeOut. DoNotTerminate will block delete operation. Delete will
+                  delete workload resources such as statefulset, deployment workloads
+                  and PVCs. WipeOut is based on Delete and wipe out all volume snapshots
+                  and snapshot data from backup storage location.
                 enum:
                 - DoNotTerminate
-                - Halt
                 - Delete
                 - WipeOut
                 type: string

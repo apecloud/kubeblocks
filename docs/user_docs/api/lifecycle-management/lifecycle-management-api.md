@@ -53,7 +53,7 @@ When the `spec.workloadType` is set as `consensus`, `spec.consensusSpec` is requ
 
 #### spec.defaultTerminationPolicy
 
-`spec.defaultTerminatingPolicy` can be set as `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`.
+`spec.defaultTerminatingPolicy` can be set as `DoNotTerminate`, `Delete`, and `WipeOut`.
 
 #### spec.connectionCredential
 
@@ -279,7 +279,7 @@ The following are examples of ApeCloud MySQL three-node clusters.
       components:
         - name: "mysql-a-1"
           type: mysql-a
-      terminationPolicy: Halt
+      terminationPolicy: Delete
   ```
 
 - Enterprise version:
@@ -303,5 +303,5 @@ The following are examples of ApeCloud MySQL three-node clusters.
               limits:
                   cpu: 32 
                   memory: 128Gi
-      terminationPolicy: Halt
+      terminationPolicy: Delete
   ```

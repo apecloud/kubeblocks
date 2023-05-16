@@ -77,10 +77,6 @@ var clusterCreateExample = templates.Examples(`
 	# Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
 
-	# In scenarios where you want to delete resources such as statements, deployments, services, pdb, but keep PVCs
-	# when deleting the cluster, use termination policy Halt
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Halt
-
 	# In scenarios where you want to delete resource such as statements, deployments, services, pdb, and including
 	# PVCs when deleting the cluster, use termination policy Delete
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Delete
@@ -288,7 +284,7 @@ func (o *CreateOptions) Validate() error {
 	}
 
 	if o.TerminationPolicy == "" {
-		return fmt.Errorf("a valid termination policy is needed, use --termination-policy to specify one of: DoNotTerminate, Halt, Delete, WipeOut")
+		return fmt.Errorf("a valid termination policy is needed, use --termination-policy to specify one of: DoNotTerminate, Delete, WipeOut")
 	}
 
 	if err := o.validateClusterVersion(); err != nil {
@@ -870,7 +866,7 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type, one of: (Preferred, Required)")
 	cmd.Flags().BoolVar(&f.Monitor, "monitor", true, "Set monitor enabled and inject metrics exporter")
 	cmd.Flags().BoolVar(&f.EnableAllLogs, "enable-all-logs", false, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level, default is false")
-	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
+	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Delete, WipeOut)")
 	cmd.Flags().StringArrayVar(&f.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 	cmd.Flags().StringToStringVar(&f.NodeLabels, "node-labels", nil, "Node label selector")
 	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'`)
@@ -881,8 +877,7 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return []string{
 				"DoNotTerminate\tblock delete operation",
-				"Halt\tdelete workload resources such as statefulset, deployment workloads but keep PVCs",
-				"Delete\tbased on Halt and deletes PVCs",
+				"Delete\tdelete workload resources such as statefulset, deployment workloads and PVCs",
 				"WipeOut\tbased on Delete and wipe out all volume snapshots and snapshot data from backup storage location",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}))

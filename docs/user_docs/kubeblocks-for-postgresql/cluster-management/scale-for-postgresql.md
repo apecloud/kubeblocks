@@ -109,7 +109,7 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
            resources:
              requests:
                storage: 1Gi
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
   
 2. Validate the vertical scaling.

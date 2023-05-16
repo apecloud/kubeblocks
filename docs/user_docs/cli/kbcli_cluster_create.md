@@ -27,10 +27,6 @@ kbcli cluster create [NAME] [flags]
   # Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
   
-  # In scenarios where you want to delete resources such as statements, deployments, services, pdb, but keep PVCs
-  # when deleting the cluster, use termination policy Halt
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Halt
-  
   # In scenarios where you want to delete resource such as statements, deployments, services, pdb, and including
   # PVCs when deleting the cluster, use termination policy Delete
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Delete
@@ -88,7 +84,7 @@ kbcli cluster create [NAME] [flags]
       --set stringArray                Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
   -f, --set-file string                Use yaml file, URL, or stdin to set the cluster resource
       --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
-      --termination-policy string      Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
+      --termination-policy string      Termination policy, one of: (DoNotTerminate, Delete, WipeOut) (default "Delete")
       --tolerations strings            Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity
 ```

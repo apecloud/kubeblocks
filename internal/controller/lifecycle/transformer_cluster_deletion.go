@@ -50,8 +50,6 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	case v1alpha1.DoNotTerminate:
 		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate", "spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
 		return graph.ErrNoops
-	case v1alpha1.Halt:
-		kinds = kindsForHalt()
 	case v1alpha1.Delete:
 		kinds = kindsForDelete()
 	case v1alpha1.WipeOut:
@@ -89,7 +87,7 @@ func kindsForDoNotTerminate() []client.ObjectList {
 	return []client.ObjectList{}
 }
 
-func kindsForHalt() []client.ObjectList {
+func kindsForDelete() []client.ObjectList {
 	kinds := kindsForDoNotTerminate()
 	kindsPlus := []client.ObjectList{
 		&appsv1.StatefulSetList{},
@@ -98,13 +96,6 @@ func kindsForHalt() []client.ObjectList {
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
 		&policyv1.PodDisruptionBudgetList{},
-	}
-	return append(kinds, kindsPlus...)
-}
-
-func kindsForDelete() []client.ObjectList {
-	kinds := kindsForHalt()
-	kindsPlus := []client.ObjectList{
 		&corev1.PersistentVolumeClaimList{},
 		&dataprotectionv1alpha1.BackupPolicyList{},
 		&batchv1.JobList{},

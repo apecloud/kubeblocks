@@ -41,9 +41,8 @@ import (
 type configOpsOptions struct {
 	*OperationsOptions
 
-	editMode    bool
-	autoApprove bool
-	wrapper     *configWrapper
+	editMode bool
+	wrapper  *configWrapper
 
 	// Reconfiguring options
 	ComponentName string

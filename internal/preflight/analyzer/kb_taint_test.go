@@ -37,6 +37,7 @@ var (
 	nodeList1 = v1.NodeList{Items: []v1.Node{
 		{Spec: v1.NodeSpec{Taints: []v1.Taint{
 			{Key: "dev", Value: "true", Effect: v1.TaintEffectNoSchedule},
+			{Key: "large", Value: "true", Effect: v1.TaintEffectNoSchedule},
 		}}},
 		{Spec: v1.NodeSpec{Taints: []v1.Taint{
 			{Key: "dev", Value: "false", Effect: v1.TaintEffectNoSchedule},
@@ -45,6 +46,7 @@ var (
 	nodeList2 = v1.NodeList{Items: []v1.Node{
 		{Spec: v1.NodeSpec{Taints: []v1.Taint{
 			{Key: "dev", Value: "false", Effect: v1.TaintEffectNoSchedule},
+			{Key: "large", Value: "true", Effect: v1.TaintEffectNoSchedule},
 		}}},
 	}}
 	nodeList3 = v1.NodeList{Items: []v1.Node{

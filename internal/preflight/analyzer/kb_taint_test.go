@@ -69,10 +69,10 @@ var _ = Describe("taint_class_test", func() {
 					Outcomes: []*troubleshoot.Outcome{
 						{
 							Pass: &troubleshoot.SingleOutcome{
-								Message: "analyze storage class success",
+								Message: "analyze taint success",
 							},
 							Fail: &troubleshoot.SingleOutcome{
-								Message: "analyze storage class fail",
+								Message: "analyze taint fail",
 							},
 						},
 					},
@@ -145,6 +145,21 @@ var _ = Describe("taint_class_test", func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(res[0].IsPass).Should(BeTrue())
 				g.Expect(res[0].IsFail).Should(BeFalse())
+			}).Should(Succeed())
+		})
+		It("Analyze test, the tolerations are nil, and analyzer result is expected that fail is true", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(analyzer.IsExcluded()).Should(BeFalse())
+				b, err := json.Marshal(nodeList2)
+				g.Expect(err).NotTo(HaveOccurred())
+				getCollectedFileContents := func(filename string) ([]byte, error) {
+					return b, nil
+				}
+				analyzer.HelmOpts = nil
+				res, err := analyzer.Analyze(getCollectedFileContents, nil)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(res[0].IsPass).Should(BeFalse())
+				g.Expect(res[0].IsFail).Should(BeTrue())
 			}).Should(Succeed())
 		})
 	})

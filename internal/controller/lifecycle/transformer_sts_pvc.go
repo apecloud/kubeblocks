@@ -63,11 +63,11 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 			if err := transCtx.Client.List(transCtx.Context, &pvList, ml); err != nil {
 				return err
 			}
-			//if len(pvList.Items) == 0 {
-			//	return errors2.Errorf("pvc deleted but pv not found")
-			//}
 			for _, pv := range pvList.Items {
 				// find pv referenced this pvc
+				if pv.Spec.ClaimRef == nil {
+					continue
+				}
 				if pv.Spec.ClaimRef.Name == pvcKey.Name {
 					newPVC.Spec.VolumeName = pv.Name
 					break

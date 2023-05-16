@@ -84,7 +84,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 		By("mock one pod of StatefulSet to update successfully")
 		testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-		testapps.MockConsensusComponentStsPod(testCtx, nil, clusterName, consensusComp,
+		testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp,
 			pod.Name, "leader", "ReadWrite")
 
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -95,7 +95,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 	testProgressDetailsWithStatelessPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource) {
 		By("create a new pod")
 		newPodName := "busybox-" + testCtx.GetRandomStr()
-		testapps.MockStatelessPod(testCtx, nil, clusterName, statelessComp, newPodName)
+		testapps.MockStatelessPod(&testCtx, nil, clusterName, statelessComp, newPodName)
 		newPod := &corev1.Pod{}
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: newPodName, Namespace: testCtx.DefaultNamespace}, newPod)).Should(Succeed())
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -183,7 +183,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 			By("test the progressDetails when scaling up replicas")
 			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, 0)
-			testapps.MockConsensusComponentStsPod(testCtx, nil, clusterName, consensusComp,
+			testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp,
 				podName, "leader", "ReadWrite")
 			pod = &corev1.Pod{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(Succeed())

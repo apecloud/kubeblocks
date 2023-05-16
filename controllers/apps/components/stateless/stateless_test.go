@@ -78,7 +78,7 @@ var _ = Describe("Stateful Component", func() {
 				Create(&testCtx).GetObject()
 			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(statelessCompName, statelessCompDefName).SetReplicas(2).Create(&testCtx).GetObject()
-			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
+			deploy := testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
 			clusterComponent := cluster.Spec.GetComponentByName(statelessCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			statelessComponent, err := NewStatelessComponent(k8sClient, cluster, clusterComponent, *componentDef)
@@ -89,7 +89,7 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test pod is ready")
 			rsName := deploy.Name + "-5847cb795c"
-			pod := testapps.MockStatelessPod(testCtx, deploy, clusterName, statelessCompName, rsName+randomStr)
+			pod := testapps.MockStatelessPod(&testCtx, deploy, clusterName, statelessCompName, rsName+randomStr)
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
 			testk8s.MockPodAvailable(pod, lastTransTime)
 			Expect(statelessComponent.PodIsAvailable(pod, defaultMinReadySeconds)).Should(BeTrue())

@@ -186,14 +186,25 @@ type ClusterComponentSpec struct {
 	// serviceAccountName is the name of the ServiceAccount that component runs depend on.
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// noCreatePDB defines PodDistruptionBudget creation behavior, set to true if creation of PodDistruptionBudget
+	// for this component is not needed. Defaults to false.
+	// +kubebuilder:default=false
+	// +optional
+	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
 }
 
-func (r *ClusterComponentSpec) GetMaxUnavailable(prefer *intstr.IntOrString) *intstr.IntOrString {
-	if r == nil || prefer == nil {
+// GetMinAvailable wraps the 'prefer' value return, as for component replicaCount <= 1 will return 0 value,
+// and for replicaCount=2 will return 1.
+func (r *ClusterComponentSpec) GetMinAvailable(prefer *intstr.IntOrString) *intstr.IntOrString {
+	if r == nil || r.NoCreatePDB || prefer == nil {
 		return nil
 	}
 	if r.Replicas <= 1 {
-		m := intstr.FromString("100%")
+		m := intstr.FromInt(0)
+		return &m
+	} else if r.Replicas == 2 {
+		m := intstr.FromInt(1)
 		return &m
 	}
 	return prefer

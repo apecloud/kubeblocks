@@ -24,10 +24,7 @@ cluster: {
 component: {
 	clusterDefName: string
 	name:           string
-	// FIXME not defined in apis
-	maxUnavailable: string
-	podSpec: containers: [...]
-	volumeClaimTemplates: [...]
+	minAvailable: string | int
 }
 
 pdb: {
@@ -45,8 +42,8 @@ pdb: {
 		}
 	}
 	"spec": {
-		if component.maxUnavailable != _|_ {
-			maxUnavailable: component.maxUnavailable
+		if component.minAvailable != _|_ {
+			minAvailable: component.minAvailable
 		}
 		selector: {
 			matchLabels: {

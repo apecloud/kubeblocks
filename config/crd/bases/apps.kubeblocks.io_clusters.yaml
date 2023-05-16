@@ -235,6 +235,12 @@ spec:
                       maxLength: 15
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
+                    noCreatePDB:
+                      default: false
+                      description: noCreatePDB defines PodDistruptionBudget creation
+                        behavior, set to true if creation of PodDistruptionBudget
+                        for this component is not needed. Defaults to false.
+                      type: boolean
                     primaryIndex:
                       description: primaryIndex determines which index is primary
                         when workloadType is Replication, index number starts from

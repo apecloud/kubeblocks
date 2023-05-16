@@ -51,7 +51,7 @@ website:
   legal_info_url: hello@legal.com
 
 datastore:
-  # in list of (pinecone, weaviate, zilliz, milvus, qdrant, redis)
+  # in list of (pinecone, weaviate, zilliz, milvus, qdrant, redis, llama, chroma, azuresearch, supabase, postgres)
   DATASTORE:
   # Yes	Your secret token to protect the local plugin API
   BEARER_TOKEN:

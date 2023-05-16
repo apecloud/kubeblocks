@@ -84,7 +84,7 @@ func TestInit(t *testing.T) {
 func TestInitDelay(t *testing.T) {
 	// Initialize a new instance of MysqlOperations.
 	mysqlOps, _, _ := mockDatabase(t)
-	//mysqlOps.initIfNeed()
+	// mysqlOps.initIfNeed()
 	t.Run("Invalid url", func(t *testing.T) {
 		mysqlOps.db = nil
 		mysqlOps.initIfNeed()

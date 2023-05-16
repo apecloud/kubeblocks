@@ -15,7 +15,16 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/chaos-mesh-0.1.0-beta.0.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/chaos-mesh-2.5.2.tgz
+
+    installValues:
+      setValues:
+        - "version=2.5.2"
+        - "chaosDaemon.privileged=true"
+        - "dnsServer.create=true"
+        - "chaosDaemon.runtime=containerd"
+        - "chaosDaemon.socketPath=/run/containerd/containerd.sock"
+
     valuesMapping:
       valueMap:
         replicaCount: controllerManager.replicaCount

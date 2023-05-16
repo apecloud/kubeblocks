@@ -104,7 +104,7 @@ var _ = Describe("clusterdefinition list components", func() {
 
 	It("list-components", func() {
 		cmd.Run(cmd, []string{clusterdefinitionName})
-		expected := `NAME                    WORKLOAD-TYPE   CHARACTER-TYPE   CLUSTER DEFINITION        
+		expected := `NAME                    WORKLOAD-TYPE   CHARACTER-TYPE   CLUSTER-DEFINITION        
 fake-component-type                     mysql            fake-cluster-definition   
 fake-component-type-1                   mysql            fake-cluster-definition   
 `

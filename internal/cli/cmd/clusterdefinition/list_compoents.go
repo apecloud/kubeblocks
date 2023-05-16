@@ -79,7 +79,7 @@ func run(o *list.ListOptions) error {
 		return err
 	}
 	p := printer.NewTablePrinter(o.Out)
-	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE", "CLUSTER DEFINITION")
+	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE", "CLUSTER-DEFINITION")
 	for _, info := range infos {
 		var cd v1alpha1.ClusterDefinition
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd); err != nil {

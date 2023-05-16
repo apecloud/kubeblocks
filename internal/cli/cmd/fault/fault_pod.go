@@ -95,7 +95,7 @@ func NewPodChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, 
 func NewPodChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pod",
-		Short: "pod chaos.",
+		Short: "Pod chaos.",
 	}
 	cmd.AddCommand(
 		NewPodKillCmd(f, streams),

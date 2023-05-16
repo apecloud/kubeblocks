@@ -12,10 +12,10 @@ kbcli fault network dns random [flags]
 
 ```
   // Inject DNS faults into all pods under the default namespace, so that any IP is returned when accessing the baidu.com domain name.
-  kbcli fault DNS random --patterns=baidu.com --duration=1m
+  kbcli fault dns random --patterns=baidu.com --duration=1m
   
   // Inject DNS faults into all pods under the default namespace, so that error is returned when accessing the baidu.com domain name.
-  kbcli fault DNS error --patterns=baidu.com --duration=1m
+  kbcli fault dns error --patterns=baidu.com --duration=1m
 ```
 
 ### Options

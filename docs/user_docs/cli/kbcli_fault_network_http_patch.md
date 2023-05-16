@@ -32,7 +32,7 @@ kbcli fault network http patch [flags]
   # Replace the response content "you" from port 80.
   kbcli fault network http replace --target=Response --body=you --duration=30s
   
-  # AAppend content to the body of the post request sent from port 4399, in JSON format.
+  # Append content to the body of the post request sent from port 4399, in JSON format.
   kbcli fault network http patch --method=POST --port=4399 --body="you are good luck" --type=JSON --duration=30s
 ```
 

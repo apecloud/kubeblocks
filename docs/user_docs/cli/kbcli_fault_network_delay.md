@@ -15,32 +15,35 @@ kbcli fault network delay [flags]
   kbcli fault network partition
   
   # The specified pod is isolated from the k8s external network "kubeblocks.io".
-  kbcli fault network partition --label=statefulset.kubernetes.io/pod-name=mycluster-mysql-1 --external-targets=kubeblocks.io
+  kbcli fault network partition mycluster-mysql-1 --external-targets=kubeblocks.io
   
   # Isolate the network between two pods.
-  kbcli fault network partition --label=statefulset.kubernetes.io/pod-name=mycluster-mysql-1 --target-label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2
+  kbcli fault network partition mycluster-mysql-1 --target-label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2
   
   // Like the partition command, the target can be specified through --target-label or --external-targets. The pod only has obstacles in communicating with this target. If the target is not specified, all communication will be blocked.
   # Block all pod communication under the default namespace, resulting in a 50% packet loss rate.
   kbcli fault network loss --loss=50
   
   # Block the specified pod communication, so that the packet loss rate is 50%.
-  kbcli fault network loss --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --loss=50
+  kbcli fault network loss mysql-cluster-mysql-2 --loss=50
   
   kbcli fault network corrupt --corrupt=50
   
   # Blocks specified pod communication with a 50% packet corruption rate.
-  kbcli fault network corrupt --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --corrupt=50
+  kbcli fault network corrupt mysql-cluster-mysql-2 --corrupt=50
   
   kbcli fault network duplicate --duplicate=50
   
   # Block specified pod communication so that the packet repetition rate is 50%.
-  kbcli fault network duplicate --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --duplicate=50
+  kbcli fault network duplicate mysql-cluster-mysql-2 --duplicate=50
   
   kbcli fault network delay --latency=10s
   
   # Block the communication of the specified pod, causing its network delay for 10s.
-  kbcli fault network delay --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --latency=10s
+  kbcli fault network delay mysql-cluster-mysql-2 --latency=10s
+  
+  # Limit the communication bandwidth between mysql-cluster-mysql-2 and the outside.
+  kbcli fault network bandwidth mysql-cluster-mysql-2 --rate=1kbps --duration=1m
 ```
 
 ### Options

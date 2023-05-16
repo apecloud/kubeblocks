@@ -39,7 +39,7 @@ import (
 )
 
 // HorizontalScaling2Transformer Pod level horizontal scaling handling
-type HorizontalScaling2Transformer struct {}
+type HorizontalScaling2Transformer struct{}
 
 type podAction struct {
 	podName       string
@@ -106,9 +106,8 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	// compute diff set: pods to be created and pods to be deleted
 	roleMap := composeRoleMap(*transCtx.CSSet)
 	leaderPodName := getLeaderPod(pods, roleMap)
-	createActions := func(ordinal int, actionTypeList []string) (bool, error) {
+	createActions := func(ordinal int, actionTypeList []string) error {
 		podName := getPodName(transCtx.CSSet.Name, ordinal)
-		hasActionCreated := false
 		for _, actionType := range actionTypeList {
 			checker := func() bool {
 				return podName == leaderPodName
@@ -121,16 +120,15 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 			}
 			env := buildActionEnv(transCtx.CSSet, leaderPodName, podName)
 			if err := doAction(transCtx.CSSet, dag, env, actionType, ordinal, true); err != nil {
-				return false, err
+				return err
 			}
-			hasActionCreated = true
 		}
-		return hasActionCreated, nil
+		return nil
 	}
 	// handle member join
 	actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
 	for i := transCtx.CSSet.Status.Replicas; i < transCtx.CSSet.Spec.Replicas; i++ {
-		if _, err := createActions(int(i), actionTypeList); err != nil {
+		if err := createActions(int(i), actionTypeList); err != nil {
 			return err
 		}
 	}
@@ -142,14 +140,9 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 
 	// handle member leave
 	actionTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
-	memberLeaveList := make([]string, 0)
 	for i := transCtx.CSSet.Spec.Replicas; i < transCtx.CSSet.Status.Replicas; i++ {
-		hasActionCreated, err := createActions(int(i), actionTypeList)
-		if err != nil {
+		if err := createActions(int(i), actionTypeList); err != nil {
 			return err
-		}
-		if hasActionCreated {
-			memberLeaveList = append(memberLeaveList, getPodName(transCtx.CSSet.Name, int(i)))
 		}
 	}
 
@@ -158,19 +151,6 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	podActionMap, orphanActionList, err := getPodActionMap(transCtx)
 	if err != nil {
 		return err
-	}
-
-	// if all pods to be deleted have no pre actions(but should), return and wait actions synced into cache
-	if len(memberLeaveList) > 0 {
-		noActions := true
-		for _, podName := range memberLeaveList {
-			if pAction, ok := podActionMap[podName]; ok && pAction.hasPreAction {
-				noActions = false
-			}
-		}
-		if noActions {
-			return nil
-		}
 	}
 	// if pod not exist, delete all related suspend actions
 	for _, action := range orphanActionList {
@@ -189,19 +169,16 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 		}
 		delete(podActionMap, podName)
 	}
-	// if action list empty, delete pods
 	if len(podActionMap) == 0 {
-		updateStsHandler()
 		return nil
 	}
-
 	// handle membership actions
 	podList := make([]string, 0, len(podActionMap))
 	for podName := range podActionMap {
 		podList = append(podList, podName)
 	}
 	sort.SliceStable(podList, func(i, j int) bool {
-		return podList[i] < podList[j]
+		return podList[i] > podList[j]
 	})
 	// handle pods in sequence to minimum disrupt on current cluster
 	podName := podList[0]

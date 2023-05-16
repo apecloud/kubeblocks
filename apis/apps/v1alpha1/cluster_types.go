@@ -187,14 +187,14 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// noCreatePDB define PodDistruptionBudget creation behavior, set to true if creation of PodDistruptionBudget
+	// noCreatePDB defines PodDistruptionBudget creation behavior, set to true if creation of PodDistruptionBudget
 	// for this component is not needed. Defaults to false.
 	// +kubebuilder:default=false
 	// +optional
 	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
 }
 
-// GetMinAvailable wrap 'prefer' value return, as for component replicaCount <= 1 will return 0 value,
+// GetMinAvailable wraps the 'prefer' value return, as for component replicaCount <= 1 will return 0 value,
 // and for replicaCount=2 will return 1.
 func (r *ClusterComponentSpec) GetMinAvailable(prefer *intstr.IntOrString) *intstr.IntOrString {
 	if r == nil || r.NoCreatePDB || prefer == nil {

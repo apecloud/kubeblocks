@@ -237,7 +237,7 @@ spec:
                       type: string
                     noCreatePDB:
                       default: false
-                      description: noCreatePDB define PodDistruptionBudget creation
+                      description: noCreatePDB defines PodDistruptionBudget creation
                         behavior, set to true if creation of PodDistruptionBudget
                         for this component is not needed. Defaults to false.
                       type: boolean

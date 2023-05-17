@@ -20,3 +20,8 @@ spec:
   installable:
     autoInstall: false
 
+  defaultInstallValues:
+    - enabled: false
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}

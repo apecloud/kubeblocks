@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ include "milvus.fullname" . }}
+  name: {{ include "clustername" . }}
   labels: {{ include "milvus.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: milvus # ref clusterdefinition.name

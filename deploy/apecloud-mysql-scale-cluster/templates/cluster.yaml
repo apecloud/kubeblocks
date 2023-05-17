@@ -20,6 +20,7 @@ spec:
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 3 }}
       enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
+      serviceAccountName: {{ include "apecloud-mysql-cluster.serviceAccountName" . }}
       {{- with  .Values.resources }}
       resources:
         limits:

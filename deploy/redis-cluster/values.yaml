@@ -49,3 +49,7 @@ tolerations: [ ]
 
 enabledLogs:
   - running
+
+# The RABC permission used by cluster component pod, now include event.create
+serviceAccount:
+  name: ""

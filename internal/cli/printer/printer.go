@@ -111,6 +111,9 @@ func (t *TablePrinter) AddRow(row ...interface{}) {
 }
 
 func (t *TablePrinter) Print() {
+	if t == nil || t.Tbl == nil {
+		return
+	}
 	t.Tbl.Render()
 }
 

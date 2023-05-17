@@ -29,6 +29,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/maps"
 	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -215,7 +216,7 @@ func (o *UninstallOptions) Uninstall() error {
 
 // uninstallAddons uninstall all KubeBlocks addons
 func (o *UninstallOptions) uninstallAddons() error {
-	addonStatus := make(map[string]string)
+	addons := make(map[string]*extensionsv1alpha1.Addon)
 
 	var (
 		allErrs []error
@@ -236,8 +237,8 @@ func (o *UninstallOptions) uninstallAddons() error {
 			}
 
 			for _, obj := range objects.Items {
-				addon := extensionsv1alpha1.Addon{}
-				if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
+				addon := &extensionsv1alpha1.Addon{}
+				if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, addon); err != nil {
 					klog.V(1).Infof("Failed to convert KubeBlocks addon %s", err.Error())
 					allErrs = append(allErrs, err)
 					continue
@@ -248,18 +249,18 @@ func (o *UninstallOptions) uninstallAddons() error {
 					if addon.Status.Phase == extensionsv1alpha1.AddonDisabled {
 						continue
 					}
-					addonStatus[addon.Name] = string(addon.Status.Phase)
-					o.addons = append(o.addons, &addon)
+					addons[addon.Name] = addon
+					o.addons = append(o.addons, addon)
 
 					// uninstall addons
-					if err = disableAddon(o.Dynamic, &addon); err != nil {
+					if err = disableAddon(o.Dynamic, addon); err != nil {
 						klog.V(1).Infof("Failed to uninstall KubeBlocks addon %s %s", addon.Name, err.Error())
 						allErrs = append(allErrs, err)
 					}
 				} else {
-					// update addons if exists
-					if _, ok := addonStatus[addon.Name]; ok {
-						addonStatus[addon.Name] = string(addon.Status.Phase)
+					// update cached addon if exists
+					if _, ok := addons[addon.Name]; ok {
+						addons[addon.Name] = addon
 					}
 				}
 			}
@@ -269,13 +270,14 @@ func (o *UninstallOptions) uninstallAddons() error {
 		buildMsg = func() (string, bool) {
 			var addonMsg []string
 			allDisabled := true
-			for k, v := range addonStatus {
-				if v == string(extensionsv1alpha1.AddonDisabled) {
-					v = printer.BoldGreen("OK")
+			for k, v := range addons {
+				status := string(v.Status.Phase)
+				if v.Status.Phase == extensionsv1alpha1.AddonDisabled {
+					status = printer.BoldGreen("OK")
 				} else {
 					allDisabled = false
 				}
-				addonMsg = append(addonMsg, fmt.Sprintf("%-48s %s", "Addon "+k, v))
+				addonMsg = append(addonMsg, fmt.Sprintf("%-48s %s", "Addon "+k, status))
 			}
 			sort.Strings(addonMsg)
 			return fmt.Sprintf("%-50s\n  %s", msg, strings.Join(addonMsg, "\n  ")), allDisabled
@@ -295,7 +297,7 @@ func (o *UninstallOptions) uninstallAddons() error {
 		return err
 	}
 
-	if len(addonStatus) == 0 || !o.Wait {
+	if len(addons) == 0 || !o.Wait {
 		s.Success()
 		return nil
 	}
@@ -324,7 +326,8 @@ func (o *UninstallOptions) uninstallAddons() error {
 		m, _ := buildMsg()
 		spinnerDone(s, m)
 		if err == wait.ErrWaitTimeout {
-			allErrs = append(allErrs, errors.New("timeout waiting for addons to be disabled, run \"kbcli addon list\" to check addon status"))
+			printAddonTimeoutMsg(o.Out, maps.Values(addons), false)
+			allErrs = append(allErrs, errors.New("timeout waiting for addons to be disabled"))
 		} else {
 			allErrs = append(allErrs, err)
 		}

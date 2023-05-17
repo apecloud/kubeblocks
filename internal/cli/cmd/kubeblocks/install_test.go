@@ -20,16 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubeblocks
 
 import (
+	"bytes"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -115,5 +118,67 @@ var _ = Describe("kubeblocks install", func() {
 		By("kubernetes is not provided by cloud provider")
 		v.Kubernetes = "v1.25.0"
 		Expect(o.checkVersion(v)).Should(Succeed())
+	})
+
+	It("printAddonTimeoutMsg", func() {
+		const (
+			reason = "test-failed-reason"
+		)
+
+		fakeAddOn := func(name string, conditionTrue bool, msg string) *extensionsv1alpha1.Addon {
+			addon := &extensionsv1alpha1.Addon{}
+			addon.Name = name
+			addon.Status = extensionsv1alpha1.AddonStatus{}
+			if conditionTrue {
+				addon.Status.Phase = extensionsv1alpha1.AddonEnabled
+			} else {
+				addon.Status.Phase = extensionsv1alpha1.AddonFailed
+				addon.Status.Conditions = []metav1.Condition{
+					{
+						Message: msg,
+						Reason:  reason,
+					},
+					{
+						Message: msg,
+						Reason:  reason,
+					},
+				}
+			}
+			return addon
+		}
+
+		testCases := []struct {
+			desc     string
+			addons   []*extensionsv1alpha1.Addon
+			expected string
+		}{
+			{
+				desc:     "addons is nil",
+				addons:   nil,
+				expected: "",
+			},
+			{
+				desc: "addons without false condition",
+				addons: []*extensionsv1alpha1.Addon{
+					fakeAddOn("addon", true, ""),
+				},
+				expected: "",
+			},
+			{
+				desc: "addons with false condition",
+				addons: []*extensionsv1alpha1.Addon{
+					fakeAddOn("addon1", true, ""),
+					fakeAddOn("addon2", false, "failed to enable addon2"),
+				},
+				expected: "failed to enable addon2",
+			},
+		}
+
+		for _, c := range testCases {
+			By(c.desc)
+			out := &bytes.Buffer{}
+			printAddonTimeoutMsg(out, c.addons)
+			Expect(out.String()).To(ContainSubstring(c.expected))
+		}
 	})
 })

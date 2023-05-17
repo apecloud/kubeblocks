@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/docker/cli/cli"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -128,6 +129,7 @@ func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 		Use:               "describe ADDON_NAME",
 		Short:             "Describe an addon specification.",
 		Args:              cli.ExactArgs(1),
+		Aliases:           []string{"desc"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
@@ -359,7 +361,7 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 		return nil
 	}
 
-	labels := []string{}
+	var labels []string
 	for k, v := range o.addon.Labels {
 		if strings.Contains(k, constant.APIGroup) {
 			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
@@ -369,14 +371,18 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 	printer.PrintPairStringToLine("Description", o.addon.Spec.Description, 0)
 	printer.PrintPairStringToLine("Labels", strings.Join(labels, ","), 0)
 	printer.PrintPairStringToLine("Type", string(o.addon.Spec.Type), 0)
-	printer.PrintPairStringToLine("Extras", strings.Join(o.addon.GetExtraNames(), ","), 0)
+	if len(o.addon.GetExtraNames()) > 0 {
+		printer.PrintPairStringToLine("Extras", strings.Join(o.addon.GetExtraNames(), ","), 0)
+	}
 	printer.PrintPairStringToLine("Status", string(o.addon.Status.Phase), 0)
 	var autoInstall bool
 	if o.addon.Spec.Installable != nil {
 		autoInstall = o.addon.Spec.Installable.AutoInstall
 	}
 	printer.PrintPairStringToLine("Auto-install", strconv.FormatBool(autoInstall), 0)
-	printer.PrintPairStringToLine("Auto-install selector", strings.Join(o.addon.Spec.Installable.GetSelectorsStrings(), ","), 0)
+	if len(o.addon.Spec.Installable.GetSelectorsStrings()) > 0 {
+		printer.PrintPairStringToLine("Auto-install selector", strings.Join(o.addon.Spec.Installable.GetSelectorsStrings(), ","), 0)
+	}
 
 	switch o.addon.Status.Phase {
 	case extensionsv1alpha1.AddonEnabled:
@@ -384,7 +390,7 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 		printer.PrintLineWithTabSeparator()
 		if err := printer.PrintTable(o.Out, nil, printInstalled,
 			"NAME", "REPLICAS", "STORAGE", "CPU (REQ/LIMIT)", "MEMORY (REQ/LIMIT)", "STORAGE-CLASS",
-			"TOLERATIONS", "PV Enabled"); err != nil {
+			"TOLERATIONS", "PV-ENABLED"); err != nil {
 			return err
 		}
 	default:
@@ -409,12 +415,35 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 			}
 			if err := printer.PrintTable(o.Out, nil, printInstallable,
 				"NAME", "REPLICAS", "STORAGE", "CPU (REQ/LIMIT)", "MEMORY (REQ/LIMIT)", "STORAGE-CLASS",
-				"TOLERATIONS", "PV Enabled"); err != nil {
+				"TOLERATIONS", "PV-ENABLED"); err != nil {
 				return err
 			}
 			printer.PrintLineWithTabSeparator()
 		}
 	}
+
+	// print failed message
+	if o.addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+		var tbl *printer.TablePrinter
+		printHeader := true
+		for _, c := range o.addon.Status.Conditions {
+			if c.Status == metav1.ConditionTrue {
+				continue
+			}
+			if printHeader {
+				printer.PrintTitle("Failed Message")
+				tbl = printer.NewTablePrinter(o.Out)
+				tbl.Tbl.SetColumnConfigs([]table.ColumnConfig{
+					{Number: 3, WidthMax: 120},
+				})
+				tbl.SetHeader("TIME", "REASON", "MESSAGE")
+				printHeader = false
+			}
+			tbl.AddRow(util.TimeFormat(&c.LastTransitionTime), c.Reason, c.Message)
+		}
+		tbl.Print()
+	}
+
 	return nil
 }
 
@@ -524,10 +553,10 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 		valueTransformer func(s, flag string) (interface{}, error),
 		valueAssigner func(*extensionsv1alpha1.AddonInstallSpecItem, interface{}),
 	) error {
-		var jsonArrary []map[string]interface{}
+		var jsonArray []map[string]interface{}
 		var t []string
 
-		err := json.Unmarshal([]byte(s), &jsonArrary)
+		err := json.Unmarshal([]byte(s), &jsonArray)
 		if err != nil {
 			// not a valid JSON array treat it a 2 tuples
 			t = strings.SplitN(s, ":", 2)

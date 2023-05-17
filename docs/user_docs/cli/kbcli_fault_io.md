@@ -1,13 +1,13 @@
 ---
-title: kbcli fault
+title: kbcli fault io
 ---
 
-Inject faults to pod.
+IO chaos.
 
 ### Options
 
 ```
-  -h, --help   help for fault
+  -h, --help   help for io
 ```
 
 ### Options inherited from parent commands
@@ -36,12 +36,11 @@ Inject faults to pod.
 
 ### SEE ALSO
 
-
-* [kbcli fault io](kbcli_fault_io.md)	 - IO chaos.
-* [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
-* [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
-* [kbcli fault stress](kbcli_fault_stress.md)	 - Add memory pressure or CPU load to the system.
-* [kbcli fault time](kbcli_fault_time.md)	 - Clock skew failure.
+* [kbcli fault](kbcli_fault.md)	 - Inject faults to pod.
+* [kbcli fault io attribute](kbcli_fault_io_attribute.md)	 - Override the attributes of the file.
+* [kbcli fault io errno](kbcli_fault_io_errno.md)	 - Causes IO operations to return specific errors.
+* [kbcli fault io latency](kbcli_fault_io_latency.md)	 - Delayed IO operations.
+* [kbcli fault io mistake](kbcli_fault_io_mistake.md)	 - Alters the contents of the file, distorting the contents of the file.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -134,7 +134,7 @@ func NewDetachVolumeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	cmd := o.NewCobraCommand(DetachVolume, DetachVolumeShort)
 
 	o.AddCommonFlag(cmd, f)
-	cmd.Flags().StringVar(&o.VolumeID, "volume-id", "", "The volume id of the ec2.")
+	cmd.Flags().StringVar(&o.VolumeID, "volume-id", "", "The volume id of the ec2.Only available when cloud-provider=aws.")
 	cmd.Flags().StringVar(&o.DeviceName, "device-name", "", "The device name of the volume.")
 
 	util.CheckErr(cmd.MarkFlagRequired("device-name"))

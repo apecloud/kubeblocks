@@ -200,9 +200,8 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 			// use pvc's update without anything extra
 			dag.AddVertex(simpleUpdateVertex)
 			dag.Connect(vertex, simpleUpdateVertex)
-		} else {
-			// this branch means no need to update
 		}
+		// all the else means no need to update
 
 		return nil
 	}

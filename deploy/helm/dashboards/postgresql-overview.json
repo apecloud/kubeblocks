@@ -26,6 +26,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 11323,
   "graphTooltip": 1,
+  "id": 14,
   "links": [
     {
       "asDropdown": false,
@@ -1416,7 +1417,7 @@
           "editorMode": "code",
           "errors": {},
           "exemplar": false,
-          "expr": "topk(5, pg_stat_statements_calls{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "expr": "topk(5, pg_stat_statements_calls{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"})",
           "format": "table",
           "instant": true,
           "interval": "1m",
@@ -1578,7 +1579,7 @@
           "editorMode": "code",
           "errors": {},
           "exemplar": false,
-          "expr": "topk(5, pg_stat_statements_mean_exec_time_seconds{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "expr": "topk(5, pg_stat_statements_mean_exec_time_seconds{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"})",
           "format": "table",
           "instant": true,
           "interval": "1m",
@@ -1692,7 +1693,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -1708,7 +1710,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 2
+            "y": 31
           },
           "id": 413,
           "links": [],
@@ -1801,7 +1803,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -1817,7 +1820,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 2
+            "y": 31
           },
           "id": 414,
           "links": [],
@@ -1924,7 +1927,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -1940,7 +1944,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 3
+            "y": 32
           },
           "id": 394,
           "links": [],
@@ -2033,7 +2037,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2049,7 +2054,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 3
+            "y": 32
           },
           "id": 395,
           "links": [],
@@ -2142,7 +2147,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2158,7 +2164,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 11
+            "y": 40
           },
           "id": 396,
           "links": [],
@@ -2251,7 +2257,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2267,7 +2274,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 11
+            "y": 40
           },
           "id": 397,
           "links": [],
@@ -2360,7 +2367,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2376,7 +2384,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 19
+            "y": 48
           },
           "id": 398,
           "links": [],
@@ -2532,7 +2540,7 @@
               "editorMode": "code",
               "errors": {},
               "exemplar": false,
-              "expr": "rate(pg_stat_user_tables_idx_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) > 0",
+              "expr": "rate(pg_stat_user_tables_idx_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "1m",
@@ -2644,7 +2652,7 @@
               "editorMode": "code",
               "errors": {},
               "exemplar": false,
-              "expr": "rate(pg_stat_user_tables_idx_tup_fetch{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) / rate(pg_stat_user_tables_idx_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) > 0",
+              "expr": "rate(pg_stat_user_tables_idx_tup_fetch{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) / rate(pg_stat_user_tables_idx_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "1m",
@@ -2756,7 +2764,7 @@
               "editorMode": "code",
               "errors": {},
               "exemplar": false,
-              "expr": "rate(pg_stat_user_tables_seq_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) > 0",
+              "expr": "rate(pg_stat_user_tables_seq_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "1m",
@@ -2868,7 +2876,7 @@
               "editorMode": "code",
               "errors": {},
               "exemplar": false,
-              "expr": "rate(pg_stat_user_tables_seq_tup_read{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) / rate(pg_stat_user_tables_seq_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) > 0",
+              "expr": "rate(pg_stat_user_tables_seq_tup_read{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) / rate(pg_stat_user_tables_seq_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "1m",
@@ -2980,7 +2988,7 @@
               "editorMode": "code",
               "errors": {},
               "exemplar": false,
-              "expr": "pg_stat_user_tables_n_live_tup{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"} > 0",
+              "expr": "pg_stat_user_tables_n_live_tup{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}",
               "format": "time_series",
               "instant": false,
               "interval": "1m",
@@ -3092,7 +3100,7 @@
               "editorMode": "code",
               "errors": {},
               "exemplar": false,
-              "expr": "pg_stat_user_tables_n_dead_tup{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"} > 0",
+              "expr": "pg_stat_user_tables_n_dead_tup{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}",
               "format": "time_series",
               "instant": false,
               "interval": "1m",
@@ -3169,7 +3177,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3185,7 +3194,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 5
+            "y": 34
           },
           "id": 389,
           "links": [],
@@ -3278,7 +3287,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3294,7 +3304,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 5
+            "y": 34
           },
           "id": 390,
           "links": [],
@@ -3387,7 +3397,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3403,7 +3414,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 13
+            "y": 42
           },
           "id": 391,
           "links": [],
@@ -3496,7 +3507,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3512,7 +3524,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 13
+            "y": 42
           },
           "id": 423,
           "links": [],
@@ -3641,7 +3653,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3657,7 +3670,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 6
+            "y": 35
           },
           "id": 92,
           "links": [],
@@ -3750,7 +3763,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3766,7 +3780,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 6
+            "y": 35
           },
           "id": 384,
           "links": [],
@@ -3859,7 +3873,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3875,7 +3890,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 14
+            "y": 43
           },
           "id": 385,
           "links": [],
@@ -3968,7 +3983,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3984,7 +4000,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 14
+            "y": 43
           },
           "id": 386,
           "links": [],
@@ -4175,7 +4191,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4191,7 +4208,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 7
+            "y": 36
           },
           "id": 408,
           "links": [],
@@ -4284,7 +4301,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4300,7 +4318,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 7
+            "y": 36
           },
           "id": 409,
           "links": [],
@@ -4393,7 +4411,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4409,7 +4428,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 15
+            "y": 44
           },
           "id": 401,
           "links": [],
@@ -4502,7 +4521,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4518,7 +4538,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 15
+            "y": 44
           },
           "id": 402,
           "links": [],
@@ -4611,7 +4631,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4627,7 +4648,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 23
+            "y": 52
           },
           "id": 403,
           "links": [],
@@ -4796,7 +4817,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4812,7 +4834,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 23
+            "y": 52
           },
           "id": 410,
           "links": [],
@@ -4924,7 +4946,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4940,7 +4963,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 31
+            "y": 60
           },
           "id": 415,
           "links": [],
@@ -5066,7 +5089,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -5082,7 +5106,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 16
+            "y": 37
           },
           "id": 406,
           "links": [],
@@ -5175,7 +5199,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -5191,7 +5216,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 16
+            "y": 37
           },
           "id": 407,
           "links": [],
@@ -5298,7 +5323,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -5314,7 +5340,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 17
+            "y": 38
           },
           "id": 418,
           "links": [],
@@ -5421,7 +5447,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -5437,7 +5464,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 10
+            "y": 39
           },
           "id": 486,
           "links": [],
@@ -5525,7 +5552,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -5541,7 +5569,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 10
+            "y": 39
           },
           "id": 484,
           "links": [],
@@ -5629,7 +5657,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -5645,7 +5674,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 18
+            "y": 47
           },
           "id": 483,
           "links": [],
@@ -5730,7 +5759,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -5746,7 +5776,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 18
+            "y": 47
           },
           "id": 463,
           "options": {
@@ -5825,7 +5855,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -5841,7 +5872,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 26
+            "y": 55
           },
           "id": 485,
           "links": [],

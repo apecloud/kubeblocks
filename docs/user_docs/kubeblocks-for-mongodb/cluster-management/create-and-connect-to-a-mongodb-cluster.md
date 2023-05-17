@@ -62,18 +62,23 @@ kbcli cluster create <clustername>  --node-labels '"<labelname>"' --tolerations 
  Or change the corresponding parameters in the YAML file. 
 
 ```bash
-kbcli cluster create mongodb-cluster --cluster-definition="mongodb" --set-file -<<EOF
+kbcli cluster create <clustername>  --node-labels '"<labelname>"' --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"'  --cluster-definition=mongodb --set-file 
+-<<EOF
 - name: mongodb-cluster
-  replicas: 3
   componentDefRef: mongodb
+  replicas: 3
+  resources:
+    limits:
+      cpu: 1
+      memory: 1Gi
   volumeClaimTemplates:
-  - name: data
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 10Gi
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
 EOF
 ```
 
@@ -96,8 +101,10 @@ See the table below for the detailed description for customizable parameters, se
 If no flags are used and no information specified, you create a MongoDB cluster with default settings.
 
    ```bash
-   kbcli cluster create mongodb-cluster --cluster-definition mongodb 
+   kbcli cluster create <clustername>  --node-labels '"<labelname>"' --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"'  --cluster-definition=mongodb 
    ```
+
+   
 
 ### Create a MongoDB cluster on a node without taints
 
@@ -157,3 +164,4 @@ kbcli cluster connect mongodb-cluster
 ```
 
 For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
+

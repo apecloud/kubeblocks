@@ -38,7 +38,7 @@ var faultStressExample = templates.Examples(`
 	kbcli fault stress --cpu-worker=2 --cpu-load=50 --memory-worker=1 --memory-size=100Mi
 
 	# Affects the first container in mycluster-mysql-0 pod. Making the CPU load up to 50%, and the memory up to 500MB.
-	kbcli fault stress mycluster-mysql-0 --cpu-worke=2 --cpu-load=50
+	kbcli fault stress mycluster-mysql-0 --cpu-worker=2 --cpu-load=50
 	
 	# Affects the mysql container in mycluster-mysql-0 pod. Making the memory up to 500MB.
 	kbcli fault stress mycluster-mysql-0 --memory-worker=2 --memory-size=500Mi  -c=mysql

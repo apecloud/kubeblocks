@@ -26,7 +26,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 1860,
   "graphTooltip": 1,
-  "id": 23,
+  "id": 16,
   "links": [
     {
       "asDropdown": false,
@@ -13281,7 +13281,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -13610,7 +13611,7 @@
             "h": 6,
             "w": 8,
             "x": 0,
-            "y": 8
+            "y": 21
           },
           "id": 9,
           "links": [],
@@ -13708,7 +13709,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -14037,7 +14039,7 @@
             "h": 6,
             "w": 8,
             "x": 8,
-            "y": 8
+            "y": 21
           },
           "id": 433,
           "links": [],
@@ -14137,7 +14139,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -14466,7 +14469,7 @@
             "h": 6,
             "w": 8,
             "x": 16,
-            "y": 8
+            "y": 21
           },
           "id": 33,
           "links": [],
@@ -14568,7 +14571,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -14897,7 +14901,7 @@
             "h": 6,
             "w": 8,
             "x": 0,
-            "y": 14
+            "y": 27
           },
           "id": 37,
           "links": [],
@@ -15001,7 +15005,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -15330,7 +15335,7 @@
             "h": 6,
             "w": 8,
             "x": 8,
-            "y": 14
+            "y": 27
           },
           "id": 133,
           "links": [],
@@ -15426,7 +15431,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -15743,7 +15749,7 @@
             "h": 6,
             "w": 8,
             "x": 16,
-            "y": 14
+            "y": 27
           },
           "id": 301,
           "links": [],
@@ -15842,7 +15848,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -16159,7 +16166,7 @@
             "h": 6,
             "w": 8,
             "x": 0,
-            "y": 20
+            "y": 33
           },
           "id": 36,
           "links": [],
@@ -16258,7 +16265,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -16575,7 +16583,7 @@
             "h": 6,
             "w": 8,
             "x": 8,
-            "y": 20
+            "y": 33
           },
           "id": 35,
           "links": [],
@@ -16662,7 +16670,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -16979,7 +16988,7 @@
             "h": 6,
             "w": 8,
             "x": 16,
-            "y": 20
+            "y": 33
           },
           "id": 34,
           "links": [],
@@ -17080,7 +17089,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -17096,7 +17106,7 @@
             "h": 6,
             "w": 8,
             "x": 0,
-            "y": 33
+            "y": 22
           },
           "id": 156,
           "links": [],
@@ -17183,7 +17193,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -17199,7 +17210,7 @@
             "h": 6,
             "w": 8,
             "x": 8,
-            "y": 33
+            "y": 22
           },
           "id": 43,
           "links": [],
@@ -17314,7 +17325,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -17330,7 +17342,7 @@
             "h": 6,
             "w": 8,
             "x": 16,
-            "y": 33
+            "y": 22
           },
           "id": 28,
           "links": [],
@@ -17429,7 +17441,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -17445,7 +17458,7 @@
             "h": 6,
             "w": 8,
             "x": 0,
-            "y": 39
+            "y": 28
           },
           "id": 219,
           "links": [],
@@ -17535,7 +17548,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -17551,7 +17565,7 @@
             "h": 6,
             "w": 8,
             "x": 8,
-            "y": 39
+            "y": 28
           },
           "id": 41,
           "links": [],
@@ -17642,7 +17656,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -17674,7 +17689,7 @@
             "h": 6,
             "w": 8,
             "x": 16,
-            "y": 39
+            "y": 28
           },
           "id": 44,
           "links": [],
@@ -22273,21 +22288,22 @@
   "schemaVersion": 37,
   "style": "dark",
   "tags": [
-    "linux"
+    "linux",
+    "node"
   ],
   "templating": {
     "list": [
       {
         "current": {
           "selected": false,
-          "text": "192.168.49.2:9100",
-          "value": "192.168.49.2:9100"
+          "text": "172.21.0.3:9100",
+          "value": "172.21.0.3:9100"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(node_uname_info{nodename=\"$Node\"}, instance)",
+        "definition": "label_values(node_uname_info{node=\"$Node\"}, instance)",
         "hide": 2,
         "includeAll": false,
         "label": "Host:",
@@ -22295,7 +22311,7 @@
         "name": "node",
         "options": [],
         "query": {
-          "query": "label_values(node_uname_info{nodename=\"$Node\"}, instance)",
+          "query": "label_values(node_uname_info{node=\"$Node\"}, instance)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -22350,14 +22366,14 @@
       {
         "current": {
           "selected": false,
-          "text": "minikube",
-          "value": "minikube"
+          "text": "k3d-k3s-default-server-0",
+          "value": "k3d-k3s-default-server-0"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(node_uname_info{}, nodename)",
+        "definition": "label_values(node_uname_info{}, node)",
         "hide": 0,
         "includeAll": false,
         "label": "node",
@@ -22365,7 +22381,7 @@
         "name": "Node",
         "options": [],
         "query": {
-          "query": "label_values(node_uname_info{}, nodename)",
+          "query": "label_values(node_uname_info{}, node)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,

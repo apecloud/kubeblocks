@@ -19,20 +19,18 @@
 options: {
 	namespace:        string
 	action:						string
-
-	namespaceSelector: [...]
+	selector:					{}
 	mode:							string
 	value:						string
 	duration: 				string
-	label?:						{}
 
 	direction: 				string
 	externalTargets?:  [...]
 
-	targetNamespaceSelector: string
-	targetMode:				string
-	targetValue:			string
-	targetLabel?:			{}
+	targetMode?:				string
+	targetValue:				string
+	targetNamespaceSelectors: [...string]
+	targetLabelSelectors:			{}
 
 	loss?:						string
 	corrupt?:					string
@@ -59,14 +57,7 @@ content: {
     namespace: options.namespace
   }
   spec:{
-    selector:{
-    	namespaces: options.namespaceSelector
-			if options.label != _|_ {
-				labelSelectors:{
-					options.label
-					}
-			}
-    }
+    selector: options.selector
     mode: options.mode
     value: options.value
     action: options.action
@@ -76,14 +67,14 @@ content: {
     if options.externalTargets != _|_ {
   		externalTargets: options.externalTargets
     }
-  	if options.targetLabel != _|_ {
+  	if options.targetMode != _|_ {
 				target:{
 					mode: options.targetMode
 					value: options.targetValue
 					selector:{
-						namespaces: [options.targetNamespaceSelector]
+						namespaces: options.targetNamespaceSelectors
 						labelSelectors:{
-								options.targetLabel
+								options.targetLabelSelectors
 						}
 					}
 				}

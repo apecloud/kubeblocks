@@ -29,35 +29,34 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var faultDNSExample = templates.Examples(`
 	// Inject DNS faults into all pods under the default namespace, so that any IP is returned when accessing the baidu.com domain name.
-	kbcli fault DNS random --patterns=baidu.com --duration=1m
+	kbcli fault dns random --patterns=baidu.com --duration=1m
 
 	// Inject DNS faults into all pods under the default namespace, so that error is returned when accessing the baidu.com domain name.
-	kbcli fault DNS error --patterns=baidu.com --duration=1m
+	kbcli fault dns error --patterns=baidu.com --duration=1m
 `)
 
 type DNSChaosOptions struct {
 	Patterns []string `json:"patterns"`
 
 	FaultBaseOptions
-
-	create.CreateOptions `json:"-"`
 }
 
 func NewDNSChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, action string) *DNSChaosOptions {
 	o := &DNSChaosOptions{
-		CreateOptions: create.CreateOptions{
-			Factory:         f,
-			IOStreams:       streams,
-			CueTemplateName: CueTemplateDNSChaos,
-			GVR:             GetGVR(Group, Version, ResourceDNSChaos),
+		FaultBaseOptions: FaultBaseOptions{
+			CreateOptions: create.CreateOptions{
+				Factory:         f,
+				IOStreams:       streams,
+				CueTemplateName: CueTemplateDNSChaos,
+				GVR:             GetGVR(Group, Version, ResourceDNSChaos),
+			},
+			Action: action,
 		},
-		FaultBaseOptions: FaultBaseOptions{Action: action},
 	}
 	o.CreateOptions.PreCreate = o.PreCreate
 	o.CreateOptions.Options = o
@@ -118,18 +117,9 @@ func (o *DNSChaosOptions) NewCobraCommand(use, short string) *cobra.Command {
 }
 
 func (o *DNSChaosOptions) AddCommonFlag(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.Mode, "mode", "all", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
-	cmd.Flags().StringVar(&o.Value, "value", "", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
-	cmd.Flags().StringVar(&o.Duration, "duration", "10s", "Supported formats of the duration are: ms / s / m / h.")
-	cmd.Flags().StringToStringVar(&o.Label, "label", map[string]string{}, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
-	cmd.Flags().StringArrayVar(&o.NamespaceSelector, "namespace-selector", []string{"default"}, `Specifies the namespace into which you want to inject faults.`)
+	o.FaultBaseOptions.AddCommonFlag(cmd)
 
 	cmd.Flags().StringArrayVar(&o.Patterns, "patterns", nil, `Select the domain name template that matches the failure behavior, and support placeholders ? and wildcards *.`)
-
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
-
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
 }
 
 func (o *DNSChaosOptions) Validate() error {

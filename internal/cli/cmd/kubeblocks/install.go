@@ -322,7 +322,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 				all = append(all, addonMsg("Addon "+k, printer.BoldGreen("OK")))
 				continue
 			}
-			all = append(all, addonMsg("Addon "+k, v.Name))
+			all = append(all, addonMsg("Addon "+k, string(v.Status.Phase)))
 		}
 		sort.Strings(all)
 		allMsg = fmt.Sprintf("%s\n  %s", msg, strings.Join(all, "\n  "))

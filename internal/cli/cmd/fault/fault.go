@@ -73,6 +73,7 @@ func NewFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd.AddCommand(
 		NewPodChaosCmd(f, streams),
 		NewNetworkChaosCmd(f, streams),
+		NewNodeChaosCmd(f, streams),
 	)
 	return cmd
 }

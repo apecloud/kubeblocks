@@ -50,7 +50,7 @@ type AWSChaosOptions struct {
 	VolumeID    string `json:"volumeID,omitempty"`
 	DeviceName  string `json:"deviceName"`
 
-	NodeOptions
+	//NodeOptions
 
 	create.CreateOptions `json:"-"`
 }

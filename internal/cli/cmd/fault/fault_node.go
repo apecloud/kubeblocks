@@ -20,25 +20,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package fault
 
 import (
+	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-type NodeOptions struct {
+type NodeChaoOptions struct {
 	Action     string `json:"action"`
 	SecretName string `json:"secretName"`
 	Duration   string `json:"duration"`
+
+	AwsRegion   string `json:"awsRegion"`
+	Ec2Instance string `json:"ec2Instance"`
+	VolumeID    string `json:"volumeID,omitempty"`
+	DeviceName  string `json:"deviceName"`
+
+	create.CreateOptions `json:"-"`
 }
 
-func NewNodeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewNodeOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *NodeChaoOptions {
+	o := &NodeChaoOptions{
+		CreateOptions: create.CreateOptions{
+			Factory:         f,
+			IOStreams:       streams,
+			CueTemplateName: CueTemplateAWSChaos,
+			//GVR:             GetGVR(Group, Version, ResourceAWSChaos),
+		},
+	}
+	o.CreateOptions.PreCreate = o.PreCreate
+	o.CreateOptions.Options = o
+	return o
+}
+
+func NewNodeChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "node",
 		Short: "node chaos.",
 	}
+	//cmd.AddCommand(
+	//	NewAWSChaosCmd(f, streams),
+	//	NewGCPCmd(f, streams),
+	//)
 	cmd.AddCommand(
-		NewAWSChaosCmd(f, streams),
-		NewGCPCmd(f, streams),
+		NewStopCmd(f, streams),
+		NewRestartCmd(f, streams),
+		NewDetachVolumeCmd(f, streams),
 	)
+
 	return cmd
 }
+
+//func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+//	o := NewAWSOptions(f, streams)
+//	cmd := o.NewCobraCommand(Stop, StopShort)
+//
+//	o.AddCommonFlag(cmd)
+//
+//	// register flag completion func
+//	registerFlagCompletionFunc(cmd, f)
+//
+//	return cmd
+//}

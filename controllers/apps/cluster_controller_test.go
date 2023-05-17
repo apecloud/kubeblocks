@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -63,7 +64,7 @@ var _ = Describe("Cluster Controller", func() {
 	const (
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
-		clusterNamePrefix  = "test-cluster"
+		clusterName        = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
 		leader             = "leader"
 		follower           = "follower"
 		// REVIEW:
@@ -235,7 +236,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	testServiceAddAndDelete := func(compName, compDefName string) {
 		By("Creating a cluster with two LoadBalancer services")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(compName, compDefName).SetReplicas(1).
 			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
@@ -295,7 +296,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	createClusterObj := func(compName, compDefName string) {
 		By("Creating a cluster")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(compName, compDefName).
 			Create(&testCtx).GetObject()
@@ -611,7 +612,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Creating a single component cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(compName, compDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -646,7 +647,7 @@ var _ = Describe("Cluster Controller", func() {
 		pvcSpec.StorageClassName = &storageClass.Name
 
 		By("Create cluster and waiting for the cluster initialized")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(compName, compDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -737,7 +738,7 @@ var _ = Describe("Cluster Controller", func() {
 			Tenancy: appsv1alpha1.SharedNode,
 		}
 
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(compName, compDefName).SetReplicas(3).
 			WithRandomName().SetClusterAffinity(affinity).
@@ -763,7 +764,7 @@ var _ = Describe("Cluster Controller", func() {
 	testClusterServiceAccount := func(compName, compDefName string) {
 		By("Creating a cluster with target service account name")
 
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(compName, compDefName).SetReplicas(3).
 			SetServiceAccountName("test-service-account").
@@ -796,7 +797,7 @@ var _ = Describe("Cluster Controller", func() {
 			TopologyKeys:    []string{compTopologyKey},
 			Tenancy:         appsv1alpha1.DedicatedNode,
 		}
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().SetClusterAffinity(affinity).
 			AddComponent(compName, compDefName).SetComponentAffinity(compAffinity).
 			Create(&testCtx).GetObject()
@@ -827,7 +828,7 @@ var _ = Describe("Cluster Controller", func() {
 			Operator: corev1.TolerationOpEqual,
 			Effect:   corev1.TaintEffectNoSchedule,
 		}
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(compName, compDefName).SetReplicas(1).
 			AddClusterToleration(toleration).
@@ -867,7 +868,7 @@ var _ = Describe("Cluster Controller", func() {
 			Operator: corev1.TolerationOpEqual,
 			Effect:   corev1.TaintEffectNoSchedule,
 		}
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().AddClusterToleration(toleration).
 			AddComponent(compName, compDefName).AddComponentToleration(compToleration).
 			Create(&testCtx).GetObject()
@@ -931,7 +932,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Mock a cluster obj")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(compName, compDefName).
 			SetReplicas(replicas).AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -1052,7 +1053,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Creating a cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(compName, compDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -1160,7 +1161,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("should reconcile to create cluster with no error", func() {
 			By("Creating a cluster")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, "").
 				AddComponent(statelessCompName, statelessCompDefName).SetReplicas(3).
 				AddComponent(statefulCompName, statefulCompDefName).SetReplicas(3).
@@ -1181,11 +1182,12 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		createNWaitClusterObj := func(components map[string]string,
-			addedComponentProcessor func(compName string, factory *testapps.MockClusterFactory)) {
+			addedComponentProcessor func(compName string, factory *testapps.MockClusterFactory),
+			withFixedName ...bool) {
 			Expect(components).ShouldNot(BeEmpty())
 
 			By("Creating a cluster")
-			clusterBuilder := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterBuilder := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name)
 
 			compNames := make([]string, 0, len(components))
@@ -1196,22 +1198,20 @@ var _ = Describe("Cluster Controller", func() {
 				}
 				compNames = append(compNames, compName)
 			}
-
-			clusterObj = clusterBuilder.WithRandomName().Create(&testCtx).GetObject()
+			if len(withFixedName) == 0 || !withFixedName[0] {
+				clusterBuilder.WithRandomName()
+			}
+			clusterObj = clusterBuilder.Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 			By("Waiting for the cluster controller to create resources completely")
 			waitForCreatingResourceCompletely(clusterKey, compNames...)
 		}
 
-		checkAllResourcesCreated := func() {
-			compNameNDef := map[string]string{
-				statelessCompName: statelessCompDefName,
-				consensusCompName: consensusCompDefName,
-			}
+		checkAllResourcesCreated := func(compNameNDef map[string]string) {
 			createNWaitClusterObj(compNameNDef, func(compName string, factory *testapps.MockClusterFactory) {
 				factory.SetReplicas(3)
-			})
+			}, true)
 
 			By("Check deployment workload has been created")
 			Eventually(testapps.GetListLen(&testCtx, generics.DeploymentSignature,
@@ -1267,20 +1267,7 @@ var _ = Describe("Cluster Controller", func() {
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey:   clusterKey.Name,
 					constant.AppConfigTypeLabelKey: "kubeblocks-env",
-				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
-		}
-
-		checkAllServicesCreate := func() {
-			compNameNDef := map[string]string{
-				statelessCompName:   statelessCompDefName,
-				consensusCompName:   consensusCompDefName,
-				statefulCompName:    statefulCompDefName,
-				replicationCompName: replicationCompDefName,
-			}
-
-			createNWaitClusterObj(compNameNDef, func(compName string, factory *testapps.MockClusterFactory) {
-				factory.SetReplicas(3)
-			})
+				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(len(compNameNDef)))
 
 			By("Checking stateless services")
 			statelessExpectServices := map[string]ExpectService{
@@ -1332,12 +1319,99 @@ var _ = Describe("Cluster Controller", func() {
 			horizontalScale(int(updatedReplicas), consensusCompDefName, replicationCompDefName)
 		}
 
-		It("should create all sub-resources successfully", func() {
-			checkAllResourcesCreated()
-		})
+		It("should create all sub-resources successfully, with terminationPolicy=Halt lifecycle", func() {
+			compNameNDef := map[string]string{
+				statelessCompName:   statelessCompDefName,
+				consensusCompName:   consensusCompDefName,
+				statefulCompName:    statefulCompDefName,
+				replicationCompName: replicationCompDefName,
+			}
+			checkAllResourcesCreated(compNameNDef)
 
-		It("should create corresponding services correctly", func() {
-			checkAllServicesCreate()
+			By("Mocking components' PVCs to bound")
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			for _, sts := range stsList.Items {
+				compName, ok := sts.Labels[constant.KBAppComponentLabelKey]
+				Expect(ok).Should(BeTrue())
+				for i := int(*sts.Spec.Replicas); i >= 0; i-- {
+					pvcKey := types.NamespacedName{
+						Namespace: clusterKey.Namespace,
+						Name:      getPVCName(compName, i),
+					}
+					createPVC(clusterKey.Name, pvcKey.Name, compName)
+					Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+					Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+						pvc.Status.Phase = corev1.ClaimBound
+					})()).ShouldNot(HaveOccurred())
+				}
+			}
+
+			By("delete the cluster and should preserved PVC,Secret,CM resources")
+			deleteCluster := func() {
+				// TODO: would be better that cluster is created with terminationPolicy=Halt instead of
+				// reassign the value after created
+				Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+					cluster.Spec.TerminationPolicy = appsv1alpha1.Halt
+				})()).ShouldNot(HaveOccurred())
+				testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+			}
+			deleteCluster()
+
+			By("check should preserved PVC,Secret,CM resources")
+			var secretList *corev1.SecretList
+			var cmList *corev1.ConfigMapList
+			var pvcList *corev1.PersistentVolumeClaimList
+
+			checkPreservedObjects := func(uid types.UID) {
+				checkObject := func(obj client.Object, uid types.UID) {
+					clusterJSON, ok := obj.GetAnnotations()[constant.LastAppliedClusterAnnotationKey]
+					Expect(ok).Should(BeTrue())
+					Expect(clusterJSON).ShouldNot(BeEmpty())
+					lastAppliedCluster := &appsv1alpha1.Cluster{}
+					Expect(json.Unmarshal([]byte(clusterJSON), lastAppliedCluster)).ShouldNot(HaveOccurred())
+					Expect(lastAppliedCluster.UID).Should(BeEquivalentTo(uid))
+				}
+				listOptions := []client.ListOption{
+					client.InNamespace(clusterKey.Namespace),
+					client.MatchingLabels{
+						constant.AppInstanceLabelKey: clusterKey.Name,
+					},
+				}
+				By("check pvc resources preserved")
+				pvcList = &corev1.PersistentVolumeClaimList{}
+				Expect(k8sClient.List(testCtx.Ctx, pvcList, listOptions...)).Should(Succeed())
+				Expect(pvcList.Items).ShouldNot(BeEmpty())
+				for _, pvc := range pvcList.Items {
+					checkObject(&pvc, uid)
+				}
+
+				By("check configmap resources preserved")
+				cmList = &corev1.ConfigMapList{}
+				Expect(k8sClient.List(testCtx.Ctx, cmList, listOptions...)).Should(Succeed())
+				Expect(cmList.Items).ShouldNot(BeEmpty())
+				for _, cm := range cmList.Items {
+					checkObject(&cm, uid)
+				}
+
+				By("check secret resources preserved")
+				secretList = &corev1.SecretList{}
+				Expect(k8sClient.List(testCtx.Ctx, secretList, listOptions...)).Should(Succeed())
+				Expect(secretList.Items).ShouldNot(BeEmpty())
+				for _, secret := range secretList.Items {
+					checkObject(&secret, uid)
+				}
+			}
+			checkPreservedObjects(clusterObj.UID)
+
+			By("create recovering cluster")
+			lastClusterUID := clusterObj.UID
+			checkAllResourcesCreated(compNameNDef)
+			Expect(clusterObj.UID).ShouldNot(Equal(lastClusterUID))
+
+			By("delete the cluster and should preserved PVC,Secret,CM resources but result updated the new last applied cluster UID")
+			deleteCluster()
+			checkPreservedObjects(clusterObj.UID)
 		})
 
 		It("should successfully h-scale with multiple components", func() {
@@ -1359,11 +1433,11 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		for compName, compDefName := range compNameNDef {
-			It(fmt.Sprintf("[comp: %s] should delete cluster resources immediately if deleting cluster with WipeOut termination policy", compName), func() {
+			It(fmt.Sprintf("[comp: %s] should delete cluster resources immediately if deleting cluster with terminationPolicy=WipeOut", compName), func() {
 				testWipeOut(compName, compDefName)
 			})
 
-			It(fmt.Sprintf("[comp: %s] should not terminate immediately if deleting cluster with DoNotTerminate termination policy", compName), func() {
+			It(fmt.Sprintf("[comp: %s] should not terminate immediately if deleting cluster with terminationPolicy=DoNotTerminate", compName), func() {
 				testDoNotTermintate(compName, compDefName)
 			})
 
@@ -1483,7 +1557,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("creating cluster with backup")
 			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, compName, backupName)
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(compName, compDefName).
 				SetReplicas(3).
@@ -1544,7 +1618,7 @@ var _ = Describe("Cluster Controller", func() {
 		It("Should success with primary pod and secondary pod", func() {
 			By("Mock a cluster obj with replication componentDefRef.")
 			pvcSpec := testapps.NewPVCSpec("1Gi")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(compName, compDefName).
 				SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).

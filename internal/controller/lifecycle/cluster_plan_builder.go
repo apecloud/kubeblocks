@@ -258,7 +258,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 			return err
 		}
 	case DELETE:
-		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
+		if controllerutil.RemoveFinalizer(node.obj, constant.DBClusterFinalizerName) {
 			err := c.cli.Update(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				c.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", node.obj, node.obj.GetName()))
@@ -307,8 +307,7 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		}
 		// keep the original template annotations.
 		// if annotations exist and are replaced, the statefulSet will be updated.
-		mergeAnnotations(stsObj.Spec.Template.Annotations,
-			&stsProto.Spec.Template.Annotations)
+		mergeAnnotations(stsProto.Spec.Template.Annotations, &stsObj.Spec.Template.Annotations)
 		stsObj.Spec.Template = stsProto.Spec.Template
 		stsObj.Spec.Replicas = stsProto.Spec.Replicas
 		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
@@ -317,8 +316,7 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 
 	handleDeploy := func(origObj, deployProto *appsv1.Deployment) (client.Object, error) {
 		deployObj := origObj.DeepCopy()
-		mergeAnnotations(deployObj.Spec.Template.Annotations,
-			&deployProto.Spec.Template.Annotations)
+		mergeAnnotations(deployProto.Spec.Template.Annotations, &deployObj.Spec.Template.Annotations)
 		deployObj.Spec = deployProto.Spec
 		return deployObj, nil
 	}
@@ -326,14 +324,20 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 	handleSvc := func(origObj, svcProto *corev1.Service) (client.Object, error) {
 		svcObj := origObj.DeepCopy()
 		svcObj.Spec = svcProto.Spec
-		svcObj.Annotations = mergeServiceAnnotations(svcObj.Annotations, svcProto.Annotations)
+		mergeServiceAnnotations(svcProto.Annotations, &svcObj.Annotations)
 		return svcObj, nil
 	}
 
 	handlePVC := func(origObj, pvcProto *corev1.PersistentVolumeClaim) (client.Object, error) {
 		pvcObj := origObj.DeepCopy()
-		if pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] == pvcProto.Spec.Resources.Requests[corev1.ResourceStorage] {
-			return pvcObj, nil
+		// if proto object is a real object resources, simply override annotations, this could happen
+		// due to ClusterDeletionTransformer may result preserved PVC objects when cluster termination
+		// policy is equal to Halt.
+		if pvcProto.UID != "" {
+			pvcObj.Annotations = pvcProto.Annotations
+			pvcObj.OwnerReferences = pvcProto.OwnerReferences
+		} else {
+			mergeAnnotations(pvcProto.Annotations, &pvcObj.Annotations)
 		}
 		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
 		return pvcObj, nil
@@ -351,7 +355,6 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 	case *corev1.Secret, *corev1.ConfigMap:
 		return v, nil
 	}
-
 	return node.obj, nil
 }
 

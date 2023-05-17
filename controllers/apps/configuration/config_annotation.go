@@ -73,7 +73,7 @@ func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCt
 		return false, err
 	}
 
-	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotation]
+	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotationKet]
 	if !ok {
 		return updateAppliedConfigs(client, ctx, cm, configData, cfgcore.ReconfigureCreatedPhase)
 	}
@@ -89,7 +89,7 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotation] = string(configData)
+	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotationKet] = string(configData)
 	hash, err := util.ComputeHash(config.Data)
 	if err != nil {
 		return false, err
@@ -116,7 +116,7 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 
 func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
 	data := make(map[string]string, 0)
-	cfgContent, ok := cm.GetAnnotations()[constant.LastAppliedConfigAnnotation]
+	cfgContent, ok := cm.GetAnnotations()[constant.LastAppliedConfigAnnotationKet]
 	if !ok {
 		return data, nil
 	}

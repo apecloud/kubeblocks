@@ -240,10 +240,17 @@ func BackgroundDeleteObject(cli client.Client, ctx context.Context, obj client.O
 	return nil
 }
 
-// SetOwnership set owner reference and add finalizer if not exists
-func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
-	if err := controllerutil.SetControllerReference(owner, obj, scheme); err != nil {
-		return err
+// SetOwnership provides helper function controllerutil.SetControllerReference/controllerutil.SetOwnerReference
+// and controllerutil.AddFinalizer if not exists.
+func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string, useOwnerReference ...bool) error {
+	if len(useOwnerReference) > 0 && useOwnerReference[0] {
+		if err := controllerutil.SetOwnerReference(owner, obj, scheme); err != nil {
+			return err
+		}
+	} else {
+		if err := controllerutil.SetControllerReference(owner, obj, scheme); err != nil {
+			return err
+		}
 	}
 	if !controllerutil.ContainsFinalizer(obj, finalizer) {
 		// pvc objects do not need to add finalizer

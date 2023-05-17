@@ -1,32 +1,13 @@
 ---
-title: kbcli cluster restart
+title: kbcli fault pod
 ---
 
-Restart the specified components in the cluster.
-
-```
-kbcli cluster restart NAME [flags]
-```
-
-### Examples
-
-```
-  # restart all components
-  kbcli cluster restart mycluster
-  
-  # restart specifies the component, separate with commas when component more than one
-  kbcli cluster restart mycluster --components=mysql
-```
+Pod chaos.
 
 ### Options
 
 ```
-      --components strings             Component names to this operations
-      --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
-  -h, --help                           help for restart
-      --name string                    OpsRequest name. if not specified, it will be randomly generated 
-  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
+  -h, --help   help for pod
 ```
 
 ### Options inherited from parent commands
@@ -55,7 +36,10 @@ kbcli cluster restart NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli fault](kbcli_fault.md)	 - Inject faults to pod.
+* [kbcli fault pod failure](kbcli_fault_pod_failure.md)	 - failure pod
+* [kbcli fault pod kill](kbcli_fault_pod_kill.md)	 - kill pod
+* [kbcli fault pod kill-container](kbcli_fault_pod_kill-container.md)	 - kill containers
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

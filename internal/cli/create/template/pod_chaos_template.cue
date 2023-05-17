@@ -23,25 +23,27 @@ options: {
 	mode:							string
 	value:						string
 	duration: 				string
-	
-	patterns:					[...]
+
+	gracePeriod: 			int64
+	containerNames: 	[...]
 }
 
 // required, k8s api resource content
 content: {
-  kind: "DNSChaos"
+  kind: "PodChaos"
   apiVersion: "chaos-mesh.org/v1alpha1"
   metadata:{
-  	generateName: "dns-chaos-"
+  	generateName: "pod-chaos-"
     namespace: options.namespace
   }
   spec:{
-    selector: options.selector
-    action: options.action
+		selector: options.selector
     mode: options.mode
     value: options.value
+    action: options.action
     duration: options.duration
 
-		patterns: options.patterns
+    gracePeriod: options.gracePeriod
+    containerNames: options.containerNames
   }
 }

@@ -1,32 +1,24 @@
 ---
-title: kbcli cluster restart
+title: kbcli clusterdefinition list-components
 ---
 
-Restart the specified components in the cluster.
+List cluster definition components.
 
 ```
-kbcli cluster restart NAME [flags]
+kbcli clusterdefinition list-components [flags]
 ```
 
 ### Examples
 
 ```
-  # restart all components
-  kbcli cluster restart mycluster
-  
-  # restart specifies the component, separate with commas when component more than one
-  kbcli cluster restart mycluster --components=mysql
+  # List all components belong to the cluster definition.
+  kbcli clusterdefinition list-components apecloud-mysql
 ```
 
 ### Options
 
 ```
-      --components strings             Component names to this operations
-      --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
-  -h, --help                           help for restart
-      --name string                    OpsRequest name. if not specified, it will be randomly generated 
-  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
+  -h, --help   help for list-components
 ```
 
 ### Options inherited from parent commands
@@ -55,7 +47,7 @@ kbcli cluster restart NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

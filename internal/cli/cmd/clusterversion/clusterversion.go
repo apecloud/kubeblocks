@@ -28,11 +28,17 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 )
 
 var listExample = templates.Examples(`
 		# list all ClusterVersion
 		kbcli clusterversion list`)
+
+type ListClusterVersionOptions struct {
+	*list.ListOptions
+	clusterDefinitionRef string
+}
 
 func NewClusterVersionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -46,7 +52,9 @@ func NewClusterVersionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 }
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := list.NewListOptions(f, streams, types.ClusterVersionGVR())
+	o := &ListClusterVersionOptions{
+		ListOptions: list.NewListOptions(f, streams, types.ClusterVersionGVR()),
+	}
 	cmd := &cobra.Command{
 		Use:               "list",
 		Short:             "List ClusterVersions.",
@@ -54,11 +62,15 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Aliases:           []string{"ls"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
+			if len(o.clusterDefinitionRef) != 0 {
+				o.LabelSelector = util.BuildClusterDefinitionRefLable(o.LabelSelector, []string{o.clusterDefinitionRef})
+			}
 			o.Names = args
 			_, err := o.Run()
 			util.CheckErr(err)
 		},
 	}
 	o.AddFlags(cmd, true)
+	flags.AddClusterDefinitionFlag(f, cmd, &o.clusterDefinitionRef)
 	return cmd
 }

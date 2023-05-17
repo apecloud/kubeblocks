@@ -327,6 +327,7 @@ func createDownwardHandler(meta *ConfigSpecMeta) (map[string]ConfigHandler, erro
 type tplScriptHandler struct {
 	configVolumeHandleMeta
 
+	tplScripts string
 	tplContent string
 	fileFilter regexFilter
 	engineType string
@@ -337,7 +338,7 @@ type tplScriptHandler struct {
 func (u *tplScriptHandler) OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error {
 	logger.V(1).Info(fmt.Sprintf("online update[%v]", updatedParams))
 	return wrapGoTemplateRun(ctx,
-		u.configVolumeHandleMeta.configSpec.Name,
+		u.tplScripts,
 		u.tplContent,
 		updatedParams,
 		u.formatterConfig,
@@ -383,6 +384,7 @@ func CreateTPLScriptHandler(name, configPath string, dirs []string, backupPath s
 	tplHandler := &tplScriptHandler{
 		configVolumeHandleMeta: createConfigVolumeMeta(name, appsv1alpha1.TPLScriptType, dirs, &tplConfig.FormatterConfig),
 		tplContent:             string(tplContent),
+		tplScripts:             tplScripts,
 		fileFilter:             filter,
 		engineType:             tplConfig.DataType,
 		dsn:                    tplConfig.DSN,

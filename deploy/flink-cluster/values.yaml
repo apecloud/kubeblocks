@@ -6,10 +6,6 @@ fullnameOverride: ""
 
 jobmanager:
   replicaCount: 1
-  serviceAccount:
-    create: true
-    name:
-    automountServiceAccountToken: true
   resources:
     limits:
       cpu: 500m
@@ -25,10 +21,6 @@ jobmanager:
 
 taskmanager:
   replicaCount: 1
-  serviceAccount:
-    create: true
-    name:
-    automountServiceAccountToken: true
   resources:
     limits:
       cpu: 500m

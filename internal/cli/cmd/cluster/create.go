@@ -32,6 +32,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -383,13 +384,6 @@ const (
 func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
 
-	// HACK: now we only support postgresql cluster definition
-	if c, err := shouldCreateDependencies(cd, compSpec); err != nil {
-		return err
-	} else if !c {
-		return nil
-	}
-
 	// set component service account name
 	compSpec.ServiceAccountName = saNamePrefix + o.Name
 	o.shouldCreateDependencies = true
@@ -423,20 +417,35 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 	role := rbacv1ac.Role(roleName, o.Namespace).WithRules([]*rbacv1ac.PolicyRuleApplyConfiguration{
 		{
 			APIGroups: []string{""},
-			Resources: []string{"configmaps"},
-			Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
-		},
-		{
-			APIGroups: []string{""},
-			Resources: []string{"endpoints"},
-			Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
-		},
-		{
-			APIGroups: []string{""},
-			Resources: []string{"pods"},
-			Verbs:     []string{"get", "list", "patch", "update", "watch"},
+			Resources: []string{"events"},
+			Verbs:     []string{"create"},
 		},
 	}...).WithLabels(labels)
+
+	// postgresql need more rules for patronic
+	if ok, err := o.isPostgresqlCluster(); err != nil {
+		return err
+	} else if ok {
+		rules := []rbacv1ac.PolicyRuleApplyConfiguration{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"endpoints"},
+				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+				Verbs:     []string{"get", "list", "patch", "update", "watch"},
+			},
+		}
+		role.Rules = append(role.Rules, rules...)
+	}
+
 	if _, err := o.Client.RbacV1().Roles(o.Namespace).Apply(context.TODO(), role, applyOptions); err != nil {
 		return err
 	}
@@ -558,6 +567,40 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 	}
 	obj.SetUnstructuredContent(data)
 	return nil
+}
+
+func (o *CreateOptions) isPostgresqlCluster() (bool, error) {
+	cd, err := cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return false, err
+	}
+
+	var compDef *appsv1alpha1.ClusterComponentDefinition
+	if cd.Spec.Type != "postgresql" {
+		return false, nil
+	}
+
+	// get cluster component definition
+	if len(o.ComponentSpecs) == 0 {
+		return false, fmt.Errorf("find no cluster componnet")
+	}
+	compSpec := o.ComponentSpecs[0]
+	for i, def := range cd.Spec.ComponentDefs {
+		compDefRef := compSpec["componentDefRef"]
+		if compDefRef != nil && def.Name == compDefRef.(string) {
+			compDef = &cd.Spec.ComponentDefs[i]
+		}
+	}
+
+	if compDef == nil {
+		return false, fmt.Errorf("failed to find component definition for componnet %v", compSpec["Name"])
+	}
+
+	// for postgresql, we need to create a service account, a role and a rolebinding
+	if compDef.CharacterType != "postgresql" {
+		return false, nil
+	}
+	return true, nil
 }
 
 // setEnableAllLog set enable all logs, and ignore enabledLogs of component level.
@@ -912,28 +955,60 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 	return allStorageClasses, existedDefault, nil
 }
 
-func shouldCreateDependencies(cd *appsv1alpha1.ClusterDefinition, compSpec *appsv1alpha1.ClusterComponentSpec) (bool, error) {
-	var compDef *appsv1alpha1.ClusterComponentDefinition
-	if cd.Spec.Type != "postgresql" {
-		return false, nil
+// validateClusterVersion check whether the cluster version we need is exist in K8S or
+// the default cluster version is exist
+func (o *CreateOptions) validateClusterVersion() error {
+	existedClusterVersions, defaultVersion, existedDefault, err := getClusterVersions(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return err
 	}
-
-	// get cluster component definition
-	for i, def := range cd.Spec.ComponentDefs {
-		if def.Name == compSpec.ComponentDefRef {
-			compDef = &cd.Spec.ComponentDefs[i]
+	switch {
+	case o.ClusterVersionRef != "":
+		if _, ok := existedClusterVersions[o.ClusterVersionRef]; !ok {
+			return fmt.Errorf("failed to find the specified cluster version \"%s\"", o.ClusterVersionRef)
+		}
+	case !existedDefault:
+		// if default version is not set and there is only one version, use it
+		if len(existedClusterVersions) == 1 {
+			o.ClusterVersionRef = maps.Keys(existedClusterVersions)[0]
+			fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
+		} else {
+			return fmt.Errorf("failed to find the default cluster version, use '--cluster-version ClusterVersion' to set it")
+		}
+	case existedDefault:
+		// TODO: achieve this in operator
+		if existedDefault {
+			o.ClusterVersionRef = defaultVersion
+			fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
 		}
 	}
 
-	if compDef == nil {
-		return false, fmt.Errorf("failed to find component definition for componnet %s", compSpec.Name)
-	}
+	return nil
+}
 
-	// for postgresql, we need to create a service account, a role and a rolebinding
-	if compDef.CharacterType != "postgresql" {
-		return false, nil
+// getClusterVersions return all cluster versions in K8S and return true if the cluster have a default cluster version
+func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[string]struct{}, string, bool, error) {
+	allClusterVersions := make(map[string]struct{})
+	existedDefault := false
+	defaultVersion := ""
+	list, err := dynamic.Resource(types.ClusterVersionGVR()).List(context.Background(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
+	})
+	if err != nil {
+		return nil, defaultVersion, false, err
 	}
-	return true, nil
+	for _, item := range list.Items {
+		allClusterVersions[item.GetName()] = struct{}{}
+		annotations := item.GetAnnotations()
+		if annotations != nil && annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue {
+			if existedDefault {
+				return nil, defaultVersion, existedDefault, fmt.Errorf("clusterDef %s has more than one default cluster version", clusterDef)
+			}
+			existedDefault = true
+			defaultVersion = item.GetName()
+		}
+	}
+	return allClusterVersions, defaultVersion, existedDefault, nil
 }
 
 func buildResourceLabels(clusterName string) map[string]string {

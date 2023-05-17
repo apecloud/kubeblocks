@@ -186,3 +186,10 @@ topologyKeys:
 ## @param affinity is affinity setting for Kafka cluster pods assignment
 ##
 affinity: {}
+
+nameOverride: ""
+fullnameOverride: ""
+
+# The RABC permission used by cluster component pod, now include event.create
+serviceAccount:
+  name: ""

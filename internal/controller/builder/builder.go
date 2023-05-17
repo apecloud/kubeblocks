@@ -139,6 +139,7 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 		fieldPath string
 	}{
 		{name: "KB_POD_NAME", fieldPath: "metadata.name"},
+		{name: "KB_POD_UID", fieldPath: "metadata.uid"},
 		{name: "KB_NAMESPACE", fieldPath: "metadata.namespace"},
 		{name: "KB_SA_NAME", fieldPath: "spec.serviceAccountName"},
 		{name: "KB_NODENAME", fieldPath: "spec.nodeName"},

@@ -20,22 +20,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package fault
 
 import (
-	"k8s.io/kubectl/pkg/util/templates"
-
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var faultTimeExample = templates.Examples(`
-	#Shifts the clock back five seconds.
+	# Affects the first container in default namespace's all pods.Shifts the clock back five seconds.
 	kbcli fault time --time-offset=-5s
+	
+	# Affects the first container in default namespace's all pods.
+	kbcli fault time --time-offset=-5m5s
+	
+	# Affects the first container in mycluster-mysql-0 pod. Shifts the clock forward five seconds.
+	kbcli fault time mycluster-mysql-0 --time-offset=+5s50ms
+
+	# Affects the mysql container in mycluster-mysql-0 pod. Shifts the clock forward five seconds.
+	kbcli fault time mycluster-mysql-0 --time-offset=+5s -c=mysql
+	
+	# The clock that specifies the effect of time offset is CLOCK_REALTIME.
+	kbcli fault time mycluster-mysql-0 --time-offset=+5s --clock-id=CLOCK_REALTIME -c=mysql
 `)
 
 type TimeChaosOptions struct {
@@ -67,15 +78,9 @@ func NewTimeChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams,
 
 func NewTimeChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewTimeChaosOptions(f, streams, "")
-
 	cmd := o.NewCobraCommand(Time, TimeShort)
-	o.AddCommonFlag(cmd)
 
-	util.CheckErr(cmd.MarkFlagRequired("timeOffset"))
-
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
-
+	o.AddCommonFlag(cmd, f)
 	return cmd
 }
 
@@ -94,12 +99,17 @@ func (o *TimeChaosOptions) NewCobraCommand(use, short string) *cobra.Command {
 	}
 }
 
-func (o *TimeChaosOptions) AddCommonFlag(cmd *cobra.Command) {
+func (o *TimeChaosOptions) AddCommonFlag(cmd *cobra.Command, f cmdutil.Factory) {
 	o.FaultBaseOptions.AddCommonFlag(cmd)
 
 	cmd.Flags().StringVar(&o.TimeOffset, "time-offset", "", "Specifies the length of the time offset. For example: -5s, -10m100ns.")
-	cmd.Flags().StringArrayVar(&o.ClockIds, "clockIds", nil, `Specifies the clock on which the time offset acts.If it's empty, it will be set to ['CLOCK_REALTIME'].See clock_gettime [https://man7.org/linux/man-pages/man2/clock_gettime.2.html] document for details.`)
+	cmd.Flags().StringArrayVar(&o.ClockIds, "clock-id", nil, `Specifies the clock on which the time offset acts.If it's empty, it will be set to ['CLOCK_REALTIME'].See clock_gettime [https://man7.org/linux/man-pages/man2/clock_gettime.2.html] document for details.`)
 	cmd.Flags().StringArrayVarP(&o.ContainerNames, "container", "c", nil, `Specifies the injected container name. For example: mysql. If it's empty, the first container will be injected.`)
+
+	util.CheckErr(cmd.MarkFlagRequired("time-offset"))
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
 }
 
 func (o *TimeChaosOptions) Validate() error {

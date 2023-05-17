@@ -50,20 +50,21 @@ var _ = Describe("Fault IO", func() {
 
 		It("fault io latency", func() {
 			inputs := [][]string{
-				{"--mode=one", "--delay=10s", "--dry-run=client"},
-				{"--mode=fixed", "--value=2", "--delay=10s", "--dry-run=client"},
-				{"--mode=fixed-percent", "--value=50", "--delay=10s", "--dry-run=client"},
-				{"--mode=random-max-percent", "--value=50", "--delay=10s", "--dry-run=client"},
-				{"--ns-fault=kb-system", "--delay=10s", "--dry-run=client"},
-				{"--node=minikube-m02", "--delay=10s", "--dry-run=client"},
-				{"--label=app.kubernetes.io/component=mysql", "--delay=10s", "--dry-run=client"},
-				{"--node-label=kubernetes.io/arch=arm64", "--delay=10s", "--dry-run=client"},
-				{"--annotation=example-annotation=group-a", "--delay=10s", "--dry-run=client"},
+				{"--mode=one", "--delay=10s", "--volume-path=/data", "--dry-run=client"},
+				{"--mode=fixed", "--value=2", "--delay=10s", "--volume-path=/data", "--dry-run=client"},
+				{"--mode=fixed-percent", "--value=50", "--delay=10s", "--volume-path=/data", "--dry-run=client"},
+				{"--mode=random-max-percent", "--value=50", "--delay=10s", "--volume-path=/data", "--dry-run=client"},
+				{"--ns-fault=kb-system", "--delay=10s", "--volume-path=/data", "--dry-run=client"},
+				{"--node=minikube-m02", "--delay=10s", "--volume-path=/data", "--dry-run=client"},
+				{"--label=app.kubernetes.io/component=mysql", "--delay=10s", "--volume-path=/data", "--dry-run=client"},
+				{"--node-label=kubernetes.io/arch=arm64", "--delay=10s", "--volume-path=/data", "--dry-run=client"},
+				{"--annotation=example-annotation=group-a", "--delay=10s", "--volume-path=/data", "--dry-run=client"},
 				{"--delay=10s", "--volume-path=/data", "--dry-run=client"},
+				{"--delay=10s", "--volume-path=/data", "--path=test.txt", "--percent=50", "--method=READ", "-c=mysql", "--dry-run=client"},
 			}
 			o := NewIOChaosOptions(tf, streams, string(v1alpha1.IoLatency))
 			cmd := o.NewCobraCommand(Latency, LatencyShort)
-			o.AddCommonFlag(cmd)
+			o.AddCommonFlag(cmd, tf)
 			cmd.Flags().StringVar(&o.Delay, "delay", "", `Specific delay time.`)
 
 			for _, input := range inputs {
@@ -75,13 +76,14 @@ var _ = Describe("Fault IO", func() {
 			}
 		})
 
-		It("fault io error", func() {
+		It("fault io errno", func() {
 			inputs := [][]string{
 				{"--errno=22", "--volume-path=/data", "--dry-run=client"},
+				{"--errno=22", "--volume-path=/data", "--path=test.txt", "--percent=50", "--method=READ", "--dry-run=client"},
 			}
 			o := NewIOChaosOptions(tf, streams, string(v1alpha1.IoFaults))
 			cmd := o.NewCobraCommand(Errno, ErrnoShort)
-			o.AddCommonFlag(cmd)
+			o.AddCommonFlag(cmd, tf)
 			cmd.Flags().IntVar(&o.Errno, "errno", 0, `The returned error number.`)
 
 			for _, input := range inputs {
@@ -100,7 +102,7 @@ var _ = Describe("Fault IO", func() {
 			}
 			o := NewIOChaosOptions(tf, streams, string(v1alpha1.IoAttrOverride))
 			cmd := o.NewCobraCommand(Attribute, AttributeShort)
-			o.AddCommonFlag(cmd)
+			o.AddCommonFlag(cmd, tf)
 			cmd.Flags().Uint64Var(&o.Ino, "ino", 0, `ino number.`)
 			cmd.Flags().Uint64Var(&o.Size, "size", 0, `File size.`)
 			cmd.Flags().Uint64Var(&o.Blocks, "blocks", 0, `The number of blocks the file occupies.`)
@@ -120,14 +122,16 @@ var _ = Describe("Fault IO", func() {
 
 		It("fault io mistake", func() {
 			inputs := [][]string{
-				{"--filling=zero", "--maxOccurrences=10", "--maxLength=1", "--volume-path=/data", "--dry-run=client"},
+				{"--volume-path=/data", "--filling=zero", "--max-occurrences=10", "--max-length=1", "--dry-run=client"},
+				{"--volume-path=/data", "--filling=random", "--max-occurrences=10", "--max-length=1", "--dry-run=client"},
+				{"--volume-path=/data", "--filling=zero", "--max-occurrences=10", "--max-length=1", "--path=test.txt", "--percent=50", "--method=READ", "--dry-run=client"},
 			}
 			o := NewIOChaosOptions(tf, streams, string(v1alpha1.IoMistake))
 			cmd := o.NewCobraCommand(Mistake, MistakeShort)
-			o.AddCommonFlag(cmd)
+			o.AddCommonFlag(cmd, tf)
 			cmd.Flags().StringVar(&o.Filling, "filling", "", `The filling content of the error data can only be zero (filling with 0) or random (filling with random bytes).`)
-			cmd.Flags().IntVar(&o.MaxOccurrences, "maxOccurrences", 1, `The maximum number of times an error can occur per operation.`)
-			cmd.Flags().IntVar(&o.MaxLength, "maxLength", 1, `The maximum length (in bytes) of each error.`)
+			cmd.Flags().IntVar(&o.MaxOccurrences, "max-occurrences", 1, `The maximum number of times an error can occur per operation.`)
+			cmd.Flags().IntVar(&o.MaxLength, "max-length", 1, `The maximum length (in bytes) of each error.`)
 
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())

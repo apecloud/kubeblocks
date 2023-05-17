@@ -33,18 +33,43 @@ import (
 )
 
 var faultIOExample = templates.Examples(`
-	# Injects a delay fault into the /data directory, causing a 10-second delay for all filesystem operations (including reading, writing, listing directory contents, etc.) under this directory.
+	# Affects the first container in default namespace's all pods. Delay all IO operations under the /data path by 10s.
 	kbcli fault io latency --delay=10s --volume-path=/data
 	
-	# Inject a file error fault into the /data directory, so that all file system operations under this directory have a 100% probability of error and return error code 22 (Invalid argument).
-	kbcli fault io fault --volume-path=/data --errno=22
+	# Affects the first container in mycluster-mysql-0 pod.
+	kbcli fault io latency mycluster-mysql-0 --delay=10s --volume-path=/data
 	
-	# Inject the attrOverride fault into the /data directory, so that all file system operations in this directory will have a 100% probability of changing the permission of the target file to 72 (that is, 110 in octal), which will make the file only accessible by the owner and the location Executed by the group and has no right to perform other operations.
+	# Affects the mysql container in mycluster-mysql-0 pod.
+	kbcli fault io latency mycluster-mysql-0 --delay=10s --volume-path=/data -c=mysql
+
+	# There is a 50% probability of affecting the read IO operation of the test.txt file under the /data path.
+	kbcli fault io latency mycluster-mysql-0 --delay=10s --volume-path=/data --path=test.txt --percent=50 --method=READ -c=mysql
+
+	# Same as above.Make all IO operations under the /data path return the specified error number 22 (Invalid argument).
+	kbcli fault io errno --volume-path=/data --errno=22
+	
+	# Same as above.Modify the IO operation permission attribute of the files under the /data path to 72.(110 in octal).
 	kbcli fault io attribute --volume-path=/data --perm=72
 	
-	# Inject read and write error faults into the /data directory, so that read and write operations under this directory will have a 100% probability of error. Among them, random positions of 1 with a maximum length of 10 in bytes will be replaced with 0.
-	kbcli fault io mistake --volume-path=/data --filling=zero --maxOccurrences=10 --maxLength=1
+	# Modify all files so that random positions of 1's with a maximum length of 10 bytes will be replaced with 0's.
+	kbcli fault io mistake --volume-path=/data --filling=zero --max-occurrences=10 --max-length=1
 `)
+
+type IOAttribute struct {
+	Ino    uint64 `json:"ino,omitempty"`
+	Size   uint64 `json:"size,omitempty"`
+	Blocks uint64 `json:"blocks,omitempty"`
+	Perm   uint16 `json:"perm,omitempty"`
+	Nlink  uint32 `json:"nlink,omitempty"`
+	UID    uint32 `json:"uid,omitempty"`
+	GID    uint32 `json:"gid,omitempty"`
+}
+
+type IOMistake struct {
+	Filling        string `json:"filling,omitempty"`
+	MaxOccurrences int    `json:"maxOccurrences,omitempty"`
+	MaxLength      int    `json:"maxLength,omitempty"`
+}
 
 type IOChaosOptions struct {
 	// Parameters required by the `latency` command.
@@ -54,25 +79,16 @@ type IOChaosOptions struct {
 	Errno int `json:"errno"`
 
 	// Parameters required by the `attribute` command.
-	Ino    uint64 `json:"ino,omitempty"`
-	Size   uint64 `json:"size,omitempty"`
-	Blocks uint64 `json:"blocks,omitempty"`
-	Perm   uint16 `json:"perm,omitempty"`
-	Nlink  uint32 `json:"nlink,omitempty"`
-	UID    uint32 `json:"uid,omitempty"`
-	GID    uint32 `json:"gid,omitempty"`
+	IOAttribute `json:"attr,omitempty"`
 
 	// Parameters required by the `mistake` command.
-	Filling        string `json:"filling,omitempty"`
-	MaxOccurrences int    `json:"maxOccurrences"`
-	MaxLength      int    `json:"maxLength"`
+	IOMistake `json:"mistake,omitempty"`
 
-	VolumePath string `json:"volumePath"`
-	Path       string `json:"path"`
-	Percent    int    `json:"percent"`
-
-	ContainerNames []string `json:"containerNames,omitempty"`
+	VolumePath     string   `json:"volumePath"`
+	Path           string   `json:"path"`
+	Percent        int      `json:"percent"`
 	Methods        []string `json:"methods,omitempty"`
+	ContainerNames []string `json:"containerNames,omitempty"`
 
 	FaultBaseOptions
 }
@@ -112,15 +128,10 @@ func NewIOLatencyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	o := NewIOChaosOptions(f, streams, string(v1alpha1.IoLatency))
 	cmd := o.NewCobraCommand(Latency, LatencyShort)
 
-	o.AddCommonFlag(cmd)
+	o.AddCommonFlag(cmd, f)
 	cmd.Flags().StringVar(&o.Delay, "delay", "", `Specific delay time.`)
 
 	util.CheckErr(cmd.MarkFlagRequired("delay"))
-	util.CheckErr(cmd.MarkFlagRequired("volume-path"))
-
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
-
 	return cmd
 }
 
@@ -128,15 +139,10 @@ func NewIOFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o := NewIOChaosOptions(f, streams, string(v1alpha1.IoFaults))
 	cmd := o.NewCobraCommand(Errno, ErrnoShort)
 
-	o.AddCommonFlag(cmd)
+	o.AddCommonFlag(cmd, f)
 	cmd.Flags().IntVar(&o.Errno, "errno", 0, `The returned error number.`)
 
 	util.CheckErr(cmd.MarkFlagRequired("errno"))
-	util.CheckErr(cmd.MarkFlagRequired("volume-path"))
-
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
-
 	return cmd
 }
 
@@ -144,8 +150,7 @@ func NewIOAttributeOverrideCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 	o := NewIOChaosOptions(f, streams, string(v1alpha1.IoAttrOverride))
 	cmd := o.NewCobraCommand(Attribute, AttributeShort)
 
-	o.AddCommonFlag(cmd)
-
+	o.AddCommonFlag(cmd, f)
 	cmd.Flags().Uint64Var(&o.Ino, "ino", 0, `ino number.`)
 	cmd.Flags().Uint64Var(&o.Size, "size", 0, `File size.`)
 	cmd.Flags().Uint64Var(&o.Blocks, "blocks", 0, `The number of blocks the file occupies.`)
@@ -154,11 +159,6 @@ func NewIOAttributeOverrideCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 	cmd.Flags().Uint32Var(&o.UID, "uid", 0, `Owner's user ID.`)
 	cmd.Flags().Uint32Var(&o.GID, "gid", 0, `The owner's group ID.`)
 
-	util.CheckErr(cmd.MarkFlagRequired("volume-path"))
-
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
-
 	return cmd
 }
 
@@ -166,19 +166,14 @@ func NewIOMistakeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	o := NewIOChaosOptions(f, streams, string(v1alpha1.IoMistake))
 	cmd := o.NewCobraCommand(Mistake, MistakeShort)
 
-	o.AddCommonFlag(cmd)
-
+	o.AddCommonFlag(cmd, f)
 	cmd.Flags().StringVar(&o.Filling, "filling", "", `The filling content of the error data can only be zero (filling with 0) or random (filling with random bytes).`)
-	cmd.Flags().IntVar(&o.MaxOccurrences, "maxOccurrences", 1, `The maximum number of times an error can occur per operation.`)
-	cmd.Flags().IntVar(&o.MaxLength, "maxLength", 1, `The maximum length (in bytes) of each error.`)
+	cmd.Flags().IntVar(&o.MaxOccurrences, "max-occurrences", 1, `The maximum number of times an error can occur per operation.`)
+	cmd.Flags().IntVar(&o.MaxLength, "max-length", 1, `The maximum length (in bytes) of each error.`)
 
 	util.CheckErr(cmd.MarkFlagRequired("filling"))
-	util.CheckErr(cmd.MarkFlagRequired("maxOccurrences"))
-	util.CheckErr(cmd.MarkFlagRequired("maxLength"))
-	util.CheckErr(cmd.MarkFlagRequired("volume-path"))
-
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
+	util.CheckErr(cmd.MarkFlagRequired("max-occurrences"))
+	util.CheckErr(cmd.MarkFlagRequired("max-length"))
 
 	return cmd
 }
@@ -198,14 +193,19 @@ func (o *IOChaosOptions) NewCobraCommand(use, short string) *cobra.Command {
 	}
 }
 
-func (o *IOChaosOptions) AddCommonFlag(cmd *cobra.Command) {
+func (o *IOChaosOptions) AddCommonFlag(cmd *cobra.Command, f cmdutil.Factory) {
 	o.FaultBaseOptions.AddCommonFlag(cmd)
 
 	cmd.Flags().StringVar(&o.VolumePath, "volume-path", "", `The mount point of the volume in the target container must be the root directory of the mount.`)
 	cmd.Flags().StringVar(&o.Path, "path", "", `The effective scope of the injection error can be a wildcard or a single file.`)
 	cmd.Flags().IntVar(&o.Percent, "percent", 100, `Probability of failure per operation, in %.`)
-	cmd.Flags().StringArrayVarP(&o.ContainerNames, "container", "c", nil, "The name of the container, such as mysql, prometheus.If it's empty, the first container will be injected.")
 	cmd.Flags().StringArrayVar(&o.Methods, "method", nil, "The file system calls that need to inject faults. For example: WRITE READ")
+	cmd.Flags().StringArrayVarP(&o.ContainerNames, "container", "c", nil, "The name of the container, such as mysql, prometheus.If it's empty, the first container will be injected.")
+
+	util.CheckErr(cmd.MarkFlagRequired("volume-path"))
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
 }
 
 func (o *IOChaosOptions) Validate() error {

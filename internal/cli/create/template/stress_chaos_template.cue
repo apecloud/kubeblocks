@@ -24,6 +24,7 @@ options: {
 	duration: 				string
 
 	stressors: 				{}
+	containerNames: 	[...]
 }
 
 // required, k8s api resource content
@@ -40,5 +41,6 @@ content: {
     value: options.value
     duration: options.duration
     stressors: options.stressors
+    containerNames: options.containerNames
   }
 }

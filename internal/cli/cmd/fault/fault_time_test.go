@@ -57,11 +57,12 @@ var _ = Describe("Fault Time", func() {
 				{"--label=app.kubernetes.io/component=mysql", "--time-offset=-5s", "--dry-run=client"},
 				{"--node-label=kubernetes.io/arch=arm64", "--time-offset=-5s", "--dry-run=client"},
 				{"--annotation=example-annotation=group-a", "--time-offset=-5s", "--dry-run=client"},
-				{"--time-offset=-5s", "--clockIds=CLOCK_REALTIME", "--container=mysql", "--dry-run=client"},
+				{"--time-offset=-5s", "--dry-run=client"},
+				{"--time-offset=+5s", "--clock-id=CLOCK_REALTIME", "-c=mysql", "--dry-run=client"},
 			}
 			o := NewTimeChaosOptions(tf, streams, "")
 			cmd := o.NewCobraCommand(Time, TimeShort)
-			o.AddCommonFlag(cmd)
+			o.AddCommonFlag(cmd, tf)
 
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())

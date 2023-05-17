@@ -57,11 +57,14 @@ var _ = Describe("Fault Stress", func() {
 				{"--label=app.kubernetes.io/component=mysql", "--cpu-worker=2", "--cpu-load=50", "--dry-run=client"},
 				{"--node-label=kubernetes.io/arch=arm64", "--cpu-worker=2", "--cpu-load=50", "--dry-run=client"},
 				{"--annotation=example-annotation=group-a", "--cpu-worker=2", "--cpu-load=50", "--dry-run=client"},
+				{"--cpu-worker=2", "--cpu-load=50", "--dry-run=client"},
+				{"--memory-worker=2", "--memory-size=500Mi", "-c=mysql", "--dry-run=client"},
 				{"--cpu-worker=2", "--cpu-load=50", "--memory-worker=1", "--memory-size=100Mi", "--dry-run=client"},
+				{"--cpu-worker=2", "--cpu-load=50", "--memory-worker=1", "--memory-size=100Mi", "--dry-run=client", "--container=mysql"},
 			}
 			o := NewStressChaosOptions(tf, streams, "")
 			cmd := o.NewCobraCommand(Stress, StressShort)
-			o.AddCommonFlag(cmd)
+			o.AddCommonFlag(cmd, tf)
 
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())

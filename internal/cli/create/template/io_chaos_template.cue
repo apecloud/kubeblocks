@@ -26,21 +26,12 @@ options: {
 
 	delay:				 		string
 	errno:				 		int
-	ino?: 							uint64
-	size?: 						uint64
-	blocks?: 					uint64
-	perm?: 						uint16
-	nlink?: 						uint32
-	uid?: 							uint32
-	gid?: 							uint32
-	filling?: 				string
-	maxOccurrences: 	int
-	maxLength: 				int
+	attr?:						{}
+	mistake?:					{}
 
 	volumePath:				string
 	path:				 			string
 	percent:				 	int
-
 	methods:					[...]
 	containerNames: 	[...]
 }
@@ -62,38 +53,11 @@ content: {
 
  		delay: options.delay
 		errno: options.errno
-		if options.ino != _|_ || options.size != _|_ || options.blocks != _|_ ||
-			options.perm != _|_ || options.nlink != _|_ || options.uid != _|_ || options.gid != _|_ {
-				attr:{
-					if options.ino != _|_ {
-						ino: options.ino
-					}
-					if options.size != _|_ {
-							size: options.size
-					}
-					if options.blocks != _|_ {
-						blocks: options.blocks
-					}
-					if options.perm != _|_ {
-						perm: options.perm
-					}
-					if options.nlink != _|_ {
-						nlink: options.nlink
-					}
-					if options.uid != _|_ {
-						uid: options.uid
-					}
-					if options.gid != _|_ {
-						gid	: options.gid
-					}
-				}
+		if len(options.attr) != 0 {
+			attr: options.attr
 		}
-		if options.filling != _|_ {
-			mistake:{
-				filling: options.filling
-				maxOccurrences: options.maxOccurrences
-				maxLength: options.maxLength
-			}
+		if len(options.mistake) != 0 {
+			mistake: options.mistake
 		}
 
     volumePath: options.volumePath

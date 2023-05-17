@@ -34,8 +34,14 @@ import (
 )
 
 var faultStressExample = templates.Examples(`
-	# Creating a process in a container consumes CPU and memory resources continuously, making the CPU load up to 50%, and the memory up to 100MB.
-	kbcli fault stress --cpu-workers=2 --cpu-load=50 --memory-workers=1 --memory-size=100Mi
+	# Affects the first container in default namespace's all pods.Making CPU load up to 50%, and the memory up to 100MB. 
+	kbcli fault stress --cpu-worker=2 --cpu-load=50 --memory-worker=1 --memory-size=100Mi
+
+	# Affects the first container in mycluster-mysql-0 pod. Making the CPU load up to 50%, and the memory up to 500MB.
+	kbcli fault stress mycluster-mysql-0 --cpu-worke=2 --cpu-load=50
+	
+	# Affects the mysql container in mycluster-mysql-0 pod. Making the memory up to 500MB.
+	kbcli fault stress mycluster-mysql-0 --memory-worker=2 --memory-size=500Mi  -c=mysql
 `)
 
 type CPU struct {
@@ -54,7 +60,8 @@ type Stressors struct {
 }
 
 type StressChaosOptions struct {
-	Stressors `json:"stressors"`
+	Stressors      `json:"stressors"`
+	ContainerNames []string `json:"containerNames,omitempty"`
 
 	FaultBaseOptions
 }
@@ -78,13 +85,9 @@ func NewStressChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStream
 
 func NewStressChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewStressChaosOptions(f, streams, "")
-
 	cmd := o.NewCobraCommand(Stress, StressShort)
-	o.AddCommonFlag(cmd)
 
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
-
+	o.AddCommonFlag(cmd, f)
 	return cmd
 }
 
@@ -103,13 +106,17 @@ func (o *StressChaosOptions) NewCobraCommand(use, short string) *cobra.Command {
 	}
 }
 
-func (o *StressChaosOptions) AddCommonFlag(cmd *cobra.Command) {
+func (o *StressChaosOptions) AddCommonFlag(cmd *cobra.Command, f cmdutil.Factory) {
 	o.FaultBaseOptions.AddCommonFlag(cmd)
 
 	cmd.Flags().IntVar(&o.CPU.Workers, "cpu-worker", 0, `Specifies the number of threads that exert CPU pressure.`)
 	cmd.Flags().IntVar(&o.CPU.Load, "cpu-load", 0, `Specifies the percentage of CPU occupied. 0 means no extra load added, 100 means full load. The total load is workers * load.`)
 	cmd.Flags().IntVar(&o.Memory.Workers, "memory-worker", 0, `Specifies the number of threads that apply memory pressure.`)
 	cmd.Flags().StringVar(&o.Memory.Size, "memory-size", "", `Specify the size of the allocated memory or the percentage of the total memory, and the sum of the allocated memory is size. For example:256MB or 25%`)
+	cmd.Flags().StringArrayVarP(&o.ContainerNames, "container", "c", nil, "The name of the container, such as mysql, prometheus.If it's empty, the first container will be injected.")
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
 }
 
 func (o *StressChaosOptions) Validate() error {

@@ -30,10 +30,10 @@ kbcli fault node detach-volume [flags]
   kbcli fault node stop -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-45rl --secret-name=cloud-key-secret
   
   # Restart a specified GCK instance.
-  kbcli fault node restart gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-d9nd --secret-name=cloud-key-secret
+  kbcli fault node restart gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-d9 --secret-name=cloud-key-secret
   
   # Detach a specified volume from a specified GCK instance.
-  kbcli fault node detach-volume gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-d9nd --secret-name=cloud-key-secret --device-name=/dev/sdb
+  kbcli fault node detach-volume gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-d9 --secret-name=cloud-key-secret --device-name=/dev/sdb
 ```
 
 ### Options

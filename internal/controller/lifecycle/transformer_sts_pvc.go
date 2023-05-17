@@ -209,11 +209,7 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 		}
 
 		targetQuantity := vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
-		if viper.GetBool(constant.CfgRecoverVolumeExpansionFailure) && pvc.Spec.Resources.Requests[corev1.ResourceStorage] != vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
-			// if support RECOVER_VOLUME_EXPANSION_FAILURE, update pvc directly
-			dag.AddVertex(simpleUpdateVertex)
-			dag.Connect(vertex, simpleUpdateVertex)
-		} else if pvcNotFound && !pvNotFound {
+		if pvcNotFound && !pvNotFound {
 			// this could happen if create pvc step failed when recreating pvc
 			updatePVCByRecreateFromStep(removePVClaimRefStep)
 		} else if pvcNotFound && pvNotFound {
@@ -221,7 +217,8 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 		} else if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
 			// this could happen if create pvc succeeded but last step failed
 			updatePVCByRecreateFromStep(pvRestorePolicyStep)
-		} else if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(targetQuantity) == 1 && // check if it's compressing volume
+		} else if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; !viper.GetBool(constant.CfgRecoverVolumeExpansionFailure) &&
+			pvcQuantity.Cmp(targetQuantity) == 1 && // check if it's compressing volume
 			targetQuantity.Cmp(*pvc.Status.Capacity.Storage()) >= 0 { // check if target size is greater than or equal to actual size
 			// this branch means we can update pvc size by recreate it
 			updatePVCByRecreateFromStep(pvPolicyRetainStep)

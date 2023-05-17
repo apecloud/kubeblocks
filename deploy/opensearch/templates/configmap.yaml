@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opensearch-config-template
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+  {{- include "opensearch.labels" . | nindent 4 }}
+data:
+  opensearch.yaml: |-
+    {{- .Files.Get "configs/opensearch.yaml.tpl" | nindent 4 }}

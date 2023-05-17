@@ -1,0 +1,204 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: opensearch
+  labels:
+    {{- include "opensearch.labels" . | nindent 4 }}
+spec:
+  type: opensearch
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "https://$(SVC_FQDN):$(SVC_PORT_http)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_http)"
+  componentDefs:
+    - name: opensearch
+      characterType: opensearch
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9600
+      configSpecs:
+      - name: opensearch-config-template
+        templateRef: opensearch-config-template
+        volumeName: opensearch-config
+        namespace: {{.Release.Namespace}}
+      workloadType: Stateful
+      service:
+        ports:
+          - name: http
+            port: 9200
+            targetPort: http
+          - name: transport
+            port: 9300
+            targetPort: transport
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        initContainers:
+        - name: fsgroup-volume
+          imagePullPolicy: IfNotPresent
+          command: ['sh', '-c']
+          args:
+          - 'chown -R 1000:1000 /usr/share/opensearch/data'
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+          - name: data
+            mountPath: /usr/share/opensearch/data
+        - name: sysctl
+          imagePullPolicy: IfNotPresent
+          command:
+          - sh
+          - -c
+          - |
+            set -xe
+            DESIRED="262144"
+            CURRENT=$(sysctl -n vm.max_map_count)
+            if [ "$DESIRED" -gt "$CURRENT" ]; then
+              sysctl -w vm.max_map_count=$DESIRED
+            fi
+          securityContext:
+            runAsUser: 0
+            privileged: true
+        containers:
+          - name: opensearch
+            imagePullPolicy: IfNotPresent
+            readinessProbe:
+              tcpSocket:
+                port: 9200
+              periodSeconds: 5
+              timeoutSeconds: 3
+              failureThreshold: 3
+            startupProbe:
+              tcpSocket:
+                port: 9200
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              timeoutSeconds: 3
+              failureThreshold: 30
+            ports:
+            - name: http
+              containerPort: 9200
+            - name: transport
+              containerPort: 9300
+            - name: metrics
+              containerPort: 9600
+            env:
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: cluster.initial_master_nodes
+              value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-0"
+            - name: discovery.seed_hosts
+              value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-headless"
+            - name: cluster.name
+              value: "$(KB_CLUSTER_NAME)"
+            - name: network.host
+              value: "0.0.0.0"
+            - name: OPENSEARCH_JAVA_OPTS
+              value: "-Xmx512M -Xms512M"
+            - name: node.roles
+              value: "master,ingest,data,remote_cluster_client"
+            volumeMounts:
+              - mountPath: /usr/share/opensearch/data
+                name: data
+              - mountPath: /usr/share/opensearch/config/opensearch.yaml
+                subPath: opensearch.yaml
+                name: opensearch-config
+          - name: opensearch-master-graceful-termination-handler
+            imagePullPolicy: IfNotPresent
+            command:
+            - "sh"
+            - -c
+            - |
+              #!/usr/bin/env bash
+              set -eo pipefail
+
+              http () {
+                  local path="${1}"
+                  if [ -n "${USERNAME}" ] && [ -n "${PASSWORD}" ]; then
+                    BASIC_AUTH="-u ${USERNAME}:${PASSWORD}"
+                  else
+                    BASIC_AUTH=''
+                  fi
+                  curl -XGET -s -k --fail ${BASIC_AUTH} https://$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-headless:9200:${path}
+              }
+
+              cleanup () {
+                while true ; do
+                  local master="$(http "/_cat/master?h=node" || echo "")"
+                  if [[ $master == "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)"* && $master != "${NODE_NAME}" ]]; then
+                    echo "This node is not master."
+                    break
+                  fi
+                  echo "This node is still master, waiting gracefully for it to step down"
+                  sleep 1
+                done
+
+                exit 0
+              }
+
+              trap cleanup SIGTERM
+
+              sleep infinity &
+              wait $!
+    - name: dashboard
+      characterType: opensearch-dashboard
+      workloadType: Stateless
+      service:
+        ports:
+        - name: http
+          port: 5601
+          targetPort: http
+      podSpec:
+        containers:
+        - name: dashboard
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+          - sh
+          - -c
+          - |
+            #!/usr/bin/bash
+            set -e
+            bash opensearch-dashboards-docker-entrypoint.sh opensearch-dashboards
+          env:
+          - name: OPENSEARCH_HOSTS
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: endpoint
+          - name: SERVER_HOST
+            value: "0.0.0.0"
+          startupProbe:
+            tcpSocket:
+              port: 5601
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 20
+            successThreshold: 1
+            initialDelaySeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5601
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 10
+            successThreshold: 1
+            initialDelaySeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 5601
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 10
+            successThreshold: 1
+            initialDelaySeconds: 10
+          ports:
+          - containerPort: 5601
+            name: http
+            protocol: TCP

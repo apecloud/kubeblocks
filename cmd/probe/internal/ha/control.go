@@ -75,7 +75,7 @@ func (h *Ha) UpdateRecall(oldObj, newObj interface{}) {
 }
 
 func (h *Ha) promote() error {
-	resp, err := h.config.ExecCommand(h.db, "default", "pg_ctl promote")
+	resp, err := h.config.ExecCommand(h.db, "default", "su -c 'pg_ctl promote' postgres")
 	if err != nil {
 		h.log.Errorf("promote err: %v", err)
 		return err
@@ -86,7 +86,7 @@ func (h *Ha) promote() error {
 
 func (h *Ha) demote() error {
 	time.Sleep(time.Second)
-	resp, err := h.config.ExecCommand(h.db, "default", "pg_ctl stop -m fast")
+	resp, err := h.config.ExecCommand(h.db, "default", "su -c 'pg_ctl stop -m fast' postgres")
 	if err != nil {
 		h.log.Errorf("demote err: %v", err)
 		return err

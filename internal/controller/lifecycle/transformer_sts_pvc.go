@@ -55,6 +55,7 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 		if pvcNotFound {
 			newPVC.Name = pvcKey.Name
 			newPVC.Namespace = pvcKey.Namespace
+			newPVC.SetLabels(vctProto.Labels)
 			newPVC.Spec = vctProto.Spec
 			ml := client.MatchingLabels{
 				constant.PVCNameLabelKey: pvcKey.Name,
@@ -75,6 +76,8 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 			}
 		} else {
 			newPVC.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
+			// delete annotation to make it re-bind
+			delete(newPVC.Annotations, "pv.kubernetes.io/bind-completed")
 		}
 
 		// for simple update
@@ -124,7 +127,10 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 
 		// step 3: remove claimRef in pv
 		removeClaimRefPV := retainPV.DeepCopy()
-		removeClaimRefPV.Spec.ClaimRef = nil
+		if removeClaimRefPV.Spec.ClaimRef != nil {
+			removeClaimRefPV.Spec.ClaimRef.UID = ""
+			removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
+		}
 		removeClaimRefVertex := &lifecycleVertex{
 			obj:    removeClaimRefPV,
 			oriObj: retainPV,

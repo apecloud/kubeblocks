@@ -12,9 +12,10 @@ The KubeBlocks configuration function provides a set of consistent default confi
 ## View parameter information
 
 View the current configuration file of a cluster.
+
 ```bash
 kbcli cluster describe-config mongodb-cluster
-
+>
 ConfigSpecs Meta:
 CONFIG-SPEC-NAME         FILE                  ENABLED   TEMPLATE                     CONSTRAINT                   RENDERED                                            COMPONENT    CLUSTER           
 mongodb-config           keyfile               false     mongodb5.0-config-template   mongodb-config-constraints   mongodb-cluster-replicaset-mongodb-config           replicaset   mongodb-cluster   
@@ -35,27 +36,29 @@ You can also view the details of this configuration file and parameters.
    kbcli cluster describe-config mongodb-cluster --show-detail
    ```
 
-
 ## Reconfigure parameters
 
 The example below reconfigures velocity to 1.
 
 1. Adjust the values of `velocity` to 1.
 
-   ```
-   $ kbcli cluster configure mongodb-cluster --component mongodb --config-spec mongodb-config --config-file mongodb.conf --set systemLog.verbosity=1
+   ```bash
+   kbcli cluster configure mongodb-cluster --component mongodb --config-spec mongodb-config --config-file mongodb.conf --set systemLog.verbosity=1
+   >
    Warning: The parameter change you modified needs to be restarted, which may cause the cluster to be unavailable for a period of time. Do you need to continue...
    Please type "yes" to confirm: yes
    Will updated configure file meta:
    ConfigSpec: mongodb-config      ConfigFile: mongodb.conf      ComponentName: mongodb  ClusterName: mongodb-cluster
    OpsRequest mongodb-cluster-reconfiguring-q8ndn created successfully, you can view the progress:
           kbcli cluster describe-ops mongodb-cluster-reconfiguring-q8ndn -n default
-  ```
+   ```
 
 2. Check configure history.
 
-  ```
+   ```bash
+
     kbcli cluster describe-config mongodb-cluster
+    >
     ConfigSpecs Meta:
     CONFIG-SPEC-NAME         FILE                  ENABLED   TEMPLATE                     CONSTRAINT                   RENDERED                                         COMPONENT   CLUSTER
     mongodb-config           keyfile               false     mongodb5.0-config-template   mongodb-config-constraints   mongodb-cluster-mongodb-mongodb-config           mongodb     mongodb-cluster
@@ -65,12 +68,11 @@ The example below reconfigures velocity to 1.
     History modifications:
     OPS-NAME                              CLUSTER           COMPONENT   CONFIG-SPEC-NAME   FILE           STATUS    POLICY    PROGRESS   CREATED-TIME                 VALID-UPDATED
     mongodb-cluster-reconfiguring-q8ndn   mongodb-cluster   mongodb     mongodb-config     mongodb.conf   Succeed   restart   3/3        Apr 21,2023 18:56 UTC+0800   {"mongodb.conf":"{\"systemLog\":{\"verbosity\":\"1\"}}"}```
-  ```
+   ```
 
 3. Verify change result.
 
-```
+   ```bash
     root@mongodb-cluster-mongodb-0:/# cat etc/mongodb/mongodb.conf |grep verbosity
     verbosity: "1"
-```
-
+   ```

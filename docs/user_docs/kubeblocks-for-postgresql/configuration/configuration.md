@@ -11,8 +11,8 @@ The KubeBlocks configuration function provides a set of consistent default confi
 
 ## Before you start
 
-1. [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md).
-2. [Create a PostgreSQL cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md) and wait until the cluster status is Running.
+1. [Install KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
+2. [Create a PostgreSQL cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster) and wait until the cluster status is Running.
 
 ## View parameter information
 

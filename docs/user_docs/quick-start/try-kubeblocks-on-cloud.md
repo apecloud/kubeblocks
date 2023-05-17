@@ -31,14 +31,7 @@ Make sure you have all the followings prepared.
 * [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
 * Make sure the following tools are installed.
   * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-  * [Install kbcli](./../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kbcli): It is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. Follow the steps below to install `kbcli`.
-    1. Install `kbcli`.
-
-         ```bash
-         curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
-         ```
-
-    2. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.
+  * [Install kbcli](./../installation/introduction.md):Choose one guide that fits your actual environments. `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
 
 ### Configure access key
 

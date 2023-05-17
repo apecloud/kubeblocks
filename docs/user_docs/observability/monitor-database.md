@@ -49,7 +49,7 @@ With the built-in database observability, you can observe the database health st
 
 :::note
 
-Refer to [Enable add-ons](./../../installation/enable-add-ons.md) for details.
+Refer to [Enable add-ons](./../../installation/enable-addons.md) for details.
 
 :::
 

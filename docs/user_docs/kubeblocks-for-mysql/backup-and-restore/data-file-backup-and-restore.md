@@ -1,14 +1,14 @@
 ---
 title: Data file backup and restore for MySQL
-description: How to back up and restore data files for MySQL
+description: How to back up and restore MySQL by data files
 keywords: [data file backup and restore, mysql]
 sidebar_position: 2
-sidebar_label: By data file
+sidebar_label: Data file
 ---
 
 # Data file backup and restore
 
-Data file backup of KubeBlocks is one type of full backup. It is recommended to perform the data file backup and restore on a local self-managed database.
+Data file backup of KubeBlocks is one type of full backup.
 
 Follow the steps below to back up and restore a cluster by data files.
 
@@ -94,7 +94,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
 --set storageClass.singleBucket=<bucket_name>  \
 --set secret.endpoint=https://oss-<region>.aliyuncs.com \
 --set storageClass.mounter=s3fs,storageClass.mountOptions="" \
--n kb-system
+ -n kb-system
 
 # CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
 --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
@@ -133,7 +133,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
 
 ## Configure global backup storage source by KubeBlocks
 
-You can configure a global backup storage source to make this source the default backup policy of all new clusters. Currently, the glocal backup storage source cannot be synchronized as the backup policy of created clusters.
+You can configure a global backup storage source to make this source the default backup policy of all new clusters. But currently, the global backup storage source cannot be synchronized as the backup policy of created clusters.
 
 If there is no PVC, the system creates one automatically based on the configuration.
 
@@ -246,7 +246,7 @@ spec:
 **Option 2.** Use `kubectl`
 
 ```bash
-kubectl edit backuppolicy mysql-cluster-mysql-backup-policy
+kbcli cluster edit-backup-policy mysql-cluster-mysql-backup-policy
 > 
 spec:
   full:
@@ -264,7 +264,7 @@ spec:
 
 ## Back up the cluster
 
-**Option 1** Use `kbcli`
+**Option 1.** Use `kbcli`
 
 1. Check whether the cluster is running.
 
@@ -278,7 +278,7 @@ spec:
 2. Create a backup for this cluster.
 
    ```bash
-   kbcli cluster backup mysql-cluster --backup-type=full
+   kbcli cluster backup mysql-cluster --type=datafile
    > 
    Backup backup-default-mysql-cluster-20230418124113 created successfully, you can view the progress:
            kbcli cluster list-backup --name=backup-default-mysql-cluster-20230418124113 -n default

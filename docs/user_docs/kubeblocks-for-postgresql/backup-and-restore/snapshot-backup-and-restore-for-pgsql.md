@@ -15,11 +15,7 @@ This guide shows how to use `kbcli` to back up and restore a PostgreSQL cluster.
 
 - Prepare a clean EKS cluster, and install EBS CSI driver plug-in, with at least one node and the memory of each node is not less than 4GB.
 - [Install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) to ensure that you can connect to the EKS cluster.
-- Install `kbcli`. Refer to [Install kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
-
-   ```bash
-   curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
-   ```
+- [Install `kbcli`](./../../installation/introduction.md): Choose one guide that fits your actual environments.
 
 ***Steps:***
 
@@ -45,7 +41,7 @@ This guide shows how to use `kbcli` to back up and restore a PostgreSQL cluster.
     kb-addon-snapshot-controller-6b4f656c99-zgq7g     1/1     Running            0             9m
     ```
 
-    If the output result does not show `kb-addon-snapshot-controller`, it means the snapshot-controller add-on is not enabled. It may be caused by failing to meet the installable condition of this add-on. Refer to [Enable add-ons](../../installation/enable-add-ons.md) to find the environment requirements and then enable the snapshot-controller add-on.
+    If the output result does not show `kb-addon-snapshot-controller`, it means the snapshot-controller add-on is not enabled. It may be caused by failing to meet the installable condition of this add-on. Refer to [Enable add-ons](../../installation/enable-addons.md) to find the environment requirements and then enable the snapshot-controller add-on.
 
 2. Configure EKS to support the snapshot function.
 

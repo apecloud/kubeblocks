@@ -53,7 +53,7 @@ Prepare a clean EKS cluster, and install EBS CSI driver plug-in, with at least o
 
     </details>
 
-    If the output result does not show `snapshot-controller`, refer to [Enable add-ons](../../installation/enable-add-ons.md) to find the environment requirements and then enable the snapshot-controller add-on. It may be caused by failing to meet the installation condition of this add-on.
+    If the output result does not show `snapshot-controller`, refer to [Enable add-ons](../../installation/enable-addons.md) to find the environment requirements and then enable the snapshot-controller add-on. It may be caused by failing to meet the installation condition of this add-on.
 
 3. Configure Cloud-based Kubernetes managed service to support the snapshot function.
 
@@ -131,7 +131,7 @@ Prepare a clean EKS cluster, and install EBS CSI driver plug-in, with at least o
     # Edit the backup policy and enable incremental log backups
     kbcli cluster edit-backup-policy my-pg-postgresql-backup-policy
 
-    # Find spec.schedule.incremental.enable, change it from false to true
+    # Find spec.schedule.logfile.enable, change it from false to true
 
     #Save and exit
     :wq

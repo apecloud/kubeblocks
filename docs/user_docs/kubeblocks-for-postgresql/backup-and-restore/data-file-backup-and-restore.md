@@ -278,7 +278,7 @@ spec:
 2. Create a backup for this cluster.
 
    ```bash
-   kbcli cluster backup pg-cluster --backup-type=full
+   kbcli cluster backup pg-cluster --type=datafile
    > 
    Backup backup-default-pg-cluster-20230418124113 created successfully, you can view the progress:
            kbcli cluster list-backup --name=backup-default-pg-cluster-20230418124113 -n default

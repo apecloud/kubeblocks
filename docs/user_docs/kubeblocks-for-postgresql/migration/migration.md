@@ -140,8 +140,8 @@ It is recommended to prepare data sampling for verification after the migration 
 
 ## Enable kbcli migration
 
-1. [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kubeblocks).
-2. [Enable the migration add-on](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md#enable-add-ons).
+1. [Install KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
+2. [Enable the migration add-on](./../../installation/enable-addons.md).
 
    ```bash
    kbcli addon list

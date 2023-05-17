@@ -8,29 +8,25 @@ sidebar_label: By snapshot
 
 # Snapshot backup and restore for MySQL
 
-Snapshot backup is one type of full backup. Snapshot backup and restore is the recommended option of KubeBlocks but it also depends on whether your environment support snapshot. If snapshot backup is not supported, try [Data file backup and restore](./data-file-backup-and-restore.md)
+Snapshot backup is one type of full backup. Snapshot backup and restore is the recommended option of KubeBlocks but it also depends on whether your environment support snapshot. If snapshot backup is not supported, try [Data file backup and restore](./data-file-backup-and-restore.md).
 
 This guide shows how to use `kbcli` to back up and restore a MySQL cluster.
 
 ***Before you start***
 
-- Prepare a clean EKS cluster, and install ebs csi driver plug-in, with at least one node and the memory of each node is not less than 4GB.
-- [Install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) to ensure that you can connect to the EKS cluster
-- [Install `kbcli`](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md#install-kbcli).
-
-   ```bash
-   curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
-   ```
+- Prepare a clean EKS cluster, and install EBS CSI driver plug-in, with at least one node and the memory of each node is not less than 4GB.
+- [Install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) to ensure that you can connect to the EKS cluster.
+- [Install `kbcli`](./../../installation/introduction.md): Choose one guide that fits your actual environments.
 
 ***Steps:***
 
-1. Install KubeBlocks and the snapshot-controller add-on.
+1. Install KubeBlocks and the snapshot-controller add-on is enabled by default.
 
      ```bash
      kbcli kubeblocks install --set snapshot-controller.enabled=true
      ```
 
-     If you have installed KubeBlock without enabling the snapshot-controller, run the command below.
+     If you have installed KubeBlock without enabling the snapshot-controller by setting `--set snapshot-controller.enabled=false`, run the command below.
 
      ```bash
      kbcli kubeblocks upgrade --set snapshot-controller.enabled=true
@@ -46,13 +42,13 @@ This guide shows how to use `kbcli` to back up and restore a MySQL cluster.
 
      The pod with `kubeblocks` and  `kb-addon-snapshot-controller` is shown. See the information below.
 
-     ```
+     ```bash
      NAME                                              READY   STATUS             RESTARTS      AGE
      kubeblocks-5c8b9d76d6-m984n                       1/1     Running            0             9m
      kb-addon-snapshot-controller-6b4f656c99-zgq7g     1/1     Running            0             9m
      ```
 
-     If the output result does not show `kb-addon-snapshot-controller`, it means the snapshot-controller add-on is not enabled. It may be caused by failing to meet the installable condition of this add-on. Refer to [Enable add-ons](../../installation/enable-add-ons.md) to find the environment requirements and then enable the snapshot-controller add-on.
+     If the output result does not show `kb-addon-snapshot-controller`, it means the snapshot-controller add-on is not enabled. It may be caused by failing to meet the installable condition of this add-on. Refer to [Enable add-ons](../../installation/enable-addons.md) to find the environment requirements and then enable the snapshot-controller add-on.
 
 2. Configure EKS to support the snapshot function.
 
@@ -94,7 +90,7 @@ This guide shows how to use `kbcli` to back up and restore a MySQL cluster.
      kbcli cluster list
      ```
 
-     For details on creating a cluster, refer to [Create a Redis cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster).
+     For details on creating a cluster, refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster).
 
 4. Insert test data to test backup.
 
@@ -121,13 +117,13 @@ This guide shows how to use `kbcli` to back up and restore a MySQL cluster.
     kbcli cluster list-backups
     ```
 
-7. Restore to a new cluster.
+7. Restore data from backup.
 
-   Copy the backup name to the clipboard, and restore to the new cluster.
+   Copy the backup name to the clipboard, and restore data.
 
    :::note
 
-   You do not need to specify other parameters for creating a cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and creates a new MySQL cluster with the same specifications.
+   You do not need to specify other parameters for creating a cluster. The restore automatically reads the parameters of the source cluster, including specification, disk size, etc., and creates a new MySQL cluster with the same specifications.
 
    :::
 

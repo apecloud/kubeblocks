@@ -54,10 +54,13 @@ spec:
                 items:
                   properties:
                     description:
+                      description: The description of the plugin.
                       type: string
                     indexRepository:
+                      description: The index repository of the plugin.
                       type: string
                     name:
+                      description: Name of the plugin.
                       type: string
                   required:
                   - indexRepository

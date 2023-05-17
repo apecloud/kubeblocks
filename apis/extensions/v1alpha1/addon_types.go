@@ -238,9 +238,17 @@ type ResourceMappingItem struct {
 }
 
 type CliPlugin struct {
-	Name            string `json:"name"`
+	// Name of the plugin.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// The index repository of the plugin.
+	// +kubebuilder:validation:Required
 	IndexRepository string `json:"indexRepository"`
-	Description     string `json:"description,omitempty"`
+
+	// The description of the plugin.
+	// +optional
+	Description string `json:"description,omitempty"`
 }
 
 func (r *ResourceMappingItem) HasStorageMapping() bool {

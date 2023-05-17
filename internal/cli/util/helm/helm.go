@@ -71,6 +71,10 @@ type InstallOpts struct {
 	Timeout         time.Duration
 	Atomic          bool
 	DisableHooks    bool
+
+	// for helm template
+	DryRun    *bool
+	OutputDir string
 }
 
 type Option func(*cli.EnvSettings)
@@ -213,6 +217,11 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	client.Timeout = i.Timeout
 	client.Version = i.Version
 	client.Atomic = i.Atomic
+	// for helm template
+	if i.DryRun != nil {
+		client.DryRun = *i.DryRun
+		client.OutputDir = i.OutputDir
+	}
 
 	if client.Timeout == 0 {
 		client.Timeout = defaultTimeout

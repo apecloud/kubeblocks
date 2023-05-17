@@ -22,7 +22,6 @@ package lifecycle
 import (
 	"fmt"
 	"reflect"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -44,7 +43,7 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 		return nil
 	}
 
-	// reference: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
+	// reference: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#recovering-from-failure-when-expanding-volumes
 	// 1. Mark the PersistentVolume(PV) that is bound to the PersistentVolumeClaim(PVC) with Retain reclaim policy.
 	// 2. Delete the PVC. Since PV has Retain reclaim policy - we will not lose any data when we recreate the PVC.
 	// 3. Delete the claimRef entry from PV specs, so as new PVC can bind to it. This should make the PV Available.
@@ -148,54 +147,73 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 			action: actionPtr(PATCH),
 		}
 
-		targetQuantity := vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
-		if pvcNotFound && !pvNotFound {
-			// this could happen if some steps failed
-			// step 3: remove claimRef in pv
-			dag.AddVertex(removeClaimRefVertex)
-			// step 4: create new pvc
-			dag.AddVertex(createNewPVCVertex)
-			dag.Connect(createNewPVCVertex, removeClaimRefVertex)
-			// step 5: restore to previous pv policy
-			dag.AddVertex(restorePVVertex)
-			dag.Connect(restorePVVertex, createNewPVCVertex)
-			dag.Connect(vertex, restorePVVertex)
-		} else if pvcNotFound && pvNotFound {
-			// if both pvc and pv not found, do nothing
-		} else if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
-			// this could happen if create pvc succeeded but last step failed
-			// step 5: restore to previous pv policy
-			dag.AddVertex(restorePVVertex)
-			dag.Connect(vertex, restorePVVertex)
-		} else if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(targetQuantity) == 1 && // check if it's compressing volume
-			targetQuantity.Cmp(*pvc.Status.Capacity.Storage()) >= 0 { // check if target size is greater than or equal to actual size
-			// this branch means we can update pvc size by recreate it
-			tmpPV := &corev1.PersistentVolume{}
-			if err := transCtx.Client.Get(transCtx.Context, pvKey, tmpPV); client.IgnoreNotFound(err) != nil {
-				return err
-			}
-			if tmpPV.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
-				// make sure pv policy is 'retain' before deleting pvc
+		type pvcRecreateStep int
+		const (
+			pvPolicyRetainStep   pvcRecreateStep = 1
+			deletePVCStep        pvcRecreateStep = 2
+			removePVClaimRefStep pvcRecreateStep = 3
+			createPVCStep        pvcRecreateStep = 4
+			pvRestorePolicyStep  pvcRecreateStep = 5
+		)
+
+		addStepVertex := func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
+			switch step {
+			case pvPolicyRetainStep:
+				// step 1: update pv to retain
+				dag.AddVertex(retainPVVertex)
+				dag.Connect(fromVertex, retainPVVertex)
+				return retainPVVertex
+			case deletePVCStep:
 				// step 2: delete pvc, this will not delete pv because policy is 'retain'
 				dag.AddVertex(deletePVCVertex)
 				dag.AddVertex(removeFinalizerPVCVertex)
 				dag.Connect(removeFinalizerPVCVertex, deletePVCVertex)
+				dag.Connect(fromVertex, removeFinalizerPVCVertex)
+				return deletePVCVertex
+			case removePVClaimRefStep:
 				// step 3: remove claimRef in pv
 				dag.AddVertex(removeClaimRefVertex)
-				dag.Connect(removeClaimRefVertex, removeFinalizerPVCVertex)
+				dag.Connect(fromVertex, removeClaimRefVertex)
+				return removeClaimRefVertex
+			case createPVCStep:
 				// step 4: create new pvc
 				dag.AddVertex(createNewPVCVertex)
-				dag.Connect(createNewPVCVertex, removeClaimRefVertex)
+				dag.Connect(fromVertex, createNewPVCVertex)
+				return createNewPVCVertex
+			case pvRestorePolicyStep:
 				// step 5: restore to previous pv policy
 				dag.AddVertex(restorePVVertex)
-				dag.Connect(restorePVVertex, createNewPVCVertex)
-				dag.Connect(vertex, restorePVVertex)
-			} else {
-				// step 1: update pv to retain
-				dag.AddVertex(retainPVVertex)
-				dag.Connect(vertex, retainPVVertex)
-				return newRequeueError(time.Second, "pv not in retain policy")
+				dag.Connect(fromVertex, restorePVVertex)
+				return restorePVVertex
 			}
+			return nil
+		}
+
+		updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
+			recreateSteps := []pvcRecreateStep{pvPolicyRetainStep, deletePVCStep, removePVClaimRefStep, createPVCStep, pvRestorePolicyStep}
+			lastVertex := vertex
+			for i := len(recreateSteps) - 1; i >= 0; i-- {
+				step := recreateSteps[i]
+				lastVertex = addStepVertex(lastVertex, step)
+				if recreateSteps[i] == fromStep {
+					break
+				}
+			}
+		}
+
+		targetQuantity := vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
+		if pvcNotFound && !pvNotFound {
+			// this could happen if create pvc step failed when recreating pvc
+			updatePVCByRecreateFromStep(removePVClaimRefStep)
+		} else if pvcNotFound && pvNotFound {
+			// if both pvc and pv not found, do nothing
+		} else if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+			// this could happen if create pvc succeeded but last step failed
+			updatePVCByRecreateFromStep(pvRestorePolicyStep)
+		} else if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(targetQuantity) == 1 && // check if it's compressing volume
+			targetQuantity.Cmp(*pvc.Status.Capacity.Storage()) >= 0 { // check if target size is greater than or equal to actual size
+			// this branch means we can update pvc size by recreate it
+			updatePVCByRecreateFromStep(pvPolicyRetainStep)
 		} else if pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 			// use pvc's update without anything extra
 			dag.AddVertex(simpleUpdateVertex)

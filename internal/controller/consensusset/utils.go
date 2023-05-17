@@ -105,15 +105,18 @@ func updatePodRoleLabel(cli client.Client,
 	roleMap := composeRoleMap(set)
 	// role not defined in CR, ignore it
 	roleName = strings.ToLower(roleName)
-	role, ok := roleMap[roleName]
-	if !ok {
-		return nil
-	}
 
 	// update pod role label
 	patch := client.MergeFrom(pod.DeepCopy())
-	pod.Labels[model.RoleLabelKey] = role.Name
-	pod.Labels[model.ConsensusSetAccessModeLabelKey] = string(role.AccessMode)
+	role, ok := roleMap[roleName]
+	switch ok {
+	case true:
+		pod.Labels[model.RoleLabelKey] = role.Name
+		pod.Labels[model.ConsensusSetAccessModeLabelKey] = string(role.AccessMode)
+	case false:
+		delete(pod.Labels, model.RoleLabelKey)
+		delete(pod.Labels, model.ConsensusSetAccessModeLabelKey)
+	}
 	return cli.Patch(ctx, pod, patch)
 }
 

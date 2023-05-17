@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -208,7 +209,11 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 		}
 
 		targetQuantity := vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
-		if pvcNotFound && !pvNotFound {
+		if viper.GetBool(constant.CfgRecoverVolumeExpansionFailure) && pvc.Spec.Resources.Requests[corev1.ResourceStorage] != vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
+			// if support RECOVER_VOLUME_EXPANSION_FAILURE, update pvc directly
+			dag.AddVertex(simpleUpdateVertex)
+			dag.Connect(vertex, simpleUpdateVertex)
+		} else if pvcNotFound && !pvNotFound {
 			// this could happen if create pvc step failed when recreating pvc
 			updatePVCByRecreateFromStep(removePVClaimRefStep)
 		} else if pvcNotFound && pvNotFound {

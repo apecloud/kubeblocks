@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -161,6 +162,7 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 		updateStsHandler()
 	}
 
+	// handle actions in serial order to minimum disrupt on current cluster
 	// sort pods in order:
 	// 1. action generation in ascend
 	// 2. leaving with ordinal descend
@@ -174,44 +176,36 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	//
 	// the action list can be shortened:
 	// basic idea:
-	// if one pod has an adjacent leave-join action pair, 'adjacent' means 'generation' diff is 1,
-	// the action pair can be removed.
-	// one adjacent pair of pod 4 in the example above: action-1-4-join-suspend | action-2-4-leave-suspend.
+	// if one pod has a leave-join action pair, the pair can be removed.
+	// one leave-join pair of pod 4 in the example above: action-1-4-join-suspend | action-2-4-leave-suspend.
 	//
 	// algorithm:
-	// loop the action list in reverse order
-	// find the first pod ordinal same as the first item of the list, mark as 'index'
-	// the actions between the first item and the 'index+1' items can be removed
-	podList := make([]string, 0, len(podActionMap))
-	sort.SliceStable(memberLeaving, func(i, j int) bool {
-		return memberLeaving[j] < memberLeaving[i]
-	})
-	sort.SliceStable(memberJoining, func(i, j int) bool {
-		return memberJoining[i] < memberJoining[j]
-	})
-	podList = append(podList, memberLeaving...)
-	podList = append(podList, memberJoining...)
-
-	// handle pods in sequence to minimum disrupt on current cluster
-	allActionList := buildAllActionList(podList, podActionMap)
-	transCtx.Logger.Info(fmt.Sprintf("action list: %v", allActionList))
+	// loop the action list and try to put action into a stack
+	// if current action and action at the stack top are a leave-join pair, pop
+	// else push
+	// pop the stack into a list and reverse it
+	allActionList := buildAllActionList(podActionMap)
+	printActionList(transCtx.Logger, allActionList)
+	finalActionList := buildFinalActionList(allActionList)
+	printActionList(transCtx.Logger, finalActionList)
 	// find first unfinished action
-	index := findFirstUnfinishedAction(allActionList)
+	index := findFirstUnfinishedAction(finalActionList)
 	switch {
 	case index > 0:
-		lastFinishedAction := allActionList[index-1]
+		lastFinishedAction := finalActionList[index-1]
 		if lastFinishedAction.Status.Failed > 0 {
 			emitActionFailedEvent(transCtx, lastFinishedAction.Labels[jobTypeLabel], lastFinishedAction.Name)
 		}
 		fallthrough
 	case index == 0:
 		// start action if suspend
-		if *allActionList[index].Spec.Suspend {
+		if *finalActionList[index].Spec.Suspend {
 			// validate cluster state: all pods without actions should be ok(role label set and has one leader)
 			if err := abnormalAnalysis(pods, podActionMap, roleMap); err != nil {
+				emitAbnormalEvent(transCtx, finalActionList[index].Labels[jobTypeLabel], finalActionList[index].Name, err)
 				return err
 			}
-			startAction(dag, allActionList[index])
+			startAction(dag, finalActionList[index])
 		}
 	case index < 0:
 		// all action finished, do clean up
@@ -222,6 +216,41 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	}
 
 	return nil
+}
+
+func buildFinalActionList(allActionList []*batchv1.Job) []*batchv1.Job {
+	var finalActionList []*batchv1.Job
+	for _, action := range allActionList {
+		if len(finalActionList) == 0 {
+			finalActionList = append(finalActionList, action)
+			continue
+		}
+		lastIndex := len(finalActionList) - 1
+		lastAction := finalActionList[lastIndex]
+		if isSuspendPair(lastAction, action) {
+			finalActionList = finalActionList[:lastIndex]
+		} else {
+			finalActionList = append(finalActionList, action)
+		}
+	}
+	return finalActionList
+}
+
+func printActionList(logger logr.Logger, actionList []*batchv1.Job) {
+	var actionNameList []string
+	for _, action := range actionList {
+		actionNameList = append(actionNameList, fmt.Sprintf("%s-%v", action.Name, *action.Spec.Suspend))
+	}
+	logger.Info(fmt.Sprintf("action list: %v\n", actionNameList))
+}
+
+func isSuspendPair(lastAction, currentAction *batchv1.Job) bool {
+	if lastAction.Spec.Suspend != nil && !*lastAction.Spec.Suspend {
+		return false
+	}
+	lastOrdinal, _ := getActionOrdinal(lastAction.Name)
+	currentOrdinal, _ := getActionOrdinal(currentAction.Name)
+	return lastOrdinal == currentOrdinal
 }
 
 func findFirstUnfinishedAction(allActionList []*batchv1.Job) int {
@@ -236,10 +265,9 @@ func findFirstUnfinishedAction(allActionList []*batchv1.Job) int {
 	return index
 }
 
-func buildAllActionList(podList []string, podActionMap map[string]*podAction) []*batchv1.Job {
+func buildAllActionList(podActionMap map[string]*podAction) []*batchv1.Job {
 	allActionList := make([]*batchv1.Job, 0, len(podActionMap))
-	for _, podName := range podList {
-		pAction := podActionMap[podName]
+	for _, pAction := range podActionMap {
 		allActionList = append(allActionList, pAction.actionList...)
 	}
 	actionTypePriorityMap := map[string]int{
@@ -447,7 +475,7 @@ func getActionGenerationOrdinalAndType(actionName string) (string, string, strin
 	if len(subMatches) < 5 {
 		return "", "", "", fmt.Errorf("error actionName: %s", actionName)
 	}
-	return fmt.Sprintf("%s-%s", subMatches[1], subMatches[2]),subMatches[3], subMatches[4], nil
+	return fmt.Sprintf("%s-%s", subMatches[1], subMatches[2]), subMatches[3], subMatches[4], nil
 }
 
 func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
@@ -692,7 +720,16 @@ func doActionCleanup(dag *graph.DAG, action *batchv1.Job) {
 
 func emitActionFailedEvent(transCtx *CSSetTransformContext, actionType, actionName string) {
 	message := fmt.Sprintf("%s action failed, job name: %s", actionType, actionName)
-	transCtx.EventRecorder.Event(transCtx.CSSet, corev1.EventTypeWarning, strings.ToUpper(actionType), message)
+	emitActionEvent(transCtx, corev1.EventTypeWarning, actionType, message)
+}
+
+func emitAbnormalEvent(transCtx *CSSetTransformContext, actionType, actionName string, err error) {
+	message := fmt.Sprintf("%s, job name: %s", err.Error(), actionName)
+	emitActionEvent(transCtx, corev1.EventTypeWarning, actionType, message)
+}
+
+func emitActionEvent(transCtx *CSSetTransformContext, eventType, reason, message string) {
+	transCtx.EventRecorder.Event(transCtx.CSSet, eventType, strings.ToUpper(reason), message)
 }
 
 var _ graph.Transformer = &HorizontalScaling2Transformer{}

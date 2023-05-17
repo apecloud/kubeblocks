@@ -83,24 +83,26 @@ var _ = Describe("Deployment Controller", func() {
 			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(statelessCompName, statelessCompDefName).SetReplicas(2).Create(&testCtx).GetObject()
 
+			clusterKey := client.ObjectKeyFromObject(cluster)
+
 			By("patch cluster to Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 				cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 			}))
 
 			By("create the deployment of the stateless component")
-			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
+			deploy := testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
 			newDeploymentKey := client.ObjectKey{Name: deploy.Name, Namespace: namespace}
 			Eventually(testapps.CheckObj(&testCtx, newDeploymentKey, func(g Gomega, deploy *appsv1.Deployment) {
 				g.Expect(deploy.Generation == 1).Should(BeTrue())
 			})).Should(Succeed())
 
 			By("check stateless component phase is Failed")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, statelessCompName)).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			By("mock error message and PodCondition about some pod's failure")
 			podName := fmt.Sprintf("%s-%s-%s", clusterName, statelessCompName, testCtx.GetRandomStr())
-			pod := testapps.MockStatelessPod(testCtx, deploy, clusterName, statelessCompName, podName)
+			pod := testapps.MockStatelessPod(&testCtx, deploy, clusterName, statelessCompName, podName)
 			// mock pod container is failed
 			errMessage := "Back-off pulling image nginx:latest"
 			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
@@ -144,7 +146,7 @@ var _ = Describe("Deployment Controller", func() {
 			})).Should(Succeed())
 
 			By("waiting for the component to be running")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, statelessCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		})
 	})
 })

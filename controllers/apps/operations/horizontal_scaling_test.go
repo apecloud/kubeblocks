@@ -121,7 +121,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			// mock pod created according to horizontalScaling replicas
 			for _, v := range []int{1, 2} {
 				podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, v)
-				testapps.MockConsensusComponentStsPod(testCtx, nil, clusterName, consensusComp, podName, "follower", "ReadOnly")
+				testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "ReadOnly")
 			}
 
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 3)

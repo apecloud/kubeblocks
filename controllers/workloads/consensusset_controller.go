@@ -21,9 +21,9 @@ package workloads
 
 import (
 	"context"
-	batchv1 "k8s.io/api/batch/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -126,7 +126,6 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err = plan.Execute(); err != nil {
 		return requeueError(err)
 	}
-
 
 	return intctrlutil.Reconciled()
 }

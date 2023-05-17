@@ -51,7 +51,7 @@ type podAction struct {
 
 type conditionChecker = func() bool
 
-var actionNameRegex = regexp.MustCompile("(.*)-([0-9]+)-([0-9]+)-([a-zA-Z\\-]+)$")
+var actionNameRegex = regexp.MustCompile(`(.*)-([0-9]+)-([0-9]+)-([a-zA-Z\-]+)$`)
 
 func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*CSSetTransformContext)

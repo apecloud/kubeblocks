@@ -29,11 +29,11 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/StudioSol/set"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 

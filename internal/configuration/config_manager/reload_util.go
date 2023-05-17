@@ -285,3 +285,15 @@ func copyFileContents(src, dst string) error {
 	}
 	return out.Sync()
 }
+
+func NeedSharedProcessNamespace(configSpecs []ConfigSpecMeta) bool {
+	for _, configSpec := range configSpecs {
+		if configSpec.ConfigSpec.ConfigConstraintRef == "" {
+			continue
+		}
+		if configSpec.ReloadType == appsv1alpha1.UnixSignalType {
+			return true
+		}
+	}
+	return false
+}

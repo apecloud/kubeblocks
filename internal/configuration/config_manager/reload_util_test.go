@@ -319,4 +319,85 @@ var _ = Describe("ReloadUtil Test", func() {
 			Expect("[test]\na=1\nb=2\nkey1=128M\nkey2=512M\n").Should(BeEquivalentTo(string(b)))
 		})
 	})
+
+	Context("NeedSharedProcessNamespace", func() {
+		It("Should success with no error", func() {
+			tests := []struct {
+				name string
+				args []ConfigSpecMeta
+				want bool
+			}{{
+				name: "test1",
+				args: []ConfigSpecMeta{},
+				want: false,
+			}, {
+				name: "test2",
+				args: []ConfigSpecMeta{{
+					ConfigSpecInfo: ConfigSpecInfo{
+						ConfigSpec: appsv1alpha1.ComponentConfigSpec{
+							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+								Name:        "test",
+								TemplateRef: "test_cm",
+							}},
+					}},
+				},
+				want: false,
+			}, {
+				name: "test3",
+				args: []ConfigSpecMeta{{
+					ConfigSpecInfo: ConfigSpecInfo{
+						ConfigSpec: appsv1alpha1.ComponentConfigSpec{
+							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+								Name:        "test",
+								TemplateRef: "test_cm",
+							},
+							ConfigConstraintRef: "cc2",
+						},
+						ReloadType: appsv1alpha1.ShellType,
+					},
+				}, {
+					ConfigSpecInfo: ConfigSpecInfo{
+						ConfigSpec: appsv1alpha1.ComponentConfigSpec{
+							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+								Name:        "test2",
+								TemplateRef: "test_cm",
+							},
+							ConfigConstraintRef: "cc3",
+						},
+						ReloadType: appsv1alpha1.TPLScriptType,
+					}}},
+				want: false,
+			}, {
+				name: "test4",
+				args: []ConfigSpecMeta{{
+					ConfigSpecInfo: ConfigSpecInfo{
+						ConfigSpec: appsv1alpha1.ComponentConfigSpec{
+							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+								Name:        "test",
+								TemplateRef: "test_cm",
+							},
+							ConfigConstraintRef: "cc1",
+						},
+						ReloadType: appsv1alpha1.UnixSignalType,
+					},
+				}, {
+					ConfigSpecInfo: ConfigSpecInfo{
+						ConfigSpec: appsv1alpha1.ComponentConfigSpec{
+							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+								Name:        "test2",
+								TemplateRef: "test_cm",
+							},
+							ConfigConstraintRef: "cc3",
+						},
+						ReloadType: appsv1alpha1.TPLScriptType,
+					}}},
+				want: true,
+			}}
+			for _, tt := range tests {
+				got := NeedSharedProcessNamespace(tt.args)
+				Expect(got).Should(BeEquivalentTo(tt.want))
+			}
+
+		})
+	})
 })

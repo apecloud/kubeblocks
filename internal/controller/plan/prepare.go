@@ -144,6 +144,8 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 		return nil
 	}
 
+	// This sidecar container will be able to view and signal processes from other containers
+	checkAndUpdateSharProcessNamespace(podSpec, buildParams, configSpecMetas)
 	container, err := builder.BuildCfgManagerContainer(buildParams, component)
 	if err != nil {
 		return err
@@ -156,10 +158,15 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	if len(buildParams.ToolsContainers) > 0 {
 		podSpec.InitContainers = append(podSpec.InitContainers, buildParams.ToolsContainers...)
 	}
-
-	// This sidecar container will be able to view and signal processes from other containers
-	podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
 	return nil
+}
+
+func checkAndUpdateSharProcessNamespace(podSpec *corev1.PodSpec, buildParams *cfgcm.CfgManagerBuildParams, configSpecMetas []cfgcm.ConfigSpecMeta) {
+	shared := cfgcm.NeedSharedProcessNamespace(configSpecMetas)
+	if shared {
+		podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
+	}
+	buildParams.ShareProcessNamespace = shared
 }
 
 func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildParams) {

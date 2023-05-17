@@ -182,7 +182,7 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 				dag.Connect(removeFinalizerPVCVertex, deletePVCVertex)
 				// step 3: remove claimRef in pv
 				dag.AddVertex(removeClaimRefVertex)
-				dag.Connect(removeClaimRefVertex, deletePVCVertex)
+				dag.Connect(removeClaimRefVertex, removeFinalizerPVCVertex)
 				// step 4: create new pvc
 				dag.AddVertex(createNewPVCVertex)
 				dag.Connect(createNewPVCVertex, removeClaimRefVertex)

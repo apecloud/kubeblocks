@@ -1541,7 +1541,7 @@ var _ = Describe("Cluster Controller", func() {
 				})
 			})
 
-			FIt("should be able to recover if volume expansion fails", func() {
+			It("should be able to recover if volume expansion fails", func() {
 				testVolumeExpansionFailedAndRecover(compName, compDefName)
 			})
 

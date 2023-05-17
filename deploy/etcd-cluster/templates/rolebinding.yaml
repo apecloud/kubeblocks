@@ -1,16 +1,14 @@
-{{- if .Values.serviceAccount.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: kb-rolebinding-{{ .Release.Name }}
   labels:
-    {{ include "postgresqlcluster.labels" . | nindent 4 }}
+    {{ include "etcd-cluster.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: kb-role-{{ .Release.Name }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "postgresqlcluster.serviceAccountName" . }}
+    name: {{ include "etcd-cluster.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
-{{- end }}

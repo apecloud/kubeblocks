@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/config"
 	"strconv"
 	"sync"
 	"time"
@@ -87,8 +88,9 @@ var (
 
 // PostgresOperations represents PostgreSQL output binding.
 type PostgresOperations struct {
-	mu sync.Mutex
-	db *pgxpool.Pool
+	mu     sync.Mutex
+	db     *pgxpool.Pool
+	config *config.Config
 	BaseOperations
 }
 
@@ -120,6 +122,7 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.RegisterOperation(CheckStatusOperation, pgOps.CheckStatusOps)
 	pgOps.RegisterOperation(ExecOperation, pgOps.ExecOps)
 	pgOps.RegisterOperation(QueryOperation, pgOps.QueryOps)
+	pgOps.RegisterOperation(SwitchOverOperation, pgOps.SwitchOverOps)
 
 	// following are ops for account management
 	pgOps.RegisterOperation(ListUsersOp, pgOps.listUsersOps)
@@ -302,6 +305,86 @@ func (pgOps *PostgresOperations) QueryOps(ctx context.Context, req *bindings.Inv
 		result["message"] = string(data)
 	}
 	return result, nil
+}
+
+func (pgOps *PostgresOperations) SwitchOverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	result := OpsResult{}
+	primary, ok := req.Metadata[PRIMARY]
+	if !ok || primary == "" {
+		result["event"] = OperationFailed
+		result["message"] = "no primary provided"
+		return result, nil
+	}
+	candidate, ok := req.Metadata[CANDIDATE]
+	if !ok || candidate == "" {
+		result["event"] = OperationFailed
+		result["message"] = "no candidate provided"
+		return result, nil
+	}
+
+	pgOps.config = config.NewConfig()
+
+	if can, err := pgOps.isSwitchOverPossible(primary, candidate); !can || err != nil {
+		result["event"] = OperationFailed
+		result["message"] = err.Error()
+		return result, nil
+	}
+
+	if err := pgOps.manualSwitchOver(ctx, primary, candidate); err != nil {
+		result["event"] = OperationFailed
+		result["message"] = err.Error()
+		return result, nil
+	}
+	if ok, err := pgOps.getSwitchOverResult(candidate); err != nil {
+		result["event"] = OperationFailed
+		result["message"] = err.Error()
+		return result, nil
+	} else if !ok {
+		result["event"] = OperationFailed
+		result["message"] = fmt.Sprintf("switchover to candidate: %s fail", candidate)
+		return result, nil
+	}
+
+	result["event"] = OperationSuccess
+	result["message"] = fmt.Sprintf("Successfully switch over to: %s", candidate)
+
+	return result, nil
+}
+
+// Checks whether there are nodes that could take it over after demoting the primary
+func (pgOps *PostgresOperations) isSwitchOverPossible(primary string, candidate string) (bool, error) {
+	if pgOps.config.Cluster.Leader != nil && pgOps.config.Cluster.Leader.Member.GetName() != primary {
+		return false, errors.Errorf("leader name does not match")
+	}
+	if !pgOps.config.Cluster.Sync.SynchronizedToLeader(candidate) {
+		//return false, errors.Errorf("candidate name does not match with sync_standby")
+	}
+
+	// TODO: isFailOverPossible还依赖很多其他状态，先不做
+	return true, nil
+}
+
+// 更改配置
+func (pgOps *PostgresOperations) manualSwitchOver(ctx context.Context, primary string, candidate string) error {
+	configMap, err := pgOps.config.GetConfigMap("default", "pg-cluster-pg-replication-env")
+	if err != nil {
+		return err
+	}
+	configMap.Data["KB_PRIMARY_POD_NAME"] = candidate + ".pg-cluster-pg-replication-headless"
+	configMap.Data["KB_PG-REPLICATION_1_HOSTNAME"] = primary + ".pg-cluster-pg-replication-headless"
+
+	_, err = pgOps.config.UpdateConfigMap("default", configMap)
+	return nil
+}
+
+func (pgOps *PostgresOperations) getSwitchOverResult(candidate string) (bool, error) {
+	pgOps.config.GetCluster()
+	time.Sleep(time.Second)
+	if pgOps.config.Cluster.Leader.Member.GetName() != candidate {
+		return false, errors.New("switchover fail")
+	}
+
+	return true, nil
 }
 
 func (pgOps *PostgresOperations) query(ctx context.Context, sql string) (result []byte, err error) {

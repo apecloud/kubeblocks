@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-
 	// Register all components
 	bindingsLoader "github.com/dapr/dapr/pkg/components/bindings"
 	configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
@@ -39,13 +38,12 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/dapr/dapr/pkg/runtime"
-	"github.com/dapr/kit/logger"
-
 	dhttp "github.com/dapr/components-contrib/bindings/http"
 	"github.com/dapr/components-contrib/bindings/localstorage"
 	"github.com/dapr/components-contrib/middleware"
 	"github.com/dapr/components-contrib/nameresolution/mdns"
+	"github.com/dapr/dapr/pkg/runtime"
+	"github.com/dapr/kit/logger"
 
 	"go.uber.org/automaxprocs/maxprocs"
 
@@ -54,6 +52,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/ha"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 )
 
@@ -122,6 +121,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("fatal error from runtime: %s", err)
 	}
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	Ha := ha.NewHa()
+	Ha.HaControl(stopCh)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

@@ -30,6 +30,7 @@ const (
 	ExecOperation         bindings.OperationKind = "exec"
 	QueryOperation        bindings.OperationKind = "query"
 	CloseOperation        bindings.OperationKind = "close"
+	SwitchOverOperation   bindings.OperationKind = "switchOver"
 
 	// actions for cluster accounts management
 	ListUsersOp          bindings.OperationKind = "listUsers"

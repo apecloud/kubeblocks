@@ -48,6 +48,8 @@ type podAction struct {
 	actionList    []*batchv1.Job
 }
 
+type conditionChecker = func() bool
+
 var actionNameRegex = regexp.MustCompile("(.*)-([0-9]+)-([0-9]+)-([a-zA-Z\\-]+)$")
 
 func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
@@ -64,14 +66,14 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	if stsVertex.Action == nil || *stsVertex.Action != model.UPDATE {
 		return nil
 	}
+
+	// handle membership in consensus_set level and pod lifecycle in stateful_set
+	// pre-conditions validation: make sure sts level is ok
 	sts, _ := stsVertex.OriObj.(*apps.StatefulSet)
 	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
 	if err != nil {
 		return err
 	}
-
-	// handle membership in consensus_set level and pod lifecycle in stateful_set
-	// pre-conditions validation: make sure sts level is ok
 	if sts.Status.ObservedGeneration != sts.Generation ||
 		sts.Status.Replicas != *sts.Spec.Replicas ||
 		sts.Status.ReadyReplicas != sts.Status.Replicas ||
@@ -102,33 +104,15 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	updateStsHandler := func() {
 		stsVertex.Immutable = false
 	}
-	// handle spec update
+	// spec update
 	// compute diff set: pods to be created and pods to be deleted
 	roleMap := composeRoleMap(*transCtx.CSSet)
 	leaderPodName := getLeaderPod(pods, roleMap)
-	createActions := func(ordinal int, actionTypeList []string) error {
-		podName := getPodName(transCtx.CSSet.Name, ordinal)
-		for _, actionType := range actionTypeList {
-			checker := func() bool {
-				return podName == leaderPodName
-			}
-			if actionType != jobTypeSwitchover {
-				checker = nil
-			}
-			if !shouldDoAction(transCtx.CSSet, actionType, checker) {
-				continue
-			}
-			env := buildActionEnv(transCtx.CSSet, leaderPodName, podName)
-			if err := doAction(transCtx.CSSet, dag, env, actionType, ordinal, true); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	// handle member join
+
+	// member join
 	actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
 	for i := transCtx.CSSet.Status.Replicas; i < transCtx.CSSet.Spec.Replicas; i++ {
-		if err := createActions(int(i), actionTypeList); err != nil {
+		if err := doActions(transCtx.CSSet, dag, leaderPodName, int(i), actionTypeList); err != nil {
 			return err
 		}
 	}
@@ -138,10 +122,10 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 		return nil
 	}
 
-	// handle member leave
+	// member leave
 	actionTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
 	for i := transCtx.CSSet.Spec.Replicas; i < transCtx.CSSet.Status.Replicas; i++ {
-		if err := createActions(int(i), actionTypeList); err != nil {
+		if err := doActions(transCtx.CSSet, dag, leaderPodName, int(i), actionTypeList); err != nil {
 			return err
 		}
 	}
@@ -156,7 +140,8 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	for _, action := range orphanActionList {
 		doActionCleanup(dag, action)
 	}
-	// if both pre and post suspend actions exist, delete actions
+	// if both pre and post suspend actions exist,
+	// the final membership will not change, no need to trigger them anymore, delete actions
 	for podName, pAction := range podActionMap {
 		if !pAction.hasPreAction || !pAction.hasPostAction {
 			continue
@@ -172,6 +157,7 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	if len(podActionMap) == 0 {
 		return nil
 	}
+
 	// handle membership actions
 	podList := make([]string, 0, len(podActionMap))
 	for podName := range podActionMap {
@@ -209,7 +195,7 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	return nil
 }
 
-func shouldDoAction(csSet *workloads.ConsensusSet, actionType string, checker preConditionChecker) bool {
+func shouldCreateAction(csSet *workloads.ConsensusSet, actionType string, checker conditionChecker) bool {
 	if checker != nil && !checker() {
 		return false
 	}
@@ -381,8 +367,28 @@ func abnormalAnalysis(pods []corev1.Pod, podActionMap map[string]*podAction, rol
 	return nil
 }
 
+func doActions(csSet *workloads.ConsensusSet, dag *graph.DAG, leaderPodName string, ordinal int, actionTypeList []string) error {
+	podName := getPodName(csSet.Name, ordinal)
+	for _, actionType := range actionTypeList {
+		checker := func() bool {
+			return podName == leaderPodName
+		}
+		if actionType != jobTypeSwitchover {
+			checker = nil
+		}
+		if !shouldCreateAction(csSet, actionType, checker) {
+			continue
+		}
+		env := buildActionEnv(csSet, leaderPodName, podName)
+		if err := createAction(csSet, dag, env, actionType, ordinal, true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ordinal is the ordinal of pod which this action apply to
-func doAction(csSet *workloads.ConsensusSet, dag *graph.DAG, env []corev1.EnvVar, actionType string, ordinal int, suspend bool) error {
+func createAction(csSet *workloads.ConsensusSet, dag *graph.DAG, env []corev1.EnvVar, actionType string, ordinal int, suspend bool) error {
 	actionName := fmt.Sprintf("%s-%d-%d-%s", csSet.Name, csSet.Generation, ordinal, actionType)
 	template := buildActionPodTemplate(csSet, env, actionType)
 	action := builder.NewJobBuilder(csSet.Namespace, actionName).

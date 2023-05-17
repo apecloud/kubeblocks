@@ -102,33 +102,18 @@ const (
 	RestoreFromBackUpAnnotationKey           = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
 	ClusterSnapshotAnnotationKey             = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	LeaderAnnotationKey                      = "cs.apps.kubeblocks.io/leader"
+	AllowInconsistentCVAnnotationKey            = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
 	ComponentReplicasAnnotationKey           = "apps.kubeblocks.io/component-replicas"                   // ComponentReplicasAnnotationKey specifies the number of pods in replicas
+	BackupPolicyTemplateAnnotationKey        = "apps.kubeblocks.io/backup-policy-template"
+	LastAppliedClusterAnnotationKey             = "apps.kubeblocks.io/last-applied-cluster"
 	DefaultBackupPolicyAnnotationKey         = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
 	DefaultBackupPolicyTemplateAnnotationKey = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
 	BackupDataPathPrefixAnnotationKey        = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
-	BackupPolicyTemplateAnnotationKey        = "apps.kubeblocks.io/backup-policy-template"
 	RestoreFromTimeAnnotationKey             = "kubeblocks.io/restore-from-time"           // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
 	RestoreFromSrcClusterAnnotationKey       = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
 	DefaultClusterVersionAnnotationKey       = "kubeblocks.io/is-default-cluster-version"  // DefaultClusterVersionAnnotationKey specifies the default cluster version.
 	PVLastClaimPolicyAnnotationKey           = "apps.kubeblocks.io/pv-last-claim-policy"
 	ReconfigureRefAnnotationKey              = "dataprotection.kubeblocks.io/reconfigure-ref"
-
-	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
-	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
-	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
-
-	LastAppliedOpsCRAnnotation                  = "config.kubeblocks.io/last-applied-ops-name"
-	LastAppliedConfigAnnotation                 = "config.kubeblocks.io/last-applied-configuration"
-	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
-	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
-	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
-	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
-
-	// CMConfigurationTypeLabelKey configmap is config template type, e.g: "tpl", "instance"
-	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
-	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
-	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
-	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 
 	// CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationSpecProviderLabelKey = "config.kubeblocks.io/config-spec"

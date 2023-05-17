@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -40,32 +39,35 @@ var faultNetWorkExample = templates.Examples(`
 	kbcli fault network partition
 
 	# The specified pod is isolated from the k8s external network "kubeblocks.io".
-	kbcli fault network partition --label=statefulset.kubernetes.io/pod-name=mycluster-mysql-1 --external-targets=kubeblocks.io
+	kbcli fault network partition mycluster-mysql-1 --external-targets=kubeblocks.io
 	
 	# Isolate the network between two pods.
-	kbcli fault network partition --label=statefulset.kubernetes.io/pod-name=mycluster-mysql-1 --target-label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2
+	kbcli fault network partition mycluster-mysql-1 --target-label=statefulset.kubernetes.io/pod-name=mycluster-mysql-2
 	
 	// Like the partition command, the target can be specified through --target-label or --external-targets. The pod only has obstacles in communicating with this target. If the target is not specified, all communication will be blocked.
 	# Block all pod communication under the default namespace, resulting in a 50% packet loss rate.
 	kbcli fault network loss --loss=50
 	
 	# Block the specified pod communication, so that the packet loss rate is 50%.
-	kbcli fault network loss --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --loss=50
+	kbcli fault network loss mysql-cluster-mysql-2 --loss=50
 	
 	kbcli fault network corrupt --corrupt=50
 
 	# Blocks specified pod communication with a 50% packet corruption rate.
-	kbcli fault network corrupt --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --corrupt=50
+	kbcli fault network corrupt mysql-cluster-mysql-2 --corrupt=50
 	
 	kbcli fault network duplicate --duplicate=50
 
 	# Block specified pod communication so that the packet repetition rate is 50%.
-	kbcli fault network duplicate --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --duplicate=50
+	kbcli fault network duplicate mysql-cluster-mysql-2 --duplicate=50
 	
 	kbcli fault network delay --latency=10s
 
 	# Block the communication of the specified pod, causing its network delay for 10s.
-	kbcli fault network delay --label=statefulset.kubernetes.io/pod-name=mysql-cluster-mysql-2 --latency=10s
+	kbcli fault network delay mysql-cluster-mysql-2 --latency=10s
+
+	# Limit the communication bandwidth between mysql-cluster-mysql-2 and the outside.
+	kbcli fault network bandwidth mysql-cluster-mysql-2 --rate=1kbps --duration=1m
 `)
 
 type NetworkChaosOptions struct {
@@ -74,13 +76,13 @@ type NetworkChaosOptions struct {
 	// Indicates a network target outside of Kubernetes, which can be an IPv4 address or a domain name,
 	// such as "www.baidu.com". Only works with direction: to.
 	ExternalTargets []string `json:"externalTargets,omitempty"`
-	// Specifies the labels that target Pods come with.
-	TargetLabel map[string]string `json:"targetLabel,omitempty"`
-	// Specifies the namespaces to which target Pods belong.
-	TargetNamespaceSelector string `json:"targetNamespaceSelector"`
 
-	TargetMode  string `json:"targetMode"`
+	TargetMode  string `json:"targetMode,omitempty"`
 	TargetValue string `json:"targetValue"`
+	// Specifies the labels that target Pods come with.
+	TargetLabelSelectors map[string]string `json:"targetLabelSelectors,omitempty"`
+	// Specifies the namespaces to which target Pods belong.
+	TargetNamespaceSelectors []string `json:"targetNamespaceSelectors"`
 
 	// The percentage of packet loss
 	Loss string `json:"loss,omitempty"`
@@ -104,19 +106,18 @@ type NetworkChaosOptions struct {
 	Minburst uint32 `json:"minburst"`
 
 	FaultBaseOptions
-
-	create.CreateOptions `json:"-"`
 }
 
 func NewNetworkChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, action string) *NetworkChaosOptions {
 	o := &NetworkChaosOptions{
-		CreateOptions: create.CreateOptions{
+		FaultBaseOptions: FaultBaseOptions{CreateOptions: create.CreateOptions{
 			Factory:         f,
 			IOStreams:       streams,
 			CueTemplateName: CueTemplateNetworkChaos,
 			GVR:             GetGVR(Group, Version, ResourceNetworkChaos),
 		},
-		FaultBaseOptions: FaultBaseOptions{Action: action},
+			Action: action,
+		},
 	}
 	o.CreateOptions.PreCreate = o.PreCreate
 	o.CreateOptions.Options = o
@@ -260,29 +261,23 @@ func (o *NetworkChaosOptions) NewCobraCommand(use, short string) *cobra.Command 
 }
 
 func (o *NetworkChaosOptions) AddCommonFlag(cmd *cobra.Command) {
-
-	cmd.Flags().StringVar(&o.Mode, "mode", "all", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
-	cmd.Flags().StringVar(&o.Value, "value", "", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
-	cmd.Flags().StringVar(&o.Duration, "duration", "10s", "Supported formats of the duration are: ms / s / m / h.")
-	cmd.Flags().StringToStringVar(&o.Label, "label", map[string]string{}, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
-	cmd.Flags().StringArrayVar(&o.NamespaceSelector, "namespace-selector", []string{"default"}, `Specifies the namespace into which you want to inject faults.`)
+	o.FaultBaseOptions.AddCommonFlag(cmd)
 
 	cmd.Flags().StringVar(&o.Direction, "direction", "to", `You can select "to"" or "from"" or "both"".`)
-	cmd.Flags().StringArrayVarP(&o.ExternalTargets, "external-targets", "e", nil, "a network target outside of Kubernetes, which can be an IPv4 address or a domain name,\n\t such as \"www.baidu.com\". Only works with direction: to.")
-	cmd.Flags().StringVar(&o.TargetMode, "target-mode", "all", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
+	cmd.Flags().StringArrayVarP(&o.ExternalTargets, "external-target", "e", nil, "a network target outside of Kubernetes, which can be an IPv4 address or a domain name,\n\t such as \"www.baidu.com\". Only works with direction: to.")
+	cmd.Flags().StringVar(&o.TargetMode, "target-mode", "", `You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.`)
 	cmd.Flags().StringVar(&o.TargetValue, "target-value", "", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
-	cmd.Flags().StringToStringVar(&o.TargetLabel, "target-label", nil, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
-	cmd.Flags().StringVar(&o.TargetNamespaceSelector, "target-namespace-selector", "default", `Specifies the namespace into which you want to inject faults.`)
-
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
-
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
+	cmd.Flags().StringToStringVar(&o.TargetLabelSelectors, "target-label", nil, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
+	cmd.Flags().StringArrayVar(&o.TargetNamespaceSelectors, "target-ns-fault", []string{"default"}, `Specifies the namespace into which you want to inject faults.`)
 }
 
 func (o *NetworkChaosOptions) Validate() error {
 	if o.TargetValue == "" && (o.TargetMode == "fixed" || o.TargetMode == "fixed-percent" || o.TargetMode == "random-max-percent") {
 		return fmt.Errorf("you must use --value to specify an integer")
+	}
+
+	if (o.TargetLabelSelectors != nil || o.TargetValue != "") && o.TargetMode == "" {
+		return fmt.Errorf("you must use --mode to specify an experiment mode")
 	}
 
 	if ok, err := IsInteger(o.TargetValue); !ok {

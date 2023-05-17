@@ -91,8 +91,8 @@ const (
 const (
 	Latency        = "latency"
 	LatencyShort   = "Delayed IO operations."
-	Fault          = "fault"
-	FaultShort     = "Causes IO operations to return specific errors."
+	Errno          = "errno"
+	ErrnoShort     = "Causes IO operations to return specific errors."
 	Attribute      = "attribute"
 	AttributeShort = "Override the attributes of the file."
 	Mistake        = "mistake"

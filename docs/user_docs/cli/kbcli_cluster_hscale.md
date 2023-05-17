@@ -19,7 +19,7 @@ kbcli cluster hscale NAME [flags]
 
 ```
       --auto-approve                   Skip interactive approval before horizontally scaling the cluster
-      --components strings              Component names to this operations
+      --components strings             Component names to this operations
       --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
   -h, --help                           help for hscale
       --name string                    OpsRequest name. if not specified, it will be randomly generated 

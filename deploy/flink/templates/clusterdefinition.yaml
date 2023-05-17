@@ -28,10 +28,10 @@ spec:
           namespace: {{ .Release.Namespace }}
           defaultMode: 0644
       podSpec:
+        {{- with .Values.jobmanager }}
         securityContext:
-          runAsUser: 9999
-          runAsGroup: 9999
-          fsGroup: 9999
+          {{- toYaml .podSecurityContext | nindent 10 }}
+        {{- end }}
         containers:
           - name: jobmanager-main-container
             volumeMounts:
@@ -51,11 +51,10 @@ spec:
               - containerPort: 6124
                 name: tcp-blob
                 protocol: TCP
-            env:
-              - name: JOB_MANAGER_RPC_ADDRESS
-                value: $(KB_CLUSTER_COMP_NAME)
+            {{- with .Values.jobmanager }}
             securityContext:
-              allowPrivilegeEscalation: false
+              {{- toYaml .containerSecurityContext | nindent 14 }}
+            {{- end }}
     - name: taskmanager
       characterType: flink
       workloadType: Stateless
@@ -65,10 +64,10 @@ spec:
           volumeName: flink-config
           namespace: {{ .Release.Namespace }}
       podSpec:
+        {{- with .Values.taskmanager }}
         securityContext:
-          runAsUser: 9999
-          runAsGroup: 9999
-          fsGroup: 9999
+          {{- toYaml .podSecurityContext | nindent 10 }}
+        {{- end }}
         containers:
           - name: taskmanager-main-container
             command:
@@ -84,10 +83,7 @@ spec:
               - name: rpc
                 containerPort: 6122
                 protocol: TCP
-            env:
-              - name: JOB_MANAGER_RPC_ADDRESS
-                value: "myflink-flink-cluster-jobmanager"
-              - name: TASK_MANAGER_NUMBER_OF_TASK_SLOTS
-                value: "6"
+            {{- with .Values.taskmanager }}
             securityContext:
-              allowPrivilegeEscalation: false
+              {{- toYaml .containerSecurityContext | nindent 14 }}
+            {{- end }}

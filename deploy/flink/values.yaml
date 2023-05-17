@@ -17,3 +17,19 @@ image:
     repository: flink
     tag: 1.16
   pullPolicy: IfNotPresent
+
+jobmanager:
+  podSecurityContext:
+    runAsUser: 9999
+    runAsGroup: 9999
+    fsGroup: 9999
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+
+taskmanager:
+  podSecurityContext:
+    runAsUser: 9999
+    runAsGroup: 9999
+    fsGroup: 9999
+  containerSecurityContext:
+    allowPrivilegeEscalation: false

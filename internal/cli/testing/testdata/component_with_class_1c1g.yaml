@@ -1,16 +1,20 @@
-- name: test
-  componentDefRef: mysql
-  monitor: true
-  enabledLogs: [error, slow]
-  replicas: 1
-  classDefRef:
-    class: general-1c1g
-  volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-        volumeMode: Filesystem
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+spec:
+  componentSpecs:
+  - name: test
+    componentDefRef: mysql
+    monitor: true
+    enabledLogs: [error, slow]
+    replicas: 1
+    classDefRef:
+      class: general-1c1g
+    volumeClaimTemplates:
+      - name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+          volumeMode: Filesystem

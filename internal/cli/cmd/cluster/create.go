@@ -198,8 +198,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
 			cmdutil.CheckErr(o.CreateOptions.Complete())
-			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -216,9 +216,6 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 	// add print flags
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
-
-	// set required flag
-	util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
 
 	// register flag completion func
 	registerFlagCompletionFunc(cmd, f)
@@ -319,11 +316,36 @@ func (o *CreateOptions) Validate() error {
 }
 
 func (o *CreateOptions) Complete() error {
-	if err := o.Validate(); err != nil {
+	var (
+		compByte     []byte
+		clusterComps *appsv1alpha1.Cluster
+		err          error
+	)
+	if len(o.SetFile) > 0 {
+		if compByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
+			return err
+		}
+		if compByte, err = yaml.YAMLToJSON(compByte); err != nil {
+			return err
+		}
+		if err = json.Unmarshal(compByte, &clusterComps); err != nil {
+			return err
+		}
+	}
+
+	// build annotation
+	o.buildAnnotation(clusterComps)
+
+	// build cluster definition
+	if err := o.buildClusterDef(clusterComps); err != nil {
 		return err
 	}
 
-	components, err := o.buildComponents()
+	// build cluster version
+	o.buildClusterVersion(clusterComps)
+
+	// build components
+	components, err := o.buildComponents(clusterComps)
 	if err != nil {
 		return err
 	}
@@ -353,7 +375,7 @@ func (o *CreateOptions) CleanUp() error {
 }
 
 // buildComponents build components from file or set values
-func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
+func (o *CreateOptions) buildComponents(clusterComps *appsv1alpha1.Cluster) ([]map[string]interface{}, error) {
 	var (
 		err       error
 		cd        *appsv1alpha1.ClusterDefinition
@@ -370,27 +392,9 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 		return nil, err
 	}
 
-	// build components from file
-	if len(o.SetFile) > 0 {
-		var (
-			compByte []byte
-			comps    []map[string]interface{}
-		)
-		if compByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
-			return nil, err
-		}
-		if compByte, err = yaml.YAMLToJSON(compByte); err != nil {
-			return nil, err
-		}
-		if err = json.Unmarshal(compByte, &comps); err != nil {
-			return nil, err
-		}
-		for _, comp := range comps {
-			var compSpec appsv1alpha1.ClusterComponentSpec
-			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(comp, &compSpec); err != nil {
-				return nil, err
-			}
-			compSpecs = append(compSpecs, &compSpec)
+	if clusterComps != nil {
+		for _, comp := range clusterComps.Spec.ComponentSpecs {
+			compSpecs = append(compSpecs, &comp)
 		}
 	} else {
 		// build components from set values or environment variables
@@ -1055,5 +1059,44 @@ func buildResourceLabels(clusterName string) map[string]string {
 	return map[string]string{
 		constant.AppInstanceLabelKey:  clusterName,
 		constant.AppManagedByLabelKey: "kbcli",
+	}
+}
+
+// build the cluster definition
+// if the cluster definition is not specified, we will use the cluster definition in the cluster component
+// if both of them are not specified, we will return an error
+func (o *CreateOptions) buildClusterDef(comp *appsv1alpha1.Cluster) error {
+	if o.ClusterDefRef != "" {
+		return nil
+	}
+
+	if comp != nil && comp.Spec.ClusterDefRef != "" {
+		o.ClusterDefRef = comp.Spec.ClusterDefRef
+		return nil
+	}
+
+	return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli clusterdefinition list\" to show all cluster definition")
+}
+
+// build the cluster version
+// if the cluster version is not specified, we will use the cluster version in the cluster component
+// if both of them are not specified, we use default cluster version
+func (o *CreateOptions) buildClusterVersion(comp *appsv1alpha1.Cluster) {
+	if o.ClusterVersionRef != "" {
+		return
+	}
+
+	if comp != nil && comp.Spec.ClusterVersionRef != "" {
+		o.ClusterVersionRef = comp.Spec.ClusterVersionRef
+	}
+}
+
+func (o *CreateOptions) buildAnnotation(comp *appsv1alpha1.Cluster) {
+	if comp == nil {
+		return
+	}
+
+	if o.Annotations == nil {
+		o.Annotations = comp.Annotations
 	}
 }

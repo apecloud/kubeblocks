@@ -103,56 +103,6 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 				return err
 			}
 		}
-		retainPV := pv.DeepCopy()
-		if retainPV.Labels == nil {
-			retainPV.Labels = make(map[string]string)
-		}
-		// add label to pv, in case pvc get deleted, and we can't find pv
-		retainPV.Labels[constant.PVCNameLabelKey] = pvcKey.Name
-		retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
-		retainPVVertex := &lifecycleVertex{
-			obj:    retainPV,
-			oriObj: pv,
-			action: actionPtr(PATCH),
-		}
-
-		// step 2: delete pvc, this will not delete pv because policy is 'retain'
-		deletePVCVertex := &lifecycleVertex{obj: pvc, action: actionPtr(DELETE)}
-		removeFinalizerPVC := pvc.DeepCopy()
-		removeFinalizerPVC.SetFinalizers([]string{})
-		removeFinalizerPVCVertex := &lifecycleVertex{
-			obj:    removeFinalizerPVC,
-			oriObj: pvc,
-			action: actionPtr(PATCH),
-		}
-
-		// step 3: remove claimRef in pv
-		removeClaimRefPV := retainPV.DeepCopy()
-		if removeClaimRefPV.Spec.ClaimRef != nil {
-			removeClaimRefPV.Spec.ClaimRef.UID = ""
-			removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
-		}
-		removeClaimRefVertex := &lifecycleVertex{
-			obj:    removeClaimRefPV,
-			oriObj: retainPV,
-			action: actionPtr(PATCH),
-		}
-
-		// step 4: create new pvc
-		newPVC.SetResourceVersion("")
-		createNewPVCVertex := &lifecycleVertex{
-			obj:    newPVC,
-			action: actionPtr(CREATE),
-		}
-
-		// step 5: restore to previous pv policy
-		restorePV := removeClaimRefPV.DeepCopy()
-		restorePV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimDelete
-		restorePVVertex := &lifecycleVertex{
-			obj:    restorePV,
-			oriObj: removeClaimRefPV,
-			action: actionPtr(PATCH),
-		}
 
 		type pvcRecreateStep int
 		const (
@@ -167,11 +117,35 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 			switch step {
 			case pvPolicyRetainStep:
 				// step 1: update pv to retain
+				retainPV := pv.DeepCopy()
+				if retainPV.Labels == nil {
+					retainPV.Labels = make(map[string]string)
+				}
+				// add label to pv, in case pvc get deleted, and we can't find pv
+				retainPV.Labels[constant.PVCNameLabelKey] = pvcKey.Name
+				if retainPV.Annotations == nil {
+					retainPV.Annotations = make(map[string]string)
+				}
+				retainPV.Annotations[constant.PVLastClaimPolicyAnnotationKey] = string(pv.Spec.PersistentVolumeReclaimPolicy)
+				retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
+				retainPVVertex := &lifecycleVertex{
+					obj:    retainPV,
+					oriObj: pv,
+					action: actionPtr(PATCH),
+				}
 				dag.AddVertex(retainPVVertex)
 				dag.Connect(fromVertex, retainPVVertex)
 				return retainPVVertex
 			case deletePVCStep:
 				// step 2: delete pvc, this will not delete pv because policy is 'retain'
+				deletePVCVertex := &lifecycleVertex{obj: pvc, action: actionPtr(DELETE)}
+				removeFinalizerPVC := pvc.DeepCopy()
+				removeFinalizerPVC.SetFinalizers([]string{})
+				removeFinalizerPVCVertex := &lifecycleVertex{
+					obj:    removeFinalizerPVC,
+					oriObj: pvc,
+					action: actionPtr(PATCH),
+				}
 				dag.AddVertex(deletePVCVertex)
 				dag.AddVertex(removeFinalizerPVCVertex)
 				dag.Connect(removeFinalizerPVCVertex, deletePVCVertex)
@@ -179,16 +153,42 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 				return deletePVCVertex
 			case removePVClaimRefStep:
 				// step 3: remove claimRef in pv
+				removeClaimRefPV := pv.DeepCopy()
+				if removeClaimRefPV.Spec.ClaimRef != nil {
+					removeClaimRefPV.Spec.ClaimRef.UID = ""
+					removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
+				}
+				removeClaimRefVertex := &lifecycleVertex{
+					obj:    removeClaimRefPV,
+					oriObj: pv,
+					action: actionPtr(PATCH),
+				}
 				dag.AddVertex(removeClaimRefVertex)
 				dag.Connect(fromVertex, removeClaimRefVertex)
 				return removeClaimRefVertex
 			case createPVCStep:
 				// step 4: create new pvc
+				newPVC.SetResourceVersion("")
+				createNewPVCVertex := &lifecycleVertex{
+					obj:    newPVC,
+					action: actionPtr(CREATE),
+				}
 				dag.AddVertex(createNewPVCVertex)
 				dag.Connect(fromVertex, createNewPVCVertex)
 				return createNewPVCVertex
 			case pvRestorePolicyStep:
 				// step 5: restore to previous pv policy
+				restorePV := pv.DeepCopy()
+				policy := corev1.PersistentVolumeReclaimPolicy(restorePV.Annotations[constant.PVLastClaimPolicyAnnotationKey])
+				if len(policy) == 0 {
+					policy = corev1.PersistentVolumeReclaimDelete
+				}
+				restorePV.Spec.PersistentVolumeReclaimPolicy = policy
+				restorePVVertex := &lifecycleVertex{
+					obj:    restorePV,
+					oriObj: pv,
+					action: actionPtr(PATCH),
+				}
 				dag.AddVertex(restorePVVertex)
 				dag.Connect(fromVertex, restorePVVertex)
 				return restorePVVertex

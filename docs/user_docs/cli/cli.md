@@ -113,6 +113,7 @@ List and open the KubeBlocks dashboards.
 Inject faults to pod.
 
 * [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
+* [kbcli fault node](kbcli_fault_node.md)	 - Node chaos.
 * [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
 
 

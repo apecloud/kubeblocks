@@ -1,13 +1,13 @@
 ---
-title: kbcli fault
+title: kbcli fault node
 ---
 
-Inject faults to pod.
+Node chaos.
 
 ### Options
 
 ```
-  -h, --help   help for fault
+  -h, --help   help for node
 ```
 
 ### Options inherited from parent commands
@@ -36,10 +36,10 @@ Inject faults to pod.
 
 ### SEE ALSO
 
-
-* [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
-* [kbcli fault node](kbcli_fault_node.md)	 - Node chaos.
-* [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
+* [kbcli fault](kbcli_fault.md)	 - Inject faults to pod.
+* [kbcli fault node detach-volume](kbcli_fault_node_detach-volume.md)	 - Detach volume
+* [kbcli fault node restart](kbcli_fault_node_restart.md)	 - Restart instance
+* [kbcli fault node stop](kbcli_fault_node_stop.md)	 - Stop instance
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -276,7 +276,9 @@ clean-kbcli: ## Clean bin/kbcli*.
 kbcli-doc: generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
-
+.PHONY: kbcli-prompt-schema
+prompt-schema:  ## generate CLI prompt for kbcli cloud shell.
+	go run ./hack/promptgen/cli/main.go > ./hack/promptgen/prompt_schema.json
 ##@ Operator Controller Manager
 
 .PHONY: manager

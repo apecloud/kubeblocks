@@ -17,40 +17,40 @@
 
 // required, command line input options for parameters and flags
 options: {
-	namespace:        string
-	action:						string
+	namespace: string
+	action:    string
 
 	namespaceSelector: [...]
-	mode:							string
-	value:						string
-	duration: 				string
-	label?:						{}
+	mode:     string
+	value:    string
+	duration: string
+	label?: {}
 
-	patterns:					[...]
+	patterns: [...]
 }
 
 // required, k8s api resource content
 content: {
-  kind: "DNSChaos"
-  apiVersion: "chaos-mesh.org/v1alpha1"
-  metadata:{
-  	generateName: "dns-chaos-"
-    namespace: options.namespace
-  }
-  spec:{
-    selector:{
-    	namespaces: options.namespaceSelector
-    	if options.label != _|_ {
-    		labelSelectors:{
-    			options.label
+	kind:       "DNSChaos"
+	apiVersion: "chaos-mesh.org/v1alpha1"
+	metadata: {
+		generateName: "dns-chaos-"
+		namespace:    options.namespace
+	}
+	spec: {
+		selector: {
+			namespaces: options.namespaceSelector
+			if options.label != _|_ {
+				labelSelectors: {
+					options.label
 				}
-    	}
-    }
-    action: options.action
-    mode: options.mode
-    value: options.value
-    duration: options.duration
+			}
+		}
+		action:   options.action
+		mode:     options.mode
+		value:    options.value
+		duration: options.duration
 
 		patterns: options.patterns
-  }
+	}
 }

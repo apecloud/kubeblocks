@@ -17,111 +17,111 @@
 
 // required, command line input options for parameters and flags
 options: {
-	namespace:        string
-	action:						string
+	namespace: string
+	action:    string
 
 	namespaceSelector: [...]
-	mode:							string
-	value:						string
-	duration: 				string
-	label?:						{}
+	mode:     string
+	value:    string
+	duration: string
+	label?: {}
 
-	direction: 				string
-	externalTargets?:  [...]
+	direction: string
+	externalTargets?: [...]
 
 	targetNamespaceSelector: string
-	targetMode:				string
-	targetValue:			string
-	targetLabel?:			{}
+	targetMode:              string
+	targetValue:             string
+	targetLabel?: {}
 
-	loss?:						string
-	corrupt?:					string
-	duplicate?:				string
+	loss?:      string
+	corrupt?:   string
+	duplicate?: string
 
-	latency?: 				string
-	jitter: 					string
+	latency?: string
+	jitter:   string
 
-	correlation:			string
+	correlation: string
 
-	rate?:						string
-	limit:						uint32
-	buffer:						uint32
-	peakrate:					uint32
-	minburst:					uint32
+	rate?:    string
+	limit:    uint32
+	buffer:   uint32
+	peakrate: uint32
+	minburst: uint32
 }
 
 // required, k8s api resource content
 content: {
-  kind: "NetworkChaos"
-  apiVersion: "chaos-mesh.org/v1alpha1"
-  metadata:{
-  	generateName: "network-chaos-"
-    namespace: options.namespace
-  }
-  spec:{
-    selector:{
-    	namespaces: options.namespaceSelector
+	kind:       "NetworkChaos"
+	apiVersion: "chaos-mesh.org/v1alpha1"
+	metadata: {
+		generateName: "network-chaos-"
+		namespace:    options.namespace
+	}
+	spec: {
+		selector: {
+			namespaces: options.namespaceSelector
 			if options.label != _|_ {
-				labelSelectors:{
+				labelSelectors: {
 					options.label
-					}
+				}
 			}
-    }
-    mode: options.mode
-    value: options.value
-    action: options.action
-    duration: options.duration
+		}
+		mode:     options.mode
+		value:    options.value
+		action:   options.action
+		duration: options.duration
 
-    direction: options.direction
-    if options.externalTargets != _|_ {
-  		externalTargets: options.externalTargets
-    }
-  	if options.targetLabel != _|_ {
-				target:{
-					mode: options.targetMode
-					value: options.targetValue
-					selector:{
-						namespaces: [options.targetNamespaceSelector]
-						labelSelectors:{
-								options.targetLabel
-						}
+		direction: options.direction
+		if options.externalTargets != _|_ {
+			externalTargets: options.externalTargets
+		}
+		if options.targetLabel != _|_ {
+			target: {
+				mode:  options.targetMode
+				value: options.targetValue
+				selector: {
+					namespaces: [options.targetNamespaceSelector]
+					labelSelectors: {
+						options.targetLabel
 					}
 				}
-  	}
-  	if options.loss != _|_ {
-  		loss:{
-  			loss: options.loss
+			}
+		}
+		if options.loss != _|_ {
+			loss: {
+				loss:        options.loss
 				correlation: options.correlation
 			}
-  	}
+		}
 		if options.corrupt != _|_ {
-				corrupt:{
-					corrupt: options.corrupt
-					correlation: options.correlation
-				}
+			corrupt: {
+				corrupt:     options.corrupt
+				correlation: options.correlation
+			}
 		}
 		if options.duplicate != _|_ {
-				duplicate:{
-					duplicate: options.duplicate
-					correlation: options.correlation
-				}
+			duplicate: {
+				duplicate:   options.duplicate
+				correlation: options.correlation
+			}
 		}
-  	if options.latency != _|_{
-				delay:{
-					latency: options.latency
-					jitter: options.jitter
-					correlation: options.correlation
-				}
-  	}
-  	if options.rate != _|_{
-				bandwidth:{
-					rate: options.rate
-					limit: options.limit
-					buffer: options.buffer
-					peakrate: options.peakrate
-					minburst: options.minburst
-					correlation: options.correlation
-				}
+		if options.latency != _|_ {
+			delay: {
+				latency:     options.latency
+				jitter:      options.jitter
+				correlation: options.correlation
+			}
 		}
-  }
+		if options.rate != _|_ {
+			bandwidth: {
+				rate:        options.rate
+				limit:       options.limit
+				buffer:      options.buffer
+				peakrate:    options.peakrate
+				minburst:    options.minburst
+				correlation: options.correlation
+			}
+		}
+	}
 }

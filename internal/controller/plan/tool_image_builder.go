@@ -31,6 +31,8 @@ import (
 const (
 	toolsVolumeName                  = "kb-tools"
 	initSecRenderedToolContainerName = "init-secondary-rendered-tool"
+
+	tplRenderToolPath = "/bin/config_render"
 )
 
 func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, podSpec *corev1.PodSpec, comp *component.SynthesizedComponent) {
@@ -51,13 +53,20 @@ func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 			}
 		}
 		buildToolsVolumeMount(cfgManagerParams, podSpec, buildParam.ConfigSpec.VolumeName, buildParam.ToolImageSpec.MountPoint)
-		if buildParam.ConfigSpec.SecondaryRenderedConfigSpec != nil {
+	}
+	// Ensure that the order in which iniContainers are generated does not change
+	checkAndInstallToolImageVolume(toolContainers, cfgManagerParams.ConfigSpecsBuildParams)
+	if len(toolContainers) != 0 {
+		cfgManagerParams.ToolsContainers = builder.BuildCfgManagerToolsContainer(cfgManagerParams, comp, toolContainers)
+	}
+}
+
+func checkAndInstallToolImageVolume(toolContainers map[string]appsv1alpha1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta) {
+	for _, buildParam := range buildParams {
+		if buildParam.ToolImageSpec != nil && buildParam.ConfigSpec.SecondaryRenderedConfigSpec != nil {
 			// auto install config_render tool
 			checkAndCreateRenderedInitContainer(toolContainers, buildParam.ToolImageSpec.MountPoint)
 		}
-	}
-	if len(toolContainers) != 0 {
-		cfgManagerParams.ToolsContainers = builder.BuildCfgManagerToolsContainer(cfgManagerParams, comp, toolContainers)
 	}
 }
 
@@ -69,13 +78,9 @@ func checkAndCreateRenderedInitContainer(toolContainers map[string]appsv1alpha1.
 		}
 	}
 	toolContainers[initSecRenderedToolContainerName] = appsv1alpha1.ToolConfig{
-		Name:  initSecRenderedToolContainerName,
-		Image: kbToolsImage,
-		Command: []string{
-			"cp",
-			"/bin/config_render",
-			mountPoint,
-		},
+		Name:    initSecRenderedToolContainerName,
+		Image:   kbToolsImage,
+		Command: []string{"cp", tplRenderToolPath, mountPoint},
 	}
 }
 

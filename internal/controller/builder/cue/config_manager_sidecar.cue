@@ -68,9 +68,13 @@ template: {
 	image:           parameter.sidecarImage
 	imagePullPolicy: "IfNotPresent"
 	volumeMounts:    parameter.volumes
-	securityContext:
-		runAsUser: 0
-	defaultAllowPrivilegeEscalation: false
+	if parameter.shareProcessNamespace {
+		{
+			securityContext:
+				runAsUser: 0
+			defaultAllowPrivilegeEscalation: false
+		}
+	}
 }
 
 #ArgType: string
@@ -83,10 +87,11 @@ template: {
 }
 
 parameter: {
-	name:          string
-	characterType: string
-	sidecarImage:  string
-	secreteName:   string
+	name:                  string
+	characterType:         string
+	sidecarImage:          string
+	secreteName:           string
+	shareProcessNamespace: bool
 	args: [...#ArgType]
 	// envs?: [...#EnvType]
 	volumes: [...]

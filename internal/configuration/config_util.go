@@ -161,3 +161,32 @@ func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []apps
 	}
 	return nil, nil, nil
 }
+
+func NeedSharedProcessNamespace(configSpecs []appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) (bool, error) {
+	for _, configSpec := range configSpecs {
+		if configSpec.ConfigConstraintRef == "" {
+			continue
+		}
+		b, err := isUnixSignalTrigger(configSpec, cli, ctx)
+		if err != nil {
+			return false, err
+		}
+		if b {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func isUnixSignalTrigger(configSpec appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) (bool, error) {
+	cc := appsv1alpha1.ConfigConstraint{}
+	ccKey := client.ObjectKey{
+		Namespace: "",
+		Name:      configSpec.ConfigConstraintRef,
+	}
+
+	if err := cli.Get(ctx, ccKey, &cc); err != nil {
+		return false, err
+	}
+	return cc.Spec.ReloadOptions != nil && cc.Spec.ReloadOptions.UnixSignalTrigger != nil, nil
+}

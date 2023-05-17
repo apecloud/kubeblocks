@@ -454,13 +454,14 @@ var _ = Describe("builder", func() {
 
 		It("builds config manager sidecar container correctly", func() {
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
-				ManagerName:   "cfgmgr",
-				CharacterType: "mysql",
-				SecreteName:   "test-secret",
-				Image:         constant.KBToolsImage,
-				Args:          []string{},
-				Envs:          []corev1.EnvVar{},
-				Volumes:       []corev1.VolumeMount{},
+				ManagerName:           "cfgmgr",
+				CharacterType:         "mysql",
+				SecreteName:           "test-secret",
+				Image:                 constant.KBToolsImage,
+				ShareProcessNamespace: true,
+				Args:                  []string{},
+				Envs:                  []corev1.EnvVar{},
+				Volumes:               []corev1.VolumeMount{},
 			}
 			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
 			Expect(err).Should(BeNil())

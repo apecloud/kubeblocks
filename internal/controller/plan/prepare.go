@@ -134,6 +134,16 @@ func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []ap
 		return nil
 	}
 
+	// This sidecar container will be able to view and signal processes from other containers
+	shared, err := cfgcore.NeedSharedProcessNamespace(cfgTemplates, cli, ctx)
+	if err != nil {
+		return err
+	}
+	if shared {
+		podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
+	}
+
+	buildParams.ShareProcessNamespace = shared
 	container, err := builder.BuildCfgManagerContainer(buildParams)
 	if err != nil {
 		return err
@@ -142,9 +152,6 @@ func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []ap
 
 	// Add sidecar to podTemplate
 	podSpec.Containers = append(podSpec.Containers, *container)
-
-	// This sidecar container will be able to view and signal processes from other containers
-	podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
 	return nil
 }
 

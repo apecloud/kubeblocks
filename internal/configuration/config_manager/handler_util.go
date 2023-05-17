@@ -39,6 +39,8 @@ type CfgManagerBuildParams struct {
 	Args        []string        `json:"args"`
 	Envs        []corev1.EnvVar `json:"envs"`
 
+	ShareProcessNamespace bool `json:"shareProcessNamespace"`
+
 	Volumes       []corev1.VolumeMount `json:"volumes"`
 	CharacterType string               `json:"characterType"`
 	SecreteName   string               `json:"secreteName"`

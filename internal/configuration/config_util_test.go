@@ -141,6 +141,12 @@ var _ = Describe("config_util", func() {
 			}
 		})
 	})
+
+	Context("NeedSharedProcessNamespace", func() {
+		It("Should success with no error", func() {
+			// TODO add test case
+		})
+	})
 })
 
 func TestFromUpdatedConfig(t *testing.T) {

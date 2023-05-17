@@ -258,8 +258,9 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		}
 	case PATCH:
 		patch := client.MergeFrom(node.oriObj)
-		if err := c.cli.Patch(c.transCtx.Context, node.obj, patch); err != nil {
-			return client.IgnoreNotFound(err)
+		if err := c.cli.Patch(c.transCtx.Context, node.obj, patch); !apierrors.IsNotFound(err) {
+			c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error", node.oriObj))
+			return err
 		}
 	case DELETE:
 		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {

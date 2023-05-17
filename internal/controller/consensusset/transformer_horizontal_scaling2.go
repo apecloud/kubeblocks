@@ -53,16 +53,17 @@ type conditionChecker = func() bool
 var actionNameRegex = regexp.MustCompile("(.*)-([0-9]+)-([0-9]+)-([a-zA-Z\\-]+)$")
 
 func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	// handle Update only, i.e. consensus cluster exists
 	transCtx, _ := ctx.(*CSSetTransformContext)
 	if model.IsObjectDeleting(transCtx.CSSet) {
 		return nil
 	}
+
 	// get the underlying sts
 	stsVertex, err := getUnderlyingStsVertex(dag)
 	if err != nil {
 		return err
 	}
+	// handle Update only, i.e. consensus cluster exists
 	if stsVertex.Action == nil || *stsVertex.Action != model.UPDATE {
 		return nil
 	}
@@ -70,129 +71,277 @@ func (t *HorizontalScaling2Transformer) Transform(ctx graph.TransformContext, da
 	// handle membership in consensus_set level and pod lifecycle in stateful_set
 	// pre-conditions validation: make sure sts level is ok
 	sts, _ := stsVertex.OriObj.(*apps.StatefulSet)
-	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
-	if err != nil {
-		return err
-	}
-	if sts.Status.ObservedGeneration != sts.Generation ||
-		sts.Status.Replicas != *sts.Spec.Replicas ||
-		sts.Status.ReadyReplicas != sts.Status.Replicas ||
-		len(pods) != int(sts.Status.Replicas) {
+	if !isStatefulSetReady(sts) {
 		return nil
 	}
 
-	actionLists, err := getAllActionList(transCtx)
-	if err != nil {
+	// reach the consensus_set expected state
+	switch ready, err := isConsensusSetReady(transCtx, transCtx.CSSet); {
+	case err != nil:
 		return err
-	}
-	noPendingActions := func() bool {
-		for _, actionList := range actionLists {
-			if len(actionList.Items) > 0 {
-				return false
-			}
-		}
-		return true
-	}
-	// replicas in status is same as in spec, and no pending membership action exists, no need to handle scaling
-	if transCtx.CSSet.Spec.Replicas == transCtx.CSSet.Status.Replicas &&
-		noPendingActions() {
+	case ready:
 		return nil
 	}
 
-	// handle horizontal scaling
+	// handle membership
 	stsVertex.Immutable = true
 	updateStsHandler := func() {
 		stsVertex.Immutable = false
 	}
-	// spec update
-	// compute diff set: pods to be created and pods to be deleted
+	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
+	if err != nil {
+		return err
+	}
 	roleMap := composeRoleMap(*transCtx.CSSet)
 	leaderPodName := getLeaderPod(pods, roleMap)
 
-	// member join
-	actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
-	for i := transCtx.CSSet.Status.Replicas; i < transCtx.CSSet.Spec.Replicas; i++ {
-		if err := doActions(transCtx.CSSet, dag, leaderPodName, int(i), actionTypeList); err != nil {
-			return err
-		}
-	}
-	// tell sts to create new pods and wait them ready
-	if transCtx.CSSet.Status.Replicas < transCtx.CSSet.Spec.Replicas {
-		updateStsHandler()
+	// TODO(free6om): separate consensus cluster Creation from Update
+	if len(leaderPodName) == 0 {
 		return nil
 	}
-
+	// members with ordinal less than 'spec.replicas' should in the consensus cluster
+	// member join
+	// create actions
+	memberJoining := make([]string, 0)
+	actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
+	for i := 0; i < int(transCtx.CSSet.Spec.Replicas); i++ {
+		podName := getPodName(transCtx.CSSet.Name, i)
+		if isMemberReady(podName, transCtx.CSSet.Status.MembersStatus) {
+			continue
+		}
+		actionCreated, err := doActions(transCtx.CSSet, dag, leaderPodName, i, actionTypeList)
+		if err != nil {
+			return err
+		}
+		if actionCreated {
+			memberJoining = append(memberJoining, podName)
+		}
+	}
 	// member leave
+	// members with ordinal greater than 'spec.replicas - 1' should not in the consensus cluster
+	memberLeaving := make([]string, 0)
 	actionTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
 	for i := transCtx.CSSet.Spec.Replicas; i < transCtx.CSSet.Status.Replicas; i++ {
-		if err := doActions(transCtx.CSSet, dag, leaderPodName, int(i), actionTypeList); err != nil {
+		actionCreated, err := doActions(transCtx.CSSet, dag, leaderPodName, int(i), actionTypeList)
+		if err != nil {
 			return err
+		}
+		if actionCreated {
+			memberLeaving = append(memberLeaving, getPodName(transCtx.CSSet.Name, int(i)))
 		}
 	}
 
-	// handle membership of each pod with unhandled actions
-	// compose pod-action map
+	// handle actions
+	// barrier: make sure all actions are in cache:
+	// 1. all joining members with a final join action
+	// 2. all leaving members with a final leave action
 	podActionMap, orphanActionList, err := getPodActionMap(transCtx)
 	if err != nil {
 		return err
 	}
+	for _, podName := range memberJoining {
+		if !hasFinalJoinAction(podName, podActionMap) {
+			return nil
+		}
+	}
+	for _, podName := range memberLeaving {
+		if !hasFinalLeaveAction(podName, podActionMap) {
+			return nil
+		}
+	}
+
+	// clean up orphan actions
 	// if pod not exist, delete all related suspend actions
 	for _, action := range orphanActionList {
 		doActionCleanup(dag, action)
 	}
-	// if both pre and post suspend actions exist,
-	// the final membership will not change, no need to trigger them anymore, delete actions
-	for podName, pAction := range podActionMap {
-		if !pAction.hasPreAction || !pAction.hasPostAction {
-			continue
-		}
-		if !isAllActionSuspend(pAction.actionList) {
-			continue
-		}
-		for _, action := range pAction.actionList {
-			doActionCleanup(dag, action)
-		}
-		delete(podActionMap, podName)
-	}
-	if len(podActionMap) == 0 {
-		return nil
-	}
 
-	// handle membership actions
-	podList := make([]string, 0, len(podActionMap))
-	for podName := range podActionMap {
-		podList = append(podList, podName)
-	}
-	sort.SliceStable(podList, func(i, j int) bool {
-		return podList[i] > podList[j]
-	})
-	// handle pods in sequence to minimum disrupt on current cluster
-	podName := podList[0]
-	pAction := podActionMap[podName]
-	action := pAction.actionList[0]
-	switch {
-	case *action.Spec.Suspend:
-		// TODO(free6om): validate cluster state: all pods without actions should be ok(role label set and has one leader)
-		if err := abnormalAnalysis(pods, podActionMap, roleMap); err != nil {
-			return err
-		}
-		startAction(dag, pAction.actionList[0])
-	case action.Status.Succeeded == 0 && action.Status.Failed == 0:
-		// in progress, do nothing and wait action done event
-	case action.Status.Failed > 0:
-		emitActionFailedEvent(transCtx, action.Labels[jobTypeLabel], action.Name)
-		fallthrough
-	case action.Status.Succeeded > 0:
-		doActionCleanup(dag, action)
-	}
-
-	// all actions finished
-	if len(podActionMap) == 1 &&
-		len(pAction.actionList) == 1 &&
-		(action.Status.Succeeded > 0 || action.Status.Failed > 0) {
+	// update sts when no pre-actions (i.e. no pre-actions configured or spec.replicas == status.replicas)
+	if len(memberLeaving) == 0 {
 		updateStsHandler()
 	}
+
+	// sort pods in order:
+	// 1. action generation in ascend
+	// 2. leaving with ordinal descend
+	// 3. joining with ordinal ascend
+	//
+	// e.g. if the 'spec.replicas' changing history is: 3->5->1->7, and the initial object 'generation' is 1.
+	// the action list may look like this:
+	// action-1-3-join-in-progress | action-1-4-join-suspend | action-2-4-leave-suspend | action-2-3-leave-suspend |
+	// action-2-2-leave-suspend | action-2-1-leave-suspend | action-3-1-join-suspend | action-3-2-join-suspend |
+	// action-3-3-join-suspend | action-3-4-join-suspend | action-3-5-join-suspend | action-3-6-join-suspend
+	//
+	// the action list can be shortened:
+	// basic idea:
+	// if one pod has an adjacent leave-join action pair, 'adjacent' means 'generation' diff is 1,
+	// the action pair can be removed.
+	// one adjacent pair of pod 4 in the example above: action-1-4-join-suspend | action-2-4-leave-suspend.
+	//
+	// algorithm:
+	// loop the action list in reverse order
+	// find the first pod ordinal same as the first item of the list, mark as 'index'
+	// the actions between the first item and the 'index+1' items can be removed
+	podList := make([]string, 0, len(podActionMap))
+	sort.SliceStable(memberLeaving, func(i, j int) bool {
+		return memberLeaving[j] < memberLeaving[i]
+	})
+	sort.SliceStable(memberJoining, func(i, j int) bool {
+		return memberJoining[i] < memberJoining[j]
+	})
+	podList = append(podList, memberLeaving...)
+	podList = append(podList, memberJoining...)
+
+	// handle pods in sequence to minimum disrupt on current cluster
+	allActionList := buildAllActionList(podList, podActionMap)
+	transCtx.Logger.Info(fmt.Sprintf("action list: %v", allActionList))
+	// find first unfinished action
+	index := findFirstUnfinishedAction(allActionList)
+	switch {
+	case index > 0:
+		lastFinishedAction := allActionList[index-1]
+		if lastFinishedAction.Status.Failed > 0 {
+			emitActionFailedEvent(transCtx, lastFinishedAction.Labels[jobTypeLabel], lastFinishedAction.Name)
+		}
+		fallthrough
+	case index == 0:
+		// start action if suspend
+		if *allActionList[index].Spec.Suspend {
+			// validate cluster state: all pods without actions should be ok(role label set and has one leader)
+			if err := abnormalAnalysis(pods, podActionMap, roleMap); err != nil {
+				return err
+			}
+			startAction(dag, allActionList[index])
+		}
+	case index < 0:
+		// all action finished, do clean up
+		for _, ac := range allActionList {
+			doActionCleanup(dag, ac)
+		}
+		updateStsHandler()
+	}
+
 	return nil
+}
+
+func findFirstUnfinishedAction(allActionList []*batchv1.Job) int {
+	index := -1
+	for i := range allActionList {
+		if allActionList[i].Status.Failed > 0 || allActionList[i].Status.Succeeded > 0 {
+			continue
+		}
+		index = i
+		break
+	}
+	return index
+}
+
+func buildAllActionList(podList []string, podActionMap map[string]*podAction) []*batchv1.Job {
+	allActionList := make([]*batchv1.Job, 0, len(podActionMap))
+	for _, podName := range podList {
+		pAction := podActionMap[podName]
+		allActionList = append(allActionList, pAction.actionList...)
+	}
+	actionTypePriorityMap := map[string]int{
+		jobTypeSwitchover:           1,
+		jobTypeMemberLeaveNotifying: 2,
+		jobTypeMemberJoinNotifying:  3,
+		jobTypeLogSync:              4,
+		jobTypePromote:              5,
+	}
+	sort.Slice(allActionList, func(i, j int) bool {
+		nameI, nameJ := allActionList[i].Name, allActionList[j].Name
+		// name should be legal, no error should be returned
+		generationI, ordinalI, actionTypeI, _ := getActionGenerationOrdinalAndType(nameI)
+		generationJ, ordinalJ, actionTypeJ, _ := getActionGenerationOrdinalAndType(nameJ)
+		switch {
+		case generationI == generationJ && ordinalI == ordinalJ:
+			return actionTypePriorityMap[actionTypeI] < actionTypePriorityMap[actionTypeJ]
+		case generationI == generationJ && (actionTypeI == jobTypeSwitchover || actionTypeI == jobTypeMemberLeaveNotifying):
+			return ordinalJ < ordinalI
+		case generationI == generationJ:
+			return ordinalI < ordinalJ
+		default:
+			return generationI < generationJ
+		}
+	})
+	return allActionList
+}
+
+func hasFinalLeaveAction(podName string, podActionMap map[string]*podAction) bool {
+	pAction, ok := podActionMap[podName]
+	if !ok {
+		return false
+	}
+	if !pAction.hasPreAction {
+		return false
+	}
+	finalAction := pAction.actionList[len(pAction.actionList)-1]
+	actionType := finalAction.Labels[jobTypeLabel]
+	return actionType == jobTypeSwitchover || actionType == jobTypeMemberLeaveNotifying
+}
+
+func hasFinalJoinAction(podName string, podActionMap map[string]*podAction) bool {
+	pAction, ok := podActionMap[podName]
+	if !ok {
+		return false
+	}
+	if !pAction.hasPostAction {
+		return false
+	}
+	finalAction := pAction.actionList[len(pAction.actionList)-1]
+	actionType := finalAction.Labels[jobTypeLabel]
+	return actionType == jobTypeMemberJoinNotifying ||
+		actionType == jobTypeLogSync ||
+		actionType == jobTypePromote
+}
+
+func isStatefulSetReady(sts *apps.StatefulSet) bool {
+	if sts.Status.ObservedGeneration == sts.Generation &&
+		sts.Status.Replicas == *sts.Spec.Replicas &&
+		sts.Status.ReadyReplicas == sts.Status.Replicas {
+		return true
+	}
+	return false
+}
+
+// consensus_set level 'ready' state:
+// 1. all replicas exist
+// 2. all members have role set
+func isConsensusSetReady(transCtx *CSSetTransformContext, csSet *workloads.ConsensusSet) (bool, error) {
+	if csSet.Status.Replicas != csSet.Spec.Replicas {
+		return false, nil
+	}
+	membersStatus := csSet.Status.MembersStatus
+	if len(membersStatus) != int(csSet.Spec.Replicas) {
+		return false, nil
+	}
+	for i := 0; i < int(csSet.Spec.Replicas); i++ {
+		podName := getPodName(csSet.Name, i)
+		if !isMemberReady(podName, membersStatus) {
+			return false, nil
+		}
+	}
+	// no pending actions
+	actionLists, err := getAllActionList(transCtx)
+	if err != nil {
+		return false, err
+	}
+	for _, actionList := range actionLists {
+		if len(actionList.Items) > 0 {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func isMemberReady(podName string, membersStatus []workloads.ConsensusMemberStatus) bool {
+	for _, memberStatus := range membersStatus {
+		if memberStatus.PodName == podName {
+			return true
+		}
+	}
+	return false
 }
 
 func shouldCreateAction(csSet *workloads.ConsensusSet, actionType string, checker conditionChecker) bool {
@@ -241,32 +390,23 @@ func getPodName(parent string, ordinal int) string {
 	return fmt.Sprintf("%s-%d", parent, ordinal)
 }
 
-func isAllActionSuspend(actionList []*batchv1.Job) bool {
-	for _, action := range actionList {
-		suspend := action.Spec.Suspend
-		if suspend == nil || !*suspend {
-			return false
-		}
-	}
-	return true
-}
-
+// with actionList sorted by generation and action priority
 func getPodActionMap(transCtx *CSSetTransformContext) (map[string]*podAction, []*batchv1.Job, error) {
 	// sort actions by generation and actionType
 	actionLists, err := getAllActionList(transCtx)
 	if err != nil {
 		return nil, nil, err
 	}
-	podActionMap := make(map[string]*podAction, 0)
-	orphanActionList := make([]*batchv1.Job, 0)
+	podActionMap := make(map[string]*podAction, len(actionLists))
+	var orphanActionList []*batchv1.Job
 	for _, list := range actionLists {
-		for _, action := range list.Items {
+		for i, action := range list.Items {
 			ordinal, err := getActionOrdinal(action.Name)
 			if err != nil {
 				return nil, nil, err
 			}
-			if ordinal >= int(transCtx.CSSet.Status.Replicas) {
-				orphanActionList = append(orphanActionList, &action)
+			if ordinal >= int(transCtx.CSSet.Status.Replicas) && ordinal >= int(transCtx.CSSet.Spec.Replicas) {
+				orphanActionList = append(orphanActionList, &list.Items[i])
 				continue
 			}
 			podName := getPodName(transCtx.CSSet.Name, ordinal)
@@ -285,15 +425,10 @@ func getPodActionMap(transCtx *CSSetTransformContext) (map[string]*podAction, []
 			if actionList == nil {
 				actionList = make([]*batchv1.Job, 0)
 			}
-			actionList = append(actionList, &action)
+			actionList = append(actionList, &list.Items[i])
 			pAction.actionList = actionList
 			podActionMap[podName] = pAction
 		}
-	}
-	for _, pAction := range podActionMap {
-		sort.Slice(pAction.actionList, func(i, j int) bool {
-			return pAction.actionList[i].Name < pAction.actionList[j].Name
-		})
 	}
 
 	return podActionMap, orphanActionList, nil
@@ -305,6 +440,14 @@ func getActionOrdinal(actionName string) (int, error) {
 		return 0, fmt.Errorf("error actionName: %s", actionName)
 	}
 	return strconv.Atoi(subMatches[3])
+}
+
+func getActionGenerationOrdinalAndType(actionName string) (string, string, string, error) {
+	subMatches := actionNameRegex.FindStringSubmatch(actionName)
+	if len(subMatches) < 5 {
+		return "", "", "", fmt.Errorf("error actionName: %s", actionName)
+	}
+	return fmt.Sprintf("%s-%s", subMatches[1], subMatches[2]),subMatches[3], subMatches[4], nil
 }
 
 func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
@@ -367,7 +510,8 @@ func abnormalAnalysis(pods []corev1.Pod, podActionMap map[string]*podAction, rol
 	return nil
 }
 
-func doActions(csSet *workloads.ConsensusSet, dag *graph.DAG, leaderPodName string, ordinal int, actionTypeList []string) error {
+func doActions(csSet *workloads.ConsensusSet, dag *graph.DAG, leaderPodName string, ordinal int, actionTypeList []string) (bool, error) {
+	actionCreated := false
 	podName := getPodName(csSet.Name, ordinal)
 	for _, actionType := range actionTypeList {
 		checker := func() bool {
@@ -381,10 +525,11 @@ func doActions(csSet *workloads.ConsensusSet, dag *graph.DAG, leaderPodName stri
 		}
 		env := buildActionEnv(csSet, leaderPodName, podName)
 		if err := createAction(csSet, dag, env, actionType, ordinal, true); err != nil {
-			return err
+			return false, err
 		}
+		actionCreated = true
 	}
-	return nil
+	return actionCreated, nil
 }
 
 // ordinal is the ordinal of pod which this action apply to

@@ -27,6 +27,7 @@ jobmanager:
     allowPrivilegeEscalation: false
 
 taskmanager:
+  taskSlots: 6
   podSecurityContext:
     runAsUser: 9999
     runAsGroup: 9999

@@ -84,6 +84,11 @@ spec:
                 containerPort: 6122
                 protocol: TCP
             {{- with .Values.taskmanager }}
+            env:
+              - name: TASK_MANAGER_NUMBER_OF_TASK_SLOTS
+                value: "{{ .taskSlots }}"
+            {{- end}}
+            {{- with .Values.taskmanager }}
             securityContext:
               {{- toYaml .containerSecurityContext | nindent 14 }}
             {{- end }}

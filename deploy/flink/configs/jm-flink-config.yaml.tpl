@@ -30,8 +30,7 @@ jobmanager.bind-host: 0.0.0.0
 jobmanager.execution.failover-strategy: region
 jobmanager.memory.process.size: {{ $phy_memory }}
 jobmanager.rpc.address: {{ $clusterName }}-{{ $jm_component.name }}
-jobmanager.rpc.bind-port: {{ $default_rpc_port }}
-jobmanager.rpc.port:  {{ $default_rpc_port }}
+jobmanager.rpc.port: {{ $default_rpc_port }}
 parallelism.default: 1
 rest.address: {{ $clusterName }}-{{ $jm_component.name }}
 rest.bind-address: 0.0.0.0

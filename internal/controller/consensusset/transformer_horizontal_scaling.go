@@ -80,7 +80,9 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	memberReadyReplicas := int32(len(transCtx.CSSet.Status.MembersStatus))
 
-	// barrier 2: latest action list in the api-server
+	// handle spec update
+
+	// send the latest action list to the api-server
 	if model.IsObjectUpdating(transCtx.OrigCSSet) {
 		if memberReadyReplicas == transCtx.CSSet.Spec.Replicas {
 			return nil
@@ -88,7 +90,9 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		return generateActions(transCtx, dag, memberReadyReplicas)
 	}
 
-	// barrier 3: if scale out, make sure new pods are ready
+	// handle status
+
+	// barrier 2: if scale out, make sure new pods are ready
 	if memberReadyReplicas < transCtx.CSSet.Spec.Replicas &&
 		sts.Status.ReadyReplicas != transCtx.CSSet.Spec.Replicas {
 		updateStsHandler()
@@ -122,10 +126,10 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		return err
 	}
 	printActionList(transCtx.Logger, allActionList)
-	finalActionList := buildFinalActionList(allActionList, int(memberReadyReplicas), int(transCtx.CSSet.Spec.Replicas))
+	finalActionList := buildFinalActionList(allActionList, memberReadyReplicas, transCtx.CSSet.Spec.Replicas)
 	printActionList(transCtx.Logger, finalActionList)
 
-	// barrier 4: make sure latest action list is in cache
+	// barrier 3: make sure latest action list is in cache
 	// why should have the latest action list?
 	// one case:
 	// replicas: 5->3, local action list: member-5-leave
@@ -148,7 +152,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		// start action if suspend
 		action := finalActionList[index]
 		if *action.Spec.Suspend {
-			// barrier 5: members with ordinal less than action target ordinal should be ready
+			// barrier 4: members with ordinal less than action target ordinal should be ready
 			// validate cluster state: all pods without actions should be ok(role label set and has one leader)
 			if err := abnormalAnalysis(transCtx.CSSet, action); err != nil {
 				emitAbnormalEvent(transCtx, action.Labels[jobTypeLabel], action.Name, err)
@@ -294,16 +298,16 @@ func buildAllActionList(transCtx *CSSetTransformContext) ([]*batchv1.Job, error)
 	return allActionList, nil
 }
 
-func buildFinalActionList(allActionList []*batchv1.Job, readyMembers, expectedMembers int) []*batchv1.Job {
+func buildFinalActionList(allActionList []*batchv1.Job, readyMembers, expectedMembers int32) []*batchv1.Job {
 	currentMembers := readyMembers
 	index := findFirstUnfinishedAction(allActionList)
 	if index > 0 {
 		lastAction := allActionList[index-1]
 		ordinal, _ := getActionOrdinal(lastAction.Name)
 		if isPreAction(lastAction.Labels[jobTypeLabel]) {
-			currentMembers = ordinal
+			currentMembers = int32(ordinal)
 		} else {
-			currentMembers = ordinal + 1
+			currentMembers = int32(ordinal + 1)
 		}
 	}
 
@@ -332,12 +336,13 @@ func buildFinalActionList(allActionList []*batchv1.Job, readyMembers, expectedMe
 	return finalActionList
 }
 
-func isOutOfScope(action *batchv1.Job, currentMembers, expectedMembers int) bool {
+func isOutOfScope(action *batchv1.Job, currentMembers, expectedMembers int32) bool {
 	bottom, top := currentMembers, expectedMembers
 	if bottom > top {
 		bottom, top = top, bottom
 	}
-	ordinal, _ := getActionOrdinal(action.Name)
+	od, _ := getActionOrdinal(action.Name)
+	ordinal := int32(od)
 	return ordinal >= top || ordinal < bottom
 }
 
@@ -347,27 +352,27 @@ func isSuspendPair(lastAction, currentAction *batchv1.Job) bool {
 	}
 	lastOrdinal, _ := getActionOrdinal(lastAction.Name)
 	currentOrdinal, _ := getActionOrdinal(currentAction.Name)
-	return lastOrdinal == currentOrdinal
+	lastPre := isPreAction(lastAction.Labels[jobTypeLabel])
+	currentPre := isPreAction(currentAction.Labels[jobTypeLabel])
+	return lastOrdinal == currentOrdinal && lastPre != currentPre
 }
 
 func isAdjacentPair(lastAction, currentAction *batchv1.Job) bool {
-	if lastAction.Spec.Suspend != nil && !*lastAction.Spec.Suspend {
-		return true
-	}
 	lastOrdinal, _ := getActionOrdinal(lastAction.Name)
 	currentOrdinal, _ := getActionOrdinal(currentAction.Name)
 	lastPre := isPreAction(lastAction.Labels[jobTypeLabel])
 	currentPre := isPreAction(currentAction.Labels[jobTypeLabel])
+	// member-3-post-join-finished adjacent with member-3-pre-leave-unfinished
+	if lastPre != currentPre {
+		return lastOrdinal == currentOrdinal
+	}
 	// scale out: member-3-post-join adjacent with member-4-post-join
 	// scale in:  member-4-pre-leave adjacent with member-3-pre-leave
-	if lastPre != currentPre {
-		return false
-	}
 	switch lastPre {
 	case true:
-		return lastOrdinal - currentOrdinal == 1
+		return lastOrdinal-currentOrdinal == 1
 	default:
-		return currentOrdinal - lastOrdinal == 1
+		return currentOrdinal-lastOrdinal == 1
 	}
 }
 

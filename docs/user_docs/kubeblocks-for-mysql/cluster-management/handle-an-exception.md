@@ -8,17 +8,11 @@ sidebar_label: Handle an exception
 
 # Handle an exception
 
-When there is an exception during your operation, you can perform the following procedure to solve it.
+When an exception occurs during your operation, you can perform the following steps to solve it.
 
 ## Steps
 
-1. Check the cluster status. Fill in the name of the cluster you want to check and run the command below.
-
-    ```bash
-    kbcli cluster list <name>
-    ```
-
-    ***Example***
+1. Check the cluster status.
 
     ```bash
     kbcli cluster list mysql-cluster

@@ -52,22 +52,14 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    EOF
    ```
 
-2. Validate the restarting.
-
-   Check the cluster status to check the restarting status.
+2. Check the cluster status to validate the restarting.
 
    ```bash
-   kbcli cluster list <name>
+   kbcli cluster list mysql-cluster
+   >
+   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
+   mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
    ```
 
    - STATUS=Restarting: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.
-
-   ***Example***
-
-     ```bash
-     kbcli cluster list mysql-cluster
-     >
-     NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-     mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
-     ```

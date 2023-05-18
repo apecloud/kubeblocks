@@ -2,7 +2,7 @@
 title: ChatGPT Retrieval Plugin with KubeBlocks
 description: Introduction and Installation of ChatGPT Retrieval Plugin on KubeBlocks
 keywords: [ChatGPT retrieval plugin]
-sidebar_position: 2
+sidebar_position: 6
 sidebar_label: ChatGPT Retrieval Plugin
 ---
 

@@ -9,45 +9,54 @@ sidebar_position: 1
 
 :::note
 
-* Using the public network and network load balancer causes extra fees.
+* Using the public network and network load balancer may incur expenses.
 * The following tutorial is based on the prerequisite that ApeCloud MySQL is deployed on AWS EKS. Using other Kubernetes clusters to deploy ApeCloud MySQL is not included.
 
 :::
 
-## Step 1. Network configuration
+## Network configuration
 
 ### Expose the target ApeCloud MySQL network
 
-The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS environment. But the migration task of DMS  (Database Migration Service) runs in an independent Replication Instance, in which the Replication Instance can be set with the same VPC used by the Kubernetes clusters, but visiting ClusterIP still fails. This solution aims to connect this part of the network.
+The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS environment. But the migration task of DMS (Database Migration Service) runs in an independent Replication Instance, in which the Replication Instance can be set with the same VPC used by the Kubernetes clusters, but visiting ClusterIP still fails. This solution aims to connect this part of the network.
 
 #### KubeBlocks native solution
 
-1. Check whether the loadbalancer add-on is enabled.
+***Before you start***
+
+* [Install `kbcli` and KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments. The `kbcli` version should be 0.4.0 or above.
+* Enable the AWS loadbalancer controller add-on.
 
    ```bash
    kbcli addon list
+
+   kbcli addon enable aws-load-balancer-controller
+   >
+   addon.extensions.kubeblocks.io/aws-load-balancer-controller enabled
    ```
 
-   If the loadbalancer is disabled, it may relate to your environment since the loadbalancer add-on relies on the EKS environment.
-   Build your EKS environment, and refer to [Enable add-ons](./../../installation/enable-addons.md) to enable the loadbalancer add-on.
-2. Create an ApeCloud MySQL cluster on AWS. Refer to [Create an ApeCloud MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md) for details.
-3. Fill in the cluster name and run the command below to expose the external IP of the cluster.
+   If the loadbalancer is not enabled successfully, it may relate to your environment since the loadbalancer add-on relies on the EKS environment.
+
+   Check your EKS environment and enable this add-on again. For enabling add-on details, refer to [Enable add-ons](./../../installation/enable-addons.md).
+
+***Steps***
+
+1. Create an ApeCloud MySQL cluster on AWS. Refer to [Create an ApeCloud MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md) for details.
+2. Fill in the cluster name and run the command below to expose the external IP of the cluster.
 
    ```bash
-   kbcli cluster expose ${mysql clustrName} --enable=true --type=vpc
+   kbcli cluster expose mysql-cluster --enable=true --type='vpc'
    ```
+
+   :::note
+
+   For the above `kbcli cluster expose` command, the available value for `--type` are `vpc` and `internet`. Use `--type=vpc` for access within the same VPC and `--type=internet` for cross VPC access under the public network.
+
+   :::
 
    Run the command below to view the external IP:Port address which can be accessed by the same VPC machine but outside the EKS cluster.
 
    ```bash
-   kbcli cluster describe ${clustrName} | grep -A 3 Endpoints
-   ```
-
-   ***Example***
-
-   ```bash
-   KBCLI_EXPERIMENTAL_EXPOSE="1" kb cluster expose mysql-cluster --on=true
-
    kbcli cluster describe mysql-cluster | grep -A 3 Endpoints
    >
    Endpoints:
@@ -55,31 +64,36 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
    mysql           ReadWrite       10.100.51.xxx:3306      172.31.35.xxx:3306 
    ```
 
-4. Configure the external IP:Port as the target endpoint on AWS DMS.
+3. Configure the external IP:Port as the target endpoint on AWS DMS.
+
    This operation generates an ENI (Elastic Network Interface) on EC2. If the quota of the low-spec machine is small, pay more attention to the available level of ENI.
+
    For the corresponding ENI specifications, refer to [Elastic network interfaces - Amazon Elastic Compute Cloud](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html).
 
 #### Use Network Load Balancer (NLB) to expose the service
 
 1. Install Load Balancer Controller on EKS.
+
    For installation details, refer to [Installing the AWS Load Balancer Controller add-on](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html).
+
    For how to create NLB in a cluster, refer to [Network load balancing on Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html).
-2. Create and use the NLB service to expose the ApeCloud MySQL service.
+2. Create a service that uses NLB to expose the ApeCloud MySQL service.
+
    Configure `metadata.name`, `metadata.annotations`, `metadata.labels`, and `spec.selector` according to your actual environment.
 
-   ```bash
+   ```yaml
    cat <<EOF | kubectl apply -f -
    kind: Service
    apiVersion: v1
    metadata:
-       name: mysql-service
+       name: apecloud-mysql-service
        annotations:
            service.beta.kubernetes.io/aws-load-balancer-type: nlb-ip
            alb.ingress.kubernetes.io/scheme: internet-facing
-           service.beta.kubernetes.io/aws-load-balancer-subnets: ${subnet name1},${subnet name2}
+           service.beta.kubernetes.io/aws-load-balancer-subnets: <subnet name1>,<subnet name2>
        labels:
          apps.kubeblocks.io/component-name: mysql
-         app.kubernetes.io/instance: ${mysql clustername}
+         app.kubernetes.io/instance: <apecloud-mysql clustername>
          app.kubernetes.io/managed-by: kubeblocks
          app.kubernetes.io/name: apecloud-mysql     
    spec:
@@ -87,7 +101,7 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
        type: LoadBalancer
        selector:
          apps.kubeblocks.io/component-name: mysql
-         app.kubernetes.io/instance: ${mysql clustername}
+         app.kubernetes.io/instance: <apecloud-mysql clustername>
          app.kubernetes.io/managed-by: kubeblocks
          kubeblocks.io/role: leader
        ports:
@@ -98,16 +112,17 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
    EOF
    ```
 
-3. Run the command below to make sure the service and NLB run normally.
+3. Check whether this new service and NLB run normally.
 
    ```bash
    kubectl get svc 
    >
-   NAME                  TYPE           CLUSTER-IP       EXTERNAL-IP                                        PORT(S)  
-   mysql-service         LoadBalancer   10.100.xx.xx     k8s-xx-xx-xx.elb.cn-northwest-1.amazonaws.com.cn   3306:xx/TCP
+   NAME                           TYPE           CLUSTER-IP       EXTERNAL-IP                                        PORT(S)  
+   apecloud-mysql-service         LoadBalancer   10.100.xx.xx     k8s-xx-xx-xx.elb.cn-northwest-1.amazonaws.com.cn   3306:xx/TCP
    ```
 
    Make sure the server runs normally and can generate EXTERNAL-IP. Meanwhile, verify whether the NLB state is `Active` by the AWS console, then you can access the cluster by EXTERNAL-IP:Port.
+
    ![NLB-active](./../../../img/mysql_migration_active.png)
 
 ### Expose the source network
@@ -121,24 +136,31 @@ There exist four different conditions for the source network. Choose one method 
 * RDS within the same VPC in AWS
   
    You only need to specify an RDS when creating an endpoint in DMS and no extra operation is required.
-   For creating an endpoint, refer to step 2 in [Configure AWS DMS tasks](#step-2-configure-aws-dms-tasks).
+
+   For creating an endpoint, refer to step 2 in [Configure AWS DMS tasks](#configure-aws-dms-tasks).
 
 * RDS within different VPCs in AWS
   
-   Use the public network to create an endpoint. Refer to [this document](https://aws.amazon.com/premiumsupport/knowledge-center/aurora-mysql-connect-outside-vpc/?nc1=h_ls) to make public network access available, then create an endpoint in AWS DMS. For creating an endpoint, refer to step 2 in [Configure AWS DMS tasks](#step-2-configure-aws-dms-tasks).
+   Use the public network to create an endpoint. Refer to [this document](https://aws.amazon.com/premiumsupport/knowledge-center/aurora-mysql-connect-outside-vpc/?nc1=h_ls) to make public network access available, then create an endpoint in AWS DMS.
+
+   For creating an endpoint, refer to step 2 in [Configure AWS DMS tasks](#configure-aws-dms-tasks).
 
 * MySQL in AWS EKS
   
    Use NLB to expose the service.
 
-  1. Install Load Balancer Controller
+  1. Install Load Balancer Controller.
+
      For installation details, refer to [Installing the AWS Load Balancer Controller add-on](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html).
+
      For how to create NLB in a cluster, refer to [Network load balancing on Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html).
-  2. Create the service using NLB
+  2. Create the service using NLB.
+
      Make sure the value of `some.label.key` in `metadata.labels` is consistent with the value of ApeCloud MySQL you created.
+
      Configure `port` and `targetPort` in `spec.ports` according to your current environment.
 
-     ```bash
+     ```yaml
      cat <<EOF | kubectl apply -f -
      kind: Service
      apiVersion: v1
@@ -164,9 +186,10 @@ There exist four different conditions for the source network. Choose one method 
      ```
 
   3. Make sure Service and NLB run normally.
+
      Refer to step 3 in [Use Network Load Balancer (NLB) to expose the service](#use-network-load-balancer-nlb-to-expose-the-service) for details.
 
-## Step 2. Configure AWS DMS tasks
+## Configure AWS DMS tasks
 
 Pay attention to the following potential issues during the migration task.
 
@@ -181,20 +204,28 @@ Pay attention to the following potential issues during the migration task.
 * DDL and onlineDDL
   
    Locked structure changes often affect the speed of data migration.
-   The lock-free structure change is based on the rename of the temporary table in principle, which causes data problems if the migration object is not the whole database migration. For example, if the migration object chooses to migrate db1.table1 to the target, and an onlineDDL is performed on db1.table1 on the source database during the process, the data of db1.table1 on the target database will be inconsistent with the source database.
-   It should be noted that the way some database management tools initiate DDL is performed using lock-free mutation by default.
-   Migration is short-term behavior. To avoid unnecessary troubles, it is recommended not to perform DDL operations during the migration process.
+
+   The lock-free structure change is based on the rename of the temporary table in principle, which causes data problems if the migration object is not the whole database migration.
+
+   For example, if the migration object chooses to migrate db1.table1 to the target, and an onlineDDL is performed on db1.table1 on the source database during the process, the data of db1.table1 on the target database will be inconsistent with the source database.
+
+   It should be noted that the way some database management tools initiate DDL is performed by using lock-free mutation by default.
+
+   Migration is a short-term behavior. To avoid unnecessary troubles, it is recommended not to perform DDL operations during the migration process.
 
 * binlog retention hours
-  
-   The process of migrating data transmission changes depends on the binlog of the source database.
+
+   The incrementally migrating process of data transmission relies on the binlog of the source database.
+
    It is recommended to extend the binlog retention hours to avoid a long-term interruption and the situation that the binlog of the source database is cleared during recovery, resulting in the migration not being resumed.
+
    For example, in AWS RDS, connect to the database and run the command below:
 
    ```bash
    # View configuration
    # Input: 
    call mysql.rds_show_configuration;
+
    # Output: Pay attention to the binlog retention hours.
    +------------------------+-------+-----------------------------------------------------------------------------------------------------------+
    | name                   | value | description                                                                                               |
@@ -260,7 +291,8 @@ Pay attention to the following potential issues during the migration task.
 
      ![Target table preparation mode](./../../../img/mysql_migration_target_table_preparation_mode.png)
 
-     The target table preparation mode specifies the initial mode of the data structure. You can click Info beside the options to view the definition of each mode. For example, if ApeCloud MySQL is a newly created empty instance, you can select **Do nothing** mode.
+     The target table preparation mode specifies the initial mode of the data structure. You can click the Info link beside the options to view the definition of each mode. For example, if ApeCloud MySQL is a newly created empty instance, you can select **Do nothing** mode.
+
      In addition, create a database on ApeCloud MySQL before migration because AWS DMS does not create a database.
 
    * Turn on validation
@@ -277,22 +309,22 @@ Pay attention to the following potential issues during the migration task.
 
    * Full load tuning settings: Maximum number of tables to load in parallel
 
-     This number decides how many concurrencies DMS uses to get source table data. Theoretically speaking, this will cause pressure on the source table during the full-load migration. Lower this number when the business in the source table is delicate.
+     This number decides how many concurrencies DMS uses to get source table data. Theoretically speaking, this can cause pressure on the source table during the full-load migration. Lower this number when the business in the source table is delicate.
 
      ![Full load tuning settings](./../../../img/mysql_migration_full_load_tuning_settings.png)
 
    * Table Mapping
 
      Table mapping decides which tables in the database are used for migration and can also apply easy conversions. It is recommended to enable **Wizard** mode to configure this parameter.
-4. Click the button to start the migration task.
+4. Start the migration task.
 
-## Step 3. Switch applications
+## Switch applications
 
 ***Before you start***
 
-* DMS migration tasks run normally. If you perform a validation task, make sure the results are as expected.
+* Make sure DMS migration tasks run normally. If you perform a validation task, make sure the results are as expected.
 * To differentiate conversation and improve data security, it is recommended to create and authorize a database account solely for migration.
-* It is recommended to switch applications during business off-peak hours because for the sake of safety during the switching process, it is necessary to stop business write.
+* It is recommended to switch applications during business off-peak hours because for safety concerns during the switching process, it is necessary to stop business write.
 
 ***Steps:***
 
@@ -308,6 +340,7 @@ Pay attention to the following potential issues during the migration task.
 
 2. Pause business and prohibit new business write in the source database.
 3. Verify the transmission task status again to make sure the task runs normally and the running status lasts at least 1 minute.
+
    Refer to step 1 above to observe whether the link is normal and whether latency exists.
 4. Use the target database to resume business.
 5. Verify the migration with business.

@@ -2,7 +2,7 @@
 title: Handle exception and uninstall kbcli and KubeBlocks
 description: Handle exception and uninstall kbcli and KubeBlocks
 keywords: [kbcli, kubeblocks, exception, uninstall]
-sidebar_position: 1
+sidebar_position: 4
 sidebar_label: kbcli and KubeBlocks
 ---
 

@@ -2,7 +2,7 @@
 title: Install kbcli and KubeBlocks on the existed Kubernetes clusters
 description: Install kbcli and KubeBlocks on the existed Kubernetes clusters
 keywords: [taints, affinity, tolerance, install]
-sidebar_position: 4
+sidebar_position: 3
 sidebar_label: Install kbcli and KubeBlocks on the existed Kubernetes clusters
 ---
 

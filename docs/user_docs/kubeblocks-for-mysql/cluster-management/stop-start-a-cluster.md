@@ -17,12 +17,6 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 Configure the name of your cluster and run the command below to stop this cluster.
 
 ```bash
-kbcli cluster stop <name>
-```
-
-***Example***
-
-```bash
 kbcli cluster stop mysql-cluster
 ```
 
@@ -78,12 +72,6 @@ spec:
 ### Option 1. (Recommended) Use kbcli
 
 Configure the name of your cluster and run the command below to start this cluster.
-
-```bash
-kbcli cluster start <name>
-```
-
-***Example***
 
 ```bash
 kbcli cluster start mysql-cluster

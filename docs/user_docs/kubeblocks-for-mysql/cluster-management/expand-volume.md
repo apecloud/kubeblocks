@@ -20,12 +20,6 @@ Volume expansion triggers pod restart, all pods restart in the order of learner 
 Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list <name>
-```
-
-***Example***
-
-```bash
 kbcli cluster list mysql-cluster
 >
 NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
@@ -51,7 +45,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
     **Option 2.** Create an OpsRequest
 
-    Run the command below to expand the volume of a cluster.
+    Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
     ```bash
     kubectl apply -f - <<EOF
@@ -72,7 +66,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
     **Option 3.** Change the YAML file of the cluster
 
-    Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file. 
+    Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 
     `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
@@ -101,12 +95,6 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     ```
 
 2. Validate the volume expansion operation.
-
-   ``bash
-   kbcli cluster list <name>
-   ```
-
-   ***Example***
 
    ```bash
    kbcli cluster list mysql-cluster

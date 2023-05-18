@@ -12,7 +12,7 @@ You can scale a MySQL cluster in two ways, vertical scaling and horizontal scali
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource demand from 1C2G to 2C4G, vertical scaling is what you need.
+You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
 
 :::note
 
@@ -23,12 +23,6 @@ During the vertical scaling process, all pods restart in the order of learner ->
 ### Before you start
 
 Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
-
-```bash
-kbcli cluster list <name>
-```
-
-***Example***
 
 ```bash
 kbcli cluster list mysql-cluster
@@ -44,8 +38,6 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    **Option 1.** (**Recommended**) Use kbcli
 
    Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
-
-   ***Example***
 
    ```bash
    kbcli cluster vscale mysql-cluster \
@@ -73,7 +65,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
    :::
 
-   2. Use `--set` option with `kbcli cluster vscale` command.
+   2. Use `--set` option with `kbcli cluster vscale` command to apply the vertical scaling.
 
    ```bash
    kbcli cluster vscale mysql-clsuter --components="mysql" --cluster-definition apecloud-mysql --set class=general-2c2g
@@ -81,7 +73,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
    **Option 2.** Create an OpsRequest
   
-   Run the command below to apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
    ```bash
    kubectl apply -f - <<EOF
@@ -140,42 +132,28 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
      terminationPolicy: Halt
    ```
   
-2. Validate the vertical scaling.
-
-    Check the cluster status to identify the vertical scaling status.
-
-    ```bash
-    kbcli cluster list <name>
-    ```
-
-    ***Example***
+2. Check the cluste status to validate the vertical scaling.
 
     ```bash
     kbcli cluster list mysql-cluster
     >
-    NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS          CREATED-TIME
-    mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Updating        Jan 29,2023 14:29 UTC+0800
+    NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS                 CREATED-TIME
+    mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    VerticalScaling        Jan 29,2023 14:29 UTC+0800
     ```
 
    - STATUS=VerticalScaling: it means the vertical scaling is in progress.
    - STATUS=Running: it means the vertical scaling operation has been applied.
-   - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the leader instance is running properly while others are abnormal.
-     > To solve the problem, you can check manually to see whether resources are sufficient. If AutoScaling is supported, the system recovers when there are enough resources, otherwise, you can create enough resources and check the result with kubectl describe command.
+   - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
+     > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale up from three pods to five pods. The scaling process includes the backup and restoration of data.
+Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restoration of data.
 
 ### Before you start
 
-- Refer to [Backup and restore for MySQL](./../backup-and-restore/backup-and-restore-for-mysql-standalone.md) to make sure the EKS environment is configured properly since the horizontal scaling relies on the backup function.
-- Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
-
-  ```bash
-  kbcli cluster list <name>
-  ```
-
-  ***Example***
+- Refer to [Backup and restore for MySQL](./../backup-and-restore/snapshot-backup-and-restore-for-mysql.md) to make sure the EKS environment is configured properly since the horizontal scaling relies on the backup function.
+- Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
   ```bash
   kbcli cluster list mysql-cluster
@@ -192,8 +170,6 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
    Configure the parameters `--components` and `--replicas`, and run the command.
 
-   ***Example***
-
    ```bash
    kbcli cluster hscale mysql-cluster \
    --components="mysql" --replicas=3
@@ -204,7 +180,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
    **Option 2.** Create an OpsRequest
 
-   Run the command below to apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
    ```bash
    kubectl apply -f - <<EOF

@@ -66,11 +66,14 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	// reach the consensus_set expected state
-	switch ready, err := isConsensusSetReady(transCtx, transCtx.CSSet); {
-	case err != nil:
+	allActionList, err := buildAllActionList(transCtx)
+	if err != nil {
 		return err
-	case ready:
+	}
+	printActionList(transCtx.Logger, allActionList)
+
+	// reach the consensus_set expected state
+	if isConsensusSetReady(transCtx.CSSet) && len(allActionList) == 0 {
 		return nil
 	}
 
@@ -78,7 +81,8 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	updateStsHandler := func() {
 		stsVertex.Immutable = false
 	}
-	memberReadyReplicas := int32(len(transCtx.CSSet.Status.MembersStatus))
+	// in progress action should be in cache as has been started in last loop
+	memberReadyReplicas := getCurrentMembers(allActionList, int32(len(transCtx.CSSet.Status.MembersStatus)))
 
 	// handle spec update
 
@@ -99,33 +103,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	// compose action list
-	// sort actions in order:
-	// 1. action generation in ascend
-	// 2. leaving with ordinal descend
-	// 3. joining with ordinal ascend
-	//
-	// e.g. if the 'spec.replicas' changing history is: 3->5->1->7, and the initial object 'generation' is 1.
-	// the action list may look like this:
-	// action-1-3-join-in-progress | action-1-4-join-suspend | action-2-4-leave-suspend | action-2-3-leave-suspend |
-	// action-2-2-leave-suspend | action-2-1-leave-suspend | action-3-1-join-suspend | action-3-2-join-suspend |
-	// action-3-3-join-suspend | action-3-4-join-suspend | action-3-5-join-suspend | action-3-6-join-suspend
-	//
-	// the action list can be shortened:
-	// basic idea:
-	// if one pod has a leave-join action pair, the pair can be removed.
-	// one leave-join pair of pod 4 in the example above: action-1-4-join-suspend | action-2-4-leave-suspend.
-	//
-	// algorithm:
-	// loop the action list and try to put action into a stack
-	// if current action and action at the stack top are a leave-join pair, pop
-	// else push
-	// pop the stack into a list and reverse it
-	allActionList, err := buildAllActionList(transCtx)
-	if err != nil {
-		return err
-	}
-	printActionList(transCtx.Logger, allActionList)
+	// build the shortened action list
 	finalActionList := buildFinalActionList(allActionList, memberReadyReplicas, transCtx.CSSet.Spec.Replicas)
 	printActionList(transCtx.Logger, finalActionList)
 
@@ -190,31 +168,21 @@ func isStatefulSetReady(sts *apps.StatefulSet) bool {
 // consensus_set level 'ready' state:
 // 1. all replicas exist
 // 2. all members have role set
-func isConsensusSetReady(transCtx *CSSetTransformContext, csSet *workloads.ConsensusSet) (bool, error) {
+func isConsensusSetReady(csSet *workloads.ConsensusSet) bool {
 	if csSet.Status.Replicas != csSet.Spec.Replicas {
-		return false, nil
+		return false
 	}
 	membersStatus := csSet.Status.MembersStatus
 	if len(membersStatus) != int(csSet.Spec.Replicas) {
-		return false, nil
+		return false
 	}
 	for i := 0; i < int(csSet.Spec.Replicas); i++ {
 		podName := getPodName(csSet.Name, i)
 		if !isMemberReady(podName, membersStatus) {
-			return false, nil
+			return false
 		}
 	}
-	// no pending actions
-	actionLists, err := getAllActionList(transCtx)
-	if err != nil {
-		return false, err
-	}
-	for _, actionList := range actionLists {
-		if len(actionList.Items) > 0 {
-			return false, nil
-		}
-	}
-	return true, nil
+	return true
 }
 
 func isMemberReady(podName string, membersStatus []workloads.ConsensusMemberStatus) bool {
@@ -255,7 +223,16 @@ func generateActions(transCtx *CSSetTransformContext, dag *graph.DAG, memberRead
 	return nil
 }
 
-// sorted by generation and action priority
+// sort actions in order:
+// 1. action generation in ascend
+// 2. leaving with ordinal descend
+// 3. joining with ordinal ascend
+//
+// e.g. if the 'spec.replicas' changing history is: 3->5->1->7, and the initial object 'generation' is 1.
+// the action list may look like this:
+// action-1-3-join-in-progress | action-1-4-join-suspend | action-2-4-leave-suspend | action-2-3-leave-suspend |
+// action-2-2-leave-suspend | action-2-1-leave-suspend | action-3-1-join-suspend | action-3-2-join-suspend |
+// action-3-3-join-suspend | action-3-4-join-suspend | action-3-5-join-suspend | action-3-6-join-suspend
 func buildAllActionList(transCtx *CSSetTransformContext) ([]*batchv1.Job, error) {
 	// get all actions in cache
 	actionLists, err := getAllActionList(transCtx)
@@ -285,31 +262,31 @@ func buildAllActionList(transCtx *CSSetTransformContext) ([]*batchv1.Job, error)
 		generationI, ordinalI, actionTypeI, _ := getActionGenerationOrdinalAndType(nameI)
 		generationJ, ordinalJ, actionTypeJ, _ := getActionGenerationOrdinalAndType(nameJ)
 		switch {
-		case generationI == generationJ && ordinalI == ordinalJ:
-			return actionTypePriorityMap[actionTypeI] < actionTypePriorityMap[actionTypeJ]
-		case generationI == generationJ && isPreAction(actionTypeI):
+		case generationI != generationJ:
+			return generationI < generationJ
+		case ordinalI != ordinalJ && isPreAction(actionTypeI):
 			return ordinalJ < ordinalI
-		case generationI == generationJ:
+		case ordinalI != ordinalJ:
 			return ordinalI < ordinalJ
 		default:
-			return generationI < generationJ
+			return actionTypePriorityMap[actionTypeI] < actionTypePriorityMap[actionTypeJ]
 		}
 	})
 	return allActionList, nil
 }
 
+// the action list can be shortened:
+// basic idea:
+// if one pod has a leave-join action pair, the pair can be removed.
+// one leave-join pair of pod 4 in the example above: action-1-4-join-suspend | action-2-4-leave-suspend.
+//
+// algorithm:
+// loop the action list and try to put action into a stack
+// if current action and action at the stack top are a leave-join pair, pop
+// else push
+// pop the stack into a list and reverse it
 func buildFinalActionList(allActionList []*batchv1.Job, readyMembers, expectedMembers int32) []*batchv1.Job {
-	currentMembers := readyMembers
-	index := findFirstUnfinishedAction(allActionList)
-	if index > 0 {
-		lastAction := allActionList[index-1]
-		ordinal, _ := getActionOrdinal(lastAction.Name)
-		if isPreAction(lastAction.Labels[jobTypeLabel]) {
-			currentMembers = int32(ordinal)
-		} else {
-			currentMembers = int32(ordinal + 1)
-		}
-	}
+	currentMembers := getCurrentMembers(allActionList, readyMembers)
 
 	var finalActionList []*batchv1.Job
 	for _, action := range allActionList {
@@ -374,6 +351,21 @@ func isAdjacentPair(lastAction, currentAction *batchv1.Job) bool {
 	default:
 		return currentOrdinal-lastOrdinal == 1
 	}
+}
+
+func getCurrentMembers(allActionList []*batchv1.Job, readyMembers int32) int32 {
+	currentMembers := readyMembers
+	index := findFirstUnfinishedAction(allActionList)
+	if index > 0 {
+		lastAction := allActionList[index-1]
+		ordinal, _ := getActionOrdinal(lastAction.Name)
+		if isPreAction(lastAction.Labels[jobTypeLabel]) {
+			currentMembers = int32(ordinal)
+		} else {
+			currentMembers = int32(ordinal + 1)
+		}
+	}
+	return currentMembers
 }
 
 func printActionList(logger logr.Logger, actionList []*batchv1.Job) {
@@ -498,12 +490,15 @@ func getActionOrdinal(actionName string) (int, error) {
 	return strconv.Atoi(subMatches[3])
 }
 
-func getActionGenerationOrdinalAndType(actionName string) (string, string, string, error) {
+// return generation, ordinal, action type
+func getActionGenerationOrdinalAndType(actionName string) (int, int, string, error) {
 	subMatches := actionNameRegex.FindStringSubmatch(actionName)
 	if len(subMatches) < 5 {
-		return "", "", "", fmt.Errorf("error actionName: %s", actionName)
+		return 0, 0, "", fmt.Errorf("error actionName: %s", actionName)
 	}
-	return fmt.Sprintf("%s-%s", subMatches[1], subMatches[2]), subMatches[3], subMatches[4], nil
+	generation, _ := strconv.Atoi(subMatches[2])
+	ordinal, _ := strconv.Atoi(subMatches[3])
+	return generation, ordinal, subMatches[4], nil
 }
 
 func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {

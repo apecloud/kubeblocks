@@ -89,47 +89,46 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	updateStsHandler := func() {
 		stsVertex.Immutable = false
 	}
-	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
-	if err != nil {
-		return err
-	}
-	roleMap := composeRoleMap(*transCtx.CSSet)
-	leaderPodName := getLeaderPod(pods, roleMap)
+	leaderPodName := getLeaderPodName(transCtx.CSSet.Status.MembersStatus)
 
 	// TODO(free6om): separate consensus cluster Creation from Update
-	if len(leaderPodName) == 0 {
+	//if len(leaderPodName) == 0 {
+	//	return nil
+	//}
+
+	if model.IsObjectUpdating(transCtx.OrigCSSet) {
+		// members with ordinal less than 'spec.replicas' should in the consensus cluster
+		// member join
+		// create actions
+		memberJoining := make([]string, 0)
+		actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
+		for i := 0; i < int(transCtx.CSSet.Spec.Replicas); i++ {
+			podName := getPodName(transCtx.CSSet.Name, i)
+			if isMemberReady(podName, transCtx.CSSet.Status.MembersStatus) {
+				continue
+			}
+			actionCreated, err := doActions(transCtx.CSSet, dag, leaderPodName, i, actionTypeList)
+			if err != nil {
+				return err
+			}
+			if actionCreated {
+				memberJoining = append(memberJoining, podName)
+			}
+		}
+		// member leave
+		// members with ordinal greater than 'spec.replicas - 1' should not in the consensus cluster
+		memberLeaving := make([]string, 0)
+		actionTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
+		for i := transCtx.CSSet.Spec.Replicas; i < transCtx.CSSet.Status.Replicas; i++ {
+			actionCreated, err := doActions(transCtx.CSSet, dag, leaderPodName, int(i), actionTypeList)
+			if err != nil {
+				return err
+			}
+			if actionCreated {
+				memberLeaving = append(memberLeaving, getPodName(transCtx.CSSet.Name, int(i)))
+			}
+		}
 		return nil
-	}
-	// members with ordinal less than 'spec.replicas' should in the consensus cluster
-	// member join
-	// create actions
-	memberJoining := make([]string, 0)
-	actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
-	for i := 0; i < int(transCtx.CSSet.Spec.Replicas); i++ {
-		podName := getPodName(transCtx.CSSet.Name, i)
-		if isMemberReady(podName, transCtx.CSSet.Status.MembersStatus) {
-			continue
-		}
-		actionCreated, err := doActions(transCtx.CSSet, dag, leaderPodName, i, actionTypeList)
-		if err != nil {
-			return err
-		}
-		if actionCreated {
-			memberJoining = append(memberJoining, podName)
-		}
-	}
-	// member leave
-	// members with ordinal greater than 'spec.replicas - 1' should not in the consensus cluster
-	memberLeaving := make([]string, 0)
-	actionTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
-	for i := transCtx.CSSet.Spec.Replicas; i < transCtx.CSSet.Status.Replicas; i++ {
-		actionCreated, err := doActions(transCtx.CSSet, dag, leaderPodName, int(i), actionTypeList)
-		if err != nil {
-			return err
-		}
-		if actionCreated {
-			memberLeaving = append(memberLeaving, getPodName(transCtx.CSSet.Name, int(i)))
-		}
 	}
 
 	// handle actions
@@ -140,26 +139,11 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
-	for _, podName := range memberJoining {
-		if !hasFinalJoinAction(podName, podActionMap) {
-			return nil
-		}
-	}
-	for _, podName := range memberLeaving {
-		if !hasFinalLeaveAction(podName, podActionMap) {
-			return nil
-		}
-	}
 
 	// clean up orphan actions
 	// if pod not exist, delete all related suspend actions
 	for _, action := range orphanActionList {
 		doActionCleanup(dag, action)
-	}
-
-	// update sts when no pre-actions (i.e. no pre-actions configured or spec.replicas == status.replicas)
-	if len(memberLeaving) == 0 {
-		updateStsHandler()
 	}
 
 	// handle actions in serial order to minimum disrupt on current cluster
@@ -185,6 +169,10 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	// else push
 	// pop the stack into a list and reverse it
 	allActionList := buildAllActionList(podActionMap)
+	if len(allActionList) == 0 {
+		// no actions come yet, but should, wait
+		return nil
+	}
 	printActionList(transCtx.Logger, allActionList)
 	finalActionList := buildFinalActionList(allActionList)
 	printActionList(transCtx.Logger, finalActionList)
@@ -192,20 +180,22 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	index := findFirstUnfinishedAction(finalActionList)
 	switch {
 	case index > 0:
-		lastFinishedAction := finalActionList[index-1]
-		if lastFinishedAction.Status.Failed > 0 {
-			emitActionFailedEvent(transCtx, lastFinishedAction.Labels[jobTypeLabel], lastFinishedAction.Name)
+		// last finished action
+		action := finalActionList[index-1]
+		if action.Status.Failed > 0 {
+			emitActionFailedEvent(transCtx, action.Labels[jobTypeLabel], action.Name)
 		}
 		fallthrough
 	case index == 0:
 		// start action if suspend
-		if *finalActionList[index].Spec.Suspend {
+		action := finalActionList[index]
+		if *action.Spec.Suspend {
 			// validate cluster state: all pods without actions should be ok(role label set and has one leader)
-			if err := abnormalAnalysis(pods, podActionMap, roleMap); err != nil {
-				emitAbnormalEvent(transCtx, finalActionList[index].Labels[jobTypeLabel], finalActionList[index].Name, err)
+			if err := abnormalAnalysis(transCtx.CSSet, action); err != nil {
+				emitAbnormalEvent(transCtx, action.Labels[jobTypeLabel], action.Name, err)
 				return err
 			}
-			startAction(dag, finalActionList[index])
+			startAction(dag, action)
 		}
 	case index < 0:
 		// all action finished, do clean up
@@ -294,34 +284,6 @@ func buildAllActionList(podActionMap map[string]*podAction) []*batchv1.Job {
 		}
 	})
 	return allActionList
-}
-
-func hasFinalLeaveAction(podName string, podActionMap map[string]*podAction) bool {
-	pAction, ok := podActionMap[podName]
-	if !ok {
-		return false
-	}
-	if !pAction.hasPreAction {
-		return false
-	}
-	finalAction := pAction.actionList[len(pAction.actionList)-1]
-	actionType := finalAction.Labels[jobTypeLabel]
-	return actionType == jobTypeSwitchover || actionType == jobTypeMemberLeaveNotifying
-}
-
-func hasFinalJoinAction(podName string, podActionMap map[string]*podAction) bool {
-	pAction, ok := podActionMap[podName]
-	if !ok {
-		return false
-	}
-	if !pAction.hasPostAction {
-		return false
-	}
-	finalAction := pAction.actionList[len(pAction.actionList)-1]
-	actionType := finalAction.Labels[jobTypeLabel]
-	return actionType == jobTypeMemberJoinNotifying ||
-		actionType == jobTypeLogSync ||
-		actionType == jobTypePromote
 }
 
 func isStatefulSetReady(sts *apps.StatefulSet) bool {
@@ -487,54 +449,52 @@ func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
 	return stsVertex, nil
 }
 
-func getLeaderPod(pods []corev1.Pod, roleMap map[string]workloads.ConsensusRole) string {
-	for _, pod := range pods {
-		roleName := getRoleName(pod)
-		role, ok := roleMap[roleName]
-		if !ok {
-			continue
-		}
-		if role.IsLeader {
-			return pod.Name
+func getLeaderPodName(membersStatus []workloads.ConsensusMemberStatus) string {
+	for _, memberStatus := range membersStatus {
+		if memberStatus.IsLeader {
+			return memberStatus.PodName
 		}
 	}
 	return ""
 }
 
-// abnormalAnalysis normal conditions: all pods with role label set and one is leader
-func abnormalAnalysis(pods []corev1.Pod, podActionMap map[string]*podAction, roleMap map[string]workloads.ConsensusRole) error {
-	// find all members in current cluster
-	memberPods := make([]corev1.Pod, 0)
-	for _, pod := range pods {
-		if _, ok := podActionMap[pod.Name]; ok {
-			continue
-		}
-		memberPods = append(memberPods, pod)
+// all members with ordinal less than action target pod should be in a good consensus state:
+// 1. they should be in membersStatus
+// 2. they should have a leader
+func abnormalAnalysis(csSet *workloads.ConsensusSet, action *batchv1.Job) error {
+	membersStatus := csSet.Status.MembersStatus
+	statusMap := make(map[string]workloads.ConsensusMemberStatus, len(membersStatus))
+	for _, status := range membersStatus {
+		statusMap[status.PodName] = status
 	}
-	// if no pods, no need to check the following conditions
-	if len(memberPods) == 0 {
-		return nil
-	}
-	allRoleLabelSet := true
-	leaderCount := 0
-	for _, pod := range memberPods {
-		roleName := getRoleName(pod)
-		if len(roleName) == 0 {
-			allRoleLabelSet = false
-			break
+	ordinal, _ := getActionOrdinal(action.Name)
+	var abnormalPodList, leaderPodList []string
+	for i := 0; i < ordinal; i++ {
+		podName := getPodName(csSet.Name, i)
+		status, ok := statusMap[podName]
+		if !ok {
+			abnormalPodList = append(abnormalPodList, podName)
 		}
-		if role, ok := roleMap[roleName]; ok {
-			if role.IsLeader {
-				leaderCount++
-			}
+		if status.IsLeader {
+			leaderPodList = append(leaderPodList, podName)
 		}
 	}
-	if !allRoleLabelSet {
-		return fmt.Errorf("cluster unhealthy: pod missing role label")
+
+	var message string
+	if len(abnormalPodList) > 0 {
+		message = fmt.Sprintf("abnormal pods: %v", abnormalPodList)
 	}
-	if leaderCount != 1 {
-		return fmt.Errorf("cluster unhealthy: # of leader %d not equals 1", leaderCount)
+	switch len(leaderPodList) {
+	case 0:
+		message = fmt.Sprintf("%s, no leader exists", message)
+	case 1:
+	default:
+		message = fmt.Sprintf("%s, too many leaders: %v", message, leaderPodList)
 	}
+	if len(message) > 0 {
+		return fmt.Errorf("cluster unhealthy: %s", message)
+	}
+
 	return nil
 }
 

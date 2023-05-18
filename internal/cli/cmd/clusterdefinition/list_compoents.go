@@ -44,6 +44,7 @@ var (
 
 func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.ClusterDefGVR())
+	o.AllNamespaces = true
 	cmd := &cobra.Command{
 		Use:               "list-components",
 		Short:             "List cluster definition components.",
@@ -52,7 +53,7 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(validate(args))
-			o.FieldSelector = fmt.Sprintf("metadata.name=%s", args[0])
+			o.Names = args
 			util.CheckErr(run(o))
 		},
 	}
@@ -62,14 +63,13 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 func validate(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("missing clusterdefinition name")
-	} else if len(args) > 1 {
-		return fmt.Errorf("only support one clusterdefinition name")
 	}
 	return nil
 }
 
 func run(o *list.ListOptions) error {
 	o.Print = false
+
 	r, err := o.Run()
 	if err != nil {
 		return err
@@ -78,18 +78,15 @@ func run(o *list.ListOptions) error {
 	if err != nil {
 		return err
 	}
-	if len(infos) == 0 {
-		return fmt.Errorf("no clusterdefinition %s found", o.Names[0])
-	}
 	p := printer.NewTablePrinter(o.Out)
-	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE")
+	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE", "CLUSTER-DEFINITION")
 	for _, info := range infos {
 		var cd v1alpha1.ClusterDefinition
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd); err != nil {
 			return err
 		}
 		for _, comp := range cd.Spec.ComponentDefs {
-			p.AddRow(comp.Name, comp.WorkloadType, comp.CharacterType)
+			p.AddRow(comp.Name, comp.WorkloadType, comp.CharacterType, cd.Name)
 		}
 	}
 	p.Print()

@@ -32,6 +32,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/utils/pointer"
 
@@ -303,6 +304,9 @@ func FakeComponentClassDef(name string, clusterDefRef string, componentDefRef st
 
 func FakeClusterVersion() *appsv1alpha1.ClusterVersion {
 	cv := &appsv1alpha1.ClusterVersion{}
+	gvr := types.ClusterVersionGVR()
+	cv.TypeMeta.APIVersion = gvr.GroupVersion().String()
+	cv.TypeMeta.Kind = types.KindClusterVersion
 	cv.Name = ClusterVersionName
 	cv.SetLabels(map[string]string{
 		constant.ClusterDefLabelKey:   ClusterDefName,
@@ -791,5 +795,19 @@ func FakeCronJob(name string, namespace string, extraLabels map[string]string) *
 				},
 			},
 		},
+	}
+}
+
+func FakeResourceNotFound(versionResource schema.GroupVersionResource, name string) *metav1.Status {
+	return &metav1.Status{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Status",
+			APIVersion: "v1",
+		},
+		Status:  "Failure",
+		Message: fmt.Sprintf("%s.%s \"%s\" not found", versionResource.Resource, versionResource.Group, name),
+		Reason:  "NotFound",
+		Details: nil,
+		Code:    404,
 	}
 }

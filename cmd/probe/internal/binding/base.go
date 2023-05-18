@@ -188,9 +188,10 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 
 func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
+	opsRes["operation"] = CheckRoleOperation
 	opsRes["originalRole"] = ops.OriRole
 	if ops.GetRole == nil {
-		message := fmt.Sprintf("roleCheck operation is not implemented for %v", ops.DBType)
+		message := fmt.Sprintf("checkRole operation is not implemented for %v", ops.DBType)
 		ops.Logger.Errorf(message)
 		opsRes["event"] = OperationNotImplemented
 		opsRes["message"] = message
@@ -200,12 +201,12 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 
 	role, err := ops.GetRole(ctx, req, resp)
 	if err != nil {
-		ops.Logger.Infof("error executing roleCheck: %v", err)
+		ops.Logger.Infof("error executing checkRole: %v", err)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
-			resp.Metadata[StatusCode] = OperationFailedHTTPCode
+			SentProbeEvent(ctx, opsRes, ops.Logger)
 		}
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
@@ -222,9 +223,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	opsRes["role"] = role
 	if ops.OriRole != role {
 		ops.OriRole = role
-		ops.RoleUnchangedCount = 0
-	} else {
-		ops.RoleUnchangedCount++
+		SentProbeEvent(ctx, opsRes, ops.Logger)
 	}
 
 	// RoleUnchangedCount is the count of consecutive role unchanged checks.
@@ -232,16 +231,16 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	// then the roleCheck event will be reported at roleEventReportFrequency so that the event controller
 	// can always get relevant roleCheck events in order to maintain the pod label accurately, even in cases
 	// of roleChanged events being lost or the pod role label being deleted or updated incorrectly.
-	if ops.RoleUnchangedCount < ops.RoleDetectionThreshold && ops.RoleUnchangedCount%roleEventReportFrequency == 0 {
-		resp.Metadata[StatusCode] = OperationFailedHTTPCode
-	}
+	// if ops.RoleUnchangedCount < ops.RoleDetectionThreshold && ops.RoleUnchangedCount%roleEventReportFrequency == 0 {
+	// 	resp.Metadata[StatusCode] = OperationFailedHTTPCode
+	// }
 	return opsRes, nil
 }
 
 func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	if ops.GetRole == nil {
-		message := fmt.Sprintf("roleCheck operation is not implemented for %v", ops.DBType)
+		message := fmt.Sprintf("getRole operation is not implemented for %v", ops.DBType)
 		ops.Logger.Errorf(message)
 		opsRes["event"] = OperationNotImplemented
 		opsRes["message"] = message
@@ -251,12 +250,12 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 
 	role, err := ops.GetRole(ctx, req, resp)
 	if err != nil {
-		ops.Logger.Infof("error executing roleCheck: %v", err)
+		ops.Logger.Infof("error executing getRole: %v", err)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
-			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
-			resp.Metadata[StatusCode] = OperationFailedHTTPCode
+			ops.Logger.Infof("getRole failed %v times continuously", ops.CheckRoleFailedCount)
+			// resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
@@ -295,6 +294,7 @@ func (ops *BaseOperations) roleValidate(role string) (bool, string) {
 func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	var message string
 	opsRes := OpsResult{}
+	opsRes["operation"] = CheckRunningOperation
 
 	host := net.JoinHostPort(ops.DBAddress, strconv.Itoa(ops.DBPort))
 	// sql exec timeout need to be less than httpget's timeout which default is 1s.
@@ -306,7 +306,8 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 		opsRes["message"] = message
 		if ops.CheckRunningFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("running checks failed %v times continuously", ops.CheckRunningFailedCount)
-			resp.Metadata[StatusCode] = OperationFailedHTTPCode
+			// resp.Metadata[StatusCode] = OperationFailedHTTPCode
+			SentProbeEvent(ctx, opsRes, ops.Logger)
 		}
 		ops.CheckRunningFailedCount++
 		return opsRes, nil

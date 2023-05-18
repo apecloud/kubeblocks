@@ -24,10 +24,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -62,70 +59,6 @@ const (
 	emptyPriority             = 1 << 0
 	// unknownPriority           = 0
 )
-
-// SortPods sorts pods by their role priority
-func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
-	// make a Serial pod list,
-	// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
-	sort.SliceStable(pods, func(i, j int) bool {
-		roleI := pods[i].Labels[constant.RoleLabelKey]
-		roleJ := pods[j].Labels[constant.RoleLabelKey]
-
-		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
-			_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
-			_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
-			return ordinal1 < ordinal2
-		}
-
-		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
-	})
-}
-
-// generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
-func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
-	component appsv1alpha1.ClusterComponentDefinition) *util.Plan {
-	plan := &util.Plan{}
-	plan.Start = &util.Step{}
-	plan.WalkFunc = func(obj interface{}) (bool, error) {
-		pod, ok := obj.(corev1.Pod)
-		if !ok {
-			return false, errors.New("wrong type: obj not Pod")
-		}
-
-		// if DeletionTimestamp is not nil, it is terminating.
-		if pod.DeletionTimestamp != nil {
-			return true, nil
-		}
-
-		// if pod is the latest version, we do nothing
-		if intctrlutil.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
-			// wait until ready
-			return !intctrlutil.PodIsReadyWithLabel(pod), nil
-		}
-
-		// delete the pod to trigger associate StatefulSet to re-create it
-		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
-			return false, err
-		}
-
-		return true, nil
-	}
-
-	rolePriorityMap := ComposeRolePriorityMap(component)
-	SortPods(pods, rolePriorityMap)
-
-	// generate plan by UpdateStrategy
-	switch component.ConsensusSpec.UpdateStrategy {
-	case appsv1alpha1.SerialStrategy:
-		generateConsensusSerialPlan(plan, pods)
-	case appsv1alpha1.ParallelStrategy:
-		generateConsensusParallelPlan(plan, pods)
-	case appsv1alpha1.BestEffortParallelStrategy:
-		generateConsensusBestEffortParallelPlan(plan, pods, rolePriorityMap)
-	}
-
-	return plan
-}
 
 // unknown & empty & learner & 1/2 followers -> 1/2 followers -> leader
 func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
@@ -184,7 +117,7 @@ func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod,
 }
 
 // unknown & empty & leader & followers & learner
-func generateConsensusParallelPlan(plan *util.Plan, pods []corev1.Pod) {
+func generateConsensusParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
 	start := plan.Start
 	for _, pod := range pods {
 		nextStep := &util.Step{}
@@ -194,7 +127,7 @@ func generateConsensusParallelPlan(plan *util.Plan, pods []corev1.Pod) {
 }
 
 // unknown -> empty -> learner -> followers(none->readonly->readwrite) -> leader
-func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
+func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
 	start := plan.Start
 	for _, pod := range pods {
 		nextStep := &util.Step{}
@@ -205,18 +138,17 @@ func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
 }
 
 // ComposeRolePriorityMap generates a priority map based on roles.
-func ComposeRolePriorityMap(component appsv1alpha1.ClusterComponentDefinition) map[string]int {
-	if component.ConsensusSpec == nil {
-		component.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{Leader: appsv1alpha1.DefaultLeader}
+func ComposeRolePriorityMap(componentDef *appsv1alpha1.ClusterComponentDefinition) map[string]int {
+	if componentDef.ConsensusSpec == nil {
+		componentDef.ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
 	}
-
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[""] = emptyPriority
-	rolePriorityMap[component.ConsensusSpec.Leader.Name] = leaderPriority
-	if component.ConsensusSpec.Learner != nil {
-		rolePriorityMap[component.ConsensusSpec.Learner.Name] = learnerPriority
+	rolePriorityMap[componentDef.ConsensusSpec.Leader.Name] = leaderPriority
+	if componentDef.ConsensusSpec.Learner != nil {
+		rolePriorityMap[componentDef.ConsensusSpec.Learner.Name] = learnerPriority
 	}
-	for _, follower := range component.ConsensusSpec.Followers {
+	for _, follower := range componentDef.ConsensusSpec.Followers {
 		switch follower.AccessMode {
 		case appsv1alpha1.None:
 			rolePriorityMap[follower.Name] = followerNonePriority
@@ -226,7 +158,6 @@ func ComposeRolePriorityMap(component appsv1alpha1.ClusterComponentDefinition) m
 			rolePriorityMap[follower.Name] = followerReadWritePriority
 		}
 	}
-
 	return rolePriorityMap
 }
 

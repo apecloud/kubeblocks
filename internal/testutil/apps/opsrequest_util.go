@@ -32,7 +32,7 @@ import (
 )
 
 // CreateRestartOpsRequest creates a OpsRequest of restart type for testing.
-func CreateRestartOpsRequest(testCtx testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *appsv1alpha1.OpsRequest {
+func CreateRestartOpsRequest(testCtx *testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *appsv1alpha1.OpsRequest {
 	opsRequest := NewOpsRequestObj(opsRequestName, testCtx.DefaultNamespace, clusterName, appsv1alpha1.RestartType)
 	componentList := make([]appsv1alpha1.ComponentOps, len(componentNames))
 	for i := range componentNames {

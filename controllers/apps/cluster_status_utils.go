@@ -180,17 +180,6 @@ func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
 	}
 }
 
-// getClusterAvailabilityEffect whether the component will affect the cluster availability.
-// if the component can affect and be Failed, the cluster will be Failed too.
-func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDefinition) bool {
-	switch componentDef.WorkloadType {
-	case appsv1alpha1.Replication, appsv1alpha1.Consensus:
-		return true
-	default:
-		return componentDef.MaxUnavailable != nil
-	}
-}
-
 // getComponentRelatedInfo gets componentMap, clusterAvailabilityMap and component definition information
 func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition,
 	componentName string) (map[string]string, map[string]bool, *appsv1alpha1.ClusterComponentDefinition, error) {
@@ -210,7 +199,7 @@ func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1al
 	}
 	clusterAvailabilityEffectMap := map[string]bool{}
 	for i, v := range clusterDef.Spec.ComponentDefs {
-		clusterAvailabilityEffectMap[v.Name] = getClusterAvailabilityEffect(&v)
+		clusterAvailabilityEffectMap[v.Name] = componentDef.GetMaxUnavailable() != nil
 		if componentDef == nil && v.Name == compDefName {
 			componentDef = &clusterDef.Spec.ComponentDefs[i]
 		}

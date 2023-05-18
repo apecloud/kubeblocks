@@ -29,6 +29,7 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -337,15 +338,18 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 
 	handlePVC := func(origObj, pvcProto *corev1.PersistentVolumeClaim) (client.Object, error) {
 		pvcObj := origObj.DeepCopy()
-		if pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] == pvcProto.Spec.Resources.Requests[corev1.ResourceStorage] {
-			return pvcObj, nil
-		}
 		if pvcObj.Spec.Resources.Requests == nil {
 			pvcObj.Spec.Resources.Requests = pvcProto.Spec.Resources.Requests
 		} else {
 			pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
 		}
 		return pvcObj, nil
+	}
+
+	handlePDB := func(origObj, pdbProto *policyv1.PodDisruptionBudget) (client.Object, error) {
+		pdbObj := origObj.DeepCopy()
+		pdbObj.Spec = pdbProto.Spec
+		return pdbObj, nil
 	}
 
 	switch v := node.obj.(type) {
@@ -357,10 +361,9 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		return handleSvc(node.oriObj.(*corev1.Service), v)
 	case *corev1.PersistentVolumeClaim:
 		return handlePVC(node.oriObj.(*corev1.PersistentVolumeClaim), v)
-	case *corev1.Secret, *corev1.ConfigMap:
-		return v, nil
+	case *policyv1.PodDisruptionBudget:
+		return handlePDB(node.oriObj.(*policyv1.PodDisruptionBudget), v)
 	}
-
 	return node.obj, nil
 }
 

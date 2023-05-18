@@ -34,7 +34,7 @@ import (
 
 // InitClusterWithHybridComps initializes a cluster environment for testing, includes ClusterDefinition/ClusterVersion/Cluster resources.
 func InitClusterWithHybridComps(
-	testCtx testutil.TestContext,
+	testCtx *testutil.TestContext,
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
@@ -45,44 +45,44 @@ func InitClusterWithHybridComps(
 		AddComponentDef(StatelessNginxComponent, statelessCompDefName).
 		AddComponentDef(ConsensusMySQLComponent, consensusCompDefName).
 		AddComponentDef(StatefulMySQLComponent, statefulCompDefName).
-		Create(&testCtx).GetObject()
+		Create(testCtx).GetObject()
 	clusterVersion := NewClusterVersionFactory(clusterVersionName, clusterDefName).
 		AddComponentVersion(statelessCompDefName).AddContainerShort(DefaultNginxContainerName, NginxImage).
 		AddComponentVersion(consensusCompDefName).AddContainerShort(DefaultMySQLContainerName, NginxImage).
 		AddComponentVersion(statefulCompDefName).AddContainerShort(DefaultMySQLContainerName, NginxImage).
-		Create(&testCtx).GetObject()
+		Create(testCtx).GetObject()
 	pvcSpec := NewPVCSpec("1Gi")
 	cluster := NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 		AddComponent(statelessCompDefName, statelessCompDefName).SetReplicas(1).
 		AddComponent(consensusCompDefName, consensusCompDefName).SetReplicas(3).
 		AddComponent(statefulCompDefName, statefulCompDefName).SetReplicas(3).
 		AddVolumeClaimTemplate(DataVolumeName, pvcSpec).
-		Create(&testCtx).GetObject()
+		Create(testCtx).GetObject()
 	return clusterDef, clusterVersion, cluster
 }
 
-func CreateK8sResource(testCtx testutil.TestContext, obj client.Object) client.Object {
+func CreateK8sResource(testCtx *testutil.TestContext, obj client.Object) client.Object {
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, obj)).Should(gomega.Succeed())
 	// wait until cluster created
-	gomega.Eventually(CheckObjExists(&testCtx, client.ObjectKeyFromObject(obj),
+	gomega.Eventually(CheckObjExists(testCtx, client.ObjectKeyFromObject(obj),
 		obj, true)).Should(gomega.Succeed())
 	return obj
 }
 
-func CheckedCreateK8sResource(testCtx testutil.TestContext, obj client.Object) client.Object {
+func CheckedCreateK8sResource(testCtx *testutil.TestContext, obj client.Object) client.Object {
 	gomega.Expect(testCtx.CheckedCreateObj(testCtx.Ctx, obj)).Should(gomega.Succeed())
 	// wait until cluster created
-	gomega.Eventually(CheckObjExists(&testCtx, client.ObjectKeyFromObject(obj),
+	gomega.Eventually(CheckObjExists(testCtx, client.ObjectKeyFromObject(obj),
 		obj, true)).Should(gomega.Succeed())
 	return obj
 }
 
 // GetClusterComponentPhase gets the component phase of testing cluster for verification.
-func GetClusterComponentPhase(testCtx testutil.TestContext, clusterName, componentName string) func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
+func GetClusterComponentPhase(testCtx *testutil.TestContext, clusterKey types.NamespacedName, componentName string) func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
 	return func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
 		tmpCluster := &appsv1alpha1.Cluster{}
-		g.Expect(testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterName,
-			Namespace: testCtx.DefaultNamespace}, tmpCluster)).Should(gomega.Succeed())
+		g.Expect(testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterKey.Name,
+			Namespace: clusterKey.Namespace}, tmpCluster)).Should(gomega.Succeed())
 		return tmpCluster.Status.Components[componentName].Phase
 	}
 }
@@ -93,6 +93,15 @@ func GetClusterPhase(testCtx *testutil.TestContext, clusterKey types.NamespacedN
 		cluster := &appsv1alpha1.Cluster{}
 		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(gomega.Succeed())
 		return cluster.Status.Phase
+	}
+}
+
+// GetClusterGeneration gets the testing cluster's metadata.generation.
+func GetClusterGeneration(testCtx *testutil.TestContext, clusterKey types.NamespacedName) func(gomega.Gomega) int64 {
+	return func(g gomega.Gomega) int64 {
+		cluster := &appsv1alpha1.Cluster{}
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(gomega.Succeed())
+		return cluster.GetGeneration()
 	}
 }
 

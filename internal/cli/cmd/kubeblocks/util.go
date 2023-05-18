@@ -181,10 +181,10 @@ func printAddonMsg(out io.Writer, addons []*extensionsv1alpha1.Addon, install bo
 			disablingAddons = append(disablingAddons, addon.Name)
 		case extensionsv1alpha1.AddonFailed:
 			for _, c := range addon.Status.Conditions {
-				if c.Status == metav1.ConditionTrue {
-					continue
+				if c.Status == metav1.ConditionFalse {
+					failedAddons = append(failedAddons, addon)
+					break
 				}
-				failedAddons = append(failedAddons, addon)
 			}
 		}
 	}
@@ -216,7 +216,7 @@ func printFailedAddonMsg(out io.Writer, addons []*extensionsv1alpha1.Addon) {
 	for _, addon := range addons {
 		var times, reasons, messages []string
 		for _, c := range addon.Status.Conditions {
-			if c.Status == metav1.ConditionTrue {
+			if c.Status != metav1.ConditionFalse {
 				continue
 			}
 			times = append(times, util.TimeFormat(&c.LastTransitionTime))

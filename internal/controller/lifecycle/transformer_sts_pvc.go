@@ -212,20 +212,29 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 		if pvcNotFound && !pvNotFound {
 			// this could happen if create pvc step failed when recreating pvc
 			updatePVCByRecreateFromStep(removePVClaimRefStep)
-		} else if pvcNotFound && pvNotFound {
+			return nil
+		}
+		if pvcNotFound && pvNotFound {
 			// if both pvc and pv not found, do nothing
-		} else if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+			return nil
+		}
+		if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
 			// this could happen if create pvc succeeded but last step failed
 			updatePVCByRecreateFromStep(pvRestorePolicyStep)
-		} else if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; !viper.GetBool(constant.CfgRecoverVolumeExpansionFailure) &&
+			return nil
+		}
+		if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; !viper.GetBool(constant.CfgRecoverVolumeExpansionFailure) &&
 			pvcQuantity.Cmp(targetQuantity) == 1 && // check if it's compressing volume
 			targetQuantity.Cmp(*pvc.Status.Capacity.Storage()) >= 0 { // check if target size is greater than or equal to actual size
 			// this branch means we can update pvc size by recreate it
 			updatePVCByRecreateFromStep(pvPolicyRetainStep)
-		} else if pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
+			return nil
+		}
+		if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 			// use pvc's update without anything extra
 			dag.AddVertex(simpleUpdateVertex)
 			dag.Connect(vertex, simpleUpdateVertex)
+			return nil
 		}
 		// all the else means no need to update
 

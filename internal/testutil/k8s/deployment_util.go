@@ -22,9 +22,15 @@ package testutil
 import (
 	"fmt"
 
+	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 // MockDeploymentReady mocks deployment is ready
@@ -53,4 +59,16 @@ func MockPodAvailable(pod *corev1.Pod, lastTransitionTime metav1.Time) {
 			LastTransitionTime: lastTransitionTime,
 		},
 	}
+}
+
+func ListAndCheckDeployment(testCtx *testutil.TestContext, key types.NamespacedName) *appsv1.DeploymentList {
+	deployList := &appsv1.DeploymentList{}
+	gomega.Eventually(func(g gomega.Gomega) {
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, deployList, client.MatchingLabels{
+			constant.AppInstanceLabelKey: key.Name,
+		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
+		g.Expect(deployList.Items).ShouldNot(gomega.BeNil())
+		g.Expect(deployList.Items).ShouldNot(gomega.BeEmpty())
+	}).Should(gomega.Succeed())
+	return deployList
 }

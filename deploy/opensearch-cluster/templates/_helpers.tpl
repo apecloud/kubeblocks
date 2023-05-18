@@ -50,13 +50,13 @@ app.kubernetes.io/name: {{ include "opensearch-cluster.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "clustername" -}}
+{{ include "opensearch-cluster.fullname" .}}
+{{- end}}
+
 {{/*
 Create the name of the service account to use
 */}}
 {{- define "opensearch-cluster.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "opensearch-cluster.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
+{{- default (printf "kb-%s" (include "clustername" .)) .Values.serviceAccount.name }}
 {{- end }}

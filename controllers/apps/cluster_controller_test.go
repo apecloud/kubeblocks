@@ -26,12 +26,9 @@ import (
 	"strings"
 	"time"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
@@ -42,8 +39,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes/scheme"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -169,7 +168,7 @@ var _ = Describe("Cluster Controller", func() {
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		for _, compName := range compNames {
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 		}
 	}
 
@@ -357,40 +356,68 @@ var _ = Describe("Cluster Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 	}
 
-	changeStatefulSetReplicas := func(clusterName types.NamespacedName, replicas int32) {
+	changeComponentReplicas := func(clusterName types.NamespacedName, replicas int32) {
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *appsv1alpha1.Cluster) {
-			if len(cluster.Spec.ComponentSpecs) == 0 {
-				cluster.Spec.ComponentSpecs = []appsv1alpha1.ClusterComponentSpec{
-					{
-						Name:            replicationCompName,
-						ComponentDefRef: replicationCompDefName,
-						Replicas:        replicas,
-					}}
-			} else {
-				cluster.Spec.ComponentSpecs[0].Replicas = replicas
-			}
+			Expect(cluster.Spec.ComponentSpecs).Should(HaveLen(1))
+			cluster.Spec.ComponentSpecs[0].Replicas = replicas
 		})()).ShouldNot(HaveOccurred())
 	}
 
-	testChangeReplicas := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName)
+	getPodSpec := func(sts *appsv1.StatefulSet, deploy *appsv1.Deployment) *corev1.PodSpec {
+		if sts != nil {
+			return &sts.Spec.Template.Spec
+		} else if deploy != nil {
+			return &deploy.Spec.Template.Spec
+		}
+		panic("unreachable")
+	}
 
+	checkSingleWorkload := func(compDefName string, expects func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment)) {
+		isStsWorkload := true
+		switch compDefName {
+		case statelessCompDefName:
+			isStsWorkload = false
+		case statefulCompDefName, replicationCompDefName, consensusCompDefName:
+			break
+		default:
+			panic("unreachable")
+		}
+
+		if isStsWorkload {
+			Eventually(func(g Gomega) {
+				l := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+				expects(g, &l.Items[0], nil)
+			}).Should(Succeed())
+		} else {
+			Eventually(func(g Gomega) {
+				l := testk8s.ListAndCheckDeployment(&testCtx, clusterKey)
+				expects(g, nil, &l.Items[0])
+			}).Should(Succeed())
+		}
+	}
+
+	testChangeReplicas := func(compName, compDefName string) {
+		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
+		createClusterObj(compName, compDefName)
 		replicasSeq := []int32{5, 3, 1, 0, 2, 4}
 		expectedOG := int64(1)
 		for _, replicas := range replicasSeq {
 			By(fmt.Sprintf("Change replicas to %d", replicas))
-			changeStatefulSetReplicas(clusterKey, replicas)
+			changeComponentReplicas(clusterKey, replicas)
 			expectedOG++
-
 			By("Checking cluster status and the number of replicas changed")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
 				g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(expectedOG))
 				g.Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 			})).Should(Succeed())
-			Eventually(func(g Gomega) {
-				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-				g.Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(replicas))
-			}).Should(Succeed())
+
+			checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
+				if sts != nil {
+					g.Expect(int(*sts.Spec.Replicas)).To(BeEquivalentTo(replicas))
+				} else {
+					g.Expect(int(*deploy.Spec.Replicas)).To(BeEquivalentTo(replicas))
+				}
+			})
 		}
 	}
 
@@ -688,13 +715,13 @@ var _ = Describe("Cluster Controller", func() {
 		case replicationCompDefName:
 			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterObj.Name, compDefName, nil)
 		case statefulCompDefName, consensusCompDefName:
-			testapps.MockConsensusComponentPods(testCtx, sts, clusterObj.Name, compName)
+			testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
 		}
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 			testk8s.MockStatefulSetReady(sts)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Updating the PVC storage size")
@@ -706,7 +733,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking the resize operation finished")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
-		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking PVCs are resized")
@@ -729,6 +756,8 @@ var _ = Describe("Cluster Controller", func() {
 		const labelValue = "testLabelValue"
 
 		By("Creating a cluster with Affinity")
+		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
+
 		affinity := &appsv1alpha1.Affinity{
 			PodAntiAffinity: appsv1alpha1.Required,
 			TopologyKeys:    []string{topologyKey},
@@ -749,20 +778,19 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("Checking the Affinity and TopologySpreadConstraints")
-		Eventually(func(g Gomega) {
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			podSpec := stsList.Items[0].Spec.Template.Spec
+		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
+			podSpec := getPodSpec(sts, deploy)
 			g.Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(labelKey))
 			g.Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
 			g.Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
 			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
 			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
-		}).Should(Succeed())
-
+		})
 	}
 
 	testClusterServiceAccount := func(compName, compDefName string) {
 		By("Creating a cluster with target service account name")
+		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
 
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).
@@ -775,11 +803,10 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("Checking the podSpec.serviceAccountName")
-		Eventually(func(g Gomega) {
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			podSpec := stsList.Items[0].Spec.Template.Spec
+		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
+			podSpec := getPodSpec(sts, deploy)
 			g.Expect(podSpec.ServiceAccountName).To(Equal("test-service-account"))
-		}).Should(Succeed())
+		})
 	}
 
 	testComponentAffinity := func(compName, compDefName string) {
@@ -787,6 +814,7 @@ var _ = Describe("Cluster Controller", func() {
 		const compTopologyKey = "testComponentTopologyKey"
 
 		By("Creating a cluster with Affinity")
+		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
 		affinity := &appsv1alpha1.Affinity{
 			PodAntiAffinity: appsv1alpha1.Required,
 			TopologyKeys:    []string{clusterTopologyKey},
@@ -807,31 +835,30 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("Checking the Affinity and the TopologySpreadConstraints")
-		Eventually(func(g Gomega) {
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			podSpec := stsList.Items[0].Spec.Template.Spec
+		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
+			podSpec := getPodSpec(sts, deploy)
 			g.Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.ScheduleAnyway))
 			g.Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(compTopologyKey))
 			g.Expect(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
 			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
 			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(corev1.LabelHostname))
-		}).Should(Succeed())
+		})
 	}
 
 	testClusterToleration := func(compName, compDefName string) {
 		const tolerationKey = "testClusterTolerationKey"
 		const tolerationValue = "testClusterTolerationValue"
 		By("Creating a cluster with Toleration")
-		toleration := corev1.Toleration{
-			Key:      tolerationKey,
-			Value:    tolerationValue,
-			Operator: corev1.TolerationOpEqual,
-			Effect:   corev1.TaintEffectNoSchedule,
-		}
+		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(compName, compDefName).SetReplicas(1).
-			AddClusterToleration(toleration).
+			AddClusterToleration(corev1.Toleration{
+				Key:      tolerationKey,
+				Value:    tolerationValue,
+				Operator: corev1.TolerationOpEqual,
+				Effect:   corev1.TaintEffectNoSchedule,
+			}).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -839,29 +866,24 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("Checking the tolerations")
-		Eventually(func(g Gomega) {
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			podSpec := stsList.Items[0].Spec.Template.Spec
+		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
+			podSpec := getPodSpec(sts, deploy)
 			g.Expect(podSpec.Tolerations).Should(HaveLen(2))
-			toleration = podSpec.Tolerations[0]
-			g.Expect(toleration.Key).Should(BeEquivalentTo(tolerationKey))
-			g.Expect(toleration.Value).Should(BeEquivalentTo(tolerationValue))
-			g.Expect(toleration.Operator).Should(BeEquivalentTo(corev1.TolerationOpEqual))
-			g.Expect(toleration.Effect).Should(BeEquivalentTo(corev1.TaintEffectNoSchedule))
-		}).Should(Succeed())
+			t := podSpec.Tolerations[0]
+			g.Expect(t.Key).Should(BeEquivalentTo(tolerationKey))
+			g.Expect(t.Value).Should(BeEquivalentTo(tolerationValue))
+			g.Expect(t.Operator).Should(BeEquivalentTo(corev1.TolerationOpEqual))
+			g.Expect(t.Effect).Should(BeEquivalentTo(corev1.TaintEffectNoSchedule))
+		})
 	}
 
-	testComponentToleration := func(compName, compDefName string) {
+	testStsWorkloadComponentToleration := func(compName, compDefName string) {
 		clusterTolerationKey := "testClusterTolerationKey"
 		compTolerationKey := "testcompTolerationKey"
 		compTolerationValue := "testcompTolerationValue"
 
 		By("Creating a cluster with Toleration")
-		toleration := corev1.Toleration{
-			Key:      clusterTolerationKey,
-			Operator: corev1.TolerationOpExists,
-			Effect:   corev1.TaintEffectNoExecute,
-		}
+		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
 		compToleration := corev1.Toleration{
 			Key:      compTolerationKey,
 			Value:    compTolerationValue,
@@ -869,7 +891,12 @@ var _ = Describe("Cluster Controller", func() {
 			Effect:   corev1.TaintEffectNoSchedule,
 		}
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().AddClusterToleration(toleration).
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddClusterToleration(corev1.Toleration{
+				Key:      clusterTolerationKey,
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoExecute,
+			}).
 			AddComponent(compName, compDefName).AddComponentToleration(compToleration).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -878,16 +905,15 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("Checking the tolerations")
-		Eventually(func(g Gomega) {
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			podSpec := stsList.Items[0].Spec.Template.Spec
+		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
+			podSpec := getPodSpec(sts, deploy)
 			Expect(podSpec.Tolerations).Should(HaveLen(2))
-			toleration = podSpec.Tolerations[0]
-			g.Expect(toleration.Key).Should(BeEquivalentTo(compTolerationKey))
-			g.Expect(toleration.Value).Should(BeEquivalentTo(compTolerationValue))
-			g.Expect(toleration.Operator).Should(BeEquivalentTo(corev1.TolerationOpEqual))
-			g.Expect(toleration.Effect).Should(BeEquivalentTo(corev1.TaintEffectNoSchedule))
-		}).Should(Succeed())
+			t := podSpec.Tolerations[0]
+			g.Expect(t.Key).Should(BeEquivalentTo(compTolerationKey))
+			g.Expect(t.Value).Should(BeEquivalentTo(compTolerationValue))
+			g.Expect(t.Operator).Should(BeEquivalentTo(corev1.TolerationOpEqual))
+			g.Expect(t.Effect).Should(BeEquivalentTo(corev1.TaintEffectNoSchedule))
+		})
 	}
 
 	mockRoleChangedEvent := func(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
@@ -1029,7 +1055,7 @@ var _ = Describe("Cluster Controller", func() {
 		}).Should(Succeed())
 
 		By("Waiting the component be running")
-		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, compName)).
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).
 			Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 	}
 
@@ -1247,7 +1273,7 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.List(&testCtx, generics.PodDisruptionBudgetSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterKey.Name,
-				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
+				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEmpty())
 
 			podSpec := stsList.Items[0].Spec.Template.Spec
 			By("Checking created sts pods template with built-in toleration")
@@ -1346,7 +1372,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	When("creating cluster with workloadType=[Stateless|Stateful|Consensus|Replication] component", func() {
+	When("creating cluster with all workloadTypes (being Stateless|Stateful|Consensus|Replication) component", func() {
 		compNameNDef := map[string]string{
 			statelessCompName:   statelessCompDefName,
 			statefulCompName:    statefulCompDefName,
@@ -1356,7 +1382,6 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj)
 		})
 
 		for compName, compDefName := range compNameNDef {
@@ -1368,12 +1393,12 @@ var _ = Describe("Cluster Controller", func() {
 				testDoNotTermintate(compName, compDefName)
 			})
 
-			It(fmt.Sprintf("[comp: %s] should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", compName), func() {
-				testChangeReplicas(compName, compDefName)
-			})
-
 			It(fmt.Sprintf("[comp: %s] should add and delete service correctly", compName), func() {
 				testServiceAddAndDelete(compName, compDefName)
+			})
+
+			It(fmt.Sprintf("[comp: %s] should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", compName), func() {
+				testChangeReplicas(compName, compDefName)
 			})
 
 			It(fmt.Sprintf("[comp: %s] should add serviceAccountName correctly", compName), func() {
@@ -1400,39 +1425,47 @@ var _ = Describe("Cluster Controller", func() {
 
 			Context(fmt.Sprintf("[comp: %s] and with both cluster tolerations and component tolerations set", compName), func() {
 				It("Should observe the component tolerations will override the cluster tolerations", func() {
-					testComponentToleration(compName, compDefName)
+					testStsWorkloadComponentToleration(compName, compDefName)
+				})
+			})
+		}
+	})
+
+	When("creating cluster with stateful workloadTypes (being Stateful|Consensus|Replication) component", func() {
+		compNameNDef := map[string]string{
+			statefulCompName:    statefulCompDefName,
+			consensusCompName:   consensusCompDefName,
+			replicationCompName: replicationCompDefName,
+		}
+
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+			createBackupPolicyTpl(clusterDefObj)
+		})
+
+		for compName, compDefName := range compNameNDef {
+			Context(fmt.Sprintf("[comp: %s] with pvc", compName), func() {
+				It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
+					testHorizontalScale(compName, compDefName)
 				})
 			})
 
-			// HACK/TODO: only Stateful and Consensus workload types passes following test, need to investigate.
-			//   Would expect that non-stateless workload types should all pass tests.
-			switch compName {
-			case statefulCompName, consensusCompName, replicationCompName:
-				Context(fmt.Sprintf("[comp: %s] with pvc", compName), func() {
-					It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
-						testHorizontalScale(compName, compDefName)
-					})
+			Context(fmt.Sprintf("[comp: %s] with pvc and dynamic-provisioning storage class", compName), func() {
+				It("should update PVC request storage size accordingly", func() {
+					testStorageExpansion(compName, compDefName)
 				})
+			})
 
-				Context(fmt.Sprintf("[comp: %s] with pvc and dynamic-provisioning storage class", compName), func() {
-					It("should update PVC request storage size accordingly", func() {
-						testStorageExpansion(compName, compDefName)
-					})
+			It(fmt.Sprintf("[comp: %s] should report error if backup error during horizontal scale", compName), func() {
+				testBackupError(compName, compDefName)
+			})
+
+			Context(fmt.Sprintf("[comp: %s] with horizontal scale after storage expansion", compName), func() {
+				It("should succeed with horizontal scale to 5 replicas", func() {
+					testStorageExpansion(compName, compDefName)
+					horizontalScale(5, compDefName)
 				})
-
-				It(fmt.Sprintf("[comp: %s] should report error if backup error during horizontal scale", compName), func() {
-					testBackupError(compName, compDefName)
-				})
-
-				Context(fmt.Sprintf("[comp: %s] with horizontal scale after storage expansion", compName), func() {
-					It("should succeed with horizontal scale to 5 replicas", func() {
-						testStorageExpansion(compName, compDefName)
-						horizontalScale(5, compDefName)
-					})
-				})
-			default:
-			}
-
+			})
 		}
 	})
 
@@ -1499,11 +1532,11 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(sts.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
 
 			By("mock pod/sts are available and wait for component enter running phase")
-			testapps.MockConsensusComponentPods(testCtx, &sts, clusterObj.Name, compName)
+			testapps.MockConsensusComponentPods(&testCtx, &sts, clusterObj.Name, compName)
 			Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
 				testk8s.MockStatefulSetReady(&sts)
 			})).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 			By("remove init container after all components are Running")
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(clusterObj))).Should(BeEquivalentTo(1))
@@ -1516,7 +1549,7 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
 				g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 			})).Should(Succeed())
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 
 			By("clean up annotations after cluster running")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
@@ -1559,7 +1592,7 @@ var _ = Describe("Cluster Controller", func() {
 			waitForCreatingResourceCompletely(clusterKey, compDefName)
 
 			By("Checking statefulSet number")
-			stsList := testk8s.ListAndCheckStatefulSetCount(&testCtx, clusterKey, 1)
+			stsList := testk8s.ListAndCheckStatefulSetItemsCount(&testCtx, clusterKey, 1)
 			sts := &stsList.Items[0]
 
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
@@ -1577,7 +1610,7 @@ var _ = Describe("Cluster Controller", func() {
 	Context("test cluster Failed/Abnormal phase", func() {
 		It("test cluster conditions", func() {
 			By("init cluster")
-			cluster := testapps.CreateConsensusMysqlCluster(testCtx, clusterDefNameRand,
+			cluster := testapps.CreateConsensusMysqlCluster(&testCtx, clusterDefNameRand,
 				clusterVersionNameRand, clusterNameRand, consensusCompDefName, consensusCompName)
 			clusterKey := client.ObjectKeyFromObject(cluster)
 
@@ -1613,8 +1646,8 @@ var _ = Describe("Cluster Controller", func() {
 			// })).Should(Succeed())
 
 			By("test when clusterVersion not Available")
-			_ = testapps.CreateConsensusMysqlClusterDef(testCtx, clusterDefNameRand, consensusCompDefName)
-			clusterVersion := testapps.CreateConsensusMysqlClusterVersion(testCtx, clusterDefNameRand, clusterVersionNameRand, consensusCompDefName)
+			_ = testapps.CreateConsensusMysqlClusterDef(&testCtx, clusterDefNameRand, consensusCompDefName)
+			clusterVersion := testapps.CreateConsensusMysqlClusterVersion(&testCtx, clusterDefNameRand, clusterVersionNameRand, consensusCompDefName)
 			clusterVersionKey := client.ObjectKeyFromObject(clusterVersion)
 			// mock clusterVersion unavailable
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterVersionKey, func(clusterVersion *appsv1alpha1.ClusterVersion) {

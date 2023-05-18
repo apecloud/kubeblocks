@@ -186,7 +186,9 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, statement []str
 	// place statements and endpoints before user defined envs.
 	envs := make([]corev1.EnvVar, 0, 2+len(engine.getEnvs()))
 	envs = append(envs, statementEnv, endpointEnv)
-	envs = append(envs, engine.getEnvs()...)
+	if len(engine.getEnvs()) > 0 {
+		envs = append(envs, engine.getEnvs()...)
+	}
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -398,10 +400,14 @@ func completeExecConfig(execConfig *appsv1alpha1.CmdExecutorConfig, version *app
 		execConfig.Image = sysAccountSpec.CmdExecutorConfig.Image
 	}
 
-	if len(sysAccountSpec.CmdExecutorConfig.Env) > 0 {
-		if len(execConfig.Env) == 0 {
-			execConfig.Env = make([]corev1.EnvVar, 0)
-		}
-		execConfig.Env = append(execConfig.Env, sysAccountSpec.CmdExecutorConfig.Env...)
+	// envs from sysAccountSpec will override the envs from execConfig
+	if sysAccountSpec.CmdExecutorConfig.Env == nil {
+		return
+	}
+	if len(sysAccountSpec.CmdExecutorConfig.Env) == 0 {
+		// clean up envs
+		execConfig.Env = nil
+	} else {
+		execConfig.Env = sysAccountSpec.CmdExecutorConfig.Env
 	}
 }

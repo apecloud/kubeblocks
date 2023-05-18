@@ -137,8 +137,10 @@ spec:
                       x-kubernetes-list-type: map
                     systemAccountSpec:
                       description: systemAccountSpec define image for the component
-                        to connect database or engines. It has a higher priority over
-                        ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.image.
+                        to connect database or engines. It overrides `image` and `env`
+                        attributes defined in ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.
+                        To clean default envs settings, set `SystemAccountSpec.CmdExecutorConfig.Env`
+                        to empty list.
                       properties:
                         cmdExecutorConfig:
                           description: cmdExecutorConfig configs how to get client

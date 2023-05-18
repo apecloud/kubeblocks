@@ -363,6 +363,17 @@ func TestRenderCreationStmt(t *testing.T) {
 
 func TestMergeSystemAccountConfig(t *testing.T) {
 	systemAccount := mockSystemAccountsSpec()
+	// Make sure env is not empty
+	if systemAccount.CmdExecutorConfig.Env == nil {
+		systemAccount.CmdExecutorConfig.Env = []corev1.EnvVar{}
+	}
+
+	if len(systemAccount.CmdExecutorConfig.Env) == 0 {
+		systemAccount.CmdExecutorConfig.Env = append(systemAccount.CmdExecutorConfig.Env, corev1.EnvVar{
+			Name:  "cluster-def-env",
+			Value: "cluster-def-env-value",
+		})
+	}
 	// nil spec
 	componentVersion := &appsv1alpha1.ClusterComponentVersion{
 		SystemAccountSpec: nil,
@@ -380,6 +391,7 @@ func TestMergeSystemAccountConfig(t *testing.T) {
 	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
 		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{},
 	}
+
 	completeExecConfig(accountConfig, componentVersion)
 	assert.Equal(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
 	assert.Len(t, accountConfig.Env, len(systemAccount.CmdExecutorConfig.Env))
@@ -393,6 +405,7 @@ func TestMergeSystemAccountConfig(t *testing.T) {
 	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
 		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{
 			Image: mockImageName,
+			Env:   nil,
 		},
 	}
 	completeExecConfig(accountConfig, componentVersion)
@@ -402,6 +415,19 @@ func TestMergeSystemAccountConfig(t *testing.T) {
 	if len(systemAccount.CmdExecutorConfig.Env) > 0 {
 		assert.True(t, reflect.DeepEqual(accountConfig.Env, systemAccount.CmdExecutorConfig.Env))
 	}
+	// sepc with empty envs
+	accountConfig = systemAccount.CmdExecutorConfig.DeepCopy()
+	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
+		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{
+			Image: mockImageName,
+			Env:   []corev1.EnvVar{},
+		},
+	}
+	completeExecConfig(accountConfig, componentVersion)
+	assert.NotEqual(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
+	assert.Equal(t, mockImageName, accountConfig.Image)
+	assert.Len(t, accountConfig.Env, 0)
+
 	// sepc with envs
 	testEnv := corev1.EnvVar{
 		Name:  "test-env",
@@ -411,14 +437,12 @@ func TestMergeSystemAccountConfig(t *testing.T) {
 	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
 		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{
 			Image: mockImageName,
-			Env: []corev1.EnvVar{
-				testEnv,
-			},
+			Env:   []corev1.EnvVar{testEnv},
 		},
 	}
 	completeExecConfig(accountConfig, componentVersion)
 	assert.NotEqual(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
 	assert.Equal(t, mockImageName, accountConfig.Image)
-	assert.Len(t, accountConfig.Env, len(systemAccount.CmdExecutorConfig.Env)+1)
+	assert.Len(t, accountConfig.Env, 1)
 	assert.Contains(t, accountConfig.Env, testEnv)
 }

@@ -83,7 +83,8 @@ type ClusterComponentVersion struct {
 	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// systemAccountSpec define image for the component to connect database or engines.
-	// It has a higher priority over ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.image.
+	// It overrides `image` and `env` attributes defined in ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.
+	// To clean default envs settings, set `SystemAccountSpec.CmdExecutorConfig.Env` to empty list.
 	// +optional
 	SystemAccountSpec *SystemAccountShortSpec `json:"systemAccountSpec,omitempty"`
 

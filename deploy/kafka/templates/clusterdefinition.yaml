@@ -432,6 +432,8 @@ spec:
                 value: "5555"
               - name: KAFKA_VOLUME_DIR
                 value: "/bitnami/kafka"
+              - name: KAFKA_CFG_METADATA_LOG_DIR
+                value: "/bitnami/kafka/metadata"
               - name: KAFKA_LOG_DIR
                 value: "/opt/bitnami/kafka/logs"
               - name: KAFKA_HEAP_OPTS

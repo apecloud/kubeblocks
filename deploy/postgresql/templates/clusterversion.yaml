@@ -49,9 +49,9 @@ spec:
       versionsContext:
         initContainers:
           - name: pg-init-container
-            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
         containers:
           - name: postgresql
-            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0
-      clientImage: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
+      clientImage: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
 ---

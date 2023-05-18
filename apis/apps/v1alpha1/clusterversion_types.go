@@ -83,7 +83,7 @@ type ClusterComponentVersion struct {
 	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// clientImage define image for the component to connect database or engines.
-	// This value has a higher proirity over ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.image.
+	// This value override ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.image. [EXPERIMENTAL]
 	// +optional
 	ClientImage string `json:"clientImage,omitempty"`
 

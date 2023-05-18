@@ -64,8 +64,8 @@ spec:
                   properties:
                     clientImage:
                       description: clientImage define image for the component to connect
-                        database or engines. This value has a higher proirity over
-                        ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.image.
+                        database or engines. This value override ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.image.
+                        [EXPERIMENTAL]
                       type: string
                     componentDefRef:
                       description: componentDefRef reference one of the cluster component

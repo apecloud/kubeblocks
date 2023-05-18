@@ -181,9 +181,15 @@ data:
         echo "self is leader, need to switchover" >> /data/mysql/.kb_pre_stop.log
         echo "mysql -uroot $password_flag -e \"call dbms_consensus.change_leader('$new_leader_host:13306');\" 2>&1" >> /data/mysql/.kb_pre_stop.log
         mysql -uroot $password_flag -e "call dbms_consensus.change_leader('$new_leader_host:13306');" 2>&1
-        echo "leader=$new_leader_host" >> /data/mysql/.kb_pre_stop.log
-        leader=`echo "$new_leader_host" | cut -d "." -f 1`
-        idx=${KB_POD_NAME##*-}
+        sleep 1
+        role_info=`mysql -uroot $password_flag -e "select * from information_schema.wesql_cluster_local;" 2>&1`
+        echo "role_info=$role_info" >> /data/mysql/.kb_pre_stop.log
+        is_follower=`echo $role_info | grep "Follower"`
+        if [ ! -z "$is_follower" ]; then
+          echo "new_leader=$new_leader_host" >> /data/mysql/.kb_pre_stop.log
+          leader=`echo "$new_leader_host" | cut -d "." -f 1`
+          idx=${KB_POD_NAME##*-}
+        fi
       fi
     }
     leader=`cat /etc/annotations/leader`

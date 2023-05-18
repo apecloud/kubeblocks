@@ -1792,3 +1792,6 @@ aws-load-balancer-controller:
             operator: In
             values:
             - "true"
+
+recover-volume-expansion-failure:
+  enabled: false

@@ -17,41 +17,41 @@
 
 // required, command line input options for parameters and flags
 options: {
-	namespace:        string
-	action:						string
-	selector:					{}
-	mode:							string
-	value:						string
-	duration: 				string
+	namespace: string
+	action:    string
+	selector: {}
+	mode:     string
+	value:    string
+	duration: string
 
-	delay:				 		string
-	errno:				 		int
-	attr?:						{}
-	mistake?:					{}
+	delay: string
+	errno: int
+	attr?: {}
+	mistake?: {}
 
-	volumePath:				string
-	path:				 			string
-	percent:				 	int
-	methods:					[...]
-	containerNames: 	[...]
+	volumePath: string
+	path:       string
+	percent:    int
+	methods: [...]
+	containerNames: [...]
 }
 
 // required, k8s api resource content
 content: {
-  kind: "IOChaos"
-  apiVersion: "chaos-mesh.org/v1alpha1"
-  metadata:{
-  	generateName: "io-chaos-"
-    namespace: options.namespace
-  }
-  spec:{
-    selector: options.selector
-    mode: options.mode
-    value: options.value
-    action: options.action
-    duration: options.duration
+	kind:       "IOChaos"
+	apiVersion: "chaos-mesh.org/v1alpha1"
+	metadata: {
+		generateName: "io-chaos-"
+		namespace:    options.namespace
+	}
+	spec: {
+		selector: options.selector
+		mode:     options.mode
+		value:    options.value
+		action:   options.action
+		duration: options.duration
 
- 		delay: options.delay
+		delay: options.delay
 		errno: options.errno
 		if len(options.attr) != 0 {
 			attr: options.attr
@@ -60,10 +60,10 @@ content: {
 			mistake: options.mistake
 		}
 
-    volumePath: options.volumePath
-    path: options.path
-    percent: options.percent
-    methods: options.methods
-    containerNames: options.containerNames
-  }
+		volumePath:     options.volumePath
+		path:           options.path
+		percent:        options.percent
+		methods:        options.methods
+		containerNames: options.containerNames
+	}
 }

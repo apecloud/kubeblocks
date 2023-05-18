@@ -17,33 +17,33 @@
 
 // required, command line input options for parameters and flags
 options: {
-	namespace:        string
-	action:						string
-	selector:					{}
-	mode:							string
-	value:						string
-	duration: 				string
+	namespace: string
+	action:    string
+	selector: {}
+	mode:     string
+	value:    string
+	duration: string
 
-	gracePeriod: 			int64
-	containerNames: 	[...]
+	gracePeriod: int64
+	containerNames: [...]
 }
 
 // required, k8s api resource content
 content: {
-  kind: "PodChaos"
-  apiVersion: "chaos-mesh.org/v1alpha1"
-  metadata:{
-  	generateName: "pod-chaos-"
-    namespace: options.namespace
-  }
-  spec:{
+	kind:       "PodChaos"
+	apiVersion: "chaos-mesh.org/v1alpha1"
+	metadata: {
+		generateName: "pod-chaos-"
+		namespace:    options.namespace
+	}
+	spec: {
 		selector: options.selector
-    mode: options.mode
-    value: options.value
-    action: options.action
-    duration: options.duration
+		mode:     options.mode
+		value:    options.value
+		action:   options.action
+		duration: options.duration
 
-    gracePeriod: options.gracePeriod
-    containerNames: options.containerNames
-  }
+		gracePeriod:    options.gracePeriod
+		containerNames: options.containerNames
+	}
 }

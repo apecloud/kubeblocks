@@ -16,7 +16,7 @@ spec:
   {{- end }}
   componentSpecs:
     {{- if eq "combined" $.Values.mode }}
-    - name: kafka-server
+    - name: server
       componentDefRef: kafka-server
       replicas: {{ $.Values.kafkaServer.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}
@@ -70,7 +70,7 @@ spec:
         {{- end }}
       {{- end }}
     {{- else }}
-    - name: kafka-ctrlr
+    - name: controller
       componentDefRef: kafka-controller
       replicas: {{ $.Values.kafkaController.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}
@@ -113,7 +113,7 @@ spec:
           {{- end }}
         {{- end }}
       {{- end }}
-    - name: kafka-broker
+    - name: broker
       componentDefRef: kafka-broker
       replicas: {{ $.Values.kafkaBroker.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}

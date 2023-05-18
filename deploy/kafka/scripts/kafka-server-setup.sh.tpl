@@ -83,6 +83,7 @@ if [[ "broker" = "$KAFKA_CFG_PROCESS_ROLES" ]]; then
     INDEX=${INDEX#-}
     BROKER_NODE_ID=$(( $INDEX + $BROKER_MIN_NODE_ID ))
     export KAFKA_CFG_NODE_ID="$BROKER_NODE_ID"
+    export KAFKA_CFG_BROKER_ID="$BROKER_NODE_ID"
     echo "KAFKA_CFG_NODE_ID=$KAFKA_CFG_NODE_ID"
     # generate KAFKA_CFG_CONTROLLER_QUORUM_VOTERS for broker if not a combine-cluster
     {{- $voters := "" }}
@@ -103,6 +104,7 @@ else
     # generate node.id
     ID="${KB_POD_NAME#${KB_CLUSTER_COMP_NAME}-}"
     export KAFKA_CFG_NODE_ID="$((ID + 0))"
+    export KAFKA_CFG_BROKER_ID="$((ID + 0))"
     echo "KAFKA_CFG_NODE_ID=$KAFKA_CFG_NODE_ID"
     # generate KAFKA_CFG_CONTROLLER_QUORUM_VOTERS if is a combine-cluster or controller
     {{- $replicas := $.component.replicas | int }}

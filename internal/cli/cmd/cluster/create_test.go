@@ -37,6 +37,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 func generateComponents(component appsv1alpha1.ClusterComponentSpec, count int) []map[string]interface{} {
@@ -359,8 +360,9 @@ var _ = Describe("create", func() {
 	})
 
 	It("build tolerations", func() {
-		raw := []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"}
-		res := buildTolerations(raw)
+		raw := []string{"engineType=mongo:NoSchedule"}
+		res, err := util.BuildTolerations(raw)
+		Expect(err).Should(BeNil())
 		Expect(len(res)).Should(Equal(1))
 	})
 

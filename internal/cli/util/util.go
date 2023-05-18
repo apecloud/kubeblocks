@@ -768,3 +768,25 @@ func BuildClusterDefinitionRefLable(prefix string, clusterDef []string) string {
 func IsWindows() bool {
 	return runtime.GOOS == types.GoosWindows
 }
+
+// BuildTolerations toleration format: key=value:effect
+func BuildTolerations(raw []string) ([]interface{}, error) {
+	tolerations := make([]interface{}, 0)
+	for _, tolerationRaw := range raw {
+		for _, entries := range strings.Split(tolerationRaw, ",") {
+			toleration := make(map[string]interface{})
+			toleration["operator"] = "Equal"
+			parts := strings.FieldsFunc(entries, func(r rune) bool {
+				return r == '=' || r == ':'
+			})
+			if len(parts) != 3 {
+				return nil, fmt.Errorf("invalid toleration %s", entries)
+			}
+			toleration["key"] = parts[0]
+			toleration["value"] = parts[1]
+			toleration["effect"] = parts[2]
+			tolerations = append(tolerations, toleration)
+		}
+	}
+	return tolerations, nil
+}

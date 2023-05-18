@@ -20,16 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
 
-	"github.com/StudioSol/set"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/StudioSol/set"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -144,7 +149,146 @@ var _ = Describe("config_util", func() {
 
 	Context("NeedSharedProcessNamespace", func() {
 		It("Should success with no error", func() {
-			// TODO add test case
+			k8sMockClient := testutil.NewK8sMockClient()
+			defer k8sMockClient.Finish()
+
+			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
+				&v1alpha1.ConfigConstraint{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cc1",
+					},
+					Spec: v1alpha1.ConfigConstraintSpec{
+						ReloadOptions: &v1alpha1.ReloadOptions{
+							UnixSignalTrigger: &v1alpha1.UnixSignalTrigger{
+								Signal:      v1alpha1.SIGHUP,
+								ProcessName: "test",
+							},
+						},
+					},
+				},
+				&v1alpha1.ConfigConstraint{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cc2",
+					},
+					Spec: v1alpha1.ConfigConstraintSpec{
+						ReloadOptions: &v1alpha1.ReloadOptions{
+							ShellTrigger: &v1alpha1.ShellTrigger{
+								ScriptConfigMapRef: "script_cm",
+							},
+						},
+					},
+				},
+				&v1alpha1.ConfigConstraint{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cc3",
+					},
+					Spec: v1alpha1.ConfigConstraintSpec{},
+				},
+			}), testutil.WithAnyTimes()))
+
+			type args struct {
+				configSpecs []v1alpha1.ComponentConfigSpec
+				cli         client.Client
+				ctx         context.Context
+			}
+			tests := []struct {
+				name    string
+				args    args
+				want    bool
+				wantErr bool
+			}{{
+				name: "test1",
+				args: args{
+					configSpecs: []v1alpha1.ComponentConfigSpec{},
+					cli:         k8sMockClient.Client(),
+					ctx:         context.TODO(),
+				},
+				want: false,
+			}, {
+				name: "test2",
+				args: args{
+					configSpecs: []v1alpha1.ComponentConfigSpec{
+						{
+							ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+								Name:        "test",
+								TemplateRef: "test_cm",
+							},
+						},
+					},
+					cli: k8sMockClient.Client(),
+					ctx: context.TODO(),
+				},
+				want: false,
+			}, {
+				name: "test3",
+				args: args{
+					configSpecs: []v1alpha1.ComponentConfigSpec{
+						{
+							ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+								Name:        "test",
+								TemplateRef: "test_cm",
+							},
+							ConfigConstraintRef: "cc2",
+						},
+						{
+							ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+								Name:        "test2",
+								TemplateRef: "test_cm",
+							},
+							ConfigConstraintRef: "cc3",
+						},
+					},
+					cli: k8sMockClient.Client(),
+					ctx: context.TODO(),
+				},
+				want: false,
+			}, {
+				name: "test4",
+				args: args{
+					configSpecs: []v1alpha1.ComponentConfigSpec{
+						{
+							ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+								Name:        "test",
+								TemplateRef: "test_cm",
+							},
+							ConfigConstraintRef: "cc1",
+						},
+						{
+							ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+								Name:        "test2",
+								TemplateRef: "test_cm",
+							},
+							ConfigConstraintRef: "cc3",
+						},
+					},
+					cli: k8sMockClient.Client(),
+					ctx: context.TODO(),
+				},
+				want: true,
+			}, {
+				name: "test5",
+				args: args{
+					configSpecs: []v1alpha1.ComponentConfigSpec{
+						{
+							ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+								Name:        "test",
+								TemplateRef: "test_cm",
+							},
+							ConfigConstraintRef: "cc_not_exist",
+						},
+					},
+					cli: k8sMockClient.Client(),
+					ctx: context.TODO(),
+				},
+				wantErr: true,
+				want:    false,
+			}}
+			for _, tt := range tests {
+				got, err := NeedSharedProcessNamespace(tt.args.configSpecs, tt.args.cli, tt.args.ctx)
+				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
+				Expect(got).Should(BeEquivalentTo(tt.want))
+			}
+
 		})
 	})
 })

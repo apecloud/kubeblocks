@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ include "clickhouse-cluster.fullname" . }}
+  name: {{ include "clustername" . }}
   labels: {{ include "clickhouse-cluster.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: clickhouse  # ref clusterdefinition.name

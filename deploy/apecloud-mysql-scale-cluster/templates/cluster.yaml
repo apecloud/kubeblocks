@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ include "apecloud-mysql-cluster.fullname" . }}
+  name: {{ include "clustername" . }}
   labels: {{ include "apecloud-mysql-cluster.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-mysql-scale  # ref clusterdefinition.name

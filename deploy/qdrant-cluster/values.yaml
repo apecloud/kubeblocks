@@ -29,3 +29,6 @@ persistence:
   data:
     storageClassName:
     size: 10Gi
+
+serviceAccount:
+  name:

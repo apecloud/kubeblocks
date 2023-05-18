@@ -1,16 +1,37 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package main
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd"
 )
 
 type option struct {
@@ -35,6 +56,8 @@ type data struct {
 	Options []option  `json:"options"`
 }
 
+const boolname = "bool"
+
 func genAllCommandForData(cmd *cobra.Command, data *data) error {
 
 	for _, c := range cmd.Commands() {
@@ -57,7 +80,7 @@ func genAllCommandForData(cmd *cobra.Command, data *data) error {
 			if len(flag.Shorthand) > 0 {
 				newoption.Alias = "-" + flag.Shorthand
 			}
-			if flag.Value.Type() == "bool" {
+			if flag.Value.Type() == boolname {
 				newoption.IsBoolean = true
 			}
 			newcmd.Options = append(newcmd.Options, newoption)
@@ -77,7 +100,7 @@ func genAllCommandForData(cmd *cobra.Command, data *data) error {
 				if len(flag.Shorthand) > 0 {
 					newoption.Alias = "-" + flag.Shorthand
 				}
-				if flag.Value.Type() == "bool" {
+				if flag.Value.Type() == boolname {
 					newoption.IsBoolean = true
 				}
 				newsub.Options = append(newsub.Options, newoption)
@@ -105,7 +128,15 @@ func writeToLocal(data data) error {
 	filePath := filepath.Join(dir, "prompt_schema.json")
 	jsonData, _ := json.MarshalIndent(data, "", "    ")
 	file, _ := os.Create(filePath)
-	defer file.Close()
+	defer func() {
+		err = file.Close()
+		if err != nil {
+			return
+		}
+	}()
+	if err != nil {
+		return err
+	}
 	_, err = file.Write(jsonData)
 	if err != nil {
 		return err
@@ -127,12 +158,23 @@ func main() {
 		log.Fatal("can't execute kbcli", err)
 		return
 	}
-	w.Close()
+	err = w.Close()
+	if err != nil {
+		log.Fatal("can't execute kbcli", err)
+		return
+	}
 	os.Stdout = old
-	io.Copy(&buff, r)
+	_, err = io.Copy(&buff, r)
+	if err != nil {
+		log.Fatal("can't copy outpute byteflow to pipe", err)
+		return
+	}
 	buff.Reset()
-	r.Close()
-	w.Close()
+	err = r.Close()
+	if err != nil {
+		log.Fatal("can't close read side", err)
+		return
+	}
 	cli.Flags().VisitAll(func(flag *pflag.Flag) {
 		var newoption option
 		newoption.Name = "--" + flag.Name
@@ -140,7 +182,7 @@ func main() {
 		if len(flag.Shorthand) > 0 {
 			newoption.Alias = "-" + flag.Shorthand
 		}
-		if flag.Value.Type() == "bool" {
+		if flag.Value.Type() == boolname {
 			newoption.IsBoolean = true
 		}
 		writedata.Options = append(writedata.Options, newoption)

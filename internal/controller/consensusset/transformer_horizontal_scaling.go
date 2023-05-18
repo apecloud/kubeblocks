@@ -148,6 +148,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		// start action if suspend
 		action := finalActionList[index]
 		if *action.Spec.Suspend {
+			// barrier 5: members with ordinal less than action target ordinal should be ready
 			// validate cluster state: all pods without actions should be ok(role label set and has one leader)
 			if err := abnormalAnalysis(transCtx.CSSet, action); err != nil {
 				emitAbnormalEvent(transCtx, action.Labels[jobTypeLabel], action.Name, err)

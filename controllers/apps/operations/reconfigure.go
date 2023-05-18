@@ -40,7 +40,7 @@ func init() {
 	opsManager := GetOpsManager()
 	reconfigureBehaviour := OpsBehaviour{
 		// REVIEW: can do opsrequest if not running?
-		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
+		FromClusterPhases: appsv1alpha1.GetReconfiguringRunningPhases(),
 		// TODO: add cluster reconcile Reconfiguring phase.
 		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
 		MaintainClusterPhaseBySelf:         true,
@@ -293,7 +293,8 @@ func isFailedPhase(condition metav1.Condition) bool {
 }
 
 func isRunningPhase(condition metav1.Condition) bool {
-	return isExpectedPhase(condition, []string{appsv1alpha1.ReasonReconfigureRunning}, metav1.ConditionTrue)
+	return isExpectedPhase(condition, []string{appsv1alpha1.ReasonReconfigureRunning, appsv1alpha1.ReasonReconfigureMerged},
+		metav1.ConditionTrue)
 }
 
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) error {

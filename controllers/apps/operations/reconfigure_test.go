@@ -243,7 +243,10 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 		It("Test Reconfigure OpsRequest with autoReload", func() {
 			opsRes, eventContext := assureMockReconfigureData("autoReload")
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: testCtx.Ctx,
+				Log: log.FromContext(ctx).WithValues("Reconfigure"),
+			}
 
 			By("mock reconfigure success")
 			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr+"-reload", testCtx.DefaultNamespace,

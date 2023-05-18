@@ -615,6 +615,16 @@ func GetClusterUpRunningPhases() []ClusterPhase {
 	}
 }
 
+// GetReconfiguringRunningPhases return Cluster running or partially running phases.
+func GetReconfiguringRunningPhases() []ClusterPhase {
+	return []ClusterPhase{
+		RunningClusterPhase,
+		SpecReconcilingClusterPhase, // enable partial running for reconfiguring
+		AbnormalClusterPhase,
+		FailedClusterPhase,
+	}
+}
+
 // GetClusterFailedPhases return Cluster failed or partially failed phases.
 func GetClusterFailedPhases() []ClusterPhase {
 	return []ClusterPhase{

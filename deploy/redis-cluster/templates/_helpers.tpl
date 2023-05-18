@@ -50,13 +50,13 @@ app.kubernetes.io/name: {{ include "redis-cluster.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "clustername" -}}
+{{ include "redis-cluster.fullname" .}}
+{{- end}}
+
 {{/*
 Create the name of the service account to use
 */}}
 {{- define "redis-cluster.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "redis-cluster.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
+{{- default (printf "kb-%s" (include "clustername" .)) .Values.serviceAccount.name }}
 {{- end }}

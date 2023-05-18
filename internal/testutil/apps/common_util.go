@@ -264,13 +264,13 @@ func NewCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 func CreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
 	filePath string, pobj PT, actions ...any) PT {
 	pobj = NewCustomizedObj(filePath, pobj, actions...)
-	return CreateK8sResource(*testCtx, pobj).(PT)
+	return CreateK8sResource(testCtx, pobj).(PT)
 }
 
 func CheckedCreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
 	filePath string, pobj PT, actions ...any) PT {
 	pobj = NewCustomizedObj(filePath, pobj, actions...)
-	return CheckedCreateK8sResource(*testCtx, pobj).(PT)
+	return CheckedCreateK8sResource(testCtx, pobj).(PT)
 }
 
 // Helper functions to delete object.

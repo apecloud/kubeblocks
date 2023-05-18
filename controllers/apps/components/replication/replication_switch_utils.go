@@ -307,7 +307,7 @@ func (pdm *ProbeDetectManager) lagDetect(pod *corev1.Pod) (*LagDetectResult, err
 
 // getSwitchStatementsBySwitchPolicyType gets the SwitchStatements corresponding to switchPolicyType
 func getSwitchStatementsBySwitchPolicyType(switchPolicyType appsv1alpha1.SwitchPolicyType,
-	replicationSpec *appsv1alpha1.ReplicationSpec) (*appsv1alpha1.SwitchStatements, error) {
+	replicationSpec *appsv1alpha1.ReplicationSetSpec) (*appsv1alpha1.SwitchStatements, error) {
 	if replicationSpec == nil || len(replicationSpec.SwitchPolicies) == 0 {
 		return nil, fmt.Errorf("replicationSpec and replicationSpec.SwitchPolicies can not be nil")
 	}

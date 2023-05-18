@@ -269,6 +269,12 @@ spec:
                       maxLength: 15
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
+                    noCreatePDB:
+                      default: false
+                      description: noCreatePDB defines PodDistruptionBudget creation
+                        behavior, set to true if creation of PodDistruptionBudget
+                        for this component is not needed. Defaults to false.
+                      type: boolean
                     replicas:
                       default: 1
                       description: Component replicas, use default value in ClusterDefinition

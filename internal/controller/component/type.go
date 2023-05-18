@@ -37,10 +37,13 @@ type SynthesizedComponent struct {
 	Name                  string                                 `json:"name,omitempty"`
 	Type                  string                                 `json:"type,omitempty"`
 	CharacterType         string                                 `json:"characterType,omitempty"`
-	MaxUnavailable        *intstr.IntOrString                    `json:"maxUnavailable,omitempty"`
+	MinAvailable          *intstr.IntOrString                    `json:"minAvailable,omitempty"`
 	Replicas              int32                                  `json:"replicas"`
 	WorkloadType          v1alpha1.WorkloadType                  `json:"workloadType,omitempty"`
+	StatelessSpec         *v1alpha1.StatelessSetSpec             `json:"statelessSpec,omitempty"`
+	StatefulSpec          *v1alpha1.StatefulSetSpec              `json:"statefulSpec,omitempty"`
 	ConsensusSpec         *v1alpha1.ConsensusSetSpec             `json:"consensusSpec,omitempty"`
+	ReplicationSpec       *v1alpha1.ReplicationSetSpec           `json:"replicationSpec,omitempty"`
 	PodSpec               *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Services              []corev1.Service                       `json:"services,omitempty"`
 	Probes                *v1alpha1.ClusterDefinitionProbes      `json:"probes,omitempty"`
@@ -58,4 +61,5 @@ type SynthesizedComponent struct {
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
 	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
 	CandidateInstance     *v1alpha1.CandidateInstance            `json:"candidateInstance,omitempty"`
+	StatefulSetWorkload   v1alpha1.StatefulSetWorkload
 }

@@ -181,7 +181,9 @@ var (
 			Name:       "follower",
 			AccessMode: appsv1alpha1.Readonly,
 		}},
-		UpdateStrategy: appsv1alpha1.BestEffortParallelStrategy,
+		StatefulSetSpec: appsv1alpha1.StatefulSetSpec{
+			UpdateStrategy: appsv1alpha1.BestEffortParallelStrategy,
+		},
 	}
 
 	defaultMySQLService = appsv1alpha1.ServiceSpec{

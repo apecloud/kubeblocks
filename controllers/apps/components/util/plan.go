@@ -31,7 +31,14 @@ type Step struct {
 
 type WalkFunc func(obj interface{}) (bool, error)
 
+// WalkOneStep process plan stepping
+// @return isCompleted
+// @return err
 func (p *Plan) WalkOneStep() (bool, error) {
+	if p == nil {
+		return true, nil
+	}
+
 	if len(p.Start.NextSteps) == 0 {
 		return true, nil
 	}
@@ -46,7 +53,6 @@ func (p *Plan) WalkOneStep() (bool, error) {
 			shouldStop = true
 		}
 	}
-
 	if shouldStop {
 		return false, nil
 	}
@@ -63,7 +69,6 @@ func (p *Plan) WalkOneStep() (bool, error) {
 			}
 		}
 	}
-
 	return plan.WalkOneStep()
 }
 
@@ -73,6 +78,5 @@ func containStep(steps []*Step, step *Step) bool {
 			return true
 		}
 	}
-
 	return false
 }

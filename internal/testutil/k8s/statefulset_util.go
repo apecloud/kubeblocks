@@ -25,7 +25,7 @@ import (
 	"reflect"
 
 	"github.com/onsi/gomega"
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +42,7 @@ const (
 )
 
 // NewFakeStatefulSet creates a fake StatefulSet workload object for testing.
-func NewFakeStatefulSet(name string, replicas int) *apps.StatefulSet {
+func NewFakeStatefulSet(name string, replicas int) *appsv1.StatefulSet {
 	template := corev1.PodTemplateSpec{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -57,12 +57,12 @@ func NewFakeStatefulSet(name string, replicas int) *apps.StatefulSet {
 	template.Labels = map[string]string{"foo": "bar"}
 	statefulSetReplicas := int32(replicas)
 	Revision := name + "-d5df5b8d6"
-	return &apps.StatefulSet{
+	return &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: corev1.NamespaceDefault,
 		},
-		Spec: apps.StatefulSetSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
@@ -70,7 +70,7 @@ func NewFakeStatefulSet(name string, replicas int) *apps.StatefulSet {
 			Template:    template,
 			ServiceName: "governingsvc",
 		},
-		Status: apps.StatefulSetStatus{
+		Status: appsv1.StatefulSetStatus{
 			AvailableReplicas:  statefulSetReplicas,
 			ObservedGeneration: 0,
 			ReadyReplicas:      statefulSetReplicas,
@@ -82,14 +82,14 @@ func NewFakeStatefulSet(name string, replicas int) *apps.StatefulSet {
 }
 
 // NewFakeStatefulSetPod creates a fake pod of the StatefulSet workload for testing.
-func NewFakeStatefulSetPod(set *apps.StatefulSet, ordinal int) *corev1.Pod {
+func NewFakeStatefulSetPod(set *appsv1.StatefulSet, ordinal int) *corev1.Pod {
 	pod := &corev1.Pod{}
 	pod.Name = fmt.Sprintf("%s-%d", set.Name, ordinal)
 	return pod
 }
 
 // MockStatefulSetReady mocks the StatefulSet workload is ready.
-func MockStatefulSetReady(sts *apps.StatefulSet) {
+func MockStatefulSetReady(sts *appsv1.StatefulSet) {
 	sts.Status.AvailableReplicas = *sts.Spec.Replicas
 	sts.Status.ObservedGeneration = sts.Generation
 	sts.Status.Replicas = *sts.Spec.Replicas
@@ -154,8 +154,8 @@ func RemovePodFinalizer(ctx context.Context, testCtx testutil.TestContext, pod *
 	}).Should(gomega.Satisfy(apierrors.IsNotFound))
 }
 
-func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.NamespacedName) *apps.StatefulSetList {
-	stsList := &apps.StatefulSetList{}
+func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.NamespacedName) *appsv1.StatefulSetList {
+	stsList := &appsv1.StatefulSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
 			constant.AppInstanceLabelKey: key.Name,
@@ -166,8 +166,8 @@ func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.Namespaced
 	return stsList
 }
 
-func ListAndCheckStatefulSetCount(testCtx *testutil.TestContext, key types.NamespacedName, cnt int) *apps.StatefulSetList {
-	stsList := &apps.StatefulSetList{}
+func ListAndCheckStatefulSetItemsCount(testCtx *testutil.TestContext, key types.NamespacedName, cnt int) *appsv1.StatefulSetList {
+	stsList := &appsv1.StatefulSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
 			constant.AppInstanceLabelKey: key.Name,
@@ -177,8 +177,8 @@ func ListAndCheckStatefulSetCount(testCtx *testutil.TestContext, key types.Names
 	return stsList
 }
 
-func ListAndCheckStatefulSetWithComponent(testCtx *testutil.TestContext, key types.NamespacedName, componentName string) *apps.StatefulSetList {
-	stsList := &apps.StatefulSetList{}
+func ListAndCheckStatefulSetWithComponent(testCtx *testutil.TestContext, key types.NamespacedName, componentName string) *appsv1.StatefulSetList {
+	stsList := &appsv1.StatefulSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
 			constant.AppInstanceLabelKey:    key.Name,
@@ -202,17 +202,17 @@ func ListAndCheckPodCountWithComponent(testCtx *testutil.TestContext, key types.
 	return podList
 }
 
-func PatchStatefulSetStatus(testCtx *testutil.TestContext, stsName string, status apps.StatefulSetStatus) {
+func PatchStatefulSetStatus(testCtx *testutil.TestContext, stsName string, status appsv1.StatefulSetStatus) {
 	objectKey := client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}
-	gomega.Expect(testapps.GetAndChangeObjStatus(testCtx, objectKey, func(newSts *apps.StatefulSet) {
+	gomega.Expect(testapps.GetAndChangeObjStatus(testCtx, objectKey, func(newSts *appsv1.StatefulSet) {
 		newSts.Status = status
 	})()).Should(gomega.Succeed())
-	gomega.Eventually(testapps.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newSts *apps.StatefulSet) {
+	gomega.Eventually(testapps.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newSts *appsv1.StatefulSet) {
 		g.Expect(reflect.DeepEqual(newSts.Status, status)).Should(gomega.BeTrue())
 	})).Should(gomega.Succeed())
 }
 
-func InitStatefulSetStatus(testCtx testutil.TestContext, statefulset *apps.StatefulSet, controllerRevision string) {
+func InitStatefulSetStatus(testCtx testutil.TestContext, statefulset *appsv1.StatefulSet, controllerRevision string) {
 	gomega.Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
 		statefulset.Status.UpdateRevision = controllerRevision
 		statefulset.Status.CurrentRevision = controllerRevision

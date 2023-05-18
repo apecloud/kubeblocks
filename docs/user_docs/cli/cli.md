@@ -112,7 +112,11 @@ List and open the KubeBlocks dashboards.
 
 Inject faults to pod.
 
+* [kbcli fault io](kbcli_fault_io.md)	 - IO chaos.
 * [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
+* [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
+* [kbcli fault stress](kbcli_fault_stress.md)	 - Add memory pressure or CPU load to the system.
+* [kbcli fault time](kbcli_fault_time.md)	 - Clock skew failure.
 
 
 ## [kubeblocks](kbcli_kubeblocks.md)

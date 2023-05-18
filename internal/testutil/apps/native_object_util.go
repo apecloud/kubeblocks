@@ -68,7 +68,7 @@ func NewPVC(size string) corev1.PersistentVolumeClaimSpec {
 	}
 }
 
-func CreateStorageClass(testCtx testutil.TestContext, storageClassName string,
+func CreateStorageClass(testCtx *testutil.TestContext, storageClassName string,
 	allowVolumeExpansion bool) *storagev1.StorageClass {
 	storageClass := &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{

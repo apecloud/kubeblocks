@@ -158,7 +158,7 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 		BeforeEach(func() {
 
 			By("Mock a replicationSpec with SwitchPolicy and SwitchCmdExecutorConfig.")
-			replicationSpec := &appsv1alpha1.ReplicationSpec{
+			replicationSpec := &appsv1alpha1.ReplicationSetSpec{
 				SwitchPolicies: []appsv1alpha1.SwitchPolicy{
 					{
 						Type: appsv1alpha1.MaximumAvailability,

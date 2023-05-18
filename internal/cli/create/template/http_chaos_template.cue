@@ -18,8 +18,7 @@
 // required, command line input options for parameters and flags
 options: {
 	namespace:        string
-	label?:						{}
-	namespaceSelector: [...]
+	selector:					{}
 	mode:							string
 	value:						string
 	duration: 				string
@@ -50,14 +49,7 @@ content: {
     namespace: options.namespace
   }
   spec:{
-    selector:{
-    	namespaces: options.namespaceSelector
-    	if options.label != _|_ {
-    		labelSelectors:{
-    			options.label
-    		}
-    	}
-    }
+    selector: options.selector
     mode: options.mode
     value: options.value
     duration: options.duration

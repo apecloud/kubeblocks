@@ -49,30 +49,28 @@ func BuildComponent(
 		Name:                  clusterCompSpec.Name,
 		Type:                  clusterCompDefObj.Name,
 		CharacterType:         clusterCompDefObj.CharacterType,
-		MaxUnavailable:        clusterCompDefObj.MaxUnavailable,
 		WorkloadType:          clusterCompDefObj.WorkloadType,
+		StatelessSpec:         clusterCompDefObj.StatelessSpec,
+		StatefulSpec:          clusterCompDefObj.StatefulSpec,
 		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
+		ReplicationSpec:       clusterCompDefObj.ReplicationSpec,
 		PodSpec:               clusterCompDefObj.PodSpec,
 		Probes:                clusterCompDefObj.Probes,
 		LogConfigs:            clusterCompDefObj.LogConfigs,
 		HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
+		ConfigTemplates:       clusterCompDefObj.ConfigSpecs,
+		ScriptTemplates:       clusterCompDefObj.ScriptSpecs,
+		VolumeTypes:           clusterCompDefObj.VolumeTypes,
+		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
+		StatefulSetWorkload:   clusterCompDefObj.GetStatefulSetWorkload(),
+		MinAvailable:          clusterCompSpec.GetMinAvailable(clusterCompDefObj.GetMinAvailable()),
 		Replicas:              clusterCompSpec.Replicas,
 		EnabledLogs:           clusterCompSpec.EnabledLogs,
 		TLS:                   clusterCompSpec.TLS,
 		Issuer:                clusterCompSpec.Issuer,
-		VolumeTypes:           clusterCompDefObj.VolumeTypes,
-		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
 		ComponentDef:          clusterCompSpec.ComponentDefRef,
 		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
 		CandidateInstance:     clusterCompSpec.CandidateInstance,
-	}
-
-	// resolve component.ConfigTemplates
-	if clusterCompDefObj.ConfigSpecs != nil {
-		component.ConfigTemplates = clusterCompDefObj.ConfigSpecs
-	}
-	if clusterCompDefObj.ScriptSpecs != nil {
-		component.ScriptTemplates = clusterCompDefObj.ScriptSpecs
 	}
 
 	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
@@ -88,6 +86,7 @@ func BuildComponent(
 		}
 	}
 
+	// handle component.PodSpec extra settings
 	// set affinity and tolerations
 	affinity := cluster.Spec.Affinity
 	if clusterCompSpec.Affinity != nil {
@@ -106,16 +105,13 @@ func BuildComponent(
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
 	}
-
 	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {
 		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
 	}
-
 	if clusterCompDefObj.Service != nil {
 		service := corev1.Service{Spec: clusterCompDefObj.Service.ToSVCSpec()}
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 		component.Services = append(component.Services, service)
-
 		for _, item := range clusterCompSpec.Services {
 			service = corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -128,12 +124,11 @@ func BuildComponent(
 			component.Services = append(component.Services, service)
 		}
 	}
-
 	// set component.PodSpec.ServiceAccountName
 	component.PodSpec.ServiceAccountName = component.ServiceAccountName
 
-	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
-	// At present, it is possible to distinguish between ConfigMap volume and normal volume,
+	// TODO: (zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
+	// At present, it is not possible to distinguish between ConfigMap volume and normal volume,
 	// Compare the VolumeName of configTemplateRef and Name of VolumeMounts
 	//
 	// if component.VolumeClaimTemplates == nil {
@@ -147,9 +142,7 @@ func BuildComponent(
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
 	}
-
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
-
 	return component, nil
 }
 

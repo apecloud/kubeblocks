@@ -550,8 +550,10 @@ func (r *Redis) priv2Role(commands string) RoleType {
 }
 
 func (r *Redis) Close() error {
+	if r.cancel == nil {
+		return nil
+	}
 	r.cancel()
-
 	return r.client.Close()
 }
 

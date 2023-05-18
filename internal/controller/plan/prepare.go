@@ -107,7 +107,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		}()
 
 		// render config template
-		configs, err := buildCfg(task, workload, podSpec, reqCtx.Ctx, cli)
+		configs, err := renderConfigNScriptFiles(task, workload, podSpec, reqCtx.Ctx, cli)
 		if err != nil {
 			return err
 		}
@@ -123,6 +123,34 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		return nil
 	}
 
+	// TODO: may add a PDB transform to Create/Update/Delete.
+	// if no these handle, the cluster controller will occur an error during reconciling.
+	// conditional build PodDisruptionBudget
+	if task.Component.MinAvailable != nil {
+		pdb, err := builder.BuildPDB(task.GetBuilderParams())
+		if err != nil {
+			return err
+		}
+		task.AppendResource(pdb)
+	} else {
+		panic("this shouldn't happen")
+	}
+
+	svcList, err := builder.BuildSvcListWithCustomAttributes(task.GetBuilderParams(), func(svc *corev1.Service) {
+		switch task.Component.WorkloadType {
+		case appsv1alpha1.Consensus:
+			addLeaderSelectorLabels(svc, task.Component)
+		case appsv1alpha1.Replication:
+			svc.Spec.Selector[constant.RoleLabelKey] = constant.Primary
+		}
+	})
+	if err != nil {
+		return err
+	}
+	for _, svc := range svcList {
+		task.AppendResource(svc)
+	}
+
 	// REVIEW/TODO:
 	// - need higher level abstraction handling
 	// - or move this module to part operator controller handling
@@ -134,59 +162,16 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			}); err != nil {
 			return err
 		}
-	case appsv1alpha1.Stateful:
+	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfig.Name)
 			}); err != nil {
 			return err
 		}
-	case appsv1alpha1.Consensus:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return buildConsensusSet(reqCtx, task, envConfig.Name)
-			}); err != nil {
-			return err
-		}
-	case appsv1alpha1.Replication:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return buildReplicationSet(reqCtx, task, envConfig.Name)
-			}); err != nil {
-			return err
-		}
 	}
 
-	if needBuildPDB(task) {
-		pdb, err := builder.BuildPDB(task.GetBuilderParams())
-		if err != nil {
-			return err
-		}
-		task.AppendResource(pdb)
-	}
-
-	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
-	if err != nil {
-		return err
-	}
-	for _, svc := range svcList {
-		// REVIEW/TODO: need higher level abstraction handling
-		switch task.Component.WorkloadType {
-		case appsv1alpha1.Consensus:
-			addLeaderSelectorLabels(svc, task.Component)
-		case appsv1alpha1.Replication:
-			svc.Spec.Selector[constant.RoleLabelKey] = constant.Primary
-		}
-		task.AppendResource(svc)
-	}
 	return nil
-}
-
-// needBuildPDB check whether the PodDisruptionBudget needs to be built
-func needBuildPDB(task *intctrltypes.ReconcileTask) bool {
-	// TODO: add ut
-	comp := task.Component
-	return comp.WorkloadType == appsv1alpha1.Consensus && comp.MaxUnavailable != nil
 }
 
 // TODO multi roles with same accessMode support
@@ -197,35 +182,10 @@ func addLeaderSelectorLabels(service *corev1.Service, component *component.Synth
 	}
 }
 
-// buildConsensusSet build on a stateful set
-func buildConsensusSet(reqCtx intctrlutil.RequestCtx,
-	task *intctrltypes.ReconcileTask,
-	envConfigName string) (*appsv1.StatefulSet, error) {
-	sts, err := builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfigName)
-	if err != nil {
-		return sts, err
-	}
-
-	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
-	return sts, err
-}
-
-// buildReplicationSet builds a replication component on statefulSet.
-func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
-	task *intctrltypes.ReconcileTask,
-	envConfigName string) (*appsv1.StatefulSet, error) {
-	sts, err := builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfigName)
-	if err != nil {
-		return nil, err
-	}
-	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
-	return sts, nil
-}
-
-// buildCfg generate volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
+// renderConfigNScriptFiles generate volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
 // and generate configManager sidecar for the reconfigure operation.
 // TODO rename this function, this function name is not very reasonable, but there is no suitable name.
-func buildCfg(task *intctrltypes.ReconcileTask,
+func renderConfigNScriptFiles(task *intctrltypes.ReconcileTask,
 	obj client.Object,
 	podSpec *corev1.PodSpec,
 	ctx context.Context,

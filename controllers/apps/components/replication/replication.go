@@ -150,10 +150,6 @@ func (r *ReplicationComponent) HandleUpdate(ctx context.Context, obj client.Obje
 		return err
 	}
 
-	if err := util.DeleteStsPods(ctx, r.Cli, sts); err != nil {
-		return err
-	}
-
 	// sync cluster.status.components.replicationSet.status
 	clusterDeepCopy := r.Cluster.DeepCopy()
 	if err := syncReplicationSetClusterStatus(r.Cli, ctx, r.Cluster, sts); err != nil {
